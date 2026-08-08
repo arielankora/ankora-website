@@ -192,6 +192,8 @@ const en: Dictionary = {
       submit: "Send & book a call",
       directTitle: "Or directly",
       directBody: "Write to us and we'll respond within one business day.",
+      successMessage: "Thank you! We've received your message and will get back to you soon.",
+      errorMessage: "Something went wrong sending this. Please try again, or email us directly at info@ankora.co.il.",
     },
     legal: {
       privacyTitle: "Privacy Policy",

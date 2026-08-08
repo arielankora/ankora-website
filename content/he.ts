@@ -192,6 +192,8 @@ const he: Dictionary = {
       submit: "שליחה וקביעת שיחה",
       directTitle: "או ישירות",
       directBody: "כותבים לנו ונחזור תוך יום עסקים אחד.",
+      successMessage: "תודה! קיבלנו את הפנייה ונחזור אליכם בהקדם.",
+      errorMessage: "משהו השתבש בשליחה. אפשר לנסות שוב, או לכתוב לנו ישירות ל-info@ankora.co.il.",
     },
     legal: {
       privacyTitle: "מדיניות פרטיות",

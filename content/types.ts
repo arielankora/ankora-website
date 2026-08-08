@@ -107,6 +107,8 @@ export interface PagesContent {
     submit: string;
     directTitle: string;
     directBody: string;
+    successMessage: string;
+    errorMessage: string;
   };
   legal: { privacyTitle: string; termsTitle: string; placeholder: string };
   segments: {
