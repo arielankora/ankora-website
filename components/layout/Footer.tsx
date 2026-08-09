@@ -11,7 +11,7 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       <Container className="grid gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="Ankora" width={32} height={32} className="rounded-full" />
+            <Image src="/logo.png" alt="Ankora" width={40} height={40} className="rounded-full" />
             <span className="text-lg font-semibold text-paper">ANKORA</span>
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-paper/50">{dict.footer.tagline}</p>
