@@ -25,7 +25,7 @@ export async function POST(request: Request) {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "Ankora Website <onboarding@resend.dev>",
+        from: "Ankora Website <noreply@ankora.co.il>",
         to: ["info@ankora.co.il"],
         reply_to: email,
         subject: `New website inquiry from ${name}`,
