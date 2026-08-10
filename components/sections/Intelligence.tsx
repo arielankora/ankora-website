@@ -8,19 +8,18 @@ import { motion } from "framer-motion";
 
 export function Intelligence({ dict }: { dict: Dictionary }) {
   return (
-    <section className="relative overflow-hidden bg-navy py-24 md:py-36">
-      <div className="absolute inset-0 bg-radial-glow opacity-60" />
+    <section className="relative overflow-hidden bg-cream py-24 md:py-36">
       <Container className="relative">
         <div className="grid gap-16 lg:grid-cols-2 lg:items-center">
           <div>
-            <Reveal><Badge>{dict.intelligence.label}</Badge></Reveal>
+            <Reveal><Badge tone="light">{dict.intelligence.label}</Badge></Reveal>
             <Reveal delay={0.08}>
-              <h2 className="mt-6 text-[28px] font-medium leading-[1.2] tracking-tight text-paper md:text-[42px]">
+              <h2 className="mt-6 text-[28px] font-medium leading-[1.2] tracking-tight text-navy md:text-[42px]">
                 {dict.intelligence.title}
               </h2>
             </Reveal>
             <Reveal delay={0.14}>
-              <p className="mt-6 max-w-lg text-base leading-relaxed text-paper/55 md:text-lg">
+              <p className="mt-6 max-w-lg text-base leading-relaxed text-navy/60 md:text-lg">
                 {dict.intelligence.body}
               </p>
             </Reveal>
@@ -31,10 +30,10 @@ export function Intelligence({ dict }: { dict: Dictionary }) {
               <motion.div
                 key={p.title}
                 variants={staggerItem}
-                className="rounded-2xl border border-line bg-white/[0.02] p-6 backdrop-blur-sm transition-colors hover:border-lineGold"
+                className="rounded-2xl border border-lineDark bg-paper p-6 transition-colors hover:border-gold/50"
               >
-                <h3 className="text-base font-medium text-gold-light">{p.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{p.body}</p>
+                <h3 className="text-base font-medium text-gold">{p.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-navy/55">{p.body}</p>
               </motion.div>
             ))}
           </RevealStagger>

@@ -14,12 +14,12 @@ export default function AboutPage({ params }: { params: { locale: string } }) {
   return (
     <>
       <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container className="grid gap-8 md:grid-cols-2">
           {p.blocks.map((b, i) => (
             <Reveal key={b.title} delay={i * 0.08}>
-              <h3 className="text-xl font-medium text-paper">{b.title}</h3>
-              <p className="mt-3 leading-relaxed text-paper/55">{b.body}</p>
+              <h3 className="text-xl font-medium text-navy">{b.title}</h3>
+              <p className="mt-3 leading-relaxed text-navy/60">{b.body}</p>
             </Reveal>
           ))}
         </Container>

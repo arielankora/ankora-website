@@ -9,18 +9,20 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#050B14",
-        navy: "#07162B",
-        navyLight: "#0E2138",
-        paper: "#F7F5F0",
-        paperDim: "#EDEAE2",
+        ink: "#0B1B33",
+        navy: "#1B2A3D",
+        navyLight: "#1B2A3D",
+        cream: "#F3EADB",
+        paper: "#F8F4EC",
+        paperDim: "#EDE3D2",
         gold: {
-          DEFAULT: "#C9A24B",
-          light: "#E8C77A",
-          dim: "#8A733A",
+          DEFAULT: "#B08D57",
+          light: "#C7AC7E",
+          dim: "#8A6F45",
         },
-        line: "rgba(247,245,240,0.08)",
-        lineGold: "rgba(201,162,75,0.35)",
+        line: "rgba(248,244,236,0.08)",
+        lineDark: "rgba(27,42,61,0.14)",
+        lineGold: "rgba(176,141,87,0.4)",
       },
       fontFamily: {
         sans: ["Heebo", "system-ui", "sans-serif"],
@@ -29,8 +31,8 @@ const config: Config = {
         content: "1440px",
       },
       backgroundImage: {
-        "gold-gradient": "linear-gradient(120deg, #C9A24B 0%, #E8C77A 50%, #C9A24B 100%)",
-        "radial-glow": "radial-gradient(60% 60% at 50% 40%, rgba(201,162,75,0.16) 0%, rgba(201,162,75,0) 70%)",
+        "gold-gradient": "linear-gradient(120deg, #B08D57 0%, #C7AC7E 50%, #B08D57 100%)",
+        "radial-glow": "radial-gradient(60% 60% at 50% 40%, rgba(176,141,87,0.16) 0%, rgba(176,141,87,0) 70%)",
       },
       keyframes: {
         drift: {

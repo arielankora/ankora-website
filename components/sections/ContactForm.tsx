@@ -36,24 +36,24 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
   }
 
   const fieldClass =
-    "w-full rounded-xl border border-line bg-transparent px-4 py-3 text-paper outline-none transition-colors focus:border-lineGold";
+    "w-full rounded-xl border border-lineDark bg-paper px-4 py-3 text-navy outline-none transition-colors focus:border-gold/60";
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       <div>
-        <label className="mb-2 block text-sm text-paper/60">{p.nameLabel}</label>
+        <label className="mb-2 block text-sm text-navy/60">{p.nameLabel}</label>
         <input name="name" type="text" required className={fieldClass} />
       </div>
       <div>
-        <label className="mb-2 block text-sm text-paper/60">{p.emailLabel}</label>
+        <label className="mb-2 block text-sm text-navy/60">{p.emailLabel}</label>
         <input name="email" type="email" required className={fieldClass} />
       </div>
       <div>
-        <label className="mb-2 block text-sm text-paper/60">{p.companyLabel}</label>
+        <label className="mb-2 block text-sm text-navy/60">{p.companyLabel}</label>
         <input name="company" type="text" className={fieldClass} />
       </div>
       <div>
-        <label className="mb-2 block text-sm text-paper/60">{p.messageLabel}</label>
+        <label className="mb-2 block text-sm text-navy/60">{p.messageLabel}</label>
         <textarea name="message" rows={4} className={fieldClass} />
       </div>
 
@@ -66,10 +66,10 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
       </button>
 
       {status === "success" && (
-        <p className="text-sm text-gold-light">{p.successMessage}</p>
+        <p className="text-sm text-gold">{p.successMessage}</p>
       )}
       {status === "error" && (
-        <p className="text-sm text-red-400">{p.errorMessage}</p>
+        <p className="text-sm text-red-600">{p.errorMessage}</p>
       )}
     </form>
   );

@@ -16,14 +16,14 @@ export default function HowItWorksPage({ params }: { params: { locale: string } 
   return (
     <>
       <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
-          <RevealStagger className="grid gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-2 lg:grid-cols-5">
+          <RevealStagger className="grid gap-px overflow-hidden rounded-2xl border border-lineDark bg-lineDark md:grid-cols-2 lg:grid-cols-5">
             {p.blocks.map((b, i) => (
-              <motion.div key={b.title} variants={staggerItem} className="bg-navy p-7">
-                <span className="font-mono text-xs text-gold-light/70">0{i + 1}</span>
-                <h3 className="mt-4 text-lg font-medium text-paper">{b.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{b.body}</p>
+              <motion.div key={b.title} variants={staggerItem} className="bg-paper p-7">
+                <span className="font-mono text-xs text-gold/70">0{i + 1}</span>
+                <h3 className="mt-4 text-lg font-medium text-navy">{b.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-navy/55">{b.body}</p>
               </motion.div>
             ))}
           </RevealStagger>

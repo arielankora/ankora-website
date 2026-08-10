@@ -14,19 +14,32 @@ export function EditorialSection({
   body: string;
   tone?: "light" | "dark";
 }) {
+  const isLight = tone === "light";
   return (
-    <section className={cn("py-24 md:py-36", tone === "dark" ? "bg-ink" : "bg-navy")}>
+    <section className={cn("py-24 md:py-36", isLight ? "bg-cream" : "bg-navy")}>
       <Container>
         <Reveal>
-          <Badge>{label}</Badge>
+          <Badge tone={isLight ? "light" : "dark"}>{label}</Badge>
         </Reveal>
         <Reveal delay={0.08}>
-          <h2 className="mt-6 max-w-3xl text-[28px] font-medium leading-[1.2] tracking-tight text-paper md:text-[42px]">
+          <h2
+            className={cn(
+              "mt-6 max-w-3xl text-[28px] font-medium leading-[1.2] tracking-tight md:text-[42px]",
+              isLight ? "text-navy" : "text-paper"
+            )}
+          >
             {title}
           </h2>
         </Reveal>
         <Reveal delay={0.14}>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-paper/55 md:text-lg">{body}</p>
+          <p
+            className={cn(
+              "mt-6 max-w-2xl text-base leading-relaxed md:text-lg",
+              isLight ? "text-navy/60" : "text-paper/55"
+            )}
+          >
+            {body}
+          </p>
         </Reveal>
       </Container>
     </section>

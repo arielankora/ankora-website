@@ -20,13 +20,13 @@ export function SegmentPage({
   return (
     <>
       <PageHero eyebrow={content.eyebrow} title={content.title} sub={content.sub} />
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
           <RevealStagger className="grid gap-4 md:grid-cols-3">
             {content.bullets.map((b) => (
-              <motion.div key={b.title} variants={staggerItem} className="rounded-2xl border border-line p-7">
-                <h3 className="text-lg font-medium text-paper">{b.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{b.body}</p>
+              <motion.div key={b.title} variants={staggerItem} className="rounded-2xl border border-lineDark bg-paper p-7">
+                <h3 className="text-lg font-medium text-navy">{b.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-navy/55">{b.body}</p>
               </motion.div>
             ))}
           </RevealStagger>

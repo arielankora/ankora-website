@@ -24,8 +24,8 @@ function OrbitField() {
     >
       <defs>
         <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#C9A24B" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#C9A24B" stopOpacity="0" />
+          <stop offset="0%" stopColor="#B08D57" stopOpacity="0.5" />
+          <stop offset="100%" stopColor="#B08D57" stopOpacity="0" />
         </linearGradient>
       </defs>
       {nodes.map((n, i) =>
@@ -47,7 +47,7 @@ function OrbitField() {
           cx={n.cx}
           cy={n.cy}
           r={n.r}
-          fill="#E8C77A"
+          fill="#C7AC7E"
           animate={{ opacity: [0.4, 1, 0.4] }}
           transition={{ duration: 3 + i, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 }}
         />

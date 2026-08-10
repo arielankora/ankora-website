@@ -10,14 +10,14 @@ export default function PrivacyPage({ params }: { params: { locale: string } }) 
   return (
     <>
       <PageHero eyebrow={dict.footer.privacy} title={legal.privacyTitle} sub={legal.placeholder} />
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">{legal.updated}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-navy/45">{legal.updated}</p>
           <div className="mt-10 space-y-10">
             {legal.privacySections.map((s, i) => (
               <Reveal key={s.title} delay={i * 0.04}>
-                <h3 className="text-lg font-medium text-paper">{s.title}</h3>
-                <p className="mt-3 leading-relaxed text-paper/55">{s.body}</p>
+                <h3 className="text-lg font-medium text-navy">{s.title}</h3>
+                <p className="mt-3 leading-relaxed text-navy/60">{s.body}</p>
               </Reveal>
             ))}
           </div>

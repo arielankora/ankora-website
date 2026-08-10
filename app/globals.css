@@ -7,13 +7,13 @@ html {
 }
 
 body {
-  background-color: #07162B;
-  color: #F7F5F0;
+  background-color: #0B1B33;
+  color: #F8F4EC;
 }
 
 ::selection {
-  background: rgba(201, 162, 75, 0.35);
-  color: #F7F5F0;
+  background: rgba(176, 141, 87, 0.35);
+  color: #F8F4EC;
 }
 
 @media (prefers-reduced-motion: reduce) {

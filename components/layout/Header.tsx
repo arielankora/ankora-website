@@ -95,7 +95,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           onClick={() => setMobileOpen(true)}
         >
           <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
-            <path d="M0 1H22M0 7H22M0 13H22" stroke="#F7F5F0" strokeWidth="1.4" />
+            <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
           </svg>
         </button>
       </Container>
@@ -108,13 +108,13 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
-            style={{ backgroundColor: "#050B14" }}
+            style={{ backgroundColor: "#0B1B33" }}
           >
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold text-paper">ANKORA</span>
               <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
                 <svg width="18" height="18" viewBox="0 0 18 18">
-                  <path d="M1 1L17 17M1 17L17 1" stroke="#F7F5F0" strokeWidth="1.4" />
+                  <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
                 </svg>
               </button>
             </div>
