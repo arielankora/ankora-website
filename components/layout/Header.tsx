@@ -107,7 +107,9 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex flex-col bg-ink px-6 py-6 lg:hidden"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
+            style={{ backgroundColor: "#050B14" }}
           >
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold text-paper">ANKORA</span>
