@@ -32,7 +32,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
     >
       <Container className="flex h-20 items-center justify-between">
         <Link href={withLocale(locale, "/")} className="flex items-center gap-2.5 shrink-0">
-          <Image src="/logo-mark.png" alt="Ankora" width={40} height={40} />
+          <Image src="/logo-mark.png" alt="Ankora" width={52} height={52} />
           <span className="text-lg font-semibold tracking-tight text-paper">ANKORA</span>
         </Link>
 
