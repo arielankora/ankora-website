@@ -26,7 +26,7 @@ export default function AboutPage({ params }: { params: { locale: string } }) {
       </section>
       <section className="bg-ink py-20 md:py-28">
         <Container>
-          <Reveal><span className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">Principles</span></Reveal>
+          <Reveal><span className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">העקרונות שלנו</span></Reveal>
           <RevealStagger className="mt-8 grid gap-4 md:grid-cols-2">
             {p.principles.map((pr) => (
               <motion.div key={pr.title} variants={staggerItem} className="rounded-2xl border border-line p-7">

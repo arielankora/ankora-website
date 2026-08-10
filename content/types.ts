@@ -110,7 +110,14 @@ export interface PagesContent {
     successMessage: string;
     errorMessage: string;
   };
-  legal: { privacyTitle: string; termsTitle: string; placeholder: string };
+  legal: {
+    privacyTitle: string;
+    termsTitle: string;
+    placeholder: string;
+    updated: string;
+    privacySections: { title: string; body: string }[];
+    termsSections: { title: string; body: string }[];
+  };
   segments: {
     executives: SegmentContent;
     founders: SegmentContent;

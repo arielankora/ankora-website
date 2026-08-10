@@ -10,9 +10,8 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
     <footer className="border-t border-line bg-ink">
       <Container className="grid gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
-          <div className="flex items-center gap-2.5">
-            <Image src="/logo-mark.png" alt="Ankora" width={42} height={42} />
-            <span className="text-lg font-semibold text-paper">ANKORA</span>
+          <div className="flex items-center">
+            <Image src="/logo-cream.jpg" alt="Ankora" width={56} height={56} />
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-paper/50">{dict.footer.tagline}</p>
         </div>
