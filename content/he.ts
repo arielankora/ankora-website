@@ -199,6 +199,7 @@ const he: Dictionary = {
       privacyTitle: "מדיניות פרטיות",
       termsTitle: "תנאי שימוש",
       placeholder: "לשאלות בנושא פרטיות ואבטחת מידע, ניתן ליצור קשר ישירות בכתובת info@ankora.co.il.",
+      termsPlaceholder: "תנאי השימוש באתר ובשירותי Ankora, בקצרה.",
       updated: "עודכן לאחרונה: אוגוסט 2026",
       privacySections: [
         {

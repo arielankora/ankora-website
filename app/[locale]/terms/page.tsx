@@ -9,7 +9,7 @@ export default function TermsPage({ params }: { params: { locale: string } }) {
   const legal = dict.pages.legal;
   return (
     <>
-      <PageHero eyebrow={dict.footer.terms} title={legal.termsTitle} sub={legal.placeholder} />
+      <PageHero eyebrow={dict.footer.terms} title={legal.termsTitle} sub={legal.termsPlaceholder} />
       <section className="bg-navy py-20 md:py-28">
         <Container className="max-w-2xl">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">{legal.updated}</p>

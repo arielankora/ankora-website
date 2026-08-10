@@ -199,6 +199,7 @@ const en: Dictionary = {
       privacyTitle: "Privacy Policy",
       termsTitle: "Terms of Use",
       placeholder: "For privacy or data security questions, please contact us directly at info@ankora.co.il.",
+      termsPlaceholder: "The terms governing use of this site and Ankora’s services.",
       updated: "Last updated: August 2026",
       privacySections: [
         {

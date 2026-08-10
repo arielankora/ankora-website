@@ -114,6 +114,7 @@ export interface PagesContent {
     privacyTitle: string;
     termsTitle: string;
     placeholder: string;
+    termsPlaceholder: string;
     updated: string;
     privacySections: { title: string; body: string }[];
     termsSections: { title: string; body: string }[];
