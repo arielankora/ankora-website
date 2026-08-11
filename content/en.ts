@@ -11,6 +11,7 @@ const en: Dictionary = {
     howItWorks: "How it works",
     technology: "Technology",
     about: "About",
+    pricing: "Pricing",
     cta: "Book a call",
     solutionsMenu: [
       { label: "Executives", blurb: "Focus your attention on what actually deserves it.", href: "/solutions/executives" },
@@ -180,6 +181,55 @@ const en: Dictionary = {
       eyebrow: "Who it's for",
       title: "One operational layer, matched to your kind of complexity",
       sub: "Four kinds of clients. The same principle: you focus on what matters, we manage everything else.",
+    },
+    pricing: {
+      eyebrow: "Pricing",
+      title: "You pay for time worked. Not for a headcount.",
+      sub: "Ankora's pricing model means you pay only for time that actually worked for you, with no hidden costs and no long-term commitment.",
+      billing: {
+        label: "How it's measured",
+        title: "You pay only for the time we worked for you",
+        body: "No sick days, no vacation, no lunch breaks, no idle time. Every minute of actual work is tracked and reported transparently.",
+        points: [
+          { title: "Tracked to the minute", body: "Every task is logged precisely, with no rounding up." },
+          { title: "15-minute minimum", body: "A small task gets a small charge, not a full hour." },
+          { title: "Only actual work time", body: "No charge for waiting time, sick days, or vacation, unlike direct employment." },
+        ],
+      },
+      costCompare: {
+        label: "The real cost of hiring",
+        title: "The price you pay is the full price",
+        body: "With an in-house hire, salary is just the start. Pension, vacation, sick days, a training fund, national insurance, recruiting, training, and workspace all add to the real cost. With Ankora, the hourly rate covers everything.",
+        inHouseTitle: "In-house hire",
+        inHouseItems: ["Base salary", "Pension contributions", "Vacation and sick days", "Training fund", "Employer national insurance", "Recruiting, training, and management"],
+        ankoraTitle: "Ankora",
+        ankoraItems: ["Only actual hours worked", "No added costs", "No long-term commitment"],
+      },
+      hourBank: {
+        label: "The structure",
+        title: "An hour bank that renews with you",
+        body: "You purchase an hour bank upfront, every month. Didn't use all your hours? They roll over to next month, as long as the plan renews.",
+        points: [
+          { title: "Unused hours roll over", body: "As long as you keep renewing, nothing goes to waste." },
+          { title: "No long-term commitment", body: "You can pause the plan any month, no penalty, no explanation needed." },
+        ],
+      },
+      tiers: {
+        label: "Packages",
+        title: "The larger the hour bank, the better the hourly rate",
+        sub: "Three illustrative examples. Scope and fit are set during the intro call.",
+        items: [
+          { name: "Starter", hours: "10 hours / month", rate: "$50 / hour", blurb: "For focused operational needs.", highlighted: false },
+          { name: "Ongoing", hours: "20 hours / month", rate: "$44 / hour", blurb: "For steady, ongoing operational management.", highlighted: true },
+          { name: "Extended", hours: "40 hours / month", rate: "$38 / hour", blurb: "For complex, multi-area operational load.", highlighted: false },
+        ],
+        footnote: "* Figures are illustrative only and do not constitute a price quote. Final pricing is set according to scope during the intro call.",
+      },
+      closing: {
+        title: "Ready to see how much time this actually saves?",
+        body: "A twenty-minute intro call. No commitment, no long forms.",
+        cta: "Book an intro call",
+      },
     },
     contact: {
       eyebrow: "Book a call",

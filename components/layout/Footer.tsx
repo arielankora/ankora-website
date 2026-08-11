@@ -30,6 +30,7 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           <Link href={withLocale(locale, "/how-it-works")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.howItWorks}</Link>
           <Link href={withLocale(locale, "/technology")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.technology}</Link>
           <Link href={withLocale(locale, "/about")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.about}</Link>
+          <Link href={withLocale(locale, "/pricing")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.pricing}</Link>
           <Link href={withLocale(locale, "/contact")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.cta}</Link>
         </div>
 

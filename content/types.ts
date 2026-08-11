@@ -10,6 +10,7 @@ export interface Dictionary {
     howItWorks: string;
     technology: string;
     about: string;
+    pricing: string;
     cta: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
   };
@@ -96,6 +97,40 @@ export interface PagesContent {
   technology: SimplePageContent;
   about: SimplePageContent & { principles: { title: string; body: string }[] };
   solutionsIndex: { eyebrow: string; title: string; sub: string };
+  pricing: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    billing: {
+      label: string;
+      title: string;
+      body: string;
+      points: { title: string; body: string }[];
+    };
+    costCompare: {
+      label: string;
+      title: string;
+      body: string;
+      inHouseTitle: string;
+      inHouseItems: string[];
+      ankoraTitle: string;
+      ankoraItems: string[];
+    };
+    hourBank: {
+      label: string;
+      title: string;
+      body: string;
+      points: { title: string; body: string }[];
+    };
+    tiers: {
+      label: string;
+      title: string;
+      sub: string;
+      items: { name: string; hours: string; rate: string; blurb: string; highlighted: boolean }[];
+      footnote: string;
+    };
+    closing: { title: string; body: string; cta: string };
+  };
   contact: {
     eyebrow: string;
     title: string;
