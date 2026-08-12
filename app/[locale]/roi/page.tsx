@@ -4,19 +4,16 @@ import { useMemo, useState } from "react";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
-import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/motion/Reveal";
 import { withLocale } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
-// Illustrative blended rates, matching the example tiers shown on /pricing.
-// Keep these in sync with content/*.ts pages.pricing.tiers if those numbers change.
-function ankoraRateForMonthlyHours(hours: number): number {
-  if (hours <= 10) return 180;
-  if (hours <= 20) return 160;
-  return 140;
-}
+// Flat illustrative Ankora rate used for this calculator (kept distinct from the
+// tiered example rates on /pricing, per the flat per-hour assumption requested).
+const ANKORA_RATE: Record<Locale, number> = { he: 130, en: 35 };
+// Employer-overhead multiplier applied to the direct hourly cost entered by the visitor.
+const EMPLOYER_OVERHEAD_MULTIPLIER = 1.33;
 
 function formatCurrency(n: number, locale: Locale) {
   const rounded = Math.round(n);
@@ -31,24 +28,30 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
   const [personaIndex, setPersonaIndex] = useState(0);
   const persona = p.personas[personaIndex];
 
-  const [hours, setHours] = useState(persona.hoursDefault);
+  const [hourValues, setHourValues] = useState<number[]>(persona.hourQuestions.map((q) => q.default));
   const [rate, setRate] = useState(persona.rateDefault);
 
   function selectPersona(i: number) {
     setPersonaIndex(i);
-    setHours(p.personas[i].hoursDefault);
+    setHourValues(p.personas[i].hourQuestions.map((q) => q.default));
     setRate(p.personas[i].rateDefault);
   }
 
+  function updateHour(i: number, value: number) {
+    setHourValues((prev) => prev.map((v, idx) => (idx === i ? value : v)));
+  }
+
+  const totalHoursPerWeek = useMemo(() => hourValues.reduce((sum, v) => sum + (Number.isFinite(v) ? v : 0), 0), [hourValues]);
+
   const results = useMemo(() => {
-    const hoursPerMonth = Math.max(0, hours) * 4.33;
-    const ankoraRate = ankoraRateForMonthlyHours(hoursPerMonth);
-    const cost = hoursPerMonth * ankoraRate;
-    const valueFreed = hoursPerMonth * Math.max(0, rate);
+    const hoursPerMonth = Math.max(0, totalHoursPerWeek) * 4.33;
+    const fullyLoadedRate = Math.max(0, rate) * EMPLOYER_OVERHEAD_MULTIPLIER;
+    const valueFreed = hoursPerMonth * fullyLoadedRate;
+    const cost = hoursPerMonth * ANKORA_RATE[locale];
     const netValue = valueFreed - cost;
     const multiple = cost > 0 ? valueFreed / cost : 0;
-    return { hoursPerMonth, cost, valueFreed, netValue, multiple };
-  }, [hours, rate]);
+    return { hoursPerMonth, valueFreed, cost, netValue, multiple };
+  }, [totalHoursPerWeek, rate, locale]);
 
   const personaLabels = p.personas.map((pr) => dict.pages.segments[pr.key].eyebrow);
 
@@ -84,27 +87,28 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
           <div className="mt-12 grid gap-8 lg:grid-cols-2 lg:items-start">
             <Reveal delay={0.1}>
               <div className="rounded-2xl border border-lineDark bg-paper p-8">
-                <div>
-                  <label className="block text-sm font-medium text-navy">{persona.hoursLabel}</label>
-                  <p className="mt-1 text-xs text-navy/45">{persona.hoursHint}</p>
-                  <div className="mt-4 flex items-center gap-4">
-                    <input
-                      type="range"
-                      min={0}
-                      max={40}
-                      step={1}
-                      value={hours}
-                      onChange={(e) => setHours(Number(e.target.value))}
-                      className="w-full accent-[#B08D57]"
-                    />
-                    <input
-                      type="number"
-                      min={0}
-                      value={hours}
-                      onChange={(e) => setHours(Number(e.target.value))}
-                      className="w-20 shrink-0 rounded-lg border border-lineDark bg-cream px-3 py-2 text-center text-navy outline-none focus:border-gold/60"
-                    />
-                  </div>
+                <div className="space-y-5">
+                  {persona.hourQuestions.map((q, i) => (
+                    <div key={q.label} className="flex items-center justify-between gap-4 border-b border-lineDark pb-4 last:border-b-0 last:pb-0">
+                      <div className="min-w-0">
+                        <label className="block text-sm font-medium text-navy">{q.label}</label>
+                        <p className="mt-0.5 text-xs text-navy/45">{q.hint}</p>
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.5}
+                        value={hourValues[i]}
+                        onChange={(e) => updateHour(i, Number(e.target.value))}
+                        className="w-16 shrink-0 rounded-lg border border-lineDark bg-cream px-2 py-2 text-center text-navy outline-none focus:border-gold/60"
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between rounded-xl bg-cream px-4 py-3">
+                  <span className="text-sm font-medium text-navy">{p.hoursTotalLabel}</span>
+                  <span className="text-lg font-semibold text-gold">{totalHoursPerWeek}</span>
                 </div>
 
                 <div className="mt-8">
@@ -128,6 +132,7 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                       className="w-24 shrink-0 rounded-lg border border-lineDark bg-cream px-3 py-2 text-center text-navy outline-none focus:border-gold/60"
                     />
                   </div>
+                  <p className="mt-3 text-xs leading-relaxed text-navy/40">{p.rateNote}</p>
                 </div>
               </div>
             </Reveal>
@@ -141,13 +146,19 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                     <span className="text-sm text-paper/60">{p.results.hoursFreedLabel}</span>
                     <span className="text-lg font-medium text-paper">{Math.round(results.hoursPerMonth)}</span>
                   </div>
-                  <div className="flex items-baseline justify-between border-b border-line pb-4">
-                    <span className="text-sm text-paper/60">{p.results.valueFreedLabel}</span>
-                    <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed, locale)}</span>
+                  <div className="border-b border-line pb-4">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm text-paper/60">{p.results.valueFreedLabel}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed, locale)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-paper/35">{p.results.valueFreedHint}</p>
                   </div>
-                  <div className="flex items-baseline justify-between border-b border-line pb-4">
-                    <span className="text-sm text-paper/60">{p.results.costLabel}</span>
-                    <span className="text-lg font-medium text-paper">{formatCurrency(results.cost, locale)}</span>
+                  <div className="border-b border-line pb-4">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-sm text-paper/60">{p.results.costLabel}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.cost, locale)}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-paper/35">{p.results.costHint}</p>
                   </div>
                   <div className="flex items-baseline justify-between border-b border-line pb-4">
                     <span className="text-sm text-paper/60">{p.results.netValueLabel}</span>

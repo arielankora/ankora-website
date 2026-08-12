@@ -103,11 +103,11 @@ export interface PagesContent {
     title: string;
     sub: string;
     personaPrompt: string;
+    hoursTotalLabel: string;
+    rateNote: string;
     personas: {
       key: "executives" | "founders" | "companies" | "familyOffice";
-      hoursLabel: string;
-      hoursHint: string;
-      hoursDefault: number;
+      hourQuestions: { label: string; hint: string; default: number }[];
       rateLabel: string;
       rateHint: string;
       rateDefault: number;
@@ -116,7 +116,9 @@ export interface PagesContent {
       title: string;
       hoursFreedLabel: string;
       valueFreedLabel: string;
+      valueFreedHint: string;
       costLabel: string;
+      costHint: string;
       netValueLabel: string;
       multipleLabel: string;
       multipleSuffix: string;
