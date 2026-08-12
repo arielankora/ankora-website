@@ -94,21 +94,26 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                         <label className="block text-sm font-medium text-navy">{q.label}</label>
                         <p className="mt-0.5 text-xs text-navy/45">{q.hint}</p>
                       </div>
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.5}
-                        value={hourValues[i]}
-                        onChange={(e) => updateHour(i, Number(e.target.value))}
-                        className="w-16 shrink-0 rounded-lg border border-lineDark bg-cream px-2 py-2 text-center text-navy outline-none focus:border-gold/60"
-                      />
+                      <div className="flex shrink-0 items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.5}
+                          value={hourValues[i]}
+                          onChange={(e) => updateHour(i, Number(e.target.value))}
+                          className="w-16 rounded-lg border border-lineDark bg-cream px-2 py-2 text-center text-navy outline-none focus:border-gold/60"
+                        />
+                        <span className="text-xs text-navy/40">{p.hoursUnitLabel}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
 
                 <div className="mt-6 flex items-center justify-between rounded-xl bg-cream px-4 py-3">
                   <span className="text-sm font-medium text-navy">{p.hoursTotalLabel}</span>
-                  <span className="text-lg font-semibold text-gold">{totalHoursPerWeek}</span>
+                  <span className="text-lg font-semibold text-gold">
+                    {totalHoursPerWeek} <span className="text-xs font-normal text-navy/40">{p.hoursUnitLabel}</span>
+                  </span>
                 </div>
 
                 <div className="mt-8">
@@ -184,6 +189,33 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
           <Reveal delay={0.2}>
             <p className="mt-8 max-w-2xl text-xs leading-relaxed text-navy/40">{p.results.footnote}</p>
           </Reveal>
+        </Container>
+      </section>
+
+      <section className="bg-navy py-20 md:py-28">
+        <Container>
+          <Reveal>
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gold-light">{p.hiddenCost.label}</span>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h2 className="mt-4 max-w-xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
+              {p.hiddenCost.title}
+            </h2>
+          </Reveal>
+          <Reveal delay={0.1}>
+            <p className="mt-4 max-w-xl text-sm leading-relaxed text-paper/55 md:text-base">{p.hiddenCost.body}</p>
+          </Reveal>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {p.hiddenCost.items.map((item, i) => (
+              <Reveal key={item.title} delay={0.14 + i * 0.06}>
+                <div className="h-full rounded-2xl border border-paper/10 bg-paper/[0.03] p-7">
+                  <h3 className="text-sm font-medium text-gold-light">{item.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-paper/55">{item.body}</p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
         </Container>
       </section>
 

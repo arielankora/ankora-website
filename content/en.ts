@@ -188,6 +188,7 @@ const en: Dictionary = {
       title: "How much time and money Ankora can give back",
       sub: "Pick the profile that fits you, adjust the numbers to your reality, and get an instant estimate.",
       personaPrompt: "Who are you?",
+      hoursUnitLabel: "hours / week",
       hoursTotalLabel: "Total hours / week",
       rateNote: "This is the direct cost of the time. The system adds about 33% for employer overhead (pension, national insurance, benefits) to reflect the true fully-loaded cost.",
       personas: [
@@ -257,6 +258,25 @@ const en: Dictionary = {
         ctaBody: "These numbers are an estimate. A short intro call will give you an exact picture.",
         cta: "Book an intro call",
         footnote: "* This calculation is illustrative only: the cost of time spent today is the direct hourly cost entered, multiplied by 1.33 to reflect employer overhead. Ankora's cost is based on an example rate of $35/hour. It does not constitute a price quote or commitment.",
+      },
+      hiddenCost: {
+        label: "Beyond the numbers",
+        title: "There's also a cost to what doesn't get handled",
+        body: "The calculator above measures what can be counted: hours and money. But part of the real cost of operational overload doesn't show up in a table.",
+        items: [
+          {
+            title: "Financial",
+            body: "A late fee on a bill that slipped, interest on a debt that was forgotten, a small repair that became a big one because it was postponed.",
+          },
+          {
+            title: "Opportunity",
+            body: "A call that wasn't returned in time, a vendor that never got aligned, a decision delayed because no one handled the details around it.",
+          },
+          {
+            title: "Personal",
+            body: "The mental load that stays with you after the workday ends, and the attention that gets split between what's urgent and what actually matters.",
+          },
+        ],
       },
     },
     pricing: {

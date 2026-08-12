@@ -103,6 +103,7 @@ export interface PagesContent {
     title: string;
     sub: string;
     personaPrompt: string;
+    hoursUnitLabel: string;
     hoursTotalLabel: string;
     rateNote: string;
     personas: {
@@ -125,6 +126,12 @@ export interface PagesContent {
       ctaBody: string;
       cta: string;
       footnote: string;
+    };
+    hiddenCost: {
+      label: string;
+      title: string;
+      body: string;
+      items: { title: string; body: string }[];
     };
   };
   pricing: {
