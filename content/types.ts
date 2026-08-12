@@ -12,6 +12,7 @@ export interface Dictionary {
     about: string;
     pricing: string;
     roi: string;
+    coverage: string;
     cta: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
   };
@@ -199,5 +200,18 @@ export interface PagesContent {
     founders: SegmentContent;
     companies: SegmentContent;
     familyOffice: SegmentContent;
+  };
+  coverage: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    intro: string;
+    searchPlaceholder: string;
+    searchNoResults: string;
+    categories: {
+      name: string;
+      description: string;
+      services: { name: string; description: string }[];
+    }[];
   };
 }
