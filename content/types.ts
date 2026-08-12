@@ -106,6 +106,9 @@ export interface PagesContent {
     hoursUnitLabel: string;
     hoursTotalLabel: string;
     rateNote: string;
+    nonProductiveLabel: string;
+    nonProductiveHint: string;
+    nonProductiveDefault: number;
     personas: {
       key: "executives" | "founders" | "companies" | "familyOffice";
       hourQuestions: { label: string; hint: string; default: number }[];

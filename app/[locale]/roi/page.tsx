@@ -30,6 +30,7 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
 
   const [hourValues, setHourValues] = useState<number[]>(persona.hourQuestions.map((q) => q.default));
   const [rate, setRate] = useState(persona.rateDefault);
+  const [nonProductivePct, setNonProductivePct] = useState(p.nonProductiveDefault);
 
   function selectPersona(i: number) {
     setPersonaIndex(i);
@@ -45,13 +46,17 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
 
   const results = useMemo(() => {
     const hoursPerMonth = Math.max(0, totalHoursPerWeek) * 4.33;
-    const fullyLoadedRate = Math.max(0, rate) * EMPLOYER_OVERHEAD_MULTIPLIER;
+    // Direct rate -> fully-loaded rate: employer overhead (33%), then grossed up for
+    // paid-but-non-productive time (sick days, vacation, lunch, idle time) — time the
+    // client pays for today but won't pay Ankora for.
+    const nonProductiveFraction = Math.min(0.9, Math.max(0, nonProductivePct / 100));
+    const fullyLoadedRate = (Math.max(0, rate) * EMPLOYER_OVERHEAD_MULTIPLIER) / (1 - nonProductiveFraction);
     const valueFreed = hoursPerMonth * fullyLoadedRate;
     const cost = hoursPerMonth * ANKORA_RATE[locale];
     const netValue = valueFreed - cost;
     const multiple = cost > 0 ? valueFreed / cost : 0;
     return { hoursPerMonth, valueFreed, cost, netValue, multiple };
-  }, [totalHoursPerWeek, rate, locale]);
+  }, [totalHoursPerWeek, rate, nonProductivePct, locale]);
 
   const personaLabels = p.personas.map((pr) => dict.pages.segments[pr.key].eyebrow);
 
@@ -138,6 +143,33 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                     />
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-navy/40">{p.rateNote}</p>
+                </div>
+
+                <div className="mt-8">
+                  <label className="block text-sm font-medium text-navy">{p.nonProductiveLabel}</label>
+                  <p className="mt-1 text-xs text-navy/45">{p.nonProductiveHint}</p>
+                  <div className="mt-4 flex items-center gap-4">
+                    <input
+                      type="range"
+                      min={0}
+                      max={40}
+                      step={1}
+                      value={nonProductivePct}
+                      onChange={(e) => setNonProductivePct(Number(e.target.value))}
+                      className="w-full accent-[#B08D57]"
+                    />
+                    <div className="flex w-24 shrink-0 items-center justify-center gap-1 rounded-lg border border-lineDark bg-cream px-3 py-2 text-navy">
+                      <input
+                        type="number"
+                        min={0}
+                        max={90}
+                        value={nonProductivePct}
+                        onChange={(e) => setNonProductivePct(Number(e.target.value))}
+                        className="w-10 bg-transparent text-center outline-none"
+                      />
+                      <span className="text-sm text-navy/50">%</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </Reveal>

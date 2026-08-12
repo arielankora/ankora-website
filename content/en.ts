@@ -191,6 +191,9 @@ const en: Dictionary = {
       hoursUnitLabel: "hours / week",
       hoursTotalLabel: "Total hours / week",
       rateNote: "This is the direct cost of the time. The system adds about 33% for employer overhead (pension, national insurance, benefits) to reflect the true fully-loaded cost.",
+      nonProductiveLabel: "How much of that paid time is non-productive?",
+      nonProductiveHint: "Sick days, vacation, breaks, and idle time. You pay for this today. You won't pay for it with Ankora.",
+      nonProductiveDefault: 15,
       personas: [
         {
           key: "executives",
@@ -249,15 +252,15 @@ const en: Dictionary = {
         title: "Your estimate",
         hoursFreedLabel: "Hours freed per month",
         valueFreedLabel: "Full employer cost of the time spent today",
-        valueFreedHint: "The direct hourly cost you entered, plus about 33% employer overhead",
+        valueFreedHint: "The direct hourly cost you entered, plus about 33% employer overhead and non-productive paid time",
         costLabel: "Estimated Ankora cost",
         costHint: "Based on an example rate of $35/hour",
-        netValueLabel: "Net monthly value",
+        netValueLabel: "Net monthly savings",
         multipleLabel: "A return of",
         multipleSuffix: "on every dollar spent",
         ctaBody: "These numbers are an estimate. A short intro call will give you an exact picture.",
         cta: "Book an intro call",
-        footnote: "* This calculation is illustrative only: the cost of time spent today is the direct hourly cost entered, multiplied by 1.33 to reflect employer overhead. Ankora's cost is based on an example rate of $35/hour. It does not constitute a price quote or commitment.",
+        footnote: "* This calculation is illustrative only: the cost of time spent today is the direct hourly cost entered, multiplied by 1.33 to reflect employer overhead, then divided by the productive share of paid time (100% minus the non-productive percentage entered). Ankora's cost is based on an example rate of $35/hour. It does not constitute a price quote or commitment.",
       },
       hiddenCost: {
         label: "Beyond the numbers",
