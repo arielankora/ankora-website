@@ -11,6 +11,7 @@ export interface Dictionary {
     technology: string;
     about: string;
     pricing: string;
+    roi: string;
     cta: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
   };
@@ -97,6 +98,33 @@ export interface PagesContent {
   technology: SimplePageContent;
   about: SimplePageContent & { principles: { title: string; body: string }[] };
   solutionsIndex: { eyebrow: string; title: string; sub: string };
+  roi: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    personaPrompt: string;
+    personas: {
+      key: "executives" | "founders" | "companies" | "familyOffice";
+      hoursLabel: string;
+      hoursHint: string;
+      hoursDefault: number;
+      rateLabel: string;
+      rateHint: string;
+      rateDefault: number;
+    }[];
+    results: {
+      title: string;
+      hoursFreedLabel: string;
+      valueFreedLabel: string;
+      costLabel: string;
+      netValueLabel: string;
+      multipleLabel: string;
+      multipleSuffix: string;
+      ctaBody: string;
+      cta: string;
+      footnote: string;
+    };
+  };
   pricing: {
     eyebrow: string;
     title: string;

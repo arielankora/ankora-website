@@ -83,6 +83,9 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           <Link href={withLocale(locale, "/pricing")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
             {dict.nav.pricing}
           </Link>
+          <Link href={withLocale(locale, "/roi")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
+            {dict.nav.roi}
+          </Link>
         </nav>
 
         <div className="hidden items-center gap-4 lg:flex">
@@ -128,6 +131,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
                 { label: dict.nav.technology, href: "/technology" },
                 { label: dict.nav.about, href: "/about" },
                 { label: dict.nav.pricing, href: "/pricing" },
+                { label: dict.nav.roi, href: "/roi" },
               ].map((item) => (
                 <Link
                   key={item.href}
