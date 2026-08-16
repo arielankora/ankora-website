@@ -135,10 +135,10 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ y: "-100%" }}
+            initial={{ y: -16 }}
             animate={{ y: 0 }}
-            exit={{ y: "-100%" }}
-            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            exit={{ y: -16 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
             style={{ backgroundColor: "#0B1B33", opacity: 1 }}
           >
