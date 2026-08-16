@@ -20,6 +20,60 @@ function formatCurrency(n: number, locale: Locale) {
   return locale === "he" ? `₪${rounded.toLocaleString("he-IL")}` : `$${rounded.toLocaleString("en-US")}`;
 }
 
+// Number input with explicit tap targets for +/- (native number-input spinners
+// aren't reliable across browsers, and are hidden entirely on most mobile
+// browsers, which made these fields hard to adjust precisely on a phone).
+function Stepper({
+  value,
+  onChange,
+  step = 1,
+  min = 0,
+  max,
+  className,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+  className?: string;
+}) {
+  function clamp(v: number) {
+    let n = Number.isFinite(v) ? v : min;
+    if (min !== undefined) n = Math.max(min, n);
+    if (max !== undefined) n = Math.min(max, n);
+    return Math.round(n * 100) / 100;
+  }
+
+  return (
+    <div className={cn("flex h-10 items-stretch overflow-hidden rounded-lg border border-lineDark bg-cream", className)}>
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value - step))}
+        aria-label="הפחת"
+        className="flex w-9 shrink-0 items-center justify-center text-base text-navy/50 transition-colors hover:bg-navy/5 hover:text-navy active:bg-navy/10"
+      >
+        −
+      </button>
+      <input
+        type="number"
+        inputMode="decimal"
+        value={value}
+        onChange={(e) => onChange(clamp(Number(e.target.value)))}
+        className="w-full min-w-0 bg-transparent text-center text-navy outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <button
+        type="button"
+        onClick={() => onChange(clamp(value + step))}
+        aria-label="הוסף"
+        className="flex w-9 shrink-0 items-center justify-center text-base text-navy/50 transition-colors hover:bg-navy/5 hover:text-navy active:bg-navy/10"
+      >
+        +
+      </button>
+    </div>
+  );
+}
+
 export default function RoiPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
@@ -100,13 +154,12 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                         <p className="mt-0.5 text-xs text-navy/45">{q.hint}</p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.5}
+                        <Stepper
                           value={hourValues[i]}
-                          onChange={(e) => updateHour(i, Number(e.target.value))}
-                          className="w-16 rounded-lg border border-lineDark bg-cream px-2 py-2 text-center text-navy outline-none focus:border-gold/60"
+                          onChange={(v) => updateHour(i, v)}
+                          step={0.5}
+                          min={0}
+                          className="w-28"
                         />
                         <span className="text-xs text-navy/40">{p.hoursUnitLabel}</span>
                       </div>
@@ -134,13 +187,7 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                       onChange={(e) => setRate(Number(e.target.value))}
                       className="w-full accent-[#B08D57]"
                     />
-                    <input
-                      type="number"
-                      min={0}
-                      value={rate}
-                      onChange={(e) => setRate(Number(e.target.value))}
-                      className="w-24 shrink-0 rounded-lg border border-lineDark bg-cream px-3 py-2 text-center text-navy outline-none focus:border-gold/60"
-                    />
+                    <Stepper value={rate} onChange={setRate} step={10} min={0} className="w-32 shrink-0" />
                   </div>
                   <p className="mt-3 text-xs leading-relaxed text-navy/40">{p.rateNote}</p>
                 </div>
@@ -158,15 +205,8 @@ export default function RoiPage({ params }: { params: { locale: string } }) {
                       onChange={(e) => setNonProductivePct(Number(e.target.value))}
                       className="w-full accent-[#B08D57]"
                     />
-                    <div className="flex w-24 shrink-0 items-center justify-center gap-1 rounded-lg border border-lineDark bg-cream px-3 py-2 text-navy">
-                      <input
-                        type="number"
-                        min={0}
-                        max={90}
-                        value={nonProductivePct}
-                        onChange={(e) => setNonProductivePct(Number(e.target.value))}
-                        className="w-10 bg-transparent text-center outline-none"
-                      />
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Stepper value={nonProductivePct} onChange={setNonProductivePct} step={1} min={0} max={90} className="w-28" />
                       <span className="text-sm text-navy/50">%</span>
                     </div>
                   </div>
