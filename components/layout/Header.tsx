@@ -112,12 +112,12 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       <AnimatePresence>
         {mobileOpen && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            initial={{ y: "-100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "-100%" }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
             className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
-            style={{ backgroundColor: "#0B1B33" }}
+            style={{ backgroundColor: "#0B1B33", opacity: 1 }}
           >
             <div className="flex items-center justify-between">
               <span className="text-lg font-semibold text-paper">ANKORA</span>
