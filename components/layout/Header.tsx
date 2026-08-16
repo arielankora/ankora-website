@@ -23,6 +23,29 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
+  // Lock background scroll while the mobile menu is open. Without this, the
+  // page behind the fixed drawer can still scroll (notably on iOS Safari),
+  // which leaves gaps where the underlying page shows through the menu.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const scrollY = window.scrollY;
+    const { style } = document.body;
+    const prev = { position: style.position, top: style.top, left: style.left, right: style.right, width: style.width };
+    style.position = "fixed";
+    style.top = `-${scrollY}px`;
+    style.left = "0";
+    style.right = "0";
+    style.width = "100%";
+    return () => {
+      style.position = prev.position;
+      style.top = prev.top;
+      style.left = prev.left;
+      style.right = prev.right;
+      style.width = prev.width;
+      window.scrollTo(0, scrollY);
+    };
+  }, [mobileOpen]);
+
   return (
     <header
       className={cn(
