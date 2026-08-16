@@ -95,15 +95,18 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           </Button>
         </div>
 
-        <button
-          aria-label="Menu"
-          className="flex h-10 w-10 items-center justify-center lg:hidden"
-          onClick={() => setMobileOpen(true)}
-        >
-          <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
-            <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
-          </svg>
-        </button>
+        <div className="flex items-center gap-3 lg:hidden">
+          <LanguageToggle locale={locale} />
+          <button
+            aria-label="Menu"
+            className="flex h-10 w-10 items-center justify-center"
+            onClick={() => setMobileOpen(true)}
+          >
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+              <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
+            </svg>
+          </button>
+        </div>
       </Container>
 
       <AnimatePresence>
@@ -144,7 +147,6 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
               ))}
             </nav>
             <div className="mt-auto flex flex-col gap-4">
-              <LanguageToggle locale={locale} />
               <Button href={withLocale(locale, "/contact")} className="w-full">
                 {dict.nav.cta}
               </Button>
