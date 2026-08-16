@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
@@ -15,6 +16,11 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 24);
@@ -47,6 +53,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   }, [mobileOpen]);
 
   return (
+    <>
     <header
       className={cn(
         "fixed inset-x-0 top-0 z-50 transition-all duration-300",
@@ -132,51 +139,57 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
         </div>
       </Container>
 
-      <AnimatePresence>
-        {mobileOpen && (
-          <motion.div
-            initial={{ y: -16 }}
-            animate={{ y: 0 }}
-            exit={{ y: -16 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
-            style={{ backgroundColor: "#0B1B33", opacity: 1 }}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-paper">ANKORA</span>
-              <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
-                <svg width="18" height="18" viewBox="0 0 18 18">
-                  <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
-                </svg>
-              </button>
-            </div>
-            <nav className="mt-12 flex flex-col gap-7">
-              {[
-                { label: dict.nav.solutions, href: "/solutions" },
-                { label: dict.nav.howItWorks, href: "/how-it-works" },
-                { label: dict.nav.technology, href: "/technology" },
-                { label: dict.nav.about, href: "/about" },
-                { label: dict.nav.pricing, href: "/pricing" },
-                { label: dict.nav.roi, href: "/roi" },
-              ].map((item) => (
-                <Link
-                  key={item.href}
-                  href={withLocale(locale, item.href)}
-                  onClick={() => setMobileOpen(false)}
-                  className="text-2xl font-medium text-paper"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="mt-auto flex flex-col gap-4">
-              <Button href={withLocale(locale, "/contact")} className="w-full">
-                {dict.nav.cta}
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </header>
+
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {mobileOpen && (
+              <motion.div
+                initial={{ y: -16 }}
+                animate={{ y: 0 }}
+                exit={{ y: -16 }}
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
+                style={{ backgroundColor: "#0B1B33", opacity: 1 }}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-semibold text-paper">ANKORA</span>
+                  <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
+                    <svg width="18" height="18" viewBox="0 0 18 18">
+                      <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
+                    </svg>
+                  </button>
+                </div>
+                <nav className="mt-12 flex flex-col gap-7">
+                  {[
+                    { label: dict.nav.solutions, href: "/solutions" },
+                    { label: dict.nav.howItWorks, href: "/how-it-works" },
+                    { label: dict.nav.technology, href: "/technology" },
+                    { label: dict.nav.about, href: "/about" },
+                    { label: dict.nav.pricing, href: "/pricing" },
+                    { label: dict.nav.roi, href: "/roi" },
+                  ].map((item) => (
+                    <Link
+                      key={item.href}
+                      href={withLocale(locale, item.href)}
+                      onClick={() => setMobileOpen(false)}
+                      className="text-2xl font-medium text-paper"
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </nav>
+                <div className="mt-auto flex flex-col gap-4">
+                  <Button href={withLocale(locale, "/contact")} className="w-full">
+                    {dict.nav.cta}
+                  </Button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body
+        )}
+    </>
   );
 }
