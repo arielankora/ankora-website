@@ -11,11 +11,14 @@ export function ComparisonTable({
 }) {
   return (
     <Reveal delay={0.1}>
-      <div className="overflow-x-auto rounded-2xl border border-lineDark">
-        <table className="w-full min-w-[640px] border-collapse text-start">
+      {/* Desktop / tablet: a real semantic table, kept in the DOM at every
+          breakpoint (only its display is toggled) so the comparison data
+          stays crawlable regardless of viewport. */}
+      <div className="hidden overflow-hidden rounded-2xl border border-lineDark md:block">
+        <table className="w-full border-collapse text-start">
           <thead>
             <tr className="border-b border-lineDark bg-cream">
-              <th className="w-1/3 p-4 text-start text-xs font-semibold uppercase tracking-[0.12em] text-navy/35">
+              <th className="w-[28%] p-4 text-start text-xs font-semibold uppercase tracking-[0.12em] text-navy/35">
                 &nbsp;
               </th>
               <th className="p-4 text-start text-sm font-medium text-navy/60">{columnA}</th>
@@ -32,6 +35,26 @@ export function ComparisonTable({
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* Narrow viewports: the same data as stacked cards, so nothing gets
+          clipped by horizontal table scroll on RTL / small screens. */}
+      <div className="flex flex-col gap-3 md:hidden">
+        {rows.map((row) => (
+          <div key={row.dimension} className="rounded-2xl border border-lineDark bg-cream/40 p-5">
+            <h3 className="text-sm font-medium text-navy">{row.dimension}</h3>
+            <dl className="mt-3 flex flex-col gap-2.5">
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="shrink-0 text-xs text-navy/40">{columnA}</dt>
+                <dd className="text-sm leading-relaxed text-navy/60">{row.a}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4">
+                <dt className="shrink-0 text-xs font-medium text-navy/50">{columnB}</dt>
+                <dd className="text-sm font-medium leading-relaxed text-navy">{row.b}</dd>
+              </div>
+            </dl>
+          </div>
+        ))}
       </div>
     </Reveal>
   );
