@@ -47,6 +47,21 @@ export default function LocaleLayout({
 
   return (
     <html lang={locale} dir={dir}>
+      <head>
+        {/* Google tag (gtag.js) */}
+        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XZ1T8Z0NDY"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+
+              gtag('config', 'G-XZ1T8Z0NDY');
+            `,
+          }}
+        />
+      </head>
       <body className="font-sans antialiased">
         <Header dict={dict} locale={locale} />
         <main>{children}</main>
