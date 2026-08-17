@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
 import { Container } from "@/components/ui/Container";
@@ -104,6 +105,22 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             {dict.hero.ctaSecondary}
           </Button>
         </motion.div>
+
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, delay: 0.44, ease: [0.16, 1, 0.3, 1] }}
+          className="mt-14 max-w-2xl border-t border-line pt-7 text-sm leading-relaxed text-paper/45"
+        >
+          {dict.hero.definitionPre}
+          <Link
+            href={withLocale(locale, "/personal-operations-management")}
+            className="text-paper/70 underline decoration-gold/40 underline-offset-4 transition-colors hover:text-gold-light"
+          >
+            {dict.hero.definitionLinked}
+          </Link>
+          {dict.hero.definitionPost}
+        </motion.p>
       </Container>
     </section>
   );

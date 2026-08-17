@@ -1,42 +1,58 @@
-"use client";
-
+import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
-import { PageHero } from "@/components/sections/PageHero";
-import { Container } from "@/components/ui/Container";
-import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
-import { motion } from "framer-motion";
+import { AboutPageClient } from "@/components/sections/AboutPageClient";
+import { JsonLd } from "@/components/seo/JsonLd";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const locale = params.locale === "en" ? "en" : "he";
+  const dict = getDictionary(params.locale);
+  return {
+    title: dict.meta.aboutTitle,
+    description: dict.meta.aboutDescription,
+    alternates: {
+      canonical: `/${locale}/about`,
+      languages: { he: "/he/about", en: "/en/about" },
+    },
+    openGraph: {
+      title: dict.meta.aboutTitle,
+      description: dict.meta.aboutDescription,
+      type: "website",
+    },
+  };
+}
 
 export default function AboutPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.about;
+  const base = "https://ankora.co.il";
+
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Ankora",
+    url: base,
+    logo: `${base}/logo.png`,
+    description: p.entityDefinition,
+    email: "hello@ankora.co.il",
+    areaServed: "IL",
+    address: { "@type": "PostalAddress", addressLocality: "Tel Aviv", addressCountry: "IL" },
+    contactPoint: {
+      "@type": "ContactPoint",
+      email: "hello@ankora.co.il",
+      contactType: "customer service",
+      areaServed: "IL",
+    },
+  };
 
   return (
     <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
-      <section className="bg-cream py-20 md:py-28">
-        <Container className="grid gap-8 md:grid-cols-2">
-          {p.blocks.map((b, i) => (
-            <Reveal key={b.title} delay={i * 0.08}>
-              <h3 className="text-xl font-medium text-navy">{b.title}</h3>
-              <p className="mt-3 leading-relaxed text-navy/60">{b.body}</p>
-            </Reveal>
-          ))}
-        </Container>
-      </section>
-      <section className="bg-ink py-20 md:py-28">
-        <Container>
-          <Reveal><span className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">העקרונות שלנו</span></Reveal>
-          <RevealStagger className="mt-8 grid gap-4 md:grid-cols-2">
-            {p.principles.map((pr) => (
-              <motion.div key={pr.title} variants={staggerItem} className="rounded-2xl border border-line p-7">
-                <h4 className="font-medium text-paper">{pr.title}</h4>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{pr.body}</p>
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
+      <JsonLd id="about-organization-schema" data={organizationSchema} />
+      <AboutPageClient dict={dict} locale={locale} />
     </>
   );
 }

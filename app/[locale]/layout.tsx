@@ -19,17 +19,21 @@ export async function generateMetadata({
 }: {
   params: { locale: string };
 }): Promise<Metadata> {
+  const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   return {
+    metadataBase: new URL("https://ankora.co.il"),
     title: dict.meta.title,
     description: dict.meta.description,
     alternates: {
+      canonical: `/${locale}`,
       languages: { he: "/he", en: "/en" },
     },
     openGraph: {
       title: dict.meta.title,
       description: dict.meta.description,
       type: "website",
+      locale: locale === "he" ? "he_IL" : "en_US",
     },
   };
 }

@@ -4,6 +4,10 @@ export interface Dictionary {
   meta: {
     title: string;
     description: string;
+    homeTitle: string;
+    homeDescription: string;
+    aboutTitle: string;
+    aboutDescription: string;
   };
   nav: {
     solutions: string;
@@ -14,6 +18,10 @@ export interface Dictionary {
     roi: string;
     coverage: string;
     cta: string;
+    personalOperationsManagement: string;
+    personalAssistantForExecutives: string;
+    ankoraVsPersonalAssistant: string;
+    relatedReading: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
   };
   hero: {
@@ -22,6 +30,9 @@ export interface Dictionary {
     sub: string;
     ctaPrimary: string;
     ctaSecondary: string;
+    definitionPre: string;
+    definitionLinked: string;
+    definitionPost: string;
   };
   problem: { label: string; title: string; body: string };
   insight: { label: string; title: string; body: string };
@@ -97,7 +108,11 @@ export interface SimplePageContent {
 export interface PagesContent {
   howItWorks: SimplePageContent & { vignette: { title: string; body: string } };
   technology: SimplePageContent;
-  about: SimplePageContent & { principles: { title: string; body: string }[] };
+  about: SimplePageContent & {
+    entityDefinition: string;
+    principlesLabel: string;
+    principles: { title: string; body: string }[];
+  };
   solutionsIndex: { eyebrow: string; title: string; sub: string };
   roi: {
     eyebrow: string;
@@ -213,5 +228,90 @@ export interface PagesContent {
       description: string;
       services: { name: string; description: string }[];
     }[];
+  };
+  personalOperationsManagement: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    directAnswerLabel: string;
+    directAnswer: string;
+    problem: {
+      title: string;
+      intro: string;
+      items: string[];
+      closing: string;
+    };
+    whatManagerDoes: {
+      title: string;
+      body: string;
+      examples: { title: string; body: string }[];
+    };
+    comparisonPA: {
+      title: string;
+      intro: string;
+      columnA: string;
+      columnB: string;
+      rows: { dimension: string; a: string; b: string }[];
+    };
+    comparisonConcierge: {
+      title: string;
+      intro: string;
+      columnA: string;
+      columnB: string;
+      rows: { dimension: string; a: string; b: string }[];
+    };
+    humanAI: {
+      title: string;
+      body: string;
+      points: { title: string; body: string }[];
+    };
+    whoFor: {
+      title: string;
+      items: string[];
+    };
+    examples: {
+      title: string;
+      items: { scenario: string; shallow: string; deep: string }[];
+    };
+    notRightFit: {
+      title: string;
+      body: string;
+      items: string[];
+    };
+    faq: { q: string; a: string }[];
+    ctaTitle: string;
+    ctaBody: string;
+    cta: string;
+  };
+  personalAssistantForExecutives: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    directAnswer: string;
+    expectations: { title: string; items: string[] };
+    whenPARight: { title: string; body: string };
+    wherePAFalls: { title: string; body: string; items: string[] };
+    ankoraModel: { title: string; body: string; points: { title: string; body: string }[] };
+    whenFullTimePA: { title: string; body: string; items: string[] };
+    faq: { q: string; a: string }[];
+    ctaTitle: string;
+    ctaBody: string;
+    cta: string;
+  };
+  ankoraVsPersonalAssistant: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    directAnswer: string;
+    columnA: string;
+    columnB: string;
+    table: { dimension: string; a: string; b: string }[];
+    choosePA: { title: string; items: string[] };
+    chooseAnkora: { title: string; items: string[] };
+    whereAnkoraFits: { title: string; body: string };
+    faq: { q: string; a: string }[];
+    ctaTitle: string;
+    ctaBody: string;
+    cta: string;
   };
 }

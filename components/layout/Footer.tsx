@@ -38,6 +38,9 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
 
         <div className="flex flex-col gap-3">
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-paper/40">Ankora</span>
+          <Link href={withLocale(locale, "/personal-operations-management")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.personalOperationsManagement}</Link>
+          <Link href={withLocale(locale, "/personal-assistant-for-executives")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.personalAssistantForExecutives}</Link>
+          <Link href={withLocale(locale, "/ankora-vs-personal-assistant")} className="text-sm text-paper/70 hover:text-gold-light">{dict.nav.ankoraVsPersonalAssistant}</Link>
           <Link href={withLocale(locale, "/privacy")} className="text-sm text-paper/70 hover:text-gold-light">{dict.footer.privacy}</Link>
           <Link href={withLocale(locale, "/terms")} className="text-sm text-paper/70 hover:text-gold-light">{dict.footer.terms}</Link>
         </div>
