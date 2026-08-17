@@ -799,7 +799,7 @@ const en: Dictionary = {
       },
       whatManagerDoes: {
         title: "What a Personal Operations Manager does",
-        body: "A Personal Operations Manager takes end-to-end ownership of a task or area, not just the visible step. That means identifying what needs to happen, coordinating the people involved, tracking it to completion, and handling whatever goes wrong along the way, without it coming back to you as a decision you need to make.",
+        body: "A Personal Operations Manager takes end-to-end ownership of a task or area, not just the visible step. You hand over what needs to happen, your Operations Manager identifies the best solution, confirms it with you, and coordinates the people involved, tracks it to completion, and handles whatever goes wrong along the way, without it coming back to you as a decision you need to make.",
         examples: [
           { title: "A home repair", body: "Ankora identifies the appropriate provider, coordinates availability, confirms the appointment, manages communication, follows the repair through completion, handles outstanding issues, and keeps you updated, without you managing the process." },
           { title: "A recurring renewal", body: "A license, subscription or permit is tracked ahead of its deadline, renewed proactively, and confirmed, so it never becomes an urgent problem." },
@@ -818,7 +818,7 @@ const en: Dictionary = {
           { dimension: "Follow-through", a: "Typically ends once the task is done", b: "Continues until the issue is fully resolved" },
           { dimension: "Proactivity", a: "Generally responds to requests", b: "Surfaces what needs attention before you ask" },
           { dimension: "Coverage", a: "Tied to one person's availability", b: "Backed by a team and AI monitoring" },
-          { dimension: "Scope", a: "Often personal or admin-focused", b: "Personal, household, vendor, admin, travel and business" },
+          { dimension: "Scope", a: "Often personal or admin-focused", b: "Personal, household, vendor, admin, travel and business, backed by a team, technology and vendor network already built for each" },
         ],
       },
       comparisonConcierge: {
@@ -918,11 +918,12 @@ const en: Dictionary = {
       },
       ankoraModel: {
         title: "The Ankora model",
-        body: "Ankora combines a dedicated human Operations Manager with AI orchestration to take end-to-end accountability for the areas that typically overwhelm a single assistant, personal, household, vendor, administrative, travel and selected business operations, backed by persistent memory and proactive monitoring rather than a single person's recall.",
+        body: "Ankora combines a dedicated human Operations Manager with AI orchestration to take end-to-end accountability for the areas that typically overwhelm a single assistant, personal, household, vendor, administrative, travel and selected business operations, backed by persistent memory and proactive monitoring rather than a single person's recall. You hand us a task, we identify the best solution, confirm it with you, and follow it through to completion. The breadth comes from how Ankora is built: a team, a technology layer, and a vendor network already in place across these domains, not knowledge one assistant would need to build up alone.",
         points: [
           { title: "Dedicated Operations Manager", body: "One person accountable for outcomes across your operational footprint, not just your calendar." },
           { title: "AI orchestration", body: "Persistent memory, tracking and monitoring that don't depend on one person's availability or memory." },
           { title: "End-to-end accountability", body: "Issues are resolved as part of the job, not escalated back to you as a new task." },
+          { title: "A network already in place", body: "Built over time across every domain Ankora covers, this vendor network and the judgment behind it aren't something a single assistant builds on their own." },
         ],
       },
       whenFullTimePA: {
@@ -942,7 +943,7 @@ const en: Dictionary = {
         { q: "How fast does Ankora respond compared to an in-house PA?", a: "Requests are typically acknowledged the same day. Ankora doesn't offer instant, in-person, real-time responsiveness the way a PA sitting next to you would, that's a genuine strength of the in-house model." },
         { q: "Is this only for CEOs?", a: "No. Senior executives, founders and entrepreneurs at various stages use Ankora, along with busy professionals and families managing significant operational complexity." },
         { q: "Does Ankora handle personal matters as well as business ones?", a: "Yes. Personal and business operational support are both part of the model, often for the same client at the same time." },
-        { q: "How is this priced compared to hiring a Personal Assistant?", a: "A full-time in-house PA is a salaried position with fixed capacity. Ankora is scoped to your actual operational footprint. Details are on our pricing page." },
+        { q: "How is this priced compared to hiring a Personal Assistant?", a: "A full-time in-house PA costs more than the salary itself, pension contributions, National Insurance, paid vacation and sick leave, and other employer overhead typically add roughly a third on top. Ankora carries none of those costs and is scoped to your actual operational footprint. Details are on our pricing page." },
         { q: "How do I know which model is right for me?", a: "A short strategy call is usually enough to tell. We'll ask about how your time is actually being spent, and tell you honestly if a traditional PA would serve you better." },
       ],
       ctaTitle: "Not sure if you need a Personal Assistant or something broader?",
@@ -971,7 +972,7 @@ const en: Dictionary = {
         { dimension: "Coverage / continuity", a: "Limited to one person's hours and availability", b: "Backed by a team, not a single point of failure" },
         { dimension: "Physical-world, in-person execution", a: "Strong, present with you", b: "Coordinated remotely, not physically present" },
         { dimension: "Management burden on the client", a: "You manage and direct the person", b: "You manage the outcome, not the process" },
-        { dimension: "Cost structure", a: "Fixed salary regardless of workload", b: "Scoped to your actual operational footprint" },
+        { dimension: "Cost structure", a: "Fixed salary regardless of workload", b: "No salary, pension, National Insurance, or paid vacation and sick leave to carry, cost reflects only the operational footprint you actually need managed" },
         { dimension: "Best-fit customer", a: "Needs someone physically present daily", b: "Needs broad operational ownership, not physical presence" },
       ],
       choosePA: {
@@ -998,7 +999,7 @@ const en: Dictionary = {
       },
       faq: [
         { q: "Can I use both a Personal Assistant and Ankora?", a: "Yes, and many clients do. A Personal Assistant handles in-person, real-time support, while Ankora owns the broader operational areas, household, vendors, administration, travel and business, in the background." },
-        { q: "Which one is more expensive?", a: "A full-time Personal Assistant is a fixed salary regardless of workload. Ankora is scoped to your actual operational footprint, so cost depends on what you need managed. Neither is inherently cheaper; they answer different needs." },
+        { q: "Which one is more expensive?", a: "A full-time Personal Assistant's cost is more than the base salary: pension contributions, National Insurance, paid vacation and sick days, and other employer overhead typically add roughly a third on top. Ankora carries none of those costs, you pay for the operational footprint you actually need managed, which is often what makes it the more cost-effective option even before accounting for the time you get back." },
         { q: "Does Ankora offer in-person support?", a: "Ankora coordinates and manages work, including work that happens in person through vendors and providers, but your Operations Manager isn't physically present with you the way an in-house PA is." },
         { q: "What happens if my Ankora Operations Manager is unavailable?", a: "Because the model is backed by a team and AI orchestration rather than a single point of failure, coverage and continuity don't depend on one person's availability the way they would with a sole PA." },
         { q: "Is a Personal Assistant a worse choice than Ankora?", a: "No. It's a different tool for a different job. A Personal Assistant is often the better choice when you need constant physical presence and real-time, in-person responsiveness." },
