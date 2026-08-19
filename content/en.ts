@@ -23,6 +23,7 @@ const en: Dictionary = {
     personalAssistantForExecutives: "Personal Assistant for Executives",
     ankoraVsPersonalAssistant: "Ankora vs. Personal Assistant",
     relatedReading: "Related reading",
+    blog: "Blog",
     solutionsMenu: [
       { label: "Executives", blurb: "Focus your attention on what actually deserves it.", href: "/solutions/executives" },
       { label: "Founders", blurb: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
@@ -186,6 +187,25 @@ const en: Dictionary = {
     title: "Ready to put it down?",
     body: "A twenty-minute strategy call. No commitment, no long forms.",
     cta: "Book a call",
+  },
+  blog: {
+    eyebrow: "Insights",
+    title: "Field notes on operational clarity",
+    sub: "Practical thinking on operations, time, and running a life or company without carrying it all in your head.",
+    emptyState: "New articles are on the way. Check back soon.",
+    readMore: "Read article",
+    minRead: "min read",
+    allCategories: "All",
+    relatedTitle: "Related reading",
+    backToBlog: "Back to all articles",
+    categories: {
+      "personal-operations": "Personal Operations",
+      "household-property": "Household & Property",
+      "vendors-services": "Vendors & Services",
+      "travel-logistics": "Travel & Logistics",
+      "business-operations": "Business Operations",
+      "company-insights": "Company & Insights",
+    },
   },
   pages: {
     howItWorks: {

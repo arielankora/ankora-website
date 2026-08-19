@@ -22,6 +22,7 @@ export interface Dictionary {
     personalAssistantForExecutives: string;
     ankoraVsPersonalAssistant: string;
     relatedReading: string;
+    blog: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
   };
   hero: {
@@ -81,6 +82,18 @@ export interface Dictionary {
     items: { q: string; a: string }[];
   };
   finalCta: { title: string; body: string; cta: string };
+  blog: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    emptyState: string;
+    readMore: string;
+    minRead: string;
+    allCategories: string;
+    relatedTitle: string;
+    backToBlog: string;
+    categories: Record<string, string>;
+  };
   pages: PagesContent;
   footer: {
     tagline: string;

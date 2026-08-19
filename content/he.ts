@@ -23,6 +23,7 @@ const he: Dictionary = {
     personalAssistantForExecutives: "עוזר אישי למנכ״לים",
     ankoraVsPersonalAssistant: "אנקורה מול עוזר אישי",
     relatedReading: "מידע קשור",
+    blog: "בלוג",
     solutionsMenu: [
       { label: "מנהלים בכירים", blurb: "לסמן על מה באמת שווה להשקיע קשב.", href: "/solutions/executives" },
       { label: "עצמאים", blurb: "לגדול בלי לשאת כל פרט תפעולי לבד.", href: "/solutions/founders" },
@@ -186,6 +187,25 @@ const he: Dictionary = {
     title: "מוכנים להוריד את העומס?",
     body: "שיחת היכרות של עשרים דקות. בלי מחויבות, בלי טפסים ארוכים.",
     cta: "לתיאום שיחת היכרות",
+  },
+  blog: {
+    eyebrow: "תובנות",
+    title: "רשומות שטח על ניהול תפעולי",
+    sub: "מחשבות מעשיות על תפעול, זמן וניהול חיים או חברה בלי לשאת הכל בראש.",
+    emptyState: "כתבות חדשות בדרך. חזרו לבקר בקרוב.",
+    readMore: "לקריאת הכתבה",
+    minRead: "דקות קריאה",
+    allCategories: "הכל",
+    relatedTitle: "מידע קשור",
+    backToBlog: "חזרה לכל הכתבות",
+    categories: {
+      "personal-operations": "ניהול תפעול אישי",
+      "household-property": "בית ונכס",
+      "vendors-services": "ספקים ושירותים",
+      "travel-logistics": "נסיעות ולוגיסטיקה",
+      "business-operations": "תפעול עסקי",
+      "company-insights": "חברה ותובנות",
+    },
   },
   pages: {
     howItWorks: {
