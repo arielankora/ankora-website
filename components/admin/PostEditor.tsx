@@ -5,14 +5,20 @@ import { useRouter } from "next/navigation";
 import type { BlogPost } from "@/lib/blog-shared";
 import { BLOG_CATEGORY_SLUGS } from "@/lib/blog-shared";
 
-function slugifyClient(input: string): string {
+// Kept in sync with lib/blog-shared.ts#slugify. Slugs are always ASCII -
+// non-Latin characters in URLs cause inconsistent routing on Vercel.
+function sanitizeSlugChars(input: string): string {
   return input
     .trim()
     .toLowerCase()
     .replace(/['"]/g, "")
-    .replace(/[^a-z0-9\u0590-\u05FF]+/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 80);
+}
+function slugifyClient(input: string): string {
+  const base = sanitizeSlugChars(input);
+  return base || `post-${Date.now().toString(36)}`;
 }
 
 const TOOLBAR: { label: string; wrap: [string, string] }[] = [
@@ -157,12 +163,14 @@ export function PostEditor({
             value={derivedSlug}
             onChange={(e) => {
               setSlugTouched(true);
-              setSlug(slugifyClient(e.target.value));
+              setSlug(sanitizeSlugChars(e.target.value));
             }}
             disabled={mode === "edit"}
             className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-navy outline-none focus:border-gold disabled:bg-navy/5 disabled:text-navy/40"
           />
-          <p className="mt-1 text-xs text-navy/40">/{locale}/blog/{derivedSlug || "…"}</p>
+          <p className="mt-1 text-xs text-navy/40">
+            /{locale}/blog/{derivedSlug || "…"} &middot; Latin letters, numbers and hyphens only (Hebrew titles are fine - just not in the URL)
+          </p>
         </div>
 
         <div>
