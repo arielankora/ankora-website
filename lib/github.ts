@@ -8,13 +8,19 @@
 //   GITHUB_TOKEN   - a token with contents:write on this repo
 //   GITHUB_OWNER   - repo owner, e.g. "arielankora"
 //   GITHUB_REPO    - repo name, e.g. "ankora-website"
-//   GITHUB_BRANCH  - branch to commit to (defaults to "main")
+//   GITHUB_BRANCH  - branch to commit to. If unset, falls back to
+//                     VERCEL_GIT_COMMIT_REF (the branch this deployment was
+//                     built from, set automatically by Vercel) and then
+//                     "main". This means every Preview deployment publishes
+//                     to its OWN branch by default, so a post saved from a
+//                     given preview URL always shows up on that same
+//                     preview URL - no per-branch env var needed.
 
 function config() {
   const token = process.env.GITHUB_TOKEN;
   const owner = process.env.GITHUB_OWNER;
   const repo = process.env.GITHUB_REPO;
-  const branch = process.env.GITHUB_BRANCH || "main";
+  const branch = process.env.GITHUB_BRANCH || process.env.VERCEL_GIT_COMMIT_REF || "main";
   if (!token || !owner || !repo) {
     throw new Error(
       "Blog publishing isn't configured yet. GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO must be set."
