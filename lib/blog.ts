@@ -4,10 +4,16 @@ import path from "path";
 import matter from "gray-matter";
 import readingTime from "reading-time";
 import type { Locale } from "@/content";
-import { BLOG_CATEGORY_SLUGS, type BlogPostMeta, type BlogPost } from "@/lib/blog-shared";
+import {
+  BLOG_CATEGORY_SLUGS,
+  COVER_IMAGE_POSITIONS,
+  type BlogPostMeta,
+  type BlogPost,
+  type CoverImagePosition,
+} from "@/lib/blog-shared";
 
-export { BLOG_CATEGORY_SLUGS, slugify } from "@/lib/blog-shared";
-export type { BlogCategorySlug, BlogPostMeta, BlogPost } from "@/lib/blog-shared";
+export { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS, coverPositionClass, slugify } from "@/lib/blog-shared";
+export type { BlogCategorySlug, BlogPostMeta, BlogPost, CoverImagePosition } from "@/lib/blog-shared";
 
 function blogDir(locale: Locale) {
   return path.join(process.cwd(), "content", "blog", locale);
@@ -31,6 +37,9 @@ function toMeta(locale: Locale, slug: string, data: Record<string, any>, content
       : "company-insights",
     tags: Array.isArray(data.tags) ? data.tags : [],
     coverImage: data.coverImage || null,
+    coverImagePosition: (COVER_IMAGE_POSITIONS as readonly string[]).includes(data.coverImagePosition)
+      ? data.coverImagePosition
+      : "center",
     author: data.author || "Ankora",
     publishedAt: data.publishedAt || new Date().toISOString().slice(0, 10),
     updatedAt: data.updatedAt || null,
@@ -100,6 +109,7 @@ export function serializePost(
     category: data.category,
     tags: data.tags,
     coverImage: data.coverImage,
+    coverImagePosition: data.coverImagePosition,
     author: data.author,
     publishedAt: data.publishedAt,
     updatedAt: data.updatedAt,

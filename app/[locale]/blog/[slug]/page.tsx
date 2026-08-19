@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getDictionary, type Locale } from "@/content";
-import { getPostBySlug, getAllPostSlugs, getRelatedPosts } from "@/lib/blog";
+import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -130,7 +130,7 @@ export default function BlogPostPage({
             <img
               src={post.coverImage}
               alt={post.title}
-              className="w-full rounded-2xl object-cover"
+              className={`w-full rounded-2xl object-cover ${coverPositionClass(post.coverImagePosition)}`}
               style={{ maxHeight: 520 }}
             />
           </Container>

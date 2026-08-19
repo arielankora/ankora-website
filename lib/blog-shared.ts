@@ -13,6 +13,18 @@ export const BLOG_CATEGORY_SLUGS = [
 
 export type BlogCategorySlug = (typeof BLOG_CATEGORY_SLUGS)[number];
 
+// Cover images are cropped to fit two different landscape-oriented boxes (the
+// blog card thumbnail and the article hero) - a portrait or square photo
+// will lose its top and/or bottom. This lets the editor choose which part
+// of the source image stays visible in the crop, instead of always cropping
+// dead-center.
+export const COVER_IMAGE_POSITIONS = ["top", "center", "bottom"] as const;
+export type CoverImagePosition = (typeof COVER_IMAGE_POSITIONS)[number];
+
+export function coverPositionClass(pos?: string | null): string {
+  return pos === "top" ? "object-top" : pos === "bottom" ? "object-bottom" : "object-center";
+}
+
 export interface BlogPostMeta {
   slug: string;
   locale: Locale;
@@ -21,6 +33,7 @@ export interface BlogPostMeta {
   category: BlogCategorySlug;
   tags: string[];
   coverImage: string | null;
+  coverImagePosition: CoverImagePosition;
   author: string;
   publishedAt: string;
   updatedAt: string | null;
