@@ -125,7 +125,7 @@ export default function BlogPostPage({
 
       {post.coverImage && (
         <section className="bg-paper">
-          <Container className="py-10 md:py-14">
+          <Container className="max-w-3xl py-10 md:py-14">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.coverImage}
