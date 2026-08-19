@@ -2,8 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import TurndownService from "turndown";
 import type { BlogPost } from "@/lib/blog-shared";
 import { BLOG_CATEGORY_SLUGS } from "@/lib/blog-shared";
+
+// Converts pasted rich content (ChatGPT, Google Docs, Word, web pages) into
+// clean Markdown so formatting survives copy-paste into the article body.
+const turndownService = new TurndownService({
+  headingStyle: "atx",
+  bulletListMarker: "-",
+  codeBlockStyle: "fenced",
+  emDelimiter: "_",
+});
 
 // Kept in sync with lib/blog-shared.ts#slugify. Slugs are always ASCII -
 // non-Latin characters in URLs cause inconsistent routing on Vercel.
@@ -72,6 +82,31 @@ export function PostEditor({
       el.focus();
       el.selectionStart = start + before.length;
       el.selectionEnd = start + before.length + selected.length;
+    });
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const html = e.clipboardData.getData("text/html");
+    // No rich HTML on the clipboard (e.g. copying from another plain-text
+    // editor) - fall back to the browser's normal plain-text paste.
+    if (!html || !html.trim()) return;
+
+    e.preventDefault();
+    const markdown = turndownService.turndown(html).trim();
+    const el = textareaRef.current;
+    if (!el) {
+      setContent((prev) => prev + markdown);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = content.slice(0, start) + markdown + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + markdown.length;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
     });
   }
 
@@ -275,10 +310,14 @@ export function PostEditor({
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          onPaste={handlePaste}
           rows={18}
           dir="auto"
           className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-3 font-mono text-sm text-navy outline-none focus:border-gold"
         />
+        <p className="mt-1 text-xs text-navy/40">
+          Paste directly from ChatGPT, Google Docs, or Word - headings, bold, links and lists convert to Markdown automatically.
+        </p>
       </div>
 
       <div className="mt-6 flex items-center gap-2">
