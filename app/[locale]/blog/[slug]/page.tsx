@@ -125,7 +125,12 @@ export default function BlogPostPage({
 
       {post.coverImage && (
         <section className="bg-paper">
-          <Container className="max-w-3xl py-10 md:py-14">
+          {/* Deliberately not <Container> here: Container's own max-w-content
+              (1440px) and this max-w-3xl have equal CSS specificity, and
+              clsx doesn't dedupe conflicting Tailwind utilities, so
+              max-w-content was silently winning and rendering this image
+              far wider than the article text column below it. */}
+          <div className="mx-auto w-full max-w-3xl px-6 py-10 md:px-10 md:py-14 lg:px-14">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.coverImage}
@@ -133,7 +138,7 @@ export default function BlogPostPage({
               className={`w-full rounded-2xl object-cover ${coverPositionClass(post.coverImagePosition)}`}
               style={{ maxHeight: 520 }}
             />
-          </Container>
+          </div>
         </section>
       )}
 
