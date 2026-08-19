@@ -2,8 +2,18 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import type { BlogPost } from "@/lib/blog-shared";
-import { BLOG_CATEGORY_SLUGS } from "@/lib/blog-shared";
+import TurndownService from "turndown";
+import type { BlogPost, CoverImagePosition } from "@/lib/blog-shared";
+import { BLOG_CATEGORY_SLUGS, coverPositionClass } from "@/lib/blog-shared";
+
+// Converts pasted rich content (ChatGPT, Google Docs, Word, web pages) into
+// clean Markdown so formatting survives copy-paste into the article body.
+const turndownService = new TurndownService({
+  headingStyle: "atx",
+  bulletListMarker: "-",
+  codeBlockStyle: "fenced",
+  emDelimiter: "_",
+});
 
 // Kept in sync with lib/blog-shared.ts#slugify. Slugs are always ASCII -
 // non-Latin characters in URLs cause inconsistent routing on Vercel.
@@ -53,6 +63,9 @@ export function PostEditor({
   const [tags, setTags] = useState((initial?.tags || []).join(", "));
   const [draft, setDraft] = useState(initial?.draft ?? true);
   const [coverImage, setCoverImage] = useState(initial?.coverImage || "");
+  const [coverImagePosition, setCoverImagePosition] = useState<CoverImagePosition>(
+    initial?.coverImagePosition || "center"
+  );
   const [content, setContent] = useState(initial?.content || "");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -72,6 +85,31 @@ export function PostEditor({
       el.focus();
       el.selectionStart = start + before.length;
       el.selectionEnd = start + before.length + selected.length;
+    });
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const html = e.clipboardData.getData("text/html");
+    // No rich HTML on the clipboard (e.g. copying from another plain-text
+    // editor) - fall back to the browser's normal plain-text paste.
+    if (!html || !html.trim()) return;
+
+    e.preventDefault();
+    const markdown = turndownService.turndown(html).trim();
+    const el = textareaRef.current;
+    if (!el) {
+      setContent((prev) => prev + markdown);
+      return;
+    }
+    const start = el.selectionStart;
+    const end = el.selectionEnd;
+    const next = content.slice(0, start) + markdown + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = start + markdown.length;
+      el.selectionStart = pos;
+      el.selectionEnd = pos;
     });
   }
 
@@ -116,6 +154,7 @@ export function PostEditor({
       tags: tags.split(",").map((t) => t.trim()).filter(Boolean),
       draft,
       coverImage: coverImage || null,
+      coverImagePosition,
       content,
     };
 
@@ -242,10 +281,6 @@ export function PostEditor({
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-navy/70">Cover image</label>
           <div className="mt-2 flex items-center gap-4">
-            {coverImage && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={coverImage} alt="" className="h-16 w-24 rounded-lg object-cover" />
-            )}
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
@@ -254,6 +289,60 @@ export function PostEditor({
             />
             {uploading && <span className="text-sm text-navy/40">Uploading…</span>}
           </div>
+
+          {coverImage && (
+            <div className="mt-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-navy/50">
+                  Exactly how the crop will look on the site
+                </span>
+                <div className="flex gap-1">
+                  {(["top", "center", "bottom"] as CoverImagePosition[]).map((pos) => (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => setCoverImagePosition(pos)}
+                      className={`rounded-md border px-2.5 py-1 text-xs font-medium capitalize ${
+                        coverImagePosition === pos
+                          ? "border-gold bg-gold-gradient text-ink"
+                          : "border-lineDark bg-white text-navy/60 hover:border-gold"
+                      }`}
+                    >
+                      {pos}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Same box + crop rules as the article hero (app/[locale]/blog/[slug]/page.tsx) -
+                  this form shares the site's max-w-3xl width, so this is a true 1:1 preview. */}
+              <div className="mt-2">
+                <span className="text-xs text-navy/40">Article page</span>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverImage}
+                  alt=""
+                  className={`mt-1 w-full rounded-xl border border-lineDark object-cover ${coverPositionClass(
+                    coverImagePosition
+                  )}`}
+                  style={{ maxHeight: 520 }}
+                />
+              </div>
+
+              {/* Same aspect ratio as BlogCard.tsx - crop is identical regardless of thumbnail size. */}
+              <div className="mt-3 w-48">
+                <span className="text-xs text-navy/40">Blog card</span>
+                <div className="relative mt-1 aspect-[16/10] w-full overflow-hidden rounded-xl border border-lineDark bg-navy/5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={coverImage}
+                    alt=""
+                    className={`h-full w-full object-cover ${coverPositionClass(coverImagePosition)}`}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -275,10 +364,14 @@ export function PostEditor({
           ref={textareaRef}
           value={content}
           onChange={(e) => setContent(e.target.value)}
+          onPaste={handlePaste}
           rows={18}
           dir="auto"
           className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-3 font-mono text-sm text-navy outline-none focus:border-gold"
         />
+        <p className="mt-1 text-xs text-navy/40">
+          Paste directly from ChatGPT, Google Docs, or Word - headings, bold, links and lists convert to Markdown automatically.
+        </p>
       </div>
 
       <div className="mt-6 flex items-center gap-2">

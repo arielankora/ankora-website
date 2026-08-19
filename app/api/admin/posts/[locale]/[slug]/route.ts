@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRequestAuthorized } from "@/lib/adminAuth";
 import { getPostBySlug, postFilePath, serializePost } from "@/lib/blog";
-import { BLOG_CATEGORY_SLUGS } from "@/lib/blog-shared";
+import { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS } from "@/lib/blog-shared";
 import { putFile, deleteFile, isGithubConfigured } from "@/lib/github";
 import type { Locale } from "@/content";
 
@@ -38,6 +38,10 @@ export async function PUT(request: Request, { params }: { params: { locale: stri
     : existing.category;
   const content = typeof body.content === "string" ? body.content : existing.content;
 
+  const coverImagePosition = (COVER_IMAGE_POSITIONS as readonly string[]).includes(body.coverImagePosition)
+    ? body.coverImagePosition
+    : existing.coverImagePosition;
+
   const fileContent = serializePost(
     {
       title,
@@ -45,6 +49,7 @@ export async function PUT(request: Request, { params }: { params: { locale: stri
       category,
       tags: Array.isArray(body.tags) ? body.tags : existing.tags,
       coverImage: body.coverImage ?? existing.coverImage,
+      coverImagePosition,
       author: String(body.author ?? existing.author),
       publishedAt: body.publishedAt || existing.publishedAt,
       updatedAt: new Date().toISOString().slice(0, 10),

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Dictionary, Locale } from "@/content";
-import type { BlogPostMeta } from "@/lib/blog-shared";
+import { coverPositionClass, type BlogPostMeta } from "@/lib/blog-shared";
 import { withLocale } from "@/lib/nav";
 
 function formatDate(dateStr: string, locale: Locale) {
@@ -37,7 +37,7 @@ export function BlogCard({
             src={post.coverImage}
             alt={post.title}
             fill
-            className="object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+            className={`object-cover transition-transform duration-500 group-hover:scale-[1.03] ${coverPositionClass(post.coverImagePosition)}`}
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-navy/10 to-gold/10">

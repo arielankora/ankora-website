@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getDictionary, type Locale } from "@/content";
-import { getPostBySlug, getAllPostSlugs, getRelatedPosts } from "@/lib/blog";
+import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
 import { Container } from "@/components/ui/Container";
 import { Button } from "@/components/ui/Button";
@@ -125,15 +125,20 @@ export default function BlogPostPage({
 
       {post.coverImage && (
         <section className="bg-paper">
-          <Container className="py-10 md:py-14">
+          {/* Deliberately not <Container> here: Container's own max-w-content
+              (1440px) and this max-w-3xl have equal CSS specificity, and
+              clsx doesn't dedupe conflicting Tailwind utilities, so
+              max-w-content was silently winning and rendering this image
+              far wider than the article text column below it. */}
+          <div className="mx-auto w-full max-w-3xl px-6 py-10 md:px-10 md:py-14 lg:px-14">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={post.coverImage}
               alt={post.title}
-              className="w-full rounded-2xl object-cover"
+              className={`w-full rounded-2xl object-cover ${coverPositionClass(post.coverImagePosition)}`}
               style={{ maxHeight: 520 }}
             />
-          </Container>
+          </div>
         </section>
       )}
 
