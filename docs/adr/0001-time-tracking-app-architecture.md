@@ -75,3 +75,39 @@ Per spec §23's closing rule: at the end of each phase — migration review, aut
 ## 6. Open question blocking Phase 0 completion
 
 Prisma schema and folder scaffolding can proceed without a live database. Running real migrations against Production, however, needs an actual Postgres instance to exist — that requires provisioning a resource in your Vercel account (same category of step as adding `GITHUB_TOKEN` earlier). Asked in chat.
+
+## 7. Addendum (post-Phase-1 build): Prisma version corrected from 7.10.0 to 6.19.3
+
+Initial Phase 0 scaffolding pinned `prisma`/`@prisma/client` to `7.10.0` on
+the reasoning that it was the last full stable release, ahead of the
+`8.0.0-rc.x` release candidate sitting on npm's `latest` tag. That
+reasoning about avoiding an RC was correct, but it missed that Prisma 7 is
+itself a major, disruptive architecture change versus the 5.x/6.x line
+this decision assumed:
+
+- Datasource `url` in `schema.prisma` is removed in favor of a required
+  `prisma.config.ts` file.
+- Prisma Client requires an explicit driver adapter (`@prisma/adapter-pg`
+  + `pg`) instead of the built-in engine — no more zero-config
+  `new PrismaClient()`.
+- The generator must specify a custom `output` path; Prisma Client is no
+  longer generated into `node_modules` by default, so every
+  `import ... from "@prisma/client"` site would need to change.
+- The package ships ESM-only, which would have required setting
+  `"type": "module"` in this repo's `package.json` - a change with
+  blast radius far beyond the Time Tracking feature, into tooling the
+  existing marketing site depends on.
+
+This was only discovered once a real Vercel Preview build actually ran
+`prisma generate` (this sandbox cannot run any `prisma` CLI command at
+all - see the "Sandbox note" in README.md - so it wasn't caught earlier).
+Adopting all of that for a Phase 1 MVP would have meant a much larger,
+riskier diff than the feature itself justifies, and cuts directly against
+this engagement's own backward-compatibility instruction.
+
+**Corrected decision: pin to `6.19.3`**, the latest stable release on the
+5.x/6.x architecture this ADR and the rest of Phase 0/1's code were
+actually written against - inline `datasource.url`, default
+`node_modules` output, no driver adapter, no ESM requirement. No other
+Phase 0/1 code needed to change as a result; `prisma/schema.prisma` was
+already written in the 6.x-compatible form.

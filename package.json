@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@fontsource/heebo": "^5.3.0",
-    "@prisma/client": "7.10.0",
+    "@prisma/client": "6.19.3",
     "bcryptjs": "^3.0.3",
     "clsx": "2.1.1",
     "framer-motion": "11.3.19",
@@ -28,7 +28,7 @@
     "next": "^14.2.35",
     "next-auth": "^5.0.0-beta.32",
     "next-mdx-remote": "^6.0.0",
-    "prisma": "7.10.0",
+    "prisma": "6.19.3",
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "reading-time": "^1.5.0",
