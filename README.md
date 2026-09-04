@@ -58,11 +58,19 @@ Then set `DATABASE_URL` and `AUTH_SECRET` per `.env.example`. Visit
 `/app/login`.
 
 **Deploy-time migrations:** `npm run build` runs `prisma generate && prisma
-migrate deploy && next build`, so every Vercel deployment (Preview and
-Production) applies any new migrations in `prisma/migrations/` to its own
-database automatically - no manual `prisma migrate deploy` step needed on
-Vercel. `prisma migrate deploy` is safe to re-run (only applies migrations
-not yet recorded as applied), so this does not touch existing data.
+migrate deploy && node scripts/seed-preview.mjs && next build`, so every
+Vercel deployment (Preview and Production) applies any new migrations in
+`prisma/migrations/` to its own database automatically - no manual
+`prisma migrate deploy` step needed on Vercel. `prisma migrate deploy` is
+safe to re-run (only applies migrations not yet recorded as applied), so
+this does not touch existing data.
+
+**Auto-seeding on Preview only:** `scripts/seed-preview.mjs` runs
+`prisma/seed.ts`'s `[DEMO]`-prefixed fixtures automatically during build,
+but only when `VERCEL_ENV=preview` (set by Vercel itself) - it's a no-op
+for Production and for local/dev builds. This is safe specifically
+because Preview has its own isolated database branch (below), so demo
+data never reaches Production.
 
 **Preview database isolation:** the Vercel project's Postgres (Neon) is
 configured with Preview Branching enabled for the Preview environment
