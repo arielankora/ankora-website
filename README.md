@@ -57,6 +57,22 @@ npm run dev
 Then set `DATABASE_URL` and `AUTH_SECRET` per `.env.example`. Visit
 `/app/login`.
 
+**Deploy-time migrations:** `npm run build` runs `prisma generate && prisma
+migrate deploy && next build`, so every Vercel deployment (Preview and
+Production) applies any new migrations in `prisma/migrations/` to its own
+database automatically - no manual `prisma migrate deploy` step needed on
+Vercel. `prisma migrate deploy` is safe to re-run (only applies migrations
+not yet recorded as applied), so this does not touch existing data.
+
+**Preview database isolation:** the Vercel project's Postgres (Neon) is
+configured with Preview Branching enabled for the Preview environment
+only (Storage -> ankora-time-tracking -> Projects -> Update Project
+Connection). Every Preview deployment gets its own copy-on-write Neon
+branch, seeded from Production's schema/data at branch-creation time, so
+Preview testing (including running `npm run db:seed`) never touches
+Production data. Production intentionally does *not* have branching
+enabled - it deploys straight against the primary branch.
+
 **Sandbox note:** the environment this Phase 0/1 work was originally built
 in has no network route to `binaries.prisma.sh` (Prisma's engine CDN), so
 `prisma generate` / `prisma migrate dev` / `next build` could not be
