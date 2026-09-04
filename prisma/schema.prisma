@@ -1,0 +1,239 @@
+// Ankora Time Tracking - Phase 0/1 schema.
+//
+// Scope discipline: this file models ONLY what Phase 0 (schema/environments)
+// and Phase 1 (auth, roles, users, clients, categories) require, per
+// docs/adr/0001-time-tracking-app-architecture.md and spec section 23.
+// Task/TimeEntry/HourBank/AlertRule/BillingPolicy/ReportSchedule/
+// EmailDelivery/IntegrationConnection etc. belong to later phases and are
+// deliberately NOT modeled yet - adding them now would be scope creep the
+// spec's own "לא להמציא" instruction warns against.
+//
+// Conventions (spec section 0 / 25, non-negotiable defaults):
+// - All timestamps stored in UTC (Prisma DateTime -> Postgres timestamptz).
+// - Durations/money are never floats - not applicable yet in Phase 1 (no
+//   TimeEntry/billing amounts here), but the convention is documented for
+//   Phase 2+.
+// - Soft delete only (deletedAt), never hard delete via the app.
+// - Every credential-adjacent/administrative change must be auditable
+//   (AuditEvent) - enforced in application code, not the DB, but the table
+//   exists from Phase 1 onward so nothing is retrofitted later.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --- Enums -------------------------------------------------------------
+
+/// Internal Ankora staff roles, per spec section 4. Client-side portal
+/// users are represented by CLIENT_USER + a per-client ClientUserRole
+/// (see ClientUser below) rather than a fixed global role, since a client
+/// user's authority is scoped to their own client, not global.
+enum UserRole {
+  SUPER_ADMIN
+  ANKORA_ADMIN
+  ANKORA_EMPLOYEE
+  CLIENT_USER
+}
+
+/// Spec section 4.2 - explicit list.
+enum UserStatus {
+  INVITED
+  ACTIVE
+  SUSPENDED
+  ARCHIVED
+}
+
+/// Not explicitly enumerated in the spec beyond "status" - reasonable
+/// default per section 25's "use a sensible default, but keep it
+/// configurable" instruction. Documented in ADR-0001.
+enum ClientStatus {
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+/// Client Admin vs Client Viewer, spec section 4 role table.
+enum ClientUserRole {
+  ADMIN
+  VIEWER
+}
+
+/// Category.visibility, spec section 10.1.
+enum CategoryVisibility {
+  GLOBAL
+  CLIENT
+}
+
+// --- Core models ---------------------------------------------------------
+
+/// Every human who can log in - internal Ankora staff AND client-portal
+/// users share this table (spec section 5 lists a single User entity).
+/// What a given user can see/do is determined by `role` for internal
+/// staff, and by their ClientUser row(s) for client-side users.
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  username     String?    @unique
+  passwordHash String
+  role         UserRole
+  status       UserStatus @default(INVITED)
+  timezone     String     @default("Asia/Jerusalem")
+
+  /// Incremented to invalidate every previously-issued session JWT at once
+  /// (spec 4.2: "logout all sessions" for admins) without needing a
+  /// database-backed session table for a Credentials-only auth flow.
+  tokenVersion Int @default(0)
+
+  /// Spec 4.2: "Rate limiting ו-lockout הדרגתי לניסיונות כושלים." A simple
+  /// persisted counter + lockout window - correct for MVP scale, and
+  /// persisted (rather than in-memory) because serverless functions don't
+  /// share memory between invocations.
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  clientMemberships   ClientUser[]
+  clientAccess        UserClientAccess[]
+  auditEvents         AuditEvent[]         @relation("AuditActor")
+  passwordResetTokens PasswordResetToken[]
+
+  @@index([role, status])
+  @@map("users")
+}
+
+/// Spec 4.2: "Forgot password באמצעות link חד-פעמי עם expiry." Only the
+/// SHA-256 hash of the token is stored - the raw token exists only in the
+/// emailed link, same principle as never storing plaintext passwords.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// A customer of Ankora. Billing policy / hour bank fields are
+/// deliberately NOT modeled here yet (Phase 3) - only what Phase 1's
+/// "clients" epic needs: identity, status, contact/timezone, and the
+/// relations that make RBAC and categories work.
+model Client {
+  id             String       @id @default(cuid())
+  name           String
+  legalName      String?
+  status         ClientStatus @default(ACTIVE)
+  timezone       String       @default("Asia/Jerusalem")
+  primaryContact String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  portalUsers  ClientUser[]
+  employeeAccess UserClientAccess[]
+  categories   Category[]
+  auditEvents  AuditEvent[] @relation("AuditClient")
+
+  @@index([status])
+  @@map("clients")
+}
+
+/// Links a User (role=CLIENT_USER) to the Client they belong to, with
+/// their client-scoped role. Spec section 5: ClientUser(client_id,
+/// user_id, client_role).
+model ClientUser {
+  id       String         @id @default(cuid())
+  clientId String
+  userId   String
+  role     ClientUserRole @default(VIEWER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, userId])
+  @@map("client_users")
+}
+
+/// Which clients an Ankora employee is allowed to report time against /
+/// view. Spec 4.1: "לכל עובד ניתן להגדיר רשימת לקוחות מורשים." Kept as a
+/// plain assignment table in Phase 1 - granular per-assignment
+/// permissions (e.g. edit-others override) are a Phase 2+ concern once
+/// TimeEntry exists to actually scope.
+model UserClientAccess {
+  id       String @id @default(cuid())
+  userId   String
+  clientId String
+
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, clientId])
+  @@map("user_client_access")
+}
+
+/// Global or client-specific work categories. Spec section 10.1.
+model Category {
+  id          String             @id @default(cuid())
+  name        String
+  description String?
+  active      Boolean            @default(true)
+  visibility  CategoryVisibility @default(GLOBAL)
+  /// Required when visibility = CLIENT, null when GLOBAL.
+  clientId    String?
+  sortOrder   Int                @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([visibility, clientId, active])
+  @@map("categories")
+}
+
+/// Append-only audit trail. Spec section 16.1 lists the Phase-1-relevant
+/// event types this must cover from day one: login success/failure,
+/// user role/access change, client settings change. Never updated or
+/// deleted from the application - read-only in the Admin UI (section 12).
+model AuditEvent {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  clientId   String?
+  beforeJson Json?
+  afterJson  Json?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+
+  actor  User?   @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  client Client? @relation("AuditClient", fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+  @@map("audit_events")
+}

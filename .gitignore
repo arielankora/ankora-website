@@ -4,3 +4,8 @@ out
 .DS_Store
 *.log
 tsconfig.tsbuildinfo
+
+# Environment variables (Time Tracking app secrets: DATABASE_URL, AUTH_SECRET)
+.env
+.env.local
+.env.*.local

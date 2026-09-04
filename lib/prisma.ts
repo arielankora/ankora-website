@@ -1,0 +1,17 @@
+import "server-only";
+import { PrismaClient } from "@prisma/client";
+
+// Standard Next.js/Prisma singleton pattern: avoids exhausting DB
+// connections from hot-reloading in dev, where modules re-evaluate but the
+// Node process (and any open connections) persists.
+const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
+
+export const prisma =
+  globalForPrisma.prisma ??
+  new PrismaClient({
+    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+  });
+
+if (process.env.NODE_ENV !== "production") {
+  globalForPrisma.prisma = prisma;
+}
