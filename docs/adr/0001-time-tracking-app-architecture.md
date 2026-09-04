@@ -62,7 +62,7 @@ The app will reuse existing primitives (`components/ui/Container.tsx`, `Button.t
 |---|---|---|
 | **Phase 0** | Repo/hosting/design audit; ADR; DB schema; environments | **This document** + Prisma schema modeling spec §5 + folder scaffolding + `.env.example` + README additions. In progress now. |
 | **Phase 1** | Auth, roles, users, clients, categories | Next, after Phase 0 acceptance criteria pass. |
-| Phase 2 | Timer + TimeEntry + manual entry + audit revisions | Not in this engagement — future session. |
+| **Phase 2** | Timer + TimeEntry + manual entry + audit revisions | **Built in this session** (see section 8 below), on `feature/time-tracking-phase2`, PR opened for review — not merged without explicit approval. |
 | Phase 3 | Billing policy + hour bank + live client snapshot | Not in this engagement. |
 | Phase 4 | Alerts + email delivery logs | Not in this engagement. |
 | Phase 5 | Internal dashboards + reports + exports | Not in this engagement. |
@@ -70,7 +70,7 @@ The app will reuse existing primitives (`components/ui/Container.tsx`, `Button.t
 | Phase 7 | PWA/mobile polish + performance + security hardening | Not in this engagement. |
 | Phase 8 | Integration foundation validation + production rollout | Not in this engagement. |
 
-Per spec §23's closing rule: at the end of each phase — migration review, automated tests, responsive QA, permission/isolation tests, demo — **before** moving to the next phase. This ADR and Phase 0/1 will not proceed into Phase 2 regardless of how the conversation continues, unless explicitly re-scoped.
+Per spec §23's closing rule: at the end of each phase — migration review, automated tests, responsive QA, permission/isolation tests, demo — **before** moving to the next phase. Phase 0/1 did not proceed into Phase 2 until explicitly re-scoped and re-authorized (see section 8).
 
 ## 6. Open question blocking Phase 0 completion
 
@@ -111,3 +111,119 @@ actually written against - inline `datasource.url`, default
 `node_modules` output, no driver adapter, no ESM requirement. No other
 Phase 0/1 code needed to change as a result; `prisma/schema.prisma` was
 already written in the 6.x-compatible form.
+
+
+## 8. Addendum: Phase 2 (Timer + TimeEntry + manual entry + audit revisions)
+
+Phase 0/1 shipped and merged to Production first (`feature/time-tracking-phase0` → `main`,
+commit `238d8c2`). Phase 2 was explicitly re-authorized afterward and scoped strictly to
+spec §23's own Phase 2 line: Timer, TimeEntry, manual entry, and audit revisions. Everything
+else spec §5 models for later phases (HourBank, AlertRule, BillingPolicy, EmailDelivery,
+IntegrationConnection, ExternalMapping) remains unmodeled — adding those tables now would be
+scope creep the spec itself schedules for Phase 3+.
+
+### 8.1 Schema
+
+Three new models, following the exact conventions Phase 0/1 established (UTC timestamps,
+`deletedAt` soft delete, `@@map` snake_case tables):
+
+- **`Task`** — spec §6.1: "Task יכולה להיות free-text ב-MVP אך נשמרת כישות אם המשתמש בוחר
+  'צור משימה'." Modeled now (with the ClickUp-shaped `source`/`externalRef` columns spec §10
+  already specifies) so `TimeEntry.taskId` has somewhere to point, but Phase 2's actual UI
+  never requires creating one — a `TimeEntry.note` free-text field covers the MVP flow.
+- **`TimeEntry`** — a row with `endAt = null` *is* a running timer (`source = TIMER`); manual
+  entries (`source = MANUAL`) always have both timestamps set at creation. `actualSeconds` /
+  `billableSeconds` are server-computed only (spec §18.1: "server end time + compute actual"),
+  never trusted from the client, and null while a timer runs. `billableSeconds` defaults equal
+  to `actualSeconds` — no `BillingPolicy` exists yet to diverge them (spec §7); modeling the
+  column now avoids a Phase 3 backfill migration.
+- **`TimeEntryRevision`** — immutable, `(timeEntryId, version)`-unique audit trail created on
+  every post-creation edit (spec §5.1: "כל עריכה ל-start/end/client/category/task/note/billable
+  duration יוצרת Revision"). Never updated or deleted itself.
+
+**Concurrency constraint that cannot live in `schema.prisma`.** Spec §18.2 requires "concurrent
+start requests create max one active timer." Prisma's schema DSL has no portable syntax for a
+partial/filtered unique index (unique per user only among rows where `end_at IS NULL`), so this
+is a raw Postgres index added directly in the hand-authored migration SQL:
+
+```sql
+CREATE UNIQUE INDEX time_entries_one_active_per_user
+  ON time_entries (user_id) WHERE end_at IS NULL;
+```
+
+This is documented at length in `schema.prisma`'s own header comment for the Phase 2 section,
+so a future `prisma migrate dev` run (once this sandbox's network restriction no longer
+applies — see section 7 above and README.md's "Sandbox note") doesn't silently drop it as
+"drift." Application code (`lib/app-domain/time-entries.ts`) also pre-checks for a friendlier
+error message, but the database constraint is the actual race-safe guarantee — verified
+functionally (not just structurally) against a local Postgres: two concurrent `INSERT`s with
+`end_at IS NULL` for the same user, second one correctly rejected with `23505`.
+
+**Idempotent timer stop** (spec §18.2: "בקשת Stop חוזרת עם אותו idempotency key לא יוצרת Entry
+כפול"): implemented as a conditional `UPDATE ... WHERE id = ? AND end_at IS NULL` (Prisma
+`updateMany`, checking the affected-row count), rather than a separate idempotency-key table.
+A duplicate/double Stop request naturally no-ops on the second call and just re-reads the
+already-stopped row.
+
+### 8.2 Permissions
+
+Phase 2 adds the three permission strings spec §4.1 itself names as its example granular list,
+verbatim: `time_entry.create_self`, `time_entry.edit_self`, `time_entry.edit_others`. No
+separate `timer.use` permission exists — starting/stopping a timer is just creating/updating a
+`TimeEntry` with `endAt` initially null, so it's covered by the same two permissions manual
+entries use. Role assignment follows spec §4's role table directly: `ANKORA_EMPLOYEE` gets
+`create_self`/`edit_self` only (own timer/entries, self-edit window applies); `ANKORA_ADMIN`
+and `SUPER_ADMIN` additionally get `edit_others`; `CLIENT_USER` gets none, per spec §4.1's
+explicit rule that a client never gets edit permission on Ankora's time entries in the MVP.
+
+### 8.3 Client isolation
+
+Spec §4.1: "אסור לעובד לדווח זמן ללקוח שאינו משויך אליו, אלא אם יש הרשאת override." Enforced in
+`lib/app-domain/time-entries.ts` via `canAccessClientForTimeEntry()`, checked on every write
+(start timer, manual entry, edit that changes client) against the `UserClientAccess` table
+established in Phase 1 — with `client.manage` acting as the "override" permission spec §4.1
+describes, letting admins act across any client including on an employee's behalf.
+
+### 8.4 Business rules implemented exactly as spec-worded
+
+- **Overlap validation** (§6.3): half-open interval check against the user's other entries;
+  blocked unless the actor holds `time_entry.edit_others` *and* the caller explicitly passed an
+  override flag — never silently allowed.
+- **Self-edit window** (§6.4): 48 hours, the concrete number the spec itself offers as an
+  example ("עד סוף היום/48 שעות"), past which only `edit_others` (Manager+) can still edit.
+- **Backdate reason** (§6.3): any manual entry whose calendar date (Asia/Jerusalem) differs
+  from today's requires a non-empty reason.
+- **Admin-on-behalf-of-employee entries** (§6.3): `actorId` (who performed the write) and
+  `TimeEntry.userId` (whose time it is) are recorded as distinct fields — never conflated —
+  satisfying "actor שונה מ-user_id ונרשם ב-Audit."
+- **Soft delete only** (§5.1): no hard `DELETE` anywhere in the app layer.
+
+### 8.5 Screens built (spec §11 employee screens, §12 admin screens)
+
+- `/app/timer` — Today/Timer (§11, §6.2 "Quick Timer"): big Start/Stop, elapsed time ticking
+  client-side off the server-recorded `startAt`, recent client+category combinations, long-timer
+  warning banner (8h) that does not auto-stop.
+- `/app/my-time` — My Time (§11): week-by-week entry list grouped by day, manual entry form,
+  inline self-edit respecting the edit window, "נערך" (Edited) badge (§6.4).
+- `/app/time-entries` — Admin Time Entries (§12): cross-client table with client/employee/date
+  filters, inline edit with overlap-override checkbox, lazy-loaded revision history per entry,
+  and an admin "enter time for an employee" form.
+
+Everything spec §11/§12 lists beyond these three screens (Tasks, Client Snapshot, Notifications,
+Profile, Overview, Hour Banks, Reports, Alerts, Integrations) is out of Phase 2's stated scope
+and deferred to the phase that actually models the underlying entities.
+
+### 8.6 Known limitation carried forward unchanged
+
+This sandbox still cannot reach `binaries.prisma.sh` (see section 7's "Sandbox note" reference),
+so `prisma generate` cannot run here and the locally-generated `@prisma/client` remains a stale
+placeholder typed `any` throughout this repo (Phase 0/1 code included, not just Phase 2's new
+files) — confirmed by inspecting `node_modules/.prisma/client/default.d.ts` directly. Local
+`tsc --noEmit` therefore cannot fully type-check Prisma-touching code in this environment; every
+error it reports on this branch traces to that one root cause (`export declare const
+PrismaClient: any`), not to a real type mismatch — verified by diffing the error list against
+files untouched by Phase 2. The migration itself was independently verified by hand: applied
+directly to a local embedded Postgres via a raw `pg` client, including a functional test of the
+partial unique index under a simulated race. Full type-checked build verification happens where
+it always has for this project — Vercel's Preview build, which has normal internet access and
+runs the real `prisma generate` as the first step of `npm run build`.

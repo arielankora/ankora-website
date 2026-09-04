@@ -39,3 +39,43 @@ export async function createTestClient(overrides: { name?: string } = {}) {
     data: { name: overrides.name ?? `Test Client ${unique("client")}` },
   });
 }
+
+export async function createTestCategory(overrides: { clientId?: string | null; name?: string } = {}) {
+  return prisma.category.create({
+    data: {
+      name: overrides.name ?? `Test Category ${unique("category")}`,
+      visibility: overrides.clientId ? "CLIENT" : "GLOBAL",
+      clientId: overrides.clientId ?? null,
+    },
+  });
+}
+
+/// Phase 2: directly inserts a TimeEntry, bypassing lib/app-domain/time-entries.ts's
+/// business rules - for tests that need to seed a specific pre-existing entry
+/// (e.g. an old one to test the self-edit window) rather than exercise the
+/// create flow itself.
+export async function createTestTimeEntry(overrides: {
+  userId: string;
+  clientId: string;
+  categoryId: string;
+  startAt?: Date;
+  endAt?: Date | null;
+  source?: "MANUAL" | "TIMER";
+  isManual?: boolean;
+}) {
+  const startAt = overrides.startAt ?? new Date();
+  const endAt = overrides.endAt === undefined ? new Date(startAt.getTime() + 3600_000) : overrides.endAt;
+  return prisma.timeEntry.create({
+    data: {
+      userId: overrides.userId,
+      clientId: overrides.clientId,
+      categoryId: overrides.categoryId,
+      startAt,
+      endAt,
+      actualSeconds: endAt ? Math.round((endAt.getTime() - startAt.getTime()) / 1000) : null,
+      billableSeconds: endAt ? Math.round((endAt.getTime() - startAt.getTime()) / 1000) : null,
+      source: overrides.source ?? "MANUAL",
+      isManual: overrides.isManual ?? true,
+    },
+  });
+}

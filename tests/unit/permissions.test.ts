@@ -46,3 +46,31 @@ describe("canManageClients()", () => {
     }
   });
 });
+
+// Phase 2 - spec 4.1's own example permission list, used verbatim:
+// time_entry.create_self, time_entry.edit_self, time_entry.edit_others.
+describe("can() - Phase 2 time_entry permissions (spec 4 role table)", () => {
+  it("grants SUPER_ADMIN and ANKORA_ADMIN full time_entry permissions including edit_others", () => {
+    for (const role of ["SUPER_ADMIN", "ANKORA_ADMIN"] as UserRole[]) {
+      expect(can(role, "time_entry.create_self")).toBe(true);
+      expect(can(role, "time_entry.edit_self")).toBe(true);
+      expect(can(role, "time_entry.edit_others")).toBe(true);
+    }
+  });
+
+  it("grants ANKORA_EMPLOYEE only create_self/edit_self, never edit_others (spec 4: own timer/reports only)", () => {
+    expect(can("ANKORA_EMPLOYEE", "time_entry.create_self")).toBe(true);
+    expect(can("ANKORA_EMPLOYEE", "time_entry.edit_self")).toBe(true);
+    expect(can("ANKORA_EMPLOYEE", "time_entry.edit_others")).toBe(false);
+  });
+
+  it("grants CLIENT_USER no time_entry permissions (spec 4.1: client never gets edit on Ankora's time entries)", () => {
+    expect(can("CLIENT_USER", "time_entry.create_self")).toBe(false);
+    expect(can("CLIENT_USER", "time_entry.edit_self")).toBe(false);
+    expect(can("CLIENT_USER", "time_entry.edit_others")).toBe(false);
+  });
+
+  it("keeps ANKORA_ADMIN without audit.view even after Phase 2 (Phase 1's conservative default is unchanged)", () => {
+    expect(can("ANKORA_ADMIN", "audit.view")).toBe(false);
+  });
+});

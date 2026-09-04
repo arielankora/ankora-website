@@ -14,8 +14,16 @@ const ROLE_LABELS: Record<User["role"], string> = {
 
 function navItemsFor(role: User["role"]) {
   const items: { href: string; label: string }[] = [{ href: "/app", label: "בית" }];
+  // Phase 2 (spec 11 "מסכים - חוויית עובד Ankora"): Today/Timer and My
+  // Time come first in the nav for anyone who can track their own time -
+  // spec 6.2 calls Quick Timer "המסך החשוב ביותר" on mobile.
+  if (can(role, "time_entry.create_self")) items.push({ href: "/app/timer", label: "טיימר" });
+  if (can(role, "time_entry.create_self")) items.push({ href: "/app/my-time", label: "הזמן שלי" });
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות" });
   if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות" });
+  // Spec 12: Admin "Time Entries" screen - cross-client table, gated on
+  // the same permission that lets an admin edit someone else's entries.
+  if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן" });
   if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
   return items;
