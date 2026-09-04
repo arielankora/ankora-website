@@ -1,0 +1,38 @@
+// Shared setup for integration tests that hit a real Postgres database.
+//
+// These tests need the generated Prisma Client (`npx prisma generate`)
+// and a reachable DATABASE_URL - point it at a throwaway local/dev
+// database, never at Production. A convenient local option:
+//
+//   npm run db:dev            # starts the embedded dev Postgres
+//   npx prisma migrate deploy # applies prisma/migrations/*
+//   DATABASE_URL="postgresql://ankora:ankora_dev_only@127.0.0.1:55432/ankora_dev" npm run test
+//
+// This file only truncates tables between tests - it never creates the
+// schema itself, so migrations must already be applied before running.
+import { afterAll, beforeEach } from "vitest";
+import { PrismaClient } from "@prisma/client";
+
+export const prisma = new PrismaClient();
+
+const TABLES = [
+  "audit_events",
+  "user_client_access",
+  "client_users",
+  "categories",
+  "clients",
+  "password_reset_tokens",
+  "users",
+];
+
+export async function resetDb() {
+  await prisma.$transaction(TABLES.map((t) => prisma.$executeRawUnsafe(`TRUNCATE TABLE "${t}" CASCADE;`)));
+}
+
+beforeEach(async () => {
+  await resetDb();
+});
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
