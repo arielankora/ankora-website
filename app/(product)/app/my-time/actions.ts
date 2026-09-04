@@ -5,6 +5,7 @@ import {
   createManualEntry,
   updateTimeEntry,
   deleteTimeEntry,
+  combineWallClockTime,
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
@@ -20,10 +21,6 @@ function friendlyError(err: unknown): string {
   if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
   if (err instanceof Error) return err.message;
   return "אירעה שגיאה. נסו שוב.";
-}
-
-function combineDateTime(dateStr: string, timeStr: string): Date {
-  return new Date(`${dateStr}T${timeStr}:00`);
 }
 
 // Spec 6.3: manual entry - date + start/end, self-only from this screen
@@ -45,8 +42,8 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
       clientId,
       categoryId,
       taskId: null,
-      startAt: combineDateTime(date, startTime),
-      endAt: combineDateTime(date, endTime),
+      startAt: combineWallClockTime(date, startTime),
+      endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
     });
@@ -70,8 +67,8 @@ export async function updateMyEntryAction(_prev: FormState | undefined, formData
 
   try {
     await updateTimeEntry(user, timeEntryId, {
-      startAt: combineDateTime(date, startTime),
-      endAt: combineDateTime(date, endTime),
+      startAt: combineWallClockTime(date, startTime),
+      endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
       reason: String(formData.get("reason") || "") || null,
     });

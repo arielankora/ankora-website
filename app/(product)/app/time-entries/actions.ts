@@ -6,6 +6,7 @@ import {
   updateTimeEntry,
   deleteTimeEntry,
   getEntryRevisions,
+  combineWallClockTime,
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
@@ -21,10 +22,6 @@ function friendlyError(err: unknown): string {
   if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
   if (err instanceof Error) return err.message;
   return "אירעה שגיאה. נסו שוב.";
-}
-
-function combineDateTime(dateStr: string, timeStr: string): Date {
-  return new Date(`${dateStr}T${timeStr}:00`);
 }
 
 /// Spec 6.3: "אם אדמין מזין עבור עובד אחר, actor שונה מ-user_id ונרשם
@@ -47,8 +44,8 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
       clientId,
       categoryId,
       taskId: null,
-      startAt: combineDateTime(date, startTime),
-      endAt: combineDateTime(date, endTime),
+      startAt: combineWallClockTime(date, startTime),
+      endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
       allowOverlapOverride: formData.get("allowOverlapOverride") === "on",
@@ -73,8 +70,8 @@ export async function adminUpdateEntryAction(_prev: FormState | undefined, formD
 
   try {
     await updateTimeEntry(admin, timeEntryId, {
-      startAt: combineDateTime(date, startTime),
-      endAt: combineDateTime(date, endTime),
+      startAt: combineWallClockTime(date, startTime),
+      endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
       reason: String(formData.get("reason") || "") || null,
       allowOverlapOverride: formData.get("allowOverlapOverride") === "on",

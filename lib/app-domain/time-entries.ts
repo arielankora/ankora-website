@@ -59,6 +59,23 @@ function isBackdated(startAt: Date): boolean {
   return localDateKey(startAt) !== localDateKey(new Date());
 }
 
+/// Combines a `YYYY-MM-DD` date and `HH:mm` time - both entered by the
+/// user as Asia/Jerusalem wall-clock time via <input type="date"/time"> -
+/// into the correct UTC instant. Constructing `new Date(\`${date}T${time}\`)`
+/// directly is wrong: it's parsed in whatever timezone the Node process
+/// itself runs in (UTC on Vercel), silently shifting every manually-
+/// entered time by Israel's UTC+2/+3 offset. This computes that offset at
+/// the given instant (correctly following DST, and independent of the
+/// server process's own timezone - the process-timezone term cancels out
+/// algebraically in the subtraction below) and corrects for it.
+export function combineWallClockTime(dateStr: string, timeStr: string): Date {
+  const naiveUtc = new Date(`${dateStr}T${timeStr}:00Z`);
+  const asIfTargetZone = new Date(naiveUtc.toLocaleString("en-US", { timeZone: TIMEZONE }));
+  const asIfUtc = new Date(naiveUtc.toLocaleString("en-US", { timeZone: "UTC" }));
+  const offsetMs = asIfUtc.getTime() - asIfTargetZone.getTime();
+  return new Date(naiveUtc.getTime() + offsetMs);
+}
+
 /// Spec 4.1: "אסור לעובד לדווח זמן ללקוח שאינו משויך אליו, אלא אם יש
 /// הרשאת override." Admins/managers (client.manage) always pass; anyone
 /// else needs an explicit UserClientAccess row.
