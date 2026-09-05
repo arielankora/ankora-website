@@ -142,11 +142,11 @@ export default async function AppHomePage() {
               </Link>
               <div className="rounded-2xl border border-lineDark bg-white p-6">
                 <p className="text-3xl font-medium text-navy">{formatMinutes(metrics.todayMinutes)}</p>
-                <p className="mt-2 text-sm text-navy/60">שעות דווחו היום (סה"כ, כל הלקוחות)</p>
+                <p className="mt-2 text-sm text-navy/60">שעות דווחו היום (סה&quot;כ, כל הלקוחות)</p>
               </div>
               <div className="rounded-2xl border border-lineDark bg-white p-6">
                 <p className="text-3xl font-medium text-navy">{formatMinutes(metrics.monthMinutes)}</p>
-                <p className="mt-2 text-sm text-navy/60">שעות דווחו החודש (סה"כ, כל הלקוחות)</p>
+                <p className="mt-2 text-sm text-navy/60">שעות דווחו החודש (סה&quot;כ, כל הלקוחות)</p>
               </div>
               <Link
                 href="/app/reports?type=hours_by_client"
