@@ -143,6 +143,16 @@ model Client {
   timezone       String       @default("Asia/Jerusalem")
   primaryContact String?
 
+  /// Phase 6 (spec 13/14.1: "employee name configurable"). Whether the
+  /// Client Portal's Weekly Activity / Monthly Detailed reports show which
+  /// Ankora employee performed each entry, or omit that column entirely.
+  /// Spec section 25 gives no explicit default for this specific toggle,
+  /// so it defaults to true (maximum transparency, matching the spec's
+  /// stated purpose for the whole portal - section 13: "לתת ללקוחות
+  /// שקיפות מבוקרת") - Ankora can flip it per client if a contract
+  /// requires anonymity. Documented in docs/adr/0001's Phase 6 addendum.
+  portalShowEmployeeNames Boolean @default(true)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -157,6 +167,7 @@ model Client {
   hourBanks           HourBank[]
   hourBankAdjustments HourBankAdjustment[]
   alertRules          AlertRule[]
+  reportSchedules     ReportSchedule[]
 
   @@index([status])
   @@map("clients")
@@ -613,6 +624,12 @@ model AlertEvent {
 model EmailDelivery {
   id               String              @id @default(cuid())
   alertEventId     String?
+  /// Phase 6 addition: set when this send is a scheduled client/internal
+  /// report (spec 15) rather than a Phase 4 alert. A row has exactly one
+  /// of alertEventId/reportRunId set in practice - not enforced as a DB
+  /// CHECK constraint (Prisma has no portable way to express XOR across
+  /// nullable FKs), but every write path only ever sets one of the two.
+  reportRunId      String?
   template         String
   recipients       String[]
   providerMessageId String?
@@ -623,7 +640,98 @@ model EmailDelivery {
   createdAt        DateTime            @default(now())
 
   alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: SetNull)
+  reportRun  ReportRun?  @relation(fields: [reportRunId], references: [id], onDelete: SetNull)
 
   @@index([status, attempts])
   @@map("email_deliveries")
+}
+// --- Phase 6: Client portal + scheduled reports ---------------------------
+//
+// Scope discipline (spec section 23 / docs/adr/0001 addendum "Phase 6"):
+// ReportSchedule + ReportRun are modeled here, per spec section 5's own
+// field list for ReportSchedule ("client_id, report_type, frequency,
+// recipients, timezone, enabled") plus the scheduling fields (dayOfWeek/
+// dayOfMonth/hour) spec 15 requires but doesn't name explicitly ("Weekly
+// report: ברירת מחדל configurable... Monthly report: ...ביום מוגדר").
+// ReportRun is the "Snapshot/Report run id" spec 15 explicitly calls for
+// ("לפני שליחה ליצור Snapshot/Report run id כדי שיהיה ניתן לדעת בדיוק מה
+// נשלח") - one row per period actually sent, with the exact rendered
+// report frozen as JSON, and a unique (scheduleId, periodStart) constraint
+// that makes re-running the cron for an already-sent period a no-op
+// rather than a duplicate send (spec 18.2's idempotency principle, applied
+// here to scheduled sends instead of timer start/stop).
+//
+// ClientReportType is deliberately a 4-way subset of spec 14.1's 5-report
+// client table: Monthly Detailed, Weekly Activity, Hours by Category, and
+// Hour Bank Status. "Trend" is spec 14.1's own row explicitly marked
+// "אופציונלי MVP+" - same exclusion precedent as Phase 4's AlertRule
+// leaving out the spec-marked-Future "Forecast" threshold type.
+
+enum ReportFrequency {
+  WEEKLY
+  MONTHLY
+}
+
+enum ClientReportType {
+  MONTHLY_DETAILED
+  WEEKLY_ACTIVITY
+  HOURS_BY_CATEGORY
+  HOUR_BANK_STATUS
+}
+
+/// Spec section 5 + 15. One row per (client, report type, cadence) an
+/// Ankora admin has configured to auto-send. dayOfWeek (0=Sunday..
+/// 6=Saturday) is read only when frequency=WEEKLY; dayOfMonth (1-28,
+/// capped below 29 so every month has that day - spec never asks for
+/// "last day of month" semantics) only when frequency=MONTHLY. `hour` is
+/// the local hour (0-23, in `timezone`) the cron treats as this
+/// schedule's due time - see lib/app-domain/report-schedules.ts's
+/// isScheduleDue for the actual due-calculation, kept as a pure,
+/// independently unit-tested function.
+model ReportSchedule {
+  id       String           @id @default(cuid())
+  clientId String
+  reportType ClientReportType
+  frequency  ReportFrequency
+
+  recipients String[]
+  timezone   String   @default("Asia/Jerusalem")
+
+  dayOfWeek  Int? // 0-6, WEEKLY only
+  dayOfMonth Int? // 1-28, MONTHLY only
+  hour       Int  @default(7)
+
+  enabled    Boolean   @default(true)
+  lastSentAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  runs   ReportRun[]
+
+  @@index([clientId, enabled])
+  @@map("report_schedules")
+}
+
+/// The "Snapshot/Report run id" spec 15 requires. snapshotJson freezes
+/// the exact rendered report (same shape as the portal screen that
+/// produced it) at send time, independent of whatever the underlying
+/// TimeEntry/HourBank rows look like later - so "what did we actually
+/// send on that date" is always answerable even after subsequent edits
+/// or a RECALCULATED cycle (spec 8.2's own "אין לשנות silently דוח שכבר
+/// הופק ללא log" principle, applied to scheduled reports too).
+model ReportRun {
+  id          String   @id @default(cuid())
+  scheduleId  String
+  periodStart DateTime
+  periodEnd   DateTime
+  snapshotJson Json
+  createdAt   DateTime @default(now())
+
+  schedule        ReportSchedule  @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  emailDeliveries EmailDelivery[]
+
+  @@unique([scheduleId, periodStart])
+  @@map("report_runs")
 }

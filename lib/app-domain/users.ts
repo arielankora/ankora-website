@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { hashPassword } from "@/lib/app-auth/password";
-import type { User, UserRole, UserStatus } from "@prisma/client";
+import type { User, UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
 // Phase 4 (Alerts/email delivery) hasn't been built yet, so there is no
 // email provider to send invite/reset links through. Documented
@@ -29,13 +29,35 @@ export async function listUsers() {
 
 export async function inviteUser(
   actor: User,
-  input: { name: string; email: string; role: UserRole; clientIds?: string[] }
+  input: {
+    name: string;
+    email: string;
+    role: UserRole;
+    clientIds?: string[];
+    /// Phase 6: only meaningful when role === "CLIENT_USER" - see below.
+    clientUserRole?: ClientUserRole;
+  }
 ) {
   assertCan(actor.role, "user.manage");
 
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new Error("A user with this email already exists.");
+
+  // Phase 6: a CLIENT_USER is scoped by ClientUser membership (their
+  // Client Portal - lib/app-domain/client-portal.ts's resolvePortalClient
+  // is the only reader of this table), never by UserClientAccess (which
+  // scopes an ANKORA_EMPLOYEE/ADMIN's time-reporting access to clients -
+  // a different relationship entirely). Without this branch, inviting a
+  // CLIENT_USER created a User row with no ClientUser membership at all,
+  // and resolvePortalClient would permanently reject them with
+  // "No active client membership" - the Client Portal would be built but
+  // unreachable for every real client. Exactly one client is required
+  // (spec 13 models one portal user -> one client for the MVP, see the
+  // ADR addendum's resolvePortalClient note) - clientIds[1+] is ignored.
+  if (input.role === "CLIENT_USER" && (!input.clientIds || input.clientIds.length === 0)) {
+    throw new Error("יש לבחור לקוח עבור משתמש בתפקיד לקוח.");
+  }
 
   // Placeholder hash for an account with no usable password yet - nobody
   // can log in with it (verifyPassword will just return false against any
@@ -49,9 +71,14 @@ export async function inviteUser(
       role: input.role,
       status: "INVITED",
       passwordHash: placeholder,
-      clientAccess: input.clientIds?.length
-        ? { create: input.clientIds.map((clientId) => ({ clientId })) }
-        : undefined,
+      clientAccess:
+        input.role !== "CLIENT_USER" && input.clientIds?.length
+          ? { create: input.clientIds.map((clientId) => ({ clientId })) }
+          : undefined,
+      clientMemberships:
+        input.role === "CLIENT_USER" && input.clientIds?.length
+          ? { create: [{ clientId: input.clientIds[0], role: input.clientUserRole ?? "VIEWER" }] }
+          : undefined,
     },
   });
 

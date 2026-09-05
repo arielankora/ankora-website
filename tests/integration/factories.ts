@@ -1,6 +1,6 @@
 import { prisma } from "./setup";
 import { hashPassword } from "@/lib/app-auth/password";
-import type { UserRole, UserStatus } from "@prisma/client";
+import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
 let counter = 0;
 function unique(prefix: string) {
@@ -78,4 +78,18 @@ export async function createTestTimeEntry(overrides: {
       isManual: overrides.isManual ?? true,
     },
   });
+}
+
+/// Phase 6: creates a CLIENT_USER (the User row) plus its ClientUser
+/// membership row (the thing resolvePortalClient actually reads) in one
+/// call - every portal integration test needs both, since a CLIENT_USER
+/// with no ClientUser row is a valid-but-unassigned account (spec 21.2's
+/// isolation guarantee starts from "no membership => ForbiddenError", not
+/// "any client").
+export async function createTestClientUser(overrides: { clientId: string; role?: ClientUserRole; email?: string }) {
+  const { user, password } = await createTestUser({ role: "CLIENT_USER", email: overrides.email });
+  const clientUser = await prisma.clientUser.create({
+    data: { clientId: overrides.clientId, userId: user.id, role: overrides.role ?? "VIEWER" },
+  });
+  return { user, password, clientUser };
 }

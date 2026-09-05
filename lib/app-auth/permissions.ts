@@ -24,9 +24,15 @@
 // grants it to Ankora Admin/Manager: their row reads "לקוחות/קטגוריות/
 // דוחות/עריכות לפי הרשאה" - clients/categories/REPORTS/edits - so
 // report.internal.view is SUPER_ADMIN + ANKORA_ADMIN, not Super-Admin-only
-// like the two Phase 4/3 examples above. report.client.view (client-facing
-// reports, spec section 13's Client Portal) remains out of scope until
-// Phase 6 models that screen.
+// like the two Phase 4/3 examples above.
+//
+// Phase 6 (spec 23: "Client portal + scheduled reports") adds
+// report.client.view - the other half of spec 4.1's paired example
+// ("report.internal.view, report.client.view"). CLIENT_USER-only; gates
+// every screen in the new Client Portal (spec section 13) plus its CSV
+// exports. Unlike report.internal.view, there is no ANKORA_* role that
+// also holds this permission - internal staff use report.internal.view's
+// screens even when looking at a single client's numbers.
 //
 // Every server-side entry point (route handler / server action) must call
 // one of these - never rely on hiding a button in the UI (spec 4.1: "אין
@@ -51,7 +57,12 @@ export type Permission =
   // alert.manage for consistency with hour_bank.manage's naming style.
   | "alert.manage"
   // Phase 5 - spec 4.1's own example list, used verbatim.
-  | "report.internal.view";
+  | "report.internal.view"
+  // Phase 6 (spec 23: "Client portal + scheduled reports") - spec 4.1's
+  // own example list names this one too, right next to
+  // report.internal.view: "report.internal.view, report.client.view."
+  // CLIENT_USER-only; gates every Client Portal screen and its exports.
+  | "report.client.view";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Spec 4 role table: Super Admin - "הכול: משתמשים, לקוחות, בנקים,
@@ -103,10 +114,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Spec 4.1: "לקוח לעולם לא מקבל הרשאת edit על Time Entries של Ankora
   // ב-MVP" - Client Admin/Viewer are both read-only on time entries, so
   // CLIENT_USER (which models both) gets none of the time_entry.*
-  // permissions. report.internal.view is Ankora-internal by name/scope -
-  // client-facing reporting is the separate report.client.view permission,
-  // out of scope until Phase 6's Client Portal.
-  CLIENT_USER: [],
+  // permissions. report.internal.view stays Ankora-internal (a client
+  // must never see Actual time, other clients' data, or internal notes -
+  // spec 13's own exclusion list) - CLIENT_USER instead gets the
+  // dedicated report.client.view (Phase 6), which every Client Portal
+  // screen/export checks. Both Client Admin and Client Viewer (the two
+  // ClientUserRole values, spec 4's role table) get this same permission;
+  // the ADMIN/VIEWER distinction only matters for the narrower
+  // recipients-editing capability inside the portal itself (see
+  // lib/app-domain/report-schedules.ts), not for read access to the
+  // portal's own screens.
+  CLIENT_USER: ["report.client.view"],
 };
 
 export function can(role: UserRole, permission: Permission): boolean {

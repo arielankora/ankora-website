@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
 import { inviteUser, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import type { UserRole, UserStatus } from "@prisma/client";
+import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
 type InviteState = { error?: string; inviteLink?: string; invitedName?: string };
 type FormState = { error?: string; ok?: boolean };
@@ -24,9 +24,10 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
   if (!name || !email || !role) return { error: "יש למלא שם, אימייל ותפקיד." };
 
   const clientIds = formData.getAll("clientIds").map(String).filter(Boolean);
+  const clientUserRole = (String(formData.get("clientUserRole") || "") as ClientUserRole) || undefined;
 
   try {
-    const { user, setPasswordToken } = await inviteUser(actor, { name, email, role, clientIds });
+    const { user, setPasswordToken } = await inviteUser(actor, { name, email, role, clientIds, clientUserRole });
     revalidatePath("/app/users");
 
     // Spec's documented Phase 1 limitation (no email provider until

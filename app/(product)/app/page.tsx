@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -75,6 +76,13 @@ function formatMinutes(minutes: number): string {
 
 export default async function AppHomePage() {
   const user = await requireUser();
+
+  // Phase 6: this Overview screen is Ankora-internal (spec 12's admin
+  // screens table). A CLIENT_USER's home is the Client Portal dashboard
+  // instead (spec 13) - AppShell's nav already only ever links a
+  // CLIENT_USER to /app/portal/*, but redirecting here too closes the
+  // gap for the "Ankora" logo link and anyone who bookmarks /app itself.
+  if (user.role === "CLIENT_USER") redirect("/app/portal");
 
   const canSeeClients = can(user.role, "client.manage");
   const canSeeCategories = can(user.role, "category.manage");
