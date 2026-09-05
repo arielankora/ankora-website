@@ -13,14 +13,20 @@ import "../globals.css";
 // Next.js's documented "multiple root layouts" pattern. Same fonts/tokens
 // as the marketing site (ADR-0001 section 3) - no new brand.
 //
-// Phase 7 (ADR addendum 14.2): manifest.ts lives alongside this layout so
-// Next.js's metadata inheritance only links it into pages under this
-// route group (the product tool) - the marketing site under app/[locale]
-// intentionally has no manifest of its own. icons/appleWebApp here cover
-// the installability meta tags a manifest link alone doesn't add.
+// Phase 7 (ADR addendum 14.2, fixed per 14.2 addendum below): the
+// manifest is a static file at public/manifest.webmanifest, referenced
+// explicitly here via `manifest:` - Next.js's file-convention manifest.ts
+// route conflicted with app/[locale]'s catch-all locale segment (a
+// request to /manifest.webmanifest at the site root was being swallowed
+// by [locale] and served the marketing homepage's HTML instead of the
+// manifest JSON, found during this phase's own live QA). A static public
+// file bypasses app-router path matching entirely, so no such conflict is
+// possible. Scoped to this route group only via this layout's own
+// metadata - the marketing site under app/[locale] has no manifest link.
 export const metadata: Metadata = {
   title: "Ankora - ניהול שעות",
   robots: { index: false, follow: false }, // internal tool, never indexed
+  manifest: "/manifest.webmanifest",
   icons: {
     icon: [
       { url: "/icon-192.png", sizes: "192x192", type: "image/png" },

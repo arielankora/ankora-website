@@ -794,6 +794,24 @@ caching, no push notification plumbing (explicitly out of MVP per §2.2's own li
 An install banner is a browser-native behavior once the manifest and HTTPS are in
 place; nothing else was built to force it.
 
+### 14.2.1 Bug found during this phase's own live QA: manifest route swallowed by [locale]
+
+The original approach (14.2 above, before this fix) placed a Next.js file-convention
+`manifest.ts` inside `app/(product)/`, expecting Next's route-segment metadata
+inheritance to scope it to that route group only. Live QA on the Preview deployment
+found this didn't work as designed: a request to `/manifest.webmanifest` returned
+HTTP 200 with the *marketing homepage's HTML*, not the manifest JSON - `app/[locale]`'s
+dynamic segment was matching the literal path `manifest.webmanifest` as an (invalid,
+silently-defaulted-to-"he") locale value and rendering the homepage, out-prioritizing
+the file-convention route one level deep inside the sibling `(product)` route group.
+`app/robots.ts` (the true top-level app root, not nested in a route group) was
+confirmed unaffected by the same test, isolating the cause to the route-group nesting
+specifically. Fixed by deleting `app/(product)/manifest.ts` entirely and replacing it
+with a static `public/manifest.webmanifest` file, referenced explicitly via
+`metadata.manifest` in `app/(product)/layout.tsx` - a public file is served before
+app-router path matching even runs, so no route-priority conflict is possible. Content
+is otherwise identical to the original file-convention version.
+
 ### 14.3 Security headers (spec §16.2)
 
 Added a `headers()` block in `next.config.mjs` applied to all routes:
