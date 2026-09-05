@@ -8,7 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 export const metadata = { robots: { index: false, follow: false } };
 
 const PAGE_SIZE = 50;
-const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry", "BillingPolicy", "HourBank", "HourBankAdjustment"];
+const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry", "BillingPolicy", "HourBank", "HourBankAdjustment", "AlertRule", "EmailDelivery"];
 
 const ACTION_LABEL: Record<string, string> = {
   "login.success": "התחברות מוצלחת",
@@ -36,6 +36,11 @@ const ACTION_LABEL: Record<string, string> = {
   "billing_policy.update": "עדכון מדיניות חיוב",
   "hour_bank.open_cycle": "פתיחת מחזור בנק שעות",
   "hour_bank.adjustment.create": "התאמה ידנית לבנק שעות",
+  // Phase 4 (spec 9/16.1: "Alert rule change").
+  "alert_rule.create": "יצירת כלל התראה",
+  "alert_rule.update": "עדכון כלל התראה",
+  "alert_rule.delete": "מחיקת כלל התראה",
+  "email_delivery.retry": "ניסיון שליחה חוזר להתראה",
 };
 
 function formatDateTime(date: Date) {

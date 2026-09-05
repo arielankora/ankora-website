@@ -377,3 +377,39 @@ that role useful - are not built in any phase shipped so far, and the current
 `CLIENT_USER` who somehow logged in today would see only the Overview page's
 empty state. The guide says this plainly (section "תפקיד הלקוח") instead of
 describing screens that don't exist.
+
+## 11. Addendum: Phase 4 (Alerts + email delivery)
+
+### 11.1 Email provider
+
+The spec (section 3.2) calls for "Email provider עם Delivery logs" without naming one. Rather than picking a new provider, Ariel confirmed the marketing site already sends email through Resend (`app/api/contact/route.ts`, using `RESEND_API_KEY` and a verified `ankora.co.il` sending domain). Phase 4 reuses that exact provider and domain: `lib/email.ts` is a small generic `sendEmail()` wrapper around the same Resend REST endpoint the contact form already calls successfully in both Production and Preview (the API key is configured for both environments). The contact route itself is left untouched - `lib/email.ts` is new, not a refactor of existing working code, to keep this change's blast radius limited to the time-tracking app.
+
+Sending address: `Ankora <alerts@ankora.co.il>`. Resend verifies at the domain level, so any local-part at an already-verified domain is deliverable - this is the standard Resend behavior, not a new domain-verification step.
+
+This also resolves the "no email provider" limitation flagged in the Phase 1 addendum (forgot-password) and the guide's honest gap note - though wiring `lib/email.ts` into the password-reset/invite flows themselves is out of scope for Phase 4 and left for a future, explicitly-scoped change (touching auth flows deserves its own review, not a drive-by while building Alerts).
+
+### 11.2 Permission
+
+`alert.manage` is SUPER_ADMIN-only, same reasoning as `hour_bank.manage` in the Phase 3 addendum: spec section 12 lists "Alerts" as an admin screen alongside "Hour Banks", and alert thresholds are defined per-client against the same billing-sensitive hour-bank data Ankora Admin/Manager was deliberately excluded from in Phase 3. No spec text grants Ankora Admin any alert capability, so the same conservative default applies.
+
+### 11.3 Schema decisions where the spec is silent
+
+- **AlertRule.recipientsAnkora / recipientsClient**: spec 9.1 says each rule has "recipients נפרדים ל-Ankora וללקוח" but doesn't specify a format. Stored as Postgres `String[]` (email addresses), matching Prisma's native array support - no new join table needed for what is just a short list of addresses per rule.
+- **AlertRule.allowRetrigger**: spec 9.2's exact words - "ברירת מחדל: לא לשלוח שוב באותו cycle אלא אם rule.allow_retrigger=true" - already names this exact field, so it's modeled as specified, defaulting to `false`.
+- **Forecast threshold type**: spec 9.1's own table marks this row "Future" explicitly. Not implemented - `AlertThresholdType` has four members (UTILIZATION_PCT, REMAINING_MINUTES, CONSUMED_MINUTES, OVERAGE), not five. This is spec-directed, not a gap.
+- **Dedupe/retrigger mechanics**: spec 9.2 requires firing "only when crossing the threshold from below to above" and, when `allowRetrigger=false`, never firing again in the same cycle. Implemented via `AlertEvent.resolvedAt`: evaluation on every relevant mutation checks current utilization; when it clears below threshold, any unresolved event for that (rule, hourBank) pair is marked resolved (no email sent for the resolve itself - spec doesn't ask for one). A rule fires when utilization is at/above threshold AND either no event has ever existed for that (rule, hourBank) pair, or (`allowRetrigger=true` AND every prior event for that pair is already resolved). This is a deliberate, documented interpretation - the spec names the `dedupe_key` concept but not its exact algorithm.
+- **EmailDelivery granularity**: one row per logical send action (Ankora recipients and client recipients are separate rows when both lists are non-empty on a rule), not one row per individual recipient address - matches the spec's own field list (`recipients` plural on one row).
+- **Client-facing email content**: spec 9.2 lists required fields (client name, total bank, consumed, remaining, utilization %, cycle date, "link to portal"). No Client Portal exists yet (section 13, still unbuilt per the guide's own honest gap note), so the portal-link line is omitted from the client email body rather than pointing at a page that doesn't exist. This will need revisiting once Phase 6 (Client Portal) ships.
+- **Retry/backoff**: spec 9.2 wants "retry עם exponential backoff" on delivery failure. This engagement has no job queue or sub-daily scheduler - only a once-daily Vercel Cron (see 11.4). True exponential backoff (minutes/hours between attempts) isn't achievable at that granularity. The implemented approximation: the daily cron retries any `EmailDelivery` row with `status=FAILED` and `attempts < 5`, once per day, and logs an internal audit entry once a delivery has failed all 5 attempts ("N failures - internal warning לאדמין" per spec). This is a documented, coarser-than-spec tradeoff, not a silent gap.
+
+### 11.4 Trigger points
+
+Immediate evaluation (spec 9.2: "בדיקה מיד לאחר כל Stop/Create/Edit/Delete שמשנה billable time") is wired into `lib/app-domain/time-entries.ts`'s `stopTimer`, `createManualEntry`, `updateTimeEntry`, `deleteTimeEntry` - each call is best-effort and non-fatal (`.catch(console.error)`), matching the exact pattern already established for `flagAffectedCyclesRecalculated` in Phase 3, so an alert-evaluation failure can never roll back or block the underlying time-entry write. `lib/app-domain/hour-banks.ts`'s `recordHourBankAdjustment` also triggers evaluation - not explicitly named in spec 9.2's trigger list, but a manual credit/debit changes the same total-minutes number a threshold is measured against, so skipping it would leave a real gap the spec's intent clearly wants covered. This is a deliberate, documented extension of the literal trigger list, not scope creep into a new area.
+
+The daily scheduled reconciliation (spec 9.2's second requirement, "scheduled reconciliation פעם ביום") runs via Vercel Cron hitting `/api/cron/alerts-reconcile` at `0 5 * * *` (05:00 UTC, ~07:00-08:00 Israel time depending on DST - chosen as an early-morning slot with no documented spec preference), which re-evaluates every client with an OPEN hour bank and also drives the retry logic described in 11.3. The route is protected by a `CRON_SECRET` env var checked against the `Authorization: Bearer` header Vercel's Cron infrastructure sends automatically - this needs to be added to the Vercel project's Production and Preview environment variables (same mechanism as `AUTH_SECRET` in Phase 0) before the cron can run for real; Preview QA for this phase (Task #148) will call the route directly with the header to verify it without waiting for the schedule.
+
+### 11.5 What Phase 4 does not include
+
+- Scheduled weekly/monthly reports (spec section 15) - that's Phase 6, not Phase 4.
+- The Forecast threshold type (explicitly marked "Future" in spec 9.1).
+- Any change to the forgot-password/invite email flows - `lib/email.ts` exists and is proven, but wiring it into auth is a separate, explicitly-scoped future change.

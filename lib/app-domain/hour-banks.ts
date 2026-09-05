@@ -278,6 +278,16 @@ export async function recordHourBankAdjustment(
     await flagRecalculationIfClosed(hourBankId);
   }
 
+  // Phase 4 (spec 9.2 extension, documented in ADR 11.4): a manual
+  // credit/debit changes the cycle's total immediately, so it's a
+  // deliberate additional trigger point beyond the spec's literal list.
+  // Dynamic import avoids a circular dependency (alerts.ts imports
+  // getCurrentHourBank from this file). Best-effort/non-fatal, same
+  // pattern as every other alert-evaluation call site.
+  await import("@/lib/app-domain/alerts")
+    .then((mod) => mod.evaluateAlertsForClient(clientId))
+    .catch((err) => console.error("evaluateAlertsForClient failed (non-fatal)", err));
+
   return adjustment;
 }
 

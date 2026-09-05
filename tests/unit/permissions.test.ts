@@ -87,3 +87,15 @@ describe("can() - Phase 3 hour_bank.manage (spec 4 role table)", () => {
     expect(can("CLIENT_USER", "hour_bank.manage")).toBe(false);
   });
 });
+
+// Phase 4 - same conservative precedent as hour_bank.manage/audit.view:
+// alerts are a Super-Admin-only capability (ADR 11.2) since the spec's
+// role table never names alert management for Ankora Admin/Manager.
+describe("can() - Phase 4 alert.manage (ADR 11.2)", () => {
+  it("grants only SUPER_ADMIN alert.manage", () => {
+    expect(can("SUPER_ADMIN", "alert.manage")).toBe(true);
+    expect(can("ANKORA_ADMIN", "alert.manage")).toBe(false);
+    expect(can("ANKORA_EMPLOYEE", "alert.manage")).toBe(false);
+    expect(can("CLIENT_USER", "alert.manage")).toBe(false);
+  });
+});

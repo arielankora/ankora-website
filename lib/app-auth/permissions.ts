@@ -10,6 +10,14 @@
 // hour-bank-edit into two separate permissions). report.* remains out of
 // scope until Phase 5/6 model those entities.
 //
+// Phase 4 (spec 23: "Alerts + email delivery logs") adds alert.manage -
+// not named in spec 4.1's own example list (that list predates Phase 4),
+// but spec 12 places "Alerts" as an admin screen alongside "Hour Banks",
+// gating on thresholds defined against the same per-client hour-bank
+// data hour_bank.manage already protects. Same SUPER_ADMIN-only default
+// as hour_bank.manage, for the identical reason documented on that
+// permission below.
+//
 // Every server-side entry point (route handler / server action) must call
 // one of these - never rely on hiding a button in the UI (spec 4.1: "אין
 // להסתמך על הסתרת כפתור ב-UI").
@@ -28,7 +36,10 @@ export type Permission =
   | "time_entry.edit_self"
   | "time_entry.edit_others"
   // Phase 3 - spec 4.1's own example list, used verbatim.
-  | "hour_bank.manage";
+  | "hour_bank.manage"
+  // Phase 4 - not in spec 4.1's own list (see comment above); named
+  // alert.manage for consistency with hour_bank.manage's naming style.
+  | "alert.manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Spec 4 role table: Super Admin - "הכול: משתמשים, לקוחות, בנקים,
@@ -42,6 +53,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "time_entry.edit_self",
     "time_entry.edit_others",
     "hour_bank.manage",
+    "alert.manage",
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not
   // "critical system actions" (user management, audit) unless explicitly
