@@ -74,3 +74,16 @@ describe("can() - Phase 2 time_entry permissions (spec 4 role table)", () => {
     expect(can("ANKORA_ADMIN", "audit.view")).toBe(false);
   });
 });
+
+// Phase 3 - spec 4.1's own example permission list names hour_bank.manage
+// too. Same conservative precedent as audit.view: the spec's role table
+// lists "banks" under Super Admin's row only, so ANKORA_ADMIN does not
+// inherit it even though it already has client.manage.
+describe("can() - Phase 3 hour_bank.manage (spec 4 role table)", () => {
+  it("grants only SUPER_ADMIN hour_bank.manage", () => {
+    expect(can("SUPER_ADMIN", "hour_bank.manage")).toBe(true);
+    expect(can("ANKORA_ADMIN", "hour_bank.manage")).toBe(false);
+    expect(can("ANKORA_EMPLOYEE", "hour_bank.manage")).toBe(false);
+    expect(can("CLIENT_USER", "hour_bank.manage")).toBe(false);
+  });
+});

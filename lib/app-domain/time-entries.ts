@@ -2,6 +2,8 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan, can, canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
+import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import type { User, TimeEntry, Prisma } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -233,6 +235,10 @@ export async function stopTimer(
   if (!entry.endAt) {
     const endAt = new Date();
     const actualSeconds = Math.max(0, Math.round((endAt.getTime() - entry.startAt.getTime()) / 1000));
+    // Phase 3: billable diverges from actual per the client's
+    // BillingPolicy (spec 7); a client with no policy row gets the
+    // identical Phase 2 behavior (billable === actual).
+    const billableSeconds = await computeEntryBillableSeconds(entry.clientId, actualSeconds);
 
     // Idempotent stop (spec 18.2: "בקשת Stop חוזרת עם אותו idempotency
     // key לא יוצרת Entry כפול"). A conditional UPDATE ... WHERE endAt IS
@@ -244,7 +250,7 @@ export async function stopTimer(
       data: {
         endAt,
         actualSeconds,
-        billableSeconds: actualSeconds, // Phase 3's BillingPolicy will diverge these (spec 7).
+        billableSeconds,
         note: input?.note !== undefined ? input.note?.trim() || null : undefined,
         categoryId: input?.categoryId,
         taskId: input?.taskId,
@@ -313,6 +319,7 @@ export async function createManualEntry(
   await assertNoOverlap(actor, targetUserId, input.startAt, input.endAt, !!input.allowOverlapOverride);
 
   const actualSeconds = Math.round((input.endAt.getTime() - input.startAt.getTime()) / 1000);
+  const billableSeconds = await computeEntryBillableSeconds(input.clientId, actualSeconds);
 
   const entry = await prisma.timeEntry.create({
     data: {
@@ -323,7 +330,7 @@ export async function createManualEntry(
       startAt: input.startAt,
       endAt: input.endAt,
       actualSeconds,
-      billableSeconds: actualSeconds,
+      billableSeconds,
       note: input.note?.trim() || null,
       source: "MANUAL",
       isManual: true,
@@ -398,6 +405,10 @@ export async function updateTimeEntry(
   const nextActualSeconds = nextEndAt
     ? Math.round((nextEndAt.getTime() - nextStartAt.getTime()) / 1000)
     : entry.actualSeconds;
+  // Phase 3: recompute against the (possibly just-changed) client's
+  // policy, not the entry's stale billableSeconds.
+  const nextBillableSeconds =
+    nextActualSeconds != null ? await computeEntryBillableSeconds(nextClientId, nextActualSeconds) : null;
 
   const result = await prisma.$transaction(async (tx) => {
     const before = entry;
@@ -411,7 +422,7 @@ export async function updateTimeEntry(
         endAt: input.endAt,
         note: input.note !== undefined ? input.note?.trim() || null : undefined,
         actualSeconds: nextActualSeconds,
-        billableSeconds: nextActualSeconds,
+        billableSeconds: nextBillableSeconds,
         isEdited: true,
       },
     });
@@ -447,6 +458,15 @@ export async function updateTimeEntry(
     after: result.updated,
   });
 
+  // Spec 8.2: a backdated edit that lands inside an already-closed Hour
+  // Bank cycle must flip that cycle to RECALCULATED rather than silently
+  // changing its previously-reported numbers. Best-effort - a failure
+  // here must never undo the time-entry write itself, which has already
+  // committed above.
+  await flagAffectedCyclesRecalculated(result.updated.clientId, [entry.startAt, result.updated.startAt]).catch(
+    (err) => console.error("flagAffectedCyclesRecalculated failed (non-fatal)", err)
+  );
+
   return result.updated;
 }
 
@@ -470,6 +490,14 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
     clientId: entry.clientId,
     before: entry,
   });
+
+  // Spec 8.2: deleting an entry that falls inside an already-closed Hour
+  // Bank cycle also changes that cycle's consumed total after the fact -
+  // same recalculation flag as an edit, same best-effort guarantee.
+  await flagAffectedCyclesRecalculated(entry.clientId, [entry.startAt]).catch((err) =>
+    console.error("flagAffectedCyclesRecalculated failed (non-fatal)", err)
+  );
+
   return updated;
 }
 

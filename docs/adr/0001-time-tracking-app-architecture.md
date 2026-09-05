@@ -227,3 +227,108 @@ directly to a local embedded Postgres via a raw `pg` client, including a functio
 partial unique index under a simulated race. Full type-checked build verification happens where
 it always has for this project — Vercel's Preview build, which has normal internet access and
 runs the real `prisma generate` as the first step of `npm run build`.
+
+## 9. Addendum: Phase 3 (Billing policy + hour bank + live client snapshot)
+
+Phase 2 shipped and merged to Production first (PR #2 → `main`). Phase 3 was explicitly
+re-authorized afterward ("אתה יכול להתקדם לשלב שלוש") and scoped strictly to spec §23's own
+Phase 3 line: Billing policy, hour bank, live client snapshot. Everything else spec §5 models
+for later phases (AlertRule, EmailDelivery, IntegrationConnection, ExternalMapping) remains
+unmodeled.
+
+### 9.1 Schema
+
+Three new models plus four enums, following the same conventions as Phase 0-2:
+
+- **`BillingPolicy`** — one row per client (`clientId @unique`), spec §7.1's field list
+  verbatim (`minimumMinutes`, `incrementMinutes`, `roundingMode`, `aggregationScope`). A client
+  with no row uses the neutral default (0 minimum, 1-minute increment, `EXACT` rounding,
+  `PER_ENTRY` scope) - a documented no-op that keeps every existing Phase 2 entry's
+  `billableSeconds` identical to `actualSeconds` unless an admin explicitly configures a policy.
+  Spec §7.1's "Employee override" row is intentionally not modeled - no such permission exists
+  yet, and building the structure for a not-yet-real permission is the speculative scope creep
+  spec §25 itself warns against.
+- **`HourBank`** — one row per client per cycle (`@@unique([clientId, cycleStart])`), spec §5 +
+  §8's field list plus two fields the spec's field list doesn't name a home for:
+  `rolloverMode` and `rolloverCapMinutes`. **Product decision**: these live on the cycle that
+  *produces* the rollover (the ending cycle), not on a separate settings entity the spec never
+  describes - `openHourBankCycle()` reads the *previous* cycle's `rolloverMode`/`rolloverCapMinutes`
+  to compute the *new* cycle's `rolloverInMinutes`. `consumedMinutes` is a cached snapshot only,
+  recomputed from live `TimeEntry` data on every read (`getHourBankSnapshot()`) - never trusted
+  as the source of truth, exactly like `TimeEntry.actualSeconds` is never trusted from the client.
+- **`HourBankAdjustment`** — spec §8.2's "manual adjustments," signed minutes (positive credit /
+  negative debit) with a required `reason` and `createdById`. `hourBankId` is an added
+  convenience FK (nullable, `SetNull` on delete) so an adjustment survives its cycle being
+  deleted, matching the spec's own emphasis that the audit trail must outlive individual records.
+
+**Enums**: `RoundingMode` (CEIL/NEAREST/EXACT), `BillingAggregationScope`
+(PER_ENTRY/PER_TASK_PER_DAY/PER_DAY), `RolloverMode` (NONE/FULL/CAPPED/MANUAL), `HourBankStatus`
+(OPEN/CLOSED/RECALCULATED).
+
+**Aggregation scope - a genuine spec ambiguity, resolved and documented.** Spec §7.1 describes
+"per entry / per task per day / per day" as the granularity at which the minimum/rounding rules
+apply, but never specifies how a rounded *group* total should be split back across its sibling
+entries - there is no well-defined answer. **Product decision**: every `TimeEntry` always keeps
+its own true per-entry `billableSeconds` (transparency in reports/revision history, unchanged
+from Phase 2); the aggregation scope only affects the separately-computed Hour Bank *consumption*
+total (`computeConsumedMinutesForRange()` in `lib/app-domain/billing.ts`), which groups raw
+`actualSeconds` per the configured scope and applies the policy once per group before summing.
+`PER_ENTRY` (the default) is simply the sum of each entry's own `billableSeconds` - identical to
+Phase 2 behavior.
+
+Migration hand-authored for the same reason as Phase 2 (`docs/adr` section 8.1/8.6): this
+sandbox cannot reach `binaries.prisma.sh`. Verified functionally against a local embedded
+Postgres via a raw `pg` client (not the stale Prisma Client) - 7 assertions covering unique
+constraints on `BillingPolicy.clientId` and `HourBank(clientId, cycleStart)`, and correct
+CASCADE vs. `SetNull` behavior on all five foreign keys.
+
+### 9.2 Permissions
+
+Adds `hour_bank.manage` - spec §4.1's own example permission list names it verbatim. Spec §4's
+role table lists "banks" under Super Admin's row only, silent under Ankora Admin/Manager's own
+row. Following the identical precedent already established for `audit.view` in Phase 2, that
+silence is treated as deliberate: `hour_bank.manage` stays **Super-Admin-only**, even though
+`ANKORA_ADMIN` already holds `client.manage`. Regression-tested in `tests/unit/permissions.test.ts`.
+
+### 9.3 Business rules implemented exactly as spec-worded
+
+- **Billable vs. actual divergence** (§7): `lib/app-domain/time-entries.ts`'s three
+  billable-seconds assignment sites (`stopTimer`, `createManualEntry`, `updateTimeEntry`) now
+  call `computeEntryBillableSeconds()` instead of hard-coding `billableSeconds = actualSeconds`.
+- **Cycle lifecycle** (§8.2): `OPEN` is the default; a lazy check on every read
+  (`closeIfExpired()`) flips a cycle to `CLOSED` once `cycleEnd` has passed - no cron job exists
+  in this engagement, so this is computed as a pure function of "now" on read rather than via
+  background infrastructure. Opening a new cycle also proactively closes the previous `OPEN`
+  one, so two cycles are never simultaneously `OPEN` for the same client.
+- **Recalculation flag** (§8.2: "אין לשנות silently דוח שכבר הופק ללא log"): a backdated
+  `TimeEntry` edit or delete, or a manual adjustment, that lands inside an already-`CLOSED`
+  cycle's date range flips that cycle to `RECALCULATED` with a `recalculatedAt` timestamp
+  (`flagAffectedCyclesRecalculated()`), wired as a best-effort post-commit step in
+  `updateTimeEntry`/`deleteTimeEntry` - it must never roll back the entry write itself.
+- **Utilization formula** (§8.3): `total = purchased + rolloverIn + adjustments`,
+  `remaining = total - consumed`, `utilization% = consumed/total*100`, explicitly guarded
+  against divide-by-zero (0% on an empty bank, never `NaN`/`Infinity`). Utilization is allowed
+  to exceed 100% when a client overruns its bank - the spec never says to clamp it, and hiding
+  an overrun would work against the whole point of the Hour Bank feature.
+
+### 9.4 Screens
+
+Not yet built as of this addendum - `/app/hour-banks` (spec §12: "current/historical cycles,
+adjustments, utilization") is the next piece of Phase 3 work, gated on `hour_bank.manage`.
+
+### 9.5 Known limitation carried forward unchanged
+
+Same root cause as Phase 2 (section 8.6): this sandbox still cannot reach
+`binaries.prisma.sh`, and in this session that limitation is more severe than previously
+observed - `@prisma/client` is not just stale but fails to *initialize* at all
+(`new PrismaClient()` throws `"@prisma/client did not initialize yet"`), which blocks running
+**any** Vitest suite that imports a module touching `lib/prisma.ts` - confirmed this is not a
+Phase-3-specific regression by reproducing the identical failure on Phase 2's own pre-existing
+`tests/unit/time-entries.test.ts`. Phase 3's pure-function logic (`applyBillingPolicy()`,
+`computeUtilization()`, `computeRolloverInMinutes()`) was independently cross-checked via a
+standalone Node script reimplementing the same math outside the Prisma import chain - all 24
+assertions passed. Test files for Phase 3 (`tests/unit/billing.test.ts`,
+`tests/unit/hour-banks.test.ts`, `tests/integration/billing.test.ts`,
+`tests/integration/hour-banks.test.ts`) are written and structurally consistent with Phase 1/2's
+suites; their actual pass/fail confirmation, like every prior phase's, happens on Vercel's
+Preview build and live QA, which has normal internet access.
