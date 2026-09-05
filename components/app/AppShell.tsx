@@ -30,6 +30,10 @@ function navItemsFor(role: User["role"]) {
   // permission as the domain logic itself.
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
+  // Documentation, not a permission - every logged-in role should be able
+  // to understand the system in their own language, including a
+  // CLIENT_USER who currently has no other screen at all.
+  items.push({ href: "/app/guide", label: "מדריך שימוש" });
   return items;
 }
 

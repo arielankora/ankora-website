@@ -332,3 +332,48 @@ assertions passed. Test files for Phase 3 (`tests/unit/billing.test.ts`,
 `tests/integration/hour-banks.test.ts`) are written and structurally consistent with Phase 1/2's
 suites; their actual pass/fail confirmation, like every prior phase's, happens on Vercel's
 Preview build and live QA, which has normal internet access.
+
+## 10. Standing rule: the in-app user guide (`/app/guide`) must stay current
+
+Ariel asked (2026-09-05) for an in-app, Hebrew-language user guide covering every
+capability the app has - what it does, who can access it (exact role list, not a
+guess), how to use it step by step, and a real screenshot of the relevant screen -
+so that any new user granted access can understand the system on their own.
+
+This is now a **standing rule for every future change to this app**, on the same
+footing as "preserve backward compatibility" and "document decisions" from this
+engagement's original instruction:
+
+> Any commit that adds a new screen/capability, or changes what an existing
+> screen/capability does or who can access it, must update the matching entry
+> in `app/(product)/app/guide/content.ts` in the SAME change - new section for a
+> new capability, edited `roles`/`description`/`steps` for a changed one, and a
+> refreshed screenshot in `public/guide/` if the screen's layout changed
+> meaningfully. A phase/feature is not "done" until the guide reflects it,
+> exactly like a phase is not done until its migration and tests are done.
+
+Why a repo-committed rule rather than relying on a chat-level reminder: this
+engagement's whole continuity model already depends on a fresh session reading
+the spec and this ADR before touching code (see the original standing
+instruction), so writing the rule here - where every future session is already
+guaranteed to look - is the durable place for it, not something that depends on
+a particular chat's memory surviving between sessions.
+
+`content.ts` is deliberately a separate data file from `page.tsx` (which only
+renders it) specifically so "update the guide" has one obvious, small place to
+edit rather than requiring touching JSX.
+
+### 10.1 What the guide covers as of this addendum
+
+Every screen that exists in the app today: login, forgot/reset password, the
+role model itself, the Overview home page, Timer, My Time, Clients, Categories,
+the admin Time Entries table, Users, Audit Log, and Hour Banks (Phase 3).
+
+One honest gap, documented in the guide itself rather than glossed over: the
+`CLIENT_USER` role exists in the data model (spec 4) but spec 11's "Client
+Snapshot" and spec 13's "Client Portal" - the screens that would actually make
+that role useful - are not built in any phase shipped so far, and the current
+"Invite User" form doesn't even offer `CLIENT_USER` as a selectable role. A
+`CLIENT_USER` who somehow logged in today would see only the Overview page's
+empty state. The guide says this plainly (section "תפקיד הלקוח") instead of
+describing screens that don't exist.
