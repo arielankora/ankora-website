@@ -17,6 +17,10 @@ export const prisma = new PrismaClient();
 
 const TABLES = [
   "audit_events",
+  // Phase 2 tables truncate before the Phase 1 tables they reference.
+  "time_entry_revisions",
+  "time_entries",
+  "tasks",
   "user_client_access",
   "client_users",
   "categories",

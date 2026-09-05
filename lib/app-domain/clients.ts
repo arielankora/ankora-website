@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { assertCan } from "@/lib/app-auth/permissions";
+import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User, ClientStatus } from "@prisma/client";
 
@@ -10,6 +10,25 @@ export async function listClients() {
     orderBy: { name: "asc" },
     include: { _count: { select: { employeeAccess: true, categories: true } } },
   });
+}
+
+/// Phase 2 (spec 4.1: "אסור לעובד לדווח זמן ללקוח שאינו משויך אליו").
+/// Powers the client picker on /app/timer and /app/my-time - admins/
+/// managers (client.manage) see every active client, everyone else only
+/// the clients they hold a UserClientAccess row for.
+export async function listAccessibleClients(actor: User) {
+  if (canManageClients(actor.role)) {
+    return prisma.client.findMany({
+      where: { deletedAt: null, status: "ACTIVE" },
+      orderBy: { name: "asc" },
+    });
+  }
+  const access = await prisma.userClientAccess.findMany({
+    where: { userId: actor.id },
+    include: { client: true },
+    orderBy: { client: { name: "asc" } },
+  });
+  return access.map((a) => a.client).filter((c) => !c.deletedAt && c.status === "ACTIVE");
 }
 
 export async function getClient(id: string) {

@@ -106,6 +106,8 @@ model User {
   clientAccess        UserClientAccess[]
   auditEvents         AuditEvent[]         @relation("AuditActor")
   passwordResetTokens PasswordResetToken[]
+  timeEntries         TimeEntry[]
+  timeEntryRevisions  TimeEntryRevision[]  @relation("TimeEntryRevisionActor")
 
   @@index([role, status])
   @@map("users")
@@ -148,6 +150,8 @@ model Client {
   employeeAccess UserClientAccess[]
   categories   Category[]
   auditEvents  AuditEvent[] @relation("AuditClient")
+  tasks        Task[]
+  timeEntries  TimeEntry[]
 
   @@index([status])
   @@map("clients")
@@ -207,6 +211,8 @@ model Category {
   deletedAt DateTime?
 
   client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+  timeEntries TimeEntry[]
 
   @@index([visibility, clientId, active])
   @@map("categories")
@@ -236,4 +242,131 @@ model AuditEvent {
   @@index([actorId, createdAt])
   @@index([createdAt])
   @@map("audit_events")
+}
+
+// --- Phase 2: Timer + TimeEntry + manual entry + audit revisions ---------
+//
+// Scope discipline (spec section 23 / docs/adr/0001 addendum "Phase 2"):
+// only Task/TimeEntry/TimeEntryRevision are modeled here. HourBank,
+// AlertRule, BillingPolicy, ReportSchedule, EmailDelivery,
+// IntegrationConnection remain out of scope until Phase 3+ - adding them
+// now would be the same scope creep Phase 1's header comment warned
+// against. billableSeconds defaults to actualSeconds (no BillingPolicy
+// exists yet to diverge them); the column exists now per spec section 5
+// so Phase 3 doesn't need a backfill migration.
+//
+// IMPORTANT - constraint that lives ONLY in the hand-authored migration
+// SQL, not expressible in this file: spec 18.2 requires "concurrent start
+// requests create max one active timer." Prisma's schema DSL has no
+// portable way to declare a partial unique index (unique per user only
+// among rows where endAt IS NULL), so the actual enforcement is a
+// Postgres partial unique index created directly in
+// prisma/migrations/.../migration.sql:
+//   CREATE UNIQUE INDEX time_entries_one_active_per_user
+//     ON time_entries (user_id) WHERE end_at IS NULL;
+// Application code in lib/app-domain/time-entries.ts additionally
+// pre-checks for a friendlier error message, but the database constraint
+// is the actual race-safe guarantee - the pre-check alone is not enough
+// under concurrent requests. If this file and the migration ever appear
+// to drift on this specific index, the migration is the source of truth;
+// do not let a Prisma-generated migration silently drop it.
+
+enum TimeEntrySource {
+  MANUAL
+  TIMER
+}
+
+/// Free-text-first per spec 6.1 ("Task יכולה להיות free-text ב-MVP אך
+/// נשמרת כישות אם המשתמש בוחר 'צור משימה'"). Phase 2 only needs enough of
+/// this entity for TimeEntry.taskId to point somewhere and for the
+/// ClickUp-shaped source/externalRef columns to already exist (spec 10) -
+/// a full Tasks management screen is not part of Phase 2's stated scope
+/// ("Timer + TimeEntry + manual entry + audit revisions") and is deferred.
+model Task {
+  id          String    @id @default(cuid())
+  clientId    String
+  categoryId  String?
+  title       String
+  source      String    @default("local")
+  externalRef String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  timeEntries TimeEntry[]
+
+  @@index([clientId])
+  @@map("tasks")
+}
+
+/// Spec section 5 + 6. A row with endAt = null is a currently-running
+/// timer (source=TIMER). Manual entries (source=MANUAL) always have both
+/// startAt and endAt set at creation. actualSeconds/billableSeconds are
+/// null while a timer is running and computed on stop.
+model TimeEntry {
+  id     String @id @default(cuid())
+  userId String
+
+  clientId   String
+  categoryId String
+  taskId     String?
+
+  startAt DateTime
+  endAt   DateTime?
+
+  /// Server-computed only (spec 18.1: "server end time + compute actual"),
+  /// never trusted from the client. Null while a timer is actively running.
+  actualSeconds Int?
+  /// Defaults to actualSeconds once BillingPolicy exists in Phase 3 to
+  /// diverge them (spec section 7).
+  billableSeconds Int?
+
+  note String?
+
+  source   TimeEntrySource @default(MANUAL)
+  isManual Boolean         @default(false)
+  /// True once any post-creation edit has produced a TimeEntryRevision.
+  /// Spec 6.4: "כל עריכה ידנית מסומנת באייקון פנימי 'Edited'."
+  isEdited Boolean         @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft delete only, per spec 6.1's "Audit שאסור לוותר עליו" box and the
+  /// schema-header convention - never a hard DELETE via the app.
+  deletedAt DateTime?
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client   Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category Category  @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  task     Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  revisions TimeEntryRevision[]
+
+  @@index([userId, startAt])
+  @@index([clientId, startAt])
+  @@index([categoryId, startAt])
+  @@map("time_entries")
+}
+
+/// Immutable audit trail for every TimeEntry mutation after creation.
+/// Spec 6.1's "Audit שאסור לוותר עליו" box: must snapshot before/after,
+/// who, when, and (for admin-on-behalf-of-another-user edits) why. Never
+/// updated or deleted - version is a simple 1,2,3... counter per entry.
+model TimeEntryRevision {
+  id          String   @id @default(cuid())
+  timeEntryId String
+  version     Int
+  changedById String?
+  changedAt   DateTime @default(now())
+  beforeJson  Json?
+  afterJson   Json?
+  reason      String?
+
+  timeEntry TimeEntry @relation(fields: [timeEntryId], references: [id], onDelete: Cascade)
+  changedBy User?     @relation("TimeEntryRevisionActor", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@unique([timeEntryId, version])
+  @@map("time_entry_revisions")
 }

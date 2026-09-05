@@ -8,7 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 export const metadata = { robots: { index: false, follow: false } };
 
 const PAGE_SIZE = 50;
-const ENTITY_TYPES = ["User", "Client", "Category"];
+const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry"];
 
 const ACTION_LABEL: Record<string, string> = {
   "login.success": "התחברות מוצלחת",
@@ -25,6 +25,12 @@ const ACTION_LABEL: Record<string, string> = {
   "category.create": "יצירת קטגוריה",
   "category.update": "עדכון קטגוריה",
   "category.archive": "העברת קטגוריה לארכיון",
+  // Phase 2 (spec 16.1: "Create/Edit/Delete TimeEntry") - covers both
+  // timer start/stop and manual entries; the entry's own source/before-
+  // after JSON (visible via the entry detail) distinguishes which.
+  "time_entry.create": "יצירת דיווח זמן",
+  "time_entry.update": "עדכון דיווח זמן",
+  "time_entry.delete": "מחיקת דיווח זמן",
 };
 
 function formatDateTime(date: Date) {

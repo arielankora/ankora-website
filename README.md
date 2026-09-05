@@ -92,27 +92,43 @@ against `prisma/schema.prisma` and verified by applying it directly to a
 local Postgres with a raw SQL client, instead of via `prisma migrate dev`
 itself. The first real `prisma migrate dev` run anywhere with network
 access should see this migration as already in sync with the schema.
+Phase 2's migration was authored and verified the identical way, for the
+identical reason - the restriction is environment-wide, not tied to any
+one phase.
 
 ### Roles & permissions
 
 Four roles (`prisma/schema.prisma`'s `UserRole`): `SUPER_ADMIN` (every
-Phase 1 permission), `ANKORA_ADMIN` (clients + categories, not users or
-the audit log), `ANKORA_EMPLOYEE` and `CLIENT_USER` (no Phase 1 admin
-permissions - client-facing screens are Phase 6). The full map is
-`ROLE_PERMISSIONS` in `lib/app-auth/permissions.ts`; every mutation checks
-it server-side via `assertCan()` - nothing is enforced by hiding a nav
-link alone.
+permission), `ANKORA_ADMIN` (clients + categories + time entries, not
+users or the audit log), `ANKORA_EMPLOYEE` (own timer/entries only:
+`time_entry.create_self` + `time_entry.edit_self`, never `edit_others`),
+and `CLIENT_USER` (no admin permissions and no `time_entry.*` at all -
+client-facing screens are Phase 6). The full map is `ROLE_PERMISSIONS` in
+`lib/app-auth/permissions.ts`; every mutation checks it server-side via
+`assertCan()` - nothing is enforced by hiding a nav link alone.
 
-### Schema (Phase 0/1 scope only)
+### Schema (Phase 0-2 scope)
 
-`User` (internal staff + client-portal users share one table; role or
-per-client `ClientUser` membership determines authority), `Client`,
-`Category` (global or client-specific), `UserClientAccess` (which clients
-an employee may work with), `ClientUser` (a client-portal user's
-membership + role in one client - not yet wired to any UI, reserved for
-Phase 6), `PasswordResetToken`, `AuditEvent` (append-only). See the model
-comments in `prisma/schema.prisma` for exactly what's deliberately
-deferred to later phases (TimeEntry, HourBank, billing, etc.).
+Phase 0/1: `User` (internal staff + client-portal users share one table;
+role or per-client `ClientUser` membership determines authority),
+`Client`, `Category` (global or client-specific), `UserClientAccess`
+(which clients an employee may work with), `ClientUser` (a client-portal
+user's membership + role in one client - not yet wired to any UI,
+reserved for Phase 6), `PasswordResetToken`, `AuditEvent` (append-only).
+
+Phase 2 (spec 23: "Timer + TimeEntry + manual entry + audit revisions"):
+`Task` (free-text-first per spec 6.1; only enough is modeled for
+`TimeEntry.taskId` to point somewhere), `TimeEntry` (a row with
+`endAt = null` is a running timer; `actualSeconds`/`billableSeconds` are
+always server-computed, never client-trusted), `TimeEntryRevision`
+(immutable, one row per edit, `(timeEntryId, version)`-unique). The
+single-active-timer-per-user constraint (spec 18.2) is a raw Postgres
+partial unique index that only exists in the hand-authored migration SQL
+- see `prisma/schema.prisma`'s Phase 2 header comment and
+`docs/adr/0001-time-tracking-app-architecture.md` section 8 for why
+Prisma's schema DSL can't express it. See the model comments in
+`prisma/schema.prisma` for what's still deliberately deferred (HourBank,
+BillingPolicy, AlertRule, etc.).
 
 ### Seed data
 
