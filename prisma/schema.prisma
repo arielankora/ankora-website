@@ -156,6 +156,7 @@ model Client {
   billingPolicy       BillingPolicy?
   hourBanks           HourBank[]
   hourBankAdjustments HourBankAdjustment[]
+  alertRules          AlertRule[]
 
   @@index([status])
   @@map("clients")
@@ -523,4 +524,106 @@ model HourBankAdjustment {
 
   @@index([clientId, effectiveAt])
   @@map("hour_bank_adjustments")
+}
+
+// --- Phase 4: Alerts + email delivery -------------------------------------
+//
+// Scope discipline (spec section 23 / docs/adr/0001 addendum "Phase 4"):
+// only AlertRule, AlertEvent, EmailDelivery are modeled here.
+// ReportSchedule (Phase 5/6) and IntegrationConnection/ExternalMapping
+// (Phase 8) remain out of scope.
+
+/// Spec 9.1's threshold table. Forecast is explicitly marked "Future" in
+/// the spec itself, so only the other four rows are modeled - not an
+/// oversight, see ADR 11.3.
+enum AlertThresholdType {
+  UTILIZATION_PCT
+  REMAINING_MINUTES
+  CONSUMED_MINUTES
+  OVERAGE
+}
+
+enum EmailDeliveryStatus {
+  SENT
+  FAILED
+}
+
+/// Spec section 5 + 9.1. One row per (client, threshold definition).
+/// recipientsAnkora/recipientsClient are plain email-address arrays -
+/// spec 9.1: "כל Rule כולל recipients נפרדים ל-Ankora וללקוח" - no
+/// per-recipient entity is warranted for what is just a short address
+/// list per rule (ADR 11.3).
+model AlertRule {
+  id       String             @id @default(cuid())
+  clientId String
+  type     AlertThresholdType
+
+  /// Meaning depends on `type`: percentage points for UTILIZATION_PCT
+  /// (e.g. 80 = 80%), minutes for REMAINING_MINUTES/CONSUMED_MINUTES,
+  /// ignored (0) for OVERAGE - spec 9.1's own examples ("Remaining hours
+  /// <= 5") are always expressed here as minutes, never float hours, per
+  /// section 25's storage convention.
+  thresholdValue Int @default(0)
+
+  recipientsAnkora String[]
+  recipientsClient String[]
+
+  enabled Boolean @default(true)
+
+  /// Spec 9.2's own field name, used verbatim: "אלא אם
+  /// rule.allow_retrigger=true."
+  allowRetrigger Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  events AlertEvent[]
+
+  @@index([clientId, enabled])
+  @@map("alert_rules")
+}
+
+/// Spec section 5 + 9.2. One row per time a rule actually fires.
+/// resolvedAt implements the crossing/dedupe logic documented in ADR
+/// 11.3 - null means "still above threshold since it fired", set once
+/// utilization drops back below the threshold.
+model AlertEvent {
+  id         String   @id @default(cuid())
+  ruleId     String
+  hourBankId String
+  triggeredAt DateTime @default(now())
+  /// The raw metric value (minutes or percentage points, matching the
+  /// rule's own `type`) at the moment this event fired - spec 5's "value"
+  /// field, verbatim.
+  value      Int
+  resolvedAt DateTime?
+
+  rule           AlertRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  emailDeliveries EmailDelivery[]
+
+  @@index([ruleId, hourBankId])
+  @@map("alert_events")
+}
+
+/// Spec section 5's field list, verbatim: template, recipients,
+/// provider_message_id, status, attempts, error. One row per logical
+/// send action (Ankora recipients / client recipients are two separate
+/// rows when a rule has both) - see ADR 11.3.
+model EmailDelivery {
+  id               String              @id @default(cuid())
+  alertEventId     String?
+  template         String
+  recipients       String[]
+  providerMessageId String?
+  status           EmailDeliveryStatus
+  attempts         Int                 @default(1)
+  lastAttemptAt    DateTime            @default(now())
+  error            String?
+  createdAt        DateTime            @default(now())
+
+  alertEvent AlertEvent? @relation(fields: [alertEventId], references: [id], onDelete: SetNull)
+
+  @@index([status, attempts])
+  @@map("email_deliveries")
 }

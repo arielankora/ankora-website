@@ -29,6 +29,7 @@ function navItemsFor(role: User["role"]) {
   // + adjustments + live utilization, gated on the same Super-Admin-only
   // permission as the domain logic itself.
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות" });
+  if (can(role, "alert.manage")) items.push({ href: "/app/alerts", label: "התראות" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
   // Documentation, not a permission - every logged-in role should be able
   // to understand the system in their own language, including a

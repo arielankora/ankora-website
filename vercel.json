@@ -1,5 +1,8 @@
 {
   "redirects": [
     { "source": "/", "destination": "/he", "permanent": false }
+  ],
+  "crons": [
+    { "path": "/api/cron/alerts-reconcile", "schedule": "0 5 * * *" }
   ]
 }

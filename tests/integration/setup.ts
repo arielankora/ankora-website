@@ -17,6 +17,13 @@ export const prisma = new PrismaClient();
 
 const TABLES = [
   "audit_events",
+  // Phase 4 tables truncate before the Phase 3 tables they (loosely)
+  // reference - email_deliveries -> alert_events -> alert_rules -> clients.
+  // alert_events.hourBankId is a plain column (no FK - see ADR 11.3), so
+  // it does not need to precede hour_banks below.
+  "email_deliveries",
+  "alert_events",
+  "alert_rules",
   // Phase 3 tables truncate before the Phase 1/2 tables they reference.
   "hour_bank_adjustments",
   "hour_banks",
