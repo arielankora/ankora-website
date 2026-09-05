@@ -841,10 +841,14 @@ rather than duplicating that UI. Every role therefore sees between 4 and 5 botto
 tabs, never more - the two mobile-first roles named in spec §11/§13
 (`ANKORA_EMPLOYEE`, `CLIENT_USER`) both fit their entire nav across the 4 direct
 slots plus "עוד," so no destination is ever more than one tap away. The header
-hamburger button itself was removed on mobile widths (`MobileNav.tsx` is no longer
-rendered under `md:hidden` in `AppShell.tsx`); its sheet markup was reused as-is
-inside `BottomNav`'s "עוד" tab rather than duplicated. `<main>` gained
-`pb-20 md:pb-0` so page content is never hidden behind the fixed bar.
+hamburger button and `MobileNav.tsx` were deleted outright - the bottom bar's
+"עוד" tab is now the only entry point to that same content (name/role + sign-out,
+plus any nav items beyond the first 4), re-implemented directly inside
+`BottomNav.tsx` rather than importing the old component, since the trigger itself
+(a bottom tab vs. a header icon button) differs enough that keeping both would mean
+two divergent copies of the same sheet. `<main>` gained bottom padding (`pb-24` at
+mobile widths, `md:pb-10` at desktop) so page content is never hidden behind the
+fixed bar.
 
 ### 14.6 Explicitly deferred (not silently dropped)
 
