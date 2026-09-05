@@ -113,3 +113,17 @@ describe("can() - Phase 5 report.internal.view (ADR addendum 12.2)", () => {
     expect(can("CLIENT_USER", "report.internal.view")).toBe(false);
   });
 });
+
+// Phase 6 - spec 4.1's own example permission list also names
+// report.client.view. Granted to CLIENT_USER only (ADR addendum 13.2) -
+// SUPER_ADMIN/ANKORA_ADMIN already reach the same underlying data (and
+// more) through report.internal.view, so they don't additionally need
+// this client-scoped one.
+describe("can() - Phase 6 report.client.view (ADR addendum 13.2)", () => {
+  it("grants only CLIENT_USER report.client.view", () => {
+    expect(can("CLIENT_USER", "report.client.view")).toBe(true);
+    expect(can("SUPER_ADMIN", "report.client.view")).toBe(false);
+    expect(can("ANKORA_ADMIN", "report.client.view")).toBe(false);
+    expect(can("ANKORA_EMPLOYEE", "report.client.view")).toBe(false);
+  });
+});

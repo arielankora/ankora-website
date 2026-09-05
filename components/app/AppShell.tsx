@@ -13,6 +13,24 @@ const ROLE_LABELS: Record<User["role"], string> = {
 };
 
 function navItemsFor(role: User["role"]) {
+  // Phase 6 (spec 13 "Client Portal"): a CLIENT_USER gets an entirely
+  // separate, deliberately short nav - the portal is meant to "feel part
+  // of Ankora, not an internal tool exposed outward" (spec 13's own
+  // words), so it never shows any of the Ankora-internal admin screens
+  // below, even ones a permission check would technically pass (there are
+  // none for CLIENT_USER today, but this keeps the two navs structurally
+  // separate rather than relying on every future admin item remembering
+  // to gate itself out for this role).
+  if (role === "CLIENT_USER") {
+    return [
+      { href: "/app/portal", label: "לוח בקרה" },
+      { href: "/app/portal/weekly", label: "פעילות שבועית" },
+      { href: "/app/portal/monthly", label: "דוח חודשי" },
+      { href: "/app/portal/history", label: "היסטוריה" },
+      { href: "/app/guide", label: "מדריך שימוש" },
+    ];
+  }
+
   const items: { href: string; label: string }[] = [{ href: "/app", label: "בית" }];
   // Phase 2 (spec 11 "מסכים - חוויית עובד Ankora"): Today/Timer and My
   // Time come first in the nav for anyone who can track their own time -
@@ -34,10 +52,13 @@ function navItemsFor(role: User["role"]) {
   // reports + exports, gated on report.internal.view (SUPER_ADMIN +
   // ANKORA_ADMIN, unlike hour_bank.manage/alert.manage - see permissions.ts).
   if (can(role, "report.internal.view")) items.push({ href: "/app/reports", label: "דוחות" });
+  // Phase 6 (spec 12/15): Report Schedules admin screen - bundled with the
+  // same permission as Reports itself (see permissions.ts's Phase 6
+  // comment on report.internal.view vs report.client.view).
+  if (can(role, "report.internal.view")) items.push({ href: "/app/report-schedules", label: "דוחות מתוזמנים" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
   // Documentation, not a permission - every logged-in role should be able
-  // to understand the system in their own language, including a
-  // CLIENT_USER who currently has no other screen at all.
+  // to understand the system in their own language.
   items.push({ href: "/app/guide", label: "מדריך שימוש" });
   return items;
 }

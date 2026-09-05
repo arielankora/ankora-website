@@ -534,3 +534,169 @@ Phase 5.
 - XLSX/PDF export (12.5 above) - deferred, spec marks both "recommended," not required.
 - A literal 2D pivot-grid UI for "Employee x Client Matrix" - implemented as a flat,
   sortable table instead (12.3 above), consistent with every other report's table shape.
+
+
+## 13. Addendum: Phase 6 (Client portal + scheduled reports)
+
+### 13.1 Schema
+
+Two new models plus two small additions to existing ones, all additive (no column
+drops, no renames):
+
+- **`ReportSchedule`**: one row per recurring email report a client is subscribed to.
+  `clientId`, `reportType` (`ClientReportType`: `MONTHLY_DETAILED` | `WEEKLY_ACTIVITY` |
+  `HOURS_BY_CATEGORY` | `HOUR_BANK_STATUS` - the four rows of spec 14.1's table that
+  make sense as a recurring push; `Trend` is spec-marked "אופציונלי MVP+" and is not
+  built), `frequency` (`ReportFrequency`: `WEEKLY` | `MONTHLY`, spec section 15's two
+  named cadences), `recipients` (string array of emails, matching the Phase 4
+  `AlertRule.recipients` precedent), `timezone` (default `Asia/Jerusalem`, spec 15:
+  "כל Schedule שומר timezone"), `dayOfWeek`/`dayOfMonth`/`hour` (the schedule's stated
+  cadence - see 13.2 on why `hour` is not fully load-bearing yet), `enabled`, and
+  `lastSentAt`.
+- **`ReportRun`**: one row per report actually sent, `@@unique([scheduleId,
+  periodStart])` so the cron can never double-send the same period even if it's
+  retried or overlaps - this is the literal implementation of spec 15's "לפני שליחה
+  ליצור Snapshot/Report run id כדי שיהיה ניתן לדעת בדיוק מה נשלח." `snapshotJson`
+  stores the actual data that was sent (the "Snapshot" spec 15 names explicitly), so a
+  later dispute about what a client was shown can be answered from the `ReportRun`
+  itself rather than by re-running the report against today's (possibly since-edited)
+  data.
+- **`Client.portalShowEmployeeNames`** (`Boolean`, default `true`): spec 13's "Weekly
+  activity: ... עובדים לפי הגדרת privacy" and spec 14.1's "employee name configurable"
+  both name a per-client toggle without specifying a default. Default-true is a
+  deliberate choice for maximum transparency out of the box; Ankora can flip it off
+  per client if a specific contract requires anonymizing which employee did the work.
+- **`EmailDelivery.reportRunId`** (nullable, `onDelete: SetNull`): links a Phase 4
+  `EmailDelivery` log row to the `ReportRun` it delivered, reusing the existing email
+  logging/retry infrastructure (spec 15: "Email logs + retry") instead of building a
+  parallel one for report emails.
+
+### 13.2 Permission: `report.client.view`
+
+Named explicitly in spec 4.1's own permission list, alongside `report.internal.view`
+(Phase 5): "report.internal.view, report.client.view." Granted only to `CLIENT_USER`
+(both `ClientUserRole.ADMIN` and `ClientUserRole.VIEWER` get it - the role split
+governs recipient-management, not report *viewing*, see 13.4). `SUPER_ADMIN` and
+`ANKORA_ADMIN` do not need it: they already see the same underlying data, and more,
+through `report.internal.view`; granting them `report.client.view` too would just be a
+second permission gating the same admin's access to a client-scoped view they can
+already reach.
+
+### 13.3 Client Portal isolation: `resolvePortalClient` as the sole entry point
+
+Spec 21.2's integration-test requirement is explicit: "Client user של לקוח X לא יכול
+לשנות URL/ID ולקבל נתוני Y." Rather than relying on every portal function to
+individually re-check a caller-supplied `clientId` against the caller's own
+membership (a pattern that only needs one missed check, in one function, to leak data),
+`resolvePortalClient(actor)` in `lib/app-domain/client-portal.ts` is the **only**
+function in the file that touches the `ClientUser` table, and every other exported
+function (`getPortalDashboard`, `getWeeklyActivity`, `getMonthlyDetailed`,
+`getCategorySummary`, `getPortalHistory`) calls it first and uses the `clientId` it
+returns - none of them accept a `clientId` parameter from their own caller. Cross-client
+leakage is therefore structurally impossible for these functions, not merely
+prevented by discipline. This assumes one active `ClientUser` membership per user is
+the common case for the MVP; `resolvePortalClient` takes the first membership row if a
+user somehow has more than one (not currently reachable via any admin screen), which
+is a documented simplification rather than a modeled multi-client-per-user portal
+experience.
+
+### 13.4 Client-facing exclusions, enforced structurally
+
+Spec 13's own exclusion line: "אין גישה ל-Audit revisions, internal notes, actual time
+אם policy אומר להציג billable בלבד, או ללקוחות אחרים." Implemented the same way as
+13.3 - by construction, not by filtering after the fact:
+
+- `fetchPortalEntries()` (the one query every portal screen's rows flow through) never
+  selects `TimeEntry.note` (spec 6.1's internal free-text field) and never selects
+  `actualSeconds` - only `billableSeconds`, matching spec 25's stated basis for client
+  reports ("Client report basis: Billable time").
+- The client-visible "activity" description is `Task.title ?? Category.name`, never
+  the entry's own note - satisfying spec 13's "משימות שבוצעו" / spec 14.1's "משימה"
+  column with the field that's actually meant to be shown to a client.
+  `TimeEntryRevision` and `AuditEvent` are never joined anywhere in this file.
+
+### 13.5 Report cadence vs. Vercel Hobby-plan cron limits
+
+Spec 15 lets a schedule store an `hour` alongside `dayOfWeek`/`dayOfMonth`, implying
+per-schedule send-time control. Before wiring the cron, I checked Vercel's actual
+current plan limits (Hobby plan, correct as of this build): cron jobs are capped at a
+minimum **once-per-day** cadence - any more frequent expression fails at deploy time -
+though the per-project cron *count* was separately raised to 100. Given that
+constraint, `isScheduleDue()` checks only `dayOfWeek`/`dayOfMonth` (never `hour`), and
+`vercel.json` adds a single new daily cron (`/api/cron/scheduled-reports`, `"0 6 * *
+*"`) alongside Phase 4's existing alerts-reconcile cron. The `hour` field is kept on
+`ReportSchedule` and in the admin form - it is a genuine, stored admin preference for
+if/when finer-grained scheduling infrastructure exists - but is documented in both the
+code and the `ScheduleForm.tsx` UI itself ("בפועל נשלח פעם ביום; זהו תיעוד ההעדפה
+בלבד") as not currently load-bearing, rather than silently ignored without
+explanation.
+
+### 13.6 Idempotent sending and the "Send now" test path
+
+`sendReportSchedule(schedule, period, persist)` checks for an existing `ReportRun`
+(via the `@@unique([scheduleId, periodStart])` constraint, 13.1) before sending
+whenever `persist=true` - the daily cron is therefore safe to re-run or retry without
+ever double-sending the same period's report, directly implementing spec 15's
+snapshot/report-run-id requirement (13.1). Spec 15's separate line, "אפשר Send now
+מתוך Admin לצורך בדיקה," is implemented as `sendReportScheduleNow`, which calls the
+same send path with `persist=false`: it sends a real email (so the admin's test send is
+a real, honest preview) but deliberately skips creating a `ReportRun` and skips
+advancing `lastSentAt` - a manual test send must never "consume" or fulfill an actual
+scheduled period, or an admin testing the feature would silently cause that period's
+real client-facing report to never go out.
+
+### 13.7 Client Admin managing recipients: mapped onto the existing role split
+
+Spec 13: "Client Admin יכול לנהל recipients לדוחות/alerts אם Ankora מאפשרת." The
+spec's own role table (section 4) already distinguishes "Client Admin" from "Client
+Viewer," and the schema already models this distinction via `ClientUserRole.ADMIN` /
+`ClientUserRole.VIEWER` on `ClientUser` (built in Phase 1, unchanged here). Rather than
+inventing a new, separate per-client "allow recipient editing" toggle to represent "אם
+Ankora מאפשרת," this phase reads that permission as already expressed by which role
+Ankora assigns a given client's portal user: assigning `ADMIN` *is* how Ankora
+"allows" it. `updatePortalScheduleRecipients()` enforces `clientUserRole === "ADMIN"`
+and restricts the update to schedules belonging to that admin's own client (via
+`resolvePortalClient`, 13.3) - a Client Admin may only ever edit the `recipients`
+array, never `reportType`/`frequency`/`enabled`, which remain an Ankora-only decision
+via `report.internal.view`.
+
+### 13.8 Screens
+
+- `/app/portal` (Dashboard + Category summary combined) - spec 13's Dashboard
+  ("בנק שעות נוכחי, נוצל, נותר, % ניצול, ימים עד סוף cycle") and Category summary
+  ("hours + % of total") are shown on one screen rather than two, since both are
+  small, single-glance summaries and spec 13 lists them as adjacent bullets, not as
+  separate top-level nav items with their own depth of content.
+- `/app/portal/weekly` - spec 13's Weekly activity, with prev/next-week navigation.
+- `/app/portal/monthly` - spec 13/14.1's Monthly Detailed report, plus a CSV export
+  link (`/api/portal/export`) per spec 14.4's "Export מופק server-side עם אותן
+  הרשאות כמו המסך" - the export route calls the exact same `getMonthlyDetailed()`
+  domain function the screen renders, so the two can never disagree, mirroring the
+  Phase 5 internal-reports export's own pattern (12.3).
+- `/app/portal/history` - spec 13's History ("cycles קודמים ודוחות"), combining the
+  client's past `HourBank` cycles (reusing Phase 3's `listHourBanksForClient`) and its
+  `ReportRun` send history in one screen.
+- `AppShell`'s nav is special-cased for `CLIENT_USER`: rather than building the nav
+  from `can()` permission checks like every other role (which would require adding
+  portal routes to a shared admin-oriented nav-building function), `CLIENT_USER` gets
+  its own short, fixed nav list at the top of `navItemsFor()` - a client user's nav
+  never needs role/permission branching within itself, since every `CLIENT_USER`
+  sees the same four portal screens plus the guide.
+- `/app` (Overview) now redirects `CLIENT_USER` straight to `/app/portal` - a client
+  user has no use for the admin/employee Overview screen Phase 1/5 built.
+
+### 13.9 What Phase 6 does not include
+
+- `Trend` (spec 14.1, "אופציונלי MVP+") - explicitly optional, deferred.
+- PDF export for client reports (spec 14.4: "PDF לדוחות לקוח מומלץ" - recommended, not
+  mandatory, same deferral logic as Phase 5's XLSX/PDF deferral, 12.5).
+- A dedicated per-client "allow recipients editing" toggle separate from
+  `ClientUserRole` - deliberately not built, see 13.7.
+- Multi-client-per-user portal accounts - `resolvePortalClient` takes the first
+  `ClientUser` membership row; supporting a user who belongs to more than one client's
+  portal is not modeled by any admin screen shipped so far (13.3).
+- Attachment-mode report delivery - spec 15 mentions "attachment/link mode" as a
+  schedule field; this phase always sends the report inline in the email body
+  (matching the existing Phase 4 alert-email pattern) rather than as a file
+  attachment, since no admin UI in this or any prior phase generates a durable,
+  shareable link to a specific `ReportRun` yet. Documented deferral, not a silent gap.
