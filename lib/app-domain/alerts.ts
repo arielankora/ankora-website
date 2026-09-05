@@ -30,6 +30,14 @@ function normalizeEmails(emails: string[]): string[] {
   );
 }
 
+/// Phase 5 Overview KPI card ("alerts" per spec section 12) - a simple
+/// count of currently-open (unresolved) alert events across every client,
+/// reusing the same resolvedAt-based state Phase 4 already tracks rather
+/// than introducing a parallel "is this bad right now" concept.
+export async function countOpenAlertEvents(): Promise<number> {
+  return prisma.alertEvent.count({ where: { resolvedAt: null } });
+}
+
 export async function listAlertRulesForClient(clientId: string) {
   return prisma.alertRule.findMany({
     where: { clientId },

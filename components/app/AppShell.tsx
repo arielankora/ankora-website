@@ -30,6 +30,10 @@ function navItemsFor(role: User["role"]) {
   // permission as the domain logic itself.
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות" });
   if (can(role, "alert.manage")) items.push({ href: "/app/alerts", label: "התראות" });
+  // Phase 5 (spec 12): Reports admin screen - internal dashboards +
+  // reports + exports, gated on report.internal.view (SUPER_ADMIN +
+  // ANKORA_ADMIN, unlike hour_bank.manage/alert.manage - see permissions.ts).
+  if (can(role, "report.internal.view")) items.push({ href: "/app/reports", label: "דוחות" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
   // Documentation, not a permission - every logged-in role should be able
   // to understand the system in their own language, including a
