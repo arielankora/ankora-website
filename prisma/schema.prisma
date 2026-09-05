@@ -108,6 +108,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   timeEntries         TimeEntry[]
   timeEntryRevisions  TimeEntryRevision[]  @relation("TimeEntryRevisionActor")
+  hourBankAdjustments HourBankAdjustment[] @relation("HourBankAdjustmentCreator")
 
   @@index([role, status])
   @@map("users")
@@ -152,6 +153,9 @@ model Client {
   auditEvents  AuditEvent[] @relation("AuditClient")
   tasks        Task[]
   timeEntries  TimeEntry[]
+  billingPolicy       BillingPolicy?
+  hourBanks           HourBank[]
+  hourBankAdjustments HourBankAdjustment[]
 
   @@index([status])
   @@map("clients")
@@ -369,4 +373,154 @@ model TimeEntryRevision {
 
   @@unique([timeEntryId, version])
   @@map("time_entry_revisions")
+}
+
+// --- Phase 3: Billing policy + hour bank + live client snapshot ----------
+//
+// Scope discipline (spec section 23 / docs/adr/0001 addendum "Phase 3"):
+// only BillingPolicy, HourBank, HourBankAdjustment are modeled here.
+// AlertRule/AlertEvent (Phase 4), ReportSchedule/EmailDelivery (Phase 5/6),
+// IntegrationConnection/ExternalMapping (Phase 8) remain out of scope.
+//
+// billableSeconds on TimeEntry (added in Phase 2) is now actually allowed
+// to diverge from actualSeconds via BillingPolicy (spec section 7). A
+// client with NO BillingPolicy row keeps the exact Phase 2 behavior
+// (billable = actual, unmodified) - backward compatibility per the
+// engagement's own standing instruction. See lib/app-domain/billing.ts.
+
+/// Spec 7.1's own example table, used verbatim.
+enum RoundingMode {
+  CEIL
+  NEAREST
+  EXACT
+}
+
+/// Spec 7.1: "Aggregation scope: per entry / per task per day / per day."
+enum BillingAggregationScope {
+  PER_ENTRY
+  PER_TASK_PER_DAY
+  PER_DAY
+}
+
+/// Spec 8.2: "Rollover configurable: none / full / capped / manual."
+enum RolloverMode {
+  NONE
+  FULL
+  CAPPED
+  MANUAL
+}
+
+/// Spec 8.2: a cycle is normally OPEN (current), becomes CLOSED once
+/// cycle_end passes, and flips to RECALCULATED if a backdated edit lands
+/// inside an already-CLOSED cycle's date range ("המערכת מחשבת מחדש
+/// ומסמנת את ה-cycle כ-recalculated; אין לשנות silently דוח שכבר הופק
+/// ללא log").
+enum HourBankStatus {
+  OPEN
+  CLOSED
+  RECALCULATED
+}
+
+/// Spec section 5's field list, verbatim: client_id, minimum_minutes,
+/// increment_minutes, rounding_mode, applies_per_entry/per-task/per-day.
+/// One row per client (spec 7.1: "Client override: כן"); a client with no
+/// row here uses the neutral, no-op default (minimum 0, increment 1
+/// minute, rounding EXACT, per-entry) - i.e. billable stays identical to
+/// actual, exactly like every Phase 2 entry today. Spec 7.1's own
+/// "Employee override: לא, אלא Permission מיוחד" is intentionally NOT
+/// modeled as a separate per-user override table in Phase 3 - no such
+/// special permission exists yet, and adding the structure for a
+/// not-yet-real permission would be the same speculative scope creep the
+/// spec's own "לא להמציא" instruction (section 25) warns against.
+model BillingPolicy {
+  id               String                  @id @default(cuid())
+  clientId         String                  @unique
+  minimumMinutes   Int                     @default(0)
+  incrementMinutes Int                     @default(1)
+  roundingMode     RoundingMode            @default(EXACT)
+  aggregationScope BillingAggregationScope @default(PER_ENTRY)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("billing_policies")
+}
+
+/// Spec section 5 + 8.2. One row per client per cycle (monthly by
+/// default per section 25, but cycle_start/cycle_end are explicit dates
+/// so an irregular first/last cycle is representable). consumedMinutes is
+/// a cached snapshot of live usage (spec 8.3's formula, recomputed by
+/// lib/app-domain/hour-banks.ts on every read of "current" - never trusted
+/// stale for the live view) so historical cycles retain a sensible value
+/// once closed without re-scanning TimeEntry forever.
+///
+/// rolloverMode/rolloverCapMinutes are NOT in spec section 5's bare field
+/// list, but section 8.2 requires "Rollover configurable: none / full /
+/// capped / manual" per client/cycle and section 25 confirms "Rollover:
+/// Configurable; enabled per client if contract says so" without
+/// specifying where the mode itself lives. Storing it on the cycle that
+/// PRODUCES the rollover (rather than inventing a separate
+/// ClientBillingSettings entity the spec never mentions) is the smallest
+/// addition that satisfies the requirement - documented here and in
+/// docs/adr/0001's Phase 3 addendum as an explicit, deliberate choice for
+/// an underspecified parameter, per this engagement's standing
+/// "document decisions" instruction.
+model HourBank {
+  id       String @id @default(cuid())
+  clientId String
+
+  cycleStart DateTime
+  cycleEnd   DateTime
+
+  purchasedMinutes   Int
+  rolloverInMinutes  Int @default(0)
+  rolloverMode       RolloverMode @default(NONE)
+  /// Only meaningful when rolloverMode = CAPPED.
+  rolloverCapMinutes Int?
+
+  /// Cached snapshot - spec 8.3's live formula, recomputed on read.
+  consumedMinutes Int @default(0)
+
+  status         HourBankStatus @default(OPEN)
+  recalculatedAt DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  client      Client               @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  adjustments HourBankAdjustment[]
+
+  @@unique([clientId, cycleStart])
+  @@index([clientId, cycleStart])
+  @@map("hour_banks")
+}
+
+/// Spec section 5's field list, verbatim: client_id, minutes +/-, reason,
+/// created_by, effective_at. hourBankId is an additional, optional
+/// convenience FK (not in the spec's bare list) so the admin UI can
+/// attach an adjustment to a specific cycle explicitly rather than only
+/// inferring cycle membership from effective_at at read time - documented
+/// here as a deliberate, minimal addition, same rationale as HourBank's
+/// rollover fields above.
+model HourBankAdjustment {
+  id          String   @id @default(cuid())
+  clientId    String
+  hourBankId  String?
+  /// Positive = credit added, negative = deduction. Spec 8.2: "manual
+  /// adjustments."
+  minutes     Int
+  reason      String
+  createdById String?
+  effectiveAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  client    Client    @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  hourBank  HourBank? @relation(fields: [hourBankId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation("HourBankAdjustmentCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([clientId, effectiveAt])
+  @@map("hour_bank_adjustments")
 }

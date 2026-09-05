@@ -8,7 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 export const metadata = { robots: { index: false, follow: false } };
 
 const PAGE_SIZE = 50;
-const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry"];
+const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry", "BillingPolicy", "HourBank", "HourBankAdjustment"];
 
 const ACTION_LABEL: Record<string, string> = {
   "login.success": "התחברות מוצלחת",
@@ -31,6 +31,11 @@ const ACTION_LABEL: Record<string, string> = {
   "time_entry.create": "יצירת דיווח זמן",
   "time_entry.update": "עדכון דיווח זמן",
   "time_entry.delete": "מחיקת דיווח זמן",
+  // Phase 3 (spec 8: בנק שעות + מדיניות חיוב).
+  "billing_policy.create": "יצירת מדיניות חיוב",
+  "billing_policy.update": "עדכון מדיניות חיוב",
+  "hour_bank.open_cycle": "פתיחת מחזור בנק שעות",
+  "hour_bank.adjustment.create": "התאמה ידנית לבנק שעות",
 };
 
 function formatDateTime(date: Date) {

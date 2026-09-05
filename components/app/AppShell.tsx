@@ -25,6 +25,10 @@ function navItemsFor(role: User["role"]) {
   // the same permission that lets an admin edit someone else's entries.
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן" });
   if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים" });
+  // Phase 3 (spec 12): Hour Banks admin screen - billing policy + cycles
+  // + adjustments + live utilization, gated on the same Super-Admin-only
+  // permission as the domain logic itself.
+  if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
   return items;
 }
