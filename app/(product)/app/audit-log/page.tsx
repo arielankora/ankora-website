@@ -16,7 +16,6 @@ const ACTION_LABEL: Record<string, string> = {
   "password_reset.requested": "בקשת איפוס סיסמה",
   "password_reset.completed": "איפוס סיסמה הושלם",
   "user.invite": "הזמנת משתמש",
-  "user.bootstrap_invite": "יצירת חשבון Super Admin ראשוני (bootstrap)",
   "user.role_status_change": "שינוי תפקיד/סטטוס",
   "user.client_access_change": "שינוי גישה ללקוחות",
   "user.logout_all_sessions": "ניתוק כל ההתחברויות",
