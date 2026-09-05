@@ -413,3 +413,124 @@ The daily scheduled reconciliation (spec 9.2's second requirement, "scheduled re
 - Scheduled weekly/monthly reports (spec section 15) - that's Phase 6, not Phase 4.
 - The Forecast threshold type (explicitly marked "Future" in spec 9.1).
 - Any change to the forgot-password/invite email flows - `lib/email.ts` exists and is proven, but wiring it into auth is a separate, explicitly-scoped future change.
+
+## 12. Addendum: Phase 5 (Internal dashboards + reports + exports)
+
+### 12.1 No new schema
+
+Every report in this phase is a read-only aggregation over data Phases 1-4 already
+persist (`TimeEntry`, `HourBank`, `AlertRule`/`AlertEvent`, `User`, `Client`, `Category`).
+`ReportSchedule` - the one report-related model spec section 5 lists - is deliberately
+**not** added here: it exists to persist a *recurring email schedule* (spec section 15,
+"דוחות מתוזמנים במייל"), which is explicitly Phase 6 scope per spec section 23
+("Phase 6 | Client portal + scheduled reports"). Adding it now, unused, would be the
+same scope creep every prior phase's schema comments warn against.
+
+### 12.2 Permission: `report.internal.view`
+
+Unlike `hour_bank.manage` (Phase 3) and `alert.manage` (Phase 4), which are both
+Super-Admin-only because spec section 4's role table is silent on them for Ankora
+Admin/Manager, `report.internal.view` **is** named in spec 4.1's own example
+permission list, and Ankora Admin/Manager's own role-table row explicitly includes
+"דוחות" (reports): "לקוחות/קטגוריות/דוחות/עריכות לפי הרשאה." So this permission is
+granted to both `SUPER_ADMIN` and `ANKORA_ADMIN` - the opposite default from the two
+prior phases, and consistent with treating an explicit spec grant differently from an
+explicit spec silence (the same distinction the Phase 2/3/4 comments already draw in
+`permissions.ts`). `ANKORA_EMPLOYEE` and `CLIENT_USER` get nothing here: spec 4's
+Employee row never mentions reports, and `report.client.view` (client-facing reports,
+spec section 13's Client Portal) is a separate, still-unbuilt permission reserved for
+Phase 6.
+
+### 12.3 The nine internal report types (spec 14.2)
+
+All nine rows of spec 14.2's table are implemented in `lib/app-domain/reports.ts`,
+sharing one `fetchEntries()` query builder wherever the report is a per-TimeEntry
+aggregation, plus a single `runReport(actor, type, filters)` entry point used by BOTH
+the `/app/reports` screen and the CSV export route - one function, one permission
+check, so the two can never show different numbers for what claims to be the same
+report (spec 14.4: "Export מופק server-side עם אותן הרשאות כמו המסך").
+
+Decisions the spec's one-line-per-report table doesn't spell out:
+
+- **Total Client Hours**: read literally as an overall summary (entry count, distinct
+  client count, actual/billable minutes) over whatever scope the filters select, not a
+  per-client breakdown - that's "Hours by Client" below, which owns the per-client view.
+- **Hours by Client**: reads the SAME live current-cycle `HourBank` snapshot the Hour
+  Banks screen (Phase 3) already computes via `getCurrentHourBank()`, rather than
+  re-deriving used/remaining/utilization from the report's own date-range filter.
+  "Used/remaining/utilization" are cycle-scoped concepts (spec 8.3), not period-scoped
+  ones - applying an arbitrary `from`/`to` to them would produce a number that
+  disagrees with the Hour Banks screen an admin would naturally cross-check against.
+- **Employee x Client Matrix vs. Capacity**: spec 14.2 describes these almost
+  identically ("מי עובד כמה עבור כל לקוח" vs. "שעות עובד בתקופה + חלוקה ללקוחות").
+  Implemented as two different shapes of the same underlying per-(employee, client)
+  aggregation: the Matrix is flattened to one row per (employee, client) pair for
+  anyone who wants every individual pairing; Capacity is one row per EMPLOYEE with
+  their period total plus a single composite "client: minutes; client: minutes" text
+  cell, for an at-a-glance capacity view without the full cross-tab. Documented rather
+  than silently picking one and dropping the other.
+- **Manual Edits**: `isManual` and `isEdited` are independent flags (spec 6.3/6.4) - an
+  entry can be one, the other, both, or (most commonly) neither. This report includes a
+  row for EITHER flag being true, with "actor"/"reason" taken from the entry's latest
+  `TimeEntryRevision` (falling back to the original reporting employee and an empty
+  reason when an entry is manual but was never subsequently edited, since only edits
+  produce a revision row - spec 6.1/6.4).
+- **Overage / At Risk**: "Overage" = utilization at/over 100% (or literally negative
+  remaining minutes). "At risk" ("קרובים אליו") needed a concrete cutoff the spec
+  doesn't define. Rather than inventing an unrelated second threshold, this reuses each
+  client's OWN lowest enabled `UTILIZATION_PCT` alert rule (Phase 4) as the "close to
+  it" cutoff - the earliest warning an admin already configured for that specific
+  client - falling back to a documented default of 80% for a client with no such rule
+  configured yet. This ties Phase 5 directly back to Phase 4's existing per-client
+  configuration instead of introducing a disconnected, unconfigurable concept.
+- **Active Timers**: excluded from every other report's `fetchEntries()` (which
+  requires `endAt IS NOT NULL`, since a running timer has no `actualSeconds`/
+  `billableSeconds` yet) and given its own query, matching spec 14.2's own separate
+  table row. "Long-running" reuses the same `LONG_TIMER_HOURS = 8` constant as the new
+  Overview anomaly card (12.4 below) and spec 6.1's own example ("8/12 שעות
+  configurable") - a literal constant for now since no per-client/per-org configuration
+  UI exists for this threshold in any phase shipped so far, exactly like Phase 3's
+  `DEFAULT_POLICY` was a documented literal default before any config screen existed
+  for it.
+
+### 12.4 Overview screen KPI cards (spec section 12)
+
+Spec 12's Overview row lists five KPIs the original Phase 1 landing page (a plain
+active-client/category/user count) never covered: "active timers, total today/month,
+client utilization, alerts, overdue anomalies." All five are now on `/app`, gated on
+`report.internal.view` (so `ANKORA_EMPLOYEE` keeps seeing today's simple state, per
+spec 12's own placement of "Overview" in the ADMIN screens table, not spec 11's
+employee-facing one) - except the "alerts" card specifically, which stays gated on the
+separate `alert.manage` permission, matching the existing precedent that alert data is
+Super-Admin-only (Phase 4 addendum, 11.2) even for an `ANKORA_ADMIN` who now sees every
+other new KPI. "Client utilization" is the average `utilizationPct` across every active
+client's current Hour Bank cycle (Phase 3's own live snapshot, not re-derived), with a
+secondary count of clients at/over 90% highlighted - a deliberately simple summary
+rather than duplicating the full "Overage/At Risk" report's per-client detail, which is
+one click away via the new "לכל הדוחות הפנימיים" link. "Overdue anomalies" is
+implemented as the count of currently-running timers already past `LONG_TIMER_HOURS`
+(8h) - the same anomaly spec 6.1 already asks the Timer screen to warn about, now
+surfaced in aggregate for admins.
+
+### 12.5 Export: CSV mandatory, XLSX/PDF deferred
+
+Spec 14.4: "CSV חובה. XLSX מומלץ. PDF לדוחות לקוח מומלץ." Only CSV is implemented in
+this phase - the other two are explicitly "מומלץ" (recommended), not "חובה"
+(mandatory), in the same spec sentence, and PDF is scoped to *client* reports (spec
+14.1's table), which don't exist until Phase 6's Client Portal. No CSV/XLSX library was
+already a dependency of this repo, so CSV is hand-written (`app/api/reports/export/route.ts`):
+minimal RFC 4180 field escaping, a UTF-8 BOM prefix so Hebrew opens correctly in Excel
+(spec 14.4, explicit requirement), and a filename of `{report}_{client-or-"all-clients"}_{date}.csv`
+matching the spec's "שם הקובץ כולל client/report/date." Adding XLSX is a documented,
+deliberate deferral - not a silent gap - for a future phase if Ariel asks for it,
+rather than adding a new dependency for a "recommended" (not required) feature during
+Phase 5.
+
+### 12.6 What Phase 5 does not include
+
+- `ReportSchedule` / scheduled email delivery of reports (spec section 15) - Phase 6.
+- Client-facing reports and the Client Portal (spec sections 13, 14.1) - Phase 6,
+  gated on the not-yet-added `report.client.view` permission.
+- XLSX/PDF export (12.5 above) - deferred, spec marks both "recommended," not required.
+- A literal 2D pivot-grid UI for "Employee x Client Matrix" - implemented as a flat,
+  sortable table instead (12.3 above), consistent with every other report's table shape.

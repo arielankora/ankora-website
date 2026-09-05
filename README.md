@@ -31,11 +31,14 @@ Visit http://localhost:3000 — redirects to /he. Toggle language via the header
 
 ## Time Tracking app (`/app`)
 
-Phase 0 (audit/schema/environments) and Phase 1 (auth, roles, users,
-clients, categories) of `docs/adr/0001-time-tracking-app-architecture.md`.
-Phase 2 onward (timer, billing, dashboards, client portal, ...) is not
-built - see the ADR's phased plan for what's still ahead, and don't start
-it without a fresh go-ahead.
+Phases 0-5 of `docs/adr/0001-time-tracking-app-architecture.md`'s plan
+are built: audit/schema/environments (0), auth/roles/users/clients/
+categories (1), timer + manual time entries + audit revisions (2),
+billing policy + hour banks (3), alerts + email delivery (4), and
+internal dashboards/reports/CSV export (5). Client Portal + scheduled
+reports (Phase 6) and later phases are not built yet - see the ADR's
+phased plan for what's still ahead, and don't start it without a fresh
+go-ahead.
 
 ### Stack
 
@@ -99,11 +102,18 @@ one phase.
 ### Roles & permissions
 
 Four roles (`prisma/schema.prisma`'s `UserRole`): `SUPER_ADMIN` (every
-permission), `ANKORA_ADMIN` (clients + categories + time entries, not
-users or the audit log), `ANKORA_EMPLOYEE` (own timer/entries only:
-`time_entry.create_self` + `time_entry.edit_self`, never `edit_others`),
-and `CLIENT_USER` (no admin permissions and no `time_entry.*` at all -
-client-facing screens are Phase 6). The full map is `ROLE_PERMISSIONS` in
+permission, including the two Super-Admin-only screens - Hour Banks and
+Alerts), `ANKORA_ADMIN` (clients + categories + time entries + internal
+reports, not users, the audit log, hour banks, or alerts), `ANKORA_EMPLOYEE`
+(own timer/entries only: `time_entry.create_self` + `time_entry.edit_self`,
+never `edit_others`), and `CLIENT_USER` (no admin permissions and no
+`time_entry.*` at all - client-facing screens are Phase 6). Note that
+`report.internal.view` (Phase 5) is deliberately granted to `ANKORA_ADMIN`
+too, unlike `hour_bank.manage` (Phase 3) and `alert.manage` (Phase 4) which
+are Super-Admin-only - spec section 4's role table explicitly lists
+"דוחות" (reports) under Ankora Admin/Manager but never mentions hour banks
+or alerts for that role; see `docs/adr/0001`'s Phase 3/4/5 addenda for the
+full reasoning. The full map is `ROLE_PERMISSIONS` in
 `lib/app-auth/permissions.ts`; every mutation checks it server-side via
 `assertCan()` - nothing is enforced by hiding a nav link alone.
 

@@ -99,3 +99,17 @@ describe("can() - Phase 4 alert.manage (ADR 11.2)", () => {
     expect(can("CLIENT_USER", "alert.manage")).toBe(false);
   });
 });
+
+// Phase 5 - the OPPOSITE precedent from hour_bank.manage/alert.manage:
+// spec 4.1's own example list names report.internal.view explicitly, and
+// spec 4's role table explicitly grants Ankora Admin/Manager "דוחות"
+// (reports) - so this one IS shared with ANKORA_ADMIN, not Super-Admin-
+// only (ADR addendum 12.2).
+describe("can() - Phase 5 report.internal.view (ADR addendum 12.2)", () => {
+  it("grants SUPER_ADMIN and ANKORA_ADMIN report.internal.view, but not ANKORA_EMPLOYEE or CLIENT_USER", () => {
+    expect(can("SUPER_ADMIN", "report.internal.view")).toBe(true);
+    expect(can("ANKORA_ADMIN", "report.internal.view")).toBe(true);
+    expect(can("ANKORA_EMPLOYEE", "report.internal.view")).toBe(false);
+    expect(can("CLIENT_USER", "report.internal.view")).toBe(false);
+  });
+});
