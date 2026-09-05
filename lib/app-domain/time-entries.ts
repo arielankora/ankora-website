@@ -54,6 +54,20 @@ export class BackdateReasonRequiredError extends Error {
   }
 }
 
+/// Phase 7 (spec 20: "Conflict = אם Entry השתנה במקביל, לא לדרוס. להציג
+/// refresh/compare."). Thrown by updateTimeEntry when the caller supplied
+/// an `expectedUpdatedAt` (captured when their edit form was opened/last
+/// loaded) that no longer matches the row's current `updatedAt` - i.e.
+/// someone else changed this entry after this editor loaded it. The
+/// update is rejected before any write happens; the caller is expected to
+/// refresh and re-apply their edit rather than silently overwriting.
+export class ConflictError extends Error {
+  constructor(public readonly current: TimeEntry) {
+    super("This entry was changed by someone else since you opened it.");
+    this.name = "ConflictError";
+  }
+}
+
 function localDateKey(date: Date): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(date); // YYYY-MM-DD
 }
@@ -381,11 +395,21 @@ export async function updateTimeEntry(
     note?: string | null;
     reason?: string | null;
     allowOverlapOverride?: boolean;
+    /// Phase 7 (spec 20 conflict rule) - the entry's `updatedAt` as of
+    /// when the caller's edit form was loaded/last refreshed. Optional so
+    /// existing callers (tests, the timer-stop flow's own internal
+    /// updates) that don't have a "form load time" to compare against are
+    /// unaffected; every UI edit form now always sends it.
+    expectedUpdatedAt?: Date;
   }
 ) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
   const isSelf = entry.userId === actor.id;
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  if (input.expectedUpdatedAt && input.expectedUpdatedAt.getTime() !== entry.updatedAt.getTime()) {
+    throw new ConflictError(entry);
+  }
 
   // Spec 6.4: self-edit window. edit_others (manager+) bypasses it
   // entirely, which is exactly the escape hatch the spec describes

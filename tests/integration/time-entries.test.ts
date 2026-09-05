@@ -13,6 +13,7 @@ import {
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
+  ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
@@ -246,6 +247,38 @@ describe("updateTimeEntry - spec 5.1 revisions, 6.4 edit window", () => {
       orderBy: { version: "asc" },
     });
     expect(revisions.map((r) => r.version)).toEqual([1, 2]);
+  });
+
+  it("rejects an edit whose expectedUpdatedAt no longer matches (spec 20 conflict rule)", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id });
+
+    // Someone else's edit lands first...
+    await updateTimeEntry(employee, entry.id, { note: "Someone else's change" });
+
+    // ...then this caller, still holding the entry's original updatedAt
+    // from before that edit, tries to save on top of it.
+    await expect(
+      updateTimeEntry(employee, entry.id, {
+        note: "My stale change",
+        expectedUpdatedAt: entry.updatedAt,
+      })
+    ).rejects.toBeInstanceOf(ConflictError);
+
+    // The rejected edit must not have been applied.
+    const stillThere = await prisma.timeEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(stillThere.note).toBe("Someone else's change");
+  });
+
+  it("allows the edit when expectedUpdatedAt matches the current row (no false-positive conflicts)", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id });
+
+    const updated = await updateTimeEntry(employee, entry.id, {
+      note: "First real edit",
+      expectedUpdatedAt: entry.updatedAt,
+    });
+    expect(updated.note).toBe("First real edit");
   });
 
   it("blocks a self-edit past the window unless the actor has edit_others (spec 6.4)", async () => {

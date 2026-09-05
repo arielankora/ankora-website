@@ -850,6 +850,34 @@ two divergent copies of the same sheet. `<main>` gained bottom padding (`pb-24` 
 mobile widths, `md:pb-10` at desktop) so page content is never hidden behind the
 fixed bar.
 
+### 14.7 Edit-conflict detection (spec 20)
+
+Audit found a real gap here, not just missing polish: `updateTimeEntry` (Phase 2)
+always wrote against whatever the row's current state was at write time, with no
+check against what the editor's form had actually loaded - two people editing the
+same entry within the self-edit window would silently last-write-wins overwrite each
+other (fully audited via `TimeEntryRevision`, but never surfaced to either editor).
+Fixed with a minimal optimistic-concurrency check rather than a full versioning
+scheme: every edit form (`EntryRow.tsx`, `AdminEntryRow.tsx`) now carries a hidden
+`expectedUpdatedAt` field set to the entry's `updatedAt` at render time; both server
+actions pass it through to `updateTimeEntry`, which now throws a new `ConflictError`
+- before applying any change - if the row's current `updatedAt` no longer matches.
+The UI's `friendlyError()` maps that to "הרשומה הזו עודכנה בינתיים... יש לרענן"
+rather than the generic error, giving the editor exactly the "refresh/compare"
+signal spec 20 asks for (compare-and-merge itself was judged out of scope - the
+existing revision history already lets an admin see what changed). The parameter is
+optional so internal callers with no "form load time" of their own (tests, other
+domain functions) are unaffected - see the two new tests in
+`tests/integration/time-entries.test.ts`.
+
+### 14.8 Loading skeleton (spec 20)
+
+Added `app/(product)/app/loading.tsx` - a single generic skeleton (Next.js's
+`loading.tsx` convention) rather than a bespoke one per screen, since building
+20+ hand-tuned skeletons is disproportionate to what spec 20's one-line requirement
+("Loading skeletons במסכים מרכזיים") calls for. Shows automatically during
+server-side data fetches on navigation.
+
 ### 14.6 Explicitly deferred (not silently dropped)
 
 - Content-Security-Policy header (14.3) - needs a nonce strategy tuned against the

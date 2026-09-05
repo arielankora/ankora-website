@@ -112,6 +112,7 @@ export default async function AdminTimeEntriesPage({
                     userName: entry.user.name,
                     clientName: entry.client.name,
                     categoryName: entry.category.name,
+                    updatedAt: entry.updatedAt.toISOString(),
                   }}
                 />
               ))}
