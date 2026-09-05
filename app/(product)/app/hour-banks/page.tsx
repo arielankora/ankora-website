@@ -102,7 +102,7 @@ export default async function HourBanksPage({ searchParams }: { searchParams: { 
                 <h2 className="text-sm font-medium text-navy">מחזור נוכחי</h2>
                 <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
                   <div>
-                    <p className="text-xs text-navy/40">סה"כ זמין</p>
+                    <p className="text-xs text-navy/40">סה&quot;כ זמין</p>
                     <p className="mt-1 text-lg font-medium text-navy">{formatMinutes(current.utilization.totalMinutes)}</p>
                   </div>
                   <div>

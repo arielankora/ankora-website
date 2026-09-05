@@ -91,7 +91,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           min={0}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
         />
-        <p className="mt-1 text-[11px] text-navy/40">רלוונטי רק אם המחזור הקודם הוגדר כ"ידני" - הזינו כאן כמה דקות יעברו אליו.</p>
+        <p className="mt-1 text-[11px] text-navy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
       </div>
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
