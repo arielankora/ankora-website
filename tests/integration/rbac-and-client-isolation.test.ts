@@ -88,3 +88,48 @@ describe("Client isolation - spec 4.1 'an employee cannot be assigned to a clien
     expect(access.map((a) => a.clientId)).toEqual([clientB.id]);
   });
 });
+
+describe("inviteUser() with role CLIENT_USER (Phase 6 fix - see docs/adr/0001 addendum 13)", () => {
+  it("creates a ClientUser membership, never a UserClientAccess row, for a CLIENT_USER invite", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const client = await createTestClient({ name: "Portal Client" });
+
+    const { user: invited } = await inviteUser(superAdmin, {
+      name: "Portal Person",
+      email: "portal-person@test.ankora.local",
+      role: "CLIENT_USER",
+      clientIds: [client.id],
+      clientUserRole: "ADMIN",
+    });
+
+    const membership = await prisma.clientUser.findFirst({ where: { userId: invited.id } });
+    expect(membership?.clientId).toBe(client.id);
+    expect(membership?.role).toBe("ADMIN");
+
+    const access = await prisma.userClientAccess.findMany({ where: { userId: invited.id } });
+    expect(access).toHaveLength(0);
+  });
+
+  it("defaults the ClientUser role to VIEWER when none is specified", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const client = await createTestClient({ name: "Portal Client 2" });
+
+    const { user: invited } = await inviteUser(superAdmin, {
+      name: "Portal Viewer",
+      email: "portal-viewer@test.ankora.local",
+      role: "CLIENT_USER",
+      clientIds: [client.id],
+    });
+
+    const membership = await prisma.clientUser.findFirst({ where: { userId: invited.id } });
+    expect(membership?.role).toBe("VIEWER");
+  });
+
+  it("rejects a CLIENT_USER invite with no client selected", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+
+    await expect(
+      inviteUser(superAdmin, { name: "No Client", email: "no-client@test.ankora.local", role: "CLIENT_USER" })
+    ).rejects.toThrow();
+  });
+});

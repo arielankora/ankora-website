@@ -700,3 +700,21 @@ via `report.internal.view`.
   (matching the existing Phase 4 alert-email pattern) rather than as a file
   attachment, since no admin UI in this or any prior phase generates a durable,
   shareable link to a specific `ReportRun` yet. Documented deferral, not a silent gap.
+
+### 13.10 Bug found during this phase's own verification: no way to create a CLIENT_USER
+
+Live QA prep for this phase surfaced a real gap, not a documented deferral: the
+Phase 1 Users screen's invite form never listed `CLIENT_USER` as a selectable role,
+and `inviteUser()` only ever wrote `UserClientAccess` rows - the table that scopes an
+`ANKORA_EMPLOYEE`/`ANKORA_ADMIN`'s time-reporting access to clients - never
+`ClientUser`, the table `resolvePortalClient()` (13.3) actually reads. Net effect: the
+entire Client Portal built in this phase was unreachable in Production, because no
+admin action existed that could ever produce a `ClientUser` membership row for a real
+person. Fixed within this same phase (not deferred, since a portal nobody can be
+given access to is not a shipped feature): `inviteUser()` now takes an optional
+`clientUserRole` and, when `role === "CLIENT_USER"`, requires exactly one client and
+creates a `ClientUser` row instead of `UserClientAccess` rows; `InviteUserForm.tsx`
+now lists "לקוח (פורטל לקוח)" as a role option and swaps the multi-client checkbox
+list for a single required client select + a `ClientUserRole` select when that role is
+chosen. The Users guide section and its previously-accurate note that CLIENT_USER
+invites weren't yet possible were both updated in the same change.
