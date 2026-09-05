@@ -19,6 +19,21 @@ const THRESHOLD_LABEL: Record<string, string> = {
   OVERAGE: "חריגה",
 };
 
+// Spelled out in words rather than with a >=/<= symbol: a comparison
+// symbol embedded directly in RTL Hebrew text gets visually mirrored by
+// the browser's bidi algorithm (>= renders as <= on screen even though
+// the underlying character is unchanged), which would show the opposite
+// of the real breach condition from lib/app-domain/alerts.ts's
+// isThresholdBreached(). REMAINING_MINUTES breaches at-or-below the
+// threshold; every other type breaches at-or-above it.
+function describeThreshold(type: string, thresholdValue: number): string {
+  const label = THRESHOLD_LABEL[type] ?? type;
+  if (type === "REMAINING_MINUTES") {
+    return `${label}: ${thresholdValue} או פחות`;
+  }
+  return `${label}: ${thresholdValue} או יותר`;
+}
+
 function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(
     date
@@ -91,7 +106,7 @@ export default async function AlertsPage({ searchParams }: { searchParams: { cli
                     <div className="flex items-center gap-3">
                       <StatusBadge label={rule.enabled ? "פעיל" : "מושבת"} tone={rule.enabled ? "green" : "gray"} />
                       <span className="text-sm font-medium text-navy">
-                        {THRESHOLD_LABEL[rule.type] ?? rule.type} &ge; {rule.thresholdValue}
+                        {describeThreshold(rule.type, rule.thresholdValue)}
                       </span>
                       {rule.allowRetrigger && (
                         <span className="text-[11px] text-navy/40">(התראה חוזרת מופעלת)</span>
