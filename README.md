@@ -167,6 +167,30 @@ enforcement, and client-access isolation, against a real Postgres
 database - they truncate all tables before each test, so point
 `DATABASE_URL` at a throwaway local/dev database, never Production.
 
+### Deployment / rollback
+
+Every push to `main` auto-deploys to Production (`ankora.co.il`) via
+Vercel's GitHub integration; every other branch gets its own Preview URL.
+Phase 8 addendum (spec section 24 checklist: "Deployment rollback
+documented") - there is no custom rollback script, because Vercel's own
+mechanism already covers it and a custom one would just be a worse copy:
+
+1. Open the project's **Deployments** tab in the Vercel dashboard.
+2. Find the last known-good Production deployment (each one is pinned to
+   the exact git commit it was built from).
+3. Click **"..." -> Promote to Production** on that deployment.
+
+This re-points `ankora.co.il` at the previous build instantly (no
+rebuild, no redeploy) - the fastest possible rollback. It does **not**
+revert the database: if the bad deploy included a migration, promoting an
+older build does not undo that migration, so a schema-changing deploy
+should be verified on its own Preview URL (every branch already gets one
+automatically) before merging to `main`, exactly as every phase in this
+project's own history has done. If a bad migration itself needs undoing,
+that is a manual, hand-reviewed SQL operation against the actual
+Production database - never something to script blindly, since Prisma
+does not auto-generate a safe "down" migration.
+
 ### Known limitations (Phase 1, by design)
 
 - **No email provider yet** (Phase 4) - invite links and password-reset
