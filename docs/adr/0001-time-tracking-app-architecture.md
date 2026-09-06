@@ -1408,3 +1408,51 @@ documented reason (their domain modules import Prisma transitively); the
 two new passed files (`xlsx.test.ts`, `pdf.test.ts`) import neither Prisma
 nor anything that does, so they actually run here and pass, unlike almost
 every other domain-level test in this suite.
+
+### 18.11 Post-merge-prep fix: pdfkit standard-font bundling bug (live QA)
+
+Live QA on the Phase 9 Preview deployment (not caught by local `tsc`/
+`vitest`, which run under plain `node`) found `/api/reports/export?format=pdf`
+intermittently 500ing in production/preview with:
+
+```
+Error: Cannot find module '#standard-fonts/Helvetica'
+Require stack:
+- node_modules/pdfkit/js/pdfkit.node.mjs
+```
+
+Root cause: pdfkit's `PDFDocument` constructor eagerly calls
+`.font("Helvetica")` (its built-in default) unless told not to. Loading
+that *standard* (non-embedded) font requires pdfkit's Node build to
+`require("#standard-fonts/Helvetica")` - a package.json `"imports"`
+subpath resolved via a `createRequire(import.meta.url)` handle stored in a
+variable, not a literal `require("...")` call. Next.js's serverless
+output-file-tracing does not follow that dynamic, computed-specifier
+require, so the `.afm` data file it points to is silently missing from
+the deployed function's bundle, and the constructor's own default-font
+load throws `MODULE_NOT_FOUND` at runtime - despite pdfkit working
+perfectly under plain `node` locally (including this file's own vitest
+suite, where `node_modules` is intact on disk and the require resolves
+normally). This is why the bug was invisible to every local check in
+section 18.10 and only surfaced live.
+
+Fix (`lib/pdf.ts`): pass `font: false` in the `PDFDocument` constructor
+options, which disables that eager default-font load entirely. Every
+actual text draw in `toPdfTable()` goes through `drawCell()`, which always
+explicitly sets `HEBREW_FONT`/`LATIN_FONT` (real embedded fontsource
+files registered via `registerFonts()`, not a pdfkit standard font)
+before drawing - so pdfkit's standard-font loader is never invoked at
+all once the eager default is disabled. `@types/pdfkit`'s
+`PDFDocumentOptions` only types `font` as `string | undefined` (missing
+pdfkit's own documented `false` option), hence the
+`as unknown as PDFKit.PDFDocumentOptions` cast at the call site.
+
+Re-verified after the fix: `npx vitest run tests/unit/pdf.test.ts
+tests/unit/xlsx.test.ts` (9/9 pass, unchanged), `npx tsc --noEmit`
+(no new errors introduced), and the same manual `pdftotext -bbox`
+objective RTL check from section 18.10 re-run against a freshly generated
+PDF - title and row word ordering both still correct. Then re-deployed to
+the Phase 9 Preview branch and re-tested the live `/api/reports/export`
+PDF endpoint directly (see PR description / Ariel report for the
+live-QA result at deploy time).
+

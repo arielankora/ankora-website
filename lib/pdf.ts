@@ -109,7 +109,35 @@ export interface PdfTableOptions {
 /// no built-in table/pagination widget.
 export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: "A4", margin: 40, bufferPages: true });
+    // `font: false` is load-bearing, not cosmetic. Discovered via live QA on
+    // the Phase 9 gap-fix Preview deployment (docs/adr/0001 section 18):
+    // without it, pdfkit's constructor eagerly calls `.font("Helvetica")`
+    // (its built-in default) before this function ever runs. Loading that
+    // *standard* font requires pdfkit's Node build to
+    // `require("#standard-fonts/Helvetica")` - a package.json "imports"
+    // subpath resolved relative to pdfkit's own install location. Next.js's
+    // serverless output-file-tracing does not follow that dynamic,
+    // computed-specifier require() (it's invoked via a `createRequire`
+    // handle stored in a variable, not a literal `require("...")` call), so
+    // the .afm data file it points to is silently missing from the deployed
+    // function's bundle -> `Error: Cannot find module
+    // '#standard-fonts/Helvetica'` (MODULE_NOT_FOUND) at runtime in
+    // production/preview, despite working perfectly under plain `node`
+    // locally (incl. this file's own vitest suite) where node_modules is
+    // intact on disk. `font: false` disables that eager default-font load
+    // entirely; every actual text draw in this file goes through drawCell(),
+    // which always explicitly sets HEBREW_FONT/LATIN_FONT (real embedded
+    // fontsource files, not a pdfkit standard font) before drawing, so
+    // pdfkit's standard-font loader is never invoked at all.
+    // (@types/pdfkit's PDFDocumentOptions only types `font` as
+    // `string | undefined`, missing pdfkit's own documented `false` option,
+    // hence the cast.)
+    const doc = new PDFDocument({
+      size: "A4",
+      margin: 40,
+      bufferPages: true,
+      font: false,
+    } as unknown as PDFKit.PDFDocumentOptions);
     registerFonts(doc);
 
     const chunks: Buffer[] = [];
