@@ -1191,3 +1191,68 @@ documents and a stale-section rewrite are not one). Local verification
 (tsc/eslint/vitest) still runs and is compared against `main` before pushing,
 per this engagement's standing discipline for every substantive repository
 change, documentation included.
+
+## 17. Full spec re-audit (post-delivery, Ariel-requested)
+
+### 17.1 Context
+
+After the §26 delivery package closed out (section 16), Ariel asked for a
+fresh line-by-line re-read of the entire spec (`Ankora_Time_Tracking_Product_
+Spec_HE.docx`, sections 0–29 — not just §26) against the shipped app, to
+surface anything genuinely missed before deciding what, if anything, to do
+about it. This section records that audit's findings. No code changed as
+part of this section — Ariel asked to be shown the gaps first.
+
+### 17.2 Confirmed gaps
+
+- **`Task.status` doesn't exist.** Spec §5's data model and §10.2 both
+  specify Open/In progress/Done/Archived on `Task`. The current `Task`
+  model (`prisma/schema.prisma`) has no status field at all — every task is
+  implicitly "open" forever. This also means the spec §11 "Tasks" screen
+  (see below) has nothing meaningful to filter by status even if built.
+- **No standalone "Tasks" screen.** Spec §11's screen table lists a
+  dedicated employee-facing screen — open/recent tasks, filterable by
+  client/category/status. Today a `Task` only exists as an inline
+  create-or-pick autocomplete inside the timer and manual-entry forms;
+  there is no screen that lists tasks on their own.
+- **No "Profile" screen.** Spec §11 calls for a self-service in-app screen
+  for timezone/password/preferences while logged in. What exists today is
+  the unauthenticated forgot-password → reset-password flow only; there is
+  no page for a logged-in user to change their own password or set a
+  timezone preference.
+- **No "Notifications" screen.** Spec §11 calls for an in-app view of
+  anomalies/long-timer warnings/internal alerts. No such screen or
+  persisted notification list exists anywhere in the app.
+- **Long-running-timer notification is incomplete.** Spec §6.1 requires
+  both a UI warning *and* an email/internal notification to the user once a
+  timer exceeds a configurable threshold. Only the first half is built —
+  `TimerWidget.tsx` shows an amber "הטיימר רץ זמן ארוך" badge past 8 hours,
+  but no email is sent and nothing is persisted, so the warning disappears
+  the moment the user isn't looking at the timer screen (and has nowhere to
+  see it later, per the missing Notifications screen above).
+- **XLSX/PDF export not built.** Spec §14.4 marks these "מומלץ"
+  (recommended, not mandatory) with CSV as the only hard requirement — CSV
+  is implemented correctly, including the UTF-8 BOM Hebrew-in-Excel
+  requirement (`lib/csv.ts`). XLSX and PDF were never built. This was not
+  previously called out by name in the README's Known Limitations section.
+
+### 17.3 Checked and confirmed NOT gaps
+
+For completeness, since Ariel asked for a real audit and not just a list of
+suspicions: recent/favorite client+category combos on the timer (§6.2),
+mandatory reason for back-dated manual entries (§6.3), the 48-hour
+self-edit window before a Manager permission is required (§6.4), optimistic
+concurrency / "don't overwrite a concurrently-edited entry" (§20), URL-
+persisted report/entry/audit-log filters (§14.3), the password policy
+(10-char minimum + common-weak-password rejection, §4.2), login
+success/failure audit events (§16.1), the internal 9-report set matching
+§14.2's table exactly, the client 4-report set matching §14.1 minus the
+spec-marked-optional Trend report, and a dedicated client-isolation
+integration test suite (§16.2/§21.2) all exist and match the spec.
+
+### 17.4 Non-goals of this audit
+
+This section is a findings record only. Whether to build any of §17.2's
+five gaps, and in what order, is Ariel's call — flagged to him directly
+rather than assumed. No schema, permission, or screen changed, so no
+in-app guide update is triggered here either.
