@@ -4,6 +4,7 @@ import { assertCan } from "@/lib/app-auth/permissions";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { listClients } from "@/lib/app-domain/clients";
 import { listAlertRulesForClient } from "@/lib/app-domain/alerts";
+import { localDateKey } from "@/lib/timezone";
 import type { User, TimeEntrySource } from "@prisma/client";
 
 // Phase 5 domain service: spec section 14 ("דוחות ודשבורדים"), specifically
@@ -350,7 +351,7 @@ async function manualEdits(filters: ReportFilters): Promise<ReportResult> {
   const rows = entries.map((e) => {
     const lastRevision = e.revisions[0];
     return {
-      date: e.startAt.toISOString().slice(0, 10),
+      date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
       employee: e.user.name,
       client: e.client.name,
       category: e.category.name,

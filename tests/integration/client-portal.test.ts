@@ -16,6 +16,45 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 // isolation is structural, not just a permission check - only an
 // end-to-end call proves that.
 
+// Phase 8 regression: startOfWeek/endOfWeek used to compute the week
+// boundary from `weekStart`'s UTC calendar fields, not its Asia/Jerusalem
+// ones. 2026-08-30T22:30:00Z is 2026-08-31 01:30 in Israel (summer, +3) -
+// Israel has already crossed into Monday, UTC has not (still Sunday
+// 2026-08-30). The old getUTCDay()-based code computed "this week" as
+// starting 2026-08-30T00:00:00Z (UTC's own Sunday); the fix computes it
+// as 2026-08-29T21:00:00Z (Israel's Sunday 00:00 local, converted to
+// UTC) - three hours earlier. An entry seeded exactly in that three-hour
+// gap (2026-08-29T22:00:00Z, which is 2026-08-30 01:00 Israel time -
+// already locally Sunday, so it belongs in "this week") is excluded by
+// the old boundary and included by the fixed one. See docs/adr/0001,
+// Phase 8 addendum section 15.3.
+describe("getWeeklyActivity() - Phase 8 timezone fix", () => {
+  it("includes an entry that falls in the UTC/Israel week-boundary disagreement window", async () => {
+    const client = await createTestClient({ name: "Client TZ" });
+    const category = await createTestCategory({ clientId: client.id, name: "Category TZ" });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: clientUser } = await createTestClientUser({ clientId: client.id });
+
+    const inDisagreementWindow = new Date("2026-08-29T22:00:00Z");
+    await prisma.timeEntry.create({
+      data: {
+        userId: employee.id,
+        clientId: client.id,
+        categoryId: category.id,
+        startAt: inDisagreementWindow,
+        endAt: new Date(inDisagreementWindow.getTime() + 3600_000),
+        actualSeconds: 3600,
+        billableSeconds: 3600,
+      },
+    });
+
+    const activity = await getWeeklyActivity(clientUser, new Date("2026-08-30T22:30:00Z"));
+    expect(activity.from.toISOString()).toBe("2026-08-29T21:00:00.000Z");
+    expect(activity.rows).toHaveLength(1);
+    expect(activity.rows[0].category).toBe("Category TZ");
+  });
+});
+
 describe("resolvePortalClient() - spec 21.2 client isolation", () => {
   it("throws ForbiddenError for a role that lacks report.client.view", async () => {
     const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });

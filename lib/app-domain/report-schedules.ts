@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { toCsv } from "@/lib/csv";
 import { getClient } from "@/lib/app-domain/clients";
+import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import type { User, ReportSchedule, ClientReportType, ReportFrequency } from "@prisma/client";
 
 // Phase 6 domain service: spec section 15 ("דוחות מתוזמנים במייל"). Owns
@@ -187,17 +188,44 @@ export function isScheduleDue(
 /// examples ("Weekly report... עבור השבוע הקודם", "Monthly report...
 /// עבור החודש הקודם"): both cadences report on the PRECEDING complete
 /// period, never the one still in progress.
-export function computeReportingPeriod(frequency: ReportFrequency, now: Date): { from: Date; to: Date } {
+///
+/// Phase 8 fix: this used to compute week/month boundaries from `now`'s
+/// UTC calendar fields (`getUTCDay()`/`getUTCMonth()`), which is wrong for
+/// a schedule whose `timezone` is Asia/Jerusalem (the only value ever
+/// configured in practice) - `isScheduleDue` right above already
+/// correctly reads `now`'s LOCAL weekday/day-of-month via
+/// Intl.DateTimeFormat before deciding to fire, but the period this
+/// function then computed for that same fire was in a different
+/// calendar (UTC's), so near a week/month boundary the two could
+/// disagree about which day it locally is. Now: read `now`'s local
+/// Y-M-D (`localDateKey`), do calendar arithmetic on those plain
+/// numbers (weekday-of-a-date and month-rollover are timezone-free once
+/// you have Y-M-D - JS's own Date.UTC normalizes month/day overflow
+/// correctly), then convert the resulting local boundary dates back to
+/// real UTC instants (`localDateTimeToUtc`) for the Prisma range query.
+export function computeReportingPeriod(
+  frequency: ReportFrequency,
+  now: Date,
+  timeZone: string = "Asia/Jerusalem"
+): { from: Date; to: Date } {
+  const [y, m, d] = localDateKey(now, timeZone).split("-").map(Number);
+
   if (frequency === "WEEKLY") {
-    const day = now.getUTCDay();
-    const startOfThisWeek = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day));
-    const from = new Date(startOfThisWeek);
-    from.setUTCDate(from.getUTCDate() - 7);
-    return { from, to: startOfThisWeek };
+    const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // weekday of a calendar date is tz-independent
+    const startOfThisWeek = new Date(Date.UTC(y, m - 1, d - weekday));
+    const startOfLastWeek = new Date(Date.UTC(y, m - 1, d - weekday - 7));
+    return {
+      from: localDateTimeToUtc(startOfLastWeek.toISOString().slice(0, 10), "00:00", timeZone),
+      to: localDateTimeToUtc(startOfThisWeek.toISOString().slice(0, 10), "00:00", timeZone),
+    };
   }
-  const startOfThisMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  return { from, to: startOfThisMonth };
+
+  const startOfThisMonth = new Date(Date.UTC(y, m - 1, 1));
+  const startOfLastMonth = new Date(Date.UTC(y, m - 2, 1));
+  return {
+    from: localDateTimeToUtc(startOfLastMonth.toISOString().slice(0, 10), "00:00", timeZone),
+    to: localDateTimeToUtc(startOfThisMonth.toISOString().slice(0, 10), "00:00", timeZone),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -240,7 +268,7 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
         reportType,
         client: client?.name,
         rows: entries.map((e) => ({
-          date: e.startAt.toISOString().slice(0, 10),
+          date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
           activity: e.task?.title ?? e.category.name,
           category: e.category.name,
           billableMinutes: Math.round((e.billableSeconds ?? 0) / 60),
@@ -259,7 +287,7 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
         reportType,
         client: client?.name,
         rows: entries.map((e) => ({
-          date: e.startAt.toISOString().slice(0, 10),
+          date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
           activity: e.task?.title ?? e.category.name,
           category: e.category.name,
           billableMinutes: Math.round((e.billableSeconds ?? 0) / 60),
@@ -284,7 +312,18 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
 
 function renderEmailBody(reportType: ClientReportType, clientName: string, from: Date, to: Date, snapshot: any): { subject: string; text: string } {
   const label = REPORT_TYPE_LABELS[reportType];
-  const period = `${from.toISOString().slice(0, 10)} - ${to.toISOString().slice(0, 10)}`;
+  // Phase 8 fix: from/to are UTC instants representing LOCAL midnight
+  // boundaries (see computeReportingPeriod) - formatting them with
+  // toISOString() would show the wrong calendar date for the same reason
+  // documented in lib/timezone.ts, so this labels them via localDateKey
+  // instead. `to` is an exclusive upper bound (the local day AFTER the
+  // period ends); the inclusive last day is computed on the LOCAL Y-M-D
+  // numbers (not by subtracting a fixed 24h, which would land on the
+  // wrong wall-clock time across a DST transition night) and only then
+  // converted back to a Date purely so localDateKey can format it.
+  const [toY, toM, toD] = localDateKey(to).split("-").map(Number);
+  const inclusiveTo = new Date(Date.UTC(toY, toM - 1, toD - 1));
+  const period = `${localDateKey(from)} - ${localDateKey(inclusiveTo, "UTC")}`;
   const subject = `Ankora - ${label} - ${clientName} (${period})`;
 
   const lines = [`${label} עבור ${clientName}`, `תקופה: ${period}`, ""];
@@ -396,7 +435,7 @@ export async function reconcileScheduledReports(now: Date = new Date()) {
       skipped++;
       continue;
     }
-    const period = computeReportingPeriod(schedule.frequency, now);
+    const period = computeReportingPeriod(schedule.frequency, now, schedule.timezone);
     const result = await sendReportSchedule(schedule, period, true);
     if (result.sent) sent++;
     else skipped++;
@@ -413,7 +452,7 @@ export async function sendReportScheduleNow(actor: User, scheduleId: string) {
   assertCan(actor.role, "report.internal.view");
 
   const schedule = await prisma.reportSchedule.findUniqueOrThrow({ where: { id: scheduleId } });
-  const period = computeReportingPeriod(schedule.frequency, new Date());
+  const period = computeReportingPeriod(schedule.frequency, new Date(), schedule.timezone);
   return sendReportSchedule(schedule, period, false);
 }
 

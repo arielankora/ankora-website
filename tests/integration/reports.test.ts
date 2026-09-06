@@ -144,6 +144,29 @@ describe("manual_edits - spec 6.3/6.4", () => {
   });
 });
 
+// Phase 8 regression: manual_edits used to group rows by
+// `startAt.toISOString().slice(0, 10)` - the UTC calendar day - instead of
+// the Asia/Jerusalem calendar day. An entry at 2026-08-31T21:30:00Z is
+// 2026-09-01 00:30 in Israel (summer, +3); the old code labeled it
+// "2026-08-31". See docs/adr/0001, Phase 8 addendum section 15.3.
+describe("manual_edits - Phase 8 timezone fix", () => {
+  it("labels a near-midnight entry with its Israel-local date, not its UTC date", async () => {
+    const { superAdmin, employee, clientA, category } = await setup();
+    await createTestTimeEntry({
+      userId: employee.id,
+      clientId: clientA.id,
+      categoryId: category.id,
+      source: "MANUAL",
+      isManual: true,
+      startAt: new Date("2026-08-31T21:30:00Z"),
+    });
+
+    const result = await runReport(superAdmin, "manual_edits", {});
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].date).toBe("2026-09-01");
+  });
+});
+
 describe("active_timers - spec 14.2", () => {
   it("lists only entries with endAt = null", async () => {
     const { superAdmin, employee, clientA, category } = await setup();
