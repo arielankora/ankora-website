@@ -1627,3 +1627,33 @@ fix deploys and confirm the download actually completes; if the 503
 persists, the next step is checking the deployed function's actual
 bundle size via `vercel inspect` or the Vercel dashboard's Functions tab
 once it's responsive again.
+
+**Correction, same session:** the "503" was a false alarm. Once the
+Vercel dashboard's Logs page started rendering (see below), the exact
+same requests that the in-browser network inspector reported as 503 were
+recorded by Vercel's own server-side logs as `GET /api/reports/export`
+→ **200**, for all three formats (csv, xlsx, pdf), both before and after
+the dynamic-import change above. The export route was never broken at
+the server. The false reading came from this session's in-app browser
+automation tool: navigating directly to a URL whose response carries
+`Content-Disposition: attachment` triggers a native download rather than
+a page load, and this session's network-request inspector reported those
+specific requests as 503 even though the server returned 200 - a
+tooling artifact, not a real HTTP response, compounding the
+already-documented quirk that such a navigation doesn't change the tab's
+rendered page either.
+
+The dynamic-import change itself is kept (it's a legitimate improvement -
+no reason for the mandatory CSV path to load either heavy library into
+memory) but it did not fix a real bug, because there was no real bug at
+the server to fix. The three pdfkit fixes in 18.11-18.13 remain correctly
+diagnosed and confirmed: those were verified by matching the exact error
+message in Vercel's Runtime Logs (`MODULE_NOT_FOUND`, then `ENOENT`),
+which is a fundamentally different, more reliable confirmation method
+than the client-side network inspector used here. Lesson for future live
+QA on this project: treat this environment's browser network-status
+reporting as unreliable for any URL that triggers a file download, and
+prefer checking Vercel's own Logs (or asking Ariel to confirm the
+download in his own browser) over the in-app browser's reported status
+code.
+
