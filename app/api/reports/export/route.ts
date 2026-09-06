@@ -4,8 +4,6 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
-import { toXlsx } from "@/lib/xlsx";
-import { toPdfTable } from "@/lib/pdf";
 import type { TimeEntrySource } from "@prisma/client";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): spec 14.4 marks XLSX/PDF as
@@ -83,6 +81,14 @@ export async function GET(req: NextRequest) {
   const reportLabel = REPORT_DEFINITIONS.find((r) => r.id === type)?.label ?? type;
 
   if (format === "xlsx") {
+    // Dynamic import: exceljs (~23MB with its archiver/unzipper/jszip/tmp
+    // dependency tree) is only pulled into memory for xlsx requests, not
+    // paid for by the mandatory CSV default or by pdf requests. See ADR
+    // 0001 section 18.14 - a static top-of-file import made every request
+    // to this route (including CSV) load both exceljs and pdfkit, which is
+    // suspected to have caused the whole route to 503 under Vercel's
+    // Node.js function cold-start.
+    const { toXlsx } = await import("@/lib/xlsx");
     const buf = await toXlsx(reportLabel, headers, rows);
     const filename = `${type}_${clientSlug}_${dateStr}.xlsx`.replace(/[^\w.\-֐-׿]+/g, "-");
     return new Response(buf, {
@@ -94,6 +100,9 @@ export async function GET(req: NextRequest) {
   }
 
   if (format === "pdf") {
+    // Dynamic import - see the comment on the xlsx branch above (ADR 0001
+    // section 18.14): pdfkit + fontkit are only loaded for pdf requests.
+    const { toPdfTable } = await import("@/lib/pdf");
     const rangeParts = [
       filters.from ? filters.from.toLocaleDateString("he-IL") : null,
       filters.to ? filters.to.toLocaleDateString("he-IL") : null,

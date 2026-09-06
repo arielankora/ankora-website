@@ -3,8 +3,6 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { monthlyDetailedToCsv } from "@/lib/app-domain/report-schedules";
-import { toXlsx } from "@/lib/xlsx";
-import { toPdfTable } from "@/lib/pdf";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): same `?format=` addition as
 // app/api/reports/export/route.ts - CSV stays the unchanged default.
@@ -39,6 +37,8 @@ export async function GET(request: Request) {
     );
 
     if (format === "xlsx") {
+      // Dynamic import - see ADR 0001 section 18.14.
+      const { toXlsx } = await import("@/lib/xlsx");
       const buf = await toXlsx("דוח חודשי מפורט", headers, rows);
       return new NextResponse(buf, {
         status: 200,
@@ -50,6 +50,8 @@ export async function GET(request: Request) {
     }
 
     if (format === "pdf") {
+      // Dynamic import - see ADR 0001 section 18.14.
+      const { toPdfTable } = await import("@/lib/pdf");
       const buf = await toPdfTable({
         title: "דוח חודשי מפורט",
         subtitle: referenceDate.toLocaleDateString("he-IL", { year: "numeric", month: "long" }),

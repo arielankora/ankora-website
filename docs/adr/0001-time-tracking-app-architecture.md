@@ -1565,3 +1565,65 @@ extracted, same correct right-to-left ordering as every prior check in
 this section. Pushed and redeployed; this is the version live-QA'd
 before opening the PR (see PR description / Ariel report for the
 confirmed-working result).
+
+
+### 18.14 Fourth live-QA fix: the whole export route was 503ing, including plain CSV
+
+After 18.11-18.13 fixed three real pdfkit bugs and the Vercel build
+succeeded cleanly, a final round of live QA against the Preview
+deployment found the export routes still broken - but not with a pdfkit
+error. `GET /api/reports/export?type=total_client_hours&format=pdf`
+returned HTTP 503, with no JSON error body reaching the browser (ruling
+out this route's own `try/catch`, which always returns a structured
+`Response.json(...)`). A 503 with no application-level error body means
+the function invocation itself failed or was killed before the handler's
+own error handling ran.
+
+Isolating the cause: `format=xlsx` on the same route also 503'd. So did
+`format=csv` (i.e. no `format` param at all - the mandatory default).
+Interleaving requests to `/api/health` (200 every time) against
+`/api/reports/export` (503 every time, all three formats) on the same
+deployment, back to back, ruled out general platform flakiness - this
+was a deterministic, 100%-reproducible failure specific to this one
+route, not noise.
+
+Since the CSV branch runs `lib/csv.ts` only (no pdfkit, no exceljs) and
+still failed, the bug could not be inside any format-specific code path.
+`app/api/reports/export/route.ts` (and `app/api/portal/export/route.ts`)
+had static top-of-file imports of `toXlsx` (`@/lib/xlsx`, wrapping
+`exceljs` - a ~23MB package pulling in `archiver`, `unzipper`, `jszip`,
+`fast-csv`, `tmp`, `dayjs`) and `toPdfTable` (`@/lib/pdf`, wrapping
+`pdfkit` + `fontkit` + `bidi-js`). A static import is evaluated on
+*every* invocation of the function regardless of which `if (format ===
+...)` branch actually runs, so every CSV request was also paying the
+full cold-start cost of loading both of these heavy libraries into the
+same Node.js serverless function - the leading hypothesis for why the
+function was being killed (size/cold-start-time limit) before it could
+even reach the CSV branch.
+
+Fix: converted both imports in both export routes to dynamic
+`await import(...)` calls placed inside their respective `if (format ===
+"xlsx")` / `if (format === "pdf")` branches, so exceljs and pdfkit are
+only loaded into memory for requests that actually need them. The
+mandatory CSV path (spec 14.4) no longer touches either library at all.
+Confirmed via `npx next build` that this compiles cleanly (webpack has no
+trouble splitting a conditionally-awaited dynamic import into its own
+chunk) and `npx vitest run tests/unit/pdf.test.ts tests/unit/xlsx.test.ts`
+still passes unchanged - the two library wrappers themselves were never
+the problem, only when they were loaded.
+
+This is submitted as the most likely fix given the evidence (uniform
+503 across all three formats, isolated to the one route with the two
+heavy static imports, ruled out as general platform noise via the
+interleaved A/B test against `/api/health`), but - unlike 18.11-18.13,
+each of which was confirmed by reproducing the exact error message in
+Vercel's Runtime Logs - this one could not be confirmed against a Runtime
+Logs entry: both the deployment-scoped and project-wide Logs pages in
+the Vercel dashboard returned no entries for several minutes of retries
+during this session despite confirmed real traffic reaching the same
+deployment (successful `/api/health` calls, a fully-rendered `/app/reports`
+page with live data). Ariel should re-run the export buttons after this
+fix deploys and confirm the download actually completes; if the 503
+persists, the next step is checking the deployed function's actual
+bundle size via `vercel inspect` or the Vercel dashboard's Functions tab
+once it's responsive again.
