@@ -1,12 +1,7 @@
 import "server-only";
-import { createRequire } from "node:module";
+import path from "node:path";
 import PDFDocument from "pdfkit";
 import bidiFactory from "bidi-js";
-
-// Resolves the two Heebo .woff files below through real module resolution
-// (require.resolve) instead of a plain string path. This isn't cosmetic -
-// see the comment on registerFonts() for the production bug this fixes.
-const require = createRequire(import.meta.url);
 
 // Spec 14.4: "PDF לדוחות לקוח מומלץ" (recommended for client reports).
 // Added in the Phase 9 gap-fix pass (docs/adr/0001 section 17) alongside
@@ -49,26 +44,36 @@ function registerFonts(doc: PDFKit.PDFDocument) {
   // during subsetting; WOFF (v1) is just zlib-compressed sfnt tables, no
   // transform, so the normal TTF subsetting path applies untouched.
   //
-  // `require.resolve(...)`, not a plain relative-path string. Second real
-  // production bug found via live QA (docs/adr/0001 section 18.11):
-  // pdfkit's `doc.registerFont(name, path)` only *stores* the string; the
-  // actual `fs.readFileSync(path)` happens later, inside pdfkit, resolved
-  // against the Lambda's cwd at runtime. A plain string literal here is
-  // invisible to Vercel's Node File Trace (the step that decides which
-  // files get copied into this route's deployed serverless bundle) - it
-  // only recognizes real module-resolution calls. Without this, the
-  // .woff files are silently missing in production/preview -> `Error:
-  // ENOENT: no such file or directory, open 'node_modules/@fontsource/
-  // heebo/files/heebo-hebrew-400-normal.woff'` at request time, despite
-  // working locally where node_modules is intact on disk (the same class
-  // of "works under plain node, breaks once traced/bundled" issue as the
-  // font:false fix above, different mechanism). `require.resolve()` is
-  // the pattern Vercel's tracer is specifically built to detect, and
-  // @fontsource/heebo's package.json "exports" map has a
-  // "./files/*.woff" entry, so this subpath resolves correctly under
-  // Node's exports-restricted resolution too.
-  doc.registerFont(HEBREW_FONT, require.resolve("@fontsource/heebo/files/heebo-hebrew-400-normal.woff"));
-  doc.registerFont(LATIN_FONT, require.resolve("@fontsource/heebo/files/heebo-latin-400-normal.woff"));
+  // `path.join(process.cwd(), ...)`, deliberately NOT `require.resolve()`.
+  // Second and third real production bugs found via live QA (docs/adr/
+  // 0001 sections 18.11-18.13):
+  //   1. A plain relative-path string here throws `ENOENT` in prod/
+  //      preview: pdfkit's `registerFont()` only *stores* the string,
+  //      and the actual `fs.readFileSync(path)` happens later, resolved
+  //      against the Lambda's cwd at runtime - invisible to Vercel's
+  //      Node File Trace (NFT), the step deciding which files get
+  //      copied into this route's deployed bundle, so the .woff files
+  //      were never included.
+  //   2. Switching to `require.resolve("@fontsource/heebo/files/...")`
+  //      to fix (1) broke the *build itself*: webpack sees a literal
+  //      `require.resolve("...")` call and tries to bundle the target as
+  //      a JS module (that's what lets it return a module id/path at
+  //      runtime) - but a `.woff` is binary with no loader configured,
+  //      so webpack fails with "Module parse failed: Unexpected
+  //      character". require.resolve() is safe for locating a file in
+  //      plain Node (works fine locally); it is NOT safe as a way to
+  //      merely "get a path" once webpack is bundling the calling code.
+  //   3. The actual fix: build the path at runtime via `path.join(...)`
+  //      (a plain string computed from `process.cwd()`, not a literal
+  //      module specifier - webpack has nothing to statically bundle
+  //      here) *and* rely on `next.config.mjs`'s
+  //      `experimental.outputFileTracingIncludes` (added alongside this)
+  //      to explicitly guarantee NFT copies the .woff files into this
+  //      route's deployed bundle. That config is the one mechanism here
+  //      that doesn't depend on any heuristic detecting a require-like
+  //      call at all - it's a direct, unconditional include list.
+  doc.registerFont(HEBREW_FONT, path.join(process.cwd(), "node_modules/@fontsource/heebo/files/heebo-hebrew-400-normal.woff"));
+  doc.registerFont(LATIN_FONT, path.join(process.cwd(), "node_modules/@fontsource/heebo/files/heebo-latin-400-normal.woff"));
 }
 
 /// Splits a bidi-reordered string into consecutive runs of characters that

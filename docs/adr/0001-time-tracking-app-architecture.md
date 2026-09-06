@@ -1513,3 +1513,55 @@ deploy time - this is the second bug live QA caught that no local check
 could have caught, which is exactly why this engagement's standing rule
 is to verify every phase against a real Vercel Preview deployment before
 opening a PR, not just local `tsc`/`vitest`).
+
+### 18.13 Third live-QA fix: require.resolve() itself broke the build
+
+Pushed 18.12's fix and the *build* failed outright (not a runtime 500 -
+the deployment never went Ready):
+
+```
+Module parse failed: Unexpected character ' ' (1:4)
+You may need an appropriate loader to handle this file type, currently
+no loaders are configured to process this file.
+Import trace for requested module:
+./node_modules/@fontsource/heebo/files/heebo-hebrew-400-normal.woff
+./lib/pdf.ts
+./app/api/reports/export/route.ts
+```
+
+Root cause: `require.resolve("@fontsource/heebo/files/...")` fixed the
+previous runtime `ENOENT` (in plain Node, `require.resolve` really is
+just path resolution), but Next.js's build doesn't run the compiled code
+under plain Node - it runs it through webpack first. Webpack treats a
+literal `require.resolve("...")` call as a real module dependency and
+tries to *bundle* the target to be able to return a stable module id/path
+for it at runtime. A `.woff` file is binary with no loader configured for
+it, so webpack's parser chokes trying to read it as source and fails the
+build. This is the opposite failure mode from 18.12's fix target (that
+was a runtime resolution gap; this is a build-time over-eagerness) -
+`require.resolve()` on a literal turned out to be the wrong tool for
+"just get me a path" once the code is going through a bundler at all,
+even though it's exactly right for the identical-looking problem in
+plain Node.
+
+Fix: replaced `require.resolve(...)` with `path.join(process.cwd(),
+"node_modules/@fontsource/heebo/files/heebo-hebrew-400-normal.woff")` (and
+the Latin equivalent) - a value computed at runtime from string
+concatenation, not a literal module specifier, so webpack has nothing to
+statically bundle. This is exactly 18.11's original relative-path
+approach, now made to actually work by leaning entirely on
+`next.config.mjs`'s `experimental.outputFileTracingIncludes` (added in
+18.12, kept here) to guarantee the two `.woff` files land in this route's
+deployed function bundle - that config doesn't depend on webpack or NFT
+correctly guessing anything from the call site at all, which is why it's
+the right permanent fix rather than another guess at a "clever" code
+pattern.
+
+Re-verified: `npx vitest run tests/unit/pdf.test.ts tests/unit/xlsx.test.ts`
+(9/9 pass), `npx tsc --noEmit` (no new errors), a grep confirming the
+`.woff` filenames appear nowhere in an import/require position in the
+codebase, and the same manual `pdftotext -bbox` RTL check - 18 words
+extracted, same correct right-to-left ordering as every prior check in
+this section. Pushed and redeployed; this is the version live-QA'd
+before opening the PR (see PR description / Ariel report for the
+confirmed-working result).
