@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { localDateKey } from "@/lib/timezone";
 import type { User, BillingPolicy, RoundingMode, BillingAggregationScope } from "@prisma/client";
 
 // Phase 3 domain service: spec section 7 ("Actual Time לעומת Billable
@@ -115,7 +116,7 @@ export async function computeConsumedMinutesForRange(
   // policy once per group.
   const groups = new Map<string, number>();
   for (const e of entries) {
-    const dayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(e.startAt);
+    const dayKey = localDateKey(e.startAt); // Phase 8: lib/timezone.ts (shared helper, was inline here)
     const key = scope === "PER_TASK_PER_DAY" ? `${e.taskId ?? "no-task"}:${dayKey}` : dayKey;
     groups.set(key, (groups.get(key) ?? 0) + (e.actualSeconds ?? 0));
   }

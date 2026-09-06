@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
+import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import type { User, TimeEntry, Prisma } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -24,7 +25,9 @@ const SELF_EDIT_WINDOW_HOURS = 48;
 /// Spec 6.3: "חובה סיבת דיווח ידני אם המשתמש מוסיף Entry ליום קודם מעבר
 /// ל-window configurable." Interpreted as: any manual entry whose date
 /// (Asia/Jerusalem) differs from today's requires a non-empty reason.
-const TIMEZONE = "Asia/Jerusalem";
+/// `localDateKey` (Phase 8: lib/timezone.ts) is the shared Asia/Jerusalem
+/// day-boundary helper - this file had its own private copy of it before
+/// Phase 8 extracted the shared version.
 
 export class OverlapError extends Error {
   constructor(public readonly conflicting: TimeEntry) {
@@ -68,29 +71,18 @@ export class ConflictError extends Error {
   }
 }
 
-function localDateKey(date: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(date); // YYYY-MM-DD
-}
-
 function isBackdated(startAt: Date): boolean {
   return localDateKey(startAt) !== localDateKey(new Date());
 }
 
 /// Combines a `YYYY-MM-DD` date and `HH:mm` time - both entered by the
 /// user as Asia/Jerusalem wall-clock time via <input type="date"/time"> -
-/// into the correct UTC instant. Constructing `new Date(\`${date}T${time}\`)`
-/// directly is wrong: it's parsed in whatever timezone the Node process
-/// itself runs in (UTC on Vercel), silently shifting every manually-
-/// entered time by Israel's UTC+2/+3 offset. This computes that offset at
-/// the given instant (correctly following DST, and independent of the
-/// server process's own timezone - the process-timezone term cancels out
-/// algebraically in the subtraction below) and corrects for it.
+/// into the correct UTC instant. Thin wrapper around the generalized
+/// `localDateTimeToUtc` (Phase 8: lib/timezone.ts) fixed to this file's
+/// Asia/Jerusalem TIMEZONE constant - see that function's own comment for
+/// why naive `new Date(...)` parsing is wrong here.
 export function combineWallClockTime(dateStr: string, timeStr: string): Date {
-  const naiveUtc = new Date(`${dateStr}T${timeStr}:00Z`);
-  const asIfTargetZone = new Date(naiveUtc.toLocaleString("en-US", { timeZone: TIMEZONE }));
-  const asIfUtc = new Date(naiveUtc.toLocaleString("en-US", { timeZone: "UTC" }));
-  const offsetMs = asIfUtc.getTime() - asIfTargetZone.getTime();
-  return new Date(naiveUtc.getTime() + offsetMs);
+  return localDateTimeToUtc(dateStr, timeStr, TIMEZONE);
 }
 
 /// Spec 4.1: "אסור לעובד לדווח זמן ללקוח שאינו משויך אליו, אלא אם יש

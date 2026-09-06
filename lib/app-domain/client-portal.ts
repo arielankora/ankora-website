@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { getCurrentHourBank, listHourBanksForClient } from "@/lib/app-domain/hour-banks";
 import { getClient } from "@/lib/app-domain/clients";
+import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import type { User, Client, ClientUserRole } from "@prisma/client";
 
 // Phase 6 domain service: spec section 13 ("Client Portal"). Every function
@@ -59,28 +60,43 @@ export async function resolvePortalClient(actor: User): Promise<PortalClientCont
   return { client: membership.client, clientUserId: membership.id, clientUserRole: membership.role };
 }
 
+// Phase 8 fix (docs/adr/0001, Phase 8 addendum section 15.3): these four
+// used to compute week/month boundaries from `d`'s UTC calendar fields
+// (getUTCDay()/getUTCDate()/getUTCFullYear()/getUTCMonth()) - wrong for a
+// portal whose default timezone is Asia/Jerusalem (spec section 0/25):
+// near a week/month boundary, Israel's calendar and UTC's can disagree on
+// what day it is (Israel is ahead by +2/+3 hours), so "today" as seen by
+// an Ankora/client user opening the portal could silently fall in the
+// PREVIOUS UTC week/month, showing last week's data under "this week."
+// Same root cause and fix as report-schedules.ts's computeReportingPeriod
+// (that function's own comment has the full explanation) - both now go
+// through localDateKey/localDateTimeToUtc.
+
 function startOfWeek(d: Date): Date {
   // Spec default timezone Asia/Jerusalem's week starts Sunday (spec 15's
   // own weekly-report example: "יום א׳ בבוקר עבור השבוע הקודם").
-  const day = d.getUTCDay();
-  const start = new Date(d);
-  start.setUTCDate(d.getUTCDate() - day);
-  start.setUTCHours(0, 0, 0, 0);
-  return start;
+  const [y, m, day] = localDateKey(d).split("-").map(Number);
+  const weekday = new Date(Date.UTC(y, m - 1, day)).getUTCDay(); // weekday of a calendar date is tz-independent
+  const startLocal = new Date(Date.UTC(y, m - 1, day - weekday));
+  return localDateTimeToUtc(startLocal.toISOString().slice(0, 10), "00:00");
 }
 
 function endOfWeek(start: Date): Date {
-  const end = new Date(start);
-  end.setUTCDate(start.getUTCDate() + 7);
-  return end;
+  const [y, m, day] = localDateKey(start).split("-").map(Number);
+  const endLocal = new Date(Date.UTC(y, m - 1, day + 7));
+  return localDateTimeToUtc(endLocal.toISOString().slice(0, 10), "00:00");
 }
 
 function startOfMonth(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1));
+  const [y, m] = localDateKey(d).split("-").map(Number);
+  const startLocal = new Date(Date.UTC(y, m - 1, 1));
+  return localDateTimeToUtc(startLocal.toISOString().slice(0, 10), "00:00");
 }
 
 function endOfMonth(start: Date): Date {
-  return new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1));
+  const [y, m] = localDateKey(start).split("-").map(Number);
+  const endLocal = new Date(Date.UTC(y, m, 1));
+  return localDateTimeToUtc(endLocal.toISOString().slice(0, 10), "00:00");
 }
 
 function round(n: number): number {
@@ -128,7 +144,7 @@ async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEm
 
   return entries.map((e): PortalEntryRow => {
     const row: PortalEntryRow = {
-      date: e.startAt.toISOString().slice(0, 10),
+      date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
       activity: e.task?.title ?? e.category.name,
       category: e.category.name,
       billableMinutes: toMinutes(e.billableSeconds),

@@ -1,7 +1,7 @@
 # ADR-0001: Time Tracking App — Architecture Decision Record
 
-Status: Proposed (pending DB provider confirmation)
-Date: 2026-09-04
+Status: Implemented (Phases 0-7 shipped to Production; Phase 8 in progress)
+Date: 2026-09-04 (last status update: Phase 8 addendum, section 15)
 Source spec: `Ankora_Time_Tracking_Product_Spec_HE.docx` (v1.0, September 2026)
 
 ## 1. Existing stack (audit)
@@ -50,7 +50,7 @@ The app will reuse existing primitives (`components/ui/Container.tsx`, `Button.t
 | Concern | Decision |
 |---|---|
 | Database | **PostgreSQL** (spec §3.2 explicit requirement — no LocalStorage as source of truth) |
-| DB provider | **Open — needs your decision, see chat.** Leading option: Vercel Postgres (same dashboard/env-var flow already used for the blog). |
+| DB provider | **Decided in Phase 0 and in production use since: Vercel Postgres (Neon-backed, via Vercel's Marketplace/Managed Integration) — same dashboard/env-var flow already used for the blog, with Neon's branching feature giving every Preview deployment its own isolated database branch.** This row was left saying "Open — needs your decision" long after the decision was actually made and shipped (Phase 0, task #98) — a stale-documentation gap this Phase 8 addendum corrects; see section 15. |
 | ORM/migrations | **Prisma** — mature migration tooling, TypeScript types generated from schema, easiest to review migrations as plain SQL diffs (spec explicitly requires migration review at the end of every phase). |
 | Auth | **Auth.js (next-auth) v5, Credentials provider + bcrypt password hashing + Prisma adapter.** Not a paid SaaS auth vendor (Clerk/Auth0) — no new cost, no new third party holding Ankora's user data, but a well-audited library rather than hand-rolled crypto for something this security-sensitive (multi-tenant client isolation, session security, rate limiting are all explicit spec requirements in §16.2). |
 | Rate limiting | In-memory/DB-backed sliding window on the login endpoint for MVP (no Redis dependency yet; documented as a known limitation if traffic ever requires a shared store across serverless instances). |
@@ -921,3 +921,184 @@ server-side data fetches on navigation.
   employee-mobile and §13's client-mobile screens); their tables already sit inside
   `overflow-x-auto` containers so the page itself never scrolls sideways. Revisit if
   Ariel reports admins actually using these screens on phones.
+
+## 15. Addendum: Phase 8 (Integration foundation validation + production rollout)
+
+Spec §23's last row: "Phase 8 | Integration foundation validation + production
+rollout." Unlike every prior phase, this one draws from two largely independent
+parts of the spec rather than one feature area: §17 ("תשתית עתידית ל-ClickUp") for
+the integration foundation half, and §24 ("Checklist לפני Production") for the
+rollout half. Both are audited and addressed below.
+
+### 15.1 Audit findings (before any code changed)
+
+- No `IntegrationConnection`/`ExternalMapping` tables, no `/app/integrations`
+  screen — expected; both were explicitly deferred to "Phase 8" in Phase 2's own
+  schema comments (spec §5's own field lists for them were never modeled until
+  now).
+- `Task.source`/`Task.externalRef` (Phase 2) already exist — the one piece of
+  §17's foundation that was pre-built on purpose, per that phase's own comment.
+- **Real bug, not a gap**: `lib/app-domain/reports.ts`, `client-portal.ts`, and
+  `report-schedules.ts` all grouped/labeled time entries by
+  `startAt.toISOString().slice(0, 10)` — a UTC calendar date — instead of the
+  entry's Asia/Jerusalem calendar date. Israel is ahead of UTC (+2/+3), so any
+  entry logged in the roughly two-to-three-hour window after UTC midnight but
+  before Israel midnight displayed under the wrong (previous) day in: the
+  internal "Manual Edits" report, the Client Portal's Weekly/Monthly activity
+  rows, and scheduled report emails. The correct pattern already existed
+  elsewhere in the codebase (`localDateKey` in `time-entries.ts`, an inline
+  equivalent in `billing.ts`'s PER_DAY billing-policy grouping) — it just hadn't
+  been reused in the three files that needed it. Billed amounts were **not**
+  affected (billing.ts's grouping was already correct); only display/report
+  date labels were wrong. See §15.3.
+- **Second and third instances of the same bug class, one level up**:
+  `report-schedules.ts`'s `computeReportingPeriod` computed the WEEKLY/MONTHLY
+  reporting period's start/end boundaries from `now`'s **UTC** calendar fields
+  (`getUTCDay()`, `getUTCMonth()`), while the sibling function right above it,
+  `isScheduleDue`, already correctly reads `now`'s **local** weekday/day-of-month
+  via `Intl.DateTimeFormat` to decide whether to fire today. So the schedule
+  fired based on Israel's calendar but reported on a period computed in UTC's
+  calendar — normally invisible, but disagreeing near a week/month boundary.
+  The exact same pattern was independently present in `client-portal.ts`'s own
+  `startOfWeek`/`endOfWeek`/`startOfMonth`/`endOfMonth` (Phase 6) — the Client
+  Portal's live Weekly Activity / Monthly Detailed screens, not just the
+  scheduled-email copy — meaning a client or Ankora user opening the portal
+  right near a week/month boundary could see the wrong period's data under
+  "this week"/"this month." All three are fixed alongside the row-level bug
+  (§15.3) since they share the same root cause.
+- No privacy/terms link on `/app/login` (spec §24: "Privacy links/terms in
+  login/footer as needed") — the marketing site has real `/he/privacy` and
+  `/he/terms` pages (built long before this time-tracking app existed); the app
+  login screen simply never linked to them.
+- No rollback documentation (spec §24: "Deployment rollback documented") —
+  Vercel's own promote-previous-deployment mechanism already covers this; it
+  was just never written down.
+- This document's own header still read "Status: Proposed (pending DB provider
+  confirmation)" and §4's DB-provider row still said "Open — needs your
+  decision" — both were true in Phase 0, both have been false since Phase 0
+  actually shipped (Vercel Postgres, Neon-backed, has been Production's database
+  for seven phases). Stale documentation, not a code bug, but exactly the kind
+  of drift this ADR's own "document decisions" mandate exists to prevent —
+  corrected in §4 and this document's header.
+- CSV Hebrew/BOM (spec §24), audit log, alert dedupe, hour-bank rollover,
+  health endpoint, mobile responsive QA: all already verified correct in
+  Phases 1-7 (own dedicated tests/live QA each cited in their respective
+  addenda above) — re-confirmed by re-reading rather than re-tested from
+  scratch, since nothing in Phase 8 touches that code.
+
+### 15.2 Integration foundation (spec §5, §17)
+
+`IntegrationConnection` (provider, status, credentialsRef, config) and
+`ExternalMapping` (provider, internal/external entity type+id, syncMetadata) are
+modeled exactly as spec §5 lists them — no extra columns invented. `credentialsRef`
+is a `String?` pointer, never a credential value (§17.2: "Credentials נשמרים
+secret/encrypted store, לא בטבלת plain text") — nothing in this phase ever writes a
+real value into it, because no OAuth flow exists yet.
+
+`lib/app-domain/integrations.ts` defines `IntegrationProvider`, §17.1's own
+interface list verbatim (`connect`, `disconnect`, `pullTasks`, `pushTimeEntry`,
+`handleWebhook`, `healthCheck`), and one concrete implementation:
+`clickUpPlaceholder`, whose every mutating method rejects with an explicit "not
+implemented yet" reason and whose `healthCheck` alone succeeds (reporting
+`not_connected`). This is deliberate, not a stub to fill in casually later — §17.3
+is explicit that Ankora should not request OAuth scopes until the real
+integration is built, so a provider that quietly did nothing on `connect()` would
+be worse than one that says so.
+
+`/app/integrations` (spec §12's admin screens table, its final row) renders one
+card per known provider from `listIntegrationConnections` (SUPER_ADMIN-only via
+the new `integration.manage` permission — same SUPER_ADMIN-only precedent as
+`hour_bank.manage`/`alert.manage`, since connecting an external system's
+credentials is exactly the "critical system action" spec §4's Ankora Admin/Manager
+row says it does not get unless explicitly granted). No "Connect" button exists
+yet — showing a real one before OAuth exists would invite exactly the false
+affordance spec §17.3 warns against, the same reasoning Phase 7's PWA addendum
+(§14.6) already applied to the offline-banner question.
+
+### 15.3 Timezone fix (spec §24: "Timezone tests around midnight/month boundary")
+
+`lib/timezone.ts` is a new shared module, extracting what was previously a
+private `localDateKey` helper in `time-entries.ts` plus a duplicated inline
+`Intl.DateTimeFormat` call in `billing.ts`. It exports:
+
+- `localDateKey(date, timeZone = "Asia/Jerusalem")` — the one correct way to ask
+  "which calendar day is this UTC instant, locally."
+- `localDateTimeToUtc(dateStr, timeStr, timeZone)` — generalized from
+  `time-entries.ts`'s `combineWallClockTime` (which now just calls this fixed to
+  its own constant), converting a local wall-clock date+time into the correct UTC
+  instant.
+
+`reports.ts`, `client-portal.ts`, and both `report-schedules.ts` row-mappers now
+call `localDateKey(e.startAt)` instead of `e.startAt.toISOString().slice(0, 10)`.
+`billing.ts`'s inline call was replaced with the shared helper for consistency
+(no behavior change there — it was already correct).
+
+`computeReportingPeriod` now takes the schedule's own `timezone` (both call
+sites pass `schedule.timezone`, not a hardcoded default), reads `now`'s local
+Y-M-D via `localDateKey`, does the week/month rollover arithmetic on those plain
+numbers (weekday-of-a-date and month-overflow are timezone-free calendar facts
+once you have Y-M-D — `Date.UTC`'s own overflow normalization handles month/day
+wraparound correctly), then converts the resulting local boundary back to a real
+UTC instant via `localDateTimeToUtc` for the Prisma range query. The email
+subject's period label was similarly fixed to format via `localDateKey` instead
+of `toISOString()`, computing the inclusive last day from local Y-M-D numbers
+rather than subtracting a fixed 24 hours (which would land on the wrong
+wall-clock time across a DST-transition night).
+
+`client-portal.ts`'s `startOfWeek`/`endOfWeek`/`startOfMonth`/`endOfMonth` were
+fixed the identical way: each now derives its local Y-M-D via `localDateKey`,
+does the same tz-free calendar arithmetic, and converts back via
+`localDateTimeToUtc`. `getWeeklyActivity`/`getMonthlyDetailed` (the Client
+Portal's own live screens) needed no changes beyond that — they already called
+these four helpers rather than doing their own date math.
+
+No test previously exercised a near-midnight or month-boundary entry, which is
+exactly why this shipped unnoticed across Phases 5-6 — new regression tests
+(§15.5) now pin both the row-grouping and the period-computation behavior at
+Israel's actual UTC+2/+3 boundary.
+
+### 15.4 Production checklist walkthrough (spec §24)
+
+| Item | Status |
+|---|---|
+| Production DB separate from dev/staging | ✅ Neon branching — Preview gets its own DB branch per deployment, Production is its own branch, local dev uses `embedded-postgres`. |
+| Backups + restore test | ⚠️ Neon takes continuous backups automatically (platform-level, not app code) — but an actual **restore drill** is an operational exercise against Ariel's own Neon project console, not something this engagement can perform from the sandbox (standing rule: never touch Production's `DATABASE_URL` directly). Flagged for Ariel to schedule once. |
+| HTTPS + secrets + auth security | ✅ Vercel enforces HTTPS; secrets live in Vercel env vars (Production/Preview separated); Auth.js + bcrypt + rate-limited login (Phase 1), security headers (Phase 7). |
+| Admin account recovery | ✅ `PasswordResetToken` flow (Phase 1) works for every role including SUPER_ADMIN — not portal-only. |
+| No demo users/data in Production | ✅ `prisma/seed.ts` is dev/Preview-only by convention (never run against `DATABASE_URL` pointed at Production); every seeded row is named `demo.*`/marked DEMO per spec §0/§21.5. |
+| Client isolation E2E passed | ✅ `tests/integration/rbac-and-client-isolation.test.ts` (Phase 1) plus every phase's own isolation tests since (Client Portal's `resolvePortalClient`, spec 21.2's specific scenarios). |
+| Audit log tested | ✅ `/app/audit-log` (Phase 1) + `AuditEvent` writes verified in every phase's own integration tests. |
+| Email domain/provider configured + SPF/DKIM | ✅ Resend + `ankora.co.il`, domain-verified since Phase 4 (domain verification in Resend requires SPF/DKIM DNS records to already be correct) — real end-to-end delivery tested in Phase 4's own live QA. |
+| Alert dedupe tested | ✅ `dedupe_key` + `tests/unit/alerts.test.ts` (Phase 4). |
+| Timezone tests around midnight/month boundary | ✅ Was the gap this phase found and fixed — see §15.3/§15.5. |
+| Hour bank opening balances verified | ✅ `openHourBankCycle` + rollover tests (Phase 3). |
+| Privacy links/terms in login/footer | ✅ Fixed this phase — `/app/login` now links `/he/privacy` and `/he/terms`. |
+| Error tracking and health endpoint | ⚠️ `/api/health` done (Phase 7). External error-tracking vendor (Sentry vs. Vercel Observability) still needs Ariel's account decision — carried over from Phase 7's own §14.6, unchanged. |
+| Mobile Safari/Android Chrome passed | ⚠️ Verified via Chrome device emulation across every phase's live QA (most recently Phase 7's real mobile-viewport bottom-nav check) — this sandbox has no access to a real iOS device/Safari, so genuine Safari verification is best-effort via emulation, not a real-device pass. Flagged for Ariel to spot-check on an actual iPhone once convenient. |
+| CSV Hebrew opens correctly | ✅ `lib/csv.ts`'s UTF-8 BOM prefix (Phase 5), `tests/unit/csv.test.ts`. |
+| Performance test on realistic data | ✅ Phase 7 (§14, performance pass). |
+| Deployment rollback documented | ✅ Fixed this phase — new README section. |
+
+Three items are marked ⚠️ rather than ✅: a Neon restore drill, the external
+error-tracking vendor decision, and a real-device Safari pass. All three require
+either Ariel's own account/vendor decision or an action outside what this
+sandboxed engagement can perform (touching Production's actual database, or a
+physical iOS device) — consistent with how Phase 7's error-tracking gap was
+already handled, they are reported transparently rather than silently marked
+done.
+
+### 15.5 Tests
+
+`tests/unit/timezone.test.ts` (new): `localDateKey` at the Israel UTC+2/+3
+boundary (a `startAt` just after UTC midnight but before Israel midnight, both in
+winter and summer/DST), and at a year boundary (Dec 31 UTC late evening = Jan 1
+Israel). `computeReportingPeriod` at a month boundary where UTC and Israel
+calendars would disagree. `tests/unit/integrations.test.ts` (new):
+`clickUpPlaceholder`'s every mutating method rejects without throwing;
+`healthCheck` reports `not_connected`. `tests/integration/reports.test.ts` /
+`client-portal.test.ts` gain one regression case each: a `TimeEntry` seeded with
+`startAt` in the UTC/Israel disagreement window now asserts the row's `date`
+field is the correct Israel-local day, not the UTC day. `tests/unit/
+permissions.test.ts` gains `integration.manage` to its SUPER_ADMIN-only
+regression guard, matching the existing pattern for `hour_bank.manage`/
+`alert.manage`.
