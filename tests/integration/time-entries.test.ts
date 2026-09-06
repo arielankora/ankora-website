@@ -14,6 +14,7 @@ import {
   EditWindowExpiredError,
   BackdateReasonRequiredError,
   ConflictError,
+  FutureEntryError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
@@ -156,6 +157,41 @@ describe("createManualEntry - spec 6.3", () => {
     expect(entry.id).toBeTruthy();
   });
 
+  // Overnight bug-hunt (docs/adr/0001 section 19.2): a future date/time
+  // was previously accepted and mislabeled as needing a *backdate*
+  // reason (isBackdated() only checks "not today"), instead of being
+  // rejected outright - there's no legitimate case for logging hours
+  // that haven't happened yet.
+  it("rejects a future start time (overnight bug-hunt fix)", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const futureStart = new Date(Date.now() + 24 * 3600_000);
+    const futureEnd = new Date(futureStart.getTime() + 3600_000);
+
+    await expect(
+      createManualEntry(employee, employee.id, {
+        clientId: client.id,
+        categoryId: category.id,
+        startAt: futureStart,
+        endAt: futureEnd,
+      })
+    ).rejects.toBeInstanceOf(FutureEntryError);
+  });
+
+  it("rejects a future end time even when start is in the past (overnight bug-hunt fix)", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const startAt = new Date();
+    const futureEnd = new Date(Date.now() + 3600_000);
+
+    await expect(
+      createManualEntry(employee, employee.id, {
+        clientId: client.id,
+        categoryId: category.id,
+        startAt,
+        endAt: futureEnd,
+      })
+    ).rejects.toBeInstanceOf(FutureEntryError);
+  });
+
   it("rejects start >= end (spec 5.1)", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
     const t = new Date();
@@ -247,6 +283,25 @@ describe("updateTimeEntry - spec 5.1 revisions, 6.4 edit window", () => {
       orderBy: { version: "asc" },
     });
     expect(revisions.map((r) => r.version)).toEqual([1, 2]);
+  });
+
+  it("rejects editing an entry's end time to the future (overnight bug-hunt fix)", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id });
+
+    await expect(
+      updateTimeEntry(employee, entry.id, { endAt: new Date(Date.now() + 3600_000) })
+    ).rejects.toBeInstanceOf(FutureEntryError);
+  });
+
+  it("allows a non-time edit (e.g. note) without re-checking the future-date guard", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id });
+
+    // Must not throw FutureEntryError just because time has moved on
+    // since the entry was created - only startAt/endAt changes re-check it.
+    const updated = await updateTimeEntry(employee, entry.id, { note: "just a note edit" });
+    expect(updated.note).toBe("just a note edit");
   });
 
   it("rejects an edit whose expectedUpdatedAt no longer matches (spec 20 conflict rule)", async () => {

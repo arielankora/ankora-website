@@ -191,8 +191,26 @@ export async function openHourBankCycle(
     orderBy: { cycleStart: "desc" },
   });
 
+  // Overnight bug-hunt (docs/adr/0001 section 19.3): this used to pass
+  // `previous` straight into computeRolloverInMinutes(), which reads
+  // `previous.consumedMinutes` - the CACHED column on the row, only ever
+  // refreshed by getHourBankSnapshot() on a read path. An admin who opens
+  // a new cycle without first viewing the previous cycle's live snapshot
+  // (or right after a time-entry edit landed after the last snapshot
+  // read) would carry a stale, possibly-too-high remaining balance into
+  // the new cycle's rolloverInMinutes. Recomputing live here guarantees
+  // the rollover this function commits to the database is always based
+  // on the same real consumption number the admin screen would show.
+  const previousLiveConsumedMinutes = previous
+    ? await computeConsumedMinutesForRange(clientId, { from: previous.cycleStart, to: previous.cycleEnd })
+    : 0;
+
   const rolloverInMinutes = previous
-    ? computeRolloverInMinutes(previous, await sumAdjustments(previous.id), input.manualRolloverInMinutes)
+    ? computeRolloverInMinutes(
+        { ...previous, consumedMinutes: previousLiveConsumedMinutes },
+        await sumAdjustments(previous.id),
+        input.manualRolloverInMinutes
+      )
     : 0;
 
   const bank = await prisma.hourBank.create({

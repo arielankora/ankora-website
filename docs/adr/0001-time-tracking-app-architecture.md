@@ -1657,3 +1657,137 @@ prefer checking Vercel's own Logs (or asking Ariel to confirm the
 download in his own browser) over the in-app browser's reported status
 code.
 
+## 19. Addendum: Overnight bug-hunt pass (post-Phase-9, pre-authorized)
+
+After PR #12 (Phase 9) merged to `main` (`a60d30e`), Ariel gave a
+standing, blanket-approved instruction to run as thorough a
+logic/edge-case/UI audit as possible across the whole app, fix whatever
+is found, and merge directly without per-fix approval (he was going to
+sleep and unavailable for several hours). This section documents each
+fix found and applied during that pass, on branch
+`fix/overnight-bug-hunt`.
+
+Verification method for this entire pass: the sandbox has no outbound
+network access to `binaries.prisma.sh`, so `prisma generate` cannot run
+here and the locally cached Prisma client is stale relative to schema
+changes made in earlier phases. This means `npx vitest run` fails at
+import time for any file that touches `lib/prisma.ts` (directly or
+transitively), which includes essentially all domain-logic files. Every
+fix below was therefore verified with the two signals that remain
+reliable in this sandbox: `npx tsc --noEmit` (diffed against the
+pre-existing baseline error set on `main`, itself full of stale-client
+noise like "Module '@prisma/client' has no exported member 'User'", to
+confirm a change introduces zero *new* type errors) and `npx next
+build`'s webpack "Compiled successfully" step (the type-check step that
+follows it fails on the same stale-client noise and is not a useful
+signal here). Actual test execution and full `prisma generate &&
+migrate deploy && build` were not possible in this sandbox for this
+pass; live QA on the Preview deployment (which does have real network
+access and a real generated client) is the actual correctness gate.
+
+### 19.1 Bug: `/api/health` frozen at build time
+
+`app/api/health/route.ts` runs `prisma.$queryRaw\`SELECT 1\`` and
+returns `{ ok, db, time: new Date().toISOString() }` - it looks
+obviously dynamic. But nothing in the handler reads `request`,
+`cookies()`, `headers()`, or `searchParams`, and none of those are what
+Next.js's static-analysis pass actually checks for; a database call and
+`new Date()` are both invisible to it. Next therefore statically
+rendered this route at build time and served the exact same frozen
+response - the same timestamp, the same one-time `db: "up"` result -
+on every request since Phase 7 introduced this endpoint, regardless of
+actual database health. For an endpoint whose entire purpose is to be
+polled by an external uptime monitor, this defeated the point silently:
+the monitor would show green forever even if the database went down,
+because it was never actually querying the database after the first
+build.
+
+Fix: added `export const dynamic = "force-dynamic";` to the route,
+forcing per-request execution.
+
+### 19.2 Bug: manual time entries could be dated in the future
+
+Neither `createManualEntry` nor `updateTimeEntry` in
+`lib/app-domain/time-entries.ts` checked `startAt`/`endAt` against the
+current time - only internal ordering (`assertValidRange`: end after
+start) was checked. An employee could log (or edit an entry to) a start
+or end time in the future. Nothing downstream is designed to handle
+that: billing aggregation, hour-bank consumption, and reports all treat
+every stored entry as already-worked time, so a future-dated entry would
+silently inflate a client's consumed hours and could trigger hour-bank
+threshold alerts for work that had not happened yet.
+
+Fix: added a `FutureEntryError` and an `assertNotFuture()` guard (with a
+5-minute grace window to absorb ordinary client/server clock skew),
+called from both `createManualEntry` and `updateTimeEntry` (the latter
+only when the edit actually touches `startAt`/`endAt`, so a note-only
+edit to an old entry isn't penalized by clock skew on unrelated fields).
+Wired the new error to a Hebrew message ("לא ניתן לדווח על זמן בעתיד.")
+in both `time-entries/actions.ts` and `my-time/actions.ts`'s
+`friendlyError()`. Also added `max={todayKey()}` to every date `<input
+type="date">` across the four entry forms (`ManualEntryForm.tsx`,
+`AdminCreateEntryForm.tsx`, `AdminEntryRow.tsx`,
+`my-time/EntryRow.tsx`) so the browser's native date picker itself
+refuses to offer future dates - defense in depth alongside the
+server-side guard, not a replacement for it. Added integration tests
+for both the create and update paths, including a regression test
+confirming a non-date edit (e.g. a note) does not spuriously trigger the
+guard.
+
+### 19.3 Bug: hour-bank rollover computed from a potentially-stale cache
+
+`HourBank.consumedMinutes` is explicitly documented elsewhere in this
+codebase as "only a cache, never the source of truth" - every other read
+path (`getHourBankSnapshot`, via `getCurrentHourBank` /
+`listHourBanksForClient`) refreshes it live via
+`computeConsumedMinutesForRange()` before using it. `openHourBankCycle()`
+(which computes the rollover amount into a new cycle from the previous
+one) was the one place that violated this invariant: it read
+`previous.consumedMinutes` directly - the column as last written,
+potentially by the previous cycle's own opening, and never refreshed
+since, because nothing had read that bank live in the meantime. Any
+retroactive edit to a time entry inside the closed cycle's date range
+(a correction, a backdated entry, an admin fixing a mistake after the
+cycle closed) would be invisible to the rollover calculation, silently
+carrying forward a wrong (over- or under-counted) balance into the new
+cycle.
+
+Fix: `openHourBankCycle()` now calls
+`computeConsumedMinutesForRange(clientId, { from: previous.cycleStart,
+to: previous.cycleEnd })` itself to get a live, correct consumed-minutes
+figure for the previous cycle, and passes that (not the stale cached
+column) into `computeRolloverInMinutes()`. Updated
+`tests/integration/hour-banks.test.ts`'s three rollover tests (FULL,
+CAPPED, MANUAL), which had been directly stubbing the
+`consumedMinutes` column as a shortcut - now outdated by this fix -  to
+instead seed real `TimeEntry` rows via a new `seedConsumedMinutes()`
+helper, matching how the value is actually derived in production.
+
+### 19.4 Bug: alert reconciliation cron drops clients with a lapsed cycle
+
+`reconcileAllClientAlerts()` (the daily cron job per spec 9.2 / task
+#146) selected candidate clients via `prisma.hourBank.findMany({ where:
+{ status: "OPEN", deletedAt: null }, distinct: ["clientId"] })`.
+`HourBank.status` only transitions OPEN -> CLOSED lazily, via
+`closeIfExpired()`, itself only triggered when something reads that
+specific bank - including the cron's own `evaluateAlertsForClient()`
+call. So the sequence for a client whose cycle expires and whose admin
+does not immediately open a new one is: day N, cron finds the bank still
+`OPEN` (nothing has closed it yet), evaluates it, and as a side effect of
+that very evaluation the bank flips to `CLOSED`; day N+1, the cron's
+candidate query no longer matches this client at all, and it is silently
+dropped from reconciliation forever, or until an admin happens to open a
+new cycle (which produces a fresh `OPEN` bank and re-enrolls the
+client). A client stuck over budget with a lapsed, unrenewed cycle is
+exactly the case where alerts should keep firing - this bug made that
+case the one most likely to go silent.
+
+Fix: changed the candidate query to select every client with any
+non-deleted `HourBank` row at all (`where: { deletedAt: null }`,
+dropping the `status: "OPEN"` filter), so a client is only ever excluded
+from daily reconciliation if it has no hour bank history whatsoever.
+`evaluateAlertsForClient()` itself already handles a client with no
+currently-open bank correctly (it looks up the current bank internally),
+so this is a pure widening of the candidate set with no other behavior
+change. No existing test asserted on this function's candidate-selection
+behavior, so none required updating.

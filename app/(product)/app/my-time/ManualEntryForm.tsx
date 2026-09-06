@@ -61,6 +61,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           type="date"
           name="date"
           required
+          max={todayKey()}
           value={date}
           onChange={(e) => setDate(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"

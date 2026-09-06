@@ -57,6 +57,20 @@ export class BackdateReasonRequiredError extends Error {
   }
 }
 
+/// Overnight bug-hunt (docs/adr/0001 section 19.2): manual entries had no
+/// guard against a future start/end time. `isBackdated()` only checks
+/// "not today", so a future date was actually being mislabeled as
+/// requiring a *backdate* reason rather than being rejected outright - a
+/// time-TRACKING app has no legitimate case for logging hours that
+/// haven't happened yet. Thrown by both createManualEntry and
+/// updateTimeEntry whenever the resulting startAt/endAt lands after now.
+export class FutureEntryError extends Error {
+  constructor() {
+    super("Time entries cannot be dated in the future.");
+    this.name = "FutureEntryError";
+  }
+}
+
 /// Phase 7 (spec 20: "Conflict = אם Entry השתנה במקביל, לא לדרוס. להציג
 /// refresh/compare."). Thrown by updateTimeEntry when the caller supplied
 /// an `expectedUpdatedAt` (captured when their edit form was opened/last
@@ -125,6 +139,21 @@ async function assertActiveTargets(actor: User, clientId: string, categoryId: st
 function assertValidRange(startAt: Date, endAt: Date | null) {
   if (endAt && startAt.getTime() >= endAt.getTime()) {
     throw new Error("Start time must be before end time.");
+  }
+}
+
+/// Overnight bug-hunt (docs/adr/0001 section 19.2). A small grace period
+/// (5 minutes) absorbs ordinary clock skew between the user's browser
+/// clock (which renders "now" for date/time inputs with a `max`) and the
+/// server clock that actually evaluates this - without that grace
+/// period, a real user finishing an entry for "right now" could get
+/// bounced by a few seconds of drift.
+const FUTURE_ENTRY_GRACE_MS = 5 * 60 * 1000;
+
+function assertNotFuture(startAt: Date, endAt: Date | null) {
+  const cutoff = Date.now() + FUTURE_ENTRY_GRACE_MS;
+  if (startAt.getTime() > cutoff || (endAt && endAt.getTime() > cutoff)) {
+    throw new FutureEntryError();
   }
 }
 
@@ -319,6 +348,7 @@ export async function createManualEntry(
   assertCan(actor.role, isSelf ? "time_entry.create_self" : "time_entry.edit_others");
 
   assertValidRange(input.startAt, input.endAt);
+  assertNotFuture(input.startAt, input.endAt);
   // Checks the TARGET employee's own client assignment (spec 4.1's rule
   // is about the employee, not necessarily the actor entering the data) -
   // canAccessClientForTimeEntry's canManageClients(actor.role) branch
@@ -416,6 +446,13 @@ export async function updateTimeEntry(
   const nextStartAt = input.startAt ?? entry.startAt;
   const nextEndAt = input.endAt ?? entry.endAt;
   assertValidRange(nextStartAt, nextEndAt);
+  // Only re-check the fields actually being changed - an already-stored
+  // entry that's merely getting a note/category edit shouldn't suddenly
+  // fail because the clock moved on since it was created (it can't have
+  // been future-dated when created, since this same guard applied then).
+  if (input.startAt || input.endAt) {
+    assertNotFuture(nextStartAt, nextEndAt);
+  }
 
   const nextClientId = input.clientId ?? entry.clientId;
   const nextCategoryId = input.categoryId ?? entry.categoryId;

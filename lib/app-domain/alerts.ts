@@ -387,21 +387,36 @@ export async function retryEmailDelivery(actor: User, deliveryId: string) {
   return updated;
 }
 
-/// Re-evaluates alert rules for every client that has an OPEN hour bank.
-/// Powers the daily reconciliation cron (spec 9.2's "scheduled
+/// Re-evaluates alert rules for every client that has ANY hour-bank
+/// history. Powers the daily reconciliation cron (spec 9.2's "scheduled
 /// reconciliation", Task #146).
+///
+/// Overnight bug-hunt (docs/adr/0001 section 19.4): this used to filter
+/// candidates to `status: "OPEN"` only. HourBank.status only flips from
+/// OPEN to CLOSED lazily, the first time anything reads that bank
+/// (closeIfExpired() in hour-banks.ts) - including this very cron's own
+/// evaluateAlertsForClient() -> getCurrentHourBank() call. So a client
+/// whose cycle expired and whose admin never opened a new one would get
+/// exactly one more day of alerts (the run that still finds it OPEN and
+/// flips it CLOSED as a side effect), then silently stop being evaluated
+/// forever - precisely the "client is over budget and nobody renewed
+/// their cycle" situation alerts most need to keep firing for.
+/// getCurrentHourBank() already has its own "current cycle, else most
+/// recently started one" fallback for exactly this case (see
+/// hour-banks.ts) - this query now just needs to find every client with
+/// ANY cycle history at all, and let that fallback do the rest.
 export async function reconcileAllClientAlerts(): Promise<{ clientsEvaluated: number }> {
-  const openBanks = await prisma.hourBank.findMany({
-    where: { status: "OPEN", deletedAt: null },
+  const clientsWithBanks = await prisma.hourBank.findMany({
+    where: { deletedAt: null },
     select: { clientId: true },
     distinct: ["clientId"],
   });
 
-  for (const { clientId } of openBanks) {
+  for (const { clientId } of clientsWithBanks) {
     await evaluateAlertsForClient(clientId).catch((err) =>
       console.error(`Alert reconciliation failed for client ${clientId}:`, err)
     );
   }
 
-  return { clientsEvaluated: openBanks.length };
+  return { clientsEvaluated: clientsWithBanks.length };
 }
