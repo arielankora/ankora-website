@@ -1102,3 +1102,92 @@ field is the correct Israel-local day, not the UTC day. `tests/unit/
 permissions.test.ts` gains `integration.manage` to its SUPER_ADMIN-only
 regression guard, matching the existing pattern for `hour_bank.manage`/
 `alert.manage`.
+
+## 16. Addendum: Delivery-package closeout (spec §26 Definition of Ready)
+
+### 16.1 Context
+
+Spec §23's phase table (Phase 0 through Phase 8) is now fully implemented and
+shipped to Production — Phase 8's PR (#9) merged and verified live. The spec
+defines no Phase 9; §23's own development order ends at Phase 8
+("Integration foundation validation + production rollout"). Rather than
+inventing further phases the spec never asked for, this addendum documents an
+audit against spec §26 ("Definition of Ready למסירת האפליקציה"), which lists
+the concrete deliverables a complete handoff requires:
+
+> קלוד מספק: קוד נקי ומתועד, migrations, README להתקנה/Deployment,
+> env.example ללא secrets, תרשים schema/ERD, פירוט roles/permissions, seed
+> script ל-Staging, test suite, רשימת known limitations, ו-Admin guide קצר
+> להפעלת לקוח חדש והגדרת בנק שעות/alerts/reports.
+
+### 16.2 Audit findings
+
+Most of §26's list has existed and been kept current since early phases:
+clean/documented code (every model and permission in `schema.prisma`/
+`permissions.ts` carries an inline rationale comment, a practice followed
+since Phase 1), hand-authored migrations for every phase, a README with
+install/local-setup/deployment instructions (extended each phase), a secret-
+free `.env.example`, `prisma/seed.ts`'s demo fixtures, and a 22-file Vitest
+suite (unit + integration) across every domain module. The in-app Hebrew
+guide (`/app/guide`, built in the guide phase and required by this project's
+own standing rule — ADR §10 — to stay current on every capability change)
+satisfies "Admin guide קצר" and then some: it is more thorough than a static
+doc, with real screenshots per role, and was already kept in sync through
+Phase 8.
+
+Two items were genuinely missing, and one was stale:
+
+1. **No ERD/schema diagram existed.** The schema's own rationale lives in
+   `schema.prisma`'s inline comments, but nothing renders the 20-model
+   structure visually. Added `docs/erd.md` (Mermaid `erDiagram`), grouped by
+   the phase that introduced each model, matching `schema.prisma`'s own
+   section comments so the two documents stay easy to cross-reference.
+
+2. **No standalone roles/permissions matrix existed.** README's "Roles &
+   permissions" section (written Phase 1, lightly extended since) is prose,
+   not a matrix, and doesn't mention `report.client.view` (Phase 6) or
+   `integration.manage` (Phase 8) at all. Added `docs/roles-permissions.md`:
+   a full role × permission table generated directly from `ROLE_PERMISSIONS`
+   in `lib/app-auth/permissions.ts`, with a one-line note on each permission's
+   origin phase so it can be diffed against the source map by eye. This does
+   not replace the README's prose explanation (which carries the *why* behind
+   each grant/withhold decision, e.g. `report.internal.view` going to
+   `ANKORA_ADMIN` while `hour_bank.manage` does not) — it is a
+   quick-reference companion, and the README's "Roles & permissions" section
+   now links to it.
+
+3. **README's "Known limitations" section was stale.** Still titled "(Phase
+   1, by design)" and listing gaps that Phases 2–7 already closed (no timer/
+   billing existed at the time it was written; both now do). Rewritten to
+   describe the application's actual current limitations as of Phase 8 —
+   see §16.3.
+
+### 16.3 Known limitations, reviewed as of Phase 8
+
+The rewritten README section reflects what is genuinely still a limitation
+today, not what was true in Phase 1:
+
+- No real external integration is connected yet — `/app/integrations`
+  (Phase 8) shows ClickUp as a deliberate placeholder; every mutating method
+  on its provider adapter rejects by design (spec §17.3: no OAuth scope
+  requested until the integration is actually built).
+- Forecast-based hour-bank alerts and anomaly detection are spec §28 "future"
+  ideas, explicitly out of scope for all of Phase 0–8 (not a bug, a
+  documented non-goal).
+- The three §24 checklist items already flagged ⚠️ in §15.4 (Neon restore
+  drill, external error-tracking vendor choice, real-device Safari pass)
+  remain open pending Ariel's own action — repeated here rather than
+  duplicated with different wording, since they are the same three items.
+- Audit log has no export/retention policy UI (unchanged since Phase 1 — an
+  append-only table with a read-only filtered viewer; retention/export was
+  never a stated acceptance criterion for any phase).
+
+### 16.4 Non-goals of this closeout
+
+This is a documentation pass, not a new phase: no schema change, no new
+permission, no new screen, and therefore no in-app guide update is triggered
+(ADR §10's standing rule applies to capability changes; two new reference
+documents and a stale-section rewrite are not one). Local verification
+(tsc/eslint/vitest) still runs and is compared against `main` before pushing,
+per this engagement's standing discipline for every substantive repository
+change, documentation included.
