@@ -718,3 +718,206 @@ now lists "לקוח (פורטל לקוח)" as a role option and swaps the multi-
 list for a single required client select + a `ClientUserRole` select when that role is
 chosen. The Users guide section and its previously-accurate note that CLIENT_USER
 invites weren't yet possible were both updated in the same change.
+
+## 14. Addendum: Phase 7 (PWA/mobile polish + performance + security hardening)
+
+Spec §23's Phase 7 line ("PWA/mobile polish + performance + security hardening") has
+no single dedicated spec section of its own - unlike Phases 2-6, which each map to a
+numbered section. Its substance is instead assembled from several sections written
+earlier in the document: §2.2's PWA note, §11.1 (mobile UX), §16.2 (security
+requirements), §20 (states/errors), §21.4 (visual QA), and the subset of §24's
+pre-production checklist that is about hardening rather than the Phase 8 rollout
+mechanics themselves (DB separation, no-demo-data, rollback runbook - those stay
+Phase 8). This section documents which concrete line items were pulled from each,
+what was found on audit, and what was built or deliberately left as-is.
+
+### 14.1 Audit findings (before any code changed)
+
+- No `manifest.json`/`.webmanifest`, no app icons, no `theme-color`/viewport meta
+  beyond Next.js defaults. §2.2's PWA note was not yet implemented.
+- No security headers configured anywhere (`next.config.mjs` had no `headers()`,
+  no `vercel.json` headers block). HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
+  a `Content-Security-Policy`, and `Referrer-Policy` were all absent.
+- No `/api/health` endpoint and no error-tracking service wired up (§24: "Error
+  tracking and health endpoint").
+- No `app/error.tsx`, `app/global-error.tsx`, or `app/not-found.tsx` anywhere -
+  an unhandled exception in any route would fall back to Next.js's bare default
+  error screen, and a bad URL under `/app/**` would 404 with no Ankora chrome.
+- Login lockout, generic-failure-message, and audit logging (§16.1/§20's forbidden-
+  without-detail rule) were already built correctly in Phase 1 (`lib/app-auth/
+  authenticate.ts`, `lib/app-auth/login-attempts.ts`) - no gap found there.
+- `components/app/MobileNav.tsx` (Phase 1) is a hamburger-triggered dropdown, not a
+  bottom tab bar. §11.1 literally asks for "Bottom navigation עם 3-5 יעדים בלבד" -
+  this is the clearest, most concrete gap against a specific spec line found in this
+  audit.
+- The Start/Stop timer button (Phase 2, `TimerWidget.tsx`) is already full-width with
+  ~52px effective height on mobile - already meets "כפתור גדול וברור" and the 44px
+  touch-target rule. No change needed.
+- `My Time` (Phase 2) already renders `EntryRow` components (stacked rows), not a
+  raw `<table>` - already meets "אין טבלאות רחבות" for the one screen spec §11
+  itself names. The three Client Portal table screens (Phase 6) already wrap their
+  `<table>` in `overflow-x-auto` containers, so a wide table scrolls within its own
+  bounded box rather than the page scrolling sideways - an acceptable, deliberate
+  reading of "no horizontal scrolling on core screens" (§21.4) that a fully re-built
+  card layout would only cosmetically improve. Left as-is; see 14.5 for the one
+  exception.
+- Client Portal dashboard's KPI cards (`grid-cols-2 sm:grid-cols-4`) and the Overview
+  screen's cards (`grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`) both already collapse
+  to a narrow-safe column count at 320-390px - no clipping found.
+- Prisma schema already carries composite indexes on the highest-volume table
+  (`TimeEntry`: `[userId, startAt]`, `[clientId, startAt]`, `[categoryId, startAt]`)
+  plus indexes on `AuditEvent`, `HourBank`, `AlertEvent`. Two internal-reports
+  functions (`hoursByClient`, `overageAtRisk` in `lib/app-domain/reports.ts`) issue
+  one `getCurrentHourBank` query per active client rather than a single aggregate
+  query - a real N+1 pattern, but bounded by Ankora's actual client count (tens, not
+  thousands - spec §21.5's own test-data scale is 3 clients). Documented here as a
+  reviewed, accepted tradeoff rather than rewritten: forcing these into a single
+  aggregate query would touch working, already-shipped Phase 5 report logic without
+  a measured performance problem to justify the risk. Revisit if Ankora's client
+  count grows into the hundreds.
+- No rate limiting exists beyond the per-account graduated lockout already in
+  `login-attempts.ts` (Phase 1) - no separate IP-based throttle. Judged sufficient
+  for this deployment's traffic profile; a shared IP-based limiter is infrastructure
+  the spec doesn't ask for and Vercel Hobby doesn't give a good primitive for
+  (no KV/Redis provisioned) - noted as a documented gap, not silently accepted.
+
+### 14.2 PWA (spec §2.2)
+
+Added `app/manifest.ts` (Next.js's typed manifest route, served at `/manifest.
+webmanifest`) plus `192x192` and `512x512` PNG icons generated from the existing
+`public/logo-mark.png` (550x550, transparent) composited onto the brand navy
+(`#1B2A3D`) background - consistent with "dark premium palette" rather than a plain
+white or transparent icon tile. `theme_color`/`background_color` both set to the same
+navy. Display mode `standalone`, `start_url: /app`. Per §2.2's own caveat ("אך לא
+להפוך PWA לתלות קשיחה") this is additive only - no service worker, no offline asset
+caching, no push notification plumbing (explicitly out of MVP per §2.2's own list).
+An install banner is a browser-native behavior once the manifest and HTTPS are in
+place; nothing else was built to force it.
+
+### 14.2.1 Bug found during this phase's own live QA: manifest route swallowed by [locale]
+
+The original approach (14.2 above, before this fix) placed a Next.js file-convention
+`manifest.ts` inside `app/(product)/`, expecting Next's route-segment metadata
+inheritance to scope it to that route group only. Live QA on the Preview deployment
+found this didn't work as designed: a request to `/manifest.webmanifest` returned
+HTTP 200 with the *marketing homepage's HTML*, not the manifest JSON - `app/[locale]`'s
+dynamic segment was matching the literal path `manifest.webmanifest` as an (invalid,
+silently-defaulted-to-"he") locale value and rendering the homepage, out-prioritizing
+the file-convention route one level deep inside the sibling `(product)` route group.
+`app/robots.ts` (the true top-level app root, not nested in a route group) was
+confirmed unaffected by the same test, isolating the cause to the route-group nesting
+specifically. Fixed by deleting `app/(product)/manifest.ts` entirely and replacing it
+with a static `public/manifest.webmanifest` file, referenced explicitly via
+`metadata.manifest` in `app/(product)/layout.tsx` - a public file is served before
+app-router path matching even runs, so no route-priority conflict is possible. Content
+is otherwise identical to the original file-convention version.
+
+### 14.3 Security headers (spec §16.2)
+
+Added a `headers()` block in `next.config.mjs` applied to all routes:
+`Strict-Transport-Security` (`max-age=63072000; includeSubDomains; preload` -
+Vercel already terminates TLS and forces HTTPS at the edge, so this is the
+production-hardening half of "HTTPS בלבד; HSTS בפרודקשן"), `X-Content-Type-Options:
+nosniff`, `X-Frame-Options: DENY` (the app has no legitimate reason to be framed -
+closes a clickjacking vector the spec's XSS/CSRF line implies without naming),
+`Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy`
+disabling camera/microphone/geolocation (unused by this app). A `Content-Security-
+Policy` was deliberately *not* added in this phase: Next.js's default inline
+`<script>` bootstrapping and the guide's embedded screenshots would need a carefully
+tuned `nonce`-based CSP to avoid breaking the app, and shipping a wrong one is worse
+than shipping none - documented as a deferred, not skipped, item (see 14.6).
+CSRF/XSS/SQL-injection protection itself was already structurally in place before
+this phase: Next.js Server Actions carry their own origin-check CSRF protection,
+Prisma parameterizes all queries (no raw SQL string interpolation anywhere in the
+domain layer), and React escapes all rendered text by default - audited, not
+rebuilt.
+
+### 14.4 Health endpoint + error boundaries (spec §24)
+
+Added `GET /api/health` - unauthenticated (a health check has to be reachable by an
+external monitor with no credentials), returns `{ ok: true, db: "up" }` on a
+successful `SELECT 1` against Postgres via Prisma, `503` with `db: "down"` on
+failure. No secrets or stack traces in the body, matching §16.2's "production logs
+לא מכילים... תוכן רגיש." No external error-tracking service (Sentry et al.) was
+wired up - that requires an account/API key decision that belongs to Ariel, not a
+default this engagement should silently pick; flagged as an open item in 14.6, not
+built. Added `app/error.tsx` (client error boundary, Ankora-branded, "משהו השתבש" +
+retry) and `app/(product)/app/not-found.tsx` (branded 404 inside the AppShell,
+distinguished from the marketing site's own not-found for the public pages).
+
+### 14.5 Mobile: bottom navigation (spec §11.1)
+
+Replaced the header hamburger-only nav with a fixed bottom tab bar
+(`components/app/BottomNav.tsx`, `md:hidden`, `pb-[env(safe-area-inset-bottom)]` for
+the iPhone home-indicator safe area per §11.1's own line) that renders the same
+role-filtered `items` list `AppShell.tsx` already computes. To honor "3-5 יעדים
+בלבד" literally regardless of how many items a given role's full nav has (2 for a
+bare employee up to 9 for `SUPER_ADMIN`), the bar always shows at most the first 4
+items as direct tabs plus a 5th "עוד" (more) tab; "עוד" opens the same bottom-sheet
+list the old hamburger showed (remaining items, if any, plus name/role and sign-out)
+rather than duplicating that UI. Every role therefore sees between 4 and 5 bottom
+tabs, never more - the two mobile-first roles named in spec §11/§13
+(`ANKORA_EMPLOYEE`, `CLIENT_USER`) both fit their entire nav across the 4 direct
+slots plus "עוד," so no destination is ever more than one tap away. The header
+hamburger button and `MobileNav.tsx` were deleted outright - the bottom bar's
+"עוד" tab is now the only entry point to that same content (name/role + sign-out,
+plus any nav items beyond the first 4), re-implemented directly inside
+`BottomNav.tsx` rather than importing the old component, since the trigger itself
+(a bottom tab vs. a header icon button) differs enough that keeping both would mean
+two divergent copies of the same sheet. `<main>` gained bottom padding (`pb-24` at
+mobile widths, `md:pb-10` at desktop) so page content is never hidden behind the
+fixed bar.
+
+### 14.7 Edit-conflict detection (spec 20)
+
+Audit found a real gap here, not just missing polish: `updateTimeEntry` (Phase 2)
+always wrote against whatever the row's current state was at write time, with no
+check against what the editor's form had actually loaded - two people editing the
+same entry within the self-edit window would silently last-write-wins overwrite each
+other (fully audited via `TimeEntryRevision`, but never surfaced to either editor).
+Fixed with a minimal optimistic-concurrency check rather than a full versioning
+scheme: every edit form (`EntryRow.tsx`, `AdminEntryRow.tsx`) now carries a hidden
+`expectedUpdatedAt` field set to the entry's `updatedAt` at render time; both server
+actions pass it through to `updateTimeEntry`, which now throws a new `ConflictError`
+- before applying any change - if the row's current `updatedAt` no longer matches.
+The UI's `friendlyError()` maps that to "הרשומה הזו עודכנה בינתיים... יש לרענן"
+rather than the generic error, giving the editor exactly the "refresh/compare"
+signal spec 20 asks for (compare-and-merge itself was judged out of scope - the
+existing revision history already lets an admin see what changed). The parameter is
+optional so internal callers with no "form load time" of their own (tests, other
+domain functions) are unaffected - see the two new tests in
+`tests/integration/time-entries.test.ts`.
+
+### 14.8 Loading skeleton (spec 20)
+
+Added `app/(product)/app/loading.tsx` - a single generic skeleton (Next.js's
+`loading.tsx` convention) rather than a bespoke one per screen, since building
+20+ hand-tuned skeletons is disproportionate to what spec 20's one-line requirement
+("Loading skeletons במסכים מרכזיים") calls for. Shows automatically during
+server-side data fetches on navigation.
+
+### 14.6 Explicitly deferred (not silently dropped)
+
+- Content-Security-Policy header (14.3) - needs a nonce strategy tuned against the
+  guide's inline screenshots and Next.js's own inline bootstrap script; wrong CSP
+  breaks the app instead of hardening it.
+- External error-tracking/APM service (14.4) - needs an account decision from Ariel
+  (Sentry vs. Vercel's own Observability product, already visible in the Vercel
+  dashboard used throughout this engagement's live QA).
+- IP-based rate limiting beyond the existing per-account lockout - needs Redis/KV
+  infrastructure not yet provisioned.
+- Service worker / offline asset caching / installable-without-network - spec §2.2
+  explicitly keeps "PWA a default, not a hard dependency"; §11.1's offline rule only
+  asks that a running timer survive a reconnect (already true - server-authoritative
+  start time, Phase 2) and that a new timer not be startable offline "אלא אם נבנית
+  אסטרטגיית sync מלאה" - no such strategy exists, so the correct behavior today is
+  simply: a fully offline device gets a normal network-error state on submit (§20),
+  not a silent local queue. No offline banner/detection was added in this phase
+  since building one without a sync strategy behind it would invite exactly the
+  false affordance §11.1 warns against.
+- Full card-layout rebuild of the seven admin-only `<table>` screens (Users,
+  Clients, Categories, Time Entries, Hour Banks, Reports, Audit Log) - these are
+  desktop-primary admin tools per spec §12's own framing (as opposed to §11's
+  employee-mobile and §13's client-mobile screens); their tables already sit inside
+  `overflow-x-auto` containers so the page itself never scrolls sideways. Revisit if
+  Ariel reports admins actually using these screens on phones.

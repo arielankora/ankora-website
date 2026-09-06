@@ -134,6 +134,7 @@ export default async function MyTimePage({ searchParams }: { searchParams: { wee
                         isManual: entry.isManual,
                         clientName: entry.client.name,
                         categoryName: entry.category.name,
+                        updatedAt: entry.updatedAt.toISOString(),
                       }}
                     />
                   ))}

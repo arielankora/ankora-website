@@ -15,6 +15,10 @@ type Entry = {
   userName: string;
   clientName: string;
   categoryName: string;
+  /// Phase 7 (spec 20 conflict rule) - sent back as expectedUpdatedAt on
+  /// save so the server can detect a concurrent edit; see
+  /// lib/app-domain/time-entries.ts's ConflictError.
+  updatedAt: string;
 };
 
 type Revision = {
@@ -98,6 +102,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
         <td colSpan={7} className="px-5 py-4">
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
+            <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
                 <label className="block text-xs font-medium text-navy/60">תאריך</label>

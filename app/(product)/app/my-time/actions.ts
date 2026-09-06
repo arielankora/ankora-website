@@ -9,6 +9,7 @@ import {
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
+  ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
@@ -16,6 +17,8 @@ type FormState = { error?: string; ok?: boolean };
 
 function friendlyError(err: unknown): string {
   if (err instanceof OverlapError) return "טווח הזמן חופף לדיווח קיים.";
+  if (err instanceof ConflictError)
+    return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
   if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
   if (err instanceof BackdateReasonRequiredError) return "יש לציין סיבה לדיווח עבור יום קודם.";
   if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
@@ -65,12 +68,15 @@ export async function updateMyEntryAction(_prev: FormState | undefined, formData
     return { error: "נתונים חסרים." };
   }
 
+  const expectedUpdatedAtRaw = String(formData.get("expectedUpdatedAt") || "");
+
   try {
     await updateTimeEntry(user, timeEntryId, {
       startAt: combineWallClockTime(date, startTime),
       endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
       reason: String(formData.get("reason") || "") || null,
+      expectedUpdatedAt: expectedUpdatedAtRaw ? new Date(expectedUpdatedAtRaw) : undefined,
     });
   } catch (err) {
     return { error: friendlyError(err) };

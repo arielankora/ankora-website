@@ -14,6 +14,10 @@ type Entry = {
   isManual: boolean;
   clientName: string;
   categoryName: string;
+  /// Phase 7 (spec 20 conflict rule) - sent back as expectedUpdatedAt on
+  /// save so the server can detect a concurrent edit; see
+  /// lib/app-domain/time-entries.ts's ConflictError.
+  updatedAt: string;
 };
 
 function SubmitButton() {
@@ -60,6 +64,7 @@ export function EntryRow({ entry }: { entry: Entry }) {
     return (
       <form action={formAction} className="space-y-3 px-5 py-4">
         <input type="hidden" name="timeEntryId" value={entry.id} />
+        <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <label className="block text-xs font-medium text-navy/60">תאריך</label>
