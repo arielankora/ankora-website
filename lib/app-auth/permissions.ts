@@ -75,6 +75,23 @@ export type Permission =
   // precedent as hour_bank.manage and alert.manage.
   | "integration.manage";
 
+// Phase 9 gap-fix (docs/adr/0001 section 17): the Tasks, Profile, and
+// Notifications screens added this phase deliberately introduce NO new
+// Permission literal here.
+//   - Tasks (lib/app-domain/tasks.ts): "can this user see/act on this
+//     task" reduces entirely to "can this user see/act on this task's
+//     client," which listAccessibleClients()/canManageClients() already
+//     answer - the same scoping the timer/manual-entry client picker and
+//     reports already use. A dedicated task.manage permission would just
+//     duplicate that check.
+//   - Profile (lib/app-domain/profile.ts) and Notifications
+//     (lib/app-domain/notifications.ts) are both strictly self-service:
+//     every role (including CLIENT_USER) may view/edit their OWN profile
+//     and their OWN notifications, and never anyone else's. There is
+//     nothing to gate by role - the identity check (the session's own
+//     user id) is the only access rule, so a permission would always
+//     evaluate to "true for everyone" and add nothing.
+
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Spec 4 role table: Super Admin - "הכול: משתמשים, לקוחות, בנקים,
   // הרשאות, עריכות, audit, דוחות" - includes editing anyone's time entries

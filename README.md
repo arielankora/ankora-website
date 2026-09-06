@@ -203,12 +203,19 @@ that is a manual, hand-reviewed SQL operation against the actual
 Production database - never something to script blindly, since Prisma
 does not auto-generate a safe "down" migration.
 
-### Known limitations (reviewed as of Phase 8)
+### Known limitations (reviewed as of Phase 9)
 
 Phases 0-8 (the full development plan in spec section 23) have all shipped
-to Production. This list was last accurate for Phase 1 alone and has been
+to Production. Phase 9 (a full spec re-audit, `docs/adr/0001` section 17)
+closed five gaps the audit found - `Task.status`, a standalone Tasks
+screen, a self-service Profile screen, a Notifications screen, and the
+email/persisted half of the long-running-timer warning - plus added
+XLSX/PDF export alongside the already-mandatory CSV (spec 14.4 marks
+XLSX/PDF "מומלץ", recommended, not mandatory - previously deferred, not a
+bug). This list was last accurate for Phase 1 alone and has been
 rewritten to describe what is genuinely still a limitation today - not what
-was true before timer/billing/alerts/reports/portal/integrations existed.
+was true before timer/billing/alerts/reports/portal/integrations/tasks
+existed.
 
 - **No real external integration is connected yet.** `/app/integrations`
   (Phase 8) shows ClickUp as a deliberate placeholder - every mutating

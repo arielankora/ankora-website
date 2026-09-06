@@ -65,6 +65,21 @@ export default async function PortalMonthlyPage({ searchParams }: { searchParams
             >
               ייצוא ל-CSV
             </a>
+            {/* Phase 9 gap-fix: spec 14.4's "מומלץ" (recommended) XLSX/PDF
+                formats, deferred at Phase 5 - same export route, added
+                &format=. */}
+            <a
+              href={`/api/portal/export?monthOffset=${monthOffset}&format=xlsx`}
+              className="rounded-full border border-lineDark px-4 py-2 font-medium text-navy hover:border-gold"
+            >
+              ייצוא ל-Excel
+            </a>
+            <a
+              href={`/api/portal/export?monthOffset=${monthOffset}&format=pdf`}
+              className="rounded-full border border-lineDark px-4 py-2 font-medium text-navy hover:border-gold"
+            >
+              ייצוא ל-PDF
+            </a>
           </div>
         </div>
 

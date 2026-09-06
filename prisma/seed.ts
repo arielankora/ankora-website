@@ -169,6 +169,83 @@ async function main() {
     create: { userId: ankoraAdmin.id, clientId: clientA.id },
   });
 
+  // Phase 9 gap-fix (docs/adr/0001 section 17.2): demo Tasks across every
+  // TaskStatus value, and a couple of demo Notification rows, so the new
+  // /app/tasks and /app/notifications screens have something to show
+  // right after a fresh seed - matching spec 21.5's test-data spirit
+  // (every screen should be non-empty for a demo login).
+  await prisma.task.upsert({
+    where: { id: "demo-task-onboarding-kickoff" },
+    update: {},
+    create: {
+      id: "demo-task-onboarding-kickoff",
+      clientId: clientA.id,
+      categoryId: "demo-category-client-a-onboarding",
+      title: "[DEMO] פגישת פתיחה עם אורביט",
+      status: "DONE",
+    },
+  });
+  await prisma.task.upsert({
+    where: { id: "demo-task-research-competitors" },
+    update: {},
+    create: {
+      id: "demo-task-research-competitors",
+      clientId: clientA.id,
+      categoryId: "demo-category-research",
+      title: "[DEMO] מיפוי מתחרים",
+      status: "IN_PROGRESS",
+    },
+  });
+  await prisma.task.upsert({
+    where: { id: "demo-task-meridian-weekly" },
+    update: {},
+    create: {
+      id: "demo-task-meridian-weekly",
+      clientId: clientB.id,
+      categoryId: "demo-category-meetings",
+      title: "[DEMO] סנכרון שבועי - מרידיאן",
+      status: "OPEN",
+    },
+  });
+  await prisma.task.upsert({
+    where: { id: "demo-task-old-proposal" },
+    update: {},
+    create: {
+      id: "demo-task-old-proposal",
+      clientId: clientB.id,
+      title: "[DEMO] הצעת מחיר ישנה",
+      status: "ARCHIVED",
+    },
+  });
+
+  await prisma.notification.upsert({
+    where: { id: "demo-notification-long-timer" },
+    update: {},
+    create: {
+      id: "demo-notification-long-timer",
+      userId: employeeOne.id,
+      type: "long_running_timer",
+      title: "[DEMO] טיימר רץ זמן ארוך",
+      body: "הטיימר עבור אורביט טכנולוגיות רץ כבר 9 שעות ברצף. בדקו אם יש לעצור אותו.",
+      entityType: "TimeEntry",
+      entityId: "demo-timer-entry",
+    },
+  });
+  await prisma.notification.upsert({
+    where: { id: "demo-notification-read" },
+    update: {},
+    create: {
+      id: "demo-notification-read",
+      userId: employeeOne.id,
+      type: "long_running_timer",
+      title: "[DEMO] טיימר רץ זמן ארוך (נקרא)",
+      body: "התראה קודמת לדוגמה, כבר סומנה כנקראת.",
+      entityType: "TimeEntry",
+      entityId: "demo-timer-entry-old",
+      readAt: new Date(),
+    },
+  });
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);

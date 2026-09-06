@@ -1256,3 +1256,155 @@ This section is a findings record only. Whether to build any of §17.2's
 five gaps, and in what order, is Ariel's call — flagged to him directly
 rather than assumed. No schema, permission, or screen changed, so no
 in-app guide update is triggered here either.
+
+## 18. Addendum: Phase 9 (spec re-audit gap-fix + XLSX/PDF export)
+
+### 18.1 Context
+
+Ariel's instruction after section 17's findings report: "אני רוצה שתתקן
+את כל הפערים כולל ייצוא ל-XLSX/PDF" (fix all the gaps including XLSX/PDF
+export). This section records what was built for each of section 17.2's
+five gaps, plus XLSX/PDF export.
+
+### 18.2 Schema
+
+- **`TaskStatus` enum** (`OPEN | IN_PROGRESS | DONE | ARCHIVED`) +
+  `Task.status @default(OPEN)` - closes the exact gap section 17.2 named.
+  Hand-authored migration `prisma/migrations/20260906220000_phase9_gap_fixes/`
+  (same `binaries.prisma.sh`-unreachable-in-sandbox workaround as every
+  prior phase; verified functionally, real `prisma generate`/migrate runs
+  on Vercel's Preview build).
+- **`Notification` model** - new. Purely user-scoped (`userId`, no
+  client/role scoping needed - see `lib/app-domain/notifications.ts`'s own
+  comment), `type` a free string rather than an enum (same precedent as
+  `AuditEvent.action`), `(type, entityId)` used as an application-level
+  dedupe key (index, not a DB unique constraint, since a notification type
+  could theoretically apply to no entity at all).
+
+### 18.3 No new RBAC permission
+
+Tasks, Profile, and Notifications introduce zero new `Permission` literals
+- see `lib/app-auth/permissions.ts`'s own Phase 9 comment block for the
+full reasoning. Tasks scoping reduces to `listAccessibleClients()`
+(already used by the timer); Profile/Notifications are pure self-service
+(identity check only, same row for everyone).
+
+### 18.4 Long-running-timer notification (closes section 17.2's fourth gap)
+
+`lib/app-domain/notifications.ts`'s `notifyLongRunningTimers()` scans
+every running `TimeEntry` (`endAt = null`) past `LONG_TIMER_HOURS` (the
+same constant `TimerWidget.tsx`'s UI badge already used), dedupes via the
+`(type, entityId)` `Notification` key so the same timer is never notified
+twice even across multiple daily cron runs, then both creates a
+`Notification` row and sends an email via the existing `lib/email.ts`
+Resend adapter. Wired into the existing daily `alerts-reconcile` cron
+(`app/api/cron/alerts-reconcile/route.ts`) rather than a new job - Vercel
+Cron on this plan is daily-or-coarser regardless, the same honest
+approximation already documented for `AlertRule` reconciliation (section
+11.3).
+
+The dedupe/threshold logic is exposed as two standalone pure functions
+(`isPastLongTimerThreshold`, `selectUnnotifiedEntries`) specifically so it
+is unit-testable outside the Prisma import chain - same pattern as
+`lib/app-domain/alerts.ts`'s `currentValueForThreshold`/
+`isThresholdBreached`/`decideAlertAction` (`tests/unit/alerts.test.ts`).
+See `tests/unit/notifications.test.ts`.
+
+### 18.5 Password change invalidates all sessions, including the current one
+
+`lib/app-domain/profile.ts`'s `changeOwnPassword()` increments
+`User.tokenVersion` on success, exactly like
+`lib/app-auth/password-reset.ts`'s `consumePasswordResetToken()` - spec
+4.2's "logout all sessions" semantics apply to any password change, not
+just a forgot-password reset. Because `lib/app-auth/session.ts`'s
+`getCurrentUser()` re-checks `tokenVersion` against the DB on every
+request, this means the user's own current session becomes invalid on
+their very next request too. The server action therefore explicitly
+`redirect()`s to `/app/login?passwordChanged=1` on success rather than
+leaving the user on a profile page whose session is already dead
+server-side.
+
+### 18.6 XLSX export
+
+`exceljs` chosen over the `xlsx` (SheetJS) package - actively maintained,
+writes a real `.xlsx` (not just reads), and has first-class RTL sheet-view
+support (`views: [{ rightToLeft: true }]`) needed for Hebrew reports.
+`lib/xlsx.ts`'s `toXlsx()` takes the exact same `(sheetName, headers,
+rows)` shape every export route already assembles for CSV, so no export
+route needed a second data-fetching path - same "one data path, N output
+formats" principle as CSV/PDF.
+
+### 18.7 PDF export: a real bug found and fixed during verification
+
+`lib/pdf.ts`'s `toPdfTable()` needed to solve two problems pdfkit does not
+solve on its own, documented in that file's own header comment: (1) font
+coverage - `@fontsource/heebo`'s per-script subset files mean no single
+font covers Hebrew + Latin + digits, solved by registering both subsets
+and drawing each character run with whichever has the glyphs; (2) bidi -
+pdfkit draws codepoints strictly left-to-right regardless of script, so
+raw Hebrew renders backwards, solved with the `bidi-js` npm package (a
+real Unicode Bidi Algorithm implementation) reordering each string into
+visual order before drawing.
+
+**Bug found during manual verification, not by inspection.** The first
+implementation registered `@fontsource/heebo`'s `.woff2` files directly.
+Rendering a test PDF and rasterizing it (`pdftoppm`, then `gs
+-sDEVICE=jpeg` as a second independent renderer to rule out a
+Poppler-specific bug) produced a **blank page** - `pdftotext` still
+extracted the correct Hebrew text (the embedded ToUnicode CMap was fine),
+but nothing was actually painted, in both renderers. Root cause: pdfkit's
+TrueType font subsetter (via `fontkit`) silently produces invisible/empty
+glyph outlines when the source font is a `.woff2` file - almost certainly
+related to WOFF2's transformed glyf/loca table layout not surviving the
+subsetting rebuild, since the plain `.woff` (v1, just zlib-compressed
+sfnt tables, no transform) build of the *exact same typeface and weight*
+rendered correctly once swapped in. `registerFonts()` in `lib/pdf.ts` now
+loads the `.woff` files, with a comment recording this finding so a future
+"let's just get the newer .woff2 build" edit doesn't silently reintroduce
+invisible-text PDFs.
+
+Correctness of bidi reordering and RTL column/table layout was verified
+objectively, not by looking at rendered pixels (small reversed-looking
+Hebrew glyphs are easy to visually misread) - `pdftotext -bbox` on a real
+generated PDF extracts each word's actual x-position alongside its
+correctly-reconstructed logical-order text. A three-word ordering probe
+("ראשון שני שלישי" - "first second third") placed "ראשון" (first)
+rightmost and "שלישי" (third) leftmost in the output, exactly as correct
+RTL layout requires; the real report title "דוח שעות לפי לקוח" round-tripped
+through the same check in correct reading order. See `tests/unit/pdf.test.ts`
+for the automated regression coverage this verification informed (structural
+checks: non-empty PDF, pagination, empty-state path - not a substitute for
+the one-time manual bbox verification above, which is recorded here instead
+of re-run by CI).
+
+### 18.8 Export routes: additive `?format=` query param
+
+Both `app/api/reports/export/route.ts` and `app/api/portal/export/route.ts`
+gained a `?format=xlsx|pdf` query parameter; omitting it keeps the exact
+same mandatory-CSV default and response shape every existing caller/link
+already relies on. Both routes reuse their existing permission-checked
+data-fetching function (`runReport`/`getMonthlyDetailed`) unchanged -
+only the final serialization step branches on `format`.
+
+### 18.9 Guide + README updated in the same change
+
+Per section 10's standing rule: `app/(product)/app/guide/content.ts` gained
+a "משימות" section (daily-work group), a new "החשבון שלי" group
+("התראות שלי" + "הפרופיל שלי"), an updated long-timer note (mentions the
+new email/persisted notification), and updated CSV-only export language
+across both export sections (internal reports + client portal monthly).
+`README.md`'s Known Limitations header/intro updated to "reviewed as of
+Phase 9."
+
+### 18.10 Verification
+
+`npx tsc --noEmit` and `npx vitest run` were re-checked against the
+pre-Phase-9 baseline (17 failed / 5 passed test files, 40 passed tests -
+all 17 failures being the same pre-existing `@prisma/client did not
+initialize yet` sandbox limitation, not real regressions). Post-Phase-9:
+19 failed / 7 passed test files, 49 passed tests - the two new failed
+files (`tasks.test.ts`, `notifications.test.ts`) fail for the identical
+documented reason (their domain modules import Prisma transitively); the
+two new passed files (`xlsx.test.ts`, `pdf.test.ts`) import neither Prisma
+nor anything that does, so they actually run here and pass, unlike almost
+every other domain-level test in this suite.

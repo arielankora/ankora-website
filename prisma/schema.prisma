@@ -69,6 +69,18 @@ enum CategoryVisibility {
   CLIENT
 }
 
+/// Task.status, spec section 5's data model + section 10.2: "סטטוסים: Open /
+/// In progress / Done / Archived." Added in the Phase 9 gap-fix pass (spec
+/// re-audit, docs/adr/0001 section 17.2) - the Task model existed since
+/// Phase 2 but never had a status column, so every task was implicitly
+/// "open" forever with no way to express otherwise.
+enum TaskStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  ARCHIVED
+}
+
 // --- Core models ---------------------------------------------------------
 
 /// Every human who can log in - internal Ankora staff AND client-portal
@@ -109,6 +121,7 @@ model User {
   timeEntries         TimeEntry[]
   timeEntryRevisions  TimeEntryRevision[]  @relation("TimeEntryRevisionActor")
   hourBankAdjustments HourBankAdjustment[] @relation("HourBankAdjustmentCreator")
+  notifications       Notification[]
 
   @@index([role, status])
   @@map("users")
@@ -303,6 +316,7 @@ model Task {
   clientId    String
   categoryId  String?
   title       String
+  status      TaskStatus @default(OPEN)
   source      String    @default("local")
   externalRef String?
   createdAt   DateTime  @default(now())
@@ -811,4 +825,37 @@ model ExternalMapping {
   @@unique([provider, internalEntityType, internalEntityId])
   @@index([provider, externalEntityType, externalEntityId])
   @@map("external_mappings")
+}
+
+// --- Phase 9: gap-fix pass (spec re-audit, docs/adr/0001 section 17) ---
+
+/// Spec section 11's "Notifications" screen ("חריגות/טיימר ארוך/alerts
+/// פנימיים") - never modeled before this phase. Purely user-scoped (no
+/// client/role scoping needed): every user only ever sees their own rows.
+/// `type` is a free string rather than an enum on purpose, mirroring
+/// AuditEvent.action's own precedent (docs/adr/0001) - new notification
+/// kinds can be added without a schema migration.
+model Notification {
+  id       String  @id @default(cuid())
+  userId   String
+  type     String
+  title    String
+  body     String
+  entityType String?
+  entityId   String?
+  readAt   DateTime?
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Dedupes the long-running-timer notification (spec 6.1) so the daily
+  // cron (see app/api/cron/alerts-reconcile) never sends a second email
+  // for the same still-running TimeEntry - one notification row per
+  // (type, entityId) pair is the dedupe key, checked before insert rather
+  // than enforced by a DB constraint, since entityId is nullable for
+  // notification types that aren't tied to one entity.
+  @@index([userId, readAt])
+  @@index([type, entityId])
+  @@map("notifications")
 }

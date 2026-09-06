@@ -4,7 +4,19 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
+import { toXlsx } from "@/lib/xlsx";
+import { toPdfTable } from "@/lib/pdf";
 import type { TimeEntrySource } from "@prisma/client";
+
+// Phase 9 gap-fix (docs/adr/0001 section 17): spec 14.4 marks XLSX/PDF as
+// "מומלץ" (recommended, not mandatory) alongside the mandatory CSV - this
+// was deferred at Phase 5 and is added here via a `?format=` query param
+// so the mandatory CSV default (no format param) is unchanged for every
+// existing caller/link.
+type ExportFormat = "csv" | "xlsx" | "pdf";
+function parseFormat(value: string | null): ExportFormat {
+  return value === "xlsx" || value === "pdf" ? value : "csv";
+}
 
 // Spec 14.4: "CSV חובה... Export מופק server-side עם אותן הרשאות כמו
 // המסך. שם הקובץ כולל client/report/date. עברית חייבת להישאר קריאה, כולל
@@ -62,15 +74,48 @@ export async function GET(req: NextRequest) {
     throw err;
   }
 
-  // toCsv (lib/csv.ts) owns escaping + the UTF-8 BOM Excel needs for
-  // Hebrew (spec 14.4, explicit) - shared, unit-tested, dependency-free.
-  const csv = toCsv(
-    result.columns.map((c) => c.label),
-    result.rows.map((row) => result.columns.map((c) => row[c.key] ?? ""))
-  );
+  const format = parseFormat(params.get("format"));
+  const headers = result.columns.map((c) => c.label);
+  const rows = result.rows.map((row) => result.columns.map((c) => row[c.key] ?? ""));
 
   const dateStr = new Date().toISOString().slice(0, 10);
   const clientSlug = filters.clientId ? (await getClient(filters.clientId))?.name ?? filters.clientId : "all-clients";
+  const reportLabel = REPORT_DEFINITIONS.find((r) => r.id === type)?.label ?? type;
+
+  if (format === "xlsx") {
+    const buf = await toXlsx(reportLabel, headers, rows);
+    const filename = `${type}_${clientSlug}_${dateStr}.xlsx`.replace(/[^\w.\-֐-׿]+/g, "-");
+    return new Response(buf, {
+      headers: {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  if (format === "pdf") {
+    const rangeParts = [
+      filters.from ? filters.from.toLocaleDateString("he-IL") : null,
+      filters.to ? filters.to.toLocaleDateString("he-IL") : null,
+    ].filter(Boolean);
+    const buf = await toPdfTable({
+      title: reportLabel,
+      subtitle: rangeParts.length ? rangeParts.join(" - ") : undefined,
+      headers,
+      rows,
+    });
+    const filename = `${type}_${clientSlug}_${dateStr}.pdf`.replace(/[^\w.\-֐-׿]+/g, "-");
+    return new Response(buf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="${filename}"`,
+      },
+    });
+  }
+
+  // toCsv (lib/csv.ts) owns escaping + the UTF-8 BOM Excel needs for
+  // Hebrew (spec 14.4, explicit) - shared, unit-tested, dependency-free.
+  const csv = toCsv(headers, rows);
   const filename = `${type}_${clientSlug}_${dateStr}.csv`.replace(/[^\w.\-֐-׿]+/g, "-");
 
   return new Response(csv, {
