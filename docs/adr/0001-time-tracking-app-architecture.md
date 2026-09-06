@@ -1456,3 +1456,60 @@ the Phase 9 Preview branch and re-tested the live `/api/reports/export`
 PDF endpoint directly (see PR description / Ariel report for the
 live-QA result at deploy time).
 
+
+### 18.12 Second live-QA fix: fontsource .woff files missing from the Vercel bundle
+
+Redeployed after 18.11 and re-tested `/api/reports/export?format=pdf`
+live: still 500ing, now with a *different* error -
+
+```
+Error: ENOENT: no such file or directory, open 'node_modules/@fontsource/
+heebo/files/heebo-hebrew-400-normal.woff'
+```
+
+Root cause: `registerFonts()` passed `doc.registerFont(name, "node_modules/
+@fontsource/heebo/files/heebo-hebrew-400-normal.woff")` - a plain relative-
+path *string*. `registerFont()` only stores that string; pdfkit doesn't
+actually `fs.readFileSync()` it until the font is first used via
+`doc.font(...)`, resolved against the Lambda's cwd at request time. A
+bare string literal passed to a runtime function call is invisible to
+Vercel's Node File Trace (the step that decides which files under
+`node_modules` get copied into each route's deployed serverless
+function) - it has no way to know that string is a filesystem path this
+route depends on, so the `.woff` files were never included in the
+`/api/reports/export` function's bundle. This is a different mechanism
+from 18.11's bug (that one was pdfkit's own internal dynamic subpath
+`require`; this one is our own code doing a plain file read) but the same
+underlying category: something that works under plain `node` locally,
+where `node_modules` is fully intact on disk, and silently breaks once
+traced/bundled for serverless.
+
+Fix, two layers:
+
+1. **`lib/pdf.ts`**: `registerFonts()` now resolves both files via
+   `require.resolve("@fontsource/heebo/files/heebo-hebrew-400-normal.woff")`
+   (via a `createRequire(import.meta.url)` handle - the same pattern
+   pdfkit's own Node build already uses successfully elsewhere in this
+   file's fix history) instead of a plain string. `require.resolve(...)`
+   with a literal argument is exactly the pattern Vercel's tracer is
+   built to detect and follow. `@fontsource/heebo`'s `package.json`
+   `"exports"` map has an explicit `"./files/*.woff"` entry, so this
+   subpath resolves correctly under Node's exports-restricted resolution
+   (confirmed locally: `node -e "console.log(require.resolve(...))"`
+   prints the real on-disk path).
+2. **`next.config.mjs`**: added `experimental.outputFileTracingIncludes`
+   for both `/api/reports/export` and `/api/portal/export`, explicitly
+   globbing in the two `.woff` files regardless of whether the tracer's
+   `require.resolve` heuristic fires. Belt-and-suspenders, not a
+   substitute for (1) - an explicit include list is the one guarantee
+   here that doesn't depend on tracer heuristics at all.
+
+Re-verified after this fix: `npx vitest run tests/unit/pdf.test.ts
+tests/unit/xlsx.test.ts` (9/9 pass), `npx tsc --noEmit` (no new errors),
+`node -e "require.resolve(...)"` sanity check, and the same manual
+`pdftotext -bbox` RTL check re-run once more - still correct. Redeployed
+and re-tested live (see PR description / Ariel report for the result at
+deploy time - this is the second bug live QA caught that no local check
+could have caught, which is exactly why this engagement's standing rule
+is to verify every phase against a real Vercel Preview deployment before
+opening a PR, not just local `tsc`/`vitest`).
