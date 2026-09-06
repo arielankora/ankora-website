@@ -1191,3 +1191,469 @@ documents and a stale-section rewrite are not one). Local verification
 (tsc/eslint/vitest) still runs and is compared against `main` before pushing,
 per this engagement's standing discipline for every substantive repository
 change, documentation included.
+
+## 17. Full spec re-audit (post-delivery, Ariel-requested)
+
+### 17.1 Context
+
+After the §26 delivery package closed out (section 16), Ariel asked for a
+fresh line-by-line re-read of the entire spec (`Ankora_Time_Tracking_Product_
+Spec_HE.docx`, sections 0–29 — not just §26) against the shipped app, to
+surface anything genuinely missed before deciding what, if anything, to do
+about it. This section records that audit's findings. No code changed as
+part of this section — Ariel asked to be shown the gaps first.
+
+### 17.2 Confirmed gaps
+
+- **`Task.status` doesn't exist.** Spec §5's data model and §10.2 both
+  specify Open/In progress/Done/Archived on `Task`. The current `Task`
+  model (`prisma/schema.prisma`) has no status field at all — every task is
+  implicitly "open" forever. This also means the spec §11 "Tasks" screen
+  (see below) has nothing meaningful to filter by status even if built.
+- **No standalone "Tasks" screen.** Spec §11's screen table lists a
+  dedicated employee-facing screen — open/recent tasks, filterable by
+  client/category/status. Today a `Task` only exists as an inline
+  create-or-pick autocomplete inside the timer and manual-entry forms;
+  there is no screen that lists tasks on their own.
+- **No "Profile" screen.** Spec §11 calls for a self-service in-app screen
+  for timezone/password/preferences while logged in. What exists today is
+  the unauthenticated forgot-password → reset-password flow only; there is
+  no page for a logged-in user to change their own password or set a
+  timezone preference.
+- **No "Notifications" screen.** Spec §11 calls for an in-app view of
+  anomalies/long-timer warnings/internal alerts. No such screen or
+  persisted notification list exists anywhere in the app.
+- **Long-running-timer notification is incomplete.** Spec §6.1 requires
+  both a UI warning *and* an email/internal notification to the user once a
+  timer exceeds a configurable threshold. Only the first half is built —
+  `TimerWidget.tsx` shows an amber "הטיימר רץ זמן ארוך" badge past 8 hours,
+  but no email is sent and nothing is persisted, so the warning disappears
+  the moment the user isn't looking at the timer screen (and has nowhere to
+  see it later, per the missing Notifications screen above).
+- **XLSX/PDF export not built.** Spec §14.4 marks these "מומלץ"
+  (recommended, not mandatory) with CSV as the only hard requirement — CSV
+  is implemented correctly, including the UTF-8 BOM Hebrew-in-Excel
+  requirement (`lib/csv.ts`). XLSX and PDF were never built. This was not
+  previously called out by name in the README's Known Limitations section.
+
+### 17.3 Checked and confirmed NOT gaps
+
+For completeness, since Ariel asked for a real audit and not just a list of
+suspicions: recent/favorite client+category combos on the timer (§6.2),
+mandatory reason for back-dated manual entries (§6.3), the 48-hour
+self-edit window before a Manager permission is required (§6.4), optimistic
+concurrency / "don't overwrite a concurrently-edited entry" (§20), URL-
+persisted report/entry/audit-log filters (§14.3), the password policy
+(10-char minimum + common-weak-password rejection, §4.2), login
+success/failure audit events (§16.1), the internal 9-report set matching
+§14.2's table exactly, the client 4-report set matching §14.1 minus the
+spec-marked-optional Trend report, and a dedicated client-isolation
+integration test suite (§16.2/§21.2) all exist and match the spec.
+
+### 17.4 Non-goals of this audit
+
+This section is a findings record only. Whether to build any of §17.2's
+five gaps, and in what order, is Ariel's call — flagged to him directly
+rather than assumed. No schema, permission, or screen changed, so no
+in-app guide update is triggered here either.
+
+## 18. Addendum: Phase 9 (spec re-audit gap-fix + XLSX/PDF export)
+
+### 18.1 Context
+
+Ariel's instruction after section 17's findings report: "אני רוצה שתתקן
+את כל הפערים כולל ייצוא ל-XLSX/PDF" (fix all the gaps including XLSX/PDF
+export). This section records what was built for each of section 17.2's
+five gaps, plus XLSX/PDF export.
+
+### 18.2 Schema
+
+- **`TaskStatus` enum** (`OPEN | IN_PROGRESS | DONE | ARCHIVED`) +
+  `Task.status @default(OPEN)` - closes the exact gap section 17.2 named.
+  Hand-authored migration `prisma/migrations/20260906220000_phase9_gap_fixes/`
+  (same `binaries.prisma.sh`-unreachable-in-sandbox workaround as every
+  prior phase; verified functionally, real `prisma generate`/migrate runs
+  on Vercel's Preview build).
+- **`Notification` model** - new. Purely user-scoped (`userId`, no
+  client/role scoping needed - see `lib/app-domain/notifications.ts`'s own
+  comment), `type` a free string rather than an enum (same precedent as
+  `AuditEvent.action`), `(type, entityId)` used as an application-level
+  dedupe key (index, not a DB unique constraint, since a notification type
+  could theoretically apply to no entity at all).
+
+### 18.3 No new RBAC permission
+
+Tasks, Profile, and Notifications introduce zero new `Permission` literals
+- see `lib/app-auth/permissions.ts`'s own Phase 9 comment block for the
+full reasoning. Tasks scoping reduces to `listAccessibleClients()`
+(already used by the timer); Profile/Notifications are pure self-service
+(identity check only, same row for everyone).
+
+### 18.4 Long-running-timer notification (closes section 17.2's fourth gap)
+
+`lib/app-domain/notifications.ts`'s `notifyLongRunningTimers()` scans
+every running `TimeEntry` (`endAt = null`) past `LONG_TIMER_HOURS` (the
+same constant `TimerWidget.tsx`'s UI badge already used), dedupes via the
+`(type, entityId)` `Notification` key so the same timer is never notified
+twice even across multiple daily cron runs, then both creates a
+`Notification` row and sends an email via the existing `lib/email.ts`
+Resend adapter. Wired into the existing daily `alerts-reconcile` cron
+(`app/api/cron/alerts-reconcile/route.ts`) rather than a new job - Vercel
+Cron on this plan is daily-or-coarser regardless, the same honest
+approximation already documented for `AlertRule` reconciliation (section
+11.3).
+
+The dedupe/threshold logic is exposed as two standalone pure functions
+(`isPastLongTimerThreshold`, `selectUnnotifiedEntries`) specifically so it
+is unit-testable outside the Prisma import chain - same pattern as
+`lib/app-domain/alerts.ts`'s `currentValueForThreshold`/
+`isThresholdBreached`/`decideAlertAction` (`tests/unit/alerts.test.ts`).
+See `tests/unit/notifications.test.ts`.
+
+### 18.5 Password change invalidates all sessions, including the current one
+
+`lib/app-domain/profile.ts`'s `changeOwnPassword()` increments
+`User.tokenVersion` on success, exactly like
+`lib/app-auth/password-reset.ts`'s `consumePasswordResetToken()` - spec
+4.2's "logout all sessions" semantics apply to any password change, not
+just a forgot-password reset. Because `lib/app-auth/session.ts`'s
+`getCurrentUser()` re-checks `tokenVersion` against the DB on every
+request, this means the user's own current session becomes invalid on
+their very next request too. The server action therefore explicitly
+`redirect()`s to `/app/login?passwordChanged=1` on success rather than
+leaving the user on a profile page whose session is already dead
+server-side.
+
+### 18.6 XLSX export
+
+`exceljs` chosen over the `xlsx` (SheetJS) package - actively maintained,
+writes a real `.xlsx` (not just reads), and has first-class RTL sheet-view
+support (`views: [{ rightToLeft: true }]`) needed for Hebrew reports.
+`lib/xlsx.ts`'s `toXlsx()` takes the exact same `(sheetName, headers,
+rows)` shape every export route already assembles for CSV, so no export
+route needed a second data-fetching path - same "one data path, N output
+formats" principle as CSV/PDF.
+
+### 18.7 PDF export: a real bug found and fixed during verification
+
+`lib/pdf.ts`'s `toPdfTable()` needed to solve two problems pdfkit does not
+solve on its own, documented in that file's own header comment: (1) font
+coverage - `@fontsource/heebo`'s per-script subset files mean no single
+font covers Hebrew + Latin + digits, solved by registering both subsets
+and drawing each character run with whichever has the glyphs; (2) bidi -
+pdfkit draws codepoints strictly left-to-right regardless of script, so
+raw Hebrew renders backwards, solved with the `bidi-js` npm package (a
+real Unicode Bidi Algorithm implementation) reordering each string into
+visual order before drawing.
+
+**Bug found during manual verification, not by inspection.** The first
+implementation registered `@fontsource/heebo`'s `.woff2` files directly.
+Rendering a test PDF and rasterizing it (`pdftoppm`, then `gs
+-sDEVICE=jpeg` as a second independent renderer to rule out a
+Poppler-specific bug) produced a **blank page** - `pdftotext` still
+extracted the correct Hebrew text (the embedded ToUnicode CMap was fine),
+but nothing was actually painted, in both renderers. Root cause: pdfkit's
+TrueType font subsetter (via `fontkit`) silently produces invisible/empty
+glyph outlines when the source font is a `.woff2` file - almost certainly
+related to WOFF2's transformed glyf/loca table layout not surviving the
+subsetting rebuild, since the plain `.woff` (v1, just zlib-compressed
+sfnt tables, no transform) build of the *exact same typeface and weight*
+rendered correctly once swapped in. `registerFonts()` in `lib/pdf.ts` now
+loads the `.woff` files, with a comment recording this finding so a future
+"let's just get the newer .woff2 build" edit doesn't silently reintroduce
+invisible-text PDFs.
+
+Correctness of bidi reordering and RTL column/table layout was verified
+objectively, not by looking at rendered pixels (small reversed-looking
+Hebrew glyphs are easy to visually misread) - `pdftotext -bbox` on a real
+generated PDF extracts each word's actual x-position alongside its
+correctly-reconstructed logical-order text. A three-word ordering probe
+("ראשון שני שלישי" - "first second third") placed "ראשון" (first)
+rightmost and "שלישי" (third) leftmost in the output, exactly as correct
+RTL layout requires; the real report title "דוח שעות לפי לקוח" round-tripped
+through the same check in correct reading order. See `tests/unit/pdf.test.ts`
+for the automated regression coverage this verification informed (structural
+checks: non-empty PDF, pagination, empty-state path - not a substitute for
+the one-time manual bbox verification above, which is recorded here instead
+of re-run by CI).
+
+### 18.8 Export routes: additive `?format=` query param
+
+Both `app/api/reports/export/route.ts` and `app/api/portal/export/route.ts`
+gained a `?format=xlsx|pdf` query parameter; omitting it keeps the exact
+same mandatory-CSV default and response shape every existing caller/link
+already relies on. Both routes reuse their existing permission-checked
+data-fetching function (`runReport`/`getMonthlyDetailed`) unchanged -
+only the final serialization step branches on `format`.
+
+### 18.9 Guide + README updated in the same change
+
+Per section 10's standing rule: `app/(product)/app/guide/content.ts` gained
+a "משימות" section (daily-work group), a new "החשבון שלי" group
+("התראות שלי" + "הפרופיל שלי"), an updated long-timer note (mentions the
+new email/persisted notification), and updated CSV-only export language
+across both export sections (internal reports + client portal monthly).
+`README.md`'s Known Limitations header/intro updated to "reviewed as of
+Phase 9."
+
+### 18.10 Verification
+
+`npx tsc --noEmit` and `npx vitest run` were re-checked against the
+pre-Phase-9 baseline (17 failed / 5 passed test files, 40 passed tests -
+all 17 failures being the same pre-existing `@prisma/client did not
+initialize yet` sandbox limitation, not real regressions). Post-Phase-9:
+19 failed / 7 passed test files, 49 passed tests - the two new failed
+files (`tasks.test.ts`, `notifications.test.ts`) fail for the identical
+documented reason (their domain modules import Prisma transitively); the
+two new passed files (`xlsx.test.ts`, `pdf.test.ts`) import neither Prisma
+nor anything that does, so they actually run here and pass, unlike almost
+every other domain-level test in this suite.
+
+### 18.11 Post-merge-prep fix: pdfkit standard-font bundling bug (live QA)
+
+Live QA on the Phase 9 Preview deployment (not caught by local `tsc`/
+`vitest`, which run under plain `node`) found `/api/reports/export?format=pdf`
+intermittently 500ing in production/preview with:
+
+```
+Error: Cannot find module '#standard-fonts/Helvetica'
+Require stack:
+- node_modules/pdfkit/js/pdfkit.node.mjs
+```
+
+Root cause: pdfkit's `PDFDocument` constructor eagerly calls
+`.font("Helvetica")` (its built-in default) unless told not to. Loading
+that *standard* (non-embedded) font requires pdfkit's Node build to
+`require("#standard-fonts/Helvetica")` - a package.json `"imports"`
+subpath resolved via a `createRequire(import.meta.url)` handle stored in a
+variable, not a literal `require("...")` call. Next.js's serverless
+output-file-tracing does not follow that dynamic, computed-specifier
+require, so the `.afm` data file it points to is silently missing from
+the deployed function's bundle, and the constructor's own default-font
+load throws `MODULE_NOT_FOUND` at runtime - despite pdfkit working
+perfectly under plain `node` locally (including this file's own vitest
+suite, where `node_modules` is intact on disk and the require resolves
+normally). This is why the bug was invisible to every local check in
+section 18.10 and only surfaced live.
+
+Fix (`lib/pdf.ts`): pass `font: false` in the `PDFDocument` constructor
+options, which disables that eager default-font load entirely. Every
+actual text draw in `toPdfTable()` goes through `drawCell()`, which always
+explicitly sets `HEBREW_FONT`/`LATIN_FONT` (real embedded fontsource
+files registered via `registerFonts()`, not a pdfkit standard font)
+before drawing - so pdfkit's standard-font loader is never invoked at
+all once the eager default is disabled. `@types/pdfkit`'s
+`PDFDocumentOptions` only types `font` as `string | undefined` (missing
+pdfkit's own documented `false` option), hence the
+`as unknown as PDFKit.PDFDocumentOptions` cast at the call site.
+
+Re-verified after the fix: `npx vitest run tests/unit/pdf.test.ts
+tests/unit/xlsx.test.ts` (9/9 pass, unchanged), `npx tsc --noEmit`
+(no new errors introduced), and the same manual `pdftotext -bbox`
+objective RTL check from section 18.10 re-run against a freshly generated
+PDF - title and row word ordering both still correct. Then re-deployed to
+the Phase 9 Preview branch and re-tested the live `/api/reports/export`
+PDF endpoint directly (see PR description / Ariel report for the
+live-QA result at deploy time).
+
+
+### 18.12 Second live-QA fix: fontsource .woff files missing from the Vercel bundle
+
+Redeployed after 18.11 and re-tested `/api/reports/export?format=pdf`
+live: still 500ing, now with a *different* error -
+
+```
+Error: ENOENT: no such file or directory, open 'node_modules/@fontsource/
+heebo/files/heebo-hebrew-400-normal.woff'
+```
+
+Root cause: `registerFonts()` passed `doc.registerFont(name, "node_modules/
+@fontsource/heebo/files/heebo-hebrew-400-normal.woff")` - a plain relative-
+path *string*. `registerFont()` only stores that string; pdfkit doesn't
+actually `fs.readFileSync()` it until the font is first used via
+`doc.font(...)`, resolved against the Lambda's cwd at request time. A
+bare string literal passed to a runtime function call is invisible to
+Vercel's Node File Trace (the step that decides which files under
+`node_modules` get copied into each route's deployed serverless
+function) - it has no way to know that string is a filesystem path this
+route depends on, so the `.woff` files were never included in the
+`/api/reports/export` function's bundle. This is a different mechanism
+from 18.11's bug (that one was pdfkit's own internal dynamic subpath
+`require`; this one is our own code doing a plain file read) but the same
+underlying category: something that works under plain `node` locally,
+where `node_modules` is fully intact on disk, and silently breaks once
+traced/bundled for serverless.
+
+Fix, two layers:
+
+1. **`lib/pdf.ts`**: `registerFonts()` now resolves both files via
+   `require.resolve("@fontsource/heebo/files/heebo-hebrew-400-normal.woff")`
+   (via a `createRequire(import.meta.url)` handle - the same pattern
+   pdfkit's own Node build already uses successfully elsewhere in this
+   file's fix history) instead of a plain string. `require.resolve(...)`
+   with a literal argument is exactly the pattern Vercel's tracer is
+   built to detect and follow. `@fontsource/heebo`'s `package.json`
+   `"exports"` map has an explicit `"./files/*.woff"` entry, so this
+   subpath resolves correctly under Node's exports-restricted resolution
+   (confirmed locally: `node -e "console.log(require.resolve(...))"`
+   prints the real on-disk path).
+2. **`next.config.mjs`**: added `experimental.outputFileTracingIncludes`
+   for both `/api/reports/export` and `/api/portal/export`, explicitly
+   globbing in the two `.woff` files regardless of whether the tracer's
+   `require.resolve` heuristic fires. Belt-and-suspenders, not a
+   substitute for (1) - an explicit include list is the one guarantee
+   here that doesn't depend on tracer heuristics at all.
+
+Re-verified after this fix: `npx vitest run tests/unit/pdf.test.ts
+tests/unit/xlsx.test.ts` (9/9 pass), `npx tsc --noEmit` (no new errors),
+`node -e "require.resolve(...)"` sanity check, and the same manual
+`pdftotext -bbox` RTL check re-run once more - still correct. Redeployed
+and re-tested live (see PR description / Ariel report for the result at
+deploy time - this is the second bug live QA caught that no local check
+could have caught, which is exactly why this engagement's standing rule
+is to verify every phase against a real Vercel Preview deployment before
+opening a PR, not just local `tsc`/`vitest`).
+
+### 18.13 Third live-QA fix: require.resolve() itself broke the build
+
+Pushed 18.12's fix and the *build* failed outright (not a runtime 500 -
+the deployment never went Ready):
+
+```
+Module parse failed: Unexpected character ' ' (1:4)
+You may need an appropriate loader to handle this file type, currently
+no loaders are configured to process this file.
+Import trace for requested module:
+./node_modules/@fontsource/heebo/files/heebo-hebrew-400-normal.woff
+./lib/pdf.ts
+./app/api/reports/export/route.ts
+```
+
+Root cause: `require.resolve("@fontsource/heebo/files/...")` fixed the
+previous runtime `ENOENT` (in plain Node, `require.resolve` really is
+just path resolution), but Next.js's build doesn't run the compiled code
+under plain Node - it runs it through webpack first. Webpack treats a
+literal `require.resolve("...")` call as a real module dependency and
+tries to *bundle* the target to be able to return a stable module id/path
+for it at runtime. A `.woff` file is binary with no loader configured for
+it, so webpack's parser chokes trying to read it as source and fails the
+build. This is the opposite failure mode from 18.12's fix target (that
+was a runtime resolution gap; this is a build-time over-eagerness) -
+`require.resolve()` on a literal turned out to be the wrong tool for
+"just get me a path" once the code is going through a bundler at all,
+even though it's exactly right for the identical-looking problem in
+plain Node.
+
+Fix: replaced `require.resolve(...)` with `path.join(process.cwd(),
+"node_modules/@fontsource/heebo/files/heebo-hebrew-400-normal.woff")` (and
+the Latin equivalent) - a value computed at runtime from string
+concatenation, not a literal module specifier, so webpack has nothing to
+statically bundle. This is exactly 18.11's original relative-path
+approach, now made to actually work by leaning entirely on
+`next.config.mjs`'s `experimental.outputFileTracingIncludes` (added in
+18.12, kept here) to guarantee the two `.woff` files land in this route's
+deployed function bundle - that config doesn't depend on webpack or NFT
+correctly guessing anything from the call site at all, which is why it's
+the right permanent fix rather than another guess at a "clever" code
+pattern.
+
+Re-verified: `npx vitest run tests/unit/pdf.test.ts tests/unit/xlsx.test.ts`
+(9/9 pass), `npx tsc --noEmit` (no new errors), a grep confirming the
+`.woff` filenames appear nowhere in an import/require position in the
+codebase, and the same manual `pdftotext -bbox` RTL check - 18 words
+extracted, same correct right-to-left ordering as every prior check in
+this section. Pushed and redeployed; this is the version live-QA'd
+before opening the PR (see PR description / Ariel report for the
+confirmed-working result).
+
+
+### 18.14 Fourth live-QA fix: the whole export route was 503ing, including plain CSV
+
+After 18.11-18.13 fixed three real pdfkit bugs and the Vercel build
+succeeded cleanly, a final round of live QA against the Preview
+deployment found the export routes still broken - but not with a pdfkit
+error. `GET /api/reports/export?type=total_client_hours&format=pdf`
+returned HTTP 503, with no JSON error body reaching the browser (ruling
+out this route's own `try/catch`, which always returns a structured
+`Response.json(...)`). A 503 with no application-level error body means
+the function invocation itself failed or was killed before the handler's
+own error handling ran.
+
+Isolating the cause: `format=xlsx` on the same route also 503'd. So did
+`format=csv` (i.e. no `format` param at all - the mandatory default).
+Interleaving requests to `/api/health` (200 every time) against
+`/api/reports/export` (503 every time, all three formats) on the same
+deployment, back to back, ruled out general platform flakiness - this
+was a deterministic, 100%-reproducible failure specific to this one
+route, not noise.
+
+Since the CSV branch runs `lib/csv.ts` only (no pdfkit, no exceljs) and
+still failed, the bug could not be inside any format-specific code path.
+`app/api/reports/export/route.ts` (and `app/api/portal/export/route.ts`)
+had static top-of-file imports of `toXlsx` (`@/lib/xlsx`, wrapping
+`exceljs` - a ~23MB package pulling in `archiver`, `unzipper`, `jszip`,
+`fast-csv`, `tmp`, `dayjs`) and `toPdfTable` (`@/lib/pdf`, wrapping
+`pdfkit` + `fontkit` + `bidi-js`). A static import is evaluated on
+*every* invocation of the function regardless of which `if (format ===
+...)` branch actually runs, so every CSV request was also paying the
+full cold-start cost of loading both of these heavy libraries into the
+same Node.js serverless function - the leading hypothesis for why the
+function was being killed (size/cold-start-time limit) before it could
+even reach the CSV branch.
+
+Fix: converted both imports in both export routes to dynamic
+`await import(...)` calls placed inside their respective `if (format ===
+"xlsx")` / `if (format === "pdf")` branches, so exceljs and pdfkit are
+only loaded into memory for requests that actually need them. The
+mandatory CSV path (spec 14.4) no longer touches either library at all.
+Confirmed via `npx next build` that this compiles cleanly (webpack has no
+trouble splitting a conditionally-awaited dynamic import into its own
+chunk) and `npx vitest run tests/unit/pdf.test.ts tests/unit/xlsx.test.ts`
+still passes unchanged - the two library wrappers themselves were never
+the problem, only when they were loaded.
+
+This is submitted as the most likely fix given the evidence (uniform
+503 across all three formats, isolated to the one route with the two
+heavy static imports, ruled out as general platform noise via the
+interleaved A/B test against `/api/health`), but - unlike 18.11-18.13,
+each of which was confirmed by reproducing the exact error message in
+Vercel's Runtime Logs - this one could not be confirmed against a Runtime
+Logs entry: both the deployment-scoped and project-wide Logs pages in
+the Vercel dashboard returned no entries for several minutes of retries
+during this session despite confirmed real traffic reaching the same
+deployment (successful `/api/health` calls, a fully-rendered `/app/reports`
+page with live data). Ariel should re-run the export buttons after this
+fix deploys and confirm the download actually completes; if the 503
+persists, the next step is checking the deployed function's actual
+bundle size via `vercel inspect` or the Vercel dashboard's Functions tab
+once it's responsive again.
+
+**Correction, same session:** the "503" was a false alarm. Once the
+Vercel dashboard's Logs page started rendering (see below), the exact
+same requests that the in-browser network inspector reported as 503 were
+recorded by Vercel's own server-side logs as `GET /api/reports/export`
+→ **200**, for all three formats (csv, xlsx, pdf), both before and after
+the dynamic-import change above. The export route was never broken at
+the server. The false reading came from this session's in-app browser
+automation tool: navigating directly to a URL whose response carries
+`Content-Disposition: attachment` triggers a native download rather than
+a page load, and this session's network-request inspector reported those
+specific requests as 503 even though the server returned 200 - a
+tooling artifact, not a real HTTP response, compounding the
+already-documented quirk that such a navigation doesn't change the tab's
+rendered page either.
+
+The dynamic-import change itself is kept (it's a legitimate improvement -
+no reason for the mandatory CSV path to load either heavy library into
+memory) but it did not fix a real bug, because there was no real bug at
+the server to fix. The three pdfkit fixes in 18.11-18.13 remain correctly
+diagnosed and confirmed: those were verified by matching the exact error
+message in Vercel's Runtime Logs (`MODULE_NOT_FOUND`, then `ENOENT`),
+which is a fundamentally different, more reliable confirmation method
+than the client-side network inspector used here. Lesson for future live
+QA on this project: treat this environment's browser network-status
+reporting as unreliable for any URL that triggers a file download, and
+prefer checking Vercel's own Logs (or asking Ariel to confirm the
+download in his own browser) over the in-app browser's reported status
+code.
+

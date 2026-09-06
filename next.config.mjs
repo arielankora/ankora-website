@@ -4,6 +4,20 @@ const nextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
   },
+  // Phase 9 gap-fix follow-up (docs/adr/0001 section 18.11-18.12): belt-
+  // and-suspenders alongside the require.resolve() fix in lib/pdf.ts.
+  // These two API routes read @fontsource/heebo's .woff files via
+  // pdfkit's registerFont(), which only reaches them through a runtime
+  // fs.readFileSync - Vercel's Node File Trace can miss that even when
+  // resolved through require.resolve(), so this explicitly guarantees
+  // the files are copied into both routes' deployed serverless bundles
+  // regardless of how reliably the tracer's heuristics detect the call.
+  experimental: {
+    outputFileTracingIncludes: {
+      '/api/reports/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
+      '/api/portal/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
+    },
+  },
   // Phase 7 security hardening (spec 16.2, ADR addendum section 14.3).
   // Applied to every response. A Content-Security-Policy is deliberately
   // NOT included here yet - see the ADR addendum for why shipping an

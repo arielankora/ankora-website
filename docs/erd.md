@@ -25,6 +25,7 @@ erDiagram
     User ||--o{ TimeEntry : "logs"
     User ||--o{ TimeEntryRevision : "edits as"
     User ||--o{ HourBankAdjustment : "creates"
+    User ||--o{ Notification : "receives"
 
     Client ||--o{ ClientUser : "has portal users"
     Client ||--o{ UserClientAccess : "grants employee access"
@@ -124,6 +125,7 @@ erDiagram
         string clientId FK
         string categoryId FK "nullable"
         string title
+        TaskStatus status "Phase 9: OPEN / IN_PROGRESS / DONE / ARCHIVED"
         string source "local or external provider name"
         string externalRef "nullable"
         datetime deletedAt
@@ -256,6 +258,18 @@ erDiagram
         string externalEntityId
         json syncMetadata
     }
+
+    Notification {
+        string id PK
+        string userId FK
+        string type "free string, e.g. long_running_timer"
+        string title
+        string body
+        string entityType "nullable"
+        string entityId "nullable, dedupe key with type"
+        datetime readAt "nullable"
+        datetime createdAt
+    }
 ```
 
 ## Models grouped by introducing phase
@@ -268,6 +282,7 @@ erDiagram
 | 4 | `AlertRule`, `AlertEvent`, `EmailDelivery` | Alerts + email delivery logs |
 | 6 | `ReportSchedule`, `ReportRun` | Client portal + scheduled reports (`EmailDelivery.reportRunId` also added this phase) |
 | 8 | `IntegrationConnection`, `ExternalMapping` | Integration foundation validation + production rollout |
+| 9 | `Notification` (+ `Task.status` added to the Phase 2 `Task` model) | Full spec re-audit gap-fix: Tasks/Profile/Notifications screens, long-timer email/notification, XLSX/PDF export |
 
 Phases 5 and 7 (internal dashboards/reports/exports; PWA/mobile/performance/
 security hardening) added no new tables — they built screens and

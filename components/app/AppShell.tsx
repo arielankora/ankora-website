@@ -27,6 +27,8 @@ function navItemsFor(role: User["role"]) {
       { href: "/app/portal/weekly", label: "פעילות שבועית" },
       { href: "/app/portal/monthly", label: "דוח חודשי" },
       { href: "/app/portal/history", label: "היסטוריה" },
+      { href: "/app/notifications", label: "התראות שלי" },
+      { href: "/app/profile", label: "הפרופיל שלי" },
       { href: "/app/guide", label: "מדריך שימוש" },
     ];
   }
@@ -37,6 +39,10 @@ function navItemsFor(role: User["role"]) {
   // spec 6.2 calls Quick Timer "המסך החשוב ביותר" on mobile.
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/timer", label: "טיימר" });
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/my-time", label: "הזמן שלי" });
+  // Phase 9 gap-fix (spec 11, docs/adr/0001 section 17.2): standalone
+  // Tasks screen - same gate as Timer/My Time (see lib/app-domain/tasks.ts
+  // for why no dedicated permission exists).
+  if (can(role, "time_entry.create_self")) items.push({ href: "/app/tasks", label: "משימות" });
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות" });
   if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות" });
   // Spec 12: Admin "Time Entries" screen - cross-client table, gated on
@@ -62,6 +68,12 @@ function navItemsFor(role: User["role"]) {
   // permissions.ts's integration.manage comment. Listed last, matching
   // spec 12's own admin-screens table order (Integrations is its final row).
   if (can(role, "integration.manage")) items.push({ href: "/app/integrations", label: "אינטגרציות" });
+  // Phase 9 gap-fix: Notifications + Profile are self-service for every
+  // logged-in role (see permissions.ts's Phase 9 comment) - listed last,
+  // right before the guide, for both the CLIENT_USER nav above and this
+  // internal-staff nav.
+  items.push({ href: "/app/notifications", label: "התראות שלי" });
+  items.push({ href: "/app/profile", label: "הפרופיל שלי" });
   // Documentation, not a permission - every logged-in role should be able
   // to understand the system in their own language.
   items.push({ href: "/app/guide", label: "מדריך שימוש" });
