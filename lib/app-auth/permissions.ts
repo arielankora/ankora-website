@@ -62,7 +62,18 @@ export type Permission =
   // own example list names this one too, right next to
   // report.internal.view: "report.internal.view, report.client.view."
   // CLIENT_USER-only; gates every Client Portal screen and its exports.
-  | "report.client.view";
+  | "report.client.view"
+  // Phase 8 (spec 23: "Integration foundation validation + production
+  // rollout") - not in spec 4.1's own example list (that list predates
+  // Phase 8, same as alert.manage/hour_bank.manage before it). Gates the
+  // new /app/integrations screen and any future IntegrationConnection
+  // credential/config write. Spec 17.2: "Credentials נשמרים secret/
+  // encrypted store" - connecting/disconnecting an external integration is
+  // exactly the kind of "פעולת מערכת קריטית" spec 4's Ankora Admin/Manager
+  // row says it does NOT get "אם לא הוגדר" (unless explicitly granted) -
+  // no such grant exists, so this follows the same SUPER_ADMIN-only
+  // precedent as hour_bank.manage and alert.manage.
+  | "integration.manage";
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   // Spec 4 role table: Super Admin - "הכול: משתמשים, לקוחות, בנקים,
@@ -79,6 +90,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "hour_bank.manage",
     "alert.manage",
     "report.internal.view",
+    "integration.manage",
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not
   // "critical system actions" (user management, audit) unless explicitly

@@ -735,3 +735,80 @@ model ReportRun {
   @@unique([scheduleId, periodStart])
   @@map("report_runs")
 }
+
+// --- Phase 8: Integration foundation validation + production rollout ----
+//
+// Spec section 23 scopes Phase 8 to "Integration foundation validation +
+// production rollout" - the Epic table (section 22) names it explicitly:
+// "generic tables/interfaces + no ClickUp coupling in domain." These two
+// models are exactly spec section 5's own field list for them - no more,
+// since 17.3 is explicit that Ankora can already show a placeholder
+// "Integrations" admin screen without requesting any OAuth scope until
+// the actual ClickUp integration is built. Task.source/externalRef
+// (Phase 2) already exist for the eventual per-entity mapping; these two
+// tables are the system-level connection record and the generic mapping
+// table spec 17.1/17.2 describe for whenever that build happens.
+
+/// Spec section 5: "IntegrationConnection - provider, status,
+/// credentials_ref, config." One row per external provider (e.g.
+/// "clickup") - not per-client, since spec 17.2's per-client Workspace/
+/// Space/Folder/List mapping is future config that would live inside
+/// `config` (Json) once built, not a new column now. `credentialsRef` is
+/// deliberately a String, never the credential itself: spec 17.2 "Credentials
+/// נשמרים secret/encrypted store, לא בטבלת plain text" - this column only
+/// ever holds an opaque pointer into that external store (e.g. a Vercel/host
+/// secret name), and nothing in this phase writes a real value into it,
+/// since no OAuth flow exists yet (spec 17.3).
+model IntegrationConnection {
+  id            String               @id @default(cuid())
+  provider      String               @unique
+  status        IntegrationStatus    @default(NOT_CONNECTED)
+  credentialsRef String?
+  config        Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mappings ExternalMapping[]
+
+  @@map("integration_connections")
+}
+
+enum IntegrationStatus {
+  NOT_CONNECTED
+  CONNECTED
+  ERROR
+}
+
+/// Spec section 5: "ExternalMapping - provider, internal_entity_type/id,
+/// external_entity_type/id, sync metadata." Generic on purpose (spec
+/// 17.1's Integration interface is provider-agnostic) - a Task-to-ClickUp-
+/// task mapping is the first expected use per 17.2, but the shape is not
+/// hardcoded to Task so a future Client-to-Workspace or Category-to-Folder
+/// mapping does not need a new table. `syncMetadata` (Json) is deliberately
+/// unopinionated: spec 17.2 requires idempotent webhook handling via
+/// external event ids and leaves the exact bookkeeping fields
+/// unspecified, so this stays a free-form bag rather than named columns
+/// that would need a migration for every new provider's quirks. Unique on
+/// (provider, internalEntityType, internalEntityId) - a given internal
+/// entity can only be mapped once per provider - spec 17.2's own rule
+/// ("לא להשתמש בשם המשימה כמפתח סנכרון") implies the internal id, not any
+/// mutable field, is the stable half of the mapping.
+model ExternalMapping {
+  id                 String   @id @default(cuid())
+  provider           String
+  internalEntityType String
+  internalEntityId   String
+  externalEntityType String
+  externalEntityId   String
+  syncMetadata       Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  connection IntegrationConnection @relation(fields: [provider], references: [provider], onDelete: Cascade)
+
+  @@unique([provider, internalEntityType, internalEntityId])
+  @@index([provider, externalEntityType, externalEntityId])
+  @@map("external_mappings")
+}

@@ -100,6 +100,18 @@ describe("can() - Phase 4 alert.manage (ADR 11.2)", () => {
   });
 });
 
+// Phase 8 - same conservative precedent as hour_bank.manage/alert.manage:
+// connecting an external integration's credentials/config is a Super-
+// Admin-only "critical system action" (see permissions.ts's Phase 8 comment).
+describe("can() - Phase 8 integration.manage", () => {
+  it("grants only SUPER_ADMIN integration.manage", () => {
+    expect(can("SUPER_ADMIN", "integration.manage")).toBe(true);
+    expect(can("ANKORA_ADMIN", "integration.manage")).toBe(false);
+    expect(can("ANKORA_EMPLOYEE", "integration.manage")).toBe(false);
+    expect(can("CLIENT_USER", "integration.manage")).toBe(false);
+  });
+});
+
 // Phase 5 - the OPPOSITE precedent from hour_bank.manage/alert.manage:
 // spec 4.1's own example list names report.internal.view explicitly, and
 // spec 4's role table explicitly grants Ankora Admin/Manager "דוחות"

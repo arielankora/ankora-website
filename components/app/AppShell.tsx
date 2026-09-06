@@ -57,6 +57,11 @@ function navItemsFor(role: User["role"]) {
   // comment on report.internal.view vs report.client.view).
   if (can(role, "report.internal.view")) items.push({ href: "/app/report-schedules", label: "דוחות מתוזמנים" });
   if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות" });
+  // Phase 8 (spec 12/17.3): Integrations admin screen - placeholder card
+  // only (no real provider connected yet), SUPER_ADMIN-only per
+  // permissions.ts's integration.manage comment. Listed last, matching
+  // spec 12's own admin-screens table order (Integrations is its final row).
+  if (can(role, "integration.manage")) items.push({ href: "/app/integrations", label: "אינטגרציות" });
   // Documentation, not a permission - every logged-in role should be able
   // to understand the system in their own language.
   items.push({ href: "/app/guide", label: "מדריך שימוש" });
