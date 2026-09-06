@@ -102,8 +102,8 @@ one phase.
 ### Roles & permissions
 
 Four roles (`prisma/schema.prisma`'s `UserRole`): `SUPER_ADMIN` (every
-permission, including the two Super-Admin-only screens - Hour Banks and
-Alerts), `ANKORA_ADMIN` (clients + categories + time entries + internal
+permission, including the three Super-Admin-only screens - Hour Banks,
+Alerts, and Integrations), `ANKORA_ADMIN` (clients + categories + time entries + internal
 reports, not users, the audit log, hour banks, or alerts), `ANKORA_EMPLOYEE`
 (own timer/entries only: `time_entry.create_self` + `time_entry.edit_self`,
 never `edit_others`), and `CLIENT_USER` (no admin permissions and no
@@ -117,7 +117,19 @@ full reasoning. The full map is `ROLE_PERMISSIONS` in
 `lib/app-auth/permissions.ts`; every mutation checks it server-side via
 `assertCan()` - nothing is enforced by hiding a nav link alone.
 
-### Schema (Phase 0-2 scope)
+See `docs/roles-permissions.md` for the full role x permission matrix
+(kept in sync with `ROLE_PERMISSIONS` directly - regenerate it if they ever
+drift, don't hand-edit around a mismatch).
+
+### Schema (Phase 0-2 detail below; full Phase 0-8 model list + diagram in `docs/erd.md`)
+
+The prose below covers Phase 0-2 in detail (the earliest, most
+foundational models); Phase 3 (billing/hour banks), Phase 4 (alerts),
+Phase 6 (report schedules), and Phase 8 (integrations) each added their
+own models, documented inline in `prisma/schema.prisma`'s own per-phase
+section comments and in `docs/adr/0001`'s matching addenda. See
+`docs/erd.md` for a single diagram covering every model across all
+phases, grouped by the phase that introduced it.
 
 Phase 0/1: `User` (internal staff + client-portal users share one table;
 role or per-client `ClientUser` membership determines authority),
@@ -191,19 +203,34 @@ that is a manual, hand-reviewed SQL operation against the actual
 Production database - never something to script blindly, since Prisma
 does not auto-generate a safe "down" migration.
 
-### Known limitations (Phase 1, by design)
+### Known limitations (reviewed as of Phase 8)
 
-- **No email provider yet** (Phase 4) - invite links and password-reset
-  links are surfaced directly in the admin UI / server action response for
-  the inviting admin to relay manually, instead of pretending an email was
-  sent.
-- **`ClientUser` (client-portal membership) exists in the schema but has
-  no UI yet** - the actual client portal is Phase 6.
-- **No timer/TimeEntry/billing** - Categories exist so Phase 2 has
-  somewhere to point, but nothing reports time against them yet.
-- **Audit log has no export/retention policy UI** - it's an append-only
-  table with a read-only filtered viewer; retention/export is not a Phase
-  1 acceptance criterion.
+Phases 0-8 (the full development plan in spec section 23) have all shipped
+to Production. This list was last accurate for Phase 1 alone and has been
+rewritten to describe what is genuinely still a limitation today - not what
+was true before timer/billing/alerts/reports/portal/integrations existed.
+
+- **No real external integration is connected yet.** `/app/integrations`
+  (Phase 8) shows ClickUp as a deliberate placeholder - every mutating
+  method on its provider adapter rejects by design (spec 17.3: no OAuth
+  scope requested until the integration is actually built). The generic
+  `IntegrationConnection`/`ExternalMapping` tables and provider interface
+  exist so a real integration can be added later without a schema change.
+- **Forecast-based hour-bank alerts and anomaly detection are not
+  built.** Spec section 28 explicitly marks these as future ideas, and
+  the Phase 4 `AlertThresholdType` enum leaves out the spec-marked-Future
+  "Forecast" type - not an oversight, see `docs/adr/0001` section 11.3.
+- **Three production-checklist items need Ariel's own action, not code**
+  (spec section 24, `docs/adr/0001` section 15.4): a Neon backup/restore
+  drill (an operational exercise against the Neon console, not something
+  this engagement can run from its sandbox), the external error-tracking
+  vendor choice (Sentry vs. Vercel Observability - `/api/health` exists
+  either way), and a real-device Safari pass (verified via Chrome device
+  emulation across every phase's QA, but that is not the same as a real
+  iPhone).
+- **Audit log has no export/retention policy UI.** Unchanged since Phase
+  1 - it's an append-only table with a read-only filtered viewer;
+  retention/export was never a stated acceptance criterion for any phase.
 
 ## Not yet built (flagged in the plan, out of v1 scope)
 
