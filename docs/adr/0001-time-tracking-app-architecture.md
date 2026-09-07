@@ -1876,3 +1876,38 @@ SUPER_ADMINs and throws a clear Hebrew error ("לא ניתן להסיר את מ�
 העל האחרון הפעיל במערכת") if that count is zero. An org with two or
 more active SUPER_ADMINs is completely unaffected - the guard only ever
 fires on the last one.
+
+### 19.8 Post-merge verification + extended audit (no new bugs)
+
+After PR #13 merged to `main` (commit `180370d`), Production
+(`ankora.co.il/api/health`) was re-checked until its timestamp moved
+past the old frozen pre-fix value (confirmed live at `2026-09-07T06:21:29Z`,
+correctly dynamic per request) - the health-check fix and the whole
+merge are confirmed live.
+
+The audit then continued into every remaining `lib/` file not yet
+reviewed this engagement: `lib/timezone.ts`, `lib/app-auth/*`
+(`authenticate.ts`, `password.ts`, `password-reset.ts`, `permissions.ts`,
+`session.ts`, `login-attempts.ts`, `lockout.ts`, `audit.ts`),
+`lib/email.ts`, `lib/pdf.ts`, `lib/xlsx.ts`, `lib/csv.ts`. All were read
+in full; no further logic bugs were found. Notably `lib/pdf.ts` and its
+three hard-won Vercel-bundling fixes (sections 18.11-18.13) were
+re-verified as internally consistent, and `session.ts`'s tokenVersion
+revocation check was traced end-to-end against `auth.ts`'s `jwt`
+callback to confirm `tokenVersion` is always present on an issued
+session token (so the `typeof === "number"` guard never silently
+skips the "logout all sessions" check in practice).
+
+A live interactive QA pass was then run against a fresh Preview
+deployment (demo employee role): start timer -> stop -> confirm dialog
+(elapsed + note) -> save -> entry appears correctly in "הזמן שלי" with
+the right client/category/duration -> edit/delete both work. This
+end-to-end flow is correct. One transient `503` was observed on the
+timer-start `POST` in the browser devtools network log during testing;
+it self-resolved (the timer had in fact started correctly server-side
+by the time of the next check) and matches the same class of
+browser-tooling false alarm already documented and closed out in
+section 18.14 - not a real server error, and not chased further.
+
+No new bugs found in this pass. Sections 19.1-19.7 remain the complete
+list of bugs found and fixed during the overnight bug-hunt.
