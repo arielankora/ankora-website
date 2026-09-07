@@ -17,6 +17,17 @@ function parseDate(value?: string): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// Overnight bug-hunt (docs/adr/0001 section 19.5): a "to" filter parsed as
+// midnight excluded the entirety of the selected end date from every
+// gte/lte range query in this file's callees - an admin filtering "this
+// week" would silently lose the last day. "to" specifically needs the end
+// of that day, not its start.
+function parseDateEndOfDay(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(`${value}T23:59:59.999`);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 function isReportType(value: string | undefined): value is ReportType {
   return REPORT_DEFINITIONS.some((r) => r.id === value);
 }
@@ -69,7 +80,7 @@ export default async function AdminReportsPage({
     editedOnly: searchParams.editedOnly === "1",
     manualOnly: searchParams.manualOnly === "1",
     from: parseDate(searchParams.from),
-    to: parseDate(searchParams.to),
+    to: parseDateEndOfDay(searchParams.to),
   };
 
   const [result, clients, allCategories, users] = await Promise.all([

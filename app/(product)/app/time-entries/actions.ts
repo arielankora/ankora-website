@@ -10,6 +10,7 @@ import {
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
+  FutureEntryError,
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
@@ -22,6 +23,7 @@ function friendlyError(err: unknown): string {
     return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
   if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
   if (err instanceof BackdateReasonRequiredError) return "יש לציין סיבה לדיווח עבור יום קודם.";
+  if (err instanceof FutureEntryError) return "לא ניתן לדווח על זמן בעתיד.";
   if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
   if (err instanceof Error) return err.message;
   return "אירעה שגיאה. נסו שוב.";

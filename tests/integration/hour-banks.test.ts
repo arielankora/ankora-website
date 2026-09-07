@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
-import { createTestUser, createTestClient } from "./factories";
+import { createTestUser, createTestClient, createTestCategory, createTestTimeEntry } from "./factories";
 import {
   openHourBankCycle,
   recordHourBankAdjustment,
@@ -15,8 +15,33 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 async function setup() {
   const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
   const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+  const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
   const client = await createTestClient();
-  return { superAdmin, admin, client };
+  const category = await createTestCategory();
+  return { superAdmin, admin, employee, client, category };
+}
+
+/// Overnight bug-hunt (docs/adr/0001 section 19.3): openHourBankCycle()'s
+/// rollover math now recomputes the previous cycle's REAL consumption
+/// from actual TimeEntry rows (computeConsumedMinutesForRange), rather
+/// than trusting the HourBank row's cached consumedMinutes column - so
+/// these tests seed a real entry inside the cycle's date range instead of
+/// writing directly to that cache column, to exercise the same code path
+/// production traffic does.
+async function seedConsumedMinutes(
+  employeeId: string,
+  clientId: string,
+  categoryId: string,
+  cycleStart: Date,
+  minutes: number
+) {
+  await createTestTimeEntry({
+    userId: employeeId,
+    clientId,
+    categoryId,
+    startAt: cycleStart,
+    endAt: new Date(cycleStart.getTime() + minutes * 60_000),
+  });
 }
 
 describe("openHourBankCycle() - spec 8.1/8.2", () => {
@@ -57,16 +82,17 @@ describe("openHourBankCycle() - spec 8.1/8.2", () => {
   });
 
   it("FULL rollover carries the previous cycle's unused minutes into the new one, and closes the previous cycle", async () => {
-    const { superAdmin, client } = await setup();
+    const { superAdmin, employee, client, category } = await setup();
     const first = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-01-01T00:00:00Z"),
       cycleEnd: new Date("2026-02-01T00:00:00Z"),
       purchasedMinutes: 600,
       rolloverMode: "FULL",
     });
-    // Simulate 400 minutes consumed in cycle 1 (no real TimeEntry rows -
-    // directly seed the cached snapshot field the rollover math reads).
-    await prisma.hourBank.update({ where: { id: first.id }, data: { consumedMinutes: 400 } });
+    // 400 minutes consumed in cycle 1, via a real TimeEntry - rollover is
+    // now computed from live consumption (docs/adr/0001 section 19.3),
+    // not the HourBank row's cached consumedMinutes column.
+    await seedConsumedMinutes(employee.id, client.id, category.id, first.cycleStart, 400);
 
     const second = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-02-01T00:00:00Z"),
@@ -81,7 +107,7 @@ describe("openHourBankCycle() - spec 8.1/8.2", () => {
   });
 
   it("CAPPED rollover never carries more than rolloverCapMinutes", async () => {
-    const { superAdmin, client } = await setup();
+    const { superAdmin, employee, client, category } = await setup();
     const first = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-01-01T00:00:00Z"),
       cycleEnd: new Date("2026-02-01T00:00:00Z"),
@@ -89,7 +115,7 @@ describe("openHourBankCycle() - spec 8.1/8.2", () => {
       rolloverMode: "CAPPED",
       rolloverCapMinutes: 50,
     });
-    await prisma.hourBank.update({ where: { id: first.id }, data: { consumedMinutes: 400 } }); // 200 unused
+    await seedConsumedMinutes(employee.id, client.id, category.id, first.cycleStart, 400); // 200 unused
 
     const second = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-02-01T00:00:00Z"),
@@ -101,14 +127,17 @@ describe("openHourBankCycle() - spec 8.1/8.2", () => {
   });
 
   it("MANUAL rollover uses the admin-supplied override, not a formula", async () => {
-    const { superAdmin, client } = await setup();
+    const { superAdmin, employee, client, category } = await setup();
     const first = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-01-01T00:00:00Z"),
       cycleEnd: new Date("2026-02-01T00:00:00Z"),
       purchasedMinutes: 600,
       rolloverMode: "MANUAL",
     });
-    await prisma.hourBank.update({ where: { id: first.id }, data: { consumedMinutes: 400 } });
+    // MANUAL mode ignores previous consumption entirely (the caller's
+    // manualRolloverInMinutes wins) - seeded anyway for symmetry with the
+    // other rollover-mode tests above.
+    await seedConsumedMinutes(employee.id, client.id, category.id, first.cycleStart, 400);
 
     const second = await openHourBankCycle(superAdmin, client.id, {
       cycleStart: new Date("2026-02-01T00:00:00Z"),

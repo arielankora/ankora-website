@@ -4,6 +4,10 @@ import { useFormState, useFormStatus } from "react-dom";
 import { adminUpdateEntryAction, adminDeleteEntryAction, getEntryRevisionsAction } from "./actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 
+function todayKey(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
+}
+
 type Entry = {
   id: string;
   startAt: string;
@@ -110,6 +114,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
                   type="date"
                   name="date"
                   defaultValue={dateKeyOf(entry.startAt)}
+                  max={todayKey()}
                   required
                   className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
                 />

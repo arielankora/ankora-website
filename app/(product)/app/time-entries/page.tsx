@@ -20,6 +20,15 @@ function parseDate(value?: string): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// Overnight bug-hunt (docs/adr/0001 section 19.5): same end-of-day fix as
+// the Reports screen/export route - "to" parsed as midnight excluded the
+// entire selected end date from listTimeEntriesForAdmin's gte/lte range.
+function parseDateEndOfDay(value?: string): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(`${value}T23:59:59.999`);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 // Spec 12 Admin screens table: "Time Entries - cross-client table +
 // filters + edits + revisions."
 export default async function AdminTimeEntriesPage({
@@ -38,7 +47,7 @@ export default async function AdminTimeEntriesPage({
   }
 
   const from = parseDate(searchParams.from);
-  const to = parseDate(searchParams.to);
+  const to = parseDateEndOfDay(searchParams.to);
 
   const [entries, clients, allCategories, users] = await Promise.all([
     listTimeEntriesForAdmin({

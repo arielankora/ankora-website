@@ -28,7 +28,7 @@ export interface ReportScheduleInput {
   enabled?: boolean;
 }
 
-function normalizeEmails(emails: string[]): string[] {
+export function normalizeEmails(emails: string[]): string[] {
   return Array.from(new Set(emails.map((e) => e.trim().toLowerCase()).filter((e) => e.length > 0)));
 }
 
