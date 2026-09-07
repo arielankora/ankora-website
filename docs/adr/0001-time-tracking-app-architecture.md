@@ -1791,3 +1791,43 @@ currently-open bank correctly (it looks up the current bank internally),
 so this is a pure widening of the candidate set with no other behavior
 change. No existing test asserted on this function's candidate-selection
 behavior, so none required updating.
+
+### 19.5 Bug: "to" date filter parsed as midnight, silently excluding the entire end date
+
+`app/(product)/app/reports/page.tsx`, `app/api/reports/export/route.ts`,
+and `app/(product)/app/time-entries/page.tsx` all parsed a `?to=`
+query-string date the same way: `new Date(\`${value}T00:00:00\`)`. That
+value then flowed into `lib/app-domain/reports.ts`'s `fetchEntries()` /
+`manualEdits()` and `lib/app-domain/time-entries.ts`'s
+`listTimeEntriesForAdmin()`, all of which filter with `startAt: { gte:
+from, lte: to }`. An inclusive upper bound of "midnight at the start of
+the selected day" excludes every entry that started later that same
+day - which is effectively the entire day, since almost no time entry
+starts at exactly 00:00:00.000. An admin picking a "to" date to mean
+"through the end of this day" (the only reasonable reading of a
+single-day-granularity date picker) got a report silently missing that
+whole day's data, in the on-screen table and in every export format
+(CSV/XLSX/PDF), since the export route re-runs the exact same
+`runReport()`.
+
+This is a straightforward end-of-range off-by-one, but a nasty one in
+practice: it doesn't error, doesn't look wrong at a glance (the report
+still renders, just short), and gets worse the more recent the pattern
+- "last 7 days" style ranges lose exactly the most recent day, which is
+often the one someone most wants to check.
+
+Fix: added a `parseDateEndOfDay()` helper (parses to `T23:59:59.999` of
+the given day) alongside the existing `parseDate()` in each of the three
+files, and switched the `to` field specifically to use it. `from` is
+unaffected - `gte` at midnight is the correct inclusive lower bound.
+
+While auditing this, also found and fixed a much smaller, related issue
+in `listMyTimeEntries()` (`lib/app-domain/time-entries.ts`): its only
+caller (`my-time/page.tsx`) passes `to` as `weekEnd`, the exclusive start
+of the *following* week - a different, already-correct convention (the
+same half-open-range pattern `client-portal.ts` and
+`report-schedules.ts` use). But the query itself used `lte`, not `lt`,
+so an entry starting at exactly that midnight boundary would appear in
+both the current week's list and the next week's - a real but far
+narrower bug (exact-midnight timestamps only) than 19.5's main fix.
+Changed to `lt` to match the convention its caller already assumes.
