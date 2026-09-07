@@ -34,6 +34,16 @@ function parseDate(value: string | null): Date | undefined {
   return isNaN(d.getTime()) ? undefined : d;
 }
 
+// Overnight bug-hunt (docs/adr/0001 section 19.5): see the identical fix
+// in app/(product)/app/reports/page.tsx - "to" must mean end-of-day, not
+// midnight, or the export silently drops the entire last day of the
+// selected range (same runReport() callees, same gte/lte bug).
+function parseDateEndOfDay(value: string | null): Date | undefined {
+  if (!value) return undefined;
+  const d = new Date(`${value}T23:59:59.999`);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
 function isReportType(value: string | null): value is ReportType {
   return REPORT_DEFINITIONS.some((r) => r.id === value);
 }
@@ -61,7 +71,7 @@ export async function GET(req: NextRequest) {
     editedOnly: params.get("editedOnly") === "1",
     manualOnly: params.get("manualOnly") === "1",
     from: parseDate(params.get("from")),
-    to: parseDate(params.get("to")),
+    to: parseDateEndOfDay(params.get("to")),
   };
 
   let result;

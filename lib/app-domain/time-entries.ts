@@ -591,11 +591,18 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
 // ---------------------------------------------------------------------
 
 export async function listMyTimeEntries(userId: string, range?: { from?: Date; to?: Date }) {
+  // Overnight bug-hunt (docs/adr/0001 section 19.5): `to` here is always
+  // the exclusive start of the following period (see my-time/page.tsx's
+  // weekEnd = addDays(weekStart, 7)), not an inclusive end-of-range
+  // instant. `lte` let an entry starting at exactly that midnight boundary
+  // appear in both the current and next week's list - `lt` matches the
+  // half-open convention this same range already uses everywhere else
+  // (lib/app-domain/client-portal.ts, lib/app-domain/report-schedules.ts).
   return prisma.timeEntry.findMany({
     where: {
       userId,
       deletedAt: null,
-      startAt: { gte: range?.from, lte: range?.to },
+      startAt: { gte: range?.from, lt: range?.to },
     },
     orderBy: { startAt: "desc" },
     include: { client: true, category: true, task: true },
