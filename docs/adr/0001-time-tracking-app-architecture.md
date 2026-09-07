@@ -1911,3 +1911,94 @@ section 18.14 - not a real server error, and not chased further.
 
 No new bugs found in this pass. Sections 19.1-19.7 remain the complete
 list of bugs found and fixed during the overnight bug-hunt.
+
+### 19.9 Feature: "select all / clear all" for Ankora-employee client access
+(PR #14, merged `316b9ae`)
+
+Ariel reported live that a real Ankora employee (Sharona) had no
+client access after being set up as `ANKORA_EMPLOYEE` - by design
+(spec 4.1: "אסור לעובד לדווח זמן ללקוח שאינו משויך אליו"), an employee
+only sees/reports time on clients explicitly assigned via
+`UserClientAccess` checkboxes on the Users admin screen, and there was
+no bulk-assign control, only one checkbox per client.
+
+Given the request touched the RBAC data-scoping model, Ariel was asked
+to choose between (a) removing the per-employee restriction entirely,
+(b) keeping the restriction but adding a "select all" convenience
+button (future clients NOT auto-included), or (c) fixing only
+Sharona's specific record manually. Ariel chose (b) - the per-employee
+`UserClientAccess` model and spec 4.1's restriction stay exactly as
+designed; only a UX convenience was added.
+
+Implementation: `ClientAccessForm.tsx` (edit-user screen) and
+`InviteUserForm.tsx` (invite-new-user screen) each gained "בחר הכל" /
+"נקה הכל" buttons above their client checkbox list, wired via a
+`useRef` on the checkbox container and a `setAllChecked(checked)`
+helper that toggles every `input[name="clientIds"]` inside it - no
+change to the underlying data model, server actions, or permission
+checks. A client created after the button is clicked is not
+automatically granted; the button only checks clients that exist at
+click time, per Ariel's explicit choice.
+
+Verified live on Preview against Sharona's real pre-existing record on
+that Preview's DB branch: checkbox toggle behavior and the full save
+round-trip (persists after reload) both confirmed correct on both
+forms. Guide `content.ts` updated in the same change (users section:
+new step + note explaining the "does not auto-assign future clients"
+caveat). Ariel applied the same action to the real Sharona record on
+Production himself after merge (this requires super-admin credential
+entry, which per this engagement's security rules Claude does not
+perform on the user's behalf).
+
+### 19.10 Bug: logout button has done nothing since Phase 0/1
+(PR #15, merged `fffedda`)
+
+Ariel reported live, with a screenshot, that the "התנתקות" logout
+button did nothing after logging in as Sharona. Reproduced directly
+using an already-authenticated real session (no credentials entered).
+Console showed no errors, but the network tab showed `GET
+/api/auth/csrf` and the subsequent `POST /api/auth/signout` both
+returning `404`.
+
+Root cause: `app/api/auth/[...nextauth]/route.ts` - the Next.js
+catch-all route that is supposed to export Auth.js v5's generated
+`handlers` at the conventional `/api/auth/*` path - was never created,
+in any phase of this engagement. This went undetected because every
+other part of the app that needs Auth.js calls `signIn()` / `auth()` /
+`signOut()` directly as a function server-side (`app/(product)/app/
+login/actions.ts`, `lib/app-auth/session.ts`, `middleware.ts`), which
+Auth.js v5 fully supports and requires no REST route at all. The one
+consumer that does need the REST API is client-side `signOut()` from
+`"next-auth/react"`, used by `LogoutButton.tsx` and `BottomNav.tsx`'s
+mobile nav - it POSTs to `/api/auth/signout` after first GETting
+`/api/auth/csrf` for a token. With both 404ing, the fetch silently
+resolved as a non-ok response: no redirect, no session cookie cleared,
+no visible error. This means the logout button has never worked, on
+any environment (Preview or Production), since Phase 0/1 - a genuine
+severe bug that simply had no automated test coverage and was never
+manually clicked during any prior QA pass in this engagement. Login
+was never affected (server-action path, not REST). The admin "ניתוק כל
+ההתחברויות" (force-logout-all-sessions) capability was also unaffected
+- it works via a DB `tokenVersion` bump, independent of this route.
+
+Fix: created the missing route file, exporting the `handlers` object
+`auth.ts` already builds:
+
+```ts
+import { handlers } from "@/auth";
+export const { GET, POST } = handlers;
+```
+
+Verified live end-to-end on a fresh Preview deployment: logged in,
+confirmed `/api/auth/csrf` now returns `200` with a real token (was
+`404`), clicked "התנתקות", confirmed the app redirects to
+`/app/login`, confirmed `/api/auth/session` now returns `null`
+(session actually cleared, not just a client-side redirect), and
+confirmed navigating back to `/app` correctly redirects to login
+instead of showing a stale "logged in" view. After merge, re-verified
+live on Production (`ankora.co.il/api/auth/csrf` returns a real token).
+
+No guide `content.ts` change was needed - the logout button's existence
+and label were already documented correctly; only its underlying
+behavior was broken.
+
