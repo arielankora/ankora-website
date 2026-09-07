@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { inviteUserAction } from "./actions";
 
@@ -20,6 +20,19 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
   const [state, formAction] = useFormState(inviteUserAction, {});
   const [role, setRole] = useState("");
   const isClientUser = role === "CLIENT_USER";
+  const checkboxContainerRef = useRef<HTMLDivElement>(null);
+
+  // Same "בחר הכל"/"נקה הכל" convenience as ClientAccessForm - see that
+  // file's comment. Here it saves a new Ankora employee from being
+  // invited with zero client access by default (the checkbox list below
+  // otherwise defaults every box to unchecked).
+  function setAllChecked(checked: boolean) {
+    checkboxContainerRef.current
+      ?.querySelectorAll<HTMLInputElement>('input[name="clientIds"]')
+      .forEach((el) => {
+        el.checked = checked;
+      });
+  }
 
   return (
     <div className="rounded-2xl border border-lineDark bg-white p-6">
@@ -99,8 +112,20 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
           </>
         ) : (
           <div className="sm:col-span-2 lg:col-span-4">
-            <label className="block text-xs font-medium text-navy/60">גישה ללקוחות (אופציונלי)</label>
-            <div className="mt-2 flex flex-wrap gap-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-medium text-navy/60">גישה ללקוחות (אופציונלי)</label>
+              {clients.length > 0 && (
+                <div className="flex items-center gap-3 text-xs">
+                  <button type="button" onClick={() => setAllChecked(true)} className="text-gold-dim underline">
+                    בחר הכל
+                  </button>
+                  <button type="button" onClick={() => setAllChecked(false)} className="text-navy/50 underline">
+                    נקה הכל
+                  </button>
+                </div>
+              )}
+            </div>
+            <div ref={checkboxContainerRef} className="mt-2 flex flex-wrap gap-3">
               {clients.length === 0 && <p className="text-xs text-navy/40">אין עדיין לקוחות במערכת.</p>}
               {clients.map((c) => (
                 <label key={c.id} className="flex items-center gap-1.5 text-sm text-navy/70">
