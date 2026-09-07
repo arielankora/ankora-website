@@ -1831,3 +1831,48 @@ so an entry starting at exactly that midnight boundary would appear in
 both the current week's list and the next week's - a real but far
 narrower bug (exact-midnight timestamps only) than 19.5's main fix.
 Changed to `lt` to match the convention its caller already assumes.
+
+### 19.6 Bug: portal recipient-editing path missing de-duplication
+
+`report-schedules.ts`'s Ankora-side `createReportSchedule` /
+`updateReportSchedule` both run recipient lists through a shared
+`normalizeEmails()` (trim, lowercase, filter blanks, de-duplicate via a
+`Set`). `client-portal.ts`'s `updatePortalScheduleRecipients()` - the
+parallel write path spec 13 gives a Client Admin to edit their own
+schedule's recipients - reimplemented the same cleanup inline but
+dropped the de-duplication step. A Client Admin who pasted an address
+that was already in the list (or retyped one that had a trailing space
+originally) would end up with that address stored twice; every future
+scheduled send to that client would email the duplicate address twice.
+
+Fix: exported `normalizeEmails()` from `report-schedules.ts` and had
+`updatePortalScheduleRecipients()` call it instead of its own inline
+cleanup, so both write paths to `ReportSchedule.recipients` are
+guaranteed to produce the same normalized shape.
+
+### 19.7 Bug: no protection against removing the last active SUPER_ADMIN
+
+`updateUserRoleStatus()` (`lib/app-domain/users.ts`) is the one function
+behind every role/status change on the Users screen, gated only by the
+`user.manage` permission (held by both SUPER_ADMIN and ANKORA_ADMIN).
+Nothing in it (or in its caller, `app/(product)/app/users/actions.ts`)
+special-cased `actorId === userId` or checked whether the target was the
+organization's only SUPER_ADMIN. In an org with a single SUPER_ADMIN
+account (the common case for a small operator like Ankora), that admin
+could demote their own role to ANKORA_ADMIN, or suspend/archive their
+own account, in one click - and since only a SUPER_ADMIN can promote
+someone back to SUPER_ADMIN, this would permanently lock the entire
+organization out of SUPER_ADMIN-level actions (integration management,
+the highest-privilege user management) with no recovery path short of
+direct database access. The same self-inflicted lockout could also
+happen accidentally to a *different* admin if they happened to be the
+last one.
+
+Fix: `updateUserRoleStatus()` now computes whether the target user is
+currently an active SUPER_ADMIN (`role === "SUPER_ADMIN" && status ===
+"ACTIVE"`) and whether they would remain one after the requested change;
+if they currently are and would stop being one, it counts other active
+SUPER_ADMINs and throws a clear Hebrew error ("לא ניתן להסיר את מנהל
+העל האחרון הפעיל במערכת") if that count is zero. An org with two or
+more active SUPER_ADMINs is completely unaffected - the guard only ever
+fires on the last one.
