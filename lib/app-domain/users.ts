@@ -106,6 +106,32 @@ export async function updateUserRoleStatus(
   assertCan(actor.role, "user.manage");
   const before = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
+  // Overnight bug-hunt (docs/adr/0001 section 19.7): nothing previously
+  // stopped a SUPER_ADMIN from demoting or suspending/archiving the last
+  // active SUPER_ADMIN account - including their own, since this function
+  // never special-cased actorId === userId. Every "user.manage"-gated
+  // action (this function, invites, client access) requires a SUPER_ADMIN
+  // or ANKORA_ADMIN already, but role/status changes themselves are also
+  // gated only by "user.manage" - an org with a single SUPER_ADMIN could
+  // therefore lock itself out of ever regaining SUPER_ADMIN-level access
+  // (e.g. re-promoting an ANKORA_ADMIN) with a single misclick, recoverable
+  // only via direct database access. Guard: if this user is currently the
+  // last ACTIVE SUPER_ADMIN, refuse any change that would leave them (or
+  // anyone else) without at least one active SUPER_ADMIN.
+  const wasActiveSuperAdmin = before.role === "SUPER_ADMIN" && before.status === "ACTIVE";
+  const nextRole = input.role ?? before.role;
+  const nextStatus = input.status ?? before.status;
+  const staysActiveSuperAdmin = nextRole === "SUPER_ADMIN" && nextStatus === "ACTIVE";
+
+  if (wasActiveSuperAdmin && !staysActiveSuperAdmin) {
+    const otherActiveSuperAdmins = await prisma.user.count({
+      where: { role: "SUPER_ADMIN", status: "ACTIVE", deletedAt: null, id: { not: userId } },
+    });
+    if (otherActiveSuperAdmins === 0) {
+      throw new Error("לא ניתן להסיר את מנהל העל האחרון הפעיל במערכת.");
+    }
+  }
+
   const user = await prisma.user.update({
     where: { id: userId },
     data: {

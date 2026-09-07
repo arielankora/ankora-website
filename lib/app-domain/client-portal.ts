@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { getCurrentHourBank, listHourBanksForClient } from "@/lib/app-domain/hour-banks";
 import { getClient } from "@/lib/app-domain/clients";
+import { normalizeEmails } from "@/lib/app-domain/report-schedules";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import type { User, Client, ClientUserRole } from "@prisma/client";
 
@@ -295,6 +296,13 @@ export async function updatePortalScheduleRecipients(actor: User, scheduleId: st
     throw new ForbiddenError("Schedule does not belong to this client");
   }
 
-  const cleaned = recipients.map((r) => r.trim().toLowerCase()).filter(Boolean);
+  // Overnight bug-hunt (docs/adr/0001 section 19.6): use the same
+  // normalizeEmails() the Ankora-side ReportSchedule CRUD already uses
+  // (report-schedules.ts) instead of a separate, slightly weaker inline
+  // clean here - this path was missing the de-duplication half, so a
+  // Client Admin pasting the same address twice (or an address already
+  // present plus a re-typed duplicate) would have every scheduled email
+  // sent to that address twice going forward.
+  const cleaned = normalizeEmails(recipients);
   return prisma.reportSchedule.update({ where: { id: scheduleId }, data: { recipients: cleaned } });
 }
