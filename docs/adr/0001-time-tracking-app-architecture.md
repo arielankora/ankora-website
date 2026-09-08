@@ -2057,64 +2057,93 @@ confirmed, working fix hostage to that unresolved investigation, only
 the `EntryRow.tsx`/`AdminEntryRow.tsx` changes were cherry-picked onto
 this clean branch and shipped alone, per Ariel's explicit choice when
 asked how to proceed.
-
-### 19.12 Bug (still open): Hebrew reversed in PDF client-report
-export - fix verified locally, does NOT reproduce as fixed on deployed
-Preview
+### 19.12 Bug (resolved): Hebrew reversed in PDF client-report export
 
 Same live bug report from Ariel as 19.11 (second half): "שמריצים דוח
 של לקוחות ומייצאים לpfd העיברית בפגכ הפוכה" (running a clients report
-and exporting to PDF, the Hebrew comes out reversed).
+and exporting to PDF, the Hebrew comes out reversed). This section
+replaces the two earlier, both-wrong attempts at this fix - the
+original `bidi-js`-based code (the bug as originally reported), and a
+later attempt (commit `97a6085`) that removed `bidi-js` entirely,
+verified only in local sandbox, and turned out to still be broken on
+the actual deployed Preview (see the prior revision of this section,
+preserved in git history, and PR #16's live QA).
 
-`lib/pdf.ts`'s `drawCell()` was pre-processing every string through
-`bidi-js` before drawing, on a documented assumption that pdfkit has
-no RTL support of its own. Extensive local sandbox investigation
-(rendering to actual page images via `pdftoppm` and inspecting glyphs
-pixel-by-pixel, deliberately not trusting `pdftotext` extraction,
-which was shown during this same investigation to mask the bug by
-"correcting" already-wrong visual output) concluded this assumption
-was false for the pdfkit/fontkit version pinned in this project
-(`pdfkit ^0.20.2` / `fontkit ^2.0.4`): feeding pdfkit raw, un-reordered
-Hebrew text in normal logical order, split only into per-font runs (no
-bidi pre-processing), appeared to render correctly when tested this
-way. The fix removed the `bidi-js` step entirely on that basis - see
-the full original writeup and minimal-repro methodology preserved in
-commit `97a6085` on branch `fix/pdf-hebrew-reversal-and-silent-save`.
+**Actual root cause.** pdfkit's font/subsetting layer (`fontkit`)
+already reverses the glyphs of a single `doc.text()` call that is
+entirely RTL-range codepoints into correct visual order **on its
+own**, with zero help from this codebase - confirmed empirically by
+drawing a plain, untouched Hebrew word with one
+`doc.font(HEBREW_FONT).text(...)` call and observing it render
+correctly. `drawCell()` additionally ran every string through
+`bidi-js`'s `getReorderedString()` before drawing, on the (wrong)
+assumption that pdfkit needed a Unicode Bidi Algorithm pass done for
+it externally. That pre-reversed each run's characters, and fontkit's
+own shaping then reversed them **again** when painting - two
+reversals cancel out to the *original* logical order, which is
+exactly backwards for RTL.
 
-**This conclusion does not hold on the actual deployed Preview.**
-Live QA (2026-09-08, `demo.admin@ankora.co.il`, Preview deployment for
-that same commit) fetched the real `/api/reports/export?
-type=total_client_hours&format=pdf` response client-side (confirmed
-`x-vercel-cache: MISS` - not a stale cached response), rendered it via
-`pdf.js` to a canvas, and visually compared individual header-cell
-glyphs at 4x zoom against the same words rendered correctly by the
-browser natively on `/app/reports`. The single word "לחיוב" (a single
-run, no embedded space or digit - the simplest possible case, not
-even subject to the multi-run-splitting part of the original bug)
-rendered with its letters in the exact mirror-image order of the
-correct HTML rendering of the same word from the same report. The PDF
-fix, as committed, does not work on the actual Vercel Preview runtime,
-contradicting the local sandbox verification.
+This was invisible for multi-word phrases only by accident:
+`splitRuns()` already breaks a phrase into one run per word at every
+space boundary (space isn't in `HEBREW_RANGE`), so `bidi-js`'s
+word-*order* flip survived even though each word's own
+double-reversed *characters* happened to cancel back to correct
+spelling. It was immediately visible for any cell that reduces to a
+single Hebrew run after `splitRuns()` - which is every table header
+and most client/category/name cells, i.e. most of what a client
+actually sees first when opening the PDF. This also explains why the
+97a6085 attempt (bidi-js removed entirely, raw text fed straight to
+fontkit) was *also* wrong in the opposite direction: a multi-word
+phrase with no reordering at all lets fontkit auto-reverse each word
+individually while leaving word *order* untouched, which spells every
+word backwards while keeping their positions "correct" - convincing
+enough to eyeball as right in an unlucky manual local check, still
+wrong.
 
-**Not yet root-caused.** `/api/reports/export` does call the fixed
-`toPdfTable()` (confirmed by reading `app/api/reports/export/
-route.ts` directly - no separate/stale PDF code path exists), so this
-is not a case of the fix simply not being wired up. The leading
-hypothesis is an environment difference between the local sandbox's
-pdfkit/fontkit execution and Vercel's Node serverless runtime (exact
-Node version is unpinned in this project - no `engines` field, no
-`.nvmrc`, no runtime override in `vercel.json` - so Vercel uses
-whatever its current default is, which may not match the sandbox) that
-somehow affects whether pdfkit/fontkit's RTL shaping actually engages,
-but this has not been confirmed. Do not re-attempt the "fix" from
-commit `97a6085` without first reproducing the bug's absence with
-pixel-level PDF verification against the *actual deployed Preview
-runtime*, not just a local sandbox - that is precisely how the
-original (wrong) "pdfkit has no RTL support" assumption avoided being
-caught earlier, and how this second, opposite-direction false
-conclusion was reached this time.
+**The fix.** Remove the `bidi-js` pass entirely (dependency dropped
+from `package.json`). `splitRuns()` now runs on the raw, untouched
+cell text. `drawCell()` reverses the *array* of runs it gets back
+(visual RTL order) but never a run's own characters - each run is
+handed to `doc.text()` exactly as typed, and fontkit's own per-run
+shaping does the only character-level RTL work it was already doing
+correctly. This is deliberately not a general Unicode Bidi Algorithm
+implementation; per this file's own header comment, this app has no
+"sometimes LTR paragraph" case to support, so reversing run order
+(and only run order) is the whole requirement.
 
-**Status:** open. Ariel was informed live QA found this still broken
-and chose to ship 19.11's save-indicator fix alone rather than hold it
-for this; PDF investigation continues separately.
+**Verified two ways, both required before this was considered done -
+see the standing warning in the prior revision of this section about
+what went wrong the first two times:**
 
+1. **Automated regression tests** (`tests/unit/pdf.test.ts`, "RTL
+   glyph order" suite) that read the actual PDF content-stream
+   operators back out via `pdfjs-dist`'s `getOperatorList()` - not
+   `getTextContent()` or `pdftotext`, both of which do their own
+   bidi-aware reconstruction on extraction and can silently mask
+   exactly this class of bug (this is what let the 97a6085 attempt
+   look correct under local-only manual verification). Covers: a
+   single Hebrew word (the case that broke - table headers, names),
+   a multi-word phrase, and a phrase with an embedded LTR number range
+   ("2026 - 31") to confirm digits are never touched.
+2. **Live Vercel Preview diagnostic**, run against the actual
+   `fix/pdf-hebrew-rtl-order` deployment (not local sandbox): fetched
+   the real `/api/reports/export?type=total_client_hours&format=pdf`
+   endpoint client-side as `demo.admin@ankora.co.il` (confirmed
+   `x-vercel-cache: MISS`), read the raw content-stream glyph order
+   back with `pdf.js`'s `getOperatorList()`, and separately rendered
+   it to a canvas for a direct 3x-zoom visual pixel check. Every
+   single-word header (`מספר`, `לקוחות`, `דיווחים`, `בפועל`, `לחיוב`)
+   - the exact shape that was broken - read correctly, word order and
+   spelling both, in both the raw glyph order and the rendered pixels.
+   A tricky real-world case not covered by the unit tests, the
+   abbreviation `סה"כ` (total) with an embedded quote mark that forces
+   an extra `splitRuns()` boundary, also rendered correctly. Digits
+   (`38`, `3`, `984`, `1061`) were untouched throughout, as expected.
+
+Also removed: `types/bidi-js.d.ts` and the temporary
+`app/api/debug/pdf-test/route.ts` diagnostic route used during the
+19.12 investigation (never merged to `main` - it only ever existed on
+the throwaway `investigate/pdf-hebrew-rendering` branch).
+
+**Status:** resolved. PR opened from `fix/pdf-hebrew-rtl-order`,
+awaiting Ariel's review before merge.
