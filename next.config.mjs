@@ -22,7 +22,7 @@ const nextConfig = {
   // Applied to every response. A Content-Security-Policy is deliberately
   // NOT included here yet - see the ADR addendum for why shipping an
   // untuned one is worse than shipping none.
-  // SEO fix (docs/adr/0001 section "www/non-www canonical inconsistency"):
+  // SEO fix (docs/adr/0002 ("Marketing site — canonical host / indexing consistency fix")):
   // three historical/broken URLs Google Search Console still has indexed.
   // Vercel's own domain configuration already 301/308-redirects the bare
   // apex (ankora.co.il) to www.ankora.co.il, preserving the full path - that

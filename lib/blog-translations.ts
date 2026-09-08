@@ -6,7 +6,7 @@
 // and /en/blog/X. The site-wide language toggle used to assume they did,
 // which produced a live 404 for any post whose slugs differ (discovered via
 // Google Search Console: /en/blog/esta, linked from the Hebrew ESTA
-// article's language toggle - docs/adr/0001 SEO fix).
+// article's language toggle - docs/adr/0002).
 //
 // Only posts with a real, published counterpart belong here. A post absent
 // from this map has no known translation, so the toggle falls back to the
