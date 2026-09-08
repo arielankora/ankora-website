@@ -1,7 +1,6 @@
 import "server-only";
 import path from "node:path";
 import PDFDocument from "pdfkit";
-import bidiFactory from "bidi-js";
 
 // Spec 14.4: "PDF לדוחות לקוח מומלץ" (recommended for client reports).
 // Added in the Phase 9 gap-fix pass (docs/adr/0001 section 17) alongside
@@ -20,14 +19,55 @@ import bidiFactory from "bidi-js";
 //    string (dates, minute counts, percentages all mix with Hebrew
 //    labels in every report). Both subsets are registered here and each
 //    run of text is drawn with whichever one actually has the glyphs.
-// 2. Bidi: pdfkit has no Unicode Bidirectional Algorithm implementation -
-//    it draws codepoints in string order, left to right, regardless of
-//    script. Fed a raw Hebrew string it renders every word backwards.
-//    `bidi-js` (a real UBA implementation) reorders each string into
-//    left-to-right *visual* order first; drawing that reordered string
-//    left-to-right then produces the correct on-page result, matching
-//    what a browser or Word would show.
-const bidi = bidiFactory();
+// 2. Bidi/RTL word order: pdfkit draws whatever doc.text() is given, left
+//    to right, run by run, at whatever x each doc.text() call is told to
+//    start at - it has no paragraph-level bidi algorithm and doesn't need
+//    one here, because pdfkit's font/subsetting layer (fontkit) *already*
+//    reorders the glyphs of a single doc.text() call that is entirely
+//    RTL-range codepoints into correct visual order on its own. This was
+//    proven empirically (docs/adr/0001 section 19.12) by drawing a plain,
+//    untouched Hebrew word with a single doc.font(HEBREW_FONT).text(...)
+//    call and observing it render correctly, with NO reordering applied
+//    by this code at all.
+//
+//    An earlier version of this file additionally ran every string
+//    through `bidi-js`'s getReorderedString() before drawing, reasoning
+//    (wrongly) that pdfkit needed a UBA pass done for it. It didn't: that
+//    pre-reversed each run's characters, and fontkit's own shaping then
+//    reversed them *again* when painting - two reversals cancel out to
+//    the *original* logical order, which is exactly backwards for RTL.
+//    For any cell that reduces to a single Hebrew run after splitRuns()
+//    (a bare word - every table header, most client/category names) that
+//    double-reversal was visible immediately. It was invisible for
+//    multi-word phrases only by accident: splitRuns() already breaks a
+//    phrase into one run per word at every space boundary (space isn't
+//    in HEBREW_RANGE), so bidi-js's word-order flip survived even though
+//    each word's own double-reversed characters happened to cancel back
+//    to correct spelling - two unrelated bugs masking each other on the
+//    one shape of input (multi-word, no digits) that happened to get
+//    tested. Confirmed via a live-Preview diagnostic (not local sandbox -
+//    an earlier attempt at this exact fix was verified only locally and
+//    turned out to still be broken on Vercel's actual runtime) that
+//    rendered isolated, labeled test strings and read the actual
+//    per-glyph PDF content-stream order back out with pdf.js.
+//
+//    The fix: don't touch each run's characters at all - draw every run
+//    exactly as typed and let fontkit's own per-run auto-reversal do the
+//    only character-level RTL work it's already doing correctly. The one
+//    thing this file must still do is *decide run order*: visually, an
+//    RTL line's *last* logical run (its rightmost reading-start) has to
+//    be drawn first/leftmost and its first logical run drawn last/
+//    rightmost - i.e. splitRuns() output, reversed, drawn left-to-right
+//    with a plain increasing cursor. A Latin/digit run's own internal
+//    order is left untouched by this reversal (only the *array* of runs
+//    is reversed, never the characters inside one), which is what keeps
+//    embedded numbers (dates, hour counts, "24/7") reading left-to-right
+//    like the rest of this app - see drawCell() below.
+//
+// NOTE: this app has no "sometimes LTR paragraph" case to also support -
+// every report is RTL Hebrew with embedded LTR numbers - so this
+// run-order-reversal approach (not a general Unicode Bidi Algorithm
+// implementation) is deliberately as simple as the real requirement.
 
 const HEBREW_FONT = "Heebo-Hebrew";
 const LATIN_FONT = "Heebo-Latin";
@@ -76,11 +116,14 @@ function registerFonts(doc: PDFKit.PDFDocument) {
   doc.registerFont(LATIN_FONT, path.join(process.cwd(), "node_modules/@fontsource/heebo/files/heebo-latin-400-normal.woff"));
 }
 
-/// Splits a bidi-reordered string into consecutive runs of characters that
+/// Splits raw, logical-order text into consecutive runs of characters that
 /// share the same font (Hebrew subset vs. Latin/digit subset), each run
-/// drawn with a single doc.font() call. A code point present in neither
-/// subset (rare - e.g. an unsupported symbol) falls back to the Latin
-/// font, which pdfkit will simply skip/tofu rather than throw on.
+/// drawn with a single doc.font() call. Each run's own characters are
+/// left untouched (see the file-header comment) - only drawCell() reverses
+/// the *array* of runs this returns, never a run's internal text. A code
+/// point present in neither subset (rare - e.g. an unsupported symbol)
+/// falls back to the Latin font, which pdfkit will simply skip/tofu
+/// rather than throw on.
 function splitRuns(text: string): { font: string; text: string }[] {
   const runs: { font: string; text: string }[] = [];
   for (const ch of text) {
@@ -106,9 +149,10 @@ function charFont(ch: string): string {
 function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, opts: { bold?: boolean; size?: number } = {}) {
   const size = opts.size ?? 9;
   doc.fontSize(size);
-  const levels = bidi.getEmbeddingLevels(text);
-  const visual = bidi.getReorderedString(text, levels);
-  const runs = splitRuns(visual);
+  // Reverse RUN order (visual RTL flow), never a run's own characters -
+  // see the file-header comment for why. splitRuns() runs on the raw,
+  // untouched `text` (not a pre-reversed string).
+  const runs = splitRuns(text).reverse();
 
   let totalWidth = 0;
   for (const run of runs) {
