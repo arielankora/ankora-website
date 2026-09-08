@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { SITE_URL } from "@/lib/site";
 
 export function Breadcrumbs({
   locale,
@@ -10,7 +11,7 @@ export function Breadcrumbs({
   locale: Locale;
   items: { label: string; href?: string }[];
 }) {
-  const base = "https://ankora.co.il";
+  const base = SITE_URL;
   const schema = {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",

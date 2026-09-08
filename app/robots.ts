@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { SITE_URL } from "@/lib/site";
 
 // Ankora's site is entirely public marketing content, there are no account
 // areas or private sections to gate. Every legitimate crawler, including AI
@@ -14,6 +15,6 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "OAI-SearchBot", allow: "/", disallow: ["/api/", "/admin/"] },
       { userAgent: "*", allow: "/", disallow: ["/api/", "/admin/"] },
     ],
-    sitemap: "https://ankora.co.il/sitemap.xml",
+    sitemap: `${SITE_URL}/sitemap.xml`,
   };
 }

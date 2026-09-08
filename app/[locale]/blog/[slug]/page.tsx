@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import { getDictionary, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
 import { Container } from "@/components/ui/Container";
@@ -67,7 +68,7 @@ export default function BlogPostPage({
   if (!post || post.draft) notFound();
 
   const related = getRelatedPosts(locale, post);
-  const base = "https://ankora.co.il";
+  const base = SITE_URL;
   const categoryLabel = dict.blog.categories[post.category] || post.category;
 
   const articleSchema = {

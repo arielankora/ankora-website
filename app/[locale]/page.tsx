@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { Hero } from "@/components/sections/Hero";
 import { EditorialSection } from "@/components/sections/EditorialSection";
 import { HowItWorks } from "@/components/sections/HowItWorks";
@@ -37,7 +38,7 @@ export async function generateMetadata({
 export default function Home({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
-  const base = "https://ankora.co.il";
+  const base = SITE_URL;
 
   const organizationSchema = {
     "@context": "https://schema.org",

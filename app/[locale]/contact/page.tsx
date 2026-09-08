@@ -1,8 +1,23 @@
+import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
 import { Reveal } from "@/components/motion/Reveal";
 import { ContactForm } from "@/components/sections/ContactForm";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const locale = params.locale === "en" ? "en" : "he";
+  return {
+    alternates: {
+      canonical: `/${locale}/contact`,
+      languages: { he: "/he/contact", en: "/en/contact" },
+    },
+  };
+}
 
 export default function ContactPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { AboutPageClient } from "@/components/sections/AboutPageClient";
 import { JsonLd } from "@/components/seo/JsonLd";
 
@@ -29,7 +30,7 @@ export default function AboutPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.about;
-  const base = "https://ankora.co.il";
+  const base = SITE_URL;
 
   const organizationSchema = {
     "@context": "https://schema.org",

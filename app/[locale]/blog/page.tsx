@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { getAllPosts, BLOG_CATEGORY_SLUGS } from "@/lib/blog";
 import { BlogIndexPage } from "@/components/sections/BlogIndexPage";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -36,7 +37,7 @@ export default function BlogPage({
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const posts = getAllPosts(locale);
-  const base = "https://ankora.co.il";
+  const base = SITE_URL;
 
   const category =
     searchParams.category && (BLOG_CATEGORY_SLUGS as readonly string[]).includes(searchParams.category)

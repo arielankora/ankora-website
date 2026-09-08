@@ -1,7 +1,22 @@
+import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
 import { Reveal } from "@/components/motion/Reveal";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const locale = params.locale === "en" ? "en" : "he";
+  return {
+    alternates: {
+      canonical: `/${locale}/terms`,
+      languages: { he: "/he/terms", en: "/en/terms" },
+    },
+  };
+}
 
 export default function TermsPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
