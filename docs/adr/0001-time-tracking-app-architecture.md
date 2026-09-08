@@ -2002,3 +2002,76 @@ No guide `content.ts` change was needed - the logout button's existence
 and label were already documented correctly; only its underlying
 behavior was broken.
 
+### 19.12 Two bugs found and fixed together: silent time-entry save +
+reversed Hebrew PDF export
+
+Ariel reported both live, in one message: (1) editing a time entry and
+clicking "שמירה" gives no indication anything happened; (2) exporting a
+"clients" report to PDF shows the Hebrew text reversed.
+
+**Bug 1 - silent save.** `EntryRow.tsx` (My Time) and `AdminEntryRow.tsx`
+(Admin Time Entries) both call `useFormState(updateAction, {})` and only
+ever read `state?.error` in their edit-mode JSX - `state?.ok` (which
+`updateMyEntryAction`/`adminUpdateEntryAction` both correctly return on
+success, and which does trigger a `revalidatePath()`) was never read by
+either component. A successful save left the edit form open with its
+original `defaultValue`-seeded inputs (uncontrolled inputs don't pick up
+new props without remounting) and no success message - indistinguishable
+from a save that silently did nothing. Fix: a `useEffect` on `state` in
+both components that calls `setEditing(false)` when `state.ok` is true,
+collapsing back to the (now server-refreshed) display row - an
+unambiguous, honest confirmation, since it's driven by the same
+revalidated data the rest of the screen already trusts, not a toast that
+could lie if the underlying save failed some other way.
+
+**Bug 2 - reversed Hebrew PDF export**, the more involved of the two.
+Root cause: `lib/pdf.ts`'s `drawCell()` ran every string through
+`bidi-js` (`getEmbeddingLevels` + `getReorderedString`) before drawing,
+on the documented assumption that "pdfkit has no Unicode Bidirectional
+Algorithm implementation." That assumption, stated in this file's own
+header comment since Phase 9, was wrong for this pdfkit/fontkit version -
+confirmed by rendering isolated minimal repros to actual page images
+(`pdftoppm`) and reading the pixels at high zoom, not just eyeballing the
+final table or trusting `pdftotext` (whose own bidi-aware text extraction
+can mask a real visual rendering bug, which is exactly what happened
+during Phase 9's original "manual verification" of this code). Feeding
+pdfkit a Hebrew string in normal logical order, split into per-font runs
+(Hebrew vs. Latin/digit, still necessary - see the font-coverage comment
+in the file) and drawn via sequential `doc.text()` calls left-to-right,
+already produces correct RTL rendering on its own. Pre-reordering with
+bidi-js *first* double-processes the direction: bidi-js flips word order
+and mirrors each word's letters; `splitRuns()` then re-splits that
+already-reordered string back into per-word calls (since a space is
+`LATIN_FONT`, not `HEBREW_FONT`); pdfkit's own per-call RTL shaping then
+un-mirrors each word's letters a second time, while the words' draw
+order (computed on the wrong assumption that pdfkit does nothing) is
+never corrected - producing exactly what Ariel's screenshot showed:
+individually-reversed words in their original (wrong) left-to-right
+sequence. Fix: delete the bidi-js step entirely; `drawCell()` now splits
+the *original* untouched string into font runs and draws them in
+original order.
+
+While in this function, also fixed a second, dormant bug noticed during
+the rewrite: `colX.reverse()` (for laying out RTL table columns) reversed
+the flat x-position array independently of `colWidths`, which stays in
+original column order - correct only when every column is the same
+width (true of every current caller; `columnWeights` is a supported
+`PdfTableOptions` field but nothing in this codebase actually passes it
+yet). Replaced with a version that reverses the *widths* first, lays out
+slots left-to-right, then maps each original column index to its correct
+slot - correct for uneven column widths too, before any real report
+exercises that path and hits it.
+
+Verified via `tests/unit/pdf.test.ts` (still passing, 4/4 - structural
+only) plus fresh manual pixel-level verification: rendered the exact
+"שעות לפי לקוח" (hours-by-client) report shape with realistic data
+(Hebrew-only, Hebrew+embedded-number, Hebrew+Latin mixed company names
+with an embedded `"` in `בע"מ`, and a pure-Latin company name) to a page
+image and confirmed every line reads correctly right-to-left, matching
+what a human would type. `tsc --noEmit` diffed against a clean-tree
+baseline is unchanged (zero new errors - the pre-existing Prisma-client-
+staleness errors are unrelated to this change), and `next build`'s
+webpack step reports "✓ Compiled successfully" (its later type-check
+step fails identically on a clean tree too, same stale-Prisma-client
+sandbox limitation documented throughout this ADR).
+

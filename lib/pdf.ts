@@ -1,33 +1,50 @@
 import "server-only";
 import path from "node:path";
 import PDFDocument from "pdfkit";
-import bidiFactory from "bidi-js";
 
 // Spec 14.4: "PDF לדוחות לקוח מומלץ" (recommended for client reports).
 // Added in the Phase 9 gap-fix pass (docs/adr/0001 section 17) alongside
 // XLSX - same (title, headers, rows) shape every export route already
 // builds for CSV/XLSX.
 //
-// Two real problems had to be solved for a Hebrew PDF, neither of which
-// pdfkit solves on its own:
+// Only one real problem needs solving for a Hebrew PDF here:
 //
-// 1. Font coverage: pdfkit's built-in fonts (Helvetica etc.) are Latin-
-//    only. This project already ships @fontsource/heebo (used by the
-//    marketing site), but fontsource splits a font into per-script
-//    *subset* files for web performance - the "hebrew" subset has no
-//    Latin/digit glyphs and the "latin" subset has no Hebrew glyphs, so a
-//    single doc.font(...) call can never render a mixed Hebrew+number
-//    string (dates, minute counts, percentages all mix with Hebrew
-//    labels in every report). Both subsets are registered here and each
-//    run of text is drawn with whichever one actually has the glyphs.
-// 2. Bidi: pdfkit has no Unicode Bidirectional Algorithm implementation -
-//    it draws codepoints in string order, left to right, regardless of
-//    script. Fed a raw Hebrew string it renders every word backwards.
-//    `bidi-js` (a real UBA implementation) reorders each string into
-//    left-to-right *visual* order first; drawing that reordered string
-//    left-to-right then produces the correct on-page result, matching
-//    what a browser or Word would show.
-const bidi = bidiFactory();
+// Font coverage: pdfkit's built-in fonts (Helvetica etc.) are Latin-
+// only. This project already ships @fontsource/heebo (used by the
+// marketing site), but fontsource splits a font into per-script
+// *subset* files for web performance - the "hebrew" subset has no
+// Latin/digit glyphs and the "latin" subset has no Hebrew glyphs, so a
+// single doc.font(...) call can never render a mixed Hebrew+number
+// string (dates, minute counts, percentages all mix with Hebrew
+// labels in every report). Both subsets are registered here and each
+// run of text is drawn with whichever one actually has the glyphs.
+//
+// Bidi (docs/adr/0001 section 19.11 - found and fixed 2026-09-08, live
+// bug report from Ariel: exported client-report PDFs showed garbled/
+// reversed Hebrew): an earlier version of this file additionally ran
+// every string through `bidi-js` before drawing, on the assumption
+// (stated here at the time, and wrong) that "pdfkit has no Unicode
+// Bidirectional Algorithm implementation - it draws codepoints in
+// string order, left to right, regardless of script." That assumption
+// was never actually true for this pdfkit/fontkit version: pdfkit
+// already applies correct per-call RTL shaping to Hebrew text handed to
+// it in normal logical (typing) order - reproduced and confirmed with
+// isolated minimal repros rendered to actual pixels (not just visually
+// eyeballing the final table). Manually bidi-reordering the string
+// *first* double-processes the direction: bidi-js's reordering plus
+// splitRuns()'s per-font-run splitting (a space is LATIN_FONT, breaking
+// one bidi-reordered phrase into several separate doc.text() calls)
+// combine to produce neither the original text nor a clean mirror of
+// it, but a garbled hybrid - individual words correctly spelled-out-
+// backwards by bidi-js, drawn via separate calls whose own internal
+// pdfkit-side RTL shaping then reverses each already-reversed word a
+// second time, while the words' left-to-right draw order (computed
+// assuming pdfkit does nothing) is never corrected - exactly what
+// Ariel's screenshot showed. The fix is to delete the bidi-js step
+// entirely: split the ORIGINAL (untouched) string into font runs and
+// draw them via sequential doc.text() calls in original order,
+// left-to-right - pdfkit's own shaping does the rest, including runs
+// with embedded Latin digits inside a Hebrew sentence.
 
 const HEBREW_FONT = "Heebo-Hebrew";
 const LATIN_FONT = "Heebo-Latin";
@@ -99,16 +116,20 @@ function charFont(ch: string): string {
   return HEBREW_RANGE.test(ch) ? HEBREW_FONT : LATIN_FONT;
 }
 
-/// Draws one bidi-correct, mixed-font line of text right-aligned within
-/// [x, x+width], vertically at y. Used for both header and body cells -
-/// every report in this app is RTL Hebrew with embedded LTR numbers, so
-/// there is no "sometimes LTR paragraph" case to also support.
+/// Draws one mixed-font line of text right-aligned within [x, x+width],
+/// vertically at y. Used for both header and body cells - every report
+/// in this app is RTL Hebrew with embedded LTR numbers, so there is no
+/// "sometimes LTR paragraph" case to also support.
+///
+/// No manual bidi reordering here - see the file header comment (docs/
+/// adr/0001 section 19.11). `text` is drawn exactly as given (original
+/// logical/typing order), split into per-font runs, each run drawn via
+/// its own doc.text() call in that same original order, left-to-right.
+/// pdfkit's own RTL shaping produces the correct visual result.
 function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, opts: { bold?: boolean; size?: number } = {}) {
   const size = opts.size ?? 9;
   doc.fontSize(size);
-  const levels = bidi.getEmbeddingLevels(text);
-  const visual = bidi.getReorderedString(text, levels);
-  const runs = splitRuns(visual);
+  const runs = splitRuns(text);
 
   let totalWidth = 0;
   for (const run of runs) {
@@ -179,14 +200,23 @@ export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
     const weights = opts.columnWeights ?? opts.headers.map(() => 1);
     const weightSum = weights.reduce((a, b) => a + b, 0);
     const colWidths = weights.map((w) => (w / weightSum) * pageWidth);
-    // RTL columns: first header is rightmost on the page.
-    const colX: number[] = [];
+    // RTL columns: first header is rightmost on the page. Lay slots out
+    // left-to-right using the REVERSED width order, then map each
+    // original column index to its slot - not just `colX.reverse()` on
+    // a flat position array computed from the un-reversed widths, which
+    // silently pairs each column with the wrong width/x combination
+    // whenever columns aren't all equal width (dormant bug: no caller
+    // currently passes columnWeights, so equal-width columns never
+    // exercised it - fixed alongside the bidi bug in the same pass,
+    // docs/adr/0001 section 19.11, before it could bite a future report).
+    const reversedWidths = [...colWidths].reverse();
+    const slotX: number[] = [];
     let acc = doc.page.margins.left;
-    for (const w of colWidths) {
-      colX.push(acc);
+    for (const w of reversedWidths) {
+      slotX.push(acc);
       acc += w;
     }
-    colX.reverse(); // header[0] gets the rightmost x
+    const colX = colWidths.map((_, i) => slotX[colWidths.length - 1 - i]);
 
     drawCell(doc, opts.title, doc.page.margins.left, doc.page.margins.top, pageWidth, { size: 16 });
     let y = doc.page.margins.top + 26;

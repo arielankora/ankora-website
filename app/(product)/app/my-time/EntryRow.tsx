@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateMyEntryAction, deleteMyEntryAction } from "./actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -63,6 +63,21 @@ function formatDuration(seconds: number | null): string {
 export function EntryRow({ entry }: { entry: Entry }) {
   const [state, formAction] = useFormState(updateMyEntryAction, {});
   const [editing, setEditing] = useState(false);
+
+  // Bug fix (docs/adr/0001 section 19.12, live report from Ariel: "clicking
+  // save gives no indication anything happened"). updateMyEntryAction
+  // always returned { ok: true } on success, but this component never
+  // read state.ok - only state.error was rendered, so a successful save
+  // left the edit form open with its original (now stale) defaultValue
+  // inputs and no visible change at all. Closing the form on success is
+  // the fix: revalidatePath() has already refreshed the server-rendered
+  // entry, so collapsing back to the display view immediately shows the
+  // new saved values - an unambiguous, honest signal that the save
+  // worked, instead of a toast that could lie if the save silently failed
+  // to persist for some other reason.
+  useEffect(() => {
+    if (state?.ok) setEditing(false);
+  }, [state]);
 
   if (editing) {
     return (
