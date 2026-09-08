@@ -3,22 +3,23 @@ import { toPdfTable } from "@/lib/pdf";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec 14.4). Like
 // lib/xlsx.ts, lib/pdf.ts imports neither Prisma nor anything that does
-// (only pdfkit + bidi-js), so this test actually RUNS in this sandbox.
+// (only pdfkit), so this test actually RUNS in this sandbox.
 //
 // This suite checks structural validity (a real, non-empty PDF is
 // produced, pagination doesn't throw, the empty-state path works) - it
-// does NOT re-assert visual Hebrew correctness, which was verified
-// separately and manually during development via pdftotext -bbox on a
-// real rendered file (objective glyph x-position order, not a visual
-// read): the title "דוח שעות לפי לקוח" extracted words in correct
-// right-to-left reading order, and a three-word ordering probe
-// ("ראשון שני שלישי") placed "ראשון" (first) rightmost and "שלישי"
-// (third) leftmost, exactly as RTL rendering requires. That manual
-// verification is what caught the real bug this phase fixed: pdfkit's
-// font subsetter silently produces invisible glyphs from fontsource's
-// .woff2 files (text layer fine, nothing painted, in both Poppler and
-// Ghostscript) - registerFonts() in lib/pdf.ts now uses the plain .woff
-// (v1) build of the same typeface for exactly this reason.
+// does NOT re-assert visual Hebrew correctness programmatically. That
+// was previously "verified" only via a manual pdftotext read during
+// Phase 9 development, which turned out to be an insufficient check: a
+// real live bug (docs/adr/0001 section 19.11, reported 2026-09-08)
+// shipped anyway - lib/pdf.ts's since-removed manual bidi-js reordering
+// step produced garbled/reversed Hebrew text in real exported reports,
+// despite that earlier manual check appearing to pass. The actual fix
+// (deleting the bidi-js step entirely - pdfkit already shapes Hebrew
+// correctly on its own) was verified this time by rendering real PDFs
+// to page images (pdftoppm) and reading the pixels directly at high
+// zoom, not just extracting text. If this ever needs re-verifying,
+// prefer that pixel-level check over pdftotext, whose own bidi/reading-
+// order heuristics can mask a real rendering bug.
 describe("toPdfTable()", () => {
   it("produces a real, non-empty PDF buffer", async () => {
     const buf = await toPdfTable({

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { adminUpdateEntryAction, adminDeleteEntryAction, getEntryRevisionsAction } from "./actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -85,6 +85,14 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
   const [showHistory, setShowHistory] = useState(false);
   const [revisions, setRevisions] = useState<Revision[] | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Bug fix (docs/adr/0001 section 19.12) - same issue as my-time/
+  // EntryRow.tsx: adminUpdateEntryAction returns { ok: true } on success
+  // but this component never read state.ok, so a successful save left
+  // the edit form open with stale values and no visible confirmation.
+  useEffect(() => {
+    if (state?.ok) setEditing(false);
+  }, [state]);
 
   async function toggleHistory() {
     if (showHistory) {
