@@ -2002,3 +2002,119 @@ No guide `content.ts` change was needed - the logout button's existence
 and label were already documented correctly; only its underlying
 behavior was broken.
 
+### 19.11 Bug: silent time-entry save gave no visible confirmation
+(branch `fix/silent-time-entry-save`, split out of a combined branch -
+see note below)
+
+Live bug report from Ariel (Hebrew, verbatim): "שמעדכנים שעון, לוחצים
+על שמירה אבל אין אינדיקציה שזה נשמר" (updating a time entry, clicking
+save gives no indication it saved).
+
+Root cause: both `EntryRow.tsx` (`/app/my-time`) and
+`AdminEntryRow.tsx` (`/app/time-entries`) use `useFormState(action,
+{})` and only ever branched on `state?.error` to render an error
+message - `state?.ok` (which `updateMyEntryAction` /
+`adminUpdateEntryAction` both already returned on a successful save)
+was never read anywhere in either component. The edit form's inputs
+are uncontrolled (`defaultValue={...}`), so even though
+`revalidatePath()` refreshed the underlying server-rendered entry data
+on every successful save, the open `<form>` itself doesn't remount and
+so never picks up the new values - and with no other success signal in
+the UI (no toast, no banner), a successful save was visually
+indistinguishable from a silently failed one. This affected every save
+in both screens, unconditionally.
+
+Fix: read `state.ok` and close the edit form on success -
+
+```ts
+useEffect(() => {
+  if (state?.ok) setEditing(false);
+}, [state]);
+```
+
+Collapsing back to the (now server-refreshed) display view is the
+confirmation: it only happens when the server actually returned
+`{ ok: true }`, so unlike a toast it can't fire on a save that failed
+for some other reason.
+
+**Verified live on Preview** (docs/adr/0001 standing rule, not just
+`tsc`/`build`): logged in as `demo.admin@ankora.co.il`, opened
+`/app/time-entries`, edited a completed (non-active) entry's note,
+clicked שמירה, confirmed the form closed immediately back to the
+read-only row. Reloaded the page from scratch and re-opened the same
+row's edit form to confirm the new note value was actually persisted
+server-side, not just a client-side illusion - it was.
+
+**Note on why this shipped alone, split from the PDF fix it was
+originally paired with:** this fix and a fix for 19.12's PDF
+Hebrew-reversal bug were originally developed and committed together
+on one branch (`fix/pdf-hebrew-reversal-and-silent-save`, commit
+`97a6085`). Live Preview QA (this section's verification above)
+confirmed this save-indicator fix works correctly. The same Preview
+QA pass found the PDF fix on that branch does **not** actually fix the
+PDF bug in the deployed environment - see 19.12. Rather than hold this
+confirmed, working fix hostage to that unresolved investigation, only
+the `EntryRow.tsx`/`AdminEntryRow.tsx` changes were cherry-picked onto
+this clean branch and shipped alone, per Ariel's explicit choice when
+asked how to proceed.
+
+### 19.12 Bug (still open): Hebrew reversed in PDF client-report
+export - fix verified locally, does NOT reproduce as fixed on deployed
+Preview
+
+Same live bug report from Ariel as 19.11 (second half): "שמריצים דוח
+של לקוחות ומייצאים לpfd העיברית בפגכ הפוכה" (running a clients report
+and exporting to PDF, the Hebrew comes out reversed).
+
+`lib/pdf.ts`'s `drawCell()` was pre-processing every string through
+`bidi-js` before drawing, on a documented assumption that pdfkit has
+no RTL support of its own. Extensive local sandbox investigation
+(rendering to actual page images via `pdftoppm` and inspecting glyphs
+pixel-by-pixel, deliberately not trusting `pdftotext` extraction,
+which was shown during this same investigation to mask the bug by
+"correcting" already-wrong visual output) concluded this assumption
+was false for the pdfkit/fontkit version pinned in this project
+(`pdfkit ^0.20.2` / `fontkit ^2.0.4`): feeding pdfkit raw, un-reordered
+Hebrew text in normal logical order, split only into per-font runs (no
+bidi pre-processing), appeared to render correctly when tested this
+way. The fix removed the `bidi-js` step entirely on that basis - see
+the full original writeup and minimal-repro methodology preserved in
+commit `97a6085` on branch `fix/pdf-hebrew-reversal-and-silent-save`.
+
+**This conclusion does not hold on the actual deployed Preview.**
+Live QA (2026-09-08, `demo.admin@ankora.co.il`, Preview deployment for
+that same commit) fetched the real `/api/reports/export?
+type=total_client_hours&format=pdf` response client-side (confirmed
+`x-vercel-cache: MISS` - not a stale cached response), rendered it via
+`pdf.js` to a canvas, and visually compared individual header-cell
+glyphs at 4x zoom against the same words rendered correctly by the
+browser natively on `/app/reports`. The single word "לחיוב" (a single
+run, no embedded space or digit - the simplest possible case, not
+even subject to the multi-run-splitting part of the original bug)
+rendered with its letters in the exact mirror-image order of the
+correct HTML rendering of the same word from the same report. The PDF
+fix, as committed, does not work on the actual Vercel Preview runtime,
+contradicting the local sandbox verification.
+
+**Not yet root-caused.** `/api/reports/export` does call the fixed
+`toPdfTable()` (confirmed by reading `app/api/reports/export/
+route.ts` directly - no separate/stale PDF code path exists), so this
+is not a case of the fix simply not being wired up. The leading
+hypothesis is an environment difference between the local sandbox's
+pdfkit/fontkit execution and Vercel's Node serverless runtime (exact
+Node version is unpinned in this project - no `engines` field, no
+`.nvmrc`, no runtime override in `vercel.json` - so Vercel uses
+whatever its current default is, which may not match the sandbox) that
+somehow affects whether pdfkit/fontkit's RTL shaping actually engages,
+but this has not been confirmed. Do not re-attempt the "fix" from
+commit `97a6085` without first reproducing the bug's absence with
+pixel-level PDF verification against the *actual deployed Preview
+runtime*, not just a local sandbox - that is precisely how the
+original (wrong) "pdfkit has no RTL support" assumption avoided being
+caught earlier, and how this second, opposite-direction false
+conclusion was reached this time.
+
+**Status:** open. Ariel was informed live QA found this still broken
+and chose to ship 19.11's save-indicator fix alone rather than hold it
+for this; PDF investigation continues separately.
+
