@@ -133,3 +133,17 @@ inspection alone.
 **Status:** implemented and Preview-verified. PR open from
 `fix/seo-www-canonical-consistency`, awaiting Ariel's review before merge, per the standing
 "never merge without approval" rule.
+
+## 6. Addendum: one page missed in the first pass
+
+The initial `generateMetadata` sweep (section 3) covered 12 pages that lacked page-level
+metadata, but missed a 13th: `app/[locale]/solutions/companies/page.tsx`. It is a server
+component with no client-split need, so it was easy to overlook next to its three siblings
+(`executives`, `founders`, `family-office`) which all received `generateMetadata` in the
+first commit. This was caught by the Phase 10 full-sitemap crawl against the deployed
+Preview (not local inspection) — `/he/solutions/companies` and `/en/solutions/companies`
+were declaring the homepage as canonical, the exact bug class this fix exists to eliminate.
+
+Fixed in a follow-up commit with the identical pattern used for its siblings (self-
+referencing canonical + hreflang alternates, no content/title override). Re-crawled the
+full 42-URL sitemap against the redeployed Preview afterward — 0 canonical mismatches.
