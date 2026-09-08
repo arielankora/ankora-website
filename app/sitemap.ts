@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllPosts } from "@/lib/blog";
+import { SITE_URL } from "@/lib/site";
 
 // Priority reflects position in the information architecture, not ranking intent.
 const routes: { path: string; priority: number; changeFrequency: MetadataRoute.Sitemap[number]["changeFrequency"] }[] = [
@@ -24,7 +25,7 @@ const routes: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
 ];
 
-const base = "https://ankora.co.il";
+const base = SITE_URL;
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];

@@ -1,7 +1,31 @@
+import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
 import { Reveal } from "@/components/motion/Reveal";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { locale: string };
+}): Promise<Metadata> {
+  const locale = params.locale === "en" ? "en" : "he";
+  const dict = getDictionary(params.locale);
+  const legal = dict.pages.legal;
+  return {
+    title: `${legal.privacyTitle} | Ankora`,
+    description: legal.placeholder,
+    alternates: {
+      canonical: `/${locale}/privacy`,
+      languages: { he: "/he/privacy", en: "/en/privacy" },
+    },
+    openGraph: {
+      title: `${legal.privacyTitle} | Ankora`,
+      description: legal.placeholder,
+      type: "website",
+    },
+  };
+}
 
 export default function PrivacyPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;

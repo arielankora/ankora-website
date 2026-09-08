@@ -7,6 +7,7 @@ import "@fontsource/heebo/700.css";
 import "@fontsource/heebo/800.css";
 import "../globals.css";
 import { getDictionary, locales, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 
@@ -22,7 +23,7 @@ export async function generateMetadata({
   const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   return {
-    metadataBase: new URL("https://ankora.co.il"),
+    metadataBase: new URL(SITE_URL),
     title: dict.meta.title,
     description: dict.meta.description,
     alternates: {
