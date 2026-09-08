@@ -3,6 +3,7 @@ import path from "node:path";
 import PDFDocument from "pdfkit";
 import bidiFactory from "bidi-js";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
+import { toPdfTable } from "@/lib/pdf";
 
 // TEMPORARY diagnostic route - docs/adr/0001 section 19.12 investigation.
 // Not part of the product surface, not linked from any UI. Renders a set
@@ -26,12 +27,38 @@ function reverseChars(s: string): string {
   return Array.from(s).reverse().join("");
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
     await requireUserOrThrow();
   } catch (err) {
     if (err instanceof UnauthorizedError) return Response.json({ error: "Unauthorized" }, { status: 401 });
     throw err;
+  }
+
+  const mode = new URL(req.url).searchParams.get("mode");
+
+  if (mode === "table") {
+    // J: the REAL production pipeline (toPdfTable -> drawCell -> bidi.getReorderedString
+    // -> splitRuns -> sequential per-run doc.text() calls with manually tracked cursorX),
+    // fed realistic mixed Hebrew+number+Latin report rows - this is what A-I do NOT
+    // cover, since every A-I test draws exactly one font in one doc.text() call.
+    const buf = await toPdfTable({
+      title: "דוח שעות לפי לקוח",
+      subtitle: "1 בינואר 2026 - 31 בינואר 2026",
+      headers: ["לקוח", "שעות", "תאריך", "הערה"],
+      rows: [
+        ["יוסי כהן", 3.5, "12/25/2024", "פגישת ייעוץ"],
+        ["Acme Corp", 7, "01/02/2026", "תמיכה טכנית 24/7"],
+        ["לקוח גרנטור רכש", 111, "15/01/2026", "שעות לפי לקוח"],
+      ],
+    });
+    return new Response(buf, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": "inline; filename=pdf-debug-table.pdf",
+        "Cache-Control": "no-store",
+      },
+    });
   }
 
   const buf = await new Promise<Buffer>((resolve, reject) => {
