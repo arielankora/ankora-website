@@ -19,7 +19,7 @@ import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain
 /// comprehension of a trend, and every RTL analytics product (Similarweb,
 /// Wix Analytics, etc.) keeps this convention for the same reason.
 
-const NAVY_SHADES = ["#1B2A3D", "#2F4257", "#4C6178", "#7791A3", "#A8BAC5"];
+const NAVY_SHADES = ["#0F1B29", "#1B2A3D", "#3D5770", "#6E8FA3", "#A3BAC7"];
 const OTHER_COLOR = "#B08D57";
 const OTHER_KEY = "__other__";
 
@@ -114,7 +114,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
           <div dir="ltr" className="mt-8 flex h-48 items-end gap-2 sm:gap-4" role="img" aria-label={`גרף שעות מדווחות, ${series.buckets.map((b) => `${b.label}: ${formatHours(b.segments.reduce((s, x) => s + x.hours, 0))} שעות`).join(", ")}`}>
             {series.buckets.map((bucket, i) => {
               const total = totalsPerBucket[i];
-              const barHeightPct = Math.max(2, (total / maxTotal) * 100);
+              const barHeightPct = Math.max(2, (total / maxTotal) * 82);
               return (
                 <div
                   key={bucket.label + i}
@@ -146,6 +146,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                         ))}
                     </div>
                   )}
+                  {total > 0 && (
+                    <span className="mb-1 text-[10px] font-medium text-navy/55">{formatHours(total)}</span>
+                  )}
                   <div
                     className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
                     style={{ height: `${barHeightPct}%` }}
@@ -158,6 +161,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                           style={{
                             background: colorFor(s.key, series.legend.findIndex((l) => l.key === s.key)),
                             height: `${(s.hours / total) * 100}%`,
+                            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.55)",
                           }}
                         />
                       ))}

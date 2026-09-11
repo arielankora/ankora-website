@@ -115,6 +115,15 @@ export default async function AppHomePage() {
           <p className="mt-1 text-sm text-navy/60">סקירה כללית של המערכת.</p>
         </div>
 
+        {trend && (
+          <div>
+            <h2 className="text-sm font-medium text-navy/70">מגמת שעות</h2>
+            <div className="mt-3">
+              <HoursTrendChart data={trend} />
+            </div>
+          </div>
+        )}
+
         {cards.length > 0 ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {cards.map((card) => (
@@ -174,15 +183,6 @@ export default async function AppHomePage() {
                 label="לכל הדוחות הפנימיים"
                 value={<ArrowLeft size={24} strokeWidth={1.75} />}
               />
-            </div>
-          </div>
-        )}
-
-        {trend && (
-          <div>
-            <h2 className="text-sm font-medium text-navy/70">מגמת שעות</h2>
-            <div className="mt-3">
-              <HoursTrendChart data={trend} />
             </div>
           </div>
         )}
