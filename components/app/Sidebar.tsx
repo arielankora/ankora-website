@@ -53,8 +53,10 @@ export function Sidebar({
               )}
               <Link
                 href={item.href}
-                className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] transition-colors ${
-                  active ? "bg-gold/15 font-medium text-goldLight" : "text-paper/85 hover:bg-white/5"
+                className={`flex items-center gap-2.5 rounded-lg border-s-2 ps-2 pe-2.5 py-2 text-[13px] transition-colors ${
+                  active
+                    ? "border-gold bg-gold/20 font-semibold text-white"
+                    : "border-transparent text-paper/70 hover:bg-white/5 hover:text-paper"
                 }`}
               >
                 <Icon size={16} strokeWidth={active ? 2.25 : 1.75} />
