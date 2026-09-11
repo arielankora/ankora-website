@@ -22,13 +22,17 @@ export function FilterBar({
   const [from, setFrom] = useState(current.from ?? "");
   const [to, setTo] = useState(current.to ?? "");
 
-  function apply() {
+  function buildParams() {
     const params = new URLSearchParams();
     if (clientId) params.set("clientId", clientId);
     if (userId) params.set("userId", userId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
-    router.push(`/app/time-entries?${params.toString()}`);
+    return params;
+  }
+
+  function apply() {
+    router.push(`/app/time-entries?${buildParams().toString()}`);
   }
 
   function clear() {
@@ -38,6 +42,11 @@ export function FilterBar({
     setTo("");
     router.push("/app/time-entries");
   }
+
+  // Same export-button pattern as app/(product)/app/reports/
+  // ReportFilterBar.tsx's exportHref - mirrors the current on-screen
+  // filters into app/api/time-entries/export/route.ts's query params.
+  const exportHref = `/api/time-entries/export?${buildParams().toString()}`;
 
   return (
     <div className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-5">
@@ -89,7 +98,7 @@ export function FilterBar({
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
         />
       </div>
-      <div className="flex items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <button
           type="button"
           onClick={apply}
@@ -100,6 +109,24 @@ export function FilterBar({
         <button type="button" onClick={clear} className="text-sm text-navy/60 hover:text-navy">
           איפוס
         </button>
+        <a
+          href={exportHref}
+          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
+        >
+          ייצוא ל-CSV
+        </a>
+        <a
+          href={`${exportHref}&format=xlsx`}
+          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
+        >
+          ייצוא ל-Excel
+        </a>
+        <a
+          href={`${exportHref}&format=pdf`}
+          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
+        >
+          ייצוא ל-PDF
+        </a>
       </div>
     </div>
   );
