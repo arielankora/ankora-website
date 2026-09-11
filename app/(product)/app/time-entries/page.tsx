@@ -95,6 +95,7 @@ export default async function AdminTimeEntriesPage({
                 <th className="px-5 py-3 font-medium">לקוח</th>
                 <th className="px-5 py-3 font-medium">קטגוריה</th>
                 <th className="px-5 py-3 font-medium">משך</th>
+                <th className="px-5 py-3 font-medium">הערה</th>
                 <th className="px-5 py-3 font-medium">מקור</th>
                 <th className="px-5 py-3 font-medium"></th>
               </tr>
@@ -102,7 +103,7 @@ export default async function AdminTimeEntriesPage({
             <tbody>
               {entries.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-8 text-center text-navy/50">
+                  <td colSpan={8} className="px-5 py-8 text-center text-navy/50">
                     אין דיווחים התואמים את הסינון.
                   </td>
                 </tr>

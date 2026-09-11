@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { adminUpdateEntryAction, adminDeleteEntryAction, getEntryRevisionsAction } from "./actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { formatDuration, SOURCE_LABEL } from "@/lib/time-entry-format";
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
@@ -67,15 +68,6 @@ function formatDateTime(iso: string): string {
   );
 }
 
-function formatDuration(seconds: number | null): string {
-  if (seconds === null) return "פעיל";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
-}
-
-const SOURCE_LABEL: Record<string, string> = { MANUAL: "ידני", TIMER: "טיימר" };
-
 /// Spec 12: Admin "Time Entries" screen needs edit + revisions on a
 /// cross-client table. Revisions are lazy-fetched on open (most rows have
 /// none) via the getEntryRevisionsAction server action.
@@ -111,7 +103,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
   if (editing) {
     return (
       <tr className="border-b border-lineDark">
-        <td colSpan={7} className="px-5 py-4">
+        <td colSpan={8} className="px-5 py-4">
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
             <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
@@ -192,6 +184,15 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
         <td className="px-5 py-3 text-navy/80">{entry.clientName}</td>
         <td className="px-5 py-3 text-navy/80">{entry.categoryName}</td>
         <td className="px-5 py-3 text-navy/80">{formatDuration(entry.actualSeconds)}</td>
+        <td className="max-w-[220px] px-5 py-3 text-navy/80">
+          {entry.note ? (
+            <span className="line-clamp-2 break-words" title={entry.note}>
+              {entry.note}
+            </span>
+          ) : (
+            <span className="text-navy/30">—</span>
+          )}
+        </td>
         <td className="px-5 py-3">
           <div className="flex items-center gap-2">
             <StatusBadge label={SOURCE_LABEL[entry.source] ?? entry.source} tone="gray" />
@@ -217,7 +218,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
       </tr>
       {showHistory && (
         <tr className="border-b border-lineDark bg-paper/60">
-          <td colSpan={7} className="px-5 py-4">
+          <td colSpan={8} className="px-5 py-4">
             {loadingHistory && <p className="text-xs text-navy/50">טוען היסטוריה...</p>}
             {!loadingHistory && revisions && revisions.length === 0 && (
               <p className="text-xs text-navy/50">אין עריכות קודמות לדיווח זה.</p>

@@ -2147,3 +2147,80 @@ the throwaway `investigate/pdf-hebrew-rendering` branch).
 
 **Status:** resolved. PR opened from `fix/pdf-hebrew-rtl-order`,
 awaiting Ariel's review before merge.
+
+### 19.13 Feature: note column + export on the admin Time Entries screen
+
+Ariel (2026-09-11): "בhttps://www.ankora.co.il/app אני מחפש דוח שאני
+אוכל להסתכל ואחכ לייצא לפי לקוח שמפרט שורה שורה מה דווח כולל ההערה
+שהוכנסה למשימה שמפרטת מה בוצע" - a per-client, row-by-row, viewable
+*and* exportable report that includes the free-text note on each
+entry. None of the three existing report surfaces
+(`/app/reports`, `/app/portal`, `/app/time-entries`) satisfied all
+four requirements (viewable, exportable, per-client, includes the
+note) at once:
+
+- `/app/reports` and its export route aggregate/summarize by report
+  type - they don't expose a raw per-entry `note` field at all.
+- `/app/portal` (Client Portal) deliberately excludes `note` from what
+  a client sees - an intentional design decision (internal notes may
+  not be appropriate to expose to the client), not a bug, so this was
+  not the screen to extend.
+- `/app/time-entries` (this screen, added Phase 2 / 19.x) already had
+  the right shape - a cross-client admin table with per-row detail -
+  and already carried `entry.note` as a prop into `AdminEntryRow.tsx`,
+  but only ever rendered it inside the edit-mode form's `<input
+  name="note">`, never read-only in the table. (First reported to
+  Ariel as already working, based on an incomplete grep; Ariel caught
+  this with a live screenshot of the deployed table showing no note
+  column, and it was corrected before any code was written.)
+
+**What changed**, all on this screen:
+
+1. Extracted `formatDuration()` and `SOURCE_LABEL`/`formatSource()`
+   out of `AdminEntryRow.tsx` into a new pure module,
+   `lib/time-entry-format.ts` (zero project imports, no
+   `"server-only"`) - so the on-screen table and the new export route
+   below are guaranteed to format duration/source identically instead
+   of maintaining two copies that could drift. `AdminEntryRow.tsx` now
+   imports from there. This is also the one part of this change that
+   is actually unit-testable in this sandbox (see
+   `tests/unit/time-entry-format.test.ts`), same as `lib/csv.ts` - the
+   sandbox's Prisma-network-restriction limitation (documented at the
+   top of `tests/unit/reports.test.ts`) means everything downstream of
+   `lib/prisma.ts` can only be verified on Vercel Preview/CI.
+2. Added a `הערה` column to both `page.tsx`'s table header and
+   `AdminEntryRow.tsx`'s read-only row (truncated to two lines with a
+   `title` tooltip for the full text; an em-dash placeholder when
+   empty). Bumped both existing `colSpan={7}` occurrences (the
+   edit-mode row, the history sub-row) to `colSpan={8}`.
+3. New route, `app/api/time-entries/export/route.ts` - the same
+   `?format=csv|xlsx|pdf` pattern as `app/api/reports/export/route.ts`
+   (csv default, xlsx/pdf via the same dynamic-import-per-format
+   technique from section 18.14, filename
+   `time-entries_${clientSlug}_${dateStr}.ext`). Unlike the reports
+   route, `listTimeEntriesForAdmin` (the domain function this calls)
+   has no internal permission check, so this route explicitly calls
+   `assertCan(user.role, "time_entry.edit_others")` itself - the same
+   permission `page.tsx` already gates the screen on ("אותן הרשאות כמו
+   המסך", spec 14.4, carried over from the reports/portal export
+   convention). Columns: תאריך, עובד, לקוח, קטגוריה, משך, הערה, מקור,
+   נערך - the table's columns plus the note, in the same order.
+4. Export buttons (`ייצוא ל-CSV` / `ייצוא ל-Excel` / `ייצוא ל-PDF`)
+   added to `FilterBar.tsx`, mirroring `ReportFilterBar.tsx`'s
+   `exportHref` pattern exactly - built from the same `clientId` /
+   `userId` / `from` / `to` state already driving the on-screen filter,
+   so what a manager exports always matches what they're currently
+   looking at.
+
+No schema change, no new permission, no change to any other screen.
+
+**Status:** implemented on `feature/time-entries-note-export`; unit
+tests for the new pure module pass locally (16/16, alongside the
+existing `lib/csv.ts` tests); `tsc --noEmit` shows only the sandbox's
+pre-existing, documented Prisma-generate limitation (types unresolved
+because `prisma generate` cannot reach `binaries.prisma.sh` from this
+sandbox - confirmed unrelated to this change, since the same error
+pattern appears across dozens of untouched files); `npm run build`
+cannot run locally for the same reason. Full build + live QA (note
+column rendering, all three export formats against real data) deferred
+to the Vercel Preview deployment, per the standing workflow.
