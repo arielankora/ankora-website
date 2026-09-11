@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -10,7 +11,12 @@ import type { User } from "@prisma/client";
 // trusting the JWT alone - spec 4.1: "כל Endpoint בשרת בודק Authorization,"
 // and spec 4.2's "logout all sessions" only actually works if something
 // re-checks tokenVersion against the database on each request.
-export async function getCurrentUser(): Promise<User | null> {
+//
+// Wrapped in React's cache() (redesign direction A, layout-flash fix):
+// both the authenticated route group's layout.tsx and the page.tsx inside
+// it call requireUser()/getCurrentUser() - cache() dedupes those to a
+// single DB round trip per request instead of two.
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   const session = await auth();
   const sub = session?.user ? (session.user as any).id : null;
   if (!sub) return null;
@@ -26,7 +32,7 @@ export async function getCurrentUser(): Promise<User | null> {
   }
 
   return user;
-}
+});
 
 /// For Server Components/layouts: redirects to login if there's no valid,
 /// still-active session. Returns the fresh DB user otherwise.
