@@ -50,7 +50,7 @@ export default async function UsersPage() {
               see docs/adr/0001 addendum and CreateClientForm's comment
               for the same change on the Clients screen. */}
           <Drawer triggerLabel="הזמנת משתמש" title="משתמש חדש">
-            {() => <InviteUserForm clients={clients.filter((c) => c.status === "ACTIVE")} />}
+            <InviteUserForm clients={clients.filter((c) => c.status === "ACTIVE")} />
           </Drawer>
         </div>
 

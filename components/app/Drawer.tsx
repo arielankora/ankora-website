@@ -1,5 +1,5 @@
 "use client";
-import { useState, type ReactNode } from "react";
+import { createContext, useContext, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 
 // Redesign direction A: replaces the old pattern of an inline "add" form
@@ -8,6 +8,19 @@ import { Plus, X } from "lucide-react";
 // both desktop and mobile even when nothing was being added. The trigger
 // is the screen's one primary action button; the form itself only
 // renders once the drawer is opened, so list screens stay data-first.
+//
+// `children` is a plain ReactNode, not a render-prop function - every
+// `page.tsx` that uses this is a Server Component, and a function
+// cannot cross the server/client boundary as a prop (only serializable
+// values and React elements can). Any form that wants to close its own
+// drawer on success reads `useDrawerClose()` instead of receiving a
+// callback prop.
+const DrawerCloseContext = createContext<() => void>(() => {});
+
+export function useDrawerClose() {
+  return useContext(DrawerCloseContext);
+}
+
 export function Drawer({
   triggerLabel,
   title,
@@ -15,9 +28,10 @@ export function Drawer({
 }: {
   triggerLabel: string;
   title: string;
-  children: (close: () => void) => ReactNode;
+  children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
 
   return (
     <>
@@ -35,7 +49,7 @@ export function Drawer({
           <button
             type="button"
             aria-label="סגירה"
-            onClick={() => setOpen(false)}
+            onClick={close}
             className="absolute inset-0 bg-navy/30"
           />
           <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-lineDark bg-white shadow-lg sm:max-w-md">
@@ -44,13 +58,15 @@ export function Drawer({
               <button
                 type="button"
                 aria-label="סגירה"
-                onClick={() => setOpen(false)}
+                onClick={close}
                 className="text-navy/50 transition-colors hover:text-navy"
               >
                 <X size={18} />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto p-5">{children(() => setOpen(false))}</div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <DrawerCloseContext.Provider value={close}>{children}</DrawerCloseContext.Provider>
+            </div>
           </div>
         </div>
       )}

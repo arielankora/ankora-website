@@ -71,7 +71,7 @@ export default async function TasksPage({
           {/* Redesign direction A: was an inline card above the filter
               bar + table - see docs/adr/0001 addendum. */}
           <Drawer triggerLabel="הוספת משימה" title="משימה חדשה">
-            {(close) => <CreateTaskForm clients={clients} categories={categories} onSuccess={close} />}
+            <CreateTaskForm clients={clients} categories={categories} />
           </Drawer>
         </div>
 

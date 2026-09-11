@@ -44,7 +44,7 @@ export default async function ClientsPage() {
               clients below the fold. It now lives in a Drawer opened by
               this one primary button - see docs/adr/0001 addendum. */}
           <Drawer triggerLabel="הוספת לקוח" title="לקוח חדש">
-            {(close) => <CreateClientForm onSuccess={close} />}
+            <CreateClientForm />
           </Drawer>
         </div>
 

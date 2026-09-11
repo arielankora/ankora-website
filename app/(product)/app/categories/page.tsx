@@ -40,7 +40,7 @@ export default async function CategoriesPage() {
           {/* Redesign direction A: was an inline card above the table -
               see docs/adr/0001 addendum. */}
           <Drawer triggerLabel="הוספת קטגוריה" title="קטגוריה חדשה">
-            {(close) => <CreateCategoryForm clients={clients.filter((c) => c.status === "ACTIVE")} onSuccess={close} />}
+            <CreateCategoryForm clients={clients.filter((c) => c.status === "ACTIVE")} />
           </Drawer>
         </div>
 

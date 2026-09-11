@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createClientAction } from "./actions";
+import { useDrawerClose } from "@/components/app/Drawer";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -18,16 +19,16 @@ function SubmitButton() {
 
 // Redesign direction A: now rendered inside components/app/Drawer.tsx
 // instead of sitting inline above the clients table (see docs/adr/0001
-// addendum). `onSuccess` closes the drawer once the server action
-// reports `ok: true`, same signal ClientsPage already used to know a
-// client was created - this form previously just stayed open and relied
-// on the fresh row appearing in the (now-adjacent) table.
-export function CreateClientForm({ onSuccess }: { onSuccess?: () => void }) {
+// addendum). `useDrawerClose()` closes the drawer once the server
+// action reports `ok: true` - this form previously just stayed open
+// and relied on the fresh row appearing in the (now-adjacent) table.
+export function CreateClientForm() {
   const [state, formAction] = useFormState(createClientAction, {});
+  const close = useDrawerClose();
 
   useEffect(() => {
-    if (state?.ok) onSuccess?.();
-  }, [state, onSuccess]);
+    if (state?.ok) close();
+  }, [state, close]);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">

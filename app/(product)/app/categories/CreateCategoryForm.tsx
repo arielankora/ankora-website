@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createCategoryAction } from "./actions";
+import { useDrawerClose } from "@/components/app/Drawer";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -19,19 +20,14 @@ function SubmitButton() {
 // Redesign direction A: now rendered inside components/app/Drawer.tsx -
 // see docs/adr/0001 addendum and CreateClientForm's comment for the same
 // change applied consistently across every list screen.
-export function CreateCategoryForm({
-  clients,
-  onSuccess,
-}: {
-  clients: { id: string; name: string }[];
-  onSuccess?: () => void;
-}) {
+export function CreateCategoryForm({ clients }: { clients: { id: string; name: string }[] }) {
   const [state, formAction] = useFormState(createCategoryAction, {});
   const [visibility, setVisibility] = useState<"GLOBAL" | "CLIENT">("GLOBAL");
+  const close = useDrawerClose();
 
   useEffect(() => {
-    if (state?.ok) onSuccess?.();
-  }, [state, onSuccess]);
+    if (state?.ok) close();
+  }, [state, close]);
 
   return (
     <form action={formAction} className="flex flex-col gap-4">

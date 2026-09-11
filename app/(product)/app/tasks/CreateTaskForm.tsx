@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createTaskAction } from "./actions";
+import { useDrawerClose } from "@/components/app/Drawer";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -25,23 +26,16 @@ function SubmitButton() {
 //
 // Redesign direction A: now rendered inside components/app/Drawer.tsx
 // instead of an inline card above the (now-adjacent) filter bar + table -
-// see docs/adr/0001 addendum. `onSuccess` closes the drawer once the
-// action reports `ok: true`, same pattern as CreateClientForm.
-export function CreateTaskForm({
-  clients,
-  categories,
-  onSuccess,
-}: {
-  clients: Client[];
-  categories: Category[];
-  onSuccess?: () => void;
-}) {
+// see docs/adr/0001 addendum. `useDrawerClose()` closes the drawer once
+// the action reports `ok: true`, same pattern as CreateClientForm.
+export function CreateTaskForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
   const [state, formAction] = useFormState(createTaskAction, {});
   const [clientId, setClientId] = useState("");
+  const close = useDrawerClose();
 
   useEffect(() => {
-    if (state?.ok) onSuccess?.();
-  }, [state, onSuccess]);
+    if (state?.ok) close();
+  }, [state, close]);
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
