@@ -9,6 +9,8 @@ import { listClients } from "@/lib/app-domain/clients";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
+import { getHoursTrend } from "@/lib/app-domain/overview-trend";
+import { HoursTrendChart } from "@/components/app/HoursTrendChart";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -92,10 +94,11 @@ export default async function AppHomePage() {
   const canSeeReports = can(user.role, "report.internal.view");
   const canSeeAlerts = can(user.role, "alert.manage");
 
-  const [counts, metrics, openAlerts] = await Promise.all([
+  const [counts, metrics, openAlerts, trend] = await Promise.all([
     loadCounts(canSeeClients, canSeeCategories, canSeeUsers),
     canSeeReports ? loadOperationalMetrics() : null,
     canSeeAlerts ? countOpenAlertEvents() : null,
+    canSeeReports ? getHoursTrend() : null,
   ]);
 
   const cards = [
@@ -171,6 +174,15 @@ export default async function AppHomePage() {
                 label="לכל הדוחות הפנימיים"
                 value={<ArrowLeft size={24} strokeWidth={1.75} />}
               />
+            </div>
+          </div>
+        )}
+
+        {trend && (
+          <div>
+            <h2 className="text-sm font-medium text-navy/70">מגמת שעות</h2>
+            <div className="mt-3">
+              <HoursTrendChart data={trend} />
             </div>
           </div>
         )}
