@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Users, Tag, UserCog, Timer, Clock, CalendarClock, Wallet, Bell, BarChart3, ArrowLeft, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -98,10 +99,10 @@ export default async function AppHomePage() {
   ]);
 
   const cards = [
-    canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients },
-    canSeeCategories && { href: "/app/categories", label: "קטגוריות פעילות", value: counts.categories },
-    canSeeUsers && { href: "/app/users", label: "משתמשים", value: counts.users },
-  ].filter(Boolean) as { href: string; label: string; value: number | null }[];
+    canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
+    canSeeCategories && { href: "/app/categories", label: "קטגוריות פעילות", value: counts.categories, icon: Tag },
+    canSeeUsers && { href: "/app/users", label: "משתמשים", value: counts.users, icon: UserCog },
+  ].filter(Boolean) as { href: string; label: string; value: number | null; icon: LucideIcon }[];
 
   return (
     <AppShell user={user}>
@@ -119,7 +120,8 @@ export default async function AppHomePage() {
                 href={card.href}
                 className="rounded-2xl border border-lineDark bg-white p-6 transition-colors hover:border-gold"
               >
-                <p className="text-3xl font-medium text-navy">{card.value}</p>
+                <card.icon size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 text-3xl font-medium text-navy">{card.value}</p>
                 <p className="mt-2 text-sm text-navy/60">{card.label}</p>
               </Link>
             ))}
@@ -140,7 +142,8 @@ export default async function AppHomePage() {
                 href="/app/reports?type=active_timers"
                 className="rounded-2xl border border-lineDark bg-white p-6 transition-colors hover:border-gold"
               >
-                <p className="text-3xl font-medium text-navy">{metrics.activeTimersCount}</p>
+                <Timer size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 text-3xl font-medium text-navy">{metrics.activeTimersCount}</p>
                 <p className="mt-2 text-sm text-navy/60">טיימרים פעילים כרגע</p>
                 {metrics.longRunningCount > 0 && (
                   <p className="mt-1 text-xs font-medium text-red-600">
@@ -149,18 +152,21 @@ export default async function AppHomePage() {
                 )}
               </Link>
               <div className="rounded-2xl border border-lineDark bg-white p-6">
-                <p className="text-3xl font-medium text-navy">{formatMinutes(metrics.todayMinutes)}</p>
+                <Clock size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 text-3xl font-medium text-navy">{formatMinutes(metrics.todayMinutes)}</p>
                 <p className="mt-2 text-sm text-navy/60">שעות דווחו היום (סה&quot;כ, כל הלקוחות)</p>
               </div>
               <div className="rounded-2xl border border-lineDark bg-white p-6">
-                <p className="text-3xl font-medium text-navy">{formatMinutes(metrics.monthMinutes)}</p>
+                <CalendarClock size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 text-3xl font-medium text-navy">{formatMinutes(metrics.monthMinutes)}</p>
                 <p className="mt-2 text-sm text-navy/60">שעות דווחו החודש (סה&quot;כ, כל הלקוחות)</p>
               </div>
               <Link
                 href="/app/reports?type=hours_by_client"
                 className="rounded-2xl border border-lineDark bg-white p-6 transition-colors hover:border-gold"
               >
-                <p className="text-3xl font-medium text-navy">
+                <Wallet size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 text-3xl font-medium text-navy">
                   {metrics.avgUtilizationPct !== null ? `${metrics.avgUtilizationPct}%` : "-"}
                 </p>
                 <p className="mt-2 text-sm text-navy/60">ניצול ממוצע בבנקי שעות (לקוחות פעילים)</p>
@@ -175,7 +181,8 @@ export default async function AppHomePage() {
                   href="/app/alerts"
                   className="rounded-2xl border border-lineDark bg-white p-6 transition-colors hover:border-gold"
                 >
-                  <p className="text-3xl font-medium text-navy">{openAlerts}</p>
+                  <Bell size={18} strokeWidth={1.75} className="text-gold-dim" />
+                  <p className="mt-3 text-3xl font-medium text-navy">{openAlerts}</p>
                   <p className="mt-2 text-sm text-navy/60">התראות פתוחות (לא נפתרו)</p>
                 </Link>
               )}
@@ -183,7 +190,8 @@ export default async function AppHomePage() {
                 href="/app/reports"
                 className="rounded-2xl border border-lineDark bg-white p-6 transition-colors hover:border-gold"
               >
-                <p className="text-3xl font-medium text-navy">→</p>
+                <BarChart3 size={18} strokeWidth={1.75} className="text-gold-dim" />
+                <p className="mt-3 flex items-center gap-2 text-3xl font-medium text-navy"><ArrowLeft size={22} strokeWidth={1.75} /></p>
                 <p className="mt-2 text-sm text-navy/60">לכל הדוחות הפנימיים</p>
               </Link>
             </div>

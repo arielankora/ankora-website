@@ -6,6 +6,7 @@ import { listClients } from "@/lib/app-domain/clients";
 import { AppShell } from "@/components/app/AppShell";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { Drawer } from "@/components/app/Drawer";
 import { InviteUserForm } from "./InviteUserForm";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -40,12 +41,18 @@ export default async function UsersPage() {
   return (
     <AppShell user={user}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-medium text-navy">משתמשים</h1>
-          <p className="mt-1 text-sm text-navy/60">צוות Ankora, תפקידים וגישה ללקוחות.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-medium text-navy">משתמשים</h1>
+            <p className="mt-1 text-sm text-navy/60">צוות Ankora, תפקידים וגישה ללקוחות.</p>
+          </div>
+          {/* Redesign direction A: was an inline card above the table -
+              see docs/adr/0001 addendum and CreateClientForm's comment
+              for the same change on the Clients screen. */}
+          <Drawer triggerLabel="הזמנת משתמש" title="משתמש חדש">
+            {() => <InviteUserForm clients={clients.filter((c) => c.status === "ACTIVE")} />}
+          </Drawer>
         </div>
-
-        <InviteUserForm clients={clients.filter((c) => c.status === "ACTIVE")} />
 
         <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
           <table className="w-full min-w-[640px] text-start text-sm">

@@ -3,6 +3,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { AppShell } from "@/components/app/AppShell";
 import { Forbidden } from "@/components/app/Forbidden";
+import { ExportMenu } from "@/components/app/ExportMenu";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -59,27 +60,7 @@ export default async function PortalMonthlyPage({ searchParams }: { searchParams
                 חודש הבא
               </a>
             )}
-            <a
-              href={`/api/portal/export?monthOffset=${monthOffset}`}
-              className="rounded-full bg-gold-gradient px-4 py-2 font-medium text-ink"
-            >
-              ייצוא ל-CSV
-            </a>
-            {/* Phase 9 gap-fix: spec 14.4's "מומלץ" (recommended) XLSX/PDF
-                formats, deferred at Phase 5 - same export route, added
-                &format=. */}
-            <a
-              href={`/api/portal/export?monthOffset=${monthOffset}&format=xlsx`}
-              className="rounded-full border border-lineDark px-4 py-2 font-medium text-navy hover:border-gold"
-            >
-              ייצוא ל-Excel
-            </a>
-            <a
-              href={`/api/portal/export?monthOffset=${monthOffset}&format=pdf`}
-              className="rounded-full border border-lineDark px-4 py-2 font-medium text-navy hover:border-gold"
-            >
-              ייצוא ל-PDF
-            </a>
+            <ExportMenu baseHref={`/api/portal/export?monthOffset=${monthOffset}`} primary />
           </div>
         </div>
 

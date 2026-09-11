@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Archive } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
 import { AppShell } from "@/components/app/AppShell";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
 import { archiveClientAction } from "./actions";
 
@@ -32,12 +34,19 @@ export default async function ClientsPage() {
   return (
     <AppShell user={user}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-medium text-navy">לקוחות</h1>
-          <p className="mt-1 text-sm text-navy/60">ניהול לקוחות Ankora, סטטוס וקטגוריות משויכות.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-medium text-navy">לקוחות</h1>
+            <p className="mt-1 text-sm text-navy/60">ניהול לקוחות Ankora, סטטוס וקטגוריות משויכות.</p>
+          </div>
+          {/* Redesign direction A: the add-client form used to sit here
+              inline, permanently above the table, pushing existing
+              clients below the fold. It now lives in a Drawer opened by
+              this one primary button - see docs/adr/0001 addendum. */}
+          <Drawer triggerLabel="הוספת לקוח" title="לקוח חדש">
+            {(close) => <CreateClientForm onSuccess={close} />}
+          </Drawer>
         </div>
-
-        <CreateClientForm />
 
         <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
           <table className="w-full min-w-[640px] text-start text-sm">
@@ -78,8 +87,13 @@ export default async function ClientsPage() {
                       {client.status !== "ARCHIVED" && (
                         <form action={archiveClientAction}>
                           <input type="hidden" name="clientId" value={client.id} />
-                          <button type="submit" className="text-xs text-navy/50 hover:text-red-600">
-                            העברה לארכיון
+                          <button
+                            type="submit"
+                            aria-label="העברה לארכיון"
+                            title="העברה לארכיון"
+                            className="text-navy/40 transition-colors hover:text-red-600"
+                          >
+                            <Archive size={16} strokeWidth={1.75} />
                           </button>
                         </form>
                       )}

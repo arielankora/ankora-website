@@ -3,27 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
-import {
-  Home,
-  Timer,
-  History,
-  Users,
-  Tag,
-  ListChecks,
-  UserCog,
-  Wallet,
-  Bell,
-  BarChart3,
-  CalendarClock,
-  ScrollText,
-  BookOpen,
-  LayoutDashboard,
-  CalendarDays,
-  FileText,
-  MoreHorizontal,
-  LogOut,
-  type LucideIcon,
-} from "lucide-react";
+import { MoreHorizontal, LogOut, Home } from "lucide-react";
+import { NAV_ICONS } from "./nav-icons";
 
 // Spec 11.1: "Bottom navigation עם 3-5 יעדים בלבד." AppShell.tsx computes
 // the full, role-filtered `items` list (2 items for a bare employee, up to
@@ -33,26 +14,6 @@ import {
 // most the first 4 items as direct tabs plus a 5th "עוד" (more) tab; "עוד"
 // opens a sheet with whatever didn't fit plus the account/sign-out block
 // the old hamburger used to show. See ADR addendum section 14.5.
-const ICONS: Record<string, LucideIcon> = {
-  "/app": Home,
-  "/app/timer": Timer,
-  "/app/my-time": History,
-  "/app/clients": Users,
-  "/app/categories": Tag,
-  "/app/time-entries": ListChecks,
-  "/app/users": UserCog,
-  "/app/hour-banks": Wallet,
-  "/app/alerts": Bell,
-  "/app/reports": BarChart3,
-  "/app/report-schedules": CalendarClock,
-  "/app/audit-log": ScrollText,
-  "/app/guide": BookOpen,
-  "/app/portal": LayoutDashboard,
-  "/app/portal/weekly": CalendarDays,
-  "/app/portal/monthly": FileText,
-  "/app/portal/history": History,
-};
-
 export function BottomNav({
   items,
   userName,
@@ -79,7 +40,7 @@ export function BottomNav({
     >
       <div className="grid grid-cols-5">
         {direct.map((item) => {
-          const Icon = ICONS[item.href] ?? Home;
+          const Icon = NAV_ICONS[item.href] ?? Home;
           const active = isActive(item.href);
           return (
             <Link
@@ -129,7 +90,7 @@ export function BottomNav({
                     className="flex items-center gap-3 text-sm text-navy/80"
                   >
                     {(() => {
-                      const Icon = ICONS[item.href] ?? Home;
+                      const Icon = NAV_ICONS[item.href] ?? Home;
                       return <Icon size={18} strokeWidth={1.75} />;
                     })()}
                     {item.label}

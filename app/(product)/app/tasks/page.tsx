@@ -6,6 +6,7 @@ import { listCategories } from "@/lib/app-domain/categories";
 import { AppShell } from "@/components/app/AppShell";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { Drawer } from "@/components/app/Drawer";
 import { CreateTaskForm } from "./CreateTaskForm";
 import { TaskStatusSelect } from "./TaskStatusSelect";
 import type { TaskStatus } from "@prisma/client";
@@ -62,12 +63,17 @@ export default async function TasksPage({
   return (
     <AppShell user={user}>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-medium text-navy">משימות</h1>
-          <p className="mt-1 text-sm text-navy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-medium text-navy">משימות</h1>
+            <p className="mt-1 text-sm text-navy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+          </div>
+          {/* Redesign direction A: was an inline card above the filter
+              bar + table - see docs/adr/0001 addendum. */}
+          <Drawer triggerLabel="הוספת משימה" title="משימה חדשה">
+            {(close) => <CreateTaskForm clients={clients} categories={categories} onSuccess={close} />}
+          </Drawer>
         </div>
-
-        <CreateTaskForm clients={clients} categories={categories} />
 
         <form className="flex flex-wrap items-end gap-4 rounded-2xl border border-lineDark bg-white p-4">
           <div>

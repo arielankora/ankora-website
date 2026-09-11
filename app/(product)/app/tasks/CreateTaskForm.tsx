@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createTaskAction } from "./actions";
 
@@ -12,7 +12,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "נוצרת..." : "הוספת משימה"}
     </button>
@@ -22,9 +22,26 @@ function SubmitButton() {
 // Spec §11 Tasks screen + §6.1 ("Task נשמרת כישות אם המשתמש בוחר 'צור
 // משימה'"). Client-then-category picker mirrors app/timer/TimerWidget.tsx
 // exactly: categories are GLOBAL or scoped to the selected client.
-export function CreateTaskForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
+//
+// Redesign direction A: now rendered inside components/app/Drawer.tsx
+// instead of an inline card above the (now-adjacent) filter bar + table -
+// see docs/adr/0001 addendum. `onSuccess` closes the drawer once the
+// action reports `ok: true`, same pattern as CreateClientForm.
+export function CreateTaskForm({
+  clients,
+  categories,
+  onSuccess,
+}: {
+  clients: Client[];
+  categories: Category[];
+  onSuccess?: () => void;
+}) {
   const [state, formAction] = useFormState(createTaskAction, {});
   const [clientId, setClientId] = useState("");
+
+  useEffect(() => {
+    if (state?.ok) onSuccess?.();
+  }, [state, onSuccess]);
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
@@ -32,10 +49,7 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
   );
 
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
+    <form action={formAction} className="flex flex-col gap-4">
       <div>
         <label className="block text-xs font-medium text-navy/60">לקוח *</label>
         <select
@@ -68,7 +82,7 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
           ))}
         </select>
       </div>
-      <div className="sm:col-span-2">
+      <div>
         <label className="block text-xs font-medium text-navy/60">שם המשימה *</label>
         <input
           name="title"
@@ -77,12 +91,8 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
         />
       </div>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <SubmitButton />
     </form>
   );
 }

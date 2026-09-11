@@ -9,13 +9,21 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "מוזמן..." : "הזמנת משתמש"}
     </button>
   );
 }
 
+// Redesign direction A: now rendered inside components/app/Drawer.tsx
+// (see docs/adr/0001 addendum) instead of an inline card above the users
+// table - the field grid is a single column now since the drawer is
+// narrower than the old full-width card. Unlike CreateClientForm, this
+// one deliberately does NOT auto-close the drawer on success: the
+// one-time invite link below still needs to be visible so it can be
+// copied (no email provider connected yet - Phase 4 TODO). The admin
+// closes it manually via the drawer's own X once they've copied it.
 export function InviteUserForm({ clients }: { clients: { id: string; name: string }[] }) {
   const [state, formAction] = useFormState(inviteUserAction, {});
   const [role, setRole] = useState("");
@@ -35,8 +43,8 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
   }
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
-      <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <form action={formAction} className="flex flex-col gap-4">
         <div>
           <label className="block text-xs font-medium text-navy/60">שם מלא *</label>
           <input
@@ -111,7 +119,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             </div>
           </>
         ) : (
-          <div className="sm:col-span-2 lg:col-span-4">
+          <div>
             <div className="flex items-center justify-between">
               <label className="block text-xs font-medium text-navy/60">גישה ללקוחות (אופציונלי)</label>
               {clients.length > 0 && (
@@ -125,7 +133,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
                 </div>
               )}
             </div>
-            <div ref={checkboxContainerRef} className="mt-2 flex flex-wrap gap-3">
+            <div ref={checkboxContainerRef} className="mt-2 flex flex-col gap-2">
               {clients.length === 0 && <p className="text-xs text-navy/40">אין עדיין לקוחות במערכת.</p>}
               {clients.map((c) => (
                 <label key={c.id} className="flex items-center gap-1.5 text-sm text-navy/70">
@@ -137,12 +145,8 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
           </div>
         )}
 
-        <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-          {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-          <div className="ms-auto">
-            <SubmitButton />
-          </div>
-        </div>
+        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+        <SubmitButton />
       </form>
 
       {state?.inviteLink && (

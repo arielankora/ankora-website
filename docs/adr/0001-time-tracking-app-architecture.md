@@ -2296,3 +2296,138 @@ shows only the sandbox's pre-existing, documented Prisma-generate
 limitation (same as 19.13, unrelated to this change). Live QA (both
 tabs render correctly, copy + download work against real client data)
 deferred to the Vercel Preview deployment, per the standing workflow.
+
+## 20. Addendum: App redesign — direction A (UI/UX modernization)
+
+**Context.** Ariel asked for a full-app UI/UX audit across every role
+(admin, Ankora employee, client portal) and every screen, with one
+explicit constraint: keep the existing color palette exactly as-is
+(`ink` `#0B1B33`, `navy` `#1B2A3D`, `cream` `#F3EADB`, `paper` `#F8F4EC`,
+`paperDim` `#EDE3D2`, `gold` `#B08D57`/`light` `#C7AC7E`/`dim` `#8A6F45`,
+`Heebo` font — all already in `tailwind.config.ts`, unchanged by this
+addendum), everything else open to change. The audit (live-browsed on
+Production across desktop and mobile viewports, plus the in-app guide
+for screens without separate role credentials) found five recurring
+issues: (1) an inline "add" form sitting permanently above the table on
+every list screen (Clients, Users, Tasks, Categories), pushing existing
+records below the fold even when nothing was being added, worst on
+mobile; (2) a single-row top nav with 16+ flat text links, no grouping,
+no icons, wrapping awkwardly at some widths; (3) three separately
+stacked CSV/Excel/PDF export buttons wherever export exists (Time
+Entries, Reports, Client Portal monthly); (4) no icons anywhere in nav,
+KPI cards, or row actions; (5) the Client Portal's guide screenshot
+(`/guide/portal-dashboard.png`) returns 404 in Production and admin
+accounts are RBAC-blocked from `/app/portal` directly, so that role's
+visual audit relied on the guide's written description plus consistency
+with the rest of the app's component language rather than a live
+screenshot — flagged to Ariel, not silently assumed fixed.
+
+Two visual directions were mocked up (interactive HTML preview, not
+committed to the repo) and presented to Ariel: direction A ("sidebar" —
+Linear-like, grouped icon+label sidebar, drawer-based create forms) and
+direction B ("editorial" — condensed top bar, hero-stat KPI treatment,
+card-row lists with a gold accent border). Ariel chose **direction A**.
+This addendum covers only its implementation.
+
+**What was built:**
+
+1. **Sidebar navigation** (`components/app/Sidebar.tsx`, new). Replaces
+   the header's horizontal nav at `md+` widths with a fixed, grouped,
+   icon+label sidebar (`bg-navy`, matching the existing dark accent
+   already used elsewhere, not a new color). `AppShell.tsx`'s
+   `navItemsFor()` now tags each item with a `group` (בית / העבודה שלי /
+   ניהול / דיווח ובקרה / מערכת / חשבון for internal roles; פורטל /
+   חשבון for `CLIENT_USER`) — pure presentation metadata, the RBAC gate
+   per item (`can(role, "...")`) is unchanged. `AppShell.tsx`'s header
+   now only renders at mobile widths (wordmark only); identity/role/
+   logout moved into the sidebar's footer, `BottomNav`'s "more" sheet is
+   unchanged. Mobile nav itself was untouched — the audit found
+   `BottomNav.tsx` already matched spec 11.1 and had no real problem.
+   `components/app/nav-icons.ts` (new) pulls the href→icon map that used
+   to live only in `BottomNav.tsx` into a shared module so the sidebar
+   and the bottom tab bar can never show different icons for the same
+   screen (this also fixed a pre-existing gap: `/app/tasks` had no entry
+   in the old map and silently fell back to the home icon).
+2. **Drawer** (`components/app/Drawer.tsx`, new). A slide-in side panel
+   with its own trigger button, used to replace every inline add-form
+   that used to sit permanently above a table. Applied to Clients
+   (`CreateClientForm`), Users (`InviteUserForm`), Tasks
+   (`CreateTaskForm`), and Categories (`CreateCategoryForm`) — all four
+   forms were narrowed from their old responsive grid layout to a single
+   stacked column to fit the drawer's width, and three of the four
+   (`CreateClientForm`, `CreateTaskForm`, `CreateCategoryForm`) gained an
+   `onSuccess` callback that closes the drawer once their server action
+   returns `{ok: true}` — the same signal these actions already
+   returned, just newly consumed. `InviteUserForm` deliberately does
+   *not* auto-close: the one-time invite link (no email provider
+   connected yet, Phase 4 TODO) still needs to stay visible to copy: the
+   admin closes it manually via the drawer's own X. No server action,
+   domain-logic, or permission-check file changed — this is purely a
+   presentation-layer move of existing forms into a new container.
+3. **Icon row actions + `StatusBadge` dot.** Clients' and Categories'
+   plain-text "העברה לארכיון" row action became an icon button
+   (`lucide-react`'s `Archive`, same `archiveClientAction`/
+   `archiveCategoryAction` underneath). `components/app/StatusBadge.tsx`
+   gained a small leading tone-dot — a shared component used by 14
+   screens (Clients, Users, Tasks, Hour Banks, Alerts, Integrations,
+   Report Schedules, Categories, My Time, Time Entries, Notifications,
+   Client Portal history, Timer, Report Schedules), so this one change
+   reached all of them without touching each screen individually.
+4. **`ExportMenu`** (`components/app/ExportMenu.tsx`, new). Replaces the
+   3-stacked-button CSV/Excel/PDF pattern with one "ייצוא" button that
+   opens a small menu; each item is the same `baseHref` the old buttons
+   already built, with `&format=` appended for Excel/PDF exactly as
+   before — no export-route change. Applied to Time Entries
+   (`FilterBar.tsx`), Reports (`ReportFilterBar.tsx`), and the Client
+   Portal monthly report (`portal/monthly/page.tsx`).
+5. **Overview KPI-card icons.** `app/(product)/app/page.tsx`'s two card
+   grids (role-based counts, operational metrics) each gained a leading
+   `lucide-react` icon per card, addressing the audit's "no color/icons
+   anywhere, screens read as almost entirely navy-on-cream text" finding
+   without introducing any new color — icons use `text-gold-dim`, the
+   existing accent.
+6. **Client Portal** required no direct changes: it already renders
+   through the same `AppShell`, so the grouped sidebar reaches it
+   automatically. Its dashboard cards were already a clean, well-
+   organized stat grid + category-breakdown layout and were left as-is.
+7. **Guide content** (`content.ts`). Updated every passage that described
+   the old top-row nav ("במחשב הניווט נשאר בראש המסך") or an inline
+   "מלאו את הטופס בראש המסך" step (Clients/Categories/Tasks/Users) to
+   describe the sidebar and the drawer instead, and consolidated every
+   "לחצו ייצוא ל-CSV / ל-Excel / ל-PDF" (3 separate buttons) passage to
+   "לחצו ייצוא ובחרו..." (one button, one menu). Screenshots
+   (`/guide/*.png`, all 9 currently-working images plus the already-
+   broken `portal-dashboard.png`) still need to be recaptured against
+   the new UI once deployed to Preview — per section 10's standing rule,
+   this happens as part of this addendum's own live-QA step, not
+   deferred to a separate piece of work.
+
+Timer and Hour Banks' "large unused whitespace on single-purpose
+screens" audit finding was **not** addressed by a content/layout change
+in this pass — the sidebar already narrows the content column on
+desktop, which reduces (though doesn't eliminate) that specific problem,
+and a deeper pass on those two screens' internal layout was judged
+lower-priority than the four items above. Left as a known follow-up, not
+silently dropped.
+
+**Verification:** `tsc --noEmit` diff against `main` shows zero new
+errors — every remaining error is the same pre-existing "Prisma client
+not generated in this sandbox" limitation this ADR has documented since
+Phase 2 (binaries.prisma.sh unreachable from the sandbox), same set and
+count as on `main`, just shifted line numbers from the added code.
+`eslint` across `app/(product)` and `components`: 0 errors, 1 pre-
+existing unrelated warning (`<img>` in the guide, not touched here).
+`next build`'s SWC compile step reports "Compiled successfully" for the
+whole app including every file this addendum touches; the build's
+subsequent type-check failure is the same Prisma limitation in an
+untouched file. No new pure business logic was introduced (every
+server action and domain function this addendum's UI wraps is
+byte-for-byte unchanged), so there's nothing new that fits this
+codebase's existing unit-test pattern (`lib/**` pure-function tests
+only); the full sandbox-runnable suite (`tests/unit`, the 9 files with
+no Prisma dependency) still passes 70/70, confirming no regression.
+
+**Status:** implemented on `feature/app-redesign-direction-a`. Live QA
+on Vercel Preview (desktop + mobile, all four roles as available,
+screenshot recapture for the guide) and PR open (no merge) are the next
+step, per the standing workflow.

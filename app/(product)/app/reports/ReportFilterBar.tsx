@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReportType } from "@/lib/app-domain/reports";
+import { ExportMenu } from "@/components/app/ExportMenu";
 
 type Option = { id: string; name: string };
 
@@ -193,27 +194,7 @@ export function ReportFilterBar({
         <button type="button" onClick={clear} className="text-sm text-navy/60 hover:text-navy">
           איפוס
         </button>
-        <a
-          href={exportHref}
-          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
-        >
-          ייצוא ל-CSV
-        </a>
-        {/* Phase 9 gap-fix: spec 14.4's "מומלץ" (recommended) XLSX/PDF
-            formats, deferred at Phase 5 - same exportHref query string,
-            just an added &format=. */}
-        <a
-          href={`${exportHref}&format=xlsx`}
-          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
-        >
-          ייצוא ל-Excel
-        </a>
-        <a
-          href={`${exportHref}&format=pdf`}
-          className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
-        >
-          ייצוא ל-PDF
-        </a>
+        <ExportMenu baseHref={exportHref} />
       </div>
     </div>
   );

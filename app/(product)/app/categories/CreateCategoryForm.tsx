@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createCategoryAction } from "./actions";
 
@@ -9,23 +9,33 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "נוצרת..." : "הוספת קטגוריה"}
     </button>
   );
 }
 
-export function CreateCategoryForm({ clients }: { clients: { id: string; name: string }[] }) {
+// Redesign direction A: now rendered inside components/app/Drawer.tsx -
+// see docs/adr/0001 addendum and CreateClientForm's comment for the same
+// change applied consistently across every list screen.
+export function CreateCategoryForm({
+  clients,
+  onSuccess,
+}: {
+  clients: { id: string; name: string }[];
+  onSuccess?: () => void;
+}) {
   const [state, formAction] = useFormState(createCategoryAction, {});
   const [visibility, setVisibility] = useState<"GLOBAL" | "CLIENT">("GLOBAL");
 
+  useEffect(() => {
+    if (state?.ok) onSuccess?.();
+  }, [state, onSuccess]);
+
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
-      <div className="sm:col-span-2 lg:col-span-1">
+    <form action={formAction} className="flex flex-col gap-4">
+      <div>
         <label className="block text-xs font-medium text-navy/60">שם הקטגוריה *</label>
         <input
           name="name"
@@ -33,7 +43,7 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
         />
       </div>
-      <div className="sm:col-span-2 lg:col-span-1">
+      <div>
         <label className="block text-xs font-medium text-navy/60">תיאור</label>
         <input
           name="description"
@@ -68,12 +78,8 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
         </select>
       </div>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <SubmitButton />
     </form>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createClientAction } from "./actions";
 
@@ -8,22 +9,29 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "נוצר..." : "הוספת לקוח"}
     </button>
   );
 }
 
-export function CreateClientForm() {
+// Redesign direction A: now rendered inside components/app/Drawer.tsx
+// instead of sitting inline above the clients table (see docs/adr/0001
+// addendum). `onSuccess` closes the drawer once the server action
+// reports `ok: true`, same signal ClientsPage already used to know a
+// client was created - this form previously just stayed open and relied
+// on the fresh row appearing in the (now-adjacent) table.
+export function CreateClientForm({ onSuccess }: { onSuccess?: () => void }) {
   const [state, formAction] = useFormState(createClientAction, {});
 
+  useEffect(() => {
+    if (state?.ok) onSuccess?.();
+  }, [state, onSuccess]);
+
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
-      <div className="sm:col-span-2 lg:col-span-1">
+    <form action={formAction} className="flex flex-col gap-4">
+      <div>
         <label className="block text-xs font-medium text-navy/60">שם הלקוח *</label>
         <input
           name="name"
@@ -54,12 +62,8 @@ export function CreateClientForm() {
         />
       </div>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+      <SubmitButton />
     </form>
   );
 }
