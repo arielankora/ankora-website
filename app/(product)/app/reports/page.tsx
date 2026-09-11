@@ -1,12 +1,18 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
+import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { listClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { listUsers } from "@/lib/app-domain/users";
 import { AppShell } from "@/components/app/AppShell";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ReportFilterBar } from "./ReportFilterBar";
+import { ClientSummaryFilterBar } from "./ClientSummaryFilterBar";
+import { ClientSummaryView } from "./ClientSummaryView";
+import { formatDuration, formatSource } from "@/lib/time-entry-format";
+import { buildClientActivityPrompt, type ActivityPromptEntry } from "@/lib/client-activity-prompt";
 import type { TimeEntrySource } from "@prisma/client";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -42,13 +48,29 @@ function formatCell(value: string | number, type?: string): string {
   return String(value);
 }
 
+function formatEntryDateTime(d: Date): string {
+  return new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(
+    d
+  );
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^\w.\-֐-׿]+/g, "-");
+}
+
 // Spec 12 Admin screens table: "Reports - internal and client reports,
 // schedule/send/export." Phase 5 (spec 23) covers the internal half only
 // (schedule/send is Phase 6's scheduled-email territory, spec section 15).
+//
+// docs/adr/0001 section 19.14: added a second tab, "תקציר פעילות ללקוח" -
+// unlike the numeric/tabular reports below, this compiles every raw time
+// entry (incl. notes) for one client/period into a single AI-ready text
+// block Ariel copies into ChatGPT/Claude to draft a client-facing update.
 export default async function AdminReportsPage({
   searchParams,
 }: {
   searchParams: {
+    tab?: string;
     type?: string;
     clientId?: string;
     userId?: string;
@@ -70,6 +92,96 @@ export default async function AdminReportsPage({
     );
   }
 
+  const tab = searchParams.tab === "summary" ? "summary" : "numeric";
+  const clients = await listClients();
+  const activeClients = clients.filter((c) => c.status === "ACTIVE");
+
+  const tabs = (
+    <div className="flex gap-2 border-b border-lineDark">
+      <Link
+        href="/app/reports"
+        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+          tab === "numeric" ? "border-gold text-navy" : "border-transparent text-navy/50 hover:text-navy"
+        }`}
+      >
+        דוחות
+      </Link>
+      <Link
+        href="/app/reports?tab=summary"
+        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
+          tab === "summary" ? "border-gold text-navy" : "border-transparent text-navy/50 hover:text-navy"
+        }`}
+      >
+        תקציר פעילות ללקוח
+      </Link>
+    </div>
+  );
+
+  if (tab === "summary") {
+    const clientId = searchParams.clientId || undefined;
+    const from = parseDate(searchParams.from);
+    const to = parseDateEndOfDay(searchParams.to);
+    const client = clientId ? activeClients.find((c) => c.id === clientId) : undefined;
+
+    let promptText: string | null = null;
+    let filename = "";
+
+    if (client) {
+      const entries = await listTimeEntriesForAdmin({ clientId: client.id, from, to });
+
+      const totalSeconds = entries.reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
+
+      const promptEntries: ActivityPromptEntry[] = entries.map((e) => ({
+        dateLabel: formatEntryDateTime(e.startAt),
+        userName: e.user.name,
+        categoryName: e.category.name,
+        durationLabel: formatDuration(e.actualSeconds),
+        sourceLabel: formatSource(e.source),
+        note: e.note,
+        isEdited: e.isEdited,
+      }));
+
+      promptText = buildClientActivityPrompt({
+        clientName: client.name,
+        fromLabel: from ? from.toLocaleDateString("he-IL") : undefined,
+        toLabel: to ? to.toLocaleDateString("he-IL") : undefined,
+        entries: promptEntries,
+        totalDurationLabel: formatDuration(totalSeconds),
+      });
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      filename = sanitizeFilename(`client-summary_${client.name}_${dateStr}.txt`);
+    }
+
+    return (
+      <AppShell user={user}>
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-xl font-medium text-navy">דוחות</h1>
+            <p className="mt-1 text-sm text-navy/60">
+              תקציר פעילות גולמי ללקוח נבחר, מוכן להדבקה ב-ChatGPT/Claude לצורך ניסוח סיכום לשיתוף עם הלקוח.
+            </p>
+          </div>
+
+          {tabs}
+
+          <ClientSummaryFilterBar
+            clients={activeClients.map((c) => ({ id: c.id, name: c.name }))}
+            current={{ clientId: searchParams.clientId, from: searchParams.from, to: searchParams.to }}
+          />
+
+          {!client && (
+            <div className="rounded-2xl border border-lineDark bg-white px-5 py-8 text-center text-sm text-navy/50">
+              בחרו לקוח כדי ליצור תקציר פעילות.
+            </div>
+          )}
+
+          {client && promptText && <ClientSummaryView text={promptText} filename={filename} />}
+        </div>
+      </AppShell>
+    );
+  }
+
   const type: ReportType = isReportType(searchParams.type) ? searchParams.type : "total_client_hours";
 
   const filters = {
@@ -83,14 +195,8 @@ export default async function AdminReportsPage({
     to: parseDateEndOfDay(searchParams.to),
   };
 
-  const [result, clients, allCategories, users] = await Promise.all([
-    runReport(user, type, filters),
-    listClients(),
-    listCategories(),
-    listUsers(),
-  ]);
+  const [result, allCategories, users] = await Promise.all([runReport(user, type, filters), listCategories(), listUsers()]);
 
-  const activeClients = clients.filter((c) => c.status === "ACTIVE");
   const employees = users.filter((u) => u.role !== "CLIENT_USER" && u.status === "ACTIVE");
 
   return (
@@ -100,6 +206,8 @@ export default async function AdminReportsPage({
           <h1 className="text-xl font-medium text-navy">דוחות</h1>
           <p className="mt-1 text-sm text-navy/60">דוחות פנימיים לניהול, עם סינון וייצוא ל-CSV.</p>
         </div>
+
+        {tabs}
 
         <ReportFilterBar
           reportTypes={REPORT_DEFINITIONS.map((r) => ({ id: r.id, label: r.label }))}

@@ -2224,3 +2224,75 @@ pattern appears across dozens of untouched files); `npm run build`
 cannot run locally for the same reason. Full build + live QA (note
 column rendering, all three export formats against real data) deferred
 to the Vercel Preview deployment, per the standing workflow.
+
+### 19.14 Feature: "תקציר פעילות ללקוח" tab on /app/reports (AI-ready text prompt)
+
+Ariel (2026-09-11), after 19.13 shipped: "אני רוצה לייצר עוד עמוד או דוח
+שעל פי המשימות שבוצעו בתקופת זמן שנבחרה והלקוח שנבחר מכל סיכום של מה
+בוצע בתקופה הזאת... הרעיון שאני אעתיק את הטקסט לchatgpt או לקלוד והוא
+על פי הטקסט יכין סיכום קצר של מה בוצע שאחכ אוכל לשתף את הלקוח" - a
+per-client, per-period compilation of raw activity data (including
+notes) formatted as a copy/paste-ready prompt for an external LLM
+(ChatGPT/Claude) to turn into a short client-facing summary. This app
+does not generate the summary itself - it only assembles the input.
+
+Confirmed with Ariel before building: (1) lives as a second tab on the
+existing `/app/reports` screen, not a standalone page; (2) both
+copy-to-clipboard and download-as-.txt; (3) include every entry in
+range regardless of whether it has a note ("להכניס הכל כדי שיהיה
+ל-AI כמה שיותר אינפורמציה" - give the AI as much information as
+possible), rather than filtering to only noted entries.
+
+**What was built:**
+
+1. `lib/client-activity-prompt.ts` - pure, dependency-free
+   `buildClientActivityPrompt()`. Takes a client name, an optional
+   date range, a total-duration label, and an array of pre-formatted
+   entries (date/time, employee, category, duration, source, edited
+   flag, note); returns one string: an instruction preface (asking
+   the LLM for a short, professional Hebrew summary suitable to send
+   to the client, grouping similar work and omitting internal details
+   like which specific employee did what) followed by one
+   `date | employee | category | duration | source (edited) — note`
+   line per entry. Zero project imports, unit-tested in the sandbox
+   (`tests/unit/client-activity-prompt.test.ts`, 10 tests) the same
+   way `lib/csv.ts` and `lib/time-entry-format.ts` are - see
+   `tests/unit/reports.test.ts`'s header for why most other
+   report-related tests can't run locally.
+2. `app/(product)/app/reports/page.tsx` - added a `?tab=` param
+   (`numeric` default, `summary` new). A small `tabs` nav (two
+   `<Link>`s) sits above both tab bodies. The `summary` branch: fetch
+   `listClients()` (already fetched for both tabs), require a
+   `clientId` (no "all clients" option - mixing multiple clients'
+   internal notes into one prompt would be both confusing to the LLM
+   and a client-confidentiality risk), call the same
+   `listTimeEntriesForAdmin()` used by the admin Time Entries screen
+   (section 19.13) filtered to that client + optional date range, sum
+   `actualSeconds` for a total-hours label, and hand the assembled
+   entries to `buildClientActivityPrompt()`. Still gated by the page's
+   existing `report.internal.view` check - no new permission.
+3. `ClientSummaryFilterBar.tsx` (new, `"use client"`) - a smaller
+   filter than `ReportFilterBar.tsx`: just client (required) + date
+   range, matching the actual inputs this tab uses (no user/category/
+   source/edited/manual filters, which don't apply to "everything for
+   one client").
+4. `ClientSummaryView.tsx` (new, `"use client"`) - renders the
+   server-built prompt text in a read-only `<textarea>`, plus "העתק
+   ללוח" (`navigator.clipboard.writeText`) and "הורדה כקובץ טקסט"
+   buttons. The download is a client-side `Blob` + object URL, not a
+   new API route - unlike the CSV/XLSX/PDF export routes (18.14,
+   19.13), a `.txt` file needs no server-side binary-building library,
+   so there was nothing an API route would add here; the full text is
+   already resolved server-side with real data and handed down as a
+   prop.
+
+No schema change, no new permission, no change to the existing numeric
+report tab's behavior or URLs (`/app/reports` with no `tab` param is
+unchanged).
+
+**Status:** implemented on `feature/client-activity-summary-tab`; unit
+tests for the new pure module pass locally (10/10); `tsc --noEmit`
+shows only the sandbox's pre-existing, documented Prisma-generate
+limitation (same as 19.13, unrelated to this change). Live QA (both
+tabs render correctly, copy + download work against real client data)
+deferred to the Vercel Preview deployment, per the standing workflow.
