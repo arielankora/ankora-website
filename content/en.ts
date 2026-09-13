@@ -2,11 +2,11 @@ import type { Dictionary } from "./types";
 
 const en: Dictionary = {
   meta: {
-    title: "Ankora — Operational Intelligence",
+    title: "Ankora — Personal Operations Management",
     description:
-      "Ankora combines AI orchestration with dedicated human Operations Managers to remove the operational weight of modern life.",
+      "Ankora is an outsourced Personal Operations Management service for executives, founders and busy families in Israel — a dedicated human Operations Manager, backed by AI orchestration, taking end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
     homeTitle: "Ankora | Personal Operations Management for Executives & Founders",
-    homeDescription: "Ankora combines a dedicated human Operations Manager with AI orchestration to take end-to-end ownership of personal, household, vendor, administrative, travel and business operations for executives, founders and busy families.",
+    homeDescription: "Ankora is an outsourced Personal Operations Management service for executives, founders and busy families in Israel — an alternative to hiring another full-time personal assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
     aboutTitle: "About Ankora | Personal Operations Management Company",
     aboutDescription: "Ankora is an Israeli Personal Operations Management company. Learn about our Human + AI model, the Operational Intelligence philosophy behind it, and who we serve.",
   },
@@ -39,7 +39,7 @@ const en: Dictionary = {
     ctaSecondary: "How it works",
     definitionPre: "Ankora is a ",
     definitionLinked: "Personal Operations Management",
-    definitionPost: " service for executives, founders and busy families. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
+    definitionPost: " service for executives, founders and busy families in Israel — an outsourced alternative to hiring another full-time assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
   },
   problem: {
     label: "The problem",
@@ -53,8 +53,8 @@ const en: Dictionary = {
   },
   category: {
     label: "A new category",
-    title: "This isn't just a personal assistant. This is Operational Intelligence.",
-    body: "Ankora combines AI orchestration with dedicated human Operations Managers to take full ownership of your operational complexity — not just complete tasks. We don't perform services. We buy back your time, attention, and peace of mind.",
+    title: "This isn't just a personal assistant. It's Personal Operations Management.",
+    body: "Ankora combines a dedicated human Operations Manager with AI orchestration — a combination we call Operational Intelligence — to take full ownership of your operational complexity, not just complete tasks. It's an outsourced service, not another employee to manage. We don't perform isolated tasks. We buy back your time, attention, and peace of mind.",
   },
   howItWorks: {
     label: "How it works",
@@ -544,7 +544,7 @@ const en: Dictionary = {
       eyebrow: "Areas of coverage",
       title: "Ankora's areas of operation",
       sub: "Anything that creates operational load has one address.",
-      intro: "The list below is a sample of what we manage for our clients. If something isn't listed here, ask us anyway.",
+      intro: "This is where Personal Operations Management becomes concrete: the vendors, travel, personal administration, household matters and business tasks a dedicated Operations Manager owns end to end for clients in Israel. The list below is a sample of what we manage. If something isn't listed here, ask us anyway.",
       searchPlaceholder: 'Search by keyword, like "car" or "authorities"',
       searchNoResults: "No results found. Try another word, or just ask us.",
       categories: [
@@ -798,7 +798,7 @@ const en: Dictionary = {
       title: "What Is Personal Operations Management?",
       sub: "An operating model for people who need to delegate ownership, not just tasks.",
       directAnswerLabel: "In short",
-      directAnswer: "Personal Operations Management is an operating model in which an individual or family delegates ongoing operational ownership, not just isolated tasks, to a dedicated Operations Manager backed by AI orchestration. Instead of coordinating vendors, appointments, paperwork and follow-ups yourself, one person takes end-to-end responsibility for the outcome, across your personal, household, administrative, travel and selected business operations.",
+      directAnswer: "Personal Operations Management is an outsourced operating model in which an individual or family delegates ongoing operational ownership, not just isolated tasks, to a dedicated Operations Manager backed by AI orchestration, without hiring another full-time employee. Instead of coordinating vendors, appointments, paperwork and follow-ups yourself, one person takes end-to-end responsibility for the outcome, across your personal, household, administrative, travel and selected business operations. Ankora provides this service to executives, founders and busy families in Israel.",
       problem: {
         title: "The problem isn't the amount of work",
         intro: "Most operational tasks are individually small. The difficulty is everything they touch:",
@@ -892,6 +892,7 @@ const en: Dictionary = {
         ],
       },
       faq: [
+        { q: "Do I need to hire my Operations Manager as an employee?", a: "No. Ankora is an outsourced service, not an employment relationship. There's no recruitment, onboarding, salary, pension or employer overhead on your side. Your Operations Manager is part of the Ankora team, not a new hire on your payroll." },
         { q: "Is Personal Operations Management the same as a virtual assistant service?", a: "No. Virtual assistant services typically execute discrete tasks remotely, often through different people each time. Personal Operations Management assigns one dedicated person to own an area of your life or business continuously, backed by AI orchestration that retains context between every interaction." },
         { q: "Do I need to manage my Operations Manager?", a: "No. The point of the model is that you don't manage the process, only the outcome. Your Operations Manager identifies what needs to happen and follows it through; you're updated proactively rather than asked to check in." },
         { q: "What happens if something goes wrong with a vendor or provider?", a: "It stays your Operations Manager's responsibility to resolve, not yours. Handling issues, delays and unsatisfactory work is part of end-to-end ownership, not a separate request you need to raise." },
@@ -911,7 +912,7 @@ const en: Dictionary = {
       eyebrow: "Personal Assistant for Executives",
       title: "Looking for a Personal Assistant? You May Need More Than an Assistant.",
       sub: "What a Personal Assistant typically covers, and where executives often need something broader.",
-      directAnswer: "Most executives who search for a Personal Assistant are really looking for relief from operational complexity, not just a calendar manager. A traditional PA is an excellent solution for scheduling, correspondence and day-to-day support. When personal, household, vendor, administrative and business operations start overlapping, many executives find they need broader ownership than a single assistant, however capable, can provide alone.",
+      directAnswer: "Most executives who search for a Personal Assistant are really looking for relief from operational complexity, not just a calendar manager. A traditional PA is an excellent solution for scheduling, correspondence and day-to-day support. When personal, household, vendor, administrative and business operations start overlapping, many executives find they need broader ownership than a single assistant, however capable, can provide alone. Ankora is an outsourced alternative to hiring another full-time personal assistant: executives and founders in Israel get a dedicated Operations Manager without adding headcount.",
       expectations: {
         title: "What executives typically expect from a Personal Assistant",
         items: [
@@ -957,6 +958,7 @@ const en: Dictionary = {
         ],
       },
       faq: [
+        { q: "Is Ankora a virtual assistant or staffing service?", a: "No. Ankora doesn't place employees or dispatch different virtual assistants per task. It's an outsourced Personal Operations Management service: one dedicated Operations Manager takes ongoing, end-to-end ownership of your operational areas, backed by AI orchestration, rather than executing one-off requests." },
         { q: "Is Ankora a replacement for a Personal Assistant?", a: "Not necessarily a replacement, an alternative for a different problem. If what you need is someone managing your calendar and sitting near you all day, a traditional PA remains the right choice. If the real issue is fragmented operational complexity across your personal, household and business life, Ankora is built for that instead." },
         { q: "Can Ankora manage my calendar like a Personal Assistant would?", a: "Coordinating a calendar is part of what your Operations Manager can handle, alongside the broader operational ownership Ankora provides. It's included as part of a wider scope, not offered as a standalone calendar-management service." },
         { q: "What if I already have a Personal Assistant?", a: "Many clients keep an existing Personal Assistant for day-to-day, in-person support and use Ankora for the operational areas that fall outside that role, household, vendors, administration, travel and business operations. The two models work well together rather than competing." },
@@ -974,7 +976,7 @@ const en: Dictionary = {
       eyebrow: "Ankora vs. Personal Assistant",
       title: "Ankora vs. Personal Assistant: Which One Do You Actually Need?",
       sub: "A genuine comparison, not a sales pitch. Both models are legitimate. They fit different situations.",
-      directAnswer: "A Personal Assistant is best when you need someone physically present with you, managing real-time scheduling and in-person tasks. Ankora is best when the real problem is fragmented operational ownership across personal, household, vendor, administrative, travel and business areas that need continuous, proactive management rather than task-by-task execution.",
+      directAnswer: "A Personal Assistant is best when you need someone physically present with you, managing real-time scheduling and in-person tasks. Ankora is best when the real problem is fragmented operational ownership across personal, household, vendor, administrative, travel and business areas that need continuous, proactive management rather than task-by-task execution. Ankora is an outsourced service, not a new hire: you get a dedicated Operations Manager without adding an employee.",
       columnA: "Personal Assistant",
       columnB: "Ankora",
       table: [
