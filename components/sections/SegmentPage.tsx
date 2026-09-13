@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import type { Locale, SegmentContent } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
@@ -7,6 +8,23 @@ import { RevealStagger, staggerItem, Reveal } from "@/components/motion/Reveal";
 import { Button } from "@/components/ui/Button";
 import { withLocale } from "@/lib/nav";
 import { motion } from "framer-motion";
+
+const bridge = {
+  en: {
+    pre: "This is one application of Ankora's ",
+    pomLabel: "Personal Operations Management",
+    mid: ", an outsourced ",
+    paLabel: "alternative to hiring a personal assistant",
+    post: " for executives, founders and family offices.",
+  },
+  he: {
+    pre: "זהו יישום של ",
+    pomLabel: "ניהול תפעול אישי",
+    mid: " מבית Ankora, ",
+    paLabel: "חלופה להעסקת עוזר אישי",
+    post: " למנהלים בכירים, יזמים ומשרדי משפחה.",
+  },
+} as const;
 
 export function SegmentPage({
   content,
@@ -17,11 +35,31 @@ export function SegmentPage({
   locale: Locale;
   cta: string;
 }) {
+  const copy = bridge[locale];
   return (
     <>
       <PageHero eyebrow={content.eyebrow} title={content.title} sub={content.sub} />
       <section className="bg-cream py-20 md:py-28">
         <Container>
+          <Reveal>
+            <p className="mx-auto mb-12 max-w-2xl text-center text-sm leading-relaxed text-navy/55">
+              {copy.pre}
+              <Link
+                href={withLocale(locale, "/personal-operations-management")}
+                className="text-navy underline decoration-gold/40 underline-offset-4 hover:text-gold"
+              >
+                {copy.pomLabel}
+              </Link>
+              {copy.mid}
+              <Link
+                href={withLocale(locale, "/personal-assistant-for-executives")}
+                className="text-navy underline decoration-gold/40 underline-offset-4 hover:text-gold"
+              >
+                {copy.paLabel}
+              </Link>
+              {copy.post}
+            </p>
+          </Reveal>
           <RevealStagger className="grid gap-4 md:grid-cols-3">
             {content.bullets.map((b) => (
               <motion.div key={b.title} variants={staggerItem} className="rounded-2xl border border-lineDark bg-paper p-7">
