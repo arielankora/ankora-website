@@ -544,7 +544,7 @@ const en: Dictionary = {
       eyebrow: "Areas of coverage",
       title: "Ankora's areas of operation",
       sub: "Anything that creates operational load has one address.",
-      intro: "This is where Personal Operations Management becomes concrete: the vendors, travel, personal administration, household matters and business tasks a dedicated Operations Manager owns end to end for clients in Israel. The list below is a sample of what we manage. If something isn't listed here, ask us anyway.",
+      intro: "Ankora's areas of coverage are the core of our Personal Operations Management service for executives, founders and busy families in Israel: vendor management, travel management, personal administration, household management, bureaucracy with authorities and institutions, and selected business operations, all owned end to end by one dedicated Operations Manager. The list below is a sample of what we manage. If something isn't listed here, ask us anyway.",
       searchPlaceholder: 'Search by keyword, like "car" or "authorities"',
       searchNoResults: "No results found. Try another word, or just ask us.",
       categories: [

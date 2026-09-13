@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
+import { SITE_URL } from "@/lib/site";
 import { AnkoraVsPersonalAssistantPage } from "@/components/sections/AnkoraVsPersonalAssistantPage";
 import { JsonLd } from "@/components/seo/JsonLd";
 
@@ -41,8 +42,20 @@ export default function Page({ params }: { params: { locale: string } }) {
     })),
   };
 
+  const serviceSchema = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "Personal Operations Management",
+    name: p.title,
+    provider: { "@type": "Organization", name: "Ankora", url: SITE_URL },
+    areaServed: "IL",
+    description: p.directAnswer,
+    url: `${SITE_URL}/${locale}/ankora-vs-personal-assistant`,
+  };
+
   return (
     <>
+      <JsonLd id="avpa-service-schema" data={serviceSchema} />
       <JsonLd id="avpa-faq-schema" data={faqSchema} />
       <AnkoraVsPersonalAssistantPage dict={dict} locale={locale} />
     </>
