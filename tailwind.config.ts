@@ -50,10 +50,16 @@ const config: Config = {
           "0%, 100%": { transform: "translate3d(0, 0, 0) scale(1)" },
           "50%": { transform: "translate3d(0, -3%, 0) scale(1.06)" },
         },
+        // /he redesign eyebrow dot pulse (design_handoff_ankora_redesign/README.md).
+        eyebrowPulse: {
+          "0%, 100%": { opacity: "0.25" },
+          "50%": { opacity: "1" },
+        },
       },
       animation: {
         drift: "drift 6s ease-in-out infinite",
         glowDrift: "glowDrift 18s ease-in-out infinite",
+        eyebrowPulse: "eyebrowPulse 2.6s ease-in-out infinite",
       },
     },
   },

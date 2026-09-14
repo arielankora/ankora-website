@@ -30,16 +30,21 @@ export function HairlineGrid({
 export function HairlineGridCell({
   children,
   className,
+  elevated = false,
   as: Comp = "div",
 }: {
   children: React.ReactNode;
   className?: string;
+  elevated?: boolean;
   as?: React.ElementType;
 }) {
   return (
     <Comp
       className={cn(
-        "bg-[rgba(11,27,51,0.5)] backdrop-blur-[12px] p-[clamp(22px,3vw,40px)]",
+        "p-[clamp(22px,3vw,40px)]",
+        elevated
+          ? "bg-[rgba(243,234,219,0.04)] backdrop-blur-[16px]"
+          : "bg-[rgba(11,27,51,0.5)] backdrop-blur-[12px]",
         className
       )}
     >
