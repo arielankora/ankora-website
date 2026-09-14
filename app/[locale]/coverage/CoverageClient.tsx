@@ -18,7 +18,8 @@ import { cn } from "@/lib/utils";
 // The /en card background is light (bg-paper), so a translucent gold mark with dark-navy
 // text reads clearly there. The /he redesign card background is dark, where that same
 // translucent overlay on dark navy composites to a dark tone and text-navy on it fails
-// contrast -- so /he passes a solid-enough gold mark with dark-ink text instead.
+// contrast -- so /he passes a solid (not translucent) gold mark with dark-ink text instead,
+// which measures ~5.6:1 against the card background (WCAG AA requires 4.5:1 for this size).
 function highlight(text: string, query: string, markClassName = "bg-gold/30 text-navy"): ReactNode {
   if (!query) return text;
   const lower = text.toLowerCase();
@@ -176,7 +177,7 @@ function HeCoverageClient({ locale, dict }: { locale: Locale; dict: ReturnType<t
                     <summary className="flex cursor-pointer list-none items-start gap-[18px] p-[clamp(22px,2.8vw,32px)] transition-colors duration-[350ms] ease-out hover:bg-[rgba(176,141,87,0.08)]">
                       <div className="min-w-0 flex-1">
                         <h3 className="text-[clamp(1.16rem,1.5vw,1.38rem)] font-normal text-paper">
-                          {highlight(cat.name, normalizedQuery, "bg-gold/70 text-ink")}
+                          {highlight(cat.name, normalizedQuery, "bg-gold text-ink")}
                         </h3>
                         <p className="mt-2.5 text-[1.02rem] font-light leading-[1.65] text-[#A9B8C9]">
                           {cat.description}
@@ -199,10 +200,10 @@ function HeCoverageClient({ locale, dict }: { locale: Locale; dict: ReturnType<t
                         {cat.services.map((s) => (
                           <div key={s.name} className="py-3.5">
                             <div className="text-sm font-medium text-paper">
-                              {highlight(s.name, normalizedQuery, "bg-gold/70 text-ink")}
+                              {highlight(s.name, normalizedQuery, "bg-gold text-ink")}
                             </div>
                             <div className="mt-1 text-xs leading-relaxed text-[#7C8EA3]">
-                              {highlight(s.description, normalizedQuery, "bg-gold/70 text-ink")}
+                              {highlight(s.description, normalizedQuery, "bg-gold text-ink")}
                             </div>
                           </div>
                         ))}
