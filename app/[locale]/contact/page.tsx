@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
+import { WideContainer } from "@/components/ui/WideContainer";
 import { Reveal } from "@/components/motion/Reveal";
 import { ContactForm } from "@/components/sections/ContactForm";
 
@@ -19,10 +20,55 @@ export async function generateMetadata({
   };
 }
 
+function HeContactPage({ locale, p }: { locale: Locale; p: ReturnType<typeof getDictionary>["pages"]["contact"] }) {
+  return (
+    <>
+      <section className="relative overflow-hidden pb-16 pt-40 md:pb-20 md:pt-48">
+        <WideContainer className="relative z-[1]">
+          <div className="grid gap-12 lg:items-start" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))" }}>
+            <div>
+              <Reveal>
+                <span className="font-jbmono text-[12px] tracking-[0.15em] text-gold">{p.eyebrow}</span>
+              </Reveal>
+              <Reveal delay={0.08}>
+                <h1 className="mt-6 text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-paper">
+                  {p.title}
+                </h1>
+              </Reveal>
+              <Reveal delay={0.16}>
+                <p className="mt-6 max-w-md font-assistant text-lg leading-relaxed text-[#D8CAB5]">{p.sub}</p>
+              </Reveal>
+              <Reveal delay={0.22}>
+                <div className="mt-10 border-t border-[rgba(243,234,219,0.12)] pt-8">
+                  <h3 className="font-jbmono text-[12px] tracking-[0.15em] text-[#7C8EA3]">{p.directTitle}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-[#A9B8C9]">{p.directBody}</p>
+                  <a
+                    href="mailto:hello@ankora.co.il"
+                    className="mt-4 block font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 hover:text-paper"
+                  >
+                    hello@ankora.co.il
+                  </a>
+                </div>
+              </Reveal>
+            </div>
+            <Reveal delay={0.1}>
+              <ContactForm p={p} locale="he" />
+            </Reveal>
+          </div>
+        </WideContainer>
+      </section>
+    </>
+  );
+}
+
 export default function ContactPage({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.contact;
+
+  if (locale === "he") {
+    return <HeContactPage locale={locale} p={p} />;
+  }
 
   return (
     <>
