@@ -1,6 +1,15 @@
 import { Reveal } from "@/components/motion/Reveal";
+import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 
-export function ComparisonTable({
+// /he redesign comparison-row pattern, built to the design_handoff_ankora_redesign/
+// README.md spec word for word (this went through several iterations during design):
+// each row is its own block in a 1px grid; the row label is a full-width, start-aligned
+// hairline-underlined header spanning BOTH columns (never centred -- centring makes it
+// read as belonging to the gold column); below it, two values in an auto-fit row, each
+// delineated by a border-inline-start (translucent cream for the comparison side, solid
+// gold for the Ankora side). Never a fixed three-column grid -- one was tried here and
+// failed badly at narrow widths (one-word-per-line).
+function HeComparisonTable({
   columnA,
   columnB,
   rows,
@@ -9,6 +18,49 @@ export function ComparisonTable({
   columnB: string;
   rows: { dimension: string; a: string; b: string }[];
 }) {
+  return (
+    <Reveal delay={0.1}>
+      <HairlineGrid minCell={9999}>
+        {rows.map((row) => (
+          <HairlineGridCell key={row.dimension}>
+            <div className="border-b border-[rgba(243,234,219,0.16)] pb-3.5 text-start text-[14.5px] font-semibold tracking-[0.02em] text-paper">
+              {row.dimension}
+            </div>
+            <div
+              className="mt-[18px] grid gap-x-8 gap-y-4"
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" }}
+            >
+              <div className="border-[rgba(243,234,219,0.18)] ps-3.5" style={{ borderInlineStartWidth: 1, borderInlineStartStyle: "solid" }}>
+                <div className="text-[12.5px] font-semibold text-[#7C8EA3]">{columnA}</div>
+                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-[#A9B8C9]">{row.a}</div>
+              </div>
+              <div className="border-gold ps-3.5" style={{ borderInlineStartWidth: 1, borderInlineStartStyle: "solid" }}>
+                <div className="text-[12.5px] font-semibold text-gold">{columnB}</div>
+                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-paper">{row.b}</div>
+              </div>
+            </div>
+          </HairlineGridCell>
+        ))}
+      </HairlineGrid>
+    </Reveal>
+  );
+}
+
+export function ComparisonTable({
+  columnA,
+  columnB,
+  rows,
+  locale,
+}: {
+  columnA: string;
+  columnB: string;
+  rows: { dimension: string; a: string; b: string }[];
+  locale?: "he" | "en";
+}) {
+  if (locale === "he") {
+    return <HeComparisonTable columnA={columnA} columnB={columnB} rows={rows} />;
+  }
+
   return (
     <Reveal delay={0.1}>
       {/* Desktop / tablet: a real semantic table, kept in the DOM at every
