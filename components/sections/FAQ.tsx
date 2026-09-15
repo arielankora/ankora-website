@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { Dictionary } from "@/content";
 import { Container } from "@/components/ui/Container";
 import { WideContainer } from "@/components/ui/WideContainer";
@@ -16,6 +17,26 @@ import { cn } from "@/lib/utils";
 // every answer stays mounted in the server-rendered HTML at all times, not just the
 // one open by default, so crawlers that don't execute click interactions still see
 // the full answer text.
+// Wraps one exact phrase in an answer string with an internal link, leaving every
+// other character untouched. Used to add the /coverage link inside the existing FAQ
+// answer text (Ariel: wrap the words, don't reword the sentence). Scoped to HeFAQ only
+// -- this component has a single caller (the home page) so a plain substring match is
+// safe and won't accidentally touch another page's copy.
+function linkifyCoverage(text: string): React.ReactNode {
+  const phrase = "דף תחומי הפעולה";
+  const idx = text.indexOf(phrase);
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <Link href="/he/coverage" className="text-gold underline decoration-gold/40 underline-offset-4 hover:text-paper">
+        {phrase}
+      </Link>
+      {text.slice(idx + phrase.length)}
+    </>
+  );
+}
+
 function HeFAQ({ dict }: { dict: Dictionary }) {
   const [open, setOpen] = useState<number | null>(0);
 
@@ -55,7 +76,7 @@ function HeFAQ({ dict }: { dict: Dictionary }) {
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <p className="pb-6 max-w-[80ch] text-sm leading-relaxed text-[#A9B8C9] md:text-base">{item.a}</p>
+                  <p className="pb-6 max-w-[80ch] text-sm leading-relaxed text-[#A9B8C9] md:text-base">{linkifyCoverage(item.a)}</p>
                 </motion.div>
               </div>
             );

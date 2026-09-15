@@ -259,7 +259,7 @@ const he: Dictionary = {
     },
     roi: {
       eyebrow: "מחשבון ROI",
-      title: "כמה זמן וכסף Ankora יכולה לחזיר לכם",
+      title: "כמה זמן וכסף Ankora יכולה להחזיר לכם",
       sub: "בחרו את הפרופיל שהכי מתאים לכם, התאימו את המספרים למציאות שלכם, וקבלו הערכה מיידית.",
       personaPrompt: "מי אתם?",
       hoursUnitLabel: "שעות בשבוע",
@@ -328,7 +328,7 @@ const he: Dictionary = {
         valueFreedLabel: "עלות המעסיק המלאה של הזמן המושקע היום",
         valueFreedHint: "עלות השעה הישירה שהזנתם, בתוספת כ-33% עלויות מעסיק וזמן משולם לא פרודוקטיבי",
         costLabel: "עלות Ankora המשוערת",
-        costHint: "מבוסס על תעריף לדוגמה של 130 ש\"ח לשעה",
+        costHint: "מבוסס על תעריף לדוגמה של ₪130 לשעה",
         netValueLabel: "חיסכון נטו בחודש",
         multipleLabel: "החזר של",
         multipleSuffix: "על כל שקל שהושקע",
@@ -387,6 +387,18 @@ const he: Dictionary = {
           { title: "שעות שלא נוצלו עוברות הלאה", body: "כל עוד ממשיכים לחדש את החבילה, שום דבר לא הולך לאיבוד." },
           { title: "בלי התחייבות ארוכת טווח", body: "אפשר לעצור את החבילה בכל חודש, בלי קנס ובלי הסברים." },
         ],
+        // New /he UI chrome: the 3-month bar chart illustrating the rollover mechanic,
+        // and its legend. Sample numbers for illustration only, same convention as the
+        // tiers footnote below. Flagged per project convention, not a rewrite.
+        chart: {
+          usedLabel: "שעות שנוצלו",
+          rolloverLabel: "יתרה שעוברת לחודש הבא",
+          months: [
+            { label: "חודש 1", used: 14, rollover: 6 },
+            { label: "חודש 2", used: 20, rollover: 6 },
+            { label: "חודש 3", used: 18, rollover: 8 },
+          ],
+        },
       },
       tiers: {
         label: "החבילות",
@@ -403,6 +415,9 @@ const he: Dictionary = {
         title: "מוכנים לראות כמה זמן זה באמת חוסך?",
         body: "שיחת היכרות של עשרים דקות. בלי מחויבות, בלי טפסים ארוכים.",
         cta: "לתיאום שיחת היכרות",
+        // New /he UI chrome: secondary link to the ROI calculator, which answers this
+        // exact question directly. Flagged per project convention, not a rewrite.
+        secondaryCta: "או נסו את מחשבון ה-ROI",
       },
     },
     contact: {

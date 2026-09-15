@@ -215,9 +215,10 @@ function HeRoiClient({ locale }: { locale: Locale }) {
 
                 <div className="mt-6 flex items-center justify-between border border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] px-4 py-3">
                   <span className="text-sm font-medium text-paper">{p.hoursTotalLabel}</span>
-                  <span className="text-lg font-semibold text-gold">
-                    {totalHoursPerWeek} <span className="text-xs font-normal text-[#7C8EA3]">{p.hoursUnitLabel}</span>
-                  </span>
+                  {/* p.hoursTotalLabel ("סה\"כ שעות בשבוע") already states the unit, so the
+                      value itself is unitless here -- avoids "8 שעות בשבוע" repeating the
+                      unit that's already in the label right next to it. */}
+                  <span className="text-lg font-semibold text-gold">{totalHoursPerWeek}</span>
                 </div>
 
                 <div className="mt-8">

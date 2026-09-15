@@ -39,7 +39,7 @@ function HeBlogIndexPage({
         title={b.title}
         sub={b.sub}
         locale="he"
-        breadcrumb={<Breadcrumbs locale={locale} items={[{ label: b.eyebrow }]} />}
+        breadcrumb={<Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: b.eyebrow }]} />}
       />
 
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">

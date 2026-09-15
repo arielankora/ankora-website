@@ -28,9 +28,13 @@ function HeBlogCard({ post, dict, locale }: { post: BlogPostMeta; dict: Dictiona
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-[rgba(243,234,219,0.04)]">
         {post.coverImage ? (
+          /* The whole card is one <Link>, and its accessible name concatenates every
+             descendant text node including image alt text. The post title is already the
+             visible <h3> a few lines down, so the cover image is marked decorative (alt="")
+             here to avoid the title being announced/read twice for the same link. */
           <Image
             src={post.coverImage}
-            alt={post.title}
+            alt=""
             fill
             className={`object-cover transition-transform duration-500 group-hover:scale-[1.03] ${coverPositionClass(post.coverImagePosition)}`}
           />

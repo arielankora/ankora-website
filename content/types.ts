@@ -190,6 +190,13 @@ export interface PagesContent {
       title: string;
       body: string;
       points: { title: string; body: string }[];
+      // /he only: the 3-month rollover bar chart + its legend (Ariel: "without the legend
+      // the diagram isn't understandable"). Optional so /en doesn't need it.
+      chart?: {
+        usedLabel: string;
+        rolloverLabel: string;
+        months: { label: string; used: number; rollover: number }[];
+      };
     };
     tiers: {
       label: string;
@@ -198,7 +205,11 @@ export interface PagesContent {
       items: { name: string; hours: string; rate: string; blurb: string; highlighted: boolean }[];
       footnote: string;
     };
-    closing: { title: string; body: string; cta: string };
+    // secondaryCta: optional /he addition -- links to the ROI calculator alongside
+    // the existing contact CTA, since the ROI page answers the closing question
+    // ("how much time does this actually save?") directly. Optional so /en (unchanged
+    // this round) doesn't need it.
+    closing: { title: string; body: string; cta: string; secondaryCta?: string };
   };
   contact: {
     eyebrow: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { WideContainer } from "@/components/ui/WideContainer";
 import { Badge } from "@/components/ui/Badge";
@@ -9,7 +10,37 @@ import { Reveal } from "@/components/motion/Reveal";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-function HePageFAQ({ label, title, items }: { label: string; title: string; items: { q: string; a: string }[] }) {
+// Wraps one exact phrase in an answer string with an internal link, leaving the rest
+// of the sentence untouched (no rewording). Opt-in via the `linkify` prop rather than a
+// blanket replace, because PageFAQ is shared by three different pages' FAQs -- a global
+// substring match here would silently add the same link to another page's copy that
+// happens to contain the same phrase, which wasn't asked for.
+function linkifyPhrase(text: string, linkify?: { phrase: string; href: string }): React.ReactNode {
+  if (!linkify) return text;
+  const idx = text.indexOf(linkify.phrase);
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <Link href={linkify.href} className="text-gold underline decoration-gold/40 underline-offset-4 hover:text-paper">
+        {linkify.phrase}
+      </Link>
+      {text.slice(idx + linkify.phrase.length)}
+    </>
+  );
+}
+
+function HePageFAQ({
+  label,
+  title,
+  items,
+  linkify,
+}: {
+  label: string;
+  title: string;
+  items: { q: string; a: string }[];
+  linkify?: { phrase: string; href: string };
+}) {
   const [open, setOpen] = useState<number | null>(0);
 
   return (
@@ -41,7 +72,7 @@ function HePageFAQ({ label, title, items }: { label: string; title: string; item
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <p className="max-w-[80ch] pb-6 text-sm leading-relaxed text-[#A9B8C9] md:text-base">{item.a}</p>
+                  <p className="max-w-[80ch] pb-6 text-sm leading-relaxed text-[#A9B8C9] md:text-base">{linkifyPhrase(item.a, linkify)}</p>
                 </motion.div>
               </div>
             );
@@ -58,18 +89,22 @@ export function PageFAQ({
   items,
   tone = "light",
   locale,
+  linkify,
 }: {
   label: string;
   title: string;
   items: { q: string; a: string }[];
   tone?: "light" | "dark";
   locale?: "he" | "en";
+  // /he only: wraps one exact phrase in one answer with an internal link. Opt-in per
+  // call site (see linkifyPhrase above) since PageFAQ is shared across pages.
+  linkify?: { phrase: string; href: string };
 }) {
   const [open, setOpen] = useState<number | null>(0);
   const isLight = tone === "light";
 
   if (locale === "he") {
-    return <HePageFAQ label={label} title={title} items={items} />;
+    return <HePageFAQ label={label} title={title} items={items} linkify={linkify} />;
   }
 
   return (

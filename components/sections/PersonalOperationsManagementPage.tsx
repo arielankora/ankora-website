@@ -218,7 +218,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
         </WideContainer>
       </section>
 
-      <PageFAQ label={p.eyebrow} title="FAQ" items={p.faq} locale="he" />
+      <PageFAQ label={p.eyebrow} title="FAQ" items={p.faq} locale="he" linkify={{ phrase: "דף התמחור", href: "/he/pricing" }} />
 
       <RelatedLinks
         locale={locale}

@@ -6,13 +6,27 @@ import { WideContainer } from "@/components/ui/WideContainer";
 import { Reveal } from "@/components/motion/Reveal";
 import { ContactForm } from "@/components/sections/ContactForm";
 
+// /he: dedicated title/description so this conversion page doesn't fall back to the
+// generic site meta (flagged and fixed per Ariel's production QA pass). /en keeps its
+// prior behaviour (no override) -- untouched, per project convention.
+const heMeta = {
+  title: "שיחת היכרות | Ankora",
+  description:
+    "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
+};
+
 export async function generateMetadata({
   params,
 }: {
   params: { locale: string };
 }): Promise<Metadata> {
   const locale = params.locale === "en" ? "en" : "he";
+  const meta =
+    locale === "he"
+      ? { title: heMeta.title, description: heMeta.description }
+      : {};
   return {
+    ...meta,
     alternates: {
       canonical: `/${locale}/contact`,
       languages: { he: "/he/contact", en: "/en/contact" },

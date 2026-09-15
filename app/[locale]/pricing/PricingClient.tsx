@@ -99,6 +99,42 @@ export default function PricingClient({ params }: { params: { locale: string } }
             <p className="mt-4 max-w-xl text-navy/60">{p.hourBank.body}</p>
           </Reveal>
 
+          {/* /he only: 3-month rollover bar chart + legend (design spec called for this;
+              it had never actually been implemented -- Ariel: "without the legend the
+              diagram isn't understandable"). Sample numbers, illustrative only. */}
+          {locale === "he" && p.hourBank.chart && (
+            <Reveal delay={0.18} className="mt-12">
+              <div className="rounded-2xl border border-lineDark bg-cream/40 p-7 md:p-10">
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                  <div className="flex items-center gap-2 text-xs text-navy/60">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-navy/70" />
+                    {p.hourBank.chart.usedLabel}
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-navy/60">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gold" />
+                    {p.hourBank.chart.rolloverLabel}
+                  </div>
+                </div>
+                <div className="mt-8 grid grid-cols-3 gap-6">
+                  {p.hourBank.chart.months.map((m) => {
+                    const max = Math.max(...p.hourBank.chart!.months.map((mm) => mm.used + mm.rollover));
+                    const usedPct = max > 0 ? (m.used / max) * 100 : 0;
+                    const rolloverPct = max > 0 ? (m.rollover / max) * 100 : 0;
+                    return (
+                      <div key={m.label} className="flex flex-col items-center">
+                        <div className="flex h-40 w-full max-w-[64px] flex-col-reverse overflow-hidden rounded-lg bg-navy/5">
+                          <div className="w-full bg-navy/70" style={{ height: `${usedPct}%` }} />
+                          <div className="w-full bg-gold" style={{ height: `${rolloverPct}%` }} />
+                        </div>
+                        <span className="mt-3 text-xs text-navy/50">{m.label}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </Reveal>
+          )}
+
           <RevealStagger className="mt-16 grid gap-4 md:grid-cols-2">
             {p.hourBank.points.map((pt) => (
               <motion.div
@@ -126,8 +162,16 @@ export default function PricingClient({ params }: { params: { locale: string } }
           <Reveal delay={0.1}>
             <p className="mx-auto mt-5 max-w-md text-paper/55">{p.closing.body}</p>
           </Reveal>
-          <Reveal delay={0.2} className="mt-10 flex justify-center">
+          <Reveal delay={0.2} className="mt-10 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
             <Button href={withLocale(locale, "/contact")}>{p.closing.cta}</Button>
+            {/* /he only: secondary link to the ROI calculator, which directly answers this
+                section's own question ("how much time does this actually save?"). Ariel
+                asked for this alongside the existing contact CTA, not replacing it. */}
+            {locale === "he" && p.closing.secondaryCta && (
+              <Button href={withLocale(locale, "/roi")} variant="ghost">
+                {p.closing.secondaryCta}
+              </Button>
+            )}
           </Reveal>
         </Container>
       </section>
