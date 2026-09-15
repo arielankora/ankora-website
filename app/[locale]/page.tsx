@@ -85,16 +85,16 @@ export default function Home({ params }: { params: { locale: string } }) {
       <JsonLd id="service-schema" data={serviceSchema} />
       <JsonLd id="faq-schema" data={faqSchema} />
       <Hero dict={dict} locale={locale} />
-      <EditorialSection label={dict.problem.label} title={dict.problem.title} body={dict.problem.body} tone="light" />
-      <EditorialSection label={dict.insight.label} title={dict.insight.title} body={dict.insight.body} tone="dark" />
-      <EditorialSection label={dict.category.label} title={dict.category.title} body={dict.category.body} tone="light" />
-      <HowItWorks dict={dict} />
-      <Intelligence dict={dict} />
-      <Capabilities dict={dict} />
-      <HumanAI dict={dict} />
+      <EditorialSection label={dict.problem.label} title={dict.problem.title} body={dict.problem.body} tone="light" locale={locale} />
+      <EditorialSection label={dict.insight.label} title={dict.insight.title} body={dict.insight.body} tone="dark" locale={locale} />
+      <EditorialSection label={dict.category.label} title={dict.category.title} body={dict.category.body} tone="light" locale={locale} />
+      <HowItWorks dict={dict} locale={locale} />
+      <Intelligence dict={dict} locale={locale} />
+      <Capabilities dict={dict} locale={locale} />
+      <HumanAI dict={dict} locale={locale} />
       <Industries dict={dict} locale={locale} />
-      <Trust dict={dict} />
-      <FAQ dict={dict} />
+      <Trust dict={dict} locale={locale} />
+      <FAQ dict={dict} locale={locale} />
       <FinalCTA dict={dict} locale={locale} />
     </>
   );

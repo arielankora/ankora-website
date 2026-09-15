@@ -12,7 +12,23 @@ import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
 import { cn } from "@/lib/utils";
 
+// Flat top-level links per design_handoff_ankora_redesign/design-files/Site Nav.dc.html —
+// no Solutions dropdown in the redesigned /he nav (the 4 segment routes stay reachable via
+// the footer's "עבור מי" column and in-page links). Flagged to Ariel in the Stage 1 report
+// as an IA change, not a silent decision.
+function heNavLinks(dict: Dictionary) {
+  return [
+    { href: "/how-it-works", label: dict.nav.howItWorks },
+    { href: "/technology", label: dict.nav.technology },
+    { href: "/about", label: dict.nav.about },
+    { href: "/pricing", label: dict.nav.pricing },
+    { href: "/roi", label: dict.nav.roi },
+    { href: "/blog", label: dict.nav.blog },
+  ];
+}
+
 export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+  const isHe = locale === "he";
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -51,6 +67,116 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       window.scrollTo(0, scrollY);
     };
   }, [mobileOpen]);
+
+  const mobileMenu = mounted &&
+    createPortal(
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ y: -16 }}
+            animate={{ y: 0 }}
+            exit={{ y: -16 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
+            style={{ backgroundColor: "#0B1B33", opacity: 1 }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-lg font-semibold text-paper">ANKORA</span>
+              <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
+                <svg width="18" height="18" viewBox="0 0 18 18">
+                  <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
+                </svg>
+              </button>
+            </div>
+            <nav className="mt-12 flex flex-col gap-7">
+              {(isHe
+                ? heNavLinks(dict)
+                : [
+                    { label: dict.nav.solutions, href: "/solutions" },
+                    { label: dict.nav.howItWorks, href: "/how-it-works" },
+                    { label: dict.nav.technology, href: "/technology" },
+                    { label: dict.nav.about, href: "/about" },
+                    { label: dict.nav.pricing, href: "/pricing" },
+                    { label: dict.nav.roi, href: "/roi" },
+                    { label: dict.nav.blog, href: "/blog" },
+                  ]
+              ).map((item) => (
+                <Link
+                  key={item.href}
+                  href={withLocale(locale, item.href)}
+                  onClick={() => setMobileOpen(false)}
+                  className="text-2xl font-medium text-paper"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="mt-auto flex flex-col gap-4">
+              <Button href={withLocale(locale, "/contact")} className="w-full">
+                {dict.nav.cta}
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>,
+      document.body
+    );
+
+  if (isHe) {
+    return (
+      <>
+        <header
+          className="sticky top-0 z-50 border-b border-[rgba(243,234,219,0.09)] bg-[rgba(11,27,51,0.62)] font-assistant backdrop-blur-[20px] [backdrop-filter:blur(20px)_saturate(1.2)]"
+        >
+          <div className="mx-auto flex max-w-wide items-center gap-[clamp(14px,3vw,44px)] px-[clamp(18px,4vw,56px)] py-[15px]">
+            <Link href={withLocale(locale, "/")} className="flex shrink-0 items-center">
+              <Image src="/logo-cream.jpg" alt="Ankora" width={40} height={40} />
+            </Link>
+
+            <nav className="hidden flex-1 flex-wrap items-center gap-[clamp(10px,1.8vw,26px)] text-[14.5px] lg:flex">
+              {heNavLinks(dict).map((item) => (
+                <Link
+                  key={item.href}
+                  href={withLocale(locale, item.href)}
+                  className="text-[#B6C4D4] transition-colors hover:text-gold"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+
+            <div className="hidden shrink-0 items-center gap-[14px] lg:flex">
+              <Link
+                href="/en"
+                className="font-jbmono text-[12px] tracking-[0.1em] text-[#7C8EA3] transition-colors hover:text-gold"
+              >
+                EN
+              </Link>
+              <Link
+                href={withLocale(locale, "/contact")}
+                className="border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-5 py-[11px] text-[14.5px] font-medium text-paper transition-colors duration-300 ease-out hover:border-gold hover:bg-gold hover:text-ink"
+              >
+                {dict.nav.cta}
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-3 lg:hidden">
+              <button
+                aria-label="Menu"
+                className="flex h-10 w-10 items-center justify-center"
+                onClick={() => setMobileOpen(true)}
+              >
+                <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+                  <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </header>
+        {mobileMenu}
+      </>
+    );
+  }
 
   return (
     <>
@@ -143,57 +269,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       </Container>
 
     </header>
-
-      {mounted &&
-        createPortal(
-          <AnimatePresence>
-            {mobileOpen && (
-              <motion.div
-                initial={{ y: -16 }}
-                animate={{ y: 0 }}
-                exit={{ y: -16 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
-                style={{ backgroundColor: "#0B1B33", opacity: 1 }}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-lg font-semibold text-paper">ANKORA</span>
-                  <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
-                    <svg width="18" height="18" viewBox="0 0 18 18">
-                      <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
-                    </svg>
-                  </button>
-                </div>
-                <nav className="mt-12 flex flex-col gap-7">
-                  {[
-                    { label: dict.nav.solutions, href: "/solutions" },
-                    { label: dict.nav.howItWorks, href: "/how-it-works" },
-                    { label: dict.nav.technology, href: "/technology" },
-                    { label: dict.nav.about, href: "/about" },
-                    { label: dict.nav.pricing, href: "/pricing" },
-                    { label: dict.nav.roi, href: "/roi" },
-                    { label: dict.nav.blog, href: "/blog" },
-                  ].map((item) => (
-                    <Link
-                      key={item.href}
-                      href={withLocale(locale, item.href)}
-                      onClick={() => setMobileOpen(false)}
-                      className="text-2xl font-medium text-paper"
-                    >
-                      {item.label}
-                    </Link>
-                  ))}
-                </nav>
-                <div className="mt-auto flex flex-col gap-4">
-                  <Button href={withLocale(locale, "/contact")} className="w-full">
-                    {dict.nav.cta}
-                  </Button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>,
-          document.body
-        )}
+      {mobileMenu}
     </>
   );
 }

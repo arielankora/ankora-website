@@ -236,6 +236,12 @@ export interface PagesContent {
     intro: string;
     searchPlaceholder: string;
     searchNoResults: string;
+    // /he redesign new UI chrome (design_handoff_ankora_redesign/README.md, "10. Coverage"):
+    // the live "N domains / M services" counter labels and the empty-state CTA button.
+    // Optional so /en (unchanged design, no counter/CTA button in that layout) doesn't need them.
+    areaCountLabel?: string;
+    serviceCountLabel?: string;
+    emptyStateCta?: string;
     categories: {
       name: string;
       description: string;

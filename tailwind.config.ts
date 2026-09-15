@@ -27,9 +27,14 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["Heebo", "system-ui", "sans-serif"],
+        assistant: ["Assistant", "system-ui", "sans-serif"],
+        jbmono: ["JetBrains Mono", "monospace"],
       },
       maxWidth: {
         content: "1440px",
+        // Wide container used only by the /he redesign (spec: 1480px content max-width).
+        // Kept separate from `content` so /en's existing 1440px containers are untouched.
+        wide: "1480px",
       },
       backgroundImage: {
         "gold-gradient": "linear-gradient(120deg, #B08D57 0%, #C7AC7E 50%, #B08D57 100%)",
@@ -40,9 +45,21 @@ const config: Config = {
           "0%, 100%": { transform: "translateY(0px)" },
           "50%": { transform: "translateY(-10px)" },
         },
+        // /he redesign page-glow drift (design_handoff_ankora_redesign/README.md).
+        glowDrift: {
+          "0%, 100%": { transform: "translate3d(0, 0, 0) scale(1)" },
+          "50%": { transform: "translate3d(0, -3%, 0) scale(1.06)" },
+        },
+        // /he redesign eyebrow dot pulse (design_handoff_ankora_redesign/README.md).
+        eyebrowPulse: {
+          "0%, 100%": { opacity: "0.25" },
+          "50%": { opacity: "1" },
+        },
       },
       animation: {
         drift: "drift 6s ease-in-out infinite",
+        glowDrift: "glowDrift 18s ease-in-out infinite",
+        eyebrowPulse: "eyebrowPulse 2.6s ease-in-out infinite",
       },
     },
   },

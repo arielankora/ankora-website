@@ -1,15 +1,25 @@
 import type { Metadata } from "next";
+import "@fontsource/heebo/200.css";
 import "@fontsource/heebo/300.css";
 import "@fontsource/heebo/400.css";
 import "@fontsource/heebo/500.css";
 import "@fontsource/heebo/600.css";
 import "@fontsource/heebo/700.css";
 import "@fontsource/heebo/800.css";
+// Redesign (/he) typography: Assistant for body/lead/eyebrow, JetBrains Mono for captions.
+import "@fontsource/assistant/200.css";
+import "@fontsource/assistant/300.css";
+import "@fontsource/assistant/400.css";
+import "@fontsource/assistant/500.css";
+import "@fontsource/assistant/600.css";
+import "@fontsource/jetbrains-mono/300.css";
+import "@fontsource/jetbrains-mono/400.css";
 import "../globals.css";
 import { getDictionary, locales, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
+import { PageShell } from "@/components/layout/PageShell";
 
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -68,9 +78,11 @@ export default function LocaleLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        <Header dict={dict} locale={locale} />
-        <main>{children}</main>
-        <Footer dict={dict} locale={locale} />
+        <PageShell locale={locale}>
+          <Header dict={dict} locale={locale} />
+          <main>{children}</main>
+          <Footer dict={dict} locale={locale} />
+        </PageShell>
       </body>
     </html>
   );

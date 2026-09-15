@@ -40,5 +40,14 @@ export async function generateMetadata({
 export default function Page({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
-  return <SegmentPage content={dict.pages.segments.companies} locale={locale} cta={dict.hero.ctaPrimary} />;
+  return (
+    <SegmentPage
+      content={dict.pages.segments.companies}
+      locale={locale}
+      cta={dict.hero.ctaPrimary}
+      currentHref="/solutions/companies"
+      solutionsMenu={dict.nav.solutionsMenu}
+      crossLinkLabel={locale === "he" ? "פתרונות נוספים" : "More Solutions"}
+    />
+  );
 }

@@ -547,6 +547,11 @@ const he: Dictionary = {
       intro: "תחומי הפעולה של Ankora הם הליבה של שירות ניהול התפעול האישי שלנו למנהלים בכירים, יזמים ומשפחות עסוקות בישראל: ניהול ספקים, ניהול נסיעות, מנהלה אישית, ניהול משק הבית, בירוקרטיה מול רשויות ומוסדות ותפעול עסקי נבחר, הכל באחריות מלאה מקצה לקצה של מנהל תפעול ייעודי אחד. הרשימה הבאה היא דוגמה לסוג הדברים שאנחנו מנהלים עבור הלקוחות שלנו. אם משהו לא מופיע כאן, כדאי לשאול אותנו בכל מקרה.",
       searchPlaceholder: "חיפוש לפי מילה, למשל \"רכב\" או \"רשויות\"",
       searchNoResults: "לא נמצאו תוצאות. נסו מילה אחרת, או פשוט תשאלו אותנו.",
+      // New UI chrome for the /he redesign card-grid layout (not on the live site before
+      // this change) -- flagged per project convention, not a rewrite of existing copy.
+      areaCountLabel: "תחומים",
+      serviceCountLabel: "שירותים",
+      emptyStateCta: "לשאול אותנו",
       categories: [
         {
           name: "מול הרשויות והמוסדות",
