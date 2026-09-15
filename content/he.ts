@@ -280,7 +280,9 @@ const he: Dictionary = {
           ],
           rateLabel: "מה עלות השעה הישירה שלכם?",
           rateHint: "עלות ישירה של שעת עבודה שלכם, לפני עלויות מעסיק",
-          rateDefault: 400,
+          // Aligned to spec (was 400, a transcription slip from the original ROI build
+          // with no documented rationale for the deviation -- confirmed with Ariel).
+          rateDefault: 450,
         },
         {
           key: "founders",
@@ -306,7 +308,8 @@ const he: Dictionary = {
           ],
           rateLabel: "מה עלות השעה הישירה של מי שמבצע את זה היום?",
           rateHint: "אתם, מנהל/ת משרד, או איש/אשת צוות",
-          rateDefault: 300,
+          // Aligned to spec (was 300, same transcription slip as executives above).
+          rateDefault: 380,
         },
         {
           key: "familyOffice",
@@ -319,7 +322,8 @@ const he: Dictionary = {
           ],
           rateLabel: "מה עלות השעה הישירה של מי שמבצע את זה היום?",
           rateHint: "אתם, או איש/אשת צוות",
-          rateDefault: 250,
+          // Aligned to spec (was 250, same transcription slip as the other personas above).
+          rateDefault: 300,
         },
       ],
       results: {
@@ -334,7 +338,13 @@ const he: Dictionary = {
         multipleSuffix: "על כל שקל שהושקע",
         ctaBody: "המספרים הם הערכה. שיחת היכרות קצרה תיתן תמונה מדויקת עבורכם.",
         cta: "לתיאום שיחת היכרות",
-        footnote: "* החישוב להמחשה בלבד: עלות הזמן המושקע היום מחושבת לפי עלות השעה הישירה שהוזנה, כפול 1.33 לשיקוף עלויות מעסיק, ומחולקת בחלק הפרודוקטיבי של הזמן המשולם (100% פחות אחוז הזמן הלא פרודוקטיבי שהוזן). עלות Ankora מחושבת לפי תעריף לדוגמה של 130 ש\"ח לשעה. אינו מהווה הצעת מחיר או התחייבות.",
+        // Rounding disclosure sentence added per Ariel decision (option 1: keep
+        // full-precision math, disclose the rounding) -- three independently-rounded
+        // displayed numbers will not always subtract to match on screen, and a
+        // calculator built to earn trust with senior executives should not leave
+        // that unexplained. Also fixed a second "130 ש\"ח" occurrence missed in the
+        // earlier currency-symbol pass (that one only touched costHint).
+        footnote: "* החישוב להמחשה בלבד: עלות הזמן המושקע היום מחושבת לפי עלות השעה הישירה שהוזנה, כפול 1.33 לשיקוף עלויות מעסיק, ומחולקת בחלק הפרודוקטיבי של הזמן המשולם (100% פחות אחוז הזמן הלא פרודוקטיבי שהוזן). עלות Ankora מחושבת לפי תעריף לדוגמה של ₪130 לשעה. הסכומים על המסך מעוגלים לצורך התצוגה, ולכן ייתכן פער של שקל או שניים בחיסור פשוט ביניהם. אינו מהווה הצעת מחיר או התחייבות.",
       },
       hiddenCost: {
         label: "מעבר למספרים",
