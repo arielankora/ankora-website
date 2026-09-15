@@ -246,7 +246,7 @@ function HeRoiClient({ locale }: { locale: Locale }) {
                     <input
                       type="range"
                       min={0}
-                      max={40}
+                      max={60}
                       step={1}
                       value={nonProductivePct}
                       onChange={(e) => setNonProductivePct(Number(e.target.value))}
@@ -477,7 +477,7 @@ function EnRoiClient({ locale }: { locale: Locale }) {
                     <input
                       type="range"
                       min={0}
-                      max={40}
+                      max={60}
                       step={1}
                       value={nonProductivePct}
                       onChange={(e) => setNonProductivePct(Number(e.target.value))}
