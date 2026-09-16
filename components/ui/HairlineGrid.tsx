@@ -19,7 +19,13 @@ export function HairlineGrid({
 }) {
   return (
     <div
-      className={cn("grid gap-px bg-[rgba(243,234,219,0.11)] border border-[rgba(243,234,219,0.11)]", className)}
+      // items-stretch is CSS grid's own default, but it's made explicit here (rather
+      // than left implicit) so a future className override can't silently reintroduce
+      // the bug below by adding items-start/items-baseline.
+      className={cn(
+        "grid items-stretch gap-px bg-[rgba(243,234,219,0.11)] border border-[rgba(243,234,219,0.11)]",
+        className
+      )}
       style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minCell}px), 1fr))` }}
     >
       {children}
@@ -40,8 +46,17 @@ export function HairlineGridCell({
 }) {
   return (
     <Comp
+      // h-full: the gap in HairlineGrid IS the divider line (parent bg shows through
+      // it as a 1px hairline). When one cell holds less content than its row siblings,
+      // its grid item box still stretches to the row's height by default -- but this
+      // element is a plain block child of that box, not the box itself, so without an
+      // explicit height it only grows to fit its own content. The shortfall exposes
+      // the parent's light background as a solid strip instead of a 1px line. h-full
+      // makes this element fill its (already-stretched) grid-item parent so the card's
+      // own background reaches the row's full height in every case, not just when
+      // every sibling happens to hold the same amount of content.
       className={cn(
-        "p-[clamp(22px,3vw,40px)]",
+        "h-full p-[clamp(22px,3vw,40px)]",
         elevated
           ? "bg-[rgba(243,234,219,0.04)] backdrop-blur-[16px]"
           : "bg-[rgba(11,27,51,0.5)] backdrop-blur-[12px]",
