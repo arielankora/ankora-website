@@ -13,8 +13,7 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { BlogCard } from "@/components/sections/BlogCard";
 import { FinalCTA } from "@/components/sections/FinalCTA";
-import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/motion/Reveal";
 import { JsonLd } from "@/components/seo/JsonLd";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
@@ -173,13 +172,13 @@ export default function BlogPostPage({
           <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
             <WideContainer>
               <Eyebrow>{dict.blog.relatedTitle}</Eyebrow>
-              <RevealStagger className="mt-8 grid gap-6 md:grid-cols-3">
-                {related.map((p) => (
-                  <motion.div key={`${p.locale}-${p.slug}`} variants={staggerItem}>
+              <div className="mt-8 grid gap-6 md:grid-cols-3">
+                {related.map((p, i) => (
+                  <Reveal key={`${p.locale}-${p.slug}`} delay={i * 0.08}>
                     <BlogCard post={p} dict={dict} locale={locale} />
-                  </motion.div>
+                  </Reveal>
                 ))}
-              </RevealStagger>
+              </div>
             </WideContainer>
           </section>
         )}
