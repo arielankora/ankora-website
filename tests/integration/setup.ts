@@ -33,6 +33,15 @@ const TABLES = [
   "hour_bank_adjustments",
   "hour_banks",
   "billing_policies",
+  // Phase 10 tables ("מועדים חשובים") truncate before "tasks" (which now
+  // carries a nullable importantDateId FK) and before the Phase 1 tables
+  // (clients/users/categories) every one of these ultimately references.
+  // CASCADE makes the exact order mostly academic, but kept logical for
+  // readability, matching every other block's own comment above.
+  "reminder_occurrences",
+  "reminder_rules",
+  "important_dates",
+  "holiday_calendar_subscriptions",
   // Phase 2 tables truncate before the Phase 1 tables they reference.
   "time_entry_revisions",
   "time_entries",

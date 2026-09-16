@@ -73,7 +73,23 @@ export type Permission =
   // row says it does NOT get "אם לא הוגדר" (unless explicitly granted) -
   // no such grant exists, so this follows the same SUPER_ADMIN-only
   // precedent as hour_bank.manage and alert.manage.
-  | "integration.manage";
+  | "integration.manage"
+  // Phase 10 (spec 23: "Important Dates - מועדים חשובים") - gates
+  // HolidayCalendarSubscription CRUD (which clients are opted into which
+  // holiday calendars) and any future global reminder-rule template
+  // management. Basic per-client ImportantDate CRUD (create/edit/delete a
+  // date, manage its own ReminderRules) deliberately gets NO permission
+  // of its own - same reasoning as Phase 9's Tasks decision directly
+  // above: "can this user act on this client's important dates" reduces
+  // entirely to listAccessibleClients()/canManageClients(), which already
+  // answers it. Holiday-calendar subscription is different: it is a
+  // per-CLIENT setting, yes, but one that drives bulk auto-creation of
+  // ImportantDate rows across every subscribed client's calendar (spec:
+  // "לעולם לא subscribe אוטומטית לכל לקוח - opt-in per calendar") - closer
+  // in shape to hour_bank.manage/alert.manage (a systemic configuration
+  // surface, not routine per-client data entry) than to Task creation, so
+  // it follows their same SUPER_ADMIN-only precedent.
+  | "important_date.manage_catalog";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): the Tasks, Profile, and
 // Notifications screens added this phase deliberately introduce NO new
@@ -108,6 +124,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "alert.manage",
     "report.internal.view",
     "integration.manage",
+    "important_date.manage_catalog",
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not
   // "critical system actions" (user management, audit) unless explicitly

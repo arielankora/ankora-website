@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { reconcileAllClientAlerts, retryFailedEmailDeliveries } from "@/lib/app-domain/alerts";
 import { notifyLongRunningTimers } from "@/lib/app-domain/notifications";
+import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -26,13 +27,25 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
+      // Phase 10 (Important Dates): reuses this same daily cron rather
+      // than a new job - see lib/app-domain/important-dates-job.ts's own
+      // header comment for why (same ADR 11.3 "no sub-daily scheduler"
+      // reasoning as reconcileAllClientAlerts/notifyLongRunningTimers
+      // above).
+      reconcileImportantDates(),
     ]);
 
-    return NextResponse.json({ ok: true, reconciled, retried, longTimersNotified: longTimers.notified });
+    return NextResponse.json({
+      ok: true,
+      reconciled,
+      retried,
+      longTimersNotified: longTimers.notified,
+      importantDates,
+    });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });

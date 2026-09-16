@@ -11,6 +11,7 @@ import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import { getHoursTrend } from "@/lib/app-domain/overview-trend";
 import { HoursTrendChart } from "@/components/app/HoursTrendChart";
+import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -94,11 +95,16 @@ export default async function AppHomePage() {
   const canSeeReports = can(user.role, "report.internal.view");
   const canSeeAlerts = can(user.role, "alert.manage");
 
-  const [counts, metrics, openAlerts, trend] = await Promise.all([
+  const canSeeImportantDates = can(user.role, "time_entry.create_self");
+
+  const [counts, metrics, openAlerts, trend, upcomingDates] = await Promise.all([
     loadCounts(canSeeClients, canSeeCategories, canSeeUsers),
     canSeeReports ? loadOperationalMetrics() : null,
     canSeeAlerts ? countOpenAlertEvents() : null,
     canSeeReports ? getHoursTrend() : null,
+    // Phase 10 ("מועדים חשובים"): dashboard "upcoming dates" card - same
+    // gate as the Important Dates nav item/screen itself.
+    canSeeImportantDates ? listUpcomingImportantDates(user, 5) : null,
   ]);
 
   const cards = [
@@ -183,6 +189,35 @@ export default async function AppHomePage() {
                 label="לכל הדוחות הפנימיים"
                 value={<ArrowLeft size={24} strokeWidth={1.75} />}
               />
+            </div>
+          </div>
+        )}
+
+        {upcomingDates && upcomingDates.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-navy/70">מועדים חשובים קרובים</h2>
+              <Link href="/app/important-dates" className="text-xs text-gold-dim underline underline-offset-4">
+                לכל המועדים
+              </Link>
+            </div>
+            <div className="mt-3 divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
+              {upcomingDates.map((d) => (
+                <Link
+                  key={d.id}
+                  href={`/app/important-dates/${d.id}`}
+                  className="flex items-center justify-between gap-4 px-5 py-3 transition-colors hover:bg-cream/40"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-navy">{d.title}</p>
+                    <p className="text-xs text-navy/50">{d.client.name}</p>
+                  </div>
+                  <p className="text-xs text-navy/60">
+                    {d.nextOccurrenceAt &&
+                      new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(d.nextOccurrenceAt)}
+                  </p>
+                </Link>
+              ))}
             </div>
           </div>
         )}
