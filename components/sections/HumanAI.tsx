@@ -22,12 +22,16 @@ function HeHumanAI({ dict }: { dict: Dictionary }) {
           <p className="mt-4 max-w-xl font-assistant text-[#A9B8C9]">{dict.humanAI.body}</p>
         </Reveal>
 
+        {/* items-stretch (grid's own default, made explicit) + h-full on each Reveal
+            wrapper and GlassPanel: the two lists are different lengths (5 vs 6 items,
+            real content -- left as-is), and each panel is individually bordered, so a
+            height mismatch reads as a visible misalignment rather than a hairline. */}
         <div
-          className="mt-14 grid gap-6"
+          className="mt-14 grid items-stretch gap-6"
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
         >
-          <Reveal delay={0.1}>
-            <GlassPanel elevated className="p-[clamp(22px,3vw,40px)]">
+          <Reveal delay={0.1} className="h-full">
+            <GlassPanel elevated className="h-full p-[clamp(22px,3vw,40px)]">
               <span className="border-b border-[rgba(243,234,219,0.16)] pb-3 text-[13px] font-semibold tracking-[0.04em] text-gold">
                 {dict.humanAI.humanTitle}
               </span>
@@ -41,8 +45,8 @@ function HeHumanAI({ dict }: { dict: Dictionary }) {
               </ul>
             </GlassPanel>
           </Reveal>
-          <Reveal delay={0.18}>
-            <GlassPanel elevated className="border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] p-[clamp(22px,3vw,40px)]">
+          <Reveal delay={0.18} className="h-full">
+            <GlassPanel elevated className="h-full border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] p-[clamp(22px,3vw,40px)]">
               <span className="border-b border-[rgba(176,141,87,0.35)] pb-3 text-[13px] font-semibold tracking-[0.04em] text-gold">
                 {dict.humanAI.aiTitle}
               </span>

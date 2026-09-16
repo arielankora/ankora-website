@@ -18,29 +18,43 @@ import { Reveal } from "@/components/motion/Reveal";
 // the spec's own note ("keep the rotation client-side -- it reads as illustrative, not
 // as a dashboard"). Hebrew strings are copied verbatim from the design spec, which is
 // new UI chrome (not existing page copy), so this is not covered by the frozen-copy rule.
-const LIVE_TASKS = [
-  "חידוש פוליסת ביטוח רכב",
-  "תיאום טכנאי מיזוג בדירה",
-  "השוואת הצעות מול שני ספקים",
-  "הזמנת טיסה וקישור לפגישות",
-  "מסמכים לרשות המקומית",
-  "תור למרפאת שיניים",
+//
+// Split into two pools (business / personal) rather than one flat list so the visible
+// composition can be guaranteed -- 2 business + 1 personal every tick -- instead of
+// left to chance. "מעקב גבייה מול לקוח" is the one new string added here (approved);
+// every other string already existed in the previous flat LIVE_TASKS list.
+const BUSINESS_TASKS = [
+  { text: "הזמנת טיסה וקישור לפגישות", domain: "נסיעות ולוגיסטיקה" },
+  { text: "השוואת הצעות מול שני ספקים", domain: "תיאום ספקים" },
+  { text: "מסמכים לרשות המקומית", domain: "ליווי אדמיניסטרטיבי" },
+  { text: "מעקב גבייה מול לקוח", domain: "תפעול עסקי" },
+];
+const PERSONAL_TASKS = [
+  { text: "חידוש פוליסת ביטוח רכב", domain: "מנהלה אישית" },
+  { text: "תיאום טכנאי מיזוג בדירה", domain: "נכסים ומשק בית" },
+  { text: "תור למרפאת שיניים", domain: "תפעול אישי" },
 ];
 const ORCHESTRATION_ROWS = ["זיכרון העדפות", "ניטור מועדים", "עדכון יזום"];
 
 function LiveOpsPanel() {
-  const [offset, setOffset] = useState(0);
+  const [tick, setTick] = useState(0);
   const [closedToday, setClosedToday] = useState(12);
 
   useEffect(() => {
     const id = setInterval(() => {
-      setOffset((o) => (o + 3) % LIVE_TASKS.length);
+      setTick((t) => t + 1);
       setClosedToday((n) => (n >= 16 ? 12 : n + 1));
     }, 3200);
     return () => clearInterval(id);
   }, []);
 
-  const visible = [0, 1, 2].map((i) => LIVE_TASKS[(offset + i) % LIVE_TASKS.length]);
+  // Always exactly 2 business + 1 personal: two items advance through the business
+  // pool per tick (indices t*2 and t*2+1), one advances through the personal pool.
+  const visible = [
+    BUSINESS_TASKS[(tick * 2) % BUSINESS_TASKS.length],
+    BUSINESS_TASKS[(tick * 2 + 1) % BUSINESS_TASKS.length],
+    PERSONAL_TASKS[tick % PERSONAL_TASKS.length],
+  ];
 
   return (
     <div className="mt-16" aria-hidden="true">
@@ -48,10 +62,10 @@ function LiveOpsPanel() {
         <HairlineGridCell elevated>
           <span className="font-jbmono text-[11px] tracking-[0.12em] text-[#7C8EA3]">בטיפול כרגע</span>
           <ul className="mt-4 space-y-3">
-            {visible.map((t) => (
-              <li key={t} className="flex items-center gap-2.5 text-sm text-[#C3CEDA]">
+            {visible.map((task) => (
+              <li key={task.text} className="flex items-center gap-2.5 text-sm text-[#C3CEDA]">
                 <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
-                {t}
+                {task.text}
               </li>
             ))}
           </ul>
