@@ -5,7 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { computeNextOccurrence } from "@/lib/app-domain/important-dates-recurrence";
 import { DEFAULT_REMINDER_OFFSETS_BY_CATEGORY } from "@/lib/app-domain/important-dates-reminders";
-import { HOLIDAY_CATALOG, HOLIDAY_CALENDAR_LABELS } from "@/lib/app-domain/important-dates-holidays";
+import { HOLIDAY_CATALOG, HOLIDAY_CALENDAR_LABELS, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import type {
   User,
   ImportantDate,
@@ -498,7 +498,7 @@ export function listHolidayCalendars() {
   return Object.entries(HOLIDAY_CALENDAR_LABELS).map(([calendarKey, label]) => ({
     calendarKey,
     label,
-    holidayCount: HOLIDAY_CATALOG.filter((h) => h.calendarKey === calendarKey).length,
+    holidayCount: HOLIDAY_CATALOG.filter((h) => h.calendarKeys.includes(calendarKey as HolidayCalendarKey)).length,
   }));
 }
 

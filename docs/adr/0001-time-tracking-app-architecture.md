@@ -2571,30 +2571,88 @@ Three independent unique-constraint-backed keys, one per duplicate risk:
 
 ### 21.6 Holiday catalog
 
-`lib/app-domain/important-dates-holidays.ts` (pure, zero-Prisma-import —
-also genuinely tested, see 21.9): 14 `il_holidays` entries (Rosh
-Hashana, Yom Kippur, Sukkot, Shmini Atzeret, Chanukah, Tu BiShvat, Purim,
-Pesach, Yom HaShoah, Yom HaZikaron, Yom HaAtzmaut, Lag BaOmer, Shavuot,
-Tisha B'Av) computed via `HebrewCalendar.calendar({il:true})` with exact
-(not prefix) description matching — the initial prefix-matching approach
-would have confused Purim with the adjacent Shushan Purim event, caught
-by an integration test cross-checking against an independent raw
-`@hebcal/core` query rather than a hardcoded date (a hardcoded date would
-itself have been wrong the following year, since Hebrew holidays drift
-against the Gregorian calendar). 2 `international_holidays` entries
-(New Year's Day, Christmas) as fixed Gregorian dates. Both years the
-spec named (2026, 2027) are covered by a dedicated test.
+`lib/app-domain/important-dates-holidays.ts` (pure, zero-Prisma-import -
+also genuinely tested, see 21.9). Originally shipped with 16 entries
+across 2 calendars; **extended in a same-day follow-up per Ariel's
+explicit request** ("תוסיף את החגים הבינלאומיים... והגדרת לוחות לפי מדינה") to the spec's full holiday list across 4 calendars:
 
-**Scope note, disclosed not hidden**: the spec's holiday list also named
-Valentine's Day, International Women's Day, Easter, Mother's/Father's
-Day, Halloween, Thanksgiving, Black Friday, Cyber Monday, Ramadan, Eid
-al-Fitr, Eid al-Adha, Lunar New Year, and per-country catalogs (US/UK/
-country-selectable). Only the 16 entries above shipped in this pass. The
-catalog's own data structure (`HolidayCatalogEntry[]`, one file, one
-`match` variant per entry) is built so adding any of the remaining
-holidays is a pure data addition — no code or schema change — but that
-data-entry work itself was not done here, and should be flagged to Ariel
-as a fast, low-risk follow-up rather than assumed complete.
+- **`il_holidays`** (unchanged, 14 entries): Rosh Hashana, Yom Kippur,
+  Sukkot, Shmini Atzeret, Chanukah, Tu BiShvat, Purim, Pesach, Yom
+  HaShoah, Yom HaZikaron, Yom HaAtzmaut, Lag BaOmer, Shavuot, Tisha
+  B'Av - computed via `HebrewCalendar.calendar({il:true})` with exact
+  (not prefix) description matching, per this section's original note
+  on the Purim/Shushan-Purim disambiguation bug this caught during
+  Phase 10's first build.
+- **`international_holidays` ("International Core", 11 entries)**: New
+  Year's Day, Valentine's Day, International Women's Day, Easter,
+  Halloween, Lunar New Year, Ramadan (start), Eid al-Fitr, Eid al-Adha,
+  Christmas Eve, Christmas Day.
+- **`us_holidays` (4 entries)**: Mother's Day (2nd Sunday of May),
+  Father's Day (3rd Sunday of June - see below), Thanksgiving (4th
+  Thursday of November), Black Friday, Cyber Monday.
+- **`uk_holidays` (2 entries)**: Mothering Sunday (UK's Mother's Day -
+  the 4th Sunday of Lent, a genuinely different date from the US
+  convention), Father's Day (same date as `us_holidays`' entry - see
+  below).
+
+**Three new date engines, none hand-rolled** (extending the spec's own
+Hebrew-calendar rule - "don't hand-roll if a mature library exists" - to
+every other non-trivial calendar system on the same reasoning), each
+exact-version-locked in `package.json` the same way `@hebcal/core` is:
+`date-easter@1.0.3` (Western/Gregorian Easter - the standard Anonymous
+Gregorian algorithm), `@umalqura/core@0.0.7` (Islamic/Hijri - the Umm
+al-Qura tabular calendar, the same calendar Saudi Arabia's official
+calendar is based on), `lunar-javascript@1.7.7` (Chinese Lunar New
+Year). Nth-weekday-of-month dates (Mother's/Father's Day US,
+Thanksgiving) and Easter-relative offsets (UK Mothering Sunday, Black
+Friday, Cyber Monday) are plain calendar arithmetic, not a calendar
+*system*, so they're computed directly rather than via a library - the
+same reasoning `important-dates-recurrence.ts` already applies to
+ordinary Gregorian recurrence.
+
+**Decisions made and disclosed:**
+- **Islamic dates are a planning estimate, not a religious ruling.**
+  Real-world Ramadan/Eid observance is ultimately set by regional
+  moon-sighting and can differ from the Umm al-Qura tabular calendar by
+  a day in either direction. Documented inline in the catalog and here,
+  not silently presented as authoritative.
+- **Father's Day is one catalog entry under two calendars**, not two
+  entries with the same date - the US and UK conventions are both "3rd
+  Sunday of June," so subscribing to both `us_holidays` and
+  `uk_holidays` must never create two `ImportantDate` rows for the same
+  real-world day. Verified by a dedicated test and enforced structurally:
+  `HolidayCatalogEntry.calendarKeys` is an array, and the dedupe key is
+  `(clientId, holidayKey)`, not `(clientId, calendarKey, holidayKey)`.
+- **Black Friday / Cyber Monday are computed relative to Thanksgiving's
+  own already-computed date** (`{ type: "relativeToKey", baseKey:
+  "thanksgiving_us", offsetDays: 1 | 4 }`), never as an independent
+  nth-weekday rule, so they can never drift from Thanksgiving if that
+  rule is ever adjusted. A unit test asserts every `relativeToKey`
+  entry's `baseKey` resolves to a real catalog entry sharing its
+  calendar.
+- **Lunar New Year's Gregorian-year mapping** (`Lunar.fromYmd(gYear, 1,
+  1).getSolar()`) and the **Hijri-year search window** for Ramadan/Eid
+  (`gregorianToHijri` on Jan 1 and Dec 31 of the target year, both ±1
+  year as candidates) were cross-checked during development against
+  known real-world dates for 2025-2027 before shipping, not trusted
+  blindly from the library's output.
+
+Both years the spec named (2026, 2027) are covered by dedicated tests
+for every new engine (Easter, Lunar New Year, Ramadan/Eid ordering and
+spacing, all four fixed-Gregorian entries, US nth-weekday entries, UK
+Mothering Sunday vs. US Mother's Day distinctness). 12 new unit tests,
+21/21 passing in this file (up from 9).
+
+**Still-open gap, disclosed not hidden**: the spec's holiday catalog UI
+requirement ("הרשמה ללוחות חגים לפי לקוח" - a screen where an admin
+subscribes a client to one or more calendars) has no UI wiring yet -
+`listHolidayCalendars`/`setHolidayCalendarSubscription` in
+`important-dates.ts` are implemented and RBAC-gated, but no screen calls
+them. This predates today's catalog-expansion work (it was already true
+of the original 2-calendar catalog) and was not addressed in either
+pass - flagged here explicitly rather than left implicit, since with 4
+calendars now available the gap is more consequential than it was with
+2.
 
 ### 21.7 RBAC and sensitivity
 

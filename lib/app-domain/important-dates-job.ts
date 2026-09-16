@@ -4,7 +4,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { computeNextOccurrence } from "@/lib/app-domain/important-dates-recurrence";
-import { computeHolidayOccurrencesForYear } from "@/lib/app-domain/important-dates-holidays";
+import { computeHolidayOccurrencesForYear, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import {
   buildReminderIdempotencyKey,
   buildAutoTaskOccurrenceKey,
@@ -73,7 +73,7 @@ export async function seedHolidayOccurrences(now = new Date()): Promise<{ create
   let created = 0;
 
   for (const sub of subscriptions) {
-    const calendarKey = sub.calendarKey as "il_holidays" | "international_holidays";
+    const calendarKey = sub.calendarKey as HolidayCalendarKey;
     for (const year of [thisYear, nextYear]) {
       let occurrences: ReturnType<typeof computeHolidayOccurrencesForYear>;
       try {
