@@ -6,11 +6,15 @@ import { SITE_URL } from "@/lib/site";
 import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
 import { Container } from "@/components/ui/Container";
+import { WideContainer } from "@/components/ui/WideContainer";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Eyebrow } from "@/components/ui/Eyebrow";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { BlogCard } from "@/components/sections/BlogCard";
-import { Reveal } from "@/components/motion/Reveal";
+import { FinalCTA } from "@/components/sections/FinalCTA";
+import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
+import { motion } from "framer-motion";
 import { JsonLd } from "@/components/seo/JsonLd";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
@@ -56,6 +60,15 @@ function formatDate(dateStr: string, locale: Locale) {
   }
 }
 
+// /he redesign: this page (unlike the blog index) never received a dark-theme He
+// variant -- it kept rendering the pre-redesign bg-paper light theme under /he too,
+// same root cause as the pricing page (see PricingClient.tsx). The article body itself
+// (MDX prose via the shared `.blog-article` CSS class) is hardcoded to dark-navy-on-
+// light colors, so it needed a `.blog-article-dark` companion class (added to
+// globals.css) rather than just dropping the section backgrounds -- otherwise the text
+// would render dark-on-dark. Everything else follows the same PageHero/WideContainer/
+// Eyebrow/hairline conventions as every other /he page; the "related posts" grid reuses
+// the existing HeBlogCard (already correct, already h-full) unchanged.
 export default function BlogPostPage({
   params,
 }: {
@@ -87,6 +100,94 @@ export default function BlogPostPage({
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": `${base}/${locale}/blog/${post.slug}` },
   };
+
+  if (locale === "he") {
+    return (
+      <>
+        <JsonLd id="blogpost-schema" data={articleSchema} />
+
+        <section className="relative overflow-hidden pb-16 pt-40 md:pb-20 md:pt-48">
+          <WideContainer className="relative z-[1]">
+            <Breadcrumbs
+              locale={locale}
+              items={[
+                { label: dict.blog.eyebrow, href: "/blog" },
+                { label: post.title },
+              ]}
+            />
+            <Reveal delay={0.06} className="mt-8">
+              <Badge>{categoryLabel}</Badge>
+            </Reveal>
+            <Reveal delay={0.12}>
+              <h1 className="mt-6 max-w-3xl text-[clamp(2rem,4.4vw,3.4rem)] font-extralight leading-[1.1] tracking-[-0.02em] text-paper">
+                {post.title}
+              </h1>
+            </Reveal>
+            <Reveal delay={0.18}>
+              <div className="mt-6 flex flex-wrap items-center gap-3 font-jbmono text-[11px] tracking-[0.1em] text-[#7C8EA3]">
+                <span>{post.author}</span>
+                <span aria-hidden>·</span>
+                <span>{formatDate(post.publishedAt, locale)}</span>
+                <span aria-hidden>·</span>
+                <span>
+                  {post.readingMinutes} {dict.blog.minRead}
+                </span>
+              </div>
+            </Reveal>
+          </WideContainer>
+        </section>
+
+        {post.coverImage && (
+          <section>
+            <WideContainer>
+              <div className="mx-auto w-full max-w-3xl py-10 md:py-14">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={post.coverImage}
+                  alt={post.title}
+                  className={`w-full border border-[rgba(243,234,219,0.12)] object-cover ${coverPositionClass(post.coverImagePosition)}`}
+                  style={{ maxHeight: 520 }}
+                />
+              </div>
+            </WideContainer>
+          </section>
+        )}
+
+        <section className={post.coverImage ? "pb-20 md:pb-28" : "py-16 md:py-24"}>
+          <WideContainer>
+            <div className="mx-auto w-full max-w-3xl">
+              <div className="blog-article blog-article-dark">
+                <MDXRemote source={post.content} />
+              </div>
+
+              <div className="mt-16">
+                <Button href={withLocale(locale, "/blog")} variant="secondary">
+                  {dict.blog.backToBlog}
+                </Button>
+              </div>
+            </div>
+          </WideContainer>
+        </section>
+
+        {related.length > 0 && (
+          <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
+            <WideContainer>
+              <Eyebrow>{dict.blog.relatedTitle}</Eyebrow>
+              <RevealStagger className="mt-8 grid gap-6 md:grid-cols-3">
+                {related.map((p) => (
+                  <motion.div key={`${p.locale}-${p.slug}`} variants={staggerItem}>
+                    <BlogCard post={p} dict={dict} locale={locale} />
+                  </motion.div>
+                ))}
+              </RevealStagger>
+            </WideContainer>
+          </section>
+        )}
+
+        <FinalCTA dict={dict} locale={locale} />
+      </>
+    );
+  }
 
   return (
     <>

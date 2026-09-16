@@ -83,6 +83,37 @@ body {
   border-color: rgba(27, 42, 61, 0.14);
 }
 
+/* /he redesign: dark-theme companion to .blog-article above. .blog-article sets the
+   layout (font-size, line-height, spacing, list markers) which stays identical in both
+   themes; this class only overrides the colors that were hardcoded for a light
+   background, applied together as `className="blog-article blog-article-dark"`. Source
+   order (this block comes after .blog-article) is what makes these overrides win at
+   equal selector specificity -- not the order the two classes appear in the element's
+   className. */
+.blog-article-dark {
+  color: #A9B8C9;
+}
+.blog-article-dark h2,
+.blog-article-dark h3 {
+  color: #F8F4EC;
+}
+.blog-article-dark a {
+  color: #C7AC7E;
+  text-decoration-color: rgba(176, 141, 87, 0.4);
+}
+.blog-article-dark a:hover {
+  text-decoration-color: #C7AC7E;
+}
+.blog-article-dark strong {
+  color: #F8F4EC;
+}
+.blog-article-dark blockquote {
+  color: rgba(243, 234, 219, 0.6);
+}
+.blog-article-dark hr {
+  border-color: rgba(243, 234, 219, 0.12);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
