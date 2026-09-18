@@ -12,7 +12,7 @@ import {
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { EditClientForm } from "./EditClientForm";
-import { HolidayCalendarsPanel } from "./HolidayCalendarsPanel";
+import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import type { ImportantDateStatus } from "@prisma/client";
 
 const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red"> = {
