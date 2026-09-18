@@ -21,20 +21,25 @@ type KpiCardProps = {
 /// below it) instead of hand-copying similar-but-drifting markup 8 times
 /// across page.tsx - one shared component, one guaranteed-consistent look.
 export function KpiCard({ icon: Icon, label, value, href, footer }: KpiCardProps) {
+  // App redesign (handoff README, screen 1 "בית"): "תווית 12.5px + עיגול
+  // אייקון 30px, מספר 30px JetBrains Mono, ריפוד 18px 20px." Card shape
+  // (radius 16px / rounded-2xl, gold/10 icon badge, hover border on gold)
+  // kept from the direction-A KpiCard this replaces - only the exact sizing
+  // and the number's font changed to match the new spec.
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm text-navy/60">{label}</p>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/10">
-          <Icon size={18} strokeWidth={1.75} className="text-gold-dim" />
+        <p className="text-[12.5px] text-navy/60">{label}</p>
+        <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-gold/10">
+          <Icon size={16} strokeWidth={1.75} className="text-gold-dim" />
         </span>
       </div>
-      <p className="mt-4 text-3xl font-medium text-navy">{value}</p>
+      <p className="mt-3.5 font-jbmono text-[26px] font-medium text-navy">{value}</p>
       {footer}
     </>
   );
 
-  const className = `block rounded-2xl border border-lineDark bg-white p-6 transition-colors${
+  const className = `block rounded-2xl border border-lineDark bg-white px-5 py-[18px] transition-colors${
     href ? " hover:border-gold" : ""
   }`;
 

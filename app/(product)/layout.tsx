@@ -5,6 +5,7 @@ import "@fontsource/heebo/500.css";
 import "@fontsource/heebo/600.css";
 import "@fontsource/heebo/700.css";
 import "../globals.css";
+import { ToastProvider } from "@/components/app/toast/ToastProvider";
 
 // Second Next.js "root layout" - see ADR-0001 and the note in
 // app/[locale]/layout.tsx's sibling: this route group lives outside
@@ -47,10 +48,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+// App redesign (design_handoff_ankora_app_redesign/README.md, "State
+// Management"): "תור טוסטים הוא הרכיב הגלובלי היחיד שצריך להוסיף... מומלץ
+// להציב אותו ב-app/(product)/layout.tsx" - mounted here, above every route
+// under this group (the internal app *and* the login/forgot/reset-password
+// pages that sit outside (authenticated)), so useToast() works anywhere in
+// app/(product)/app/**.
 export default function ProductRootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
-      <body className="bg-paper text-navy antialiased">{children}</body>
+      <body className="bg-paper text-navy antialiased">
+        <ToastProvider>{children}</ToastProvider>
+      </body>
     </html>
   );
 }
