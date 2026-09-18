@@ -3,10 +3,16 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getClient } from "@/lib/app-domain/clients";
-import { listImportantDates, IMPORTANT_DATE_STATUS_LABELS } from "@/lib/app-domain/important-dates";
+import {
+  listImportantDates,
+  IMPORTANT_DATE_STATUS_LABELS,
+  listHolidayCalendars,
+  listHolidaySubscriptionsForClient,
+} from "@/lib/app-domain/important-dates";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { EditClientForm } from "./EditClientForm";
+import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import type { ImportantDateStatus } from "@prisma/client";
 
 const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red"> = {
@@ -39,6 +45,16 @@ export default async function ClientDetailPage({ params }: { params: { clientId:
   // client.manage, a superset of every role that can reach
   // listImportantDates, so the call always succeeds here).
   const clientDates = await listImportantDates(user, { clientId: client.id });
+
+  // Phase 10 follow-up ("לוחות חגים" UI gap - ADR 21.6): gate matches
+  // setHolidayCalendarSubscription()'s own important_date.manage_catalog
+  // check, so the section (and its data fetch) simply doesn't render for
+  // anyone else, rather than rendering then failing on first click.
+  const canManageHolidayCalendars = can(user.role, "important_date.manage_catalog");
+  const holidayCalendars = canManageHolidayCalendars ? listHolidayCalendars() : [];
+  const holidaySubscriptions = canManageHolidayCalendars
+    ? await listHolidaySubscriptionsForClient(user, client.id)
+    : [];
 
   return (
     <>
@@ -92,6 +108,19 @@ export default async function ClientDetailPage({ params }: { params: { clientId:
             </ul>
           )}
         </div>
+
+        {canManageHolidayCalendars && (
+          <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-navy">לוחות חגים</h2>
+              <span className="text-xs text-navy/40">תזכורות ברירת מחדל: 30 ו-7 ימים לפני</span>
+            </div>
+            <p className="mt-1 text-xs text-navy/50">
+              רישום הלקוח ללוח חג יוצר אוטומטית מועד חשוב לכל חג בלוח, ומתעדכן מדי שנה.
+            </p>
+            <HolidayCalendarsPanel clientId={client.id} calendars={holidayCalendars} subscriptions={holidaySubscriptions} />
+          </div>
+        )}
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="text-sm font-medium text-navy">משתמשים מוקצים ({client.employeeAccess.length})</h2>

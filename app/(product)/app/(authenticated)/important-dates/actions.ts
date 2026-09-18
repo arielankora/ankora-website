@@ -9,6 +9,7 @@ import {
   updateImportantDateStatus,
   snoozeImportantDate,
   deleteImportantDate,
+  setHolidayCalendarSubscription,
   ConflictError,
 } from "@/lib/app-domain/important-dates";
 import type { ImportantDateCategory, ImportantDateSensitivity, ImportantDateStatus, CalendarType, RecurrenceType } from "@prisma/client";
@@ -138,4 +139,20 @@ export async function deleteImportantDateAction(formData: FormData) {
   await deleteImportantDate(user, id);
   revalidatePath("/app/important-dates");
   redirect("/app/important-dates");
+}
+
+// Phase 10 follow-up: holiday-calendar subscription toggle, called
+// directly from HolidayCalendarsPanel.tsx (client component), same
+// pattern as alerts/RuleActions.tsx -> toggleAlertRuleAction (positional
+// args, no FormData). setHolidayCalendarSubscription() itself enforces
+// important_date.manage_catalog (SUPER_ADMIN-only) and client access.
+export async function toggleHolidayCalendarSubscriptionAction(
+  clientId: string,
+  calendarKey: string,
+  enabled: boolean
+): Promise<void> {
+  const user = await requireUser();
+  await setHolidayCalendarSubscription(user, clientId, calendarKey, { enabled });
+  revalidatePath(`/app/clients/${clientId}`);
+  revalidatePath("/app/important-dates");
 }
