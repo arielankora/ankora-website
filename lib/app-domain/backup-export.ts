@@ -103,6 +103,7 @@ async function fetchTimeEntriesSheetData() {
     note: e.note,
     isManual: e.isManual,
     isEdited: e.isEdited,
+    isOverlapConfirmed: e.isOverlapConfirmed,
   }));
 }
 
