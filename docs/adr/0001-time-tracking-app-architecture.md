@@ -2947,4 +2947,49 @@ regression.
 Preview, and live-QA'd per this section. Not yet merged to `main` -
 merge requires Ariel's explicit approval per this ADR's standing rule
 (see section on approvals).
+### 21.15 Instant holiday seeding on subscribe (Ariel follow-up request)
+
+Previously, subscribing a client to a holiday calendar
+(`setHolidayCalendarSubscription()`) only created the
+`HolidayCalendarSubscription` row - the actual `ImportantDate` rows for
+each holiday were materialized by `seedHolidayOccurrences()`, which only
+ran as step 1 of the daily cron (`reconcileImportantDates()`, 05:00 UTC).
+A user subscribing a client mid-day would see nothing until the next
+day's run.
+
+Ariel asked whether subscribing could trigger the seed immediately
+instead. `seedHolidayOccurrences()` was already idempotent and safe to
+call twice - its create path is protected by the real guarantee, the
+`ImportantDate` `@@unique([clientId, holidayKey])` constraint, not just
+an in-memory check - so calling it a second time, immediately, carries
+no duplication risk.
+
+Implementation: `seedHolidayOccurrences()` gained an optional `scope:
+{ clientId?, calendarKey? }` param. The daily cron's own call stays
+unscoped (full sweep, unchanged). `setHolidayCalendarSubscription()`
+now calls the scoped version right after enabling a subscription, so
+only that one (client, calendar) pair is processed - subscribing one
+client never re-sweeps every other client's subscriptions. Disabling a
+subscription never seeds (no behavior change there). The call is
+wrapped in a try/catch that only logs: a transient failure here must
+never fail the subscription action itself or leave the subscription
+row in an inconsistent state, since the daily cron remains the
+authoritative, retried backstop for this exact same work either way.
+
+Guide (`guide/content.ts`) updated to say the holiday date is created
+"מיד, ללא צורך להמתין לבדיקה היומית" (immediately, no need to wait for
+the daily check) instead of leaving the timing unstated.
+
+Tests (`tests/integration/important-dates.test.ts`): the existing
+idempotency test was rewritten to assert the new behavior directly
+(subscribing alone now produces the `ImportantDate` rows, no separate
+`seedHolidayOccurrences()` call needed to see them; a subsequent sweep
+still produces zero new rows). A new test asserts the `scope` param
+never leaks into an unrelated client's subscription - inserting two
+enabled subscriptions for two different clients and confirming a scoped
+call only seeds the targeted one.
+
+**Status:** on branch `feat/instant-holiday-seed`, not yet pushed by
+Ariel at the time this section was written. Not yet merged - merge
+requires Ariel's explicit approval per this ADR's standing rule.
 

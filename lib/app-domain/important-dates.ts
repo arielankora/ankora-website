@@ -6,6 +6,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { computeNextOccurrence } from "@/lib/app-domain/important-dates-recurrence";
 import { DEFAULT_REMINDER_OFFSETS_BY_CATEGORY } from "@/lib/app-domain/important-dates-reminders";
 import { HOLIDAY_CATALOG, HOLIDAY_CALENDAR_LABELS, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
+import { seedHolidayOccurrences } from "@/lib/app-domain/important-dates-job";
 import type {
   User,
   ImportantDate,
@@ -554,6 +555,24 @@ export async function setHolidayCalendarSubscription(
     clientId,
     after: sub,
   });
+
+  // Ariel follow-up request: don't make the user wait for tomorrow's
+  // 05:00 UTC cron to see the holidays they just subscribed to - seed
+  // this one (clientId, calendarKey) pair immediately. Scoped (not a
+  // full seedHolidayOccurrences() sweep) so subscribing one client never
+  // re-processes every other client's subscriptions too. Never runs on
+  // disable (input.enabled === false - nothing to seed), and a failure
+  // here is logged but never thrown back to the caller: the daily cron
+  // remains the authoritative, retried backstop for this exact same
+  // work, so a transient error here must not fail the subscription
+  // action itself or leave `sub` in an inconsistent state.
+  if (input.enabled) {
+    try {
+      await seedHolidayOccurrences(new Date(), { clientId, calendarKey });
+    } catch (err) {
+      console.error("Immediate holiday seeding failed after subscribing; the daily cron will retry.", err);
+    }
+  }
 
   return sub;
 }

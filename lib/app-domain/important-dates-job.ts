@@ -65,8 +65,27 @@ function currentAndNextGregorianYear(now: Date): [number, number] {
 //    לכל לקוח")
 // ---------------------------------------------------------------------------
 
-export async function seedHolidayOccurrences(now = new Date()): Promise<{ created: number }> {
-  const subscriptions = await prisma.holidayCalendarSubscription.findMany({ where: { enabled: true } });
+/// `scope` narrows which enabled subscriptions get processed - omitted
+/// (undefined) for the daily cron's full sweep of every client, or
+/// { clientId, calendarKey } for the instant, single-subscription seed
+/// that setHolidayCalendarSubscription() (important-dates.ts) triggers
+/// right after a client is subscribed (Ariel follow-up request: don't
+/// make the user wait for tomorrow's 05:00 UTC cron to see the holidays
+/// they just subscribed to). Scoping only changes which subscriptions
+/// are read - the create-if-missing/dedupe logic below is identical
+/// either way, so this never introduces a second code path to keep in
+/// sync.
+export async function seedHolidayOccurrences(
+  now = new Date(),
+  scope?: { clientId?: string; calendarKey?: string }
+): Promise<{ created: number }> {
+  const subscriptions = await prisma.holidayCalendarSubscription.findMany({
+    where: {
+      enabled: true,
+      ...(scope?.clientId ? { clientId: scope.clientId } : {}),
+      ...(scope?.calendarKey ? { calendarKey: scope.calendarKey } : {}),
+    },
+  });
   if (subscriptions.length === 0) return { created: 0 };
 
   const [thisYear, nextYear] = currentAndNextGregorianYear(now);
