@@ -212,6 +212,7 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
                         note: entry.note,
                         isEdited: entry.isEdited,
                         isManual: entry.isManual,
+                        isOverlapConfirmed: entry.isOverlapConfirmed,
                         clientName: entry.client.name,
                         categoryName: entry.category.name,
                         updatedAt: entry.updatedAt.toISOString(),

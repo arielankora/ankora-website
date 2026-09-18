@@ -17,6 +17,11 @@ export type Entry = {
   actualSeconds: number | null;
   note: string | null;
   isEdited: boolean;
+  /// Phase 12 (spec "אישור דיווח שעות חופף בין לקוחות שונים"): true when
+  /// this save only went through because a conflicting entry was
+  /// overridden via the "אפשר חפיפה (override)" checkbox below - includes
+  /// a same-client override, which only this admin path can do.
+  isOverlapConfirmed: boolean;
   source: string;
   userName: string;
   clientName: string;
@@ -251,6 +256,7 @@ export function AdminEntryRow({
           <div className="flex items-center gap-2">
             <StatusBadge label={SOURCE_LABEL[entry.source] ?? entry.source} tone={entry.source === "TIMER" ? "green" : "gray"} />
             {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
+            {entry.isOverlapConfirmed && <StatusBadge label="חפיפה מאושרת" tone="amber" />}
           </div>
         </td>
         <td className="px-5 py-3 text-end">

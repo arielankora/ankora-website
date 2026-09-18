@@ -568,6 +568,15 @@ model TimeEntry {
   /// True once any post-creation edit has produced a TimeEntryRevision.
   /// Spec 6.4: "כל עריכה ידנית מסומנת באייקון פנימי 'Edited'."
   isEdited Boolean         @default(false)
+  /// Spec "אישור דיווח שעות חופף בין לקוחות שונים" (Phase 12): true when
+  /// this entry was only saved because an overlap with another entry for
+  /// the same user was explicitly confirmed past a warning - either the
+  /// employee confirming a cross-client overlap (self-service, no
+  /// edit_others required - clients differ) or a manager/admin using the
+  /// existing "אפשר חפיפה (override)" checkbox (edit_others, any client -
+  /// same-client included). Same-client overlap for a non-privileged actor
+  /// stays a hard, unconfirmable block exactly as before this feature.
+  isOverlapConfirmed Boolean @default(false)
 
   /// Phase 14: APP for anything created through the web app, MCP for
   /// anything created through /api/mcp. See the EntryOrigin enum above.

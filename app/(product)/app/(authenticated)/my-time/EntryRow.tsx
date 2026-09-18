@@ -1,11 +1,18 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateMyEntryAction, deleteMyEntryAction } from "./actions";
 import { StatusBadge } from "@/components/app/StatusBadge";
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
+}
+
+function formatTimeRange(startIso: string, endIso: string | null): string {
+  const fmt = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+  const start = fmt.format(new Date(startIso));
+  if (!endIso) return `${start} (טיימר פעיל)`;
+  return `${start}–${fmt.format(new Date(endIso))}`;
 }
 
 type Entry = {
@@ -16,6 +23,10 @@ type Entry = {
   note: string | null;
   isEdited: boolean;
   isManual: boolean;
+  /// Phase 12 (spec "אישור דיווח שעות חופף בין לקוחות שונים"): true once
+  /// this entry's overlap with another entry (for a different client) was
+  /// explicitly confirmed past the warning below.
+  isOverlapConfirmed: boolean;
   clientName: string;
   categoryName: string;
   /// Phase 7 (spec 20 conflict rule) - sent back as expectedUpdatedAt on
@@ -60,9 +71,18 @@ function formatDuration(seconds: number | null): string {
 /// Spec 6.4: "כל עריכה ידנית מסומנת באייקון פנימי 'Edited'." Edit window
 /// enforcement itself lives server-side in updateTimeEntry - this form
 /// simply surfaces whatever error that throws (EditWindowExpiredError).
+///
+/// Spec "אישור דיווח שעות חופף בין לקוחות שונים" (Phase 12): editing an
+/// entry's time into a cross-client conflict surfaces `overlapWarning`
+/// instead of `error` - shown inline with a "שמירה בכל זאת" choice that
+/// resubmits the same edit plus a confirmation flag. A same-client
+/// conflict is still the existing hard `error`.
 export function EntryRow({ entry }: { entry: Entry }) {
   const [state, formAction] = useFormState(updateMyEntryAction, {});
   const [editing, setEditing] = useState(false);
+  const [warningDismissed, setWarningDismissed] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const confirmOverlapRef = useRef<HTMLInputElement>(null);
 
   // Bug fix (docs/adr/0001 section 19.12, live report from Ariel: "clicking
   // save gives no indication anything happened"). updateMyEntryAction
@@ -77,13 +97,25 @@ export function EntryRow({ entry }: { entry: Entry }) {
   // to persist for some other reason.
   useEffect(() => {
     if (state?.ok) setEditing(false);
+    if (state?.overlapWarning) setWarningDismissed(false);
+    // A confirmation belongs to the submission it was given for. The flag lives
+    // in a ref, so it survives a re-submit; clear it whenever the server comes
+    // back with a plain error, or the next attempt would carry a consent the
+    // person was never asked for again.
+    if (state?.error && confirmOverlapRef.current) confirmOverlapRef.current.value = "false";
   }, [state]);
+
+  function saveAnyway() {
+    if (confirmOverlapRef.current) confirmOverlapRef.current.value = "true";
+    formRef.current?.requestSubmit();
+  }
 
   if (editing) {
     return (
-      <form action={formAction} className="space-y-3 px-5 py-4">
+      <form ref={formRef} action={formAction} className="space-y-3 px-5 py-4">
         <input type="hidden" name="timeEntryId" value={entry.id} />
         <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
+        <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <label className="block text-xs font-medium text-appNavy/60">תאריך</label>
@@ -132,6 +164,31 @@ export function EntryRow({ entry }: { entry: Entry }) {
             className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold sm:w-1/2"
           />
         </div>
+        {state?.overlapWarning && !warningDismissed && (
+          <div className="rounded-[10px] border border-warning/35 bg-warning-soft px-3 py-2.5 text-xs text-warning">
+            <p>
+              קיים כבר דיווח בשעה זו עבור {state.overlapWarning.clientName} (
+              {formatTimeRange(state.overlapWarning.startAt, state.overlapWarning.endAt)}). דיווח מקביל אפשרי
+              רק כשמדובר בלקוחות שונים - אם אכן כך, אפשר לשמור בכל זאת.
+            </p>
+            <div className="mt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={saveAnyway}
+                className="rounded-full border border-warning/45 px-3 py-1 text-xs font-medium text-warning hover:bg-warning/10"
+              >
+                שמירה בכל זאת
+              </button>
+              <button
+                type="button"
+                onClick={() => setWarningDismissed(true)}
+                className="text-xs text-appNavy/55 hover:text-appNavy"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <SubmitButton />
           <button type="button" onClick={() => setEditing(false)} className="text-xs text-appNavy/60 hover:text-appNavy">
@@ -160,6 +217,7 @@ export function EntryRow({ entry }: { entry: Entry }) {
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
+        {entry.isOverlapConfirmed && <StatusBadge label="חפיפה מאושרת" tone="amber" />}
         {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
         <span className="font-jbmono text-[13.5px] text-appNavy">{formatDuration(entry.actualSeconds)}</span>
         <button
