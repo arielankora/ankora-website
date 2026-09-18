@@ -191,20 +191,51 @@ describe("important-dates: holiday-calendar subscription requires important_date
 });
 
 describe("important-dates-job: idempotency (spec: never create the same holiday/reminder/task twice)", () => {
-  it("seedHolidayOccurrences() run twice never creates duplicate ImportantDate rows for the same client+holiday", async () => {
+  it("subscribing seeds holidays immediately (no need to wait for the daily cron), and a subsequent sweep never creates duplicates", async () => {
     const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
     const client = await createTestClient();
+
+    // setHolidayCalendarSubscription() itself seeds immediately now
+    // (Ariel follow-up request) - no explicit seedHolidayOccurrences()
+    // call needed here to see the rows show up.
     await setHolidayCalendarSubscription(superAdmin, client.id, "il_holidays", { enabled: true, responsibleUserId: superAdmin.id });
 
-    const first = await seedHolidayOccurrences(new Date("2026-01-01T00:00:00Z"));
-    expect(first.created).toBeGreaterThan(0);
+    const rowsAfterSubscribe = await prisma.importantDate.findMany({ where: { clientId: client.id, source: "HOLIDAY" } });
+    expect(rowsAfterSubscribe.length).toBeGreaterThan(0);
 
-    const second = await seedHolidayOccurrences(new Date("2026-01-01T00:00:00Z"));
-    expect(second.created).toBe(0); // every holiday already exists - the @@unique([clientId, holidayKey]) constraint is what actually guarantees this
+    // A subsequent sweep (the daily cron's own unscoped call) must never
+    // create duplicates - the @@unique([clientId, holidayKey]) constraint
+    // is what actually guarantees this, not the scoping itself.
+    const rerun = await seedHolidayOccurrences(new Date());
+    expect(rerun.created).toBe(0);
 
     const rows = await prisma.importantDate.findMany({ where: { clientId: client.id, source: "HOLIDAY" } });
     const keys = rows.map((r) => r.holidayKey);
     expect(new Set(keys).size).toBe(keys.length); // no duplicate holidayKey per client
+  });
+
+  it("seedHolidayOccurrences() scoped to one clientId+calendarKey never touches another client's subscription", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const clientA = await createTestClient();
+    const clientB = await createTestClient();
+
+    // Bypass the immediate-seed side effect of setHolidayCalendarSubscription()
+    // here by inserting the subscription rows directly, so this test
+    // isolates seedHolidayOccurrences()'s own scoping logic.
+    await prisma.holidayCalendarSubscription.createMany({
+      data: [
+        { clientId: clientA.id, calendarKey: "il_holidays", enabled: true, defaultReminderDaysBefore: [30, 7], responsibleUserId: superAdmin.id, createTasks: false },
+        { clientId: clientB.id, calendarKey: "il_holidays", enabled: true, defaultReminderDaysBefore: [30, 7], responsibleUserId: superAdmin.id, createTasks: false },
+      ],
+    });
+
+    const result = await seedHolidayOccurrences(new Date(), { clientId: clientA.id, calendarKey: "il_holidays" });
+    expect(result.created).toBeGreaterThan(0);
+
+    const clientARows = await prisma.importantDate.findMany({ where: { clientId: clientA.id, source: "HOLIDAY" } });
+    const clientBRows = await prisma.importantDate.findMany({ where: { clientId: clientB.id, source: "HOLIDAY" } });
+    expect(clientARows.length).toBeGreaterThan(0);
+    expect(clientBRows).toHaveLength(0); // scoped call must never seed an unrelated client
   });
 
   it("createDueReminderOccurrences() run twice never creates duplicate ReminderOccurrence rows", async () => {
