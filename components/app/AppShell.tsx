@@ -51,6 +51,15 @@ function navItemsFor(role: User["role"]): NavItem[] {
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "ניהול" });
   if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "ניהול" });
   if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "ניהול" });
+  // Phase 10 (spec: "מועדים חשובים" - Important Dates). Gated the exact
+  // same way as Tasks (time_entry.create_self - see permissions.ts's
+  // Phase 10 comment and lib/app-domain/important-dates.ts's own header
+  // comment for why no dedicated permission exists): every role that
+  // tracks time for a client should see and manage that client's
+  // important dates, including ANKORA_EMPLOYEE. Placed in the "ניהול"
+  // group per the brief's explicit nav-placement instruction, even though
+  // its permission gate matches the "העבודה שלי" items above it.
+  if (can(role, "time_entry.create_self")) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "ניהול" });
   // Spec 12: Admin "Time Entries" screen - cross-client table, gated on
   // the same permission that lets an admin edit someone else's entries.
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "דיווח ובקרה" });

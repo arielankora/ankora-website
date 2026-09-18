@@ -123,6 +123,12 @@ model User {
   hourBankAdjustments HourBankAdjustment[] @relation("HourBankAdjustmentCreator")
   notifications       Notification[]
 
+  // Phase 10: Important Dates (מועדים חשובים).
+  assignedTasks              Task[]                        @relation("TaskAssignee")
+  importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
+  importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
+  holidaySubscriptionsOwned  HolidayCalendarSubscription[]  @relation("HolidaySubscriptionResponsible")
+
   @@index([role, status])
   @@map("users")
 }
@@ -181,6 +187,10 @@ model Client {
   hourBankAdjustments HourBankAdjustment[]
   alertRules          AlertRule[]
   reportSchedules     ReportSchedule[]
+
+  // Phase 10: Important Dates (מועדים חשובים).
+  importantDates       ImportantDate[]
+  holidaySubscriptions HolidayCalendarSubscription[]
 
   @@index([status])
   @@map("clients")
@@ -242,6 +252,9 @@ model Category {
   client Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
   tasks       Task[]
   timeEntries TimeEntry[]
+  // Phase 10: Important Dates (מועדים חשובים) - category an auto-created
+  // task should use when ImportantDate.createAutoTask = true.
+  importantDatesAutoTaskCategory ImportantDate[]
 
   @@index([visibility, clientId, active])
   @@map("categories")
@@ -319,15 +332,38 @@ model Task {
   status      TaskStatus @default(OPEN)
   source      String    @default("local")
   externalRef String?
+
+  // Phase 10 (Important Dates, "מועדים חשובים"): the spec asks to extend
+  // Task with assignee + due date + a link back to the ImportantDate/
+  // occurrence that auto-created it, "אם השדות עדיין אינם קיימים" - none
+  // of these four existed before this phase. assignedToId/dueDate are
+  // useful for ANY task (not only auto-created ones), so they're plain
+  // optional columns, not important-dates-specific. importantDateId +
+  // importantDateOccurrenceKey exist ONLY on auto-created rows and are
+  // the "one task per (date, occurrence-year)" dedupe guard (spec: "אם
+  // קיימת משימה פתוחה הקשורה לאותו מועד ומופע, אין ליצור נוספת") - a
+  // unique constraint on the pair is the actual safety net (Postgres
+  // treats these as distinct when both are NULL, i.e. ordinary
+  // manually-created tasks never collide with each other here), mirroring
+  // ReminderOccurrence.idempotencyKey's precedent below.
+  assignedToId               String?
+  dueDate                    DateTime?
+  importantDateId            String?
+  importantDateOccurrenceKey String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  client      Client      @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  category    Category?   @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-  timeEntries TimeEntry[]
+  client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  assignedTo    User?          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
+  timeEntries   TimeEntry[]
 
+  @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
+  @@index([assignedToId])
   @@map("tasks")
 }
 
@@ -858,4 +894,332 @@ model Notification {
   @@index([userId, readAt])
   @@index([type, entityId])
   @@map("notifications")
+}
+
+// --- Phase 10: Important Dates ("מועדים חשובים") -------------------------
+//
+// Scope discipline: models ImportantDate, ReminderRule, ReminderOccurrence,
+// HolidayCalendarSubscription, per the "מועדים חשובים" spec (HE, Sept
+// 2026) - lets Ankora track per-client important dates (birthdays,
+// document expiries, renewals, holidays, etc.), the reminders that fire
+// before them, and the auto-created follow-up tasks. Reuses existing
+// infrastructure end to end: Client/User/Task/Category, Notification,
+// lib/email.ts, AuditEvent, soft delete, the daily reconciliation cron
+// (app/api/cron/alerts-reconcile), and RBAC.
+//
+// Naming/modeling decisions where the spec is silent, documented once
+// here rather than repeated on every field:
+//
+// - ImportantDate.type and HolidayCalendarSubscription.calendarKey are
+//   plain Strings, not Postgres enums - the exact same precedent as
+//   Notification.type/AuditEvent.action (see those models' own comments
+//   above): the spec's own type catalog is large and the spec explicitly
+//   wants it extensible without a migration ("אפשר למנהל להוסיף כותרת
+//   מותאמת גם כאשר נבחר סוג קיים"). The canonical catalogs (label,
+//   category, default recurrence, default reminders, holiday
+//   definitions) live in code - lib/app-domain/important-dates-catalog.ts
+//   and important-dates-holidays.ts - not the database.
+// - relatedEntityType/relatedEntityName/relationToClient are flat
+//   Strings, not a new normalized entity table (family member / vehicle /
+//   property registry). The spec's own field list for ImportantDate asks
+//   for exactly these flat fields ("סוג הישות שאליה המועד קשור", "שם
+//   האדם או הפריט") - not a registry - and the "לא לפתח עכשיו" list
+//   explicitly excludes OCR/document extraction, so nothing yet would
+//   populate a normalized table beyond what these three strings capture.
+// - Optimistic concurrency reuses the exact pattern already established
+//   in Phase 7 (docs/adr/0001 section 14.7: an `updatedAt`-compare +
+//   ConflictError, not a version-int column) - spec explicitly says "לפי
+//   הדפוס הקיים."
+// - ReminderRule.sendInApp/sendEmail are plain booleans rather than a
+//   channel array - spec 9.1's own "ערוץ: התראה פנימית ו/או מייל" is
+//   inherently a two-way choice, matching the codebase's existing
+//   preference for booleans over enums on binary settings (e.g.
+//   AlertRule.allowRetrigger).
+// - ReminderOccurrence.idempotencyKey (spec: "מפתח Idempotency ייחודי") is
+//   built from importantDateId + occurrenceYear + reminderRuleId +
+//   recipient + channel (lib/app-domain/important-dates-reminders.ts's
+//   buildIdempotencyKey) and carries the actual DB-level uniqueness
+//   guarantee - the daily job's own pre-check is a friendlier early exit,
+//   the same two-layer pattern TimeEntry's one-active-timer partial index
+//   already uses (see that model's own header comment above).
+// - Task gained assignedToId/dueDate/importantDateId/
+//   importantDateOccurrenceKey as additive nullable columns (see that
+//   model's own updated comment above) rather than a parallel task-like
+//   entity - spec 25's "לא לבנות ארכיטקטורה מקבילה אם ניתן להרחיב רכיב
+//   קיים" applied directly.
+
+enum ImportantDateCategory {
+  PEOPLE_FAMILY
+  DOCUMENTS_AUTHORITIES
+  BUSINESS_FINANCE
+  VEHICLE_PROPERTY
+  HEALTH_TRAVEL
+  GENERAL
+}
+
+enum CalendarType {
+  GREGORIAN
+  HEBREW
+}
+
+enum RecurrenceType {
+  ONCE
+  ANNUAL
+  MONTHLY
+  CUSTOM_INTERVAL
+}
+
+/// Spec's explicit status list, used verbatim: פעיל / דורש טיפול / בטיפול
+/// / טופל למופע הנוכחי / הושהה / בארכיון.
+enum ImportantDateStatus {
+  ACTIVE
+  NEEDS_ATTENTION
+  IN_PROGRESS
+  HANDLED_CURRENT
+  PAUSED
+  ARCHIVED
+}
+
+enum ImportantDateSensitivity {
+  NORMAL
+  SENSITIVE
+}
+
+/// Spec: "מקור המועד: ידני, חג או תבנית."
+enum ImportantDateSource {
+  MANUAL
+  HOLIDAY
+  TEMPLATE
+}
+
+enum ReminderChannel {
+  IN_APP
+  EMAIL
+}
+
+enum ReminderOccurrenceStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+/// Spec section "Important Date" - the core fact/event (not the reminder,
+/// not the task - see the spec's explicit three-entity separation).
+model ImportantDate {
+  id       String @id @default(cuid())
+  clientId String
+
+  title    String
+  /// Free-string catalog key - see schema-header comment above.
+  type     String
+  category ImportantDateCategory
+
+  relatedEntityType String?
+  relatedEntityName String?
+  relationToClient  String?
+
+  calendarType CalendarType @default(GREGORIAN)
+  /// Gregorian: literal month (1-12)/day (1-31). Hebrew: Hebrew month
+  /// number (1-13, Adar I/II both representable)/day (1-30). See
+  /// lib/app-domain/important-dates-recurrence.ts for the conversion and
+  /// every edge case (Feb 29, Adar I/II, variable Hebrew month lengths).
+  month Int
+  day   Int
+  /// Optional origin year - spec: "שנה אופציונלית בימי הולדת וימי
+  /// נישואים" / "הצגת גיל... רק אם שנת ההתחלה ידועה." Interpreted as a
+  /// Gregorian year even when calendarType = HEBREW (the common case:
+  /// someone knows they were born in 1990, not that they were born in
+  /// 5750) - age/anniversary-years display always does a Gregorian-year
+  /// subtraction from this field, never a Hebrew-year one.
+  originYear Int?
+
+  recurrence RecurrenceType @default(ANNUAL)
+  /// Only meaningful when recurrence = CUSTOM_INTERVAL.
+  customIntervalDays Int?
+  /// Only meaningful when recurrence = ONCE - the exact one-time date;
+  /// month/day/calendarType above are ignored for ONCE dates.
+  onceDate DateTime?
+
+  /// Feb 29 in a non-leap year: false (default, per spec) = Feb 28, true
+  /// = Mar 1.
+  leapDayUseMarchFirst Boolean @default(false)
+  /// A Hebrew date recorded in Adar, observed during a 13-month Hebrew
+  /// leap year: true (default, per spec) = Adar II, false = Adar I. Only
+  /// consulted when calendarType = HEBREW and the recorded month is Adar.
+  hebrewAdarTwoInLeapYear Boolean @default(true)
+
+  timezone String @default("Asia/Jerusalem")
+
+  responsibleUserId String
+  /// Additional users who should see/be notified - a plain id list, same
+  /// storage precedent as AlertRule.recipientsAnkora (String[], no join
+  /// table, for what's just a short per-date list).
+  additionalUserIds String[]
+  extraEmailRecipients String[]
+
+  status      ImportantDateStatus       @default(ACTIVE)
+  sensitivity ImportantDateSensitivity  @default(NORMAL)
+  notes       String?
+
+  createAutoTask     Boolean @default(false)
+  autoTaskLeadDays   Int?
+  autoTaskCategoryId String?
+
+  /// Cached, recomputed on every write and by the daily job - the next
+  /// Gregorian date this important date falls on. Powers list/calendar
+  /// sort and the dashboard/KPI cards without recomputing recurrence on
+  /// every read.
+  nextOccurrenceAt DateTime?
+  /// The Gregorian anchor date of the CURRENT occurrence being tracked -
+  /// once "today" passes this date, the daily job promotes the date to
+  /// its next occurrence and resets status from HANDLED_CURRENT back to
+  /// ACTIVE (spec: "לאחר מעבר למופע הבא, המועד חוזר למצב פעיל").
+  currentOccurrenceAt DateTime?
+  /// Snooze postpones reminders/handling without moving the event's own
+  /// date (spec: "Snooze... לא לשנות את תאריך האירוע המקורי").
+  snoozedUntil DateTime?
+
+  source     ImportantDateSource @default(MANUAL)
+  /// Set when source = HOLIDAY - which holiday-catalog key this row was
+  /// generated from (important-dates-holidays.ts). Prevents re-creating
+  /// the same holiday twice for a client even if it's reachable from two
+  /// subscribed calendars (spec: "יש למנוע כפילות אם אותו חג מגיע משני
+  /// לוחות").
+  holidayKey String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  archivedAt  DateTime?
+  deletedAt   DateTime?
+
+  client           Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  responsibleUser  User              @relation("ImportantDateResponsible", fields: [responsibleUserId], references: [id])
+  createdBy        User?             @relation("ImportantDateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  autoTaskCategory Category?         @relation(fields: [autoTaskCategoryId], references: [id], onDelete: SetNull)
+  reminderRules    ReminderRule[]
+  occurrences      ReminderOccurrence[]
+  tasks            Task[]
+
+  @@unique([clientId, holidayKey])
+  @@index([clientId, status, deletedAt])
+  @@index([nextOccurrenceAt])
+  @@index([responsibleUserId])
+  @@map("important_dates")
+}
+
+/// Spec section "Reminder Rule" - how many days before, on which
+/// channel(s), to whom.
+model ReminderRule {
+  id              String @id @default(cuid())
+  importantDateId String
+
+  daysBefore Int
+
+  sendInApp Boolean @default(true)
+  sendEmail Boolean @default(false)
+
+  /// Extra Ankora-side recipients beyond the date's own
+  /// responsible/additional users - same storage precedent as
+  /// AlertRule.recipientsAnkora.
+  extraAnkoraRecipients String[]
+  /// Client-side recipients - stored per spec's own field list, but no
+  /// write path sends to these yet in this MVP (client portal editing of
+  /// dates is explicitly out of scope - see the spec's "לא לפתח עכשיו"
+  /// list); keeping the column now avoids a migration if that changes.
+  clientRecipients String[]
+
+  enabled    Boolean @default(true)
+  createTask Boolean @default(false)
+
+  escalateToManager Boolean @default(false)
+  escalateAfterDays Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  importantDate ImportantDate        @relation(fields: [importantDateId], references: [id], onDelete: Cascade)
+  occurrences   ReminderOccurrence[]
+
+  @@index([importantDateId, enabled])
+  @@map("reminder_rules")
+}
+
+/// Spec section "Reminder Occurrence / Delivery" - full send history, one
+/// row per (date, occurrence year, rule, recipient, channel).
+model ReminderOccurrence {
+  id              String  @id @default(cuid())
+  importantDateId String
+  reminderRuleId  String?
+
+  /// The Gregorian year of the specific ImportantDate occurrence this
+  /// reminder belongs to - half of the idempotency key (spec: "המועד
+  /// והמופע השנתי שאליהם ההתראה שייכת").
+  occurrenceYear Int
+  /// The anchor Gregorian date of that occurrence - stored directly (not
+  /// only derived) so history stays readable even if the ImportantDate's
+  /// own recurrence fields are edited later.
+  occurrenceDate DateTime
+
+  channel ReminderChannel
+
+  recipientUserId String?
+  recipientEmail  String?
+
+  scheduledFor DateTime
+  attemptedAt  DateTime?
+  sentAt       DateTime?
+
+  status   ReminderOccurrenceStatus @default(PENDING)
+  error    String?
+  attempts Int                      @default(0)
+
+  providerMessageId String?
+
+  /// The dedupe key itself (spec: "מפתח Idempotency ייחודי") - see
+  /// lib/app-domain/important-dates-reminders.ts's buildIdempotencyKey.
+  /// The unique constraint below is the real safety net; the daily job's
+  /// own findFirst pre-check is only a friendlier early exit.
+  idempotencyKey String @unique
+
+  createdAt DateTime @default(now())
+
+  importantDate ImportantDate @relation(fields: [importantDateId], references: [id], onDelete: Cascade)
+  reminderRule  ReminderRule? @relation(fields: [reminderRuleId], references: [id], onDelete: SetNull)
+
+  @@index([importantDateId, occurrenceYear])
+  @@index([status, scheduledFor])
+  @@map("reminder_occurrences")
+}
+
+/// Spec section "Holiday Calendar Subscription" - which holiday sets a
+/// client is registered to; per-client, opt-in (spec: "אין להוסיף
+/// אוטומטית את כל החגים לכל לקוח").
+model HolidayCalendarSubscription {
+  id       String @id @default(cuid())
+  clientId String
+
+  /// Which holiday set - a code-defined key (see
+  /// lib/app-domain/important-dates-holidays.ts's HOLIDAY_CATALOG /
+  /// HOLIDAY_CALENDAR_LABELS: currently "il_holidays" and
+  /// "international_holidays") - a free String, not a DB enum, for the
+  /// identical extensibility reason as ImportantDate.type: a new calendar
+  /// is a catalog entry, never a migration.
+  calendarKey String
+
+  enabled Boolean @default(true)
+
+  defaultReminderDaysBefore Int[]   @default([30, 7])
+  responsibleUserId         String?
+  createTasks                Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client          Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  responsibleUser User?  @relation("HolidaySubscriptionResponsible", fields: [responsibleUserId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, calendarKey])
+  @@map("holiday_calendar_subscriptions")
 }

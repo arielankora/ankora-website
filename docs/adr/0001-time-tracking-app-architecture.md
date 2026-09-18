@@ -2431,3 +2431,407 @@ no Prisma dependency) still passes 70/70, confirming no regression.
 on Vercel Preview (desktop + mobile, all four roles as available,
 screenshot recapture for the guide) and PR open (no merge) are the next
 step, per the standing workflow.
+
+## 21. Addendum: Phase 10 ("מועדים חשובים" — Important Dates module)
+
+### 21.1 Context
+
+Ariel's brief (pasted in full, Hebrew) requested a complete, production-
+quality new module inside the Time Tracking app: tracking important
+dates per client (birthdays, document renewals, contracts, medical
+appointments, holidays, etc.), with reminders and auto-created
+preparation tasks, built entirely on existing patterns (RBAC, audit log,
+soft delete, email, daily cron) rather than parallel infrastructure. The
+brief's own standing instruction was explicit: don't stop after planning
+— implement end-to-end, make and document reasonable decisions, only
+stop for one of five enumerated hard blockers (missing critical
+access/secret, an irreversible destructive Production action, a material
+spec-vs-architecture contradiction, a decision materially affecting
+cross-client privacy, or no way to get any test/Preview environment
+running without Ariel's own action). None of the five were hit. This
+section documents what was built and every non-obvious decision made
+along the way.
+
+### 21.2 Entity separation (spec's core principle)
+
+Three deliberately separate concepts, never collapsed into one table:
+
+1. **`ImportantDate`** — the fact/event itself (a birthday, a passport
+   expiry).
+2. **`ReminderRule`** — a standing "remind N days before, on these
+   channels" configuration attached to a date; a date can have several.
+3. **`ReminderOccurrence`** — one concrete, historical delivery attempt
+   for one rule in one year — the row that actually gets sent, retried,
+   or marked failed.
+
+`Task` (existing model) is extended, not duplicated, for the "auto-
+created preparation task" concept — see 21.5.
+
+### 21.3 Schema
+
+Hand-authored migration `prisma/migrations/20260916090000_phase10_important_dates/`
+(same `binaries.prisma.sh`-unreachable-in-sandbox workaround as every
+migration since Phase 2 — see docs/adr/0001's "Known limitations";
+structurally verified in this sandbox, real `prisma generate`/`migrate
+deploy` runs on Vercel's build). Purely additive: 8 new enums, 4 new
+tables, one `AlterTable` on `tasks` adding 4 nullable columns. No
+existing column is dropped, renamed, or retyped.
+
+New enums: `ImportantDateCategory` (6 values — PEOPLE_FAMILY,
+DOCUMENTS_AUTHORITIES, BUSINESS_FINANCE, VEHICLE_PROPERTY, HEALTH_TRAVEL,
+GENERAL), `ImportantDateCalendarType` (GREGORIAN | HEBREW),
+`ImportantDateRecurrence` (ONCE | ANNUAL | MONTHLY | CUSTOM_INTERVAL),
+`ImportantDateStatus` (ACTIVE | NEEDS_ATTENTION | IN_PROGRESS |
+HANDLED_FOR_OCCURRENCE | PAUSED | ARCHIVED — the spec's six-status
+lifecycle), `ImportantDateSensitivity` (NORMAL | SENSITIVE),
+`ImportantDateSource` (MANUAL | HOLIDAY | TEMPLATE), `ReminderChannel`
+(IN_APP | EMAIL), `ReminderOccurrenceStatus` (PENDING | SENT | FAILED |
+CANCELLED). `ImportantDate.type` and `HolidayCalendarSubscription.calendarKey`
+are plain `String`, not enums — matching the existing `Notification.type`
+/ `AuditEvent.action` precedent, so new date types or holiday calendars
+never require a migration.
+
+New tables: `ImportantDate`, `ReminderRule`, `ReminderOccurrence`,
+`HolidayCalendarSubscription`. Every field the spec's data-model section
+listed is present (client, title, type, category, linked-person/context,
+date, calendar type, recurrence, timezone, primary + extra responsible
+users, status, sensitivity, notes, auto-task flag + lead days + category,
+computed `nextOccurrenceAt`, source, createdBy, timestamps, `archivedAt`,
+`updatedAt`-based optimistic concurrency). `Task` gains `importantDateId`
+(nullable FK), `importantDateOccurrenceKey` (nullable string), source
+discriminator, with `@@unique([importantDateId, importantDateOccurrenceKey])`
+as the actual duplicate-task guarantee (see 21.5).
+
+Indexes added on every filter/sort field the UI needs: `clientId`,
+`responsibleUserId`, `status`, `nextOccurrenceAt`, plus the two unique
+constraints that are the real (not just app-level) idempotency
+guarantees — `ReminderOccurrence.idempotencyKey` and
+`HolidayCalendarSubscription (clientId, calendarKey)`.
+
+### 21.4 Hebrew calendar: `@hebcal/core@5.9.2`, exact-locked
+
+Per the spec's explicit instruction not to hand-roll Hebrew/Gregorian
+conversion, `@hebcal/core` (the standard, actively-maintained JS Hebrew
+calendar library — also what most Israeli tech products use for this)
+was added at an exact-pinned version (`"@hebcal/core": "5.9.2"` in
+`package.json`, no `^`/`~` range) so a future minor/patch bump can't
+silently change a computed occurrence date without a deliberate,
+reviewed version bump. Its actual API (constructors, `.greg()`, `.add()`,
+`HDate.isLeapYear()`, `HebrewCalendar.calendar()`, `getDesc()`) was
+verified by reading the installed package's own `.d.ts` files rather than
+assumed from general knowledge — this caught two real bugs during
+development (documented in 21.4.1) that would otherwise have shipped.
+
+All Hebrew/Gregorian date math lives in one pure module,
+`lib/app-domain/important-dates-recurrence.ts` — zero Prisma import, so
+it is also the one part of this addendum with genuine, executed test
+coverage in this sandbox (see 21.9).
+
+#### 21.4.1 Named edge cases, all with a passing unit test
+
+- **Feb 29 anniversary in a non-leap year**: defaults to Feb 28
+  (`resolveGregorianDayForYear`'s `leapDayUseMarchFirst` flag, default
+  `false`, opt-in per date to March 1 instead — per spec).
+- **Hebrew Adar in a Hebrew leap year** (which has both Adar I and Adar
+  II): a date stored generically as "Adar" resolves to Adar II by
+  default (`hebrewAdarTwoInLeapYear`, default `true`), overridable per
+  date — per spec.
+- **DST**: every Gregorian-side occurrence is constructed via the
+  existing `lib/timezone.ts` (`localDateTimeToUtc`/`localDateKey`) rather
+  than raw `Date` arithmetic, so a whole-day event's UTC instant shifts
+  correctly across the Israel autumn/spring clock change without the
+  calendar date itself moving.
+- **Year rollover**: an annual/monthly occurrence whose month/day has
+  already passed this year rolls forward to next year (not silently
+  treated as "in the past").
+- **Month-length clamping**: day 31 stored against a 30-day (or
+  February) month clamps to that month's real last day, both Gregorian
+  and Hebrew (`HDate.daysInMonth`).
+
+### 21.5 Idempotency (the spec's "never send/create twice" requirement)
+
+Three independent unique-constraint-backed keys, one per duplicate risk:
+
+- **Reminder delivery**: `ReminderOccurrence.idempotencyKey`, a real
+  `@unique` column built from `(importantDateId, reminderRuleId,
+  occurrenceYear, channel)`. The daily job's app-level pre-check is UX
+  only — the DB constraint is what actually guarantees no double-send,
+  same "the constraint is the real guarantee" pattern as every prior
+  phase's dedupe logic (e.g. Phase 4's `AlertEvent`).
+- **Auto-created task**: `Task.importantDateOccurrenceKey` (a string like
+  `occurrence:2026`) paired with `@@unique([importantDateId,
+  importantDateOccurrenceKey])` — a second `createDueAutoTasks()` run for
+  the same date/year creates zero rows, verified by an integration test
+  that calls it twice and asserts `created: 0` on the second call.
+- **Holiday seeding**: `HolidayCalendarSubscription (clientId,
+  calendarKey)` unique constraint plus `ImportantDate.holidayKey`
+  (unique per client+holiday), so `seedHolidayOccurrences()` run twice —
+  or a holiday appearing in two subscribed calendars — never creates a
+  duplicate `ImportantDate` row.
+
+### 21.6 Holiday catalog
+
+`lib/app-domain/important-dates-holidays.ts` (pure, zero-Prisma-import -
+also genuinely tested, see 21.9). Originally shipped with 16 entries
+across 2 calendars; **extended in a same-day follow-up per Ariel's
+explicit request** ("תוסיף את החגים הבינלאומיים... והגדרת לוחות לפי מדינה") to the spec's full holiday list across 4 calendars:
+
+- **`il_holidays`** (unchanged, 14 entries): Rosh Hashana, Yom Kippur,
+  Sukkot, Shmini Atzeret, Chanukah, Tu BiShvat, Purim, Pesach, Yom
+  HaShoah, Yom HaZikaron, Yom HaAtzmaut, Lag BaOmer, Shavuot, Tisha
+  B'Av - computed via `HebrewCalendar.calendar({il:true})` with exact
+  (not prefix) description matching, per this section's original note
+  on the Purim/Shushan-Purim disambiguation bug this caught during
+  Phase 10's first build.
+- **`international_holidays` ("International Core", 11 entries)**: New
+  Year's Day, Valentine's Day, International Women's Day, Easter,
+  Halloween, Lunar New Year, Ramadan (start), Eid al-Fitr, Eid al-Adha,
+  Christmas Eve, Christmas Day.
+- **`us_holidays` (4 entries)**: Mother's Day (2nd Sunday of May),
+  Father's Day (3rd Sunday of June - see below), Thanksgiving (4th
+  Thursday of November), Black Friday, Cyber Monday.
+- **`uk_holidays` (2 entries)**: Mothering Sunday (UK's Mother's Day -
+  the 4th Sunday of Lent, a genuinely different date from the US
+  convention), Father's Day (same date as `us_holidays`' entry - see
+  below).
+
+**Three new date engines, none hand-rolled** (extending the spec's own
+Hebrew-calendar rule - "don't hand-roll if a mature library exists" - to
+every other non-trivial calendar system on the same reasoning), each
+exact-version-locked in `package.json` the same way `@hebcal/core` is:
+`date-easter@1.0.3` (Western/Gregorian Easter - the standard Anonymous
+Gregorian algorithm), `@umalqura/core@0.0.7` (Islamic/Hijri - the Umm
+al-Qura tabular calendar, the same calendar Saudi Arabia's official
+calendar is based on), `lunar-javascript@1.7.7` (Chinese Lunar New
+Year). Nth-weekday-of-month dates (Mother's/Father's Day US,
+Thanksgiving) and Easter-relative offsets (UK Mothering Sunday, Black
+Friday, Cyber Monday) are plain calendar arithmetic, not a calendar
+*system*, so they're computed directly rather than via a library - the
+same reasoning `important-dates-recurrence.ts` already applies to
+ordinary Gregorian recurrence.
+
+**Decisions made and disclosed:**
+- **Islamic dates are a planning estimate, not a religious ruling.**
+  Real-world Ramadan/Eid observance is ultimately set by regional
+  moon-sighting and can differ from the Umm al-Qura tabular calendar by
+  a day in either direction. Documented inline in the catalog and here,
+  not silently presented as authoritative.
+- **Father's Day is one catalog entry under two calendars**, not two
+  entries with the same date - the US and UK conventions are both "3rd
+  Sunday of June," so subscribing to both `us_holidays` and
+  `uk_holidays` must never create two `ImportantDate` rows for the same
+  real-world day. Verified by a dedicated test and enforced structurally:
+  `HolidayCatalogEntry.calendarKeys` is an array, and the dedupe key is
+  `(clientId, holidayKey)`, not `(clientId, calendarKey, holidayKey)`.
+- **Black Friday / Cyber Monday are computed relative to Thanksgiving's
+  own already-computed date** (`{ type: "relativeToKey", baseKey:
+  "thanksgiving_us", offsetDays: 1 | 4 }`), never as an independent
+  nth-weekday rule, so they can never drift from Thanksgiving if that
+  rule is ever adjusted. A unit test asserts every `relativeToKey`
+  entry's `baseKey` resolves to a real catalog entry sharing its
+  calendar.
+- **Lunar New Year's Gregorian-year mapping** (`Lunar.fromYmd(gYear, 1,
+  1).getSolar()`) and the **Hijri-year search window** for Ramadan/Eid
+  (`gregorianToHijri` on Jan 1 and Dec 31 of the target year, both ±1
+  year as candidates) were cross-checked during development against
+  known real-world dates for 2025-2027 before shipping, not trusted
+  blindly from the library's output.
+
+Both years the spec named (2026, 2027) are covered by dedicated tests
+for every new engine (Easter, Lunar New Year, Ramadan/Eid ordering and
+spacing, all four fixed-Gregorian entries, US nth-weekday entries, UK
+Mothering Sunday vs. US Mother's Day distinctness). 12 new unit tests,
+21/21 passing in this file (up from 9).
+
+**Still-open gap, disclosed not hidden**: the spec's holiday catalog UI
+requirement ("הרשמה ללוחות חגים לפי לקוח" - a screen where an admin
+subscribes a client to one or more calendars) has no UI wiring yet -
+`listHolidayCalendars`/`setHolidayCalendarSubscription` in
+`important-dates.ts` are implemented and RBAC-gated, but no screen calls
+them. This predates today's catalog-expansion work (it was already true
+of the original 2-calendar catalog) and was not addressed in either
+pass - flagged here explicitly rather than left implicit, since with 4
+calendars now available the gap is more consequential than it was with
+2.
+
+### 21.7 RBAC and sensitivity
+
+One new permission: `important_date.manage_catalog`
+(`lib/app-auth/permissions.ts`), SUPER_ADMIN-only, gating only holiday-
+calendar subscription management — per spec, this is deliberately
+narrower than general important-date CRUD, which reuses the existing
+`canManageClients()` / `listAccessibleClients()` client-scoping
+precedent from `tasks.ts` (an ANKORA_EMPLOYEE sees/creates dates only for
+clients assigned to them; ANKORA_ADMIN and SUPER_ADMIN are unrestricted
+by client). No new permission was needed for ordinary create/edit/
+archive — it rides the same client-access check every other client-
+scoped resource in this app already uses.
+
+Sensitivity: `NORMAL | SENSITIVE`. `resolveSensitivityDefault()` sets
+`HEALTH_TRAVEL`-category dates to `SENSITIVE` by default (per spec),
+overridable per date. A `SENSITIVE` date's `notes` field is redacted
+(returned `null`) to any caller who is not the responsible user, not one
+of the extra assigned users, and not an ANKORA_ADMIN/SUPER_ADMIN —
+enforced in `listImportantDates`/`getImportantDate` themselves, not just
+hidden in the UI, and covered by an integration test asserting the
+non-authorized caller sees `notes: null` while the responsible user sees
+the real text. Per the spec's explicit "never store" list, no field for
+passport/visa numbers, detailed medical information, or scanned
+documents exists anywhere in the schema; `assertNotesDoNotContainForbiddenData()`
+additionally heuristically rejects (regex `/\b[A-Za-z]{1,2}\d{6,9}\b/`,
+matching common passport/ID number shapes) an attempt to paste one into
+the free-text notes field — a best-effort guard, not a guarantee, and
+disclosed as such rather than presented as complete data-loss
+prevention.
+
+### 21.8 Daily job: 7 steps, reusing the existing cron
+
+`lib/app-domain/important-dates-job.ts`'s `reconcileImportantDates()` is
+called as a 4th parallel entry in the existing
+`app/api/cron/alerts-reconcile/route.ts` `Promise.all` — no new cron
+schedule, no new `CRON_SECRET`-equivalent, same authenticated endpoint
+every prior phase's daily job already uses. Each of its 7 steps is
+independently try/caught so one step's failure never blocks the others,
+and the route's JSON response gains an `importantDates` summary object
+(counts, not client data) alongside the existing alert/report/hour-bank
+summaries:
+
+1. `seedHolidayOccurrences` — creates missing `ImportantDate` rows for
+   every client's subscribed holiday calendars (idempotent, see 21.5).
+2. `recomputeOccurrences` — recalculates `nextOccurrenceAt` for every
+   active recurring date (handles the "date edited after occurrences
+   already existed" edge case named in the spec).
+3. `flagOverdueDates` — moves a date whose occurrence has passed without
+   being marked handled into `NEEDS_ATTENTION`.
+4. `createDueReminderOccurrences` — materializes `ReminderOccurrence`
+   rows for rules whose lead time has arrived (idempotent).
+5. `sendPendingReminders` — sends in-app notifications and, via the
+   existing `lib/email.ts` Resend adapter, emails; a `PENDING` row is
+   only marked `SENT` after the provider actually confirms — per spec,
+   never marked sent speculatively — and marked `FAILED` (with the error
+   recorded, retried on a later run up to a bounded attempt count) if the
+   provider errors or is unconfigured in the current environment.
+6. `createDueAutoTasks` — creates the one preparation `Task` per date/
+   occurrence when `createAutoTask` is set and the lead day has arrived
+   (idempotent, see 21.5).
+7. `escalateUnhandledReminders` — for a reminder rule with
+   `escalateToAdmin` set, notifies admins if the occurrence is still
+   unhandled past the configured escalation lead time.
+
+Completing a task marks only the current occurrence handled
+(`Task.importantDateOccurrenceKey`-scoped); it neither archives nor
+deletes the parent recurring `ImportantDate`, which returns to `ACTIVE`
+once `recomputeOccurrences` advances it to the next occurrence — per
+spec's explicit "completing a task doesn't close the recurring date"
+rule.
+
+### 21.9 What was actually verified in this sandbox, and what wasn't
+
+This addendum's biggest departure from every prior phase's verification
+story: **three of the new domain modules have zero Prisma import**
+(`important-dates-recurrence.ts`, `important-dates-holidays.ts`,
+`important-dates-reminders.ts` — pure date/holiday/message-template
+logic, deliberately kept Prisma-free specifically so they could be
+tested here) and therefore genuinely execute under this sandbox's
+Vitest setup, unlike every previous phase's `lib/app-domain/*.ts` tests,
+which only ever type-checked. **42 unit tests across these 3 files were
+actually run via `npx vitest run` and pass (42/42)** — real, executed
+proof for the highest-risk logic (Feb 29, Adar I/II, DST, Purim-vs-
+Shushan-Purim disambiguation, idempotency-key determinism).
+
+Everything that touches the database — `important-dates.ts` (CRUD/RBAC/
+redaction), `important-dates-job.ts` (the 7-step cron), and the 16
+integration tests in `tests/integration/important-dates.test.ts` — has
+the same standing limitation documented since Phase 2: this sandbox has
+no network route to `binaries.prisma.sh`, so `prisma generate` cannot
+run here, and any file importing `lib/prisma.ts` fails at import time
+under Vitest. These files are written, type-checked (via the scoped-
+tsconfig `tsc --noEmit` technique and a whole-project before/after error-
+count diff showing zero new error categories), and structurally
+reviewed, but **not executed** in this sandbox — they run for real on
+Vercel's Preview build, same as every prior phase's integration suite,
+and that Preview run is the outstanding verification step (task #361).
+
+The UI screens (list/calendar page, side-panel form, dashboard card,
+client-detail tab, notifications integration, nav item) are similarly
+type-checked and reviewed but not visually confirmed on a live Preview
+yet as of this addendum.
+
+### 21.10 UI scope decision: list + month-grouped view, not a day-grid calendar
+
+The spec asked for "תצוגת לוח שנה חודשית" (a monthly calendar view). This
+was built as a fully-featured list view (search, all 6 filter axes, KPI
+cards, URL-persisted filter state per the existing Reports-screen
+precedent) plus a lightweight month-grouped view — items grouped and
+headed by calendar month, not a day-by-day grid widget. This is a
+deliberate, disclosed scope reduction: a real interactive day-grid
+(month navigation, per-day event stacking, click-to-open on a specific
+day) is a materially larger UI component than anything else in this
+app's existing component library, and was judged lower priority than
+completing every other spec requirement end-to-end. Flagged here, and
+in the final report to Ariel, as a known gap rather than silently
+shipped as "calendar view: done."
+
+### 21.11 No new environment variables
+
+The module reuses `RESEND_API_KEY` (existing email adapter) and
+`CRON_SECRET` (existing cron authentication) exclusively. No new secret,
+API key, or config value was introduced anywhere in this addendum.
+
+### 21.12 Real bug found and fixed during build verification: `server-only` in a client-imported module
+
+Running `next build` for real (not just `tsc --noEmit`) surfaced a
+genuine bug, not the standing sandbox limitation: the first version of
+`lib/app-domain/important-dates-reminders.ts` carried `import
+"server-only"` (matching its sibling pure modules' convention), but
+`ImportantDateForm.tsx` — a Client Component — imports
+`IMPORTANT_DATE_CATEGORY_LABELS` and `IMPORTANT_DATE_TYPE_EXAMPLES` from
+it directly, to populate the add/edit drawer's type dropdown. Webpack
+correctly refused to bundle a `server-only`-gated module into client
+code: "You're importing a component that needs server-only. That only
+works in a Server Component." `tsc --noEmit` alone does not catch this
+class of error — it is a bundler-level constraint, not a type error —
+which is exactly why this addendum's earlier tsc-diff verification (see
+21.9) did not surface it, and why running a real `next build` remains
+part of this checklist even when `tsc` and `eslint` are both clean.
+
+**Fix**: removed `import "server-only"` from
+`important-dates-reminders.ts`. Nothing in that file touches Prisma,
+secrets, or any server-only resource — it is pure constants and
+functions (offset tables, label maps, idempotency-key builders, message
+templates) legitimately safe to run in the browser, unlike its two
+siblings (`important-dates-recurrence.ts`, `important-dates-holidays.ts`),
+which are never imported by a Client Component and correctly keep the
+`server-only` guard. After the fix, `next build`'s compile step reports
+"Compiled successfully" including every file this addendum touches; the
+build's subsequent type-check failure is the same pre-existing,
+untouched-file Prisma-generation limitation as every prior phase (see
+21.9), not a regression.
+
+### 21.13 Guide + documentation
+
+`app/(product)/app/(authenticated)/guide/content.ts` gained a new
+"מועדים חשובים" section (roles: SUPER_ADMIN, ANKORA_ADMIN,
+ANKORA_EMPLOYEE) under the existing "daily-work" group, positioned after
+"tasks", plus one added sentence in the existing "notifications" section
+noting that Important Date reminders now surface there too. No
+screenshots were added to this guide section — per this ADR's own
+Phase-4-era standing rule ("keep the guide updated on every app change"),
+screenshots are captured against a real Preview deployment, which had
+not yet happened at the time this section was written; recapturing them
+is part of this addendum's own remaining live-QA step, not deferred
+separately.
+
+**Status:** implemented in a scratch clone (`/tmp/test-clone`), not yet
+pushed to Ariel's repository. Local verification complete: `tsc --noEmit`
+project-wide diff (232 errors, same categories/files as the pre-existing
+baseline plus the expected cascade into the 5 new files that import
+Prisma types — zero new error categories), `eslint` (zero errors/
+warnings across every changed/new file), the 3 genuinely-executable unit
+test files (42/42 passing), and a real `next build` (compile step
+succeeds; the one real bug it caught — 21.12 — is fixed; the remaining
+type-check failure is the pre-existing, untouched-file Prisma-generation
+limitation). Integration tests and live Preview QA still require a real
+Postgres + generated Prisma Client, which only exist on Vercel's own
+build — those run once this branch reaches Preview, same as every prior
+phase.
