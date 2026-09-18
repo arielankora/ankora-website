@@ -117,6 +117,7 @@ export default async function AdminTimeEntriesPage({
                     actualSeconds: entry.actualSeconds,
                     note: entry.note,
                     isEdited: entry.isEdited,
+                    isOverlapConfirmed: entry.isOverlapConfirmed,
                     source: entry.source,
                     userName: entry.user.name,
                     clientName: entry.client.name,

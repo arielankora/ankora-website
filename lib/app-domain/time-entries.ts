@@ -6,6 +6,7 @@ import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
+import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
 import type { User, TimeEntry, Prisma } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -29,8 +30,23 @@ const SELF_EDIT_WINDOW_HOURS = 48;
 /// day-boundary helper - this file had its own private copy of it before
 /// Phase 8 extracted the shared version.
 
+/// The conflicting row, with just enough of its relations to build a
+/// human-readable warning at the action layer (spec "אישור דיווח שעות חופף
+/// בין לקוחות שונים": the cross-client warning names the conflicting
+/// client/category/time range).
+type OverlapConflict = TimeEntry & { client: { name: string }; category: { name: string } };
+
 export class OverlapError extends Error {
-  constructor(public readonly conflicting: TimeEntry) {
+  constructor(
+    public readonly conflicting: OverlapConflict,
+    /// True when the conflict is against an entry for the EXACT SAME
+    /// client - a hard, unconfirmable block for anyone without
+    /// time_entry.edit_others. False means a cross-client conflict, which
+    /// the action layer surfaces as a confirmable warning instead of a
+    /// terminal error (see resolveOverlapDecision in
+    /// time-entry-overlap.ts).
+    public readonly sameClient: boolean
+  ) {
     super("This time range overlaps an existing entry.");
     this.name = "OverlapError";
   }
@@ -160,12 +176,16 @@ function assertNotFuture(startAt: Date, endAt: Date | null) {
 /// Spec 6.3: "Validation למניעת overlap: להתריע על חפיפה עם Entry קיים;
 /// אפשר override רק למי שיש permission." Half-open interval overlap
 /// check: [startAt, endAt) vs [existing.startAt, existing.endAt or now).
+/// Phase 12 extended this to compare clientId too (see time-entry-overlap.ts)
+/// - the DB query itself is unchanged; it still finds ANY time-overlapping
+/// entry for this user regardless of client, and the client comparison
+/// happens in assertNoOverlap below.
 async function findOverlap(
   userId: string,
   startAt: Date,
   endAt: Date | null,
   excludeEntryId?: string
-): Promise<TimeEntry | null> {
+): Promise<OverlapConflict | null> {
   const effectiveEnd = endAt ?? new Date("9999-01-01"); // an active timer blocks everything after it starts
   return prisma.timeEntry.findFirst({
     where: {
@@ -175,25 +195,37 @@ async function findOverlap(
       startAt: { lt: effectiveEnd },
       OR: [{ endAt: null }, { endAt: { gt: startAt } }],
     },
+    include: { client: { select: { name: true } }, category: { select: { name: true } } },
   });
 }
 
+/// Phase 12 ("אישור דיווח שעות חופף בין לקוחות שונים"): returns whether the
+/// write that's about to happen should be flagged isOverlapConfirmed.
+/// Throws OverlapError when the conflict isn't (yet) resolved - callers
+/// distinguish a same-client hard block from a confirmable cross-client
+/// warning via err.sameClient. See resolveOverlapDecision for the actual
+/// rule.
 async function assertNoOverlap(
   actor: User,
   userId: string,
+  clientId: string,
   startAt: Date,
   endAt: Date | null,
   allowOverride: boolean,
   excludeEntryId?: string
-) {
+): Promise<{ confirmed: boolean }> {
   const conflict = await findOverlap(userId, startAt, endAt, excludeEntryId);
-  if (!conflict) return;
-  // Spec 6.3: "אפשר override רק למי שיש permission" - the actor performing
-  // the write needs edit_others to push through a flagged overlap,
-  // regardless of whose entry it is.
-  const hasOverridePermission = can(actor.role, "time_entry.edit_others");
-  if (allowOverride && hasOverridePermission) return;
-  throw new OverlapError(conflict);
+  if (!conflict) return { confirmed: false };
+
+  const decision = resolveOverlapDecision({
+    conflictClientId: conflict.clientId,
+    newEntryClientId: clientId,
+    allowOverride,
+    hasEditOthersPermission: can(actor.role, "time_entry.edit_others"),
+  });
+
+  if (decision.allowed) return { confirmed: decision.confirmed };
+  throw new OverlapError(conflict, decision.sameClient);
 }
 
 // ---------------------------------------------------------------------
@@ -362,7 +394,14 @@ export async function createManualEntry(
     throw new BackdateReasonRequiredError();
   }
 
-  await assertNoOverlap(actor, targetUserId, input.startAt, input.endAt, !!input.allowOverlapOverride);
+  const overlap = await assertNoOverlap(
+    actor,
+    targetUserId,
+    input.clientId,
+    input.startAt,
+    input.endAt,
+    !!input.allowOverlapOverride
+  );
 
   const actualSeconds = Math.round((input.endAt.getTime() - input.startAt.getTime()) / 1000);
   const billableSeconds = await computeEntryBillableSeconds(input.clientId, actualSeconds);
@@ -380,6 +419,7 @@ export async function createManualEntry(
       note: input.note?.trim() || null,
       source: "MANUAL",
       isManual: true,
+      isOverlapConfirmed: overlap.confirmed,
     },
   });
 
@@ -461,15 +501,24 @@ export async function updateTimeEntry(
     await assertActiveTargets(actor, nextClientId, nextCategoryId);
   }
 
-  if (input.startAt || input.endAt) {
-    await assertNoOverlap(
+  // Re-checked whenever the time range OR the client changes - either can
+  // flip the conflict from same-client (hard block) to cross-client
+  // (confirmable) or introduce/remove a conflict entirely. Left
+  // untouched (isOverlapConfirmed stays whatever it already was) when
+  // neither changes, matching every other field here that's only
+  // re-validated when it's actually part of the edit.
+  let overlapConfirmed: boolean | undefined;
+  if (input.startAt || input.endAt || input.clientId) {
+    const overlap = await assertNoOverlap(
       actor,
       entry.userId,
+      nextClientId,
       nextStartAt,
       nextEndAt,
       !!input.allowOverlapOverride,
       entry.id
     );
+    overlapConfirmed = overlap.confirmed;
   }
 
   const nextActualSeconds = nextEndAt
@@ -494,6 +543,7 @@ export async function updateTimeEntry(
         actualSeconds: nextActualSeconds,
         billableSeconds: nextBillableSeconds,
         isEdited: true,
+        isOverlapConfirmed: overlapConfirmed,
       },
     });
 

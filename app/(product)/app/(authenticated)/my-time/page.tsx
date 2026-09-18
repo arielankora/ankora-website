@@ -131,6 +131,7 @@ export default async function MyTimePage({ searchParams }: { searchParams: { wee
                         note: entry.note,
                         isEdited: entry.isEdited,
                         isManual: entry.isManual,
+                        isOverlapConfirmed: entry.isOverlapConfirmed,
                         clientName: entry.client.name,
                         categoryName: entry.category.name,
                         updatedAt: entry.updatedAt.toISOString(),
