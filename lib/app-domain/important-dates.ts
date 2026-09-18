@@ -96,6 +96,16 @@ export function canViewSensitiveDetails(actor: User, date: Pick<ImportantDate, "
 // CRUD
 // ---------------------------------------------------------------------------
 
+// Shared with ImportantDateInput.reminderRules below and with the
+// default-offsets fallback in createImportantDate() - both branches of that
+// function's `??` need to resolve to this exact same type. Without it, TS
+// unions the two branches into `FullShape | { daysBefore: number }`, and
+// accessing r.sendInApp on the merged array errors with "Property
+// 'sendInApp' does not exist on type '{ daysBefore: number }'" - invisible
+// in this sandbox (no generated Prisma Client to run a real build against),
+// but caught immediately by a real `tsc`/Vercel build.
+type ReminderRuleCreateInput = { daysBefore: number; sendInApp?: boolean; sendEmail?: boolean; createTask?: boolean };
+
 export interface ImportantDateInput {
   clientId: string;
   title: string;
@@ -125,7 +135,7 @@ export interface ImportantDateInput {
   /// When provided (and truthy), no explicit ReminderRule list needs to
   /// be passed - defaults are created from DEFAULT_REMINDER_OFFSETS_BY_CATEGORY.
   useDefaultReminders?: boolean;
-  reminderRules?: Array<{ daysBefore: number; sendInApp?: boolean; sendEmail?: boolean; createTask?: boolean }>;
+  reminderRules?: ReminderRuleCreateInput[];
 }
 
 function normalizeStringArray(values: string[] | undefined): string[] {
@@ -245,7 +255,9 @@ export async function createImportantDate(actor: User, input: ImportantDateInput
       reminderRules: {
         create: (
           input.reminderRules ?? (input.useDefaultReminders !== false
-            ? DEFAULT_REMINDER_OFFSETS_BY_CATEGORY[input.category].map((daysBefore) => ({ daysBefore }))
+            ? DEFAULT_REMINDER_OFFSETS_BY_CATEGORY[input.category].map(
+                (daysBefore): ReminderRuleCreateInput => ({ daysBefore })
+              )
             : [])
         ).map((r) => ({
           daysBefore: r.daysBefore,
