@@ -116,6 +116,7 @@ export const HOLIDAY_CATALOG: HolidayCatalogEntry[] = [
   { key: "lag_baomer", labelHe: "ל\"ג בעומר", calendarKeys: ["il_holidays"], defaultReminderDaysBefore: [7], match: { type: "exact", value: "Lag BaOmer" } },
   { key: "shavuot", labelHe: "שבועות", calendarKeys: ["il_holidays"], defaultReminderDaysBefore: [14, 3], match: { type: "exact", value: "Shavuot" } },
   { key: "tisha_bav", labelHe: "תשעה באב", calendarKeys: ["il_holidays"], defaultReminderDaysBefore: [7], match: { type: "exact", value: "Tish'a B'Av" } },
+  { key: "tu_bav", labelHe: "ט\"ו באב (יום האהבה)", calendarKeys: ["il_holidays"], defaultReminderDaysBefore: [7], match: { type: "exact", value: "Tu B'Av" } },
 
   // --- international_holidays ("International Core") ---
   { key: "new_year", labelHe: "ראש השנה האזרחית", calendarKeys: ["international_holidays"], defaultReminderDaysBefore: [14, 3], match: { type: "fixedGregorian", month: 1, day: 1 } },
