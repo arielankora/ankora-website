@@ -416,7 +416,11 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
   async function getAdminEmails(): Promise<string[]> {
     if (cachedAdminEmails) return cachedAdminEmails;
     const admins = await prisma.user.findMany({ where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN"] } }, select: { email: true, role: true } });
-    const emails: string[] = admins.filter((a: { role: string }) => canManageClients(a.role)).map((a: { email: string }) => a.email).filter(Boolean);
+    // Let TS infer a.role/a.email from Prisma's real generated select-result type.
+    const emails: string[] = admins
+      .filter((a) => canManageClients(a.role))
+      .map((a) => a.email)
+      .filter((e): e is string => Boolean(e));
     cachedAdminEmails = emails;
     return emails;
   }
