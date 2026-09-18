@@ -8,12 +8,26 @@ import "server-only";
 // This module intentionally does NOT touch app/api/contact/route.ts -
 // that route keeps working exactly as it did before Phase 4, unmodified.
 
+// Phase 11 addition (nightly backup + data export to email, per Ariel's
+// direct request): Resend's /emails endpoint accepts a plain `attachments`
+// array of { filename, content } where `content` is base64 - no multipart
+// upload, no separate endpoint, so this is additive to the JSON body
+// above rather than a different code path. `content` accepts a Buffer
+// directly (what lib/xlsx.ts's toXlsx()/toXlsxWorkbook() already return)
+// so callers never have to think about base64 themselves.
+export interface SendEmailAttachment {
+  filename: string;
+  content: Buffer | string;
+  contentType?: string;
+}
+
 export interface SendEmailInput {
   to: string[];
   subject: string;
   text: string;
   html?: string;
   replyTo?: string;
+  attachments?: SendEmailAttachment[];
 }
 
 export interface SendEmailResult {
@@ -51,6 +65,11 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         subject: input.subject,
         text: input.text,
         html: input.html,
+        attachments: input.attachments?.map((a) => ({
+          filename: a.filename,
+          content: Buffer.isBuffer(a.content) ? a.content.toString("base64") : a.content,
+          ...(a.contentType ? { content_type: a.contentType } : {}),
+        })),
       }),
     });
 

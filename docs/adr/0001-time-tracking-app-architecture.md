@@ -2993,3 +2993,167 @@ call only seeds the targeted one.
 Ariel at the time this section was written. Not yet merged - merge
 requires Ariel's explicit approval per this ADR's standing rule.
 
+
+## 22. Addendum: Phase 11 (nightly backup + data export to email)
+
+### 22.1 Context
+
+Ariel asked directly (not from the written spec): he's concerned about
+environment survivability and wants (a) a backup/restore plan for
+ankora.co.il and ankora.co.il/app covering code, database, and anything
+else needed to recover after a disaster, with backups kept in Ankora's
+Google Drive, and (b) ALL the operational data (line-level time entries,
+clients, etc.) emailed to him every night as an organized Excel file.
+The full backup/restore plan (Google Drive folder structure, Neon PITR,
+weekly code snapshots, the disaster-recovery runbook) is written up in
+a Claude Doc ("תוכנית גיבוי, שמירה ושחזור - ankora.co.il") rather than
+here - this addendum covers only the piece that is actual application
+code: the nightly Excel report + JSON backup dump, emailed automatically.
+
+Ariel's three explicit decisions when asked: run time 03:00 (accepted
+the plan's own recommendation); recipients ariel@ankora.co.il AND
+hadas@ankora.co.il; data scope ALL clients, not just ACTIVE ones.
+
+### 22.2 What ships in app code vs. what doesn't
+
+In this repo: `lib/app-domain/backup-export-format.ts` (pure row-shaping,
+unit tested - see below), `lib/app-domain/backup-export.ts`
+(Prisma-touching orchestrator: fetch → shape → build Excel + gzipped
+JSON dump → email both as attachments → EmailDelivery + audit record),
+an `attachments` param added to `lib/email.ts`'s `sendEmail()` (Resend's
+`/emails` accepts a plain base64 `attachments` array - additive, no new
+endpoint), and `lib/xlsx.ts` gained `toXlsxWorkbook()` (multi-sheet;
+`toXlsx()` is now just its one-sheet case, byte-for-byte
+behavior-compatible with every existing caller).
+
+NOT in this repo, by design: uploading the two attachments to Google
+Drive. That's a separate, Claude-side scheduled task (reads the nightly
+email via the Gmail MCP connector, re-uploads each attachment to its own
+Drive folder) - keeping it there means no Google API credentials need to
+live in this app or its Vercel env vars, matching this project's existing
+"secrets stay out of Drive/backups" principle from the backup plan doc.
+
+### 22.3 Where the new job runs (Vercel Hobby's 2-cron ceiling, again)
+
+Same constraint as Phase 10's `reconcileImportantDates()` (section 21.8)
+and already independently documented in
+`lib/app-domain/report-schedules.ts`'s `isScheduleDue` doc comment: this
+project's Vercel plan allows at most 2 Cron Jobs, both already spoken
+for (`/api/cron/alerts-reconcile`, `/api/cron/scheduled-reports`). A
+third standalone cron for the nightly export was not an option, so
+`sendNightlyDataExport()` was folded into `/api/cron/scheduled-reports`
+(chosen over `alerts-reconcile` because it's already the "email reports"
+cron, and because moving only its schedule leaves `alerts-reconcile`'s
+unrelated jobs - client alert reconciliation, long-timer notifications,
+important-date reminders - at their existing, presumably
+deliberately-chosen run time untouched).
+
+`vercel.json`'s schedule for `/api/cron/scheduled-reports` moved from
+`0 6 * * *` to `0 0 * * *` to land on Ariel's requested 03:00 Israel
+time. Known, documented, NOT-yet-solved limitation: Vercel Cron
+schedules are fixed UTC with no DST-aware/timezone option, so this
+actually fires at 02:00 Israel time once clocks fall back to IST
+(UTC+2) in late October, until the offset is manually revisited twice a
+year (or Vercel ships timezone-aware cron). Recorded here and in the
+backup plan doc as an open item, not silently accepted as "good enough
+forever."
+
+This schedule change does not affect the accuracy of WEEKLY/MONTHLY
+client `ReportSchedule` sends: `isScheduleDue()` only checks
+day-of-week/day-of-month, never `hour` (already true before this
+change, per its own doc comment), and 00:00-03:00 UTC is still the same
+Israel calendar day the previous 06:00 UTC fire time was - which day a
+schedule is due on is unchanged.
+
+### 22.4 Data scope
+
+Excel report: 3 sheets (לקוחות / דיווחי שעות / משימות), `deletedAt: null`
+only (matches every other report in this codebase), ALL client statuses
+per Ariel's decision, time entries filtered to `endAt: { not: null }`
+(completed entries only - a running timer has no `actualSeconds` yet).
+Full history every night, not incremental - Ariel asked for "כל הדאטה",
+and a complete nightly snapshot is also what makes this email useful as
+a backup, not only a report. Revisit if/when row count makes the
+attachment unwieldy.
+
+JSON dump (gzipped, `.json.gz`): a deliberately narrower "core
+operational tables" dump (clients, users, categories, tasks, time
+entries, hour banks) - NOT a full schema dump. Neon's own PITR (point-in-
+time recovery, per the backup plan doc) is the authoritative
+full-fidelity backup within its retention window; this dump is the
+secondary safety net specifically for the core business entities, kept
+deliberately scoped rather than growing into an ad hoc second database
+export layer. User rows are dumped WITHOUT `passwordHash` - the dump
+travels over email and into Drive, both outside the DB's own access
+boundary, so a restore means users reset their password via the
+existing forgot-password flow (already built, spec 4.2) rather than
+regaining their literal old password. A deliberate tradeoff, not a gap.
+
+### 22.5 Testability (same split this codebase already uses elsewhere)
+
+`backup-export-format.ts` has zero "server-only"/Prisma imports (only
+`lib/timezone.ts`, itself import-safe), so - like `lib/csv.ts` and
+`lib/xlsx.ts` - it actually runs in this sandbox:
+`tests/unit/backup-export-format.test.ts` covers null-field fallbacks,
+seconds→minutes rounding, a still-running timer (null actual/billable
+seconds) not crashing or producing NaN, and - the regression this
+codebase already fixed once for report-schedules.ts/reports.ts/
+client-portal.ts (section 15.3) - that day labels use the LOCAL
+(Israel) calendar day via `localDateKey()`, not the UTC day, verified
+with the same DST-boundary instants `tests/unit/timezone.test.ts` uses.
+`tests/unit/xlsx.test.ts` gained coverage for `toXlsxWorkbook()`
+(multiple sheets, per-sheet RTL view + bold header, empty-list edge
+case) and re-confirms `toXlsx()` itself is unaffected by the refactor.
+
+`backup-export.ts` (the Prisma-touching fetch/build/send orchestration)
+was NOT independently exercised in this sandbox - same documented
+limitation as every other `lib/app-domain/*.ts` file here
+(`@prisma/client` cannot reach `binaries.prisma.sh` in this sandbox;
+confirmed again this round: `npx prisma generate` fails with
+`403 Forbidden` even with `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`).
+Verification for that half relies on a clean Vercel Preview build (the
+established path for every other domain module in this repo) plus code
+review against the existing `report-schedules.ts`/`alerts.ts` patterns
+it deliberately mirrors (never-throw contract, EmailDelivery +
+recordAudit on every send, Promise.all fan-out for independent fetches).
+
+### 22.6 Open item found during this work, unrelated to the code above:
+production Cron Jobs appear to not be firing at all
+
+While verifying where to hook in the new job, production runtime logs
+for the last 7 days (`mcp__Vercel__get_runtime_logs`, grouped by
+`requestPath` and separately by `statusCode`) show **zero** requests to
+either `/api/cron/alerts-reconcile` or `/api/cron/scheduled-reports` -
+not even a `401` (which an actual Vercel-triggered request without a
+matching `CRON_SECRET` would produce). Only 14 total production
+requests logged in the whole window, all `200`s, all marketing pages.
+Both routes ARE present as deployed serverless functions on the current
+production deployment (confirmed in its build log), so this isn't a
+build/deploy problem - it looks like Vercel's own Cron scheduler is
+never actually invoking them.
+
+This was already flagged as an unverified open item in section 21.9
+(no live-fire confirmation, `CRON_SECRET` not available in-session,
+didn't want to trigger a real production side effect unprompted) - this
+round's log check upgrades it from "unverified" to "actively looks
+broken": if Cron Jobs aren't firing, NEITHER the existing alert-
+reconciliation/important-dates jobs NOR this Phase 11 nightly export
+will actually run, no matter how correct the code is.
+
+Not diagnosable further from this session: there's no Vercel MCP tool
+here that reads/writes environment variables or a project's Cron Jobs
+registration status directly, and the Vercel CLI isn't installed/
+authenticated on the linked device either. Needs one of: Ariel checking
+the Vercel dashboard's Project → Settings → Cron Jobs page directly (is
+each job listed as enabled, and does it show a last-run time/error?),
+confirming `CRON_SECRET` is actually set for Production, or running
+`vercel crons ls` / `vercel crons run <path>` from an authenticated
+`vercel` CLI. Flagged to Ariel directly, not silently left for a future
+session to rediscover.
+
+**Status:** implemented on branch `feat/nightly-backup-export`. Pending:
+clean Vercel Preview build check, then Ariel's PR review/approval per
+this ADR's merge policy (client/CRON_SECRET/production-cron-timing
+concern - not a pure code change - so opened as a PR for explicit
+approval rather than self-merged, per `claude/github-access.md`'s "לשינויים
+מבניים... קלוד פותח PR ומחכה לאישור").

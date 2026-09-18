@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { toXlsx } from "@/lib/xlsx";
+import { toXlsx, toXlsxWorkbook } from "@/lib/xlsx";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec 14.4's "מומלץ"
 // XLSX/PDF export). Unlike almost every lib/app-domain/*.ts test in this
@@ -52,5 +52,47 @@ describe("toXlsx()", () => {
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.load(buf);
     expect(workbook.worksheets[0].name.length).toBeLessThanOrEqual(31);
+  });
+});
+
+// Phase 11 addition (nightly backup + data export to email): toXlsxWorkbook()
+// is the multi-sheet primitive toXlsx() itself is now built on, so these
+// tests both confirm the new multi-sheet path and, indirectly, that the
+// refactor left toXlsx()'s own behavior unchanged (covered above).
+describe("toXlsxWorkbook()", () => {
+  it("writes one worksheet per entry, each with its own headers/rows", async () => {
+    const buf = await toXlsxWorkbook([
+      { name: "לקוחות", headers: ["שם"], rows: [["חברה בעמ"]] },
+      { name: "משימות", headers: ["כותרת", "סטטוס"], rows: [["עיצוב", "פתוח"]] },
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buf);
+
+    expect(workbook.worksheets).toHaveLength(2);
+    expect(workbook.worksheets[0].name).toBe("לקוחות");
+    expect(workbook.worksheets[0].getRow(2).getCell(1).value).toBe("חברה בעמ");
+    expect(workbook.worksheets[1].name).toBe("משימות");
+    expect(workbook.worksheets[1].getRow(2).getCell(2).value).toBe("פתוח");
+  });
+
+  it("sets rightToLeft and bolds the header row on every sheet, not just the first", async () => {
+    const buf = await toXlsxWorkbook([
+      { name: "A", headers: ["x"], rows: [["1"]] },
+      { name: "B", headers: ["y"], rows: [["2"]] },
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(buf);
+
+    for (const sheet of workbook.worksheets) {
+      expect(sheet.views[0]?.rightToLeft).toBe(true);
+      expect(sheet.getRow(1).font?.bold).toBe(true);
+    }
+  });
+
+  it("produces an empty-but-valid workbook when given an empty sheet list", async () => {
+    const buf = await toXlsxWorkbook([]);
+    expect(buf.subarray(0, 2).toString()).toBe("PK");
   });
 });
