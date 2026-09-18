@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
+import type { Notification, Client } from "@prisma/client";
 import { requireUser } from "@/lib/app-auth/session";
 import { AppShell } from "@/components/app/AppShell";
+import { can } from "@/lib/app-auth/permissions";
+import { getActiveTimer } from "@/lib/app-domain/time-entries";
+import { listNotificationsForUser, unreadNotificationCount } from "@/lib/app-domain/notifications";
+import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
+import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
 
 /// Redesign direction A, layout-flash fix: AppShell (Sidebar + BottomNav)
 /// used to be rendered inside every single page.tsx under app/(product)/app,
@@ -26,7 +33,59 @@ import { AppShell } from "@/components/app/AppShell";
 /// outside this group: they must render without a session, and this
 /// layout's requireUser() would otherwise redirect a logged-out visitor
 /// straight back into a loop on those exact pages.
+/// App redesign (design_handoff_ankora_app_redesign/README.md, App Shell +
+/// "State Management" sections): the AppShell now needs the caller's own
+/// active timer, notifications and a few nav counters on *every* screen
+/// (top bar live-timer pill, bell, sidebar counters, command palette) - not
+/// just the screens that already fetched some of this themselves (Timer,
+/// Notifications). Fetched once here, alongside requireUser(), so
+/// individual page.tsx files don't each need to know about the shell's
+/// data needs. Every call below is either already used elsewhere in the
+/// app (getActiveTimer, listNotificationsForUser, countOpenAlertEvents,
+/// listUpcomingImportantDates, listAccessibleClients) or a thin read on
+/// top of one - no new domain logic was added for this.
 export default async function AuthenticatedAppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-  return <AppShell user={user}>{children}</AppShell>;
+
+  const canTrackTime = can(user.role, "time_entry.create_self");
+  const canSeeAlerts = can(user.role, "alert.manage");
+  const isClientUser = user.role === "CLIENT_USER";
+
+  const [activeTimerRow, notificationRows, unreadCount, importantDates, alertsCount, accessibleClients] =
+    await Promise.all([
+      canTrackTime ? getActiveTimer(user.id) : Promise.resolve(null),
+      listNotificationsForUser(user.id),
+      unreadNotificationCount(user.id),
+      // Reused only for its length as a nav counter - listUpcomingImportantDates
+      // is already the vetted, access-scoped query the Important Dates screen
+      // itself uses (see that screen's page.tsx), so this doesn't duplicate
+      // any access logic.
+      canTrackTime ? listUpcomingImportantDates(user, 20) : Promise.resolve([]),
+      canSeeAlerts ? countOpenAlertEvents() : Promise.resolve(0),
+      // Command palette's "לקוחות" group. Skipped for CLIENT_USER: the
+      // portal nav has no /app/clients route, and listAccessibleClients'
+      // own-access branch isn't meant to resolve "which client is this
+      // portal user" (that's resolvePortalClient, a different lookup).
+      isClientUser ? Promise.resolve([]) : listAccessibleClients(user),
+    ]);
+
+  return (
+    <AppShell
+      user={user}
+      activeTimer={activeTimerRow ? { startAt: activeTimerRow.startAt.toISOString() } : null}
+      notifications={notificationRows.map((n: Notification) => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        createdAt: n.createdAt.toISOString(),
+        readAt: n.readAt ? n.readAt.toISOString() : null,
+      }))}
+      unreadCount={unreadCount}
+      importantDatesCount={importantDates.length}
+      alertsCount={alertsCount}
+      clients={accessibleClients.map((c: Client) => ({ id: c.id, name: c.name }))}
+    >
+      {children}
+    </AppShell>
+  );
 }

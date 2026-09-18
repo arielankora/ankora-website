@@ -4,6 +4,11 @@ import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
 import { BottomNav } from "./BottomNav";
 import { Sidebar, type NavItem } from "./Sidebar";
+import { TopBar } from "./TopBar";
+import { CommandPalette } from "./CommandPalette";
+import { LiveTimerPill } from "./LiveTimerPill";
+import { OfflineBanner } from "./states/Offline";
+import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 
 const ROLE_LABELS: Record<User["role"], string> = {
   SUPER_ADMIN: "מנהל-על",
@@ -101,18 +106,46 @@ function navItemsFor(role: User["role"]): NavItem[] {
 /// re-check permissions independently.
 ///
 /// Redesign direction A (approved by Ariel after a full-app UI audit; see
-/// docs/adr/0001 addendum "App redesign - direction A"): the old single-row
-/// header nav (16+ flat text links, no grouping) is replaced on desktop by
-/// a grouped icon+label Sidebar. The header itself now only renders at
-/// mobile widths (just the wordmark - identity/role/logout live in
-/// BottomNav's "more" sheet, unchanged from Phase 7). <main> keeps its
-/// bottom padding for the fixed bottom bar at mobile widths only.
-export function AppShell({ user, children }: { user: User; children: ReactNode }) {
+/// docs/adr/0001 addendum "App redesign - direction A") built the grouped
+/// icon+label Sidebar and the mobile-only wordmark header. The high-fidelity
+/// app redesign (design_handoff_ankora_app_redesign/README.md) layered onto
+/// that: a desktop TopBar (breadcrumb/title, live timer pill, notification
+/// bell, primary CTA), a ⌘K command palette, a mobile live-timer strip under
+/// the wordmark header, and an offline banner - all data (activeTimer,
+/// notifications, counters, clients) is fetched once in
+/// (authenticated)/layout.tsx and threaded through here rather than
+/// re-fetched per screen.
+export function AppShell({
+  user,
+  activeTimer,
+  notifications,
+  unreadCount,
+  importantDatesCount,
+  alertsCount,
+  clients,
+  children,
+}: {
+  user: User;
+  activeTimer: { startAt: string } | null;
+  notifications: NotificationSummary[];
+  unreadCount: number;
+  importantDatesCount: number;
+  alertsCount: number;
+  clients: { id: string; name: string }[];
+  children: ReactNode;
+}) {
   const items = navItemsFor(user.role);
+  const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
     <div className="min-h-screen bg-paper md:flex">
-      <Sidebar items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
+      <Sidebar
+        items={items}
+        userName={user.name}
+        roleLabel={ROLE_LABELS[user.role]}
+        counters={{ activeTimerStartAt: activeTimer?.startAt ?? null, importantDatesCount, alertsCount }}
+      />
+      <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
 
       <div className="min-w-0 flex-1">
         <header className="border-b border-lineDark bg-white md:hidden">
@@ -120,10 +153,28 @@ export function AppShell({ user, children }: { user: User; children: ReactNode }
             <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-dim">
               Ankora
             </Link>
+            <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
           </div>
+          {/* Spec, Responsive/Mobile: "פס טיימר חי מתחת לכותרת בכל מסך (לחיצה → טיימר)". */}
+          {activeTimer && (
+            <div className="border-t border-lineDark px-6 py-2">
+              <LiveTimerPill startAt={activeTimer.startAt} />
+            </div>
+          )}
         </header>
 
-        <main className="mx-auto max-w-content px-6 py-8 pb-24 md:py-10 md:pb-10">{children}</main>
+        <TopBar
+          items={items}
+          activeTimer={activeTimer}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          showPrimaryCta={showPrimaryCta}
+        />
+
+        <main className="mx-auto max-w-appContent space-y-4 px-7 py-7 pb-24 md:pb-7">
+          <OfflineBanner />
+          {children}
+        </main>
       </div>
 
       <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />

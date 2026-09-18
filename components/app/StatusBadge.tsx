@@ -1,8 +1,13 @@
+// App redesign (design_handoff_ankora_app_redesign/README.md, "Design
+// Tokens"): migrated from raw Tailwind emerald/amber/red to the shared
+// success/warning/error/neutral tokens (tailwind.config.ts) so every status
+// pill in the app draws from the same palette as toasts and inline
+// validation, rather than a separate ad-hoc set of greens/reds.
 const TONE_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
-  green: "bg-emerald-50 text-emerald-700",
-  amber: "bg-amber-50 text-amber-700",
-  gray: "bg-navy/5 text-navy/50",
-  red: "bg-red-50 text-red-700",
+  green: "bg-success-soft text-success",
+  amber: "bg-warning-soft text-warning",
+  gray: "bg-neutral-soft text-neutral",
+  red: "bg-error-soft text-error",
 };
 
 // Redesign direction A: added a leading tone dot (previously text-only
@@ -15,10 +20,10 @@ const TONE_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
 // Entries, Notifications, Client Portal history) - one change here
 // reaches all of them.
 const DOT_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
-  green: "bg-emerald-600",
-  amber: "bg-amber-600",
-  gray: "bg-navy/40",
-  red: "bg-red-600",
+  green: "bg-success",
+  amber: "bg-warning",
+  gray: "bg-neutral",
+  red: "bg-error",
 };
 
 export function StatusBadge({ label, tone }: { label: string; tone: "green" | "amber" | "gray" | "red" }) {
