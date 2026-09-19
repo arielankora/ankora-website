@@ -108,3 +108,29 @@ export async function archiveClient(actor: User, clientId: string) {
   });
   return client;
 }
+
+// App redesign (handoff README, screen 5 "לקוחות"): "פעולות: ... העברה
+// לארכיון (עם ביטול)" - the Interactions & Behavior section requires a
+// REAL undo (an actual reversing server action), not just rewinding
+// client-side state. archiveClient soft-deletes (sets deletedAt), and
+// every read path here (listClients, getClient, listAccessibleClients)
+// filters deletedAt:null - so without this, a toast "undo" button would
+// have had nothing real to call, and the client would stay invisible/
+// unreachable (even its own detail page 404s) until someone manually
+// fixed the row in the database. This mirrors reopenTimer's precedent in
+// time-entries.ts for the same reason.
+export async function restoreClient(actor: User, clientId: string) {
+  assertCan(actor.role, "client.manage");
+  const client = await prisma.client.update({
+    where: { id: clientId },
+    data: { status: "ACTIVE", deletedAt: null },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "client.restore",
+    entityType: "Client",
+    entityId: clientId,
+    clientId,
+  });
+  return client;
+}

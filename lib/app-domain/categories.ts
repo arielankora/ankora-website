@@ -12,6 +12,24 @@ export async function listCategories() {
   });
 }
 
+// App redesign (handoff README, screen 6 "קטגוריות"): "טבלה: ... שעות
+// החודש". Month boundaries computed the same lightweight UTC-calendar-
+// month way important-dates/page.tsx already does for its "thisMonth" KPI
+// (getUTCMonth/getUTCFullYear) - consistent with that existing precedent
+// rather than introducing a new Asia/Jerusalem month-boundary helper for
+// one screen's summary column.
+export async function getCategoryMonthlyHours(): Promise<Map<string, number>> {
+  const now = new Date();
+  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+  const rows = await prisma.timeEntry.groupBy({
+    by: ["categoryId"],
+    where: { deletedAt: null, startAt: { gte: monthStart, lt: monthEnd }, actualSeconds: { not: null } },
+    _sum: { actualSeconds: true },
+  });
+  return new Map(rows.map((r) => [r.categoryId, r._sum.actualSeconds ?? 0]));
+}
+
 export async function createCategory(
   actor: User,
   input: { name: string; description?: string; visibility: CategoryVisibility; clientId?: string | null }
