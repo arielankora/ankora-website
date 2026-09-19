@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileScheduledReports } from "@/lib/app-domain/report-schedules";
 import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
 
@@ -41,15 +42,11 @@ import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
 // 00:00-03:00 UTC is still the same Israel calendar day as the previous
 // 06:00 UTC fire time, so which day a schedule is due on is unchanged.
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.error("CRON_SECRET is not set");
-    return NextResponse.json({ error: "Server not configured" }, { status: 500 });
-  }
-
-  const authHeader = request.headers.get("authorization");
-  if (authHeader !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Security review: constant-time comparison, shared with the other
+  // cron route - see lib/cron-auth.ts for the CWE-208 reasoning.
+  const authorized = authorizeCronRequest(request);
+  if (!authorized.ok) {
+    return NextResponse.json({ error: authorized.error }, { status: authorized.status });
   }
 
   try {
