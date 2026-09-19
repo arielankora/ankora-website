@@ -3157,3 +3157,100 @@ this ADR's merge policy (client/CRON_SECRET/production-cron-timing
 concern - not a pure code change - so opened as a PR for explicit
 approval rather than self-merged, per `claude/github-access.md`'s "לשינויים
 מבניים... קלוד פותח PR ומחכה לאישור").
+
+## 23. Addendum: Profile & Guide screens redesign (screen 18)
+
+**Context.** Continuing the screen-by-screen App redesign (section 20) per
+the design handoff's suggested implementation order, this pass covers the
+last screen it lists: `profile/page.tsx` + `guide/page.tsx` ("פרופיל
+ומדריך שימוש"). The prototype's mockup for this screen implies three
+things that had no real capability behind them before this pass: an
+editable display-name field, a list of "התראות אישיות" (personal
+notification preference) toggles, and a "עודכנה לפני 3 חודשים"
+(password-last-changed) example string. Per this codebase's standing
+practice (every prior redesign phase), a prototype mockup is a visual/
+interaction reference, not a literal content source - real functionality
+is never regressed or fabricated for the sake of matching it exactly.
+
+**What was built (Profile):**
+
+1. **Real display-name editing** - `lib/app-domain/profile.ts` gains
+   `updateOwnName(actor, name)` (trim, 100-char cap, audited as
+   `profile.name_update`), wired through a new `NameForm.tsx` +
+   `updateNameAction`. Same self-service shape (own row only) as the
+   existing `updateOwnTimezone`/`changeOwnPassword`.
+2. **Real password-last-changed** - `getLastPasswordChangeAt(actor)`
+   queries the most recent `profile.password_change` `AuditEvent` for that
+   user (indexed on `(actorId, createdAt)`) rather than trusting
+   `User.updatedAt`, which touches on *any* field change and would silently
+   misreport a timezone/name edit as a password change. Renders as a real
+   date, or nothing at all when there's no change on record - never the
+   prototype's fabricated "3 months ago" example.
+3. **One real notification preference** - the prototype's "התראות אישיות"
+   card would otherwise have been a list of fabricated toggle rows with no
+   backing at all. Instead: `User.notifyLongRunningTimerByEmail` (new
+   column, migration `20260919090000_phase12_profile_notification_preference`,
+   default `true` so existing behavior is unchanged until a user opts out)
+   gates only the email half of the already-real
+   `notifyLongRunningTimers()` (`lib/app-domain/notifications.ts`) - the
+   persisted in-app Notification row it also creates is untouched by this
+   flag. Exposed as a single `Switch`-driven row
+   (`NotificationPreferenceForm.tsx`), same optimistic-toggle + toast +
+   undo pattern as `ScheduleActions.tsx`/`RuleActions.tsx` - not a form
+   submit, since `components/app/Switch.tsx` was itself already commented
+   as anticipating exactly this use case.
+4. **Layout** - two-column card grid matching the prototype (avatar-
+   initials circle, name/email, name + timezone in one card; notification
+   preference + password change in two more cards), replacing the old
+   plain-text header and stacked full-width bordered forms.
+   `TimezoneForm.tsx` became a curated `<select>` of common IANA zones
+   (matching the prototype's visual), but always injects the user's
+   *current* value as an option first when it isn't one of the curated
+   ones, so saving the form without touching this field can never silently
+   overwrite an existing value it doesn't recognize - `User.timezone` has
+   no real server-side allow-list to match against.
+
+**What was built (Guide):** the prototype's Guide screen is a decorative
+3-card mockup with fictional "three rules" copy - `guide/content.ts` is
+the opposite: an extensive, actively-governed, role-accurate user manual
+(section 10's standing rule) covering nearly every screen in the app. That
+real content and its rendering (`guide/page.tsx`) are fully preserved,
+unchanged in structure. Two additions:
+
+1. A dark intro card (`bg-ink`, matching the redesign's visual language
+   elsewhere) at the top of the page, with text describing how this real
+   guide is organized (role-tagged sections, jump-to-section via the TOC) -
+   not the prototype's specific fabricated "three rules" pitch, which
+   doesn't describe how this guide actually works.
+2. A new, real "פלטת פקודות וקיצורי מקלדת" section (`command-palette`, in
+   the "לפני שמתחילים" group) documenting `components/app/
+   CommandPalette.tsx` (⌘K/Ctrl+K to open, Esc to close, "פעולות"/"לקוחות"
+   groups) - a capability that already shipped with the App Shell (section
+   20) but had never been added to the guide until now. Not new
+   functionality; a documentation gap closed per the standing rule. The
+   existing `profile` guide section was also updated to describe the new
+   name field and notification-preference toggle, per that same rule.
+
+**Not reproduced from the prototype:** the fabricated "3 months ago"
+password-changed text (real value or nothing, see above); a multi-row
+notification-preference list (only one real preference exists); the
+Guide's "three rules" hero copy (real framing text instead, see above).
+
+**Verification:** `tsc --noEmit` diff against `main` - zero new errors
+(same 250-line pre-existing Prisma-stub-client output, unchanged, as
+every prior phase). `eslint` across the touched files - 0 errors after
+fixing two `react/no-unescaped-entities` issues this pass introduced (Hebrew
+quote marks in `NotificationPreferenceForm.tsx`). `vitest run` - 134/134
+of the sandbox-runnable pure-function tests pass (every Prisma-touching
+test file still fails to *load* here for the same pre-existing "Prisma
+client not generated in this sandbox" reason, not because of this
+change); no new pure-function logic was added by this pass that fits the
+existing unit-test pattern (`notifications.ts`'s only change is one
+conditional inside a Prisma-touching function, not a new pure function).
+Schema/migration changes hand-authored for the same sandbox-network
+reason documented in every prior phase's migration header.
+
+**Status:** implemented on a feature branch, per the standing workflow
+(section 20's PR/Preview/self-merge process for changes within Ariel's
+merge policy - additive, backward-compatible, easily-revertible schema
+change, same shape as every prior phase's own schema addition).

@@ -70,3 +70,68 @@ export async function updateOwnTimezone(actor: User, timezone: string): Promise<
     after: { timezone: trimmed },
   });
 }
+
+/// App redesign, Profile screen (screen 18): the prototype's editable "שם
+/// לתצוגה" field had no backing capability before this - every prior
+/// phase's Profile screen only ever let a user touch their own timezone
+/// and password. Same self-service shape as updateOwnTimezone: scoped to
+/// the caller's own row, trimmed, and audited. A generous but bounded
+/// length cap (not enforced by the prototype, which has none) is the only
+/// real-world validation this needs - there's no format constraint on a
+/// display name.
+export async function updateOwnName(actor: User, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error("יש להזין שם.");
+  if (trimmed.length > 100) throw new Error("השם ארוך מדי (100 תווים לכל היותר).");
+
+  await prisma.user.update({ where: { id: actor.id }, data: { name: trimmed } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "profile.name_update",
+    entityType: "User",
+    entityId: actor.id,
+    before: { name: actor.name },
+    after: { name: trimmed },
+  });
+}
+
+/// App redesign, Profile screen (screen 18): backs the prototype's
+/// "עודכנה לפני X" password-last-changed line with a real value instead of
+/// the prototype's fabricated "לפני 3 חודשים" example text. There's no
+/// dedicated timestamp column for this (User.updatedAt touches on *any*
+/// field change, including a timezone or name update, so it can't be
+/// trusted to mean "password changed") - the accurate source is the audit
+/// trail changeOwnPassword already writes on every real password change,
+/// queried by its indexed (actorId, createdAt) shape. Returns null for a
+/// user who has never changed their password through this screen (e.g. it
+/// was set once at invitation time and never touched since) rather than
+/// guessing.
+export async function getLastPasswordChangeAt(actor: User): Promise<Date | null> {
+  const event = await prisma.auditEvent.findFirst({
+    where: { actorId: actor.id, action: "profile.password_change" },
+    orderBy: { createdAt: "desc" },
+    select: { createdAt: true },
+  });
+  return event?.createdAt ?? null;
+}
+
+/// App redesign, Profile screen (screen 18): backs the one real toggle in
+/// the redesigned "התראות אישיות" card - see the field-level comment on
+/// User.notifyLongRunningTimerByEmail (schema.prisma) and
+/// notifyLongRunningTimers() (lib/app-domain/notifications.ts) for what it
+/// actually gates. The prototype's full toggle *list* (several rows of
+/// notification categories) isn't reproduced - this is the only one with
+/// a real, currently-existing notification behind it.
+export async function updateLongRunningTimerEmailPreference(actor: User, enabled: boolean): Promise<void> {
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: { notifyLongRunningTimerByEmail: enabled },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "profile.notification_preference_update",
+    entityType: "User",
+    entityId: actor.id,
+    after: { notifyLongRunningTimerByEmail: enabled },
+  });
+}

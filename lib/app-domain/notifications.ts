@@ -136,7 +136,11 @@ export async function notifyLongRunningTimers(): Promise<{ notified: number }> {
       },
     });
 
-    if (entry.user.email) {
+    // App redesign, Profile screen (screen 18, docs/adr/0001 section 23):
+    // the persisted in-app Notification row above is unconditional either
+    // way - only this extra email is gated by the user's own preference
+    // (default true, so behavior is unchanged until someone opts out).
+    if (entry.user.email && entry.user.notifyLongRunningTimerByEmail) {
       await sendEmail({
         to: [entry.user.email],
         subject: `Ankora - ${title}`,
