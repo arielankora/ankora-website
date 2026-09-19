@@ -212,8 +212,18 @@ const nextConfig = {
           // surface that holds sessions, client data and the audit log
           // was the weakest line in the whole policy.
           //
-          // Every directive here is 'self' or 'none'. No third-party
-          // origin is reachable from /app under any directive.
+          // Every directive here is 'self' or 'none' IN PRODUCTION. No
+          // third-party origin is reachable from /app there.
+          //
+          // PREVIEW_ORIGINS is appended on preview/local builds only, for
+          // the same reason it exists on the broad policy above: Vercel's
+          // preview toolbar (vercel.live) and Deployment Protection
+          // handshake (vercel.com) would otherwise be blocked, which was
+          // verified happening on this very branch's first preview -
+          // "Loading the script 'https://vercel.live/_next-live/feedback/
+          // feedback.js' violates ... script-src 'self' 'unsafe-inline'".
+          // Production keeps the strictly same-origin policy that is the
+          // entire point of this rule.
           //
           // 'unsafe-inline' remains in script-src, and deliberately so.
           // Removing it needs a per-request nonce, which was investigated
@@ -242,9 +252,9 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               `script-src 'self' 'unsafe-inline'${
                 process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''
-              }`,
-              "connect-src 'self'",
-              "frame-src 'none'",
+              }${PREVIEW_ORIGINS}`,
+              `connect-src 'self'${PREVIEW_ORIGINS}`,
+              `frame-src ${PREVIEW_ORIGINS ? `'self'${PREVIEW_ORIGINS}` : "'none'"}`,
               'upgrade-insecure-requests',
             ].join('; '),
           },
