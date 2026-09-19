@@ -5,6 +5,7 @@ import { getBillingPolicy } from "@/lib/app-domain/billing";
 import { listHourBanksForClient, getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { Drawer } from "@/components/app/Drawer";
 import { HbClientPicker } from "./HbClientPicker";
 import { BillingPolicyForm } from "./BillingPolicyForm";
 import { OpenCycleForm } from "./OpenCycleForm";
@@ -76,12 +77,80 @@ export default async function HourBanksPage({ searchParams }: { searchParams: { 
 
         {selectedClient && (
           <>
-            <div>
-              <h2 className="text-sm font-medium text-navy">מדיניות חיוב - {selectedClient.name}</h2>
-              <p className="mt-1 text-xs text-navy/40">
-                ללא מדיניות מוגדרת, הזמן החייב זהה תמיד לזמן בפועל (ברירת מחדל נייטרלית).
-              </p>
-              <div className="mt-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-sm font-medium text-navy">{selectedClient.name}</h2>
+              <span className="flex-1" />
+              <Drawer triggerLabel="פתיחת מחזור חדש" title={`פתיחת מחזור חדש - ${selectedClient.name}`}>
+                <OpenCycleForm clientId={selectedClient.id} />
+              </Drawer>
+            </div>
+
+            {/* App redesign (handoff README, screen 10 "בנק שעות"): the
+                prototype's 3-card row - current cycle (dark `ink` hero,
+                matching the Timer widget/Home KPI treatment), billing policy,
+                manual adjustment. "פתיחת מחזור חדש" moved from an always-open
+                form into the header button + drawer above, matching the
+                prototype's placement (a button beside the client tabs, not a
+                permanently-visible card). */}
+            <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+              {current ? (
+                <div className="rounded-[18px] bg-ink p-6 text-cream">
+                  <div className="flex items-baseline justify-between gap-2.5">
+                    <span className="text-xs text-cream/60">מחזור נוכחי</span>
+                    <span
+                      className={`font-jbmono text-[40px] font-medium leading-none ${
+                        current.utilization.utilizationPct > 100 ? "text-error" : "text-cream"
+                      }`}
+                      dir="ltr"
+                    >
+                      {current.utilization.utilizationPct}%
+                    </span>
+                  </div>
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream/15">
+                    <span
+                      className={`block h-full rounded-full ${
+                        current.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"
+                      }`}
+                      style={{ width: `${Math.min(100, current.utilization.utilizationPct)}%` }}
+                    />
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-3">
+                    <span>
+                      <span className="block text-[11px] text-cream/50">סה&quot;כ</span>
+                      <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
+                        {formatMinutes(current.utilization.totalMinutes)}
+                      </span>
+                    </span>
+                    <span>
+                      <span className="block text-[11px] text-cream/50">נוצל</span>
+                      <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
+                        {formatMinutes(current.utilization.consumedMinutes)}
+                      </span>
+                    </span>
+                    <span>
+                      <span className="block text-[11px] text-cream/50">נותר</span>
+                      <span
+                        className={`mt-1 block font-jbmono text-[16px] ${
+                          current.utilization.remainingMinutes < 0 ? "text-error" : "text-cream"
+                        }`}
+                        dir="ltr"
+                      >
+                        {formatMinutes(current.utilization.remainingMinutes)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-navy/50">
+                  אין עדיין מחזור פתוח ללקוח זה. פתחו מחזור למעלה.
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-lineDark bg-white p-5">
+                <p className="mb-1 text-sm font-medium text-navy">מדיניות חיוב</p>
+                <p className="mb-3 text-[11px] text-navy/40">
+                  ללא מדיניות מוגדרת, הזמן החייב זהה תמיד לזמן בפועל.
+                </p>
                 <BillingPolicyForm
                   clientId={selectedClient.id}
                   policy={
@@ -94,46 +163,9 @@ export default async function HourBanksPage({ searchParams }: { searchParams: { 
                   }
                 />
               </div>
-            </div>
 
-            {current && (
-              <div className="rounded-2xl border border-lineDark bg-white p-6">
-                <h2 className="text-sm font-medium text-navy">מחזור נוכחי</h2>
-                <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  <div>
-                    <p className="text-xs text-navy/40">סה&quot;כ זמין</p>
-                    <p className="mt-1 text-lg font-medium text-navy">{formatMinutes(current.utilization.totalMinutes)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-navy/40">נוצל</p>
-                    <p className="mt-1 text-lg font-medium text-navy">{formatMinutes(current.utilization.consumedMinutes)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-navy/40">נותר</p>
-                    <p className={`mt-1 text-lg font-medium ${current.utilization.remainingMinutes < 0 ? "text-red-600" : "text-navy"}`}>
-                      {formatMinutes(current.utilization.remainingMinutes)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-navy/40">ניצול</p>
-                    <p className={`mt-1 text-lg font-medium ${current.utilization.utilizationPct > 100 ? "text-red-600" : "text-navy"}`}>
-                      {current.utilization.utilizationPct}%
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div>
-              <h2 className="text-sm font-medium text-navy">פתיחת מחזור חדש</h2>
-              <div className="mt-3">
-                <OpenCycleForm clientId={selectedClient.id} />
-              </div>
-            </div>
-
-            <div>
-              <h2 className="text-sm font-medium text-navy">התאמה ידנית למחזור הנוכחי</h2>
-              <div className="mt-3">
+              <div className="rounded-2xl border border-lineDark bg-white p-5">
+                <p className="mb-3 text-sm font-medium text-navy">התאמה ידנית</p>
                 <AdjustmentForm clientId={selectedClient.id} currentHourBankId={current?.bank.id} />
               </div>
             </div>
@@ -176,10 +208,18 @@ export default async function HourBanksPage({ searchParams }: { searchParams: { 
                         <td className="px-5 py-3 text-navy/70">{formatMinutes(bank.purchasedMinutes)}</td>
                         <td className="px-5 py-3 text-navy/70">{formatMinutes(bank.rolloverInMinutes)}</td>
                         <td className="px-5 py-3 text-navy/70">{formatMinutes(utilization.consumedMinutes)}</td>
-                        <td className={`px-5 py-3 ${utilization.remainingMinutes < 0 ? "text-red-600" : "text-navy/70"}`}>
+                        {/* **קריטי ל-RTL** (handoff README): a signed number
+                            (remaining minutes, adjustment amount) needs
+                            dir="ltr" or the +/- renders on the wrong side. */}
+                        <td
+                          dir="ltr"
+                          className={`px-5 py-3 text-end font-jbmono ${
+                            utilization.remainingMinutes < 0 ? "text-error" : "text-navy/70"
+                          }`}
+                        >
                           {formatMinutes(utilization.remainingMinutes)}
                         </td>
-                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-red-600" : "text-navy/70"}`}>
+                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-error" : "text-navy/70"}`}>
                           {utilization.utilizationPct}%
                         </td>
                         <td className="px-5 py-3 text-navy/70">
@@ -189,7 +229,7 @@ export default async function HourBanksPage({ searchParams }: { searchParams: { 
                             <ul className="space-y-1">
                               {bank.adjustments.map((a) => (
                                 <li key={a.id} className="text-xs">
-                                  <span className={a.minutes < 0 ? "text-red-600" : "text-emerald-700"}>
+                                  <span dir="ltr" className={a.minutes < 0 ? "text-error" : "text-success"}>
                                     {a.minutes > 0 ? "+" : ""}
                                     {formatMinutes(a.minutes)}
                                   </span>{" "}

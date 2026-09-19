@@ -3,11 +3,24 @@ import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { Forbidden } from "@/components/app/Forbidden";
+import { StatusBadge } from "@/components/app/StatusBadge";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 const PAGE_SIZE = 50;
-const ENTITY_TYPES = ["User", "Client", "Category", "TimeEntry", "BillingPolicy", "HourBank", "HourBankAdjustment", "AlertRule", "EmailDelivery"];
+const ENTITY_TYPES = [
+  "User",
+  "Client",
+  "Category",
+  "TimeEntry",
+  "BillingPolicy",
+  "HourBank",
+  "HourBankAdjustment",
+  "AlertRule",
+  "AlertEvent",
+  "EmailDelivery",
+  "ReportSchedule",
+];
 
 const ACTION_LABEL: Record<string, string> = {
   "login.success": "התחברות מוצלחת",
@@ -30,6 +43,7 @@ const ACTION_LABEL: Record<string, string> = {
   "time_entry.create": "יצירת דיווח זמן",
   "time_entry.update": "עדכון דיווח זמן",
   "time_entry.delete": "מחיקת דיווח זמן",
+  "time_entry.restore": "שחזור דיווח זמן",
   // Phase 3 (spec 8: בנק שעות + מדיניות חיוב).
   "billing_policy.create": "יצירת מדיניות חיוב",
   "billing_policy.update": "עדכון מדיניות חיוב",
@@ -40,6 +54,12 @@ const ACTION_LABEL: Record<string, string> = {
   "alert_rule.update": "עדכון כלל התראה",
   "alert_rule.delete": "מחיקת כלל התראה",
   "email_delivery.retry": "ניסיון שליחה חוזר להתראה",
+  "alert_event.resolve": "סימון התראה כטופלה",
+  "alert_event.reopen": "פתיחה מחדש של התראה",
+  "report_schedule.create": "יצירת דוח מתוזמן",
+  "report_schedule.update": "עדכון דוח מתוזמן",
+  "report_schedule.delete": "מחיקת דוח מתוזמן",
+  "report_schedule.sent": "שליחת דוח מתוזמן",
   // Phase 9 gap-fix (spec §11): Tasks/Profile self-service actions.
   "task.create": "יצירת משימה",
   "task.status_change": "שינוי סטטוס משימה",
@@ -53,6 +73,22 @@ function formatDateTime(date: Date) {
     timeStyle: "short",
     timeZone: "Asia/Jerusalem",
   }).format(date);
+}
+
+// App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג
+// (יצירה/עריכה/מחיקה/הרשאות/התחברות/כשלון)" - derives one of those six
+// kinds from the action string's own naming convention (verified against
+// every action key in ACTION_LABEL above) rather than adding a parallel
+// "kind" column to the schema.
+function classifyAction(action: string): { label: string; tone: "green" | "amber" | "gray" | "red" } {
+  if (action.includes("failure")) return { label: "כשלון", tone: "red" };
+  if (action.startsWith("login.") || action === "logout" || action.includes("logout_all_sessions"))
+    return { label: "התחברות", tone: "gray" };
+  if (action.includes("role_status_change") || action.includes("client_access_change") || action.includes("invite"))
+    return { label: "הרשאות", tone: "amber" };
+  if (action.includes(".delete") || action.includes(".archive")) return { label: "מחיקה", tone: "red" };
+  if (action.includes(".create") || action.includes(".requested")) return { label: "יצירה", tone: "green" };
+  return { label: "עריכה", tone: "amber" };
 }
 
 export default async function AuditLogPage({
@@ -128,17 +164,23 @@ export default async function AuditLogPage({
           <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-navy/70 hover:border-gold">
             סינון
           </button>
+          <a
+            href={`/api/audit-log/export${entityType || q ? `?${new URLSearchParams({ ...(entityType ? { entityType } : {}), ...(q ? { q } : {}) }).toString()}` : ""}`}
+            className="ms-auto rounded-full border border-lineDark px-4 py-2 text-sm text-navy/70 transition-colors hover:border-gold"
+          >
+            ייצוא
+          </a>
         </form>
 
         <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
-          <table className="w-full min-w-[720px] text-start text-sm">
+          <table className="w-full min-w-[820px] text-start text-sm">
             <thead>
               <tr className="border-b border-lineDark text-xs text-navy/50">
-                <th className="px-5 py-3 font-medium">מועד</th>
+                <th className="px-5 py-3 font-medium">סוג</th>
                 <th className="px-5 py-3 font-medium">פעולה</th>
                 <th className="px-5 py-3 font-medium">בוצע ע&quot;י</th>
-                <th className="px-5 py-3 font-medium">ישות</th>
                 <th className="px-5 py-3 font-medium">לקוח</th>
+                <th className="px-5 py-3 font-medium">מועד</th>
               </tr>
             </thead>
             <tbody>
@@ -149,21 +191,28 @@ export default async function AuditLogPage({
                   </td>
                 </tr>
               )}
-              {events.map((event) => (
-                <tr key={event.id} className="border-b border-lineDark last:border-0 align-top">
-                  <td className="whitespace-nowrap px-5 py-3 text-navy/70">{formatDateTime(event.createdAt)}</td>
-                  <td className="px-5 py-3 text-navy">
-                    {ACTION_LABEL[event.action] ?? event.action}
-                    <p className="text-xs text-navy/40">{event.action}</p>
-                  </td>
-                  <td className="px-5 py-3 text-navy/70">{event.actor?.name ?? "מערכת"}</td>
-                  <td className="px-5 py-3 text-navy/70">
-                    {event.entityType}
-                    {event.entityId && <span className="text-xs text-navy/40"> #{event.entityId.slice(-6)}</span>}
-                  </td>
-                  <td className="px-5 py-3 text-navy/70">{event.client?.name ?? "-"}</td>
-                </tr>
-              ))}
+              {events.map((event) => {
+                const kind = classifyAction(event.action);
+                return (
+                  <tr key={event.id} className="border-b border-lineDark last:border-0 align-top">
+                    <td className="whitespace-nowrap px-5 py-3">
+                      <StatusBadge label={kind.label} tone={kind.tone} />
+                    </td>
+                    <td className="px-5 py-3 text-navy">
+                      {ACTION_LABEL[event.action] ?? event.action}
+                      <p className="mt-0.5 text-xs text-navy/40">
+                        {event.entityType}
+                        {event.entityId && ` #${event.entityId.slice(-6)}`}
+                      </p>
+                    </td>
+                    <td className="px-5 py-3 text-navy/70">{event.actor?.name ?? "מערכת"}</td>
+                    <td className="px-5 py-3 text-navy/70">{event.client?.name ?? "-"}</td>
+                    <td dir="ltr" className="whitespace-nowrap px-5 py-3 text-end font-jbmono text-xs text-navy/50">
+                      {formatDateTime(event.createdAt)}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -191,6 +240,8 @@ export default async function AuditLogPage({
             )}
           </div>
         )}
+
+        <p className="text-xs text-navy/50">היומן נשמר לשנתיים ואינו ניתן לעריכה או למחיקה.</p>
       </div>
     </>
   );

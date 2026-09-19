@@ -2,19 +2,27 @@
 import { useFormState, useFormStatus } from "react-dom";
 import { upsertBillingPolicyAction } from "./actions";
 
-function SubmitButton() {
+function SubmitButton({ saved }: { saved: boolean }) {
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="text-xs font-medium text-gold disabled:opacity-50"
     >
-      {pending ? "שומר..." : "שמירת מדיניות חיוב"}
+      {pending ? "שומר..." : saved ? "נשמר ✓" : "שמירה"}
     </button>
   );
 }
 
+// App redesign (handoff README, screen 10 "בנק שעות"): restyled from a
+// full-width 4-column form into the narrower vertical field list the
+// prototype's "מדיניות חיוב" card uses (label + inline input per row), now
+// that hour-banks/page.tsx renders this inside a 1-of-3 card rather than a
+// full-width section - and the submit button became a small inline
+// "שמירה" -> "נשמר ✓" link matching the card's own compact header action,
+// not a large gold pill (that treatment stays reserved for a screen's one
+// primary action).
 export function BillingPolicyForm({
   clientId,
   policy,
@@ -30,63 +38,61 @@ export function BillingPolicyForm({
   const [state, formAction] = useFormState(upsertBillingPolicyAction, {});
 
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
+    <form action={formAction} className="flex flex-col gap-2.5">
       <input type="hidden" name="clientId" value={clientId} />
 
-      <div>
-        <label className="block text-xs font-medium text-navy/60">מינימום לדיווח (דקות)</label>
+      <label className="flex items-center gap-2.5 text-[13px]">
+        <span className="flex-1 text-navy/70">מינימום לדיווח</span>
         <input
           type="number"
           name="minimumMinutes"
           min={0}
           defaultValue={policy?.minimumMinutes ?? 0}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          dir="ltr"
+          className="w-[70px] rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-navy outline-none focus:border-gold"
         />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-navy/60">יחידת עיגול (דקות)</label>
+        <span className="text-xs text-navy/50">דק&apos;</span>
+      </label>
+      <label className="flex items-center gap-2.5 text-[13px]">
+        <span className="flex-1 text-navy/70">יחידת עיגול</span>
         <input
           type="number"
           name="incrementMinutes"
           min={1}
           defaultValue={policy?.incrementMinutes ?? 1}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          dir="ltr"
+          className="w-[70px] rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-navy outline-none focus:border-gold"
         />
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-navy/60">שיטת עיגול</label>
+        <span className="text-xs text-navy/50">דק&apos;</span>
+      </label>
+      <label className="flex items-center gap-2.5 text-[13px]">
+        <span className="flex-1 text-navy/70">שיטת עיגול</span>
         <select
           name="roundingMode"
           defaultValue={policy?.roundingMode ?? "EXACT"}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="rounded-lg border border-lineDark bg-white px-2 py-1.5 text-[13px] text-navy outline-none focus:border-gold"
         >
-          <option value="EXACT">מדויק (ללא עיגול)</option>
-          <option value="CEIL">עיגול כלפי מעלה</option>
-          <option value="NEAREST">עיגול לקרוב ביותר</option>
+          <option value="EXACT">מדויק</option>
+          <option value="CEIL">כלפי מעלה</option>
+          <option value="NEAREST">לקרוב ביותר</option>
         </select>
-      </div>
-      <div>
-        <label className="block text-xs font-medium text-navy/60">רמת צבירה</label>
+      </label>
+      <label className="flex items-center gap-2.5 text-[13px]">
+        <span className="flex-1 text-navy/70">רמת צבירה</span>
         <select
           name="aggregationScope"
           defaultValue={policy?.aggregationScope ?? "PER_ENTRY"}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="rounded-lg border border-lineDark bg-white px-2 py-1.5 text-[13px] text-navy outline-none focus:border-gold"
         >
-          <option value="PER_ENTRY">לפי דיווח בודד</option>
-          <option value="PER_TASK_PER_DAY">לפי משימה ליום</option>
+          <option value="PER_ENTRY">לפי דיווח</option>
+          <option value="PER_TASK_PER_DAY">לפי משימה/יום</option>
           <option value="PER_DAY">לפי יום</option>
         </select>
-      </div>
+      </label>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">נשמר.</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        {state?.error ? <p className="text-xs text-error">{state.error}</p> : <span />}
+        <SubmitButton saved={!!state?.ok} />
       </div>
     </form>
   );

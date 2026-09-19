@@ -1,7 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { openHourBankCycleAction } from "./actions";
+import { useDrawerClose } from "@/components/app/Drawer";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -9,7 +10,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "פותח..." : "פתיחת מחזור חדש"}
     </button>
@@ -19,12 +20,14 @@ function SubmitButton() {
 export function OpenCycleForm({ clientId }: { clientId: string }) {
   const [state, formAction] = useFormState(openHourBankCycleAction, {});
   const [rolloverMode, setRolloverMode] = useState("NONE");
+  const close = useDrawerClose();
+
+  useEffect(() => {
+    if (state?.ok) close();
+  }, [state, close]);
 
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
+    <form action={formAction} className="flex flex-col gap-4">
       <input type="hidden" name="clientId" value={clientId} />
 
       <div>
@@ -94,13 +97,8 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
         <p className="mt-1 text-[11px] text-navy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
       </div>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">המחזור נפתח.</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="text-sm text-error">{state.error}</p>}
+      <SubmitButton />
     </form>
   );
 }

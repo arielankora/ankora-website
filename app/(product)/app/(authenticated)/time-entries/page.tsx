@@ -7,7 +7,7 @@ import { listUsers } from "@/lib/app-domain/users";
 import { Forbidden } from "@/components/app/Forbidden";
 import { FilterBar } from "./FilterBar";
 import { AdminCreateEntryForm } from "./AdminCreateEntryForm";
-import { AdminEntryRow } from "./AdminEntryRow";
+import { EntriesTable } from "./EntriesTable";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -85,49 +85,21 @@ export default async function AdminTimeEntriesPage({
             .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }))}
         />
 
-        <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
-          <table className="w-full min-w-[900px] text-start text-sm">
-            <thead>
-              <tr className="border-b border-lineDark text-xs text-navy/50">
-                <th className="px-5 py-3 font-medium">תאריך</th>
-                <th className="px-5 py-3 font-medium">עובד</th>
-                <th className="px-5 py-3 font-medium">לקוח</th>
-                <th className="px-5 py-3 font-medium">קטגוריה</th>
-                <th className="px-5 py-3 font-medium">משך</th>
-                <th className="px-5 py-3 font-medium">הערה</th>
-                <th className="px-5 py-3 font-medium">מקור</th>
-                <th className="px-5 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-5 py-8 text-center text-navy/50">
-                    אין דיווחים התואמים את הסינון.
-                  </td>
-                </tr>
-              )}
-              {entries.map((entry) => (
-                <AdminEntryRow
-                  key={entry.id}
-                  entry={{
-                    id: entry.id,
-                    startAt: entry.startAt.toISOString(),
-                    endAt: entry.endAt?.toISOString() ?? null,
-                    actualSeconds: entry.actualSeconds,
-                    note: entry.note,
-                    isEdited: entry.isEdited,
-                    source: entry.source,
-                    userName: entry.user.name,
-                    clientName: entry.client.name,
-                    categoryName: entry.category.name,
-                    updatedAt: entry.updatedAt.toISOString(),
-                  }}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <EntriesTable
+          entries={entries.map((entry) => ({
+            id: entry.id,
+            startAt: entry.startAt.toISOString(),
+            endAt: entry.endAt?.toISOString() ?? null,
+            actualSeconds: entry.actualSeconds,
+            note: entry.note,
+            isEdited: entry.isEdited,
+            source: entry.source,
+            userName: entry.user.name,
+            clientName: entry.client.name,
+            categoryName: entry.category.name,
+            updatedAt: entry.updatedAt.toISOString(),
+          }))}
+        />
       </div>
     </>
   );

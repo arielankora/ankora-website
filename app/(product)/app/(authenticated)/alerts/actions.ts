@@ -7,6 +7,8 @@ import {
   updateAlertRule,
   deleteAlertRule,
   retryEmailDelivery,
+  resolveAlertEvent,
+  unresolveAlertEvent,
 } from "@/lib/app-domain/alerts";
 import type { AlertThresholdType } from "@prisma/client";
 
@@ -56,20 +58,70 @@ export async function createAlertRuleAction(_prev: FormState | undefined, formDa
   return { ok: true };
 }
 
-export async function toggleAlertRuleAction(ruleId: string, enabled: boolean): Promise<void> {
+// App redesign (handoff README, Interactions & Behavior rule 2): "לכל
+// פעולה הרסנית או קבוצתית יש ביטול: ... כיבוי חוק." Converted from
+// void-returning to result objects, same reasoning as report-schedules/
+// actions.ts's toggleReportScheduleAction, so RuleActions can show a real
+// toast with undo instead of firing silently.
+export async function toggleAlertRuleAction(ruleId: string, enabled: boolean): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  await updateAlertRule(user, ruleId, { enabled });
+  try {
+    await updateAlertRule(user, ruleId, { enabled });
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
   revalidatePath("/app/alerts");
+  return { ok: true };
 }
 
-export async function deleteAlertRuleAction(ruleId: string): Promise<void> {
+export async function deleteAlertRuleAction(ruleId: string): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  await deleteAlertRule(user, ruleId);
+  try {
+    await deleteAlertRule(user, ruleId);
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
   revalidatePath("/app/alerts");
+  return { ok: true };
 }
 
-export async function retryEmailDeliveryAction(deliveryId: string): Promise<void> {
+// App redesign: surfaces the real outcome (rule 5: "כשלון אמיתי נשאר
+// כשלון") instead of the previous silent void return - retryEmailDelivery
+// itself still marks the delivery FAILED again if the resend genuinely
+// fails, this just lets the button show that instead of pretending success.
+export async function retryEmailDeliveryAction(deliveryId: string): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  await retryEmailDelivery(user, deliveryId);
+  try {
+    const updated = await retryEmailDelivery(user, deliveryId);
+    revalidatePath("/app/alerts");
+    return updated.status === "SENT" ? { ok: true } : { ok: false, error: updated.error ?? "השליחה נכשלה שוב." };
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
+}
+
+// App redesign (handoff README, screen 13 "התראות"): "כרטיסי התראה פתוחה
+// עם פעולה ישירה: סימון כטופל (עם ביטול)." See resolveAlertEvent's comment
+// in lib/app-domain/alerts.ts for why a manual resolve is safe alongside
+// the automatic evaluation that already closes these events.
+export async function resolveAlertEventAction(eventId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  try {
+    await resolveAlertEvent(user, eventId);
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
   revalidatePath("/app/alerts");
+  return { ok: true };
+}
+
+export async function unresolveAlertEventAction(eventId: string): Promise<{ ok: boolean; error?: string }> {
+  const user = await requireUser();
+  try {
+    await unresolveAlertEvent(user, eventId);
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
+  revalidatePath("/app/alerts");
+  return { ok: true };
 }

@@ -8,52 +8,52 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy transition-colors hover:border-gold disabled:opacity-50"
     >
-      {pending ? "שומר..." : "הוספת התאמה"}
+      {pending ? "שומר..." : "הוספה"}
     </button>
   );
 }
 
-// Spec 8.2 "manual adjustments" - positive minutes = credit, negative =
-// deduction. Defaults to the client's current cycle server-side when no
-// specific hourBankId is supplied here.
+// App redesign (handoff README, screen 10 "בנק שעות"): restyled to fit the
+// narrower 1-of-3 card layout (see hour-banks/page.tsx) matching the
+// prototype's "דקות" + "סיבה" + "הוספה" row. **קריטי ל-RTL** (README):
+// the minutes input carries dir="ltr" so a typed sign (+60/-15) doesn't
+// visually flip.
 export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: string; currentHourBankId?: string }) {
   const [state, formAction] = useFormState(recordAdjustmentAction, {});
 
   return (
-    <form
-      action={formAction}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
-    >
+    <form action={formAction} className="flex flex-col gap-2.5">
       <input type="hidden" name="clientId" value={clientId} />
       {currentHourBankId && <input type="hidden" name="hourBankId" value={currentHourBankId} />}
 
-      <div>
-        <label className="block text-xs font-medium text-navy/60">דקות (חיובי = זיכוי, שלילי = חיוב) *</label>
-        <input
-          type="number"
-          name="minutes"
-          required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
-        />
-      </div>
-      <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-navy/60">סיבה *</label>
-        <input
-          name="reason"
-          required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
-        />
+      <div className="flex flex-wrap items-end gap-2.5">
+        <label className="block w-[84px]">
+          <span className="mb-1 block text-[11px] text-navy/55">דקות</span>
+          <input
+            type="number"
+            name="minutes"
+            required
+            dir="ltr"
+            className="w-full rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-navy outline-none focus:border-gold"
+          />
+        </label>
+        <label className="block min-w-0 flex-1">
+          <span className="mb-1 block text-[11px] text-navy/55">סיבה</span>
+          <input
+            name="reason"
+            required
+            placeholder="למשל: זיכוי חד-פעמי"
+            className="w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-[13px] text-navy outline-none focus:border-gold"
+          />
+        </label>
+        <SubmitButton />
       </div>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">ההתאמה נוספה.</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="text-xs text-error">{state.error}</p>}
+      {state?.ok && <p className="text-xs text-success">ההתאמה נוספה.</p>}
+      <p className="text-[11px] text-navy/45">כל התאמה נרשמת ביומן הפעולות עם שם המבצע.</p>
     </form>
   );
 }

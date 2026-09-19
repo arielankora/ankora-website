@@ -5,6 +5,7 @@ import {
   createManualEntry,
   updateTimeEntry,
   deleteTimeEntry,
+  restoreTimeEntry,
   getEntryRevisions,
   combineWallClockTime,
   OverlapError,
@@ -97,6 +98,63 @@ export async function adminDeleteEntryAction(formData: FormData) {
   const timeEntryId = String(formData.get("timeEntryId") || "");
   if (!timeEntryId) return;
   await deleteTimeEntry(admin, timeEntryId);
+  revalidatePath("/app/time-entries");
+}
+
+// App redesign (handoff README, screen 9): plain async functions (not
+// <form action>) so the row/table can read back success/failure and wire a
+// REAL undo (restoreEntryAction) into the toast - same pattern as
+// clients/actions.ts's archiveClientAction/restoreClientAction. Kept
+// alongside the older FormData-based adminDeleteEntryAction above (still
+// used nowhere critical) rather than breaking its signature.
+export async function deleteEntryAction(timeEntryId: string) {
+  const admin = await requireUser();
+  try {
+    await deleteTimeEntry(admin, timeEntryId);
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+  revalidatePath("/app/time-entries");
+  return { ok: true as const };
+}
+
+export async function restoreEntryAction(timeEntryId: string) {
+  const admin = await requireUser();
+  try {
+    await restoreTimeEntry(admin, timeEntryId);
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+  revalidatePath("/app/time-entries");
+  return { ok: true as const };
+}
+
+// App redesign (handoff README, screen 9): "בחירה מרובה ... אישור מסומנים
+// (עם ביטול)". No "approval" concept exists on TimeEntry (see
+// restoreTimeEntry's comment in lib/app-domain/time-entries.ts) so the
+// bulk action this wires up is bulk delete - the one bulk-worthy capability
+// that's actually real here. Returns per-id results so the toolbar can
+// report partial failures (e.g. one entry outside the actor's edit window)
+// instead of a single all-or-nothing message.
+export async function bulkDeleteEntriesAction(timeEntryIds: string[]) {
+  const admin = await requireUser();
+  const failed: string[] = [];
+  for (const id of timeEntryIds) {
+    try {
+      await deleteTimeEntry(admin, id);
+    } catch {
+      failed.push(id);
+    }
+  }
+  revalidatePath("/app/time-entries");
+  return { deleted: timeEntryIds.filter((id) => !failed.includes(id)), failed };
+}
+
+export async function bulkRestoreEntriesAction(timeEntryIds: string[]) {
+  const admin = await requireUser();
+  for (const id of timeEntryIds) {
+    await restoreTimeEntry(admin, id).catch(() => {});
+  }
   revalidatePath("/app/time-entries");
 }
 
