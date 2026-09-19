@@ -97,6 +97,15 @@ model User {
   status       UserStatus @default(INVITED)
   timezone     String     @default("Asia/Jerusalem")
 
+  /// App redesign, Profile screen (screen 18, docs/adr/0001 section 23):
+  /// the one real per-user notification preference backing that screen's
+  /// "התראות אישיות" toggle. Gates only the *email* half of
+  /// notifyLongRunningTimers() (lib/app-domain/notifications.ts) - the
+  /// persisted in-app Notification row (feeding /app/notifications and the
+  /// header bell) is still created unconditionally either way. Default
+  /// true preserves today's behavior for every existing row.
+  notifyLongRunningTimerByEmail Boolean @default(true)
+
   /// Incremented to invalidate every previously-issued session JWT at once
   /// (spec 4.2: "logout all sessions" for admins) without needing a
   /// database-backed session table for a Credentials-only auth flow.

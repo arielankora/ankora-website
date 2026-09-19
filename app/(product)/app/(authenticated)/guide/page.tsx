@@ -38,6 +38,23 @@ export default async function GuidePage() {
           </p>
         </div>
 
+        {/* App redesign (handoff README, screen 18): dark intro card matching
+            the redesign's visual language elsewhere (e.g. AuthShell's dark
+            column). The prototype's own version of this card has fabricated
+            "three rules" copy (start a timer / write a note / stop it) that
+            doesn't match how this guide actually works - the real guide
+            below is a full reference organized by role and topic, not a
+            three-step onboarding flow - so the text here describes the real
+            thing instead of reproducing an invented pitch. */}
+        <div className="rounded-2xl bg-ink p-6 text-cream sm:p-8">
+          <p className="text-base font-medium text-white">איך להשתמש במדריך הזה</p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-cream/70">
+            תוכן העניינים למטה מקובץ לפי נושא, ובכל סעיף מופיע תג שמראה בדיוק אילו תפקידים רואים אותו - כך שהמדריך
+            תמיד משקף את מה שאתם עצמכם יכולים לעשות במערכת, לא רשימת יכולות כללית. אפשר גם לקפוץ ישירות לסעיף
+            רלוונטי דרך תוכן העניינים, במקום לגלול על פני כל המדריך.
+          </p>
+        </div>
+
         <nav aria-label="תוכן עניינים" className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="text-sm font-medium text-navy">תוכן העניינים</h2>
           <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">

@@ -2,9 +2,15 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { changeOwnPassword, updateOwnTimezone } from "@/lib/app-domain/profile";
+import {
+  changeOwnPassword,
+  updateOwnTimezone,
+  updateOwnName,
+  updateLongRunningTimerEmailPreference,
+} from "@/lib/app-domain/profile";
 
 type FormState = { error?: string; ok?: boolean };
+type ToggleState = { ok: true } | { ok: false; error: string };
 
 export async function changePasswordAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
@@ -37,4 +43,34 @@ export async function updateTimezoneAction(_prev: FormState | undefined, formDat
 
   revalidatePath("/app/profile");
   return { ok: true };
+}
+
+export async function updateNameAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const name = String(formData.get("name") || "");
+
+  try {
+    await updateOwnName(user, name);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+  }
+
+  revalidatePath("/app/profile");
+  return { ok: true };
+}
+
+// App redesign, Profile screen (screen 18): a Switch-driven toggle (see
+// ScheduleActions.tsx/RuleActions.tsx for the same optimistic-toggle +
+// toast pattern this mirrors) rather than a useFormState form - a single
+// on/off preference reads more like the report-schedule/alert-rule
+// switches elsewhere in the app than like a form submission.
+export async function updateNotificationPreferenceAction(enabled: boolean): Promise<ToggleState> {
+  const user = await requireUser();
+  try {
+    await updateLongRunningTimerEmailPreference(user, enabled);
+    revalidatePath("/app/profile");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+  }
 }

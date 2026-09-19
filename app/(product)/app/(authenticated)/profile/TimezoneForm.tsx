@@ -8,35 +8,56 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="mt-4 w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
     >
       {pending ? "נשמר..." : "שמירה"}
     </button>
   );
 }
 
+// App redesign (handoff README, screen 18): the prototype shows "אזור זמן"
+// as a <select> with a few example cities rather than the old free-text
+// input. The real field (User.timezone, updateOwnTimezone) is still a
+// plain, unvalidated string - there's no server-side IANA allow-list to
+// match against - so this stays a curated convenience list rather than a
+// fabricated constraint: the user's *current* value is always included as
+// an option even when it isn't one of the curated ones (e.g. it was set to
+// something else before this screen existed, or via a future admin tool),
+// so saving without touching this field can never silently overwrite it
+// with an unrelated city.
+const CURATED_TIMEZONES = [
+  { value: "Asia/Jerusalem", label: "ירושלים (Asia/Jerusalem)" },
+  { value: "Europe/London", label: "לונדון (Europe/London)" },
+  { value: "America/New_York", label: "ניו יורק (America/New_York)" },
+];
+
 export function TimezoneForm({ timezone }: { timezone: string }) {
   const [state, formAction] = useFormState(updateTimezoneAction, {});
+  const options = CURATED_TIMEZONES.some((tz) => tz.value === timezone)
+    ? CURATED_TIMEZONES
+    : [{ value: timezone, label: timezone }, ...CURATED_TIMEZONES];
 
   return (
-    <form action={formAction} className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-3">
-      <div>
-        <label className="block text-xs font-medium text-navy/60">אזור זמן</label>
-        <input
+    <form action={formAction}>
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-medium text-navy/60">אזור זמן</span>
+        <select
           name="timezone"
           defaultValue={timezone}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
-        />
-        <p className="mt-1 text-xs text-navy/40">לדוגמה: Asia/Jerusalem</p>
-      </div>
+          className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-gold"
+        >
+          {options.map((tz) => (
+            <option key={tz.value} value={tz.value}>
+              {tz.label}
+            </option>
+          ))}
+        </select>
+      </label>
 
-      <div className="flex items-end justify-between gap-4 sm:col-span-3">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">אזור הזמן עודכן.</p>}
-        <div className="ms-auto">
-          <SubmitButton />
-        </div>
-      </div>
+      {state?.error && <p className="mt-2 text-xs text-error">{state.error}</p>}
+      {state?.ok && <p className="mt-2 text-xs text-success">אזור הזמן עודכן.</p>}
+
+      <SubmitButton />
     </form>
   );
 }
