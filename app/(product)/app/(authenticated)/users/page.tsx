@@ -44,7 +44,7 @@ const STATUS_TAG_CLASSES: Record<UserStatus, string> = {
 // capability list lib/app-auth/permissions.ts enforces.
 const ROLE_SCOPE_CARDS: { role: string; description: string }[] = [
   { role: "מנהל-על", description: "הכל, כולל בנקי שעות, יומן פעולות ואינטגרציות" },
-  { role: "מנהל Ankora", description: "לקוחות, דיווחי זמן, דוחות והתראות" },
+  { role: "מנהל Ankora", description: "לקוחות, קטגוריות, דיווחי זמן ודוחות" },
   { role: "עובד Ankora", description: "טיימר, הזמן שלי, משימות ומועדים של לקוחותיו" },
   { role: "לקוח", description: "פורטל בלבד: בנק שעות, פילוח ודוחות שלו" },
 ];

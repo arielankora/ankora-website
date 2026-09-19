@@ -57,6 +57,15 @@ erDiagram
 
     IntegrationConnection ||--o{ ExternalMapping : "maps (by provider)"
 
+    Client ||--o{ ImportantDate : "owns"
+    Client ||--o{ HolidayCalendarSubscription : "subscribes to"
+    User ||--o{ ImportantDate : "is responsible for"
+    Category ||--o{ ImportantDate : "classifies auto-task"
+    ImportantDate ||--o{ ReminderRule : "schedules"
+    ImportantDate ||--o{ ReminderOccurrence : "emits"
+    ReminderRule ||--o{ ReminderOccurrence : "schedules"
+    ImportantDate ||--o{ Task : "auto-creates"
+
     User {
         string id PK
         string email UK
@@ -270,6 +279,63 @@ erDiagram
         datetime readAt "nullable"
         datetime createdAt
     }
+
+    ImportantDate {
+        string id PK
+        string clientId FK
+        string title
+        ImportantDateCategory category
+        CalendarType calendarType "GREGORIAN or HEBREW"
+        int month
+        int day
+        RecurrenceType recurrence
+        string responsibleUserId FK
+        ImportantDateStatus status
+        ImportantDateSensitivity sensitivity
+        boolean createAutoTask
+        string autoTaskCategoryId FK "nullable"
+        datetime nextOccurrenceAt "nullable"
+        datetime snoozedUntil "nullable"
+        ImportantDateSource source "MANUAL, HOLIDAY or TEMPLATE"
+        string holidayKey "nullable, unique per client"
+        datetime deletedAt "nullable"
+    }
+
+    ReminderRule {
+        string id PK
+        string importantDateId FK
+        int daysBefore
+        boolean sendInApp
+        boolean sendEmail
+        boolean enabled
+        boolean createTask
+        boolean escalateToManager
+        int escalateAfterDays "nullable"
+    }
+
+    ReminderOccurrence {
+        string id PK
+        string importantDateId FK
+        string reminderRuleId FK "nullable"
+        int occurrenceYear
+        datetime occurrenceDate
+        ReminderChannel channel "IN_APP or EMAIL"
+        datetime scheduledFor
+        datetime sentAt "nullable"
+        ReminderOccurrenceStatus status
+        int attempts
+        string idempotencyKey UK
+    }
+
+    HolidayCalendarSubscription {
+        string id PK
+        string clientId FK
+        string calendarKey "unique per client, e.g. il_holidays"
+        boolean enabled
+        int defaultReminderDaysBefore "int[], default [30, 7]"
+        string responsibleUserId FK "nullable"
+        boolean createTasks
+    }
 ```
 
 ## Models grouped by introducing phase
@@ -283,10 +349,13 @@ erDiagram
 | 6 | `ReportSchedule`, `ReportRun` | Client portal + scheduled reports (`EmailDelivery.reportRunId` also added this phase) |
 | 8 | `IntegrationConnection`, `ExternalMapping` | Integration foundation validation + production rollout |
 | 9 | `Notification` (+ `Task.status` added to the Phase 2 `Task` model) | Full spec re-audit gap-fix: Tasks/Profile/Notifications screens, long-timer email/notification, XLSX/PDF export |
+| 10 | `ImportantDate`, `ReminderRule`, `ReminderOccurrence`, `HolidayCalendarSubscription` (+ `Task.importantDateId` / `Task.importantDateOccurrenceKey` added to the Phase 2 `Task` model) | Important Dates (מועדים חשובים): per-client dated records, reminder rules, per-occurrence delivery log, and holiday-catalog subscriptions |
+| 12 | `User.notifyLongRunningTimerByEmail` (no new tables) | Profile screen's personal email-notification toggle |
 
-Phases 5 and 7 (internal dashboards/reports/exports; PWA/mobile/performance/
-security hardening) added no new tables — they built screens and
-infrastructure on top of the models above.
+Phases 5, 7 and 11 (internal dashboards/reports/exports; PWA/mobile/
+performance/security hardening; the nightly Excel report + JSON backup
+email) added no new tables — they built screens, jobs and infrastructure on
+top of the models above.
 
 ## Notes on relationships not enforced by a Prisma `@relation`
 
@@ -299,6 +368,11 @@ infrastructure on top of the models above.
   schema DSL cannot express a partial unique index, so it does not appear in
   this diagram's cardinalities and must not be dropped by a future
   Prisma-generated migration. See `schema.prisma`'s Phase 2 header comment.
+- `Task.importantDateOccurrenceKey` is a plain string (the occurrence's date
+  key), unique together with `importantDateId`. It is what makes the daily
+  Important Dates job idempotent: an auto-task is created once per occurrence
+  no matter how many times the job runs, without a formal FK to an
+  occurrence row.
 - `EmailDelivery` has two nullable FKs (`alertEventId`, `reportRunId`); every
   write path sets exactly one, but this is an application-level invariant,
   not a database `CHECK` constraint (Prisma has no portable way to express
