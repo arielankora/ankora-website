@@ -57,7 +57,8 @@ function formatAgo(date: Date): string {
 
 // Spec 9/9.1/9.2, 12's admin screens table: "Alerts - rule setup, event
 // history, delivery status." Super-Admin only (alert.manage - ADR 11.2).
-export default async function AlertsPage({ searchParams }: { searchParams: { clientId?: string } }) {
+export default async function AlertsPage(props: { searchParams: Promise<{ clientId?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "alert.manage")) {

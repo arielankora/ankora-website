@@ -8,7 +8,8 @@ import { EditCategoryForm } from "./EditCategoryForm";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-export default async function CategoryDetailPage({ params }: { params: { categoryId: string } }) {
+export default async function CategoryDetailPage(props: { params: Promise<{ categoryId: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
 
   if (!can(user.role, "category.manage")) {

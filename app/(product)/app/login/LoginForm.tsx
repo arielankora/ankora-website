@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { loginAction } from "./actions";
 
@@ -73,9 +74,9 @@ export function LoginForm() {
       <SubmitButton />
 
       <div className="mt-4 flex items-center justify-between gap-2.5">
-        <a href="/app/forgot-password" className="text-xs text-gold-dim hover:underline">
+        <Link href="/app/forgot-password" className="text-xs text-gold-dim hover:underline">
           שכחתי סיסמה
-        </a>
+        </Link>
       </div>
     </form>
   );

@@ -7,9 +7,10 @@ import { PostEditor } from "@/components/admin/PostEditor";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default function NewPostPage({ params }: { params: { locale: string } }) {
+export default async function NewPostPage(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!isValidSessionToken(token)) redirect(`/${locale}/admin/login`);
 
   return (

@@ -11,7 +11,8 @@ import { logoutAllSessionsAction } from "../actions";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-export default async function UserDetailPage({ params }: { params: { userId: string } }) {
+export default async function UserDetailPage(props: { params: Promise<{ userId: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
 
   if (!can(user.role, "user.manage")) {

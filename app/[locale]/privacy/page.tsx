@@ -4,11 +4,12 @@ import { PageHero } from "@/components/sections/PageHero";
 import { Container } from "@/components/ui/Container";
 import { Reveal } from "@/components/motion/Reveal";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   const legal = dict.pages.legal;
@@ -27,7 +28,8 @@ export async function generateMetadata({
   };
 }
 
-export default function PrivacyPage({ params }: { params: { locale: string } }) {
+export default async function PrivacyPage(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const legal = dict.pages.legal;

@@ -66,7 +66,8 @@ function formatDuration(seconds: number | null): string {
 
 // Spec 11 "My Time": "רשימת entries לפי יום/שבוע, actual+billable לפי
 // permission, edit."
-export default async function MyTimePage({ searchParams }: { searchParams: { week?: string } }) {
+export default async function MyTimePage(props: { searchParams: Promise<{ week?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {

@@ -31,7 +31,7 @@ const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
 const GENERIC_ERROR = "פרטי ההתחברות שגויים, או שהחשבון חסום זמנית.";
 
 export async function loginAction(_prevState: { error?: string } | undefined, formData: FormData) {
-  const ip = clientIpFrom(headers());
+  const ip = clientIpFrom(await headers());
   if (!rateLimit(`app-login:${ip}`, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW_MS).allowed) {
     return { error: GENERIC_ERROR };
   }

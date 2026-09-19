@@ -4,11 +4,12 @@ import { SITE_URL } from "@/lib/site";
 import { PersonalOperationsManagementPage } from "@/components/sections/PersonalOperationsManagementPage";
 import { JsonLd } from "@/components/seo/JsonLd";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   const p = dict.pages.personalOperationsManagement;
@@ -27,7 +28,8 @@ export async function generateMetadata({
   };
 }
 
-export default function Page({ params }: { params: { locale: string } }) {
+export default async function Page(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.personalOperationsManagement;

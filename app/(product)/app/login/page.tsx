@@ -11,7 +11,8 @@ export const metadata: Metadata = { robots: { index: false, follow: false } };
 // pre-production checklist) aren't in the prototype's own demo login
 // screen, but they're a real compliance requirement this app already
 // shipped - kept, just moved under the form instead of dropped.
-export default function LoginPage({ searchParams }: { searchParams: { passwordChanged?: string } }) {
+export default async function LoginPage(props: { searchParams: Promise<{ passwordChanged?: string }> }) {
+  const searchParams = await props.searchParams;
   return (
     <AuthShell>
       <p className="text-[22px] font-medium text-navy">כניסה למערכת</p>

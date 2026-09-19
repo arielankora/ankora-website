@@ -27,7 +27,7 @@ export async function forgotPasswordAction(
   _prev: ForgotPasswordState | undefined,
   formData: FormData
 ): Promise<ForgotPasswordState> {
-  const ip = clientIpFrom(headers());
+  const ip = clientIpFrom(await headers());
   if (!rateLimit(`forgot-password:${ip}`, RESET_REQUEST_LIMIT, RESET_REQUEST_WINDOW_MS).allowed) {
     // Returns the same "submitted" shape as the success path. Spec 20's
     // don't-reveal-anything rule applies to the rate limit too: a

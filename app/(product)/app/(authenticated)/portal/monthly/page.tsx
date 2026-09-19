@@ -28,7 +28,8 @@ function formatMonthTitle(date: Date) {
 // the prototype's "ספקים שתואמו" tile and "סיכום מנהל התיק" prose aren't
 // reproduced (no backing schema field for either - would be fabricated,
 // not real).
-export default async function PortalMonthlyPage({ searchParams }: { searchParams: { monthOffset?: string } }) {
+export default async function PortalMonthlyPage(props: { searchParams: Promise<{ monthOffset?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   const monthOffset = Number(searchParams.monthOffset || 0);

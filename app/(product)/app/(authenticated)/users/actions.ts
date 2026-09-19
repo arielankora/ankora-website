@@ -36,7 +36,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
     // Built as an absolute URL (not a relative path) since the admin will
     // typically copy/paste this into Slack or a separate email to the
     // invited user, outside the app itself.
-    const hdrs = headers();
+    const hdrs = await headers();
     const host = hdrs.get("host");
     const protocol = host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https";
     const origin = host ? `${protocol}://${host}` : "";

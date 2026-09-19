@@ -4,11 +4,12 @@ import { SITE_URL } from "@/lib/site";
 import { AboutPageClient } from "@/components/sections/AboutPageClient";
 import { JsonLd } from "@/components/seo/JsonLd";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   return {
@@ -26,7 +27,8 @@ export async function generateMetadata({
   };
 }
 
-export default function AboutPage({ params }: { params: { locale: string } }) {
+export default async function AboutPage(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.about;

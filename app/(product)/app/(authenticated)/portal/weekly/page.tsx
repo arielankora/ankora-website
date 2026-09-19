@@ -23,7 +23,8 @@ function formatHours(minutes: number) {
 // השבוע" list - see lib/app-domain/client-portal.ts's dailyTotals/
 // topActivities comment for why the list shows real per-activity totals
 // rather than the prototype's invented narrative lines.
-export default async function PortalWeeklyPage({ searchParams }: { searchParams: { weekOffset?: string } }) {
+export default async function PortalWeeklyPage(props: { searchParams: Promise<{ weekOffset?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   const weekOffset = Number(searchParams.weekOffset || 0);

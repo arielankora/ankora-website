@@ -98,7 +98,14 @@ export function isAdminConfigured(): boolean {
   return !!(process.env.ADMIN_PASSWORD && process.env.ADMIN_SESSION_SECRET);
 }
 
-export function isRequestAuthorized(): boolean {
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+// Next 15 made cookies() asynchronous. The upgrade codemod's first pass
+// reached for the `UnsafeUnwrappedCookies` escape hatch to keep this
+// function synchronous, which still works in 15 but is deprecated and is
+// removed in 16 - and this is the single gate in front of every blog
+// admin endpoint, so it is the last place to leave a shim that will
+// silently stop compiling later. Made properly async instead; all four
+// call sites are already async route handlers and simply await it.
+export async function isRequestAuthorized(): Promise<boolean> {
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   return isValidSessionToken(token);
 }

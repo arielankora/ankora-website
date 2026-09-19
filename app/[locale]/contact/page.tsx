@@ -15,11 +15,12 @@ const heMeta = {
     "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const meta =
     locale === "he"
@@ -75,7 +76,8 @@ function HeContactPage({ locale, p }: { locale: Locale; p: ReturnType<typeof get
   );
 }
 
-export default function ContactPage({ params }: { params: { locale: string } }) {
+export default async function ContactPage(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.contact;

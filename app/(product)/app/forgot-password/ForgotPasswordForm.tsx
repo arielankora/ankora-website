@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { forgotPasswordAction } from "./actions";
 
@@ -32,9 +33,9 @@ export function ForgotPasswordForm() {
             </a>
           </p>
         )}
-        <a href="/app/login" className="mt-1 block text-xs text-gold-dim">
+        <Link href="/app/login" className="mt-1 block text-xs text-gold-dim">
           חזרה לכניסה
-        </a>
+        </Link>
       </div>
     );
   }
@@ -57,9 +58,9 @@ export function ForgotPasswordForm() {
 
       <p className="mt-4 text-xs text-navy/55">אם הכתובת קיימת במערכת יישלח מייל. מטעמי אבטחה לא נציין אם היא קיימת.</p>
 
-      <a href="/app/login" className="mt-4 block text-xs text-gold-dim">
+      <Link href="/app/login" className="mt-4 block text-xs text-gold-dim">
         חזרה לכניסה
-      </a>
+      </Link>
     </form>
   );
 }

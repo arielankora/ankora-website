@@ -32,9 +32,9 @@
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.383.0",
     "lunar-javascript": "^1.7.7",
-    "next": "^14.2.35",
+    "next": "15.5.25",
     "next-auth": "^5.0.0-beta.32",
-    "next-mdx-remote": "^6.0.0",
+    "next-mdx-remote-client": "1.1.9",
     "pdfkit": "^0.20.2",
     "prisma": "6.19.3",
     "react": "18.3.1",
@@ -54,13 +54,17 @@
     "autoprefixer": "10.4.19",
     "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "8.57.0",
-    "eslint-config-next": "14.2.5",
-    "pdfjs-dist": "3.11.174",
-    "postcss": "8.4.40",
+    "eslint-config-next": "15.5.25",
+    "pdfjs-dist": "6.3.289",
+    "postcss": "^8.5.28",
     "tailwindcss": "3.4.7",
     "tsx": "^4.23.13",
     "typescript": "5.5.4",
     "vite": "^8.2.2",
     "vitest": "^5.0.0"
+  },
+  "overrides": {
+    "postcss": "$postcss",
+    "js-yaml": "^3.15.2"
   }
 }

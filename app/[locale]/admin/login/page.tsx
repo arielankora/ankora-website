@@ -3,7 +3,8 @@ import { AdminLoginForm } from "@/components/admin/AdminLoginForm";
 
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
-export default function AdminLoginPage({ params }: { params: { locale: string } }) {
+export default async function AdminLoginPage(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   return (
     <div className="bg-paper px-6 py-32">

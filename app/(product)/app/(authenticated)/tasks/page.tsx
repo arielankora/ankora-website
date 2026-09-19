@@ -38,11 +38,12 @@ const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
 // role that tracks time may see and create tasks for clients they're
 // assigned to; CLIENT_USER never reaches this route (separate nav array
 // in AppShell, spec 13's portal-isolation rule).
-export default async function TasksPage({
-  searchParams,
-}: {
-  searchParams: { clientId?: string; categoryId?: string; status?: string };
-}) {
+export default async function TasksPage(
+  props: {
+    searchParams: Promise<{ clientId?: string; categoryId?: string; status?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {

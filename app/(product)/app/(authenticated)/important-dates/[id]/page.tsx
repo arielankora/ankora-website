@@ -32,7 +32,8 @@ function formatDate(date: Date | null): string {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-export default async function ImportantDateDetailPage({ params }: { params: { id: string } }) {
+export default async function ImportantDateDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {
