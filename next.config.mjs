@@ -199,6 +199,55 @@ const nextConfig = {
         source: '/app/:path*',
         headers: [
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+          // Security review follow-up: a dedicated, strictly same-origin
+          // policy for the authenticated product surface.
+          //
+          // Until now /app inherited the marketing policy above, which
+          // allows https://www.googletagmanager.com as a SCRIPT source.
+          // /app loads no analytics and, verified by grep, references no
+          // external URL at all - so that allowance bought nothing and
+          // cost something real: Google Tag Manager is a well-known CSP
+          // bypass vector, because a GTM container can be configured to
+          // load further arbitrary scripts. Leaving it whitelisted on the
+          // surface that holds sessions, client data and the audit log
+          // was the weakest line in the whole policy.
+          //
+          // Every directive here is 'self' or 'none'. No third-party
+          // origin is reachable from /app under any directive.
+          //
+          // 'unsafe-inline' remains in script-src, and deliberately so.
+          // Removing it needs a per-request nonce, which was investigated
+          // and rejected - see docs/adr/0004 for the measurements. The
+          // short version: the obvious implementation silently applies no
+          // policy at all, and making it work means surgery on the auth
+          // middleware for a vector this codebase does not have.
+          //
+          // Note both this rule and the '/:path*' rule above match a
+          // request to /app. Whether Next emits one header or two, the
+          // result is the same: this policy is a strict subset of the
+          // broad one, so either it replaces it or the browser enforces
+          // both and the intersection is this one. Fail-safe in either
+          // direction - if this rule ever stops matching, /app simply
+          // falls back to the broader policy rather than losing its CSP.
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "base-uri 'self'",
+              "object-src 'none'",
+              "frame-ancestors 'none'",
+              "form-action 'self'",
+              "img-src 'self' data: blob:",
+              "font-src 'self' data:",
+              "style-src 'self' 'unsafe-inline'",
+              `script-src 'self' 'unsafe-inline'${
+                process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''
+              }`,
+              "connect-src 'self'",
+              "frame-src 'none'",
+              'upgrade-insecure-requests',
+            ].join('; '),
+          },
         ],
       },
     ];
