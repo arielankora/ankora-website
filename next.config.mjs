@@ -1,3 +1,10 @@
+// Vercel origins the Content-Security-Policy below allows on preview and
+// local builds only - never on production. See the CSP comment for why
+// each one is needed. Empty string on production so the directives it is
+// interpolated into come out byte-identical to the strict policy.
+const PREVIEW_ORIGINS =
+  process.env.VERCEL_ENV === 'production' ? '' : ' https://vercel.com https://vercel.live';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -119,9 +126,27 @@ const nextConfig = {
           //     defense X-Frame-Options below provides.
           //
           // 'unsafe-eval' is added in development only: Next.js's hot
-          // module replacement needs it, production never does.
-          // vercel.live is the Preview-deployment comment toolbar; it is
-          // inert on production but listing it keeps previews usable.
+          // module replacement needs it, production never does. The test
+          // is written as "is this explicitly development" rather than
+          // "is this not production" on purpose - the first cut used the
+          // latter and therefore emitted 'unsafe-eval' whenever NODE_ENV
+          // happened to be unset, which is fail-OPEN. This way an
+          // unexpected or missing NODE_ENV yields the strict policy.
+          //
+          // The PREVIEW_ORIGINS block below is the result of actually
+          // loading a preview deployment under this policy rather than
+          // assuming it worked. Vercel's Deployment Protection guards
+          // preview URLs with an SSO round trip to vercel.com/sso-api,
+          // and a first cut of this CSP blocked it - previews still
+          // rendered, but the protection handshake threw a CSP violation,
+          // which would have made reviewing every future PR awkward.
+          // vercel.live is the preview comment toolbar, same story.
+          //
+          // These hosts are added ONLY when the build is not a production
+          // build, so production keeps the strict policy and gets no
+          // Vercel origins at all. VERCEL_ENV is injected by the platform
+          // ('production' | 'preview' | 'development'); its absence means
+          // a local build, which also wants the looser set.
           {
             key: 'Content-Security-Policy',
             value: [
@@ -129,15 +154,15 @@ const nextConfig = {
               "base-uri 'self'",
               "object-src 'none'",
               "frame-ancestors 'none'",
-              "form-action 'self'",
+              `form-action 'self'${PREVIEW_ORIGINS}`,
               "img-src 'self' data: blob: https://www.googletagmanager.com https://*.google-analytics.com",
               "font-src 'self' data:",
               "style-src 'self' 'unsafe-inline'",
               `script-src 'self' 'unsafe-inline'${
-                process.env.NODE_ENV === 'production' ? '' : " 'unsafe-eval'"
-              } https://www.googletagmanager.com https://vercel.live`,
-              "connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com https://vercel.live",
-              "frame-src 'self' https://vercel.live",
+                process.env.NODE_ENV === 'development' ? " 'unsafe-eval'" : ''
+              } https://www.googletagmanager.com${PREVIEW_ORIGINS}`,
+              `connect-src 'self' https://www.googletagmanager.com https://*.google-analytics.com https://*.analytics.google.com${PREVIEW_ORIGINS}`,
+              `frame-src 'self'${PREVIEW_ORIGINS}`,
               'upgrade-insecure-requests',
             ].join('; '),
           },
