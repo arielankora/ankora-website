@@ -1,22 +1,22 @@
-import Link from "next/link";
-import { Archive } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
+import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { Forbidden } from "@/components/app/Forbidden";
-import { StatusBadge } from "@/components/app/StatusBadge";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
-import { archiveClientAction } from "./actions";
+import { ClientsGrid, type ClientCard } from "./ClientsGrid";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const STATUS_LABEL: Record<string, { label: string; tone: "green" | "amber" | "gray" }> = {
-  ACTIVE: { label: "פעיל", tone: "green" },
-  PAUSED: { label: "מושהה", tone: "amber" },
-  ARCHIVED: { label: "בארכיון", tone: "gray" },
-};
-
+// App redesign (handoff README, screen 5 "לקוחות"): "כרטיס לכל לקוח: שם,
+// תג סטטוס, מנהל תיק, אחוז ניצול (אדום מעל 100%), פס התקדמות". There is
+// no "portfolio manager" field anywhere in the domain (Client has no
+// single-owner relation - UserClientAccess is a plain many-to-many), so
+// the prototype's invented "מנהל תיק: X" line is replaced with the real
+// number of employees assigned to the client (the same _count the old
+// table already showed as "משתמשים מוקצים") - a real, honest number
+// instead of fabricating a manager designation the schema doesn't have.
 export default async function ClientsPage() {
   const user = await requireUser();
 
@@ -28,7 +28,27 @@ export default async function ClientsPage() {
     );
   }
 
+  const canManageBanks = can(user.role, "hour_bank.manage");
+  const canViewReports = can(user.role, "report.internal.view");
   const clients = await listClients();
+
+  const cards: ClientCard[] = await Promise.all(
+    clients.map(async (client) => {
+      // getCurrentHourBank does a couple of live queries per client - fine
+      // at this screen's scale (Ankora's own client roster, not a
+      // paginated public list). Archived clients skip the lookup: their
+      // cycles are frozen and irrelevant to this "current state" card.
+      const snapshot =
+        client.status !== "ARCHIVED" ? await getCurrentHourBank(client.id) : null;
+      return {
+        id: client.id,
+        name: client.name,
+        status: client.status,
+        employeeCount: client._count.employeeAccess,
+        utilizationPct: snapshot?.utilization.utilizationPct ?? null,
+      };
+    })
+  );
 
   return (
     <>
@@ -36,73 +56,14 @@ export default async function ClientsPage() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-xl font-medium text-navy">לקוחות</h1>
-            <p className="mt-1 text-sm text-navy/60">ניהול לקוחות Ankora, סטטוס וקטגוריות משויכות.</p>
+            <p className="mt-1 text-sm text-navy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
           </div>
-          {/* Redesign direction A: the add-client form used to sit here
-              inline, permanently above the table, pushing existing
-              clients below the fold. It now lives in a Drawer opened by
-              this one primary button - see docs/adr/0001 addendum. */}
-          <Drawer triggerLabel="הוספת לקוח" title="לקוח חדש">
+          <Drawer triggerLabel="+ לקוח חדש" title="לקוח חדש">
             <CreateClientForm />
           </Drawer>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
-          <table className="w-full min-w-[640px] text-start text-sm">
-            <thead>
-              <tr className="border-b border-lineDark text-xs text-navy/50">
-                <th className="px-5 py-3 font-medium">שם</th>
-                <th className="px-5 py-3 font-medium">סטטוס</th>
-                <th className="px-5 py-3 font-medium">אזור זמן</th>
-                <th className="px-5 py-3 font-medium">קטגוריות</th>
-                <th className="px-5 py-3 font-medium">משתמשים מוקצים</th>
-                <th className="px-5 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {clients.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-5 py-8 text-center text-navy/50">
-                    אין עדיין לקוחות. הוסיפו לקוח ראשון למעלה.
-                  </td>
-                </tr>
-              )}
-              {clients.map((client) => {
-                const status = STATUS_LABEL[client.status] ?? STATUS_LABEL.ACTIVE;
-                return (
-                  <tr key={client.id} className="border-b border-lineDark last:border-0">
-                    <td className="px-5 py-3">
-                      <Link href={`/app/clients/${client.id}`} className="font-medium text-navy hover:text-gold-dim">
-                        {client.name}
-                      </Link>
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge label={status.label} tone={status.tone} />
-                    </td>
-                    <td className="px-5 py-3 text-navy/70">{client.timezone}</td>
-                    <td className="px-5 py-3 text-navy/70">{client._count.categories}</td>
-                    <td className="px-5 py-3 text-navy/70">{client._count.employeeAccess}</td>
-                    <td className="px-5 py-3 text-end">
-                      {client.status !== "ARCHIVED" && (
-                        <form action={archiveClientAction}>
-                          <input type="hidden" name="clientId" value={client.id} />
-                          <button
-                            type="submit"
-                            aria-label="העברה לארכיון"
-                            title="העברה לארכיון"
-                            className="text-navy/40 transition-colors hover:text-red-600"
-                          >
-                            <Archive size={16} strokeWidth={1.75} />
-                          </button>
-                        </form>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <ClientsGrid cards={cards} canManageBanks={canManageBanks} canViewReports={canViewReports} />
       </div>
     </>
   );

@@ -120,6 +120,24 @@ export async function updateImportantDateStatusAction(formData: FormData) {
   revalidatePath("/app");
 }
 
+// App redesign (handoff README, screen 7 "מועדים חשובים"): "כפתור 'סימון
+// כטופל' (עם ביטול)" - a plain async function (not <form action>) so
+// ImportantDateRow can read back the result and wire a real undo (calling
+// this again with the previous status) into the toast, matching tasks/
+// actions.ts's toggleTaskDoneAction from the daily-screens phase.
+export async function setImportantDateStatusAction(id: string, status: ImportantDateStatus) {
+  const user = await requireUser();
+  try {
+    const updated = await updateImportantDateStatus(user, id, status);
+    revalidatePath("/app/important-dates");
+    revalidatePath(`/app/important-dates/${id}`);
+    revalidatePath("/app");
+    return { ok: true as const, status: updated.status };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
 export async function snoozeImportantDateAction(formData: FormData) {
   const user = await requireUser();
   const id = String(formData.get("importantDateId") || "");

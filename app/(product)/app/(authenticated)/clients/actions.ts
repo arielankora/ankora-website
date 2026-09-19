@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { createClient, updateClient, archiveClient } from "@/lib/app-domain/clients";
+import { createClient, updateClient, archiveClient, restoreClient } from "@/lib/app-domain/clients";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
 type FormState = { error?: string; ok?: boolean };
@@ -54,11 +54,28 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
   return { ok: true };
 }
 
-export async function archiveClientAction(formData: FormData) {
+// App redesign (handoff README, screen 5): plain async functions (not
+// <form action>) so ClientsGrid can read back success/failure and wire a
+// REAL undo (restoreClientAction) into the archive toast - same pattern
+// as tasks/actions.ts's toggleTaskDoneAction from the daily-screens phase.
+export async function archiveClientAction(clientId: string) {
   const user = await requireUser();
-  const clientId = String(formData.get("clientId") || "");
-  if (!clientId) return;
-
-  await archiveClient(user, clientId);
+  try {
+    await archiveClient(user, clientId);
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
   revalidatePath("/app/clients");
+  return { ok: true as const };
+}
+
+export async function restoreClientAction(clientId: string) {
+  const user = await requireUser();
+  try {
+    await restoreClient(user, clientId);
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+  revalidatePath("/app/clients");
+  return { ok: true as const };
 }
