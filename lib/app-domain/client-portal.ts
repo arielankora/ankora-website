@@ -155,6 +155,35 @@ async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEm
   });
 }
 
+/// App redesign (handoff README, screen 16 "פעילות שבועית"): the
+/// prototype's weekly tab is a 7-bar chart (Sun-Sat) plus a "מה נעשה
+/// השבוע" list. Both are real aggregates of the same rows fetchPortalEntries
+/// already returns - no new query, just grouped two ways: dailyTotals by
+/// calendar day (for the bars) and topActivities by activity title (for
+/// the list). The prototype's list shows invented per-line narrative
+/// ("הושלם מול הסוכן", "ממתין לאישור תאריכים") - there is no such status
+/// detail on a TimeEntry or its linked Task in this schema, so that's
+/// deliberately not reproduced; the real substitute is each activity's
+/// total billable time, sorted by size, which is honest to what the data
+/// actually holds.
+function dailyTotals(rows: PortalEntryRow[], from: Date) {
+  const [y, m, day] = localDateKey(from).split("-").map(Number);
+  const dayKeys = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(y, m - 1, day + i)).toISOString().slice(0, 10));
+  return dayKeys.map((date) => ({
+    date,
+    minutes: rows.filter((r) => r.date === date).reduce((s, r) => s + r.billableMinutes, 0),
+  }));
+}
+
+function topActivities(rows: PortalEntryRow[], limit = 5) {
+  const byActivity = new Map<string, number>();
+  for (const r of rows) byActivity.set(r.activity, (byActivity.get(r.activity) ?? 0) + r.billableMinutes);
+  return [...byActivity.entries()]
+    .map(([activity, minutes]) => ({ activity, minutes }))
+    .sort((a, b) => b.minutes - a.minutes)
+    .slice(0, limit);
+}
+
 /// Spec 13's Weekly Activity: "משימות שבוצעו, שעות לפי משימה/קטגוריה,
 /// עובדים לפי הגדרת privacy." weekStart defaults to the current week;
 /// callers (the portal screen) can page backward via the same param.
@@ -175,8 +204,41 @@ export async function getWeeklyActivity(actor: User, weekStart?: Date) {
     rows,
     totalMinutes,
     byCategory: [...byCategory.entries()].map(([category, minutes]) => ({ category, minutes })),
+    dailyTotals: dailyTotals(rows, from),
+    topActivities: topActivities(rows),
     showEmployeeNames: client.portalShowEmployeeNames,
   };
+}
+
+/// App redesign (handoff README, screen 16 "דוח חודשי"): the prototype
+/// shows three KPI tiles (hours, tasks completed, "suppliers coordinated")
+/// plus a prose "case manager summary" and an auto-send date. This schema
+/// has no supplier concept and no free-text per-cycle manager summary
+/// field anywhere (Client/HourBankCycle/ReportSchedule all checked) - both
+/// are decorative flourishes from the prototype's fictional example
+/// client, not real capabilities, so neither is reproduced (same judgment
+/// call as Phase 5's alerts panel dropping "snooze"/the long-timer card).
+/// tasksCompletedCount is real: Task.status=DONE has existed since Phase
+/// 10, updatedAt inside the period is the closest real proxy for "done
+/// this month" this schema offers (there's no separate completedAt
+/// column). nextAutoSendLabel is also real: the client's own enabled
+/// MONTHLY_DETAILED ReportSchedule, if one exists.
+async function tasksCompletedCount(clientId: string, from: Date, to: Date) {
+  return prisma.task.count({
+    where: { clientId, status: "DONE", deletedAt: null, updatedAt: { gte: from, lt: to } },
+  });
+}
+
+const WEEKDAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
+async function nextAutoSendLabel(clientId: string): Promise<string | null> {
+  const schedule = await prisma.reportSchedule.findFirst({
+    where: { clientId, reportType: "MONTHLY_DETAILED", enabled: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!schedule) return null;
+  if (schedule.frequency === "WEEKLY") return `נשלח אוטומטית כל שבוע ביום ${WEEKDAY_LABELS[schedule.dayOfWeek ?? 0]}`;
+  return `נשלח אוטומטית ב-${schedule.dayOfMonth ?? 1} לכל חודש`;
 }
 
 /// Spec 13's Monthly Detailed report / spec 14.1's "Monthly Detailed" row:
@@ -187,10 +249,22 @@ export async function getMonthlyDetailed(actor: User, monthStart?: Date) {
   const from = startOfMonth(monthStart ?? new Date());
   const to = endOfMonth(from);
 
-  const rows = await fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames);
+  const [rows, tasksCompleted, autoSendLabel] = await Promise.all([
+    fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames),
+    tasksCompletedCount(client.id, from, to),
+    nextAutoSendLabel(client.id),
+  ]);
   const totalMinutes = rows.reduce((s, r) => s + r.billableMinutes, 0);
 
-  return { from, to, rows, totalMinutes, showEmployeeNames: client.portalShowEmployeeNames };
+  return {
+    from,
+    to,
+    rows,
+    totalMinutes,
+    tasksCompleted,
+    autoSendLabel,
+    showEmployeeNames: client.portalShowEmployeeNames,
+  };
 }
 
 /// Spec 13's Category Summary: "hours + % of total."

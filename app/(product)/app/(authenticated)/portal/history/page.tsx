@@ -4,6 +4,7 @@ import { getPortalHistory } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { RecipientsForm } from "../RecipientsForm";
+import { PortalTabs } from "../PortalTabs";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -31,6 +32,20 @@ function formatMinutes(minutes: number) {
   return `${sign}${h}:${String(m).padStart(2, "0")}`;
 }
 
+// App redesign (handoff README, screen 16 "היסטוריה"): the prototype
+// shows one merged table with a "הורדה" link per row. The real domain
+// already keeps two honestly-different things separate - hour-bank
+// cycles (which may not align to calendar months) and actually-sent
+// ReportRun rows - so that separation is kept (it's more correct, not
+// less), and a download link is added only for a MONTHLY_DETAILED run,
+// computed as the same monthOffset the monthly tab/export route already
+// accept. Other report types (weekly activity, etc.) have no export route
+// today, so no link is fabricated for those rows.
+function monthOffsetFor(periodStart: Date): number {
+  const now = new Date();
+  return (periodStart.getUTCFullYear() - now.getUTCFullYear()) * 12 + (periodStart.getUTCMonth() - now.getUTCMonth());
+}
+
 // Spec 13's History: "cycles קודמים ודוחות" - past hour-bank cycles plus
 // the ReportRun send history, both scoped to the caller's own client via
 // getPortalHistory -> resolvePortalClient.
@@ -54,6 +69,8 @@ export default async function PortalHistoryPage() {
   return (
     <>
       <div className="space-y-8">
+        <PortalTabs active="history" />
+
         <div>
           <h1 className="text-xl font-medium text-navy">היסטוריה</h1>
           <p className="mt-1 text-sm text-navy/60">מחזורי בנק שעות קודמים ודוחות שנשלחו.</p>
@@ -108,12 +125,13 @@ export default async function PortalHistoryPage() {
                   <th className="px-5 py-3 font-medium">סוג דוח</th>
                   <th className="px-5 py-3 font-medium">תקופה</th>
                   <th className="px-5 py-3 font-medium">נשלח בתאריך</th>
+                  <th className="px-5 py-3 font-medium"></th>
                 </tr>
               </thead>
               <tbody>
                 {history.reportRuns.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-5 py-8 text-center text-navy/50">
+                    <td colSpan={4} className="px-5 py-8 text-center text-navy/50">
                       טרם נשלחו דוחות.
                     </td>
                   </tr>
@@ -125,6 +143,16 @@ export default async function PortalHistoryPage() {
                       {formatDate(r.periodStart)} - {formatDate(r.periodEnd)}
                     </td>
                     <td className="px-5 py-3 text-navy/70">{formatDate(r.sentAt)}</td>
+                    <td className="px-5 py-3 text-end">
+                      {r.reportType === "MONTHLY_DETAILED" && (
+                        <a
+                          href={`/api/portal/export?monthOffset=${monthOffsetFor(r.periodStart)}&format=pdf`}
+                          className="text-xs text-gold-dim hover:underline"
+                        >
+                          הורדה
+                        </a>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>

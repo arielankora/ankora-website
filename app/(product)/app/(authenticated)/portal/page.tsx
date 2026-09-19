@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { getPortalDashboard, getCategorySummary } from "@/lib/app-domain/client-portal";
+import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
+import { PortalTabs } from "./PortalTabs";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -16,22 +18,36 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
+const CATEGORY_BAR_COLORS = ["bg-gold", "bg-gold-light", "bg-gold/50"];
+
 // Spec 13's Client Portal Dashboard + Category Summary, combined on one
-// screen (both are compact "at a glance" views - a separate route for
-// each would be two nearly-empty pages). Spec 13: "Dashboard: בנק שעות
-// נוכחי, נוצל, נותר, % ניצול, ימים עד סוף cycle" + "Category summary:
-// hours + % of total." Isolation is structural, not a query filter here:
-// getPortalDashboard/getCategorySummary derive the client from the
-// caller's own ClientUser membership (lib/app-domain/client-portal.ts's
-// resolvePortalClient) - there is no clientId parameter this page could
-// even pass incorrectly.
+// screen (both are compact "at a glance" views). App redesign (handoff
+// README, screen 16): the hero card gets the design's one explicitly
+// distinct treatment for the portal - `#FBF7F0` background + a gold
+// border (`Design Tokens` table has no named token for this exact tint,
+// so it's the one arbitrary hex value in this phase - everything else
+// uses the shared gold/navy/cream tokens). The prototype's own amber
+// "כך הלקוח רואה את הפורטל" banner is NOT reproduced here: that note is
+// third-person ("this is how the client sees it"), written for an Ankora
+// staff member toggling the SAME demo between an internal view and a
+// client-view preview - this app has no "view portal as this client"
+// staff impersonation feature (resolvePortalClient only ever resolves the
+// caller's OWN ClientUser membership), so a real client landing on this
+// page would find a banner describing them in the third person
+// nonsensical. Isolation is still structural exactly as the README
+// requires, just silent rather than announced.
 export default async function PortalDashboardPage() {
   const user = await requireUser();
 
   let dashboard;
   let categorySummary;
+  let weekly;
   try {
-    [dashboard, categorySummary] = await Promise.all([getPortalDashboard(user), getCategorySummary(user)]);
+    [dashboard, categorySummary, weekly] = await Promise.all([
+      getPortalDashboard(user),
+      getCategorySummary(user),
+      getWeeklyActivity(user),
+    ]);
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return (
@@ -44,78 +60,116 @@ export default async function PortalDashboardPage() {
   }
 
   const { client, snapshot, daysUntilCycleEnd } = dashboard;
+  const totalCategoryMinutes = categorySummary.rows.reduce((s, r) => s + r.minutes, 0);
 
   return (
-    <>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-xl font-medium text-navy">שלום, {client.name}</h1>
-          <p className="mt-1 text-sm text-navy/60">סקירת בנק השעות שלכם אצל Ankora.</p>
-        </div>
+    <div className="space-y-4">
+      <PortalTabs active="dash" />
 
-        {!snapshot && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
-            טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.
-          </div>
+      <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
+        <p className="text-xl font-medium text-navy">שלום, {client.name}</p>
+        {snapshot ? (
+          <p className="mt-1.5 text-[13.5px] text-navy/60">
+            מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} – {formatDate(snapshot.bank.cycleEnd)}
+            {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
+          </p>
+        ) : (
+          <p className="mt-1.5 text-[13.5px] text-navy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
         )}
 
         {snapshot && (
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-navy">
-                מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} - {formatDate(snapshot.bank.cycleEnd)}
-              </h2>
-              {daysUntilCycleEnd !== null && (
-                <span className="text-xs text-navy/50">{daysUntilCycleEnd} ימים עד סוף המחזור</span>
-              )}
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <div>
-                <p className="text-xs text-navy/40">סה&quot;כ בבנק</p>
-                <p className="mt-1 text-lg font-medium text-navy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
+          <>
+            <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+              <div className="rounded-[14px] border border-lineDark bg-white p-4">
+                <span className="text-xs text-navy/55">סה&quot;כ בבנק</span>
+                <p className="mt-2 font-jbmono text-2xl text-navy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
               </div>
-              <div>
-                <p className="text-xs text-navy/40">נוצל</p>
-                <p className="mt-1 text-lg font-medium text-navy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
+              <div className="rounded-[14px] border border-lineDark bg-white p-4">
+                <span className="text-xs text-navy/55">נוצל</span>
+                <p className="mt-2 font-jbmono text-2xl text-navy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
               </div>
-              <div>
-                <p className="text-xs text-navy/40">נותר</p>
+              <div className="rounded-[14px] border border-lineDark bg-white p-4">
+                <span className="text-xs text-navy/55">נותר</span>
                 <p
-                  className={`mt-1 text-lg font-medium ${snapshot.utilization.remainingMinutes < 0 ? "text-red-600" : "text-navy"}`}
+                  dir="ltr"
+                  className={`mt-2 text-end font-jbmono text-2xl ${
+                    snapshot.utilization.remainingMinutes < 0 ? "text-error" : "text-navy"
+                  }`}
                 >
                   {formatMinutes(snapshot.utilization.remainingMinutes)}
                 </p>
               </div>
-              <div>
-                <p className="text-xs text-navy/40">אחוז ניצול</p>
-                <p
-                  className={`mt-1 text-lg font-medium ${snapshot.utilization.utilizationPct > 100 ? "text-red-600" : "text-navy"}`}
-                >
+              <div className="rounded-[14px] border border-lineDark bg-white p-4">
+                <span className="text-xs text-navy/55">ניצול</span>
+                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-error" : "text-navy"}`}>
                   {snapshot.utilization.utilizationPct}%
+                </p>
+                <p className="mt-1 text-[11.5px] text-navy/50">
+                  {formatMinutes(snapshot.utilization.consumedMinutes)} שעות מתוך {formatMinutes(snapshot.utilization.totalMinutes)}
                 </p>
               </div>
             </div>
-          </div>
+            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-navy/8">
+              <span
+                className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"}`}
+                style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
+              />
+            </div>
+          </>
         )}
+      </div>
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="text-sm font-medium text-navy">פילוח לפי קטגוריה - החודש</h2>
+      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+        <div className="rounded-2xl border border-lineDark bg-white p-5">
+          <p className="mb-4 text-[13.5px] font-medium text-navy">פילוח לפי תחום · החודש</p>
           {categorySummary.rows.length === 0 ? (
-            <p className="mt-3 text-sm text-navy/50">אין עדיין נתונים לחודש הנוכחי.</p>
+            <p className="text-sm text-navy/50">אין עדיין נתונים לחודש הנוכחי.</p>
           ) : (
-            <div className="mt-4 space-y-2">
-              {categorySummary.rows.map((row) => (
-                <div key={row.category} className="flex items-center justify-between text-sm">
-                  <span className="text-navy/80">{row.category}</span>
-                  <span className="text-navy/60">
-                    {formatMinutes(row.minutes)} ({row.pctOfTotal}%)
+            <div className="flex flex-col gap-3.5">
+              {categorySummary.rows.map((row, i) => (
+                <div key={row.category}>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-navy">{row.category}</span>
+                    <span className="font-jbmono text-navy/60">
+                      {formatMinutes(row.minutes)} · {row.pctOfTotal}%
+                    </span>
+                  </div>
+                  <span className="mt-1.5 block h-1.5 rounded-full bg-navy/7">
+                    <span
+                      className={`block h-full rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
+                      style={{ width: `${totalCategoryMinutes > 0 ? row.pctOfTotal : 0}%` }}
+                    />
                   </span>
                 </div>
               ))}
             </div>
           )}
         </div>
+
+        <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
+          <div className="flex items-center justify-between border-b border-lineDark px-[18px] py-3.5">
+            <span className="text-[13.5px] font-medium text-navy">פעילות השבוע</span>
+            <Link href="/app/portal/monthly" className="text-xs text-gold-dim hover:underline">
+              הורדת דוח חודשי
+            </Link>
+          </div>
+          {weekly.topActivities.length === 0 ? (
+            <p className="px-[18px] py-8 text-center text-sm text-navy/50">אין עדיין פעילות השבוע.</p>
+          ) : (
+            weekly.topActivities.map((a, i) => (
+              <div
+                key={a.activity}
+                className={`flex justify-between gap-2.5 px-[18px] py-3 text-sm ${
+                  i < weekly.topActivities.length - 1 ? "border-b border-lineDark/60" : ""
+                }`}
+              >
+                <span className="text-navy">{a.activity}</span>
+                <span className="font-jbmono text-navy/60">{formatMinutes(a.minutes)}</span>
+              </div>
+            ))
+          )}
+        </div>
       </div>
-    </>
+    </div>
   );
 }
