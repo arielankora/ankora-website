@@ -31,18 +31,25 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
 | `report.internal.view` | Phase 5 | ✅ | ✅ | — | — |
 | `report.client.view` | Phase 6 | — | — | — | ✅ |
 | `integration.manage` | Phase 8 | ✅ | — | — | — |
+| `important_date.manage_catalog` | Phase 10 | ✅ | — | — | — |
 
 ## Per-role summary
 
 - **SUPER_ADMIN** — every permission that exists. The only role that can
-  manage users, view the audit log, manage hour banks, manage alerts, or
-  manage integrations.
+  manage users, view the audit log, manage hour banks, manage alerts,
+  manage integrations, or subscribe a client to a holiday catalog
+  (`important_date.manage_catalog`).
 - **ANKORA_ADMIN** — clients, categories, and time entries (including
   editing other employees' entries) and internal reports. Deliberately
   *not* granted `user.manage`, `audit.view`, `hour_bank.manage`,
   `alert.manage`, or `integration.manage` — spec §4's role table names
   these as Super-Admin-only "critical system actions," with no grant
-  mechanism defined for extending them to Ankora Admin/Manager.
+  mechanism defined for extending them to Ankora Admin/Manager. The same
+  reasoning applies to `important_date.manage_catalog` (Phase 10): an
+  Ankora Admin creates and edits individual Important Dates through
+  `time_entry.create_self`'s client scoping, but subscribing a client to a
+  whole holiday catalog — which creates dozens of dated records at once —
+  stays with Super Admin.
 - **ANKORA_EMPLOYEE** — only their own timer and time entries
   (`create_self` + `edit_self`); never `edit_others`, never any report or
   admin permission. Spec §4: "טיימר ודיווחים שלו; עריכה עצמית לפי window
