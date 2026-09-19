@@ -10,22 +10,24 @@ import { localDateKey } from "@/lib/timezone";
 import { computeTrendWindows } from "@/lib/app-domain/overview-trend";
 
 describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
-  it("builds 7 day windows ending today, chronologically ordered, with today labeled", () => {
-    // 2026-03-04T10:00:00Z is 2026-03-04, Wednesday, Israel local (winter+DST n/a in March, +2).
+  it("builds 14 day windows ending today, chronologically ordered, with today labeled", () => {
+    // App redesign (design_handoff_ankora_app_redesign/README.md, screen 1):
+    // widened from 7 to 14 days. 2026-03-04T10:00:00Z is 2026-03-04,
+    // Wednesday, Israel local (winter+DST n/a in March, +2).
     const now = new Date("2026-03-04T10:00:00Z");
     const { dayWindows } = computeTrendWindows(now);
 
-    expect(dayWindows).toHaveLength(7);
-    expect(localDateKey(dayWindows[0].from)).toBe("2026-02-26");
-    expect(localDateKey(dayWindows[6].from)).toBe("2026-03-04");
+    expect(dayWindows).toHaveLength(14);
+    expect(localDateKey(dayWindows[0].from)).toBe("2026-02-19");
+    expect(localDateKey(dayWindows[13].from)).toBe("2026-03-04");
     // Each window is exactly one calendar day, contiguous with the next.
-    for (let i = 0; i < 7; i++) {
+    for (let i = 0; i < 14; i++) {
       expect(localDateKey(dayWindows[i].to)).toBe(localDateKey(new Date(dayWindows[i].from.getTime() + 24 * 3600_000)));
       if (i > 0) expect(dayWindows[i].from.getTime()).toBe(dayWindows[i - 1].to.getTime());
     }
-    expect(dayWindows[6].label).toContain("(היום)");
+    expect(dayWindows[13].label).toContain("(היום)");
     expect(dayWindows[0].label).not.toContain("(היום)");
-    expect(dayWindows[6].label).toContain("רביעי"); // Wednesday
+    expect(dayWindows[13].label).toContain("רביעי"); // Wednesday
   });
 
   it("builds 7 COMPLETE Sun-Sat week windows, excluding the current in-progress week", () => {
@@ -70,6 +72,6 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
     // locally, UTC still Tuesday) - day windows must use the Israel date.
     const now = new Date("2026-03-03T22:30:00Z");
     const { dayWindows } = computeTrendWindows(now);
-    expect(localDateKey(dayWindows[6].from)).toBe("2026-03-04");
+    expect(localDateKey(dayWindows[13].from)).toBe("2026-03-04");
   });
 });
