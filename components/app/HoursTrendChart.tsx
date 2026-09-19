@@ -81,7 +81,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-navy/60">
-            שעות מדווחות · {unit === "day" ? "7 הימים האחרונים" : "7 השבועות האחרונים"}
+            שעות מדווחות · {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים"}
           </p>
           <p className="mt-1 text-3xl font-medium text-navy">
             {formatHours(grandTotal)} <span className="text-base font-normal text-navy/50">שעות</span>
@@ -102,6 +102,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
             options={[
               { value: "employee", label: "לפי עובד" },
               { value: "client", label: "לפי לקוח" },
+              { value: "category", label: "לפי קטגוריה" },
             ]}
           />
         </div>

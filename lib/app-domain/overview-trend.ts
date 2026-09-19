@@ -12,7 +12,12 @@ import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 // toggle never needs a network round trip) and no export/filter surface.
 
 export type TrendUnit = "day" | "week";
-export type TrendDimension = "employee" | "client";
+// App redesign (design_handoff_ankora_app_redesign/README.md, screen 1
+// "בית"): "מתג פילוח: לפי עובד / לפי לקוח / לפי קטגוריה... זו יכולת
+// מחייבת - לא להחליף בגרף חד־צבעי." Added "category" alongside the
+// existing employee/client dimensions from the direction-A follow-up this
+// chart first shipped with.
+export type TrendDimension = "employee" | "client" | "category";
 
 const TOP_N = 5;
 const OTHER_KEY = "__other__";
@@ -51,12 +56,16 @@ type EntryRow = {
   actualSeconds: number | null;
   userId: string;
   clientId: string;
+  categoryId: string;
   userName: string;
   clientName: string;
+  categoryName: string;
 };
 
 function keyAndName(dimension: TrendDimension, e: EntryRow): { key: string; name: string } {
-  return dimension === "employee" ? { key: e.userId, name: e.userName } : { key: e.clientId, name: e.clientName };
+  if (dimension === "employee") return { key: e.userId, name: e.userName };
+  if (dimension === "category") return { key: e.categoryId, name: e.categoryName };
+  return { key: e.clientId, name: e.clientName };
 }
 
 /// UTC-calendar weekday of a `YYYY-MM-DD` key is timezone-free once you
@@ -136,12 +145,16 @@ export interface TrendWindow {
 export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; weekWindows: TrendWindow[] } {
   const todayKey = localDateKey(now);
 
-  // --- Day windows: last 7 calendar days, including today-so-far. ---
-  const dayKeys = Array.from({ length: 7 }, (_, i) => addDaysToDateKey(todayKey, i - 6));
+  // --- Day windows: last 14 calendar days, including today-so-far. ---
+  // App redesign (handoff README, screen 1): "גרף מגמה 14 ימים" - widened
+  // from the direction-A follow-up's original 7 days. Week windows below
+  // are unrelated to this spec (not mentioned there) and are left as-is.
+  const DAY_WINDOW_LENGTH = 14;
+  const dayKeys = Array.from({ length: DAY_WINDOW_LENGTH }, (_, i) => addDaysToDateKey(todayKey, i - (DAY_WINDOW_LENGTH - 1)));
   const dayWindows = dayKeys.map((dateKey, i) => ({
     from: localDateTimeToUtc(dateKey, "00:00", TIMEZONE),
     to: localDateTimeToUtc(addDaysToDateKey(dateKey, 1), "00:00", TIMEZONE),
-    label: i === 6 ? `${WEEKDAY_LABELS[weekdayOf(dateKey)]} (היום)` : WEEKDAY_LABELS[weekdayOf(dateKey)],
+    label: i === DAY_WINDOW_LENGTH - 1 ? `${WEEKDAY_LABELS[weekdayOf(dateKey)]} (היום)` : WEEKDAY_LABELS[weekdayOf(dateKey)],
   }));
 
   // --- Week windows: last 7 COMPLETE Sun-Sat weeks, ending last week -
@@ -168,15 +181,17 @@ export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; wee
 export async function getHoursTrend(): Promise<HoursTrendData> {
   const { dayWindows, weekWindows } = computeTrendWindows(new Date());
   const overallFrom = weekWindows[0].from;
-  const overallTo = dayWindows[6].to;
+  const overallTo = dayWindows[dayWindows.length - 1].to;
 
   type RawRow = {
     startAt: Date;
     actualSeconds: number | null;
     userId: string;
     clientId: string;
+    categoryId: string;
     user: { name: string };
     client: { name: string };
+    category: { name: string };
   };
 
   const rawEntries: RawRow[] = await prisma.timeEntry.findMany({
@@ -186,8 +201,10 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
       actualSeconds: true,
       userId: true,
       clientId: true,
+      categoryId: true,
       user: { select: { name: true } },
       client: { select: { name: true } },
+      category: { select: { name: true } },
     },
   });
   const entries: EntryRow[] = rawEntries.map((e: RawRow) => ({
@@ -195,8 +212,10 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
     actualSeconds: e.actualSeconds,
     userId: e.userId,
     clientId: e.clientId,
+    categoryId: e.categoryId,
     userName: e.user.name,
     clientName: e.client.name,
+    categoryName: e.category.name,
   }));
 
   // Legend/ranking uses the full fetched window (superset of both unit
@@ -204,15 +223,18 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
   // just whichever toggle happens to be selected.
   const employeeLegend = topLegend(entries, "employee");
   const clientLegend = topLegend(entries, "client");
+  const categoryLegend = topLegend(entries, "category");
 
   return {
     day: {
       employee: buildSeries(entries, "employee", dayWindows, employeeLegend),
       client: buildSeries(entries, "client", dayWindows, clientLegend),
+      category: buildSeries(entries, "category", dayWindows, categoryLegend),
     },
     week: {
       employee: buildSeries(entries, "employee", weekWindows, employeeLegend),
       client: buildSeries(entries, "client", weekWindows, clientLegend),
+      category: buildSeries(entries, "category", weekWindows, categoryLegend),
     },
   };
 }
