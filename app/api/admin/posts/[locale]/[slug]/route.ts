@@ -9,8 +9,42 @@ function parseLocale(v: string): Locale {
   return v === "en" ? "en" : "he";
 }
 
+// Security review (OWASP A01:2021 - Broken Access Control; CWE-22, "Path
+// Traversal").
+//
+// `params.slug` arrives straight from the URL and was passed unvalidated
+// into postFilePath(), which builds `content/blog/{locale}/{slug}.mdx`.
+// A slug of "../../../../README" therefore resolved to a path outside the
+// blog directory entirely - and the DELETE handler below, unlike PUT,
+// never called getPostBySlug() first, so nothing confirmed the target was
+// actually a blog post before handing the path to GitHub's Contents API.
+// An authenticated admin session (or anyone who got one - see the missing
+// brute-force protection fixed in app/api/admin/login/route.ts) could
+// delete arbitrary .mdx files anywhere in the repository, and GET could
+// read them.
+//
+// Real slugs are produced by slugify() in lib/blog-shared.ts, which only
+// ever emits lowercase ASCII letters, digits and hyphens. Enforcing that
+// same shape here closes the traversal at the boundary rather than trying
+// to sanitize a path after the fact - no "." can appear at all, so
+// neither "../" nor an encoded variant survives.
+const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+function isSafeSlug(slug: string): boolean {
+  return slug.length > 0 && slug.length <= 120 && SAFE_SLUG.test(slug);
+}
+
+// 404 rather than 400: a malformed slug and a slug that simply doesn't
+// exist are the same thing from a caller's point of view, and saying
+// "invalid slug" would confirm to a prober that the format check is what
+// stopped them.
+function rejectUnsafeSlug() {
+  return NextResponse.json({ error: "Not found" }, { status: 404 });
+}
+
 export async function GET(request: Request, { params }: { params: { locale: string; slug: string } }) {
   if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isSafeSlug(params.slug)) return rejectUnsafeSlug();
   const post = getPostBySlug(parseLocale(params.locale), params.slug);
   if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ post });
@@ -24,6 +58,8 @@ export async function PUT(request: Request, { params }: { params: { locale: stri
       { status: 503 }
     );
   }
+
+  if (!isSafeSlug(params.slug)) return rejectUnsafeSlug();
 
   const locale = parseLocale(params.locale);
   const existing = getPostBySlug(locale, params.slug);
@@ -76,7 +112,18 @@ export async function DELETE(request: Request, { params }: { params: { locale: s
     );
   }
 
+  if (!isSafeSlug(params.slug)) return rejectUnsafeSlug();
+
   const locale = parseLocale(params.locale);
+
+  // Unlike PUT above, this handler used to call deleteFile() without ever
+  // confirming the target existed as a blog post. Checking first means a
+  // path that somehow gets past isSafeSlug still cannot reach anything
+  // that is not a real post in this locale's blog directory.
+  if (!getPostBySlug(locale, params.slug)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
   try {
     await deleteFile(postFilePath(locale, params.slug), `blog: delete "${params.slug}" (${locale})`);
   } catch (err: any) {

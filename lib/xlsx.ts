@@ -1,5 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
+import { neutralizeFormula } from "@/lib/csv";
 
 // Spec 14.4: "XLSX מומלץ" (recommended). Added in the Phase 9 gap-fix pass
 // (docs/adr/0001 section 17) alongside PDF - CSV (lib/csv.ts) already
@@ -35,7 +36,13 @@ export async function toXlsxWorkbook(sheets: XlsxSheet[]): Promise<Buffer> {
 
     sheet.addRow(headers);
     sheet.getRow(1).font = { bold: true };
-    for (const row of rows) sheet.addRow(row);
+    // Security review (OWASP A03:2021 - Injection; CWE-1236): XLSX cells
+    // are evaluated as formulas by Excel exactly like CSV cells are, and
+    // these rows carry the same user-typed free text (client names, task
+    // titles, entry notes). Reuses lib/csv.ts's neutralizeFormula so the
+    // two export formats cannot drift apart - see that function's comment
+    // for the full reasoning and the DDE/HYPERLINK payloads it blocks.
+    for (const row of rows) sheet.addRow(row.map(neutralizeFormula));
 
     sheet.columns.forEach((col) => {
       let max = 10;
