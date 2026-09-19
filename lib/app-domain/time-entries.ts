@@ -323,6 +323,68 @@ export async function stopTimer(
   return prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
 }
 
+/// App redesign (handoff README, "Interactions & Behavior" rule 2): "לכל
+/// פעולה הרסנית... יש ביטול: עצירת טיימר... הביטול מבצע פעולה אמיתית".
+/// Stopping a timer is listed alongside delete/archive/etc as needing a
+/// *real* undo, not just a client-side state rewind - this re-opens the
+/// just-closed entry (clears endAt/actualSeconds/billableSeconds) so it
+/// resumes counting from its original startAt, exactly as if it had never
+/// been stopped. Guarded the same way startTimer's own "one active timer"
+/// rule is, since undoing a stop while a *different* timer was started in
+/// the meantime would otherwise violate that invariant.
+export async function reopenTimer(actor: User, timeEntryId: string) {
+  const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
+  const isSelf = entry.userId === actor.id;
+  assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  if (!entry.endAt) return entry; // already running - nothing to undo
+
+  const existingActive = await getActiveTimer(entry.userId);
+  if (existingActive) throw new ActiveTimerExistsError();
+
+  const updated = await prisma.timeEntry.update({
+    where: { id: timeEntryId },
+    data: { endAt: null, actualSeconds: null, billableSeconds: null },
+  });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "time_entry.update",
+    entityType: "TimeEntry",
+    entityId: entry.id,
+    clientId: entry.clientId,
+    before: entry,
+    after: updated,
+  });
+
+  // Reopening reduces this cycle's consumed minutes back down - same
+  // best-effort re-evaluation trigger as every other mutation here.
+  await evaluateAlertsForClient(updated.clientId).catch((err) =>
+    console.error("evaluateAlertsForClient failed (non-fatal)", err)
+  );
+
+  return updated;
+}
+
+/// App redesign (handoff README, screen 2 "טיימר"): "שדה הערה שנשמר תוך
+/// כדי ריצה" - the note field on a *running* timer autosaves (debounced,
+/// client-side) so it survives a closed tab/crash instead of only being
+/// captured at Stop. Deliberately NOT routed through updateTimeEntry:
+/// that function is spec 5.1's audited-edit path (creates a
+/// TimeEntryRevision + isEdited flag per call), meant for revising an
+/// already-meaningful stored value - it would turn every debounced
+/// keystroke into a permanent revision-history row for an entry that
+/// isn't even finished yet. This is scoped to the entry's *owner* only
+/// (no edit_others escape hatch) since it's their own in-progress
+/// scratchpad, not a completed record someone else is correcting.
+export async function updateActiveTimerNote(actor: User, timeEntryId: string, note: string): Promise<void> {
+  const { count } = await prisma.timeEntry.updateMany({
+    where: { id: timeEntryId, userId: actor.id, endAt: null, deletedAt: null },
+    data: { note: note.trim() || null },
+  });
+  if (count === 0) throw new Error("Active timer not found.");
+}
+
 // ---------------------------------------------------------------------
 // Manual entry (spec 6.3)
 // ---------------------------------------------------------------------

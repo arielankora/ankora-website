@@ -1,23 +1,36 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { listTasks, TASK_STATUS_LABELS } from "@/lib/app-domain/tasks";
+import { listTasks } from "@/lib/app-domain/tasks";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
-import { StatusBadge } from "@/components/app/StatusBadge";
+import { EmptyState } from "@/components/app/states/EmptyState";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateTaskForm } from "./CreateTaskForm";
-import { TaskStatusSelect } from "./TaskStatusSelect";
+import { TaskRow } from "./TaskRow";
+import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-const STATUS_TONE: Record<TaskStatus, "green" | "amber" | "gray" | "red"> = {
-  OPEN: "amber",
-  IN_PROGRESS: "green",
-  DONE: "gray",
-  ARCHIVED: "gray",
-};
+// App redesign (handoff README, screen 4 "משימות"): "מתג סטטוס בגלולה
+// (הכל / פתוחות / בטיפול / הושלמו)". ARCHIVED deliberately has no pill
+// here (matching the reference screenshot) - it stays reachable only
+// through each row's own status control, same as before this redesign.
+const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
+  { value: "ALL", label: "הכל" },
+  { value: "OPEN", label: "פתוחות" },
+  { value: "IN_PROGRESS", label: "בטיפול" },
+  { value: "DONE", label: "הושלמו" },
+];
+
+// The pre-redesign client/category <select> filter bar is intentionally
+// dropped here - neither the handoff README's screen-4 bullet nor its
+// screenshot show one, only the status pills + "+ משימה". listTasks()
+// still accepts clientId/categoryId filters (searchParams still flow
+// through below), so a future request to bring a client filter back is a
+// UI-only change, not a domain one.
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec §11): the "Tasks"
 // screen never existed - open/recent tasks, filterable by client/category/
@@ -41,12 +54,10 @@ export default async function TasksPage({
   }
 
   const status =
-    searchParams.status === "OPEN" ||
-    searchParams.status === "IN_PROGRESS" ||
-    searchParams.status === "DONE" ||
-    searchParams.status === "ARCHIVED"
+    searchParams.status === "OPEN" || searchParams.status === "IN_PROGRESS" || searchParams.status === "DONE"
       ? (searchParams.status as TaskStatus)
       : undefined;
+  const activePill = status ?? "ALL";
 
   const [tasks, clients, allCategories] = await Promise.all([
     listTasks(user, { clientId: searchParams.clientId, categoryId: searchParams.categoryId, status }),
@@ -62,88 +73,54 @@ export default async function TasksPage({
   return (
     <>
       <div className="space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-xl font-medium text-navy">משימות</h1>
-            <p className="mt-1 text-sm text-navy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+        <div>
+          <h1 className="text-xl font-medium text-navy">משימות</h1>
+          <p className="mt-1 text-sm text-navy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+            {FILTER_PILLS.map((pill) => (
+              <Link
+                key={pill.value}
+                href={pill.value === "ALL" ? "/app/tasks" : `/app/tasks?status=${pill.value}`}
+                className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                  activePill === pill.value ? "bg-navy text-paper" : "text-navy/60 hover:text-navy"
+                }`}
+              >
+                {pill.label}
+              </Link>
+            ))}
           </div>
-          {/* Redesign direction A: was an inline card above the filter
-              bar + table - see docs/adr/0001 addendum. */}
-          <Drawer triggerLabel="הוספת משימה" title="משימה חדשה">
+          <span className="flex-1" />
+          <Drawer triggerLabel="+ משימה" title="משימה חדשה">
             <CreateTaskForm clients={clients} categories={categories} />
           </Drawer>
         </div>
 
-        <form className="flex flex-wrap items-end gap-4 rounded-2xl border border-lineDark bg-white p-4">
-          <div>
-            <label className="block text-xs font-medium text-navy/60">לקוח</label>
-            <select
-              name="clientId"
-              defaultValue={searchParams.clientId ?? ""}
-              className="mt-1.5 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
-            >
-              <option value="">כל הלקוחות</option>
-              {clients.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+        {tasks.length === 0 ? (
+          <EmptyState
+            icon={ListChecks}
+            title="אין עדיין משימות"
+            description="הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם."
+          />
+        ) : (
+          <div className="divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
+            {tasks.map((task) => (
+              <TaskRow
+                key={task.id}
+                task={{
+                  id: task.id,
+                  title: task.title,
+                  clientName: task.client.name,
+                  categoryName: task.category?.name ?? null,
+                  dueDate: task.dueDate?.toISOString() ?? null,
+                  status: task.status,
+                }}
+              />
+            ))}
           </div>
-          <div>
-            <label className="block text-xs font-medium text-navy/60">סטטוס</label>
-            <select
-              name="status"
-              defaultValue={searchParams.status ?? ""}
-              className="mt-1.5 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
-            >
-              <option value="">כל הסטטוסים</option>
-              {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-navy hover:border-gold">
-            סינון
-          </button>
-        </form>
-
-        <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
-          <table className="w-full min-w-[640px] text-start text-sm">
-            <thead>
-              <tr className="border-b border-lineDark text-xs text-navy/50">
-                <th className="px-5 py-3 font-medium">משימה</th>
-                <th className="px-5 py-3 font-medium">לקוח</th>
-                <th className="px-5 py-3 font-medium">קטגוריה</th>
-                <th className="px-5 py-3 font-medium">סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {tasks.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-navy/50">
-                    אין עדיין משימות. הוסיפו משימה ראשונה למעלה.
-                  </td>
-                </tr>
-              )}
-              {tasks.map((task) => (
-                <tr key={task.id} className="border-b border-lineDark last:border-0">
-                  <td className="px-5 py-3 font-medium text-navy">{task.title}</td>
-                  <td className="px-5 py-3 text-navy/70">{task.client.name}</td>
-                  <td className="px-5 py-3 text-navy/70">{task.category?.name ?? "-"}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <StatusBadge label={TASK_STATUS_LABELS[task.status]} tone={STATUS_TONE[task.status]} />
-                      <TaskStatusSelect taskId={task.id} status={task.status} />
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        )}
       </div>
     </>
   );
