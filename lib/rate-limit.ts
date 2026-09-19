@@ -1,4 +1,5 @@
 import "server-only";
+import { redisRateLimit } from "@/lib/rate-limit-redis";
 
 // Security review (OWASP A07:2021 - Identification and Authentication
 // Failures; OWASP API4:2023 - Unrestricted Resource Consumption).
@@ -23,19 +24,23 @@ import "server-only";
 // each against a thousand accounts never trips any single account's
 // 5-failure counter.
 //
-// HONEST LIMITATION - read before relying on this. The counters live in
-// this Node process's memory. Vercel runs each route in serverless
-// instances that scale out and are recycled, so a determined attacker
-// distributing requests across instances gets more attempts than the
-// numbers below suggest, and a cold start resets the window. This is a
-// real, meaningful speed bump (it collapses the trivial "10k guesses/min
-// from one script" case), not a hard guarantee.
+// TWO TIERS. The counters in THIS module live in one Node process's
+// memory. Vercel scales serverless instances out and recycles them, so on
+// their own these let a distributed attacker get more attempts than the
+// configured numbers suggest, and a cold start resets the window. That was
+// the documented limitation of the first security pass.
 //
-// The durable fix is edge-level rate limiting - Vercel's WAF rate-limit
-// rules, or Upstash/Redis-backed counters shared across instances. Both
-// need a plan/account decision that belongs to Ariel, so this ships as
-// the zero-dependency, zero-cost layer that works today. See the security
-// review PR description for the recommendation.
+// It is now closed by lib/rate-limit-redis.ts, which keeps the same
+// counters in Upstash Redis where every instance shares them.
+// checkRateLimit() below prefers Redis and falls back to the in-memory
+// counters here when Redis is unconfigured, slow or erroring - so this
+// module is no longer the whole story, but it is still the floor, and it
+// is what keeps the app protected (per-instance) during an Upstash outage
+// or before the credentials are set.
+//
+// Enabling the shared tier needs UPSTASH_REDIS_REST_URL and
+// UPSTASH_REDIS_REST_TOKEN in the environment. Without them everything
+// still behaves exactly as it did before, at the in-memory level.
 
 type Bucket = { count: number; resetAt: number };
 
@@ -114,15 +119,33 @@ export function clientIpFrom(headers: Headers): string {
   return "unknown";
 }
 
+/// The limiter every caller should use. Prefers the shared, cross-instance
+/// Redis counters (lib/rate-limit-redis.ts) and falls back to the
+/// in-memory counter above when Redis is not configured, times out, or
+/// errors - see that module for why the fallback goes in that direction.
+///
+/// Callers await this instead of calling rateLimit() directly. The
+/// in-memory function stays exported and synchronous because it is both
+/// the fallback and what the unit tests exercise directly.
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  const shared = await redisRateLimit(key, limit, windowMs);
+  if (shared) return shared;
+  return rateLimit(key, limit, windowMs);
+}
+
 /// Convenience wrapper for Route Handlers: returns a ready 429 Response
 /// when the caller is over budget, or null when the request may proceed.
-export function rateLimitResponse(
+export async function rateLimitResponse(
   headers: Headers,
   namespace: string,
   limit: number,
   windowMs: number
-): Response | null {
-  const result = rateLimit(`${namespace}:${clientIpFrom(headers)}`, limit, windowMs);
+): Promise<Response | null> {
+  const result = await checkRateLimit(`${namespace}:${clientIpFrom(headers)}`, limit, windowMs);
   if (result.allowed) return null;
 
   return Response.json(

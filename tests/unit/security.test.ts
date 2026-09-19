@@ -91,3 +91,129 @@ describe("rate limiting (OWASP A07 / API4)", () => {
     expect(clientIpFrom(new Headers())).toBe("unknown");
   });
 });
+
+describe("shared Redis rate limiting (lib/rate-limit-redis.ts)", () => {
+  const ORIGINAL_FETCH = globalThis.fetch;
+
+  afterEach(() => {
+    globalThis.fetch = ORIGINAL_FETCH;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    __resetRateLimitsForTests();
+  });
+
+  async function loadRedis() {
+    return import("@/lib/rate-limit-redis");
+  }
+
+  it("reports itself unconfigured when the env vars are absent", async () => {
+    const { isRedisRateLimitConfigured } = await loadRedis();
+    expect(isRedisRateLimitConfigured()).toBe(false);
+  });
+
+  it("returns null (no answer) when unconfigured, so callers fall back", async () => {
+    const { redisRateLimit } = await loadRedis();
+    expect(await redisRateLimit("k", 5, 60_000)).toBeNull();
+  });
+
+  it("never throws when Redis errors - it returns null so logins keep working", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    globalThis.fetch = (async () => {
+      throw new Error("connection reset");
+    }) as any;
+    const { redisRateLimit } = await loadRedis();
+    // The assertion that matters: this resolves rather than rejecting.
+    await expect(redisRateLimit("k", 5, 60_000)).resolves.toBeNull();
+  });
+
+  it("returns null on a non-2xx response rather than treating it as a verdict", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    globalThis.fetch = (async () => new Response("nope", { status: 500 })) as any;
+    const { redisRateLimit } = await loadRedis();
+    expect(await redisRateLimit("k", 5, 60_000)).toBeNull();
+  });
+
+  it("sends INCR plus EXPIRE..NX in one pipelined request", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    let seenUrl = "";
+    let seenBody: any = null;
+    let seenAuth = "";
+    globalThis.fetch = (async (url: any, init: any) => {
+      seenUrl = String(url);
+      seenAuth = init.headers.Authorization;
+      seenBody = JSON.parse(init.body);
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as any;
+
+    const { redisRateLimit } = await loadRedis();
+    const r = await redisRateLimit("admin-login:1.2.3.4", 10, 60_000);
+
+    expect(seenUrl).toBe("https://example.upstash.io/pipeline");
+    expect(seenAuth).toBe("Bearer t");
+    expect(seenBody[0][0]).toBe("INCR");
+    expect(seenBody[1][0]).toBe("EXPIRE");
+    // NX is what stops a sustained attack from pushing the expiry forward
+    // on every request and keeping the window alive forever.
+    expect(seenBody[1][3]).toBe("NX");
+    expect(r).toMatchObject({ allowed: true, remaining: 9 });
+  });
+
+  it("blocks once the shared counter passes the limit", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify([{ result: 11 }, { result: 0 }]), { status: 200 })) as any;
+    const { redisRateLimit } = await loadRedis();
+    const r = await redisRateLimit("k", 10, 60_000);
+    expect(r?.allowed).toBe(false);
+    expect(r?.remaining).toBe(0);
+    expect(r?.retryAfterSeconds).toBeGreaterThan(0);
+  });
+
+  it("buckets the key by window so counters roll over instead of accumulating", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    const keys: string[] = [];
+    globalThis.fetch = (async (_u: any, init: any) => {
+      keys.push(JSON.parse(init.body)[0][1]);
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as any;
+    const { redisRateLimit } = await loadRedis();
+    await redisRateLimit("k", 5, 50);
+    await new Promise((r) => setTimeout(r, 70));
+    await redisRateLimit("k", 5, 50);
+    expect(keys).toHaveLength(2);
+    expect(keys[0]).not.toBe(keys[1]);
+  });
+});
+
+describe("checkRateLimit tier selection", () => {
+  const ORIGINAL_FETCH = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = ORIGINAL_FETCH;
+    delete process.env.UPSTASH_REDIS_REST_URL;
+    delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    __resetRateLimitsForTests();
+  });
+
+  it("falls back to the in-memory counter when Redis gives no answer", async () => {
+    const { checkRateLimit } = await import("@/lib/rate-limit");
+    // No Redis env vars -> redisRateLimit returns null -> in-memory applies.
+    expect((await checkRateLimit("fallback", 2, 60_000)).allowed).toBe(true);
+    expect((await checkRateLimit("fallback", 2, 60_000)).allowed).toBe(true);
+    expect((await checkRateLimit("fallback", 2, 60_000)).allowed).toBe(false);
+  });
+
+  it("prefers the shared answer over the local one when Redis responds", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://example.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "t";
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify([{ result: 99 }, { result: 0 }]), { status: 200 })) as any;
+    const { checkRateLimit } = await import("@/lib/rate-limit");
+    // Local memory has seen nothing, but the shared counter says 99 > 3.
+    expect((await checkRateLimit("shared-wins", 3, 60_000)).allowed).toBe(false);
+  });
+});

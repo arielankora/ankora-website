@@ -18,7 +18,7 @@ const LOGIN_ATTEMPT_LIMIT = 10;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request.headers, "admin-login", LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
+  const limited = await rateLimitResponse(request.headers, "admin-login", LOGIN_ATTEMPT_LIMIT, LOGIN_WINDOW_MS);
   if (limited) return limited;
 
   if (!isAdminConfigured()) {

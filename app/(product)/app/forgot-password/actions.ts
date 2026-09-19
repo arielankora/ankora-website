@@ -1,7 +1,7 @@
 "use server";
 import { headers } from "next/headers";
 import { requestPasswordReset } from "@/lib/app-auth/password-reset";
-import { rateLimit, clientIpFrom } from "@/lib/rate-limit";
+import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 
 // Security review (OWASP API4:2023 - Unrestricted Resource Consumption).
 // Unauthenticated, and every call that matches a real account writes a
@@ -28,7 +28,7 @@ export async function forgotPasswordAction(
   formData: FormData
 ): Promise<ForgotPasswordState> {
   const ip = clientIpFrom(await headers());
-  if (!rateLimit(`forgot-password:${ip}`, RESET_REQUEST_LIMIT, RESET_REQUEST_WINDOW_MS).allowed) {
+  if (!(await checkRateLimit(`forgot-password:${ip}`, RESET_REQUEST_LIMIT, RESET_REQUEST_WINDOW_MS)).allowed) {
     // Returns the same "submitted" shape as the success path. Spec 20's
     // don't-reveal-anything rule applies to the rate limit too: a
     // distinct "you are being throttled" response would tell an attacker

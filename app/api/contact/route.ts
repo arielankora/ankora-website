@@ -26,7 +26,7 @@ const MAX_MESSAGE = 5000;
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 
 export async function POST(request: Request) {
-  const limited = rateLimitResponse(request.headers, "contact", CONTACT_LIMIT, CONTACT_WINDOW_MS);
+  const limited = await rateLimitResponse(request.headers, "contact", CONTACT_LIMIT, CONTACT_WINDOW_MS);
   if (limited) return limited;
 
   try {

@@ -2,7 +2,7 @@
 import { headers } from "next/headers";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
-import { rateLimit, clientIpFrom } from "@/lib/rate-limit";
+import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 
 // Security review (OWASP A07:2021 - Identification and Authentication
 // Failures). lib/app-auth/login-attempts.ts's graduated lockout is
@@ -32,7 +32,7 @@ const GENERIC_ERROR = "פרטי ההתחברות שגויים, או שהחשבו
 
 export async function loginAction(_prevState: { error?: string } | undefined, formData: FormData) {
   const ip = clientIpFrom(await headers());
-  if (!rateLimit(`app-login:${ip}`, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW_MS).allowed) {
+  if (!(await checkRateLimit(`app-login:${ip}`, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW_MS)).allowed) {
     return { error: GENERIC_ERROR };
   }
 
