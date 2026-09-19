@@ -8,9 +8,9 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-6 py-3 text-sm font-medium text-ink disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-ink disabled:opacity-50"
     >
-      {pending ? "שולח..." : "שליחת קישור לאיפוס"}
+      {pending ? "שולח…" : "שליחת קישור"}
     </button>
   );
 }
@@ -20,32 +20,46 @@ export function ForgotPasswordForm() {
 
   if (state?.submitted) {
     return (
-      <div className="mt-8 space-y-3 text-sm text-navy/70">
-        <p>אם קיים חשבון פעיל עם הפרטים שהזנת, נשלח אליו קישור לאיפוס סיסמה בתוקף לשעה.</p>
+      <div className="space-y-3">
+        <p className="text-[13px] text-navy/70">
+          אם קיים חשבון פעיל עם הפרטים שהזנת, נשלח אליו קישור לאיפוס סיסמה בתוקף לשעה.
+        </p>
         {state.devLink && (
-          <p className="rounded-lg border border-lineDark bg-paperDim p-3 text-xs">
+          <p className="rounded-[10px] border border-lineDark bg-paperDim p-3 text-xs">
             אין עדיין ספק אימייל מחובר (Phase 4) - קישור לבדיקה:{" "}
             <a href={state.devLink} className="text-gold-dim underline">
               {state.devLink}
             </a>
           </p>
         )}
+        <a href="/app/login" className="mt-1 block text-xs text-gold-dim">
+          חזרה לכניסה
+        </a>
       </div>
     );
   }
 
   return (
-    <form action={formAction} className="mt-8 space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-navy/70">אימייל או שם משתמש</label>
+    <form action={formAction}>
+      <label className="block">
+        <span className="mb-1.5 block text-xs text-navy/60">אימייל</span>
         <input
           name="identifier"
           type="text"
+          dir="ltr"
           required
-          className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-navy outline-none focus:border-gold"
+          placeholder="name@ankora.co.il"
+          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-navy outline-none focus:border-gold"
         />
-      </div>
+      </label>
+
       <SubmitButton />
+
+      <p className="mt-4 text-xs text-navy/55">אם הכתובת קיימת במערכת יישלח מייל. מטעמי אבטחה לא נציין אם היא קיימת.</p>
+
+      <a href="/app/login" className="mt-4 block text-xs text-gold-dim">
+        חזרה לכניסה
+      </a>
     </form>
   );
 }
