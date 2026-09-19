@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/app-auth/session";
 import {
   startTimer,
   stopTimer,
+  reopenTimer,
+  updateActiveTimerNote,
+  deleteTimeEntry,
   ActiveTimerExistsError,
   EditWindowExpiredError,
 } from "@/lib/app-domain/time-entries";
@@ -40,6 +43,52 @@ export async function stopTimerAction(input: { timeEntryId: string; note?: strin
     revalidatePath("/app/timer");
     revalidatePath("/app/my-time");
     return { ok: true as const, entry };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+// App redesign (handoff README, Interactions & Behavior rule 2): real
+// undo for "עצירת טיימר" - re-opens the just-stopped entry so it resumes
+// counting from its original start time.
+export async function reopenTimerAction(input: { timeEntryId: string }) {
+  const user = await requireUser();
+  try {
+    const entry = await reopenTimer(user, input.timeEntryId);
+    revalidatePath("/app/timer");
+    revalidatePath("/app/my-time");
+    return { ok: true as const, entry };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+// App redesign (handoff README, screen 2): "מחיקה ללא שמירה" - discards
+// the running timer entirely. Routed through the same soft-delete +
+// audit path every other time-entry delete uses (spec 5.1: no hard
+// DELETE via the UI).
+export async function discardActiveTimerAction(input: { timeEntryId: string }) {
+  const user = await requireUser();
+  try {
+    await deleteTimeEntry(user, input.timeEntryId);
+    revalidatePath("/app/timer");
+    revalidatePath("/app/my-time");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+// App redesign (handoff README, screen 2): "שדה הערה שנשמר תוך כדי
+// ריצה" - debounced client-side autosave of the running timer's note.
+// No revalidatePath: this is a background scratchpad save, not a
+// user-visible navigation moment, and the eventual Stop already carries
+// the final note through revalidation.
+export async function updateActiveTimerNoteAction(input: { timeEntryId: string; note: string }) {
+  const user = await requireUser();
+  try {
+    await updateActiveTimerNote(user, input.timeEntryId, input.note);
+    return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

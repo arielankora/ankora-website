@@ -144,26 +144,34 @@ export function EntryRow({ entry }: { entry: Entry }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-navy">
-          {timeKey(entry.startAt)}
-          {entry.endAt ? ` – ${timeKey(entry.endAt)}` : ""} · {formatDuration(entry.actualSeconds)}
+    // App redesign (handoff README, screen 3): "פס זהב אנכי 3px לכל שורה
+    // וכפתור עריכה" - the vertical bar plus a bordered pill edit button,
+    // replacing the plain text link.
+    <div className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
+      <span className="h-[34px] w-[3px] shrink-0 rounded-full bg-gold/60" aria-hidden="true" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[13.5px] text-navy">
+          {entry.note || `${entry.clientName} · ${entry.categoryName}`}
         </p>
-        <p className="mt-0.5 text-xs text-navy/60">
-          {entry.clientName} · {entry.categoryName}
-          {entry.note ? ` · ${entry.note}` : ""}
+        <p className="mt-0.5 truncate text-[11.5px] text-navy/50">
+          {entry.clientName} · {entry.categoryName} · {timeKey(entry.startAt)}
+          {entry.endAt ? `–${timeKey(entry.endAt)}` : ""}
         </p>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-2.5">
         {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
         {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
-        <button type="button" onClick={() => setEditing(true)} className="text-xs text-navy/60 hover:text-navy">
+        <span className="font-jbmono text-[13.5px] text-navy">{formatDuration(entry.actualSeconds)}</span>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="rounded-lg border border-lineDark px-3 py-1.5 text-xs text-navy/70 hover:border-gold hover:text-navy"
+        >
           עריכה
         </button>
         <form action={deleteMyEntryAction}>
           <input type="hidden" name="timeEntryId" value={entry.id} />
-          <button type="submit" className="text-xs text-navy/50 hover:text-red-600">
+          <button type="submit" className="text-xs text-navy/50 hover:text-error">
             מחיקה
           </button>
         </form>
