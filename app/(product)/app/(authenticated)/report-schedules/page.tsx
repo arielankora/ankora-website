@@ -36,7 +36,8 @@ function formatDateTime(date: Date | null) {
 // report.internal.view, same as /app/reports - see permissions.ts's Phase
 // 5/6 comments for why scheduling stays bundled with that permission
 // rather than a separate one the spec never names.
-export default async function ReportSchedulesPage({ searchParams }: { searchParams: { clientId?: string } }) {
+export default async function ReportSchedulesPage(props: { searchParams: Promise<{ clientId?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "report.internal.view")) {

@@ -21,11 +21,12 @@ export async function generateStaticParams({ params }: { params: { locale: strin
   return getAllPostSlugs(locale).map((slug) => ({ slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string; slug: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string; slug: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const post = getPostBySlug(locale as Locale, params.slug);
   if (!post) return {};
@@ -68,11 +69,12 @@ function formatDate(dateStr: string, locale: Locale) {
 // would render dark-on-dark. Everything else follows the same PageHero/WideContainer/
 // Eyebrow/hairline conventions as every other /he page; the "related posts" grid reuses
 // the existing HeBlogCard (already correct, already h-full) unchanged.
-export default function BlogPostPage({
-  params,
-}: {
-  params: { locale: string; slug: string };
-}) {
+export default async function BlogPostPage(
+  props: {
+    params: Promise<{ locale: string; slug: string }>;
+  }
+) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const post = getPostBySlug(locale, params.slug);

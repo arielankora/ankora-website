@@ -42,16 +42,24 @@ function rejectUnsafeSlug() {
   return NextResponse.json({ error: "Not found" }, { status: 404 });
 }
 
-export async function GET(request: Request, { params }: { params: { locale: string; slug: string } }) {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(
+  request: Request,
+  props: { params: Promise<{ locale: string; slug: string }> }
+) {
+  const params = await props.params;
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isSafeSlug(params.slug)) return rejectUnsafeSlug();
   const post = getPostBySlug(parseLocale(params.locale), params.slug);
   if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ post });
 }
 
-export async function PUT(request: Request, { params }: { params: { locale: string; slug: string } }) {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function PUT(
+  request: Request,
+  props: { params: Promise<{ locale: string; slug: string }> }
+) {
+  const params = await props.params;
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },
@@ -103,8 +111,12 @@ export async function PUT(request: Request, { params }: { params: { locale: stri
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(request: Request, { params }: { params: { locale: string; slug: string } }) {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(
+  request: Request,
+  props: { params: Promise<{ locale: string; slug: string }> }
+) {
+  const params = await props.params;
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },

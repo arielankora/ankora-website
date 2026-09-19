@@ -30,11 +30,12 @@ function parseDateEndOfDay(value?: string): Date | undefined {
 
 // Spec 12 Admin screens table: "Time Entries - cross-client table +
 // filters + edits + revisions."
-export default async function AdminTimeEntriesPage({
-  searchParams,
-}: {
-  searchParams: { clientId?: string; userId?: string; from?: string; to?: string };
-}) {
+export default async function AdminTimeEntriesPage(
+  props: {
+    searchParams: Promise<{ clientId?: string; userId?: string; from?: string; to?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.edit_others")) {

@@ -13,11 +13,12 @@ import { FAQ } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { JsonLd } from "@/components/seo/JsonLd";
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const dict = getDictionary(params.locale);
   return {
@@ -35,7 +36,8 @@ export async function generateMetadata({
   };
 }
 
-export default function Home({ params }: { params: { locale: string } }) {
+export default async function Home(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const base = SITE_URL;

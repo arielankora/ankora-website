@@ -6,7 +6,7 @@ import { putFile, isGithubConfigured } from "@/lib/github";
 import type { Locale } from "@/content";
 
 export async function GET() {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const posts = [
     ...getAllPosts("he", { includeDrafts: true }),
@@ -17,7 +17,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },

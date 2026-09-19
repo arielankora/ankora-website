@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { toPdfTable } from "@/lib/pdf";
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.js";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec 14.4). Like
 // lib/xlsx.ts, lib/pdf.ts imports neither Prisma nor anything that does

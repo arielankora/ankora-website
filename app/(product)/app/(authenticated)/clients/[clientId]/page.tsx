@@ -26,7 +26,8 @@ const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red
 
 export const metadata = { robots: { index: false, follow: false } };
 
-export default async function ClientDetailPage({ params }: { params: { clientId: string } }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }> }) {
+  const params = await props.params;
   const user = await requireUser();
 
   if (!can(user.role, "client.manage")) {

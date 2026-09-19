@@ -91,11 +91,12 @@ function classifyAction(action: string): { label: string; tone: "green" | "amber
   return { label: "עריכה", tone: "amber" };
 }
 
-export default async function AuditLogPage({
-  searchParams,
-}: {
-  searchParams: { entityType?: string; q?: string; page?: string };
-}) {
+export default async function AuditLogPage(
+  props: {
+    searchParams: Promise<{ entityType?: string; q?: string; page?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "audit.view")) {

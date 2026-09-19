@@ -33,7 +33,8 @@ function formatMinutes(minutes: number) {
 // Spec 12 admin screens table: "Hour Banks - current/historical cycles,
 // adjustments, utilization." Super-Admin only (hour_bank.manage) - spec
 // 4's role table lists banks under Super Admin's row alone.
-export default async function HourBanksPage({ searchParams }: { searchParams: { clientId?: string } }) {
+export default async function HourBanksPage(props: { searchParams: Promise<{ clientId?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "hour_bank.manage")) {

@@ -10,7 +10,7 @@ const ALLOWED_EXT: Record<string, string> = {
 };
 
 export async function POST(request: Request) {
-  if (!isRequestAuthorized()) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },

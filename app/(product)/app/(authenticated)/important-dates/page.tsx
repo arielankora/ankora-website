@@ -61,7 +61,8 @@ function formatReminders(rules: { daysBefore: number }[]): string {
 // replaced is straightforward to bring back from history if ever
 // requested - this pass follows the design spec's exact, deliberately
 // simpler surface rather than preserving every prior filter control.
-export default async function ImportantDatesPage({ searchParams }: { searchParams: { tab?: string } }) {
+export default async function ImportantDatesPage(props: { searchParams: Promise<{ tab?: string }> }) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {

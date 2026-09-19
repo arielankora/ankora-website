@@ -9,15 +9,16 @@ import type { Locale } from "@/content";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
-export default function EditPostPage({
-  params,
-  searchParams,
-}: {
-  params: { locale: string };
-  searchParams: { locale?: string; slug?: string };
-}) {
+export default async function EditPostPage(
+  props: {
+    params: Promise<{ locale: string }>;
+    searchParams: Promise<{ locale?: string; slug?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const token = cookies().get(ADMIN_COOKIE)?.value;
+  const token = (await cookies()).get(ADMIN_COOKIE)?.value;
   if (!isValidSessionToken(token)) redirect(`/${locale}/admin/login`);
 
   const postLocale: Locale = searchParams.locale === "en" ? "en" : "he";

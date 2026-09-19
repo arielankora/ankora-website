@@ -10,11 +10,12 @@ const heMeta = {
     "מחשבון אינטראקטיבי: הזינו את שעות התפעול השבועיות שלכם וקבלו הערכה מיידית של שעות וכסף שאנקורה יכולה לחסוך לכם בחודש.",
 };
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { locale: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ locale: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
   const meta =
     locale === "he"
@@ -29,6 +30,7 @@ export async function generateMetadata({
   };
 }
 
-export default function Page({ params }: { params: { locale: string } }) {
+export default async function Page(props: { params: Promise<{ locale: string }> }) {
+  const params = await props.params;
   return <RoiClient params={params} />;
 }

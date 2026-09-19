@@ -65,22 +65,23 @@ function sanitizeFilename(name: string): string {
 // unlike the numeric/tabular reports below, this compiles every raw time
 // entry (incl. notes) for one client/period into a single AI-ready text
 // block Ariel copies into ChatGPT/Claude to draft a client-facing update.
-export default async function AdminReportsPage({
-  searchParams,
-}: {
-  searchParams: {
-    tab?: string;
-    type?: string;
-    clientId?: string;
-    userId?: string;
-    categoryId?: string;
-    source?: string;
-    editedOnly?: string;
-    manualOnly?: string;
-    from?: string;
-    to?: string;
-  };
-}) {
+export default async function AdminReportsPage(
+  props: {
+    searchParams: Promise<{
+      tab?: string;
+      type?: string;
+      clientId?: string;
+      userId?: string;
+      categoryId?: string;
+      source?: string;
+      editedOnly?: string;
+      manualOnly?: string;
+      from?: string;
+      to?: string;
+    }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const user = await requireUser();
 
   if (!can(user.role, "report.internal.view")) {
