@@ -43,11 +43,17 @@ const nextConfig = {
   // resolved through require.resolve(), so this explicitly guarantees
   // the files are copied into both routes' deployed serverless bundles
   // regardless of how reliably the tracer's heuristics detect the call.
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/reports/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
-      '/api/portal/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
-    },
+  //
+  // Next 15 graduated this out of `experimental` to a top-level option.
+  // Leaving it nested did not fail the build - it only printed
+  // "Unrecognized key(s) in object: 'outputFileTracingIncludes' at
+  // 'experimental'" among the warnings - which is the dangerous kind of
+  // breakage: the deploy succeeds, and the first sign of trouble is a
+  // Hebrew PDF export throwing at runtime in production because the font
+  // files were never traced into the bundle. Moved to the top level.
+  outputFileTracingIncludes: {
+    '/api/reports/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
+    '/api/portal/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
   },
   // Phase 7 security hardening (spec 16.2, ADR addendum section 14.3).
   // Applied to every response. A Content-Security-Policy is deliberately

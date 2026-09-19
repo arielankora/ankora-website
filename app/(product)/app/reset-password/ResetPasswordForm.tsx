@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { resetPasswordAction } from "./actions";
@@ -48,9 +49,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
     return (
       <div className="space-y-4">
         <p className="text-[13px] text-navy/70">הסיסמה נקבעה בהצלחה.</p>
-        <a href="/app/login" className="block text-center text-sm text-gold-dim underline">
+        <Link href="/app/login" className="block text-center text-sm text-gold-dim underline">
           מעבר להתחברות
-        </a>
+        </Link>
       </div>
     );
   }
