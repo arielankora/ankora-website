@@ -1,13 +1,14 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
-import { listAlertRulesForClient } from "@/lib/app-domain/alerts";
+import { listAlertRulesForClient, listOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { AlertsClientPicker } from "./AlertsClientPicker";
 import { AlertRuleForm } from "./AlertRuleForm";
 import { RuleActions } from "./RuleActions";
 import { RetryDeliveryButton } from "./RetryDeliveryButton";
+import { OpenAlertsPanel, type OpenAlertRow } from "./OpenAlertsPanel";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -39,6 +40,21 @@ function formatDateTime(date: Date) {
   );
 }
 
+// App redesign (handoff README, screen 13): the prototype's open-alert
+// cards show a relative "לפני 12 דקות" timestamp rather than an absolute
+// one - this is the one screen where that reads more like an operational
+// feed than a record, so it gets its own formatter instead of
+// formatDateTime above.
+function formatAgo(date: Date): string {
+  const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+  if (minutes < 1) return "הרגע";
+  if (minutes < 60) return `לפני ${minutes} דקות`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  const days = Math.round(hours / 24);
+  return `לפני ${days} ימים`;
+}
+
 // Spec 9/9.1/9.2, 12's admin screens table: "Alerts - rule setup, event
 // history, delivery status." Super-Admin only (alert.manage - ADR 11.2).
 export default async function AlertsPage({ searchParams }: { searchParams: { clientId?: string } }) {
@@ -57,7 +73,18 @@ export default async function AlertsPage({ searchParams }: { searchParams: { cli
   const clientId = searchParams.clientId || "";
   const selectedClient = clientId ? activeClients.find((c) => c.id === clientId) : undefined;
 
-  const rules = clientId && selectedClient ? await listAlertRulesForClient(clientId) : [];
+  const [rules, openEvents] = await Promise.all([
+    clientId && selectedClient ? listAlertRulesForClient(clientId) : Promise.resolve([]),
+    listOpenAlertEvents(),
+  ]);
+
+  const openAlertRows: OpenAlertRow[] = openEvents.map((e) => ({
+    id: e.id,
+    clientId: e.rule.clientId,
+    clientName: e.rule.client.name,
+    description: describeThreshold(e.rule.type, e.rule.thresholdValue),
+    triggeredAgo: formatAgo(e.triggeredAt),
+  }));
 
   return (
     <>
@@ -68,6 +95,8 @@ export default async function AlertsPage({ searchParams }: { searchParams: { cli
             כללי התראה על ניצול בנק שעות, היסטוריית אירועים וסטטוס שליחת מיילים (ספירה 9).
           </p>
         </div>
+
+        <OpenAlertsPanel alerts={openAlertRows} />
 
         <AlertsClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 

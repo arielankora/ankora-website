@@ -38,6 +38,20 @@ export async function countOpenAlertEvents(): Promise<number> {
   return prisma.alertEvent.count({ where: { resolvedAt: null } });
 }
 
+// App redesign (handoff README, screen 13 "התראות"): the prototype's top
+// section is a live, cross-client feed of currently-open alert cards. The
+// existing screen only ever looked at one client's events at a time (after
+// picking that client), so this cross-client read is new - same shape as
+// the existing cross-client countOpenAlertEvents() just above, but
+// returning the rows themselves.
+export async function listOpenAlertEvents() {
+  return prisma.alertEvent.findMany({
+    where: { resolvedAt: null },
+    orderBy: { triggeredAt: "desc" },
+    include: { rule: { include: { client: true } } },
+  });
+}
+
 export async function listAlertRulesForClient(clientId: string) {
   return prisma.alertRule.findMany({
     where: { clientId },
@@ -119,6 +133,49 @@ export async function deleteAlertRule(actor: User, ruleId: string) {
   });
 
   return before;
+}
+
+// App redesign (handoff README, screen 13): "כרטיסי התראה פתוחה עם פעולה
+// ישירה: סימון כטופל (עם ביטול)". evaluateSingleRule() below already closes
+// an AlertEvent by setting resolvedAt once the underlying metric drops back
+// under threshold - this is the same closing mechanic, just triggered
+// manually by an admin rather than by the next evaluation run. Reopening it
+// (unresolveAlertEvent) powers a REAL undo per the Interactions & Behavior
+// rule; if the rule is still genuinely breached, the next evaluation simply
+// leaves the reopened event alone (openEvent !== null keeps decideAlertAction
+// from re-firing a duplicate).
+export async function resolveAlertEvent(actor: User, eventId: string) {
+  assertCan(actor.role, "alert.manage");
+  const before = await prisma.alertEvent.findUniqueOrThrow({ where: { id: eventId } });
+  const event = await prisma.alertEvent.update({ where: { id: eventId }, data: { resolvedAt: new Date() } });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "alert_event.resolve",
+    entityType: "AlertEvent",
+    entityId: eventId,
+    before,
+    after: event,
+  });
+
+  return event;
+}
+
+export async function unresolveAlertEvent(actor: User, eventId: string) {
+  assertCan(actor.role, "alert.manage");
+  const before = await prisma.alertEvent.findUniqueOrThrow({ where: { id: eventId } });
+  const event = await prisma.alertEvent.update({ where: { id: eventId }, data: { resolvedAt: null } });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "alert_event.reopen",
+    entityType: "AlertEvent",
+    entityId: eventId,
+    before,
+    after: event,
+  });
+
+  return event;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
-import { adminUpdateEntryAction, adminDeleteEntryAction, getEntryRevisionsAction } from "./actions";
+import { adminUpdateEntryAction, deleteEntryAction, restoreEntryAction, getEntryRevisionsAction } from "./actions";
+import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatDuration, SOURCE_LABEL } from "@/lib/time-entry-format";
 
@@ -9,7 +10,7 @@ function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
 }
 
-type Entry = {
+export type Entry = {
   id: string;
   startAt: string;
   endAt: string | null;
@@ -71,12 +72,49 @@ function formatDateTime(iso: string): string {
 /// Spec 12: Admin "Time Entries" screen needs edit + revisions on a
 /// cross-client table. Revisions are lazy-fetched on open (most rows have
 /// none) via the getEntryRevisionsAction server action.
-export function AdminEntryRow({ entry }: { entry: Entry }) {
+///
+/// App redesign (handoff README, screen 9): the prototype's row is simpler
+/// (checkbox + title/meta + employee + source badge + duration, no visible
+/// edit/history/delete). Those three actions are core to spec 12 ("Time
+/// Entries - cross-client table + filters + edits + revisions") and have no
+/// equivalent anywhere else in the app, so they're kept as trailing text
+/// actions rather than dropped - same judgment call as Phase 4's Clients
+/// screen keeping real data the prototype simplified away, just for
+/// actions instead of data.
+export function AdminEntryRow({
+  entry,
+  selected,
+  onToggleSelect,
+}: {
+  entry: Entry;
+  selected: boolean;
+  onToggleSelect: () => void;
+}) {
+  const { showToast } = useToast();
   const [state, formAction] = useFormState(adminUpdateEntryAction, {});
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [revisions, setRevisions] = useState<Revision[] | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [deleted, setDeleted] = useState(false);
+
+  async function handleDelete() {
+    const result = await deleteEntryAction(entry.id);
+    if (!result.ok) {
+      showToast({ tone: "error", title: "המחיקה נכשלה", description: result.error });
+      return;
+    }
+    setDeleted(true);
+    showToast({
+      tone: "warning",
+      title: "הדיווח נמחק",
+      description: `${entry.userName} · ${entry.clientName}`,
+      undo: async () => {
+        const restored = await restoreEntryAction(entry.id);
+        if (restored.ok) setDeleted(false);
+      },
+    });
+  }
 
   // Bug fix (docs/adr/0001 section 19.12) - same issue as my-time/
   // EntryRow.tsx: adminUpdateEntryAction returns { ok: true } on success
@@ -85,6 +123,10 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
   useEffect(() => {
     if (state?.ok) setEditing(false);
   }, [state]);
+
+  // Must come after every hook above (rules-of-hooks) - this early return
+  // only skips rendering once the row's own delete already succeeded.
+  if (deleted) return null;
 
   async function toggleHistory() {
     if (showHistory) {
@@ -103,7 +145,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
   if (editing) {
     return (
       <tr className="border-b border-lineDark">
-        <td colSpan={8} className="px-5 py-4">
+        <td colSpan={9} className="px-5 py-4">
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
             <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
@@ -179,6 +221,18 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
   return (
     <>
       <tr className="border-b border-lineDark last:border-0">
+        <td className="px-5 py-3">
+          <button
+            type="button"
+            onClick={onToggleSelect}
+            aria-label="בחירה"
+            className={`flex h-5 w-5 items-center justify-center rounded-md border text-[11px] ${
+              selected ? "border-gold bg-gold-gradient text-ink" : "border-lineDark bg-white text-transparent"
+            }`}
+          >
+            ✓
+          </button>
+        </td>
         <td className="px-5 py-3 text-navy/80">{formatDateTime(entry.startAt)}</td>
         <td className="px-5 py-3 text-navy/80">{entry.userName}</td>
         <td className="px-5 py-3 text-navy/80">{entry.clientName}</td>
@@ -195,7 +249,7 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
         </td>
         <td className="px-5 py-3">
           <div className="flex items-center gap-2">
-            <StatusBadge label={SOURCE_LABEL[entry.source] ?? entry.source} tone="gray" />
+            <StatusBadge label={SOURCE_LABEL[entry.source] ?? entry.source} tone={entry.source === "TIMER" ? "green" : "gray"} />
             {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
           </div>
         </td>
@@ -207,18 +261,15 @@ export function AdminEntryRow({ entry }: { entry: Entry }) {
             <button type="button" onClick={() => setEditing(true)} className="text-xs text-navy/60 hover:text-navy">
               עריכה
             </button>
-            <form action={adminDeleteEntryAction}>
-              <input type="hidden" name="timeEntryId" value={entry.id} />
-              <button type="submit" className="text-xs text-navy/50 hover:text-red-600">
-                מחיקה
-              </button>
-            </form>
+            <button type="button" onClick={handleDelete} className="text-xs text-navy/50 hover:text-red-600">
+              מחיקה
+            </button>
           </div>
         </td>
       </tr>
       {showHistory && (
         <tr className="border-b border-lineDark bg-paper/60">
-          <td colSpan={8} className="px-5 py-4">
+          <td colSpan={9} className="px-5 py-4">
             {loadingHistory && <p className="text-xs text-navy/50">טוען היסטוריה...</p>}
             {!loadingHistory && revisions && revisions.length === 0 && (
               <p className="text-xs text-navy/50">אין עריכות קודמות לדיווח זה.</p>

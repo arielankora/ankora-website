@@ -648,6 +648,44 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
   return updated;
 }
 
+// App redesign (handoff README, screen 9 "דיווחי זמן (אדמין)"): the
+// prototype's bulk toolbar has a single primary action ("אישור מסומנים").
+// There is no "approval" concept anywhere in this domain (TimeEntry has no
+// status/approved field), so that label doesn't correspond to a real
+// capability here - the one bulk-worthy, already-real capability this
+// screen has is deleteTimeEntry (used per-row today). This restores a
+// soft-deleted entry (mirrors restoreClient's reasoning in clients.ts) so
+// both the single-row delete and the new bulk-delete toolbar can offer a
+// REAL undo per the Interactions & Behavior rule, instead of only
+// rewinding local state.
+export async function restoreTimeEntry(actor: User, timeEntryId: string) {
+  const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
+  const isSelf = entry.userId === actor.id;
+  assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  const updated = await prisma.timeEntry.update({
+    where: { id: timeEntryId },
+    data: { deletedAt: null },
+  });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "time_entry.restore",
+    entityType: "TimeEntry",
+    entityId: entry.id,
+    clientId: entry.clientId,
+  });
+
+  await flagAffectedCyclesRecalculated(entry.clientId, [entry.startAt]).catch((err) =>
+    console.error("flagAffectedCyclesRecalculated failed (non-fatal)", err)
+  );
+  await evaluateAlertsForClient(entry.clientId).catch((err) =>
+    console.error("evaluateAlertsForClient failed (non-fatal)", err)
+  );
+
+  return updated;
+}
+
 // ---------------------------------------------------------------------
 // Reads (power /app/timer, /app/my-time, /app/time-entries)
 // ---------------------------------------------------------------------

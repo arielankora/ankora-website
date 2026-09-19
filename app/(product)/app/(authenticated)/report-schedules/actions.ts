@@ -53,16 +53,34 @@ export async function createReportScheduleAction(_prev: FormState | undefined, f
   return { ok: true };
 }
 
-export async function toggleReportScheduleAction(scheduleId: string, enabled: boolean): Promise<void> {
+// App redesign (handoff README, Interactions & Behavior rule 2): "לכל
+// פעולה הרסנית או קבוצתית יש ביטול: ... כיבוי חוק או תזמון." Converted from
+// void-returning to plain result objects so ScheduleActions can show a
+// toast and wire a real undo (calling this again with the previous value)
+// instead of the silent fire-and-forget these used to be.
+export async function toggleReportScheduleAction(
+  scheduleId: string,
+  enabled: boolean
+): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  await updateReportSchedule(user, scheduleId, { enabled });
+  try {
+    await updateReportSchedule(user, scheduleId, { enabled });
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
   revalidatePath("/app/report-schedules");
+  return { ok: true };
 }
 
-export async function deleteReportScheduleAction(scheduleId: string): Promise<void> {
+export async function deleteReportScheduleAction(scheduleId: string): Promise<{ ok: boolean; error?: string }> {
   const user = await requireUser();
-  await deleteReportSchedule(user, scheduleId);
+  try {
+    await deleteReportSchedule(user, scheduleId);
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
   revalidatePath("/app/report-schedules");
+  return { ok: true };
 }
 
 export async function sendReportScheduleNowAction(scheduleId: string): Promise<{ ok: boolean; reason?: string }> {

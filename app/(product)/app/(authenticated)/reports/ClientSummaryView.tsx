@@ -56,11 +56,17 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
           </button>
         </div>
       </div>
+      {/* App redesign (handoff README, screen 11 "דוחות" -> "תקציר פעילות
+          ללקוח"): the prototype renders this as a dark `ink` block in
+          JetBrains Mono, echoing raw entries like a terminal log - kept as
+          a real (not decorative) <textarea> so select-all/copy/manual edit
+          before pasting into an external AI tool still work, just restyled
+          to match that dark-card look instead of a plain bordered box. */}
       <textarea
         readOnly
         value={text}
         dir="rtl"
-        className="h-[480px] w-full resize-y rounded-lg border border-lineDark bg-paper/40 p-4 font-mono text-xs leading-relaxed text-navy outline-none focus:border-gold"
+        className="h-[480px] w-full resize-y rounded-2xl bg-ink p-5 font-jbmono text-xs leading-loose text-cream/85 outline-none"
         onFocus={(e) => e.currentTarget.select()}
       />
     </div>
