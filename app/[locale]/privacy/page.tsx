@@ -36,6 +36,7 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
       locale={locale}
       eyebrow={dict.footer.privacy}
       title={dict.pages.legal.privacyTitle}
+      sub={dict.pages.legal.placeholder}
       sections={dict.pages.legal.privacySections}
     />
   );

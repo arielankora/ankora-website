@@ -13,14 +13,14 @@ export async function generateMetadata(
   const legal = dict.pages.legal;
   return {
     title: `${legal.termsTitle} | Ankora`,
-    description: legal.placeholder,
+    description: legal.termsPlaceholder,
     alternates: {
       canonical: `/${locale}/terms`,
       languages: { he: "/he/terms", en: "/en/terms" },
     },
     openGraph: {
       title: `${legal.termsTitle} | Ankora`,
-      description: legal.placeholder,
+      description: legal.termsPlaceholder,
       type: "website",
     },
   };
@@ -36,6 +36,7 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
       locale={locale}
       eyebrow={dict.footer.terms}
       title={dict.pages.legal.termsTitle}
+      sub={dict.pages.legal.termsPlaceholder}
       sections={dict.pages.legal.termsSections}
     />
   );

@@ -19,12 +19,16 @@ export function LegalPage({
   locale,
   eyebrow,
   title,
+  sub,
   sections,
 }: {
   dict: Dictionary;
   locale: Locale;
   eyebrow: string;
   title: string;
+  /** Each page passes its own standfirst: privacy's is the data-contact line,
+   *  terms' is `termsPlaceholder`, which nothing had been rendering. */
+  sub: string;
   sections: { title: string; body: string }[];
 }) {
   return (
@@ -32,7 +36,7 @@ export function LegalPage({
       <PageHero
         eyebrow={eyebrow}
         title={title}
-        sub={dict.pages.legal.placeholder}
+        sub={sub}
         breadcrumb={
           <Breadcrumbs locale={locale} items={[{ label: dict.nav.home, href: "/" }, { label: eyebrow }]} />
         }
