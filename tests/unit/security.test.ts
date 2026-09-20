@@ -99,6 +99,9 @@ describe("shared Redis rate limiting (lib/rate-limit-redis.ts)", () => {
     globalThis.fetch = ORIGINAL_FETCH;
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    delete process.env.KV_REST_API_READ_ONLY_TOKEN;
     __resetRateLimitsForTests();
   });
 
@@ -196,6 +199,9 @@ describe("checkRateLimit tier selection", () => {
     globalThis.fetch = ORIGINAL_FETCH;
     delete process.env.UPSTASH_REDIS_REST_URL;
     delete process.env.UPSTASH_REDIS_REST_TOKEN;
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    delete process.env.KV_REST_API_READ_ONLY_TOKEN;
     __resetRateLimitsForTests();
   });
 
@@ -215,5 +221,91 @@ describe("checkRateLimit tier selection", () => {
     const { checkRateLimit } = await import("@/lib/rate-limit");
     // Local memory has seen nothing, but the shared counter says 99 > 3.
     expect((await checkRateLimit("shared-wins", 3, 60_000)).allowed).toBe(false);
+  });
+});
+
+describe("Upstash env var naming (regression: Vercel injects KV_*, not UPSTASH_*)", () => {
+  const ORIGINAL_FETCH = globalThis.fetch;
+  afterEach(() => {
+    globalThis.fetch = ORIGINAL_FETCH;
+    for (const k of [
+      "UPSTASH_REDIS_REST_URL",
+      "UPSTASH_REDIS_REST_TOKEN",
+      "KV_REST_API_URL",
+      "KV_REST_API_TOKEN",
+      "KV_REST_API_READ_ONLY_TOKEN",
+    ]) delete process.env[k];
+    __resetRateLimitsForTests();
+  });
+
+  // This is the case that actually shipped: Vercel's Upstash Marketplace
+  // integration injects KV_REST_API_* and nothing else. Reading only the
+  // UPSTASH_* pair meant the limiter silently stayed in-memory.
+  it("works with ONLY the KV_* pair that Vercel's integration injects", async () => {
+    process.env.KV_REST_API_URL = "https://kv.upstash.io";
+    process.env.KV_REST_API_TOKEN = "kv-token";
+    const { isRedisRateLimitConfigured, redisRateLimit } = await import("@/lib/rate-limit-redis");
+    expect(isRedisRateLimitConfigured()).toBe(true);
+
+    let seenUrl = "", seenAuth = "";
+    globalThis.fetch = (async (url: any, init: any) => {
+      seenUrl = String(url);
+      seenAuth = init.headers.Authorization;
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as any;
+
+    const r = await redisRateLimit("k", 10, 60_000);
+    expect(seenUrl).toBe("https://kv.upstash.io/pipeline");
+    expect(seenAuth).toBe("Bearer kv-token");
+    expect(r?.allowed).toBe(true);
+  });
+
+  it("works with ONLY the UPSTASH_* pair (provisioned straight from Upstash)", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://direct.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "direct-token";
+    const { isRedisRateLimitConfigured } = await import("@/lib/rate-limit-redis");
+    expect(isRedisRateLimitConfigured()).toBe(true);
+  });
+
+  it("prefers an explicitly set UPSTASH_* pair over the integration's KV_*", async () => {
+    process.env.UPSTASH_REDIS_REST_URL = "https://explicit.upstash.io";
+    process.env.UPSTASH_REDIS_REST_TOKEN = "explicit-token";
+    process.env.KV_REST_API_URL = "https://integration.upstash.io";
+    process.env.KV_REST_API_TOKEN = "integration-token";
+    let seenUrl = "", seenAuth = "";
+    globalThis.fetch = (async (url: any, init: any) => {
+      seenUrl = String(url);
+      seenAuth = init.headers.Authorization;
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as any;
+    const { redisRateLimit } = await import("@/lib/rate-limit-redis");
+    await redisRateLimit("k", 10, 60_000);
+    expect(seenUrl).toBe("https://explicit.upstash.io/pipeline");
+    expect(seenAuth).toBe("Bearer explicit-token");
+  });
+
+  it("never uses the READ-ONLY token - INCR is a write", async () => {
+    process.env.KV_REST_API_URL = "https://kv.upstash.io";
+    process.env.KV_REST_API_READ_ONLY_TOKEN = "read-only-token";
+    const { isRedisRateLimitConfigured } = await import("@/lib/rate-limit-redis");
+    // A read-only token alone must NOT count as configured.
+    expect(isRedisRateLimitConfigured()).toBe(false);
+
+    process.env.KV_REST_API_TOKEN = "write-token";
+    let seenAuth = "";
+    globalThis.fetch = (async (_u: any, init: any) => {
+      seenAuth = init.headers.Authorization;
+      return new Response(JSON.stringify([{ result: 1 }, { result: 1 }]), { status: 200 });
+    }) as any;
+    const { redisRateLimit } = await import("@/lib/rate-limit-redis");
+    await redisRateLimit("k", 10, 60_000);
+    expect(seenAuth).toBe("Bearer write-token");
+    expect(seenAuth).not.toContain("read-only");
+  });
+
+  it("a half-configured pair does not count as configured", async () => {
+    process.env.KV_REST_API_URL = "https://kv.upstash.io";
+    const { isRedisRateLimitConfigured } = await import("@/lib/rate-limit-redis");
+    expect(isRedisRateLimitConfigured()).toBe(false);
   });
 });

@@ -16,22 +16,45 @@ import "server-only";
 // packages and their trees to send two Redis commands would have been a
 // poor trade.
 //
-// Configuration (both optional - see the fallback contract below):
-//   UPSTASH_REDIS_REST_URL
-//   UPSTASH_REDIS_REST_TOKEN
-// Vercel's Upstash integration injects both automatically once the store
-// is linked to the project; setting them by hand also works.
+// Configuration (all optional - see the fallback contract below). Either
+// naming convention works; see redisConfig() for why there are two:
+//   KV_REST_API_URL      + KV_REST_API_TOKEN       (Vercel integration)
+//   UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (Upstash direct)
+// Vercel's Upstash Marketplace integration injects the KV_* pair
+// automatically once the store is linked to the project.
 
+// TWO NAMING CONVENTIONS, on purpose. Provisioning the same Upstash Redis
+// two different ways produces two different sets of variable names:
+//
+//   - Vercel's Upstash Marketplace integration (how this project is set
+//     up) injects the legacy Vercel KV names: KV_REST_API_URL and
+//     KV_REST_API_TOKEN.
+//   - Upstash's own dashboard, and most of their documentation, uses
+//     UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.
+//
+// Both point at the same REST endpoint with the same auth. This module
+// originally read only the UPSTASH_* pair, which meant that after the
+// store was actually connected through Vercel, nothing matched and the
+// limiter silently stayed on the in-memory tier - a green deploy with the
+// shared counters quietly absent. Accepting either pair removes that trap
+// whichever way the store is ever re-provisioned.
+//
+// UPSTASH_* is checked first so that an explicitly set pair wins over an
+// integration-injected one, which is the right precedence if both ever
+// exist (e.g. someone points the app at a different Redis by hand).
+//
+// Deliberately NOT read: KV_REST_API_READ_ONLY_TOKEN. INCR is a write.
+//
 // Read at call time, never captured into module-level constants. Two
 // reasons, and the second is the one that bit: a module-level const is
 // frozen at first import, so it cannot be exercised by a test that sets
 // the variables afterwards - which meant the fallback path could not be
 // proven to work. Reading per call also keeps this consistent with
 // isRedisRateLimitConfigured() below, which always read freshly. The cost
-// is two property lookups per request.
+// is a few property lookups per request.
 function redisConfig(): { endpoint: string; token: string } | null {
-  const endpoint = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const endpoint = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!endpoint || !token) return null;
   return { endpoint, token };
 }
