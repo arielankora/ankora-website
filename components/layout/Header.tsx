@@ -92,11 +92,11 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             role="dialog"
             aria-modal="true"
-            className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
+            className="fixed inset-0 z-[60] flex flex-col bg-navy px-6 py-6 lg:hidden"
             style={{ backgroundColor: "#0B1B33", opacity: 1 }}
           >
             <div className="flex items-center justify-between">
-              <span className="font-assistant text-base font-light tracking-[0.3em] text-cream">
+              <span className="font-assistant text-base font-light tracking-[0.3em] text-cream-warm">
                 ANKORA
               </span>
               <button
@@ -115,7 +115,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
                   key={item.href}
                   href={withLocale(locale, item.href)}
                   onClick={() => setMobileOpen(false)}
-                  className="text-2xl font-light text-paper"
+                  className="text-2xl font-light text-cream"
                 >
                   {item.label}
                 </Link>
@@ -126,7 +126,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
               <Link
                 href={withLocale(locale, "/contact")}
                 onClick={() => setMobileOpen(false)}
-                className="flex min-h-[44px] items-center justify-center border border-gold bg-gold px-6 py-3 font-assistant text-[15px] font-medium text-ink"
+                className="flex min-h-[44px] items-center justify-center border border-gold bg-gold px-6 py-3 font-assistant text-[15px] font-medium text-navy"
               >
                 {dict.nav.cta}
               </Link>
@@ -157,12 +157,12 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             {/* Latin wordmark, so the .3em tracking stays in both locales. The matching
                 padding-inline-start balances the trailing letter-space the tracking
                 adds after the final A. */}
-            <span className="font-light text-base tracking-[0.3em] text-cream ps-[0.3em]">
+            <span className="font-light text-base tracking-[0.3em] text-cream-warm ps-[0.3em]">
               ANKORA
             </span>
           </Link>
 
-          <nav className="hidden flex-1 flex-nowrap items-center gap-[clamp(10px,1.8vw,26px)] whitespace-nowrap text-[14.5px] font-light text-tone-muted lg:flex">
+          <nav className="hidden flex-1 flex-nowrap items-center gap-[clamp(10px,1.8vw,26px)] whitespace-nowrap text-[14.5px] font-light text-muted lg:flex">
             {links.map((item) => (
               <Link
                 key={item.href}
@@ -170,7 +170,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
                 // px/-mx pair: the shortest Hebrew item ("בלוג") is 23px wide, a
                 // pixel under the 24x24 minimum. The negative margin keeps the nav's
                 // own spacing exactly as designed.
-                className="border-b border-transparent px-[5px] pb-[3px] -mx-[5px] transition-colors duration-[250ms] hover:border-gold hover:text-paper"
+                className="border-b border-transparent px-[5px] pb-[3px] -mx-[5px] transition-colors duration-[250ms] hover:border-gold hover:text-cream"
               >
                 {item.label}
               </Link>
@@ -181,7 +181,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             <LanguageToggle locale={locale} />
             <Link
               href={withLocale(locale, "/contact")}
-              className="whitespace-nowrap border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-[22px] py-[11px] text-[14.5px] font-medium text-paper transition-colors duration-300 hover:border-gold hover:bg-gold hover:text-ink"
+              className="whitespace-nowrap border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-[22px] py-[11px] text-[14.5px] font-medium text-cream transition-colors duration-300 hover:border-gold hover:bg-gold hover:text-navy"
             >
               {dict.nav.cta}
             </Link>

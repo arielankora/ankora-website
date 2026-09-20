@@ -44,7 +44,7 @@ export default function TechnologyClient({ params }: { params: { locale: string 
       />
 
       <SectionShell>
-        <MonoLabel tracking="0.15em" className="text-tone-muted">
+        <MonoLabel tracking="0.15em" className="text-muted">
           {p.orchestrationLabel}
         </MonoLabel>
 
@@ -69,20 +69,20 @@ export default function TechnologyClient({ params }: { params: { locale: string 
                     <span
                       className={cn(
                         "font-assistant text-[11px] font-semibold tracking-[0.14em] rtl:tracking-normal",
-                        isYou ? "text-paper" : "text-tone-muted"
+                        isYou ? "text-cream" : "text-muted"
                       )}
                     >
                       {isYou ? p.sideYou : p.sideAnkora}
                     </span>
                     {/* The tag is "01 · REQUEST" in English and "01 · בקשה" in Hebrew,
                         so it follows the page language rather than staying Latin. */}
-                    <MonoLabel tracking="0.16em" className={isYou ? "text-paper" : "text-gold"}>
+                    <MonoLabel tracking="0.16em" className={isYou ? "text-cream" : "text-gold"}>
                       {layer.tag}
                     </MonoLabel>
-                    <span className="text-[1.06rem] font-normal leading-[1.3] text-paper">
+                    <span className="text-[1.06rem] font-normal leading-[1.3] text-cream">
                       {layer.title}
                     </span>
-                    <span className="font-assistant text-[13.5px] font-light leading-[1.7] text-tone-muted">
+                    <span className="font-assistant text-[13.5px] font-light leading-[1.7] text-muted">
                       {layer.body}
                     </span>
                   </div>
@@ -92,7 +92,7 @@ export default function TechnologyClient({ params }: { params: { locale: string 
 
             <div className="mt-[26px] flex items-center gap-3.5 border-t border-[rgba(243,234,219,0.12)] pt-6">
               <span className="h-[7px] w-[7px] shrink-0 animate-eyebrowPulse rounded-full bg-gold" />
-              <span className="font-assistant text-sm font-light text-tone-body">
+              <span className="font-assistant text-sm font-light text-body">
                 {p.persistenceNote}
               </span>
             </div>
@@ -106,8 +106,8 @@ export default function TechnologyClient({ params }: { params: { locale: string 
             {p.blocks.map((block) => (
               <motion.div key={block.title} variants={staggerItem} className="h-full">
                 <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
-                  <h2 className="text-[1.2rem] font-normal text-paper">{block.title}</h2>
-                  <p className="mt-3.5 font-assistant text-[14.5px] font-light leading-[1.8] text-tone-muted">
+                  <h2 className="text-[1.2rem] font-normal text-cream">{block.title}</h2>
+                  <p className="mt-3.5 font-assistant text-[14.5px] font-light leading-[1.8] text-muted">
                     {block.body}
                   </p>
                 </HairlineGridCell>

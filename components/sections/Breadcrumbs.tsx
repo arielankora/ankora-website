@@ -34,7 +34,7 @@ export function Breadcrumbs({
         {items.map((item, i) => (
           <span key={item.label} className="flex items-center gap-2">
             {i > 0 && (
-              <MonoLabel size={10} tracking="0.1em" className="text-tone-muted" aria-hidden>
+              <MonoLabel size={10} tracking="0.1em" className="text-muted" aria-hidden>
                 /
               </MonoLabel>
             )}
@@ -47,12 +47,12 @@ export function Breadcrumbs({
                 href={withLocale(locale, item.href)}
                 className="inline-flex items-center px-[7px] py-[15px] -mx-[7px] -my-[15px]"
               >
-                <MonoLabel size={10} tracking="0.1em" className="text-tone-muted transition-colors hover:text-gold">
+                <MonoLabel size={10} tracking="0.1em" className="text-muted transition-colors hover:text-gold">
                   {item.label}
                 </MonoLabel>
               </Link>
             ) : (
-              <MonoLabel size={10} tracking="0.1em" className="text-tone-muted">
+              <MonoLabel size={10} tracking="0.1em" className="text-muted">
                 {item.label}
               </MonoLabel>
             )}

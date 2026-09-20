@@ -38,7 +38,7 @@ export function Drawer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-ink"
+        className="inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy"
       >
         <Plus size={16} strokeWidth={2.25} />
         {triggerLabel}
@@ -50,16 +50,16 @@ export function Drawer({
             type="button"
             aria-label="סגירה"
             onClick={close}
-            className="absolute inset-0 bg-navy/30"
+            className="absolute inset-0 bg-appNavy/30"
           />
           <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-lineDark bg-white shadow-lg sm:max-w-md">
             <div className="flex items-center justify-between border-b border-lineDark px-5 py-4">
-              <h2 className="text-base font-medium text-navy">{title}</h2>
+              <h2 className="text-base font-medium text-appNavy">{title}</h2>
               <button
                 type="button"
                 aria-label="סגירה"
                 onClick={close}
-                className="text-navy/50 transition-colors hover:text-navy"
+                className="text-appNavy/50 transition-colors hover:text-appNavy"
               >
                 <X size={18} />
               </button>

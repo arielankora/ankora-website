@@ -27,8 +27,8 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
         aria-expanded={open}
         className={
           primary
-            ? "flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-ink"
-            : "flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
+            ? "flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-navy"
+            : "flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-appNavy transition-colors hover:border-gold"
         }
       >
         <Download size={15} strokeWidth={1.75} />
@@ -49,7 +49,7 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
                 href={item.format ? `${baseHref}&format=${item.format}` : baseHref}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-navy hover:bg-paper"
+                className="block px-4 py-2.5 text-sm text-appNavy hover:bg-cream"
               >
                 {item.label}
               </a>

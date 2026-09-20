@@ -59,8 +59,8 @@ export default async function ReportSchedulesPage(props: { searchParams: Promise
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">דוחות מתוזמנים</h1>
-          <p className="mt-1 text-sm text-navy/60">
+          <h1 className="text-xl font-medium text-appNavy">דוחות מתוזמנים</h1>
+          <p className="mt-1 text-sm text-appNavy/60">
             שליחת דוחות אוטומטית ללקוח או ל-Ankora לפי תדירות קבועה (ספירה 15).
           </p>
         </div>
@@ -68,13 +68,13 @@ export default async function ReportSchedulesPage(props: { searchParams: Promise
         <ClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 
         {!clientId && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             בחרו לקוח כדי לצפות בדוחות המתוזמנים שלו וליצור דוח חדש.
           </div>
         )}
 
         {clientId && !selectedClient && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             הלקוח לא נמצא או שהוא בארכיון.
           </div>
         )}
@@ -82,7 +82,7 @@ export default async function ReportSchedulesPage(props: { searchParams: Promise
         {selectedClient && (
           <>
             <div>
-              <h2 className="text-sm font-medium text-navy">דוח מתוזמן חדש - {selectedClient.name}</h2>
+              <h2 className="text-sm font-medium text-appNavy">דוח מתוזמן חדש - {selectedClient.name}</h2>
               <div className="mt-3">
                 <ScheduleForm clientId={selectedClient.id} />
               </div>
@@ -90,7 +90,7 @@ export default async function ReportSchedulesPage(props: { searchParams: Promise
 
             <div className="space-y-4">
               {schedules.length === 0 && (
-                <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+                <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
                   עדיין אין דוחות מתוזמנים ללקוח זה.
                 </div>
               )}
@@ -100,24 +100,24 @@ export default async function ReportSchedulesPage(props: { searchParams: Promise
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lineDark px-5 py-4">
                     <div className="flex items-center gap-3">
                       <StatusBadge label={schedule.enabled ? "פעיל" : "מושבת"} tone={schedule.enabled ? "green" : "gray"} />
-                      <span className="text-sm font-medium text-navy">
+                      <span className="text-sm font-medium text-appNavy">
                         {REPORT_TYPE_LABEL[schedule.reportType]} · {describeCadence(schedule)}
                       </span>
                     </div>
                     <ScheduleActions scheduleId={schedule.id} enabled={schedule.enabled} />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-navy/60 sm:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-appNavy/60 sm:grid-cols-3">
                     <div>
-                      <span className="font-medium text-navy/70">נמענים: </span>
+                      <span className="font-medium text-appNavy/70">נמענים: </span>
                       {schedule.recipients.join(", ") || "אין"}
                     </div>
                     <div>
-                      <span className="font-medium text-navy/70">נשלח לאחרונה: </span>
+                      <span className="font-medium text-appNavy/70">נשלח לאחרונה: </span>
                       {formatDateTime(schedule.lastSentAt)}
                     </div>
                     <div>
-                      <span className="font-medium text-navy/70">שליחות תקופתיות: </span>
+                      <span className="font-medium text-appNavy/70">שליחות תקופתיות: </span>
                       {schedule.runs.length}
                     </div>
                   </div>

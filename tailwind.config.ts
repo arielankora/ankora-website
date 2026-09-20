@@ -10,42 +10,50 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0B1B33",
-        navy: "#1B2A3D",
-        navyLight: "#1B2A3D",
-        cream: "#F3EADB",
-        paper: "#F8F4EC",
-        paperDim: "#EDE3D2",
+        // Brand palette, named per the round-two C5 ruling. These are ROLE names, not
+        // material names: `ink`/`paper` inverted against the spec (this file's `ink`
+        // was the spec's Navy and its `paper` the spec's Ink), and a material pair
+        // will invert again the first time a light surface is introduced. A role
+        // cannot.
+        //
+        // Three of these names were already taken at different values before the
+        // rename -- `navy` was #1B2A3D with 862 usages, `cream` was #F3EADB (which is
+        // exactly this table's `cream.warm`), and `line` was a translucent rule. They
+        // were freed first, in their own sweep, so nothing was silently repainted.
+        navy: {
+          DEFAULT: "#0B1B33", // page ground
+          deep: "#08182D", // footer, inset panels, summary block
+        },
+        cream: {
+          DEFAULT: "#F8F4EC", // primary text on navy
+          warm: "#F3EADB", // wordmark; source colour for hairlines and washes
+          dim: "#EDE3D2",
+        },
         gold: {
-          DEFAULT: "#B08D57",
-          light: "#C7AC7E",
+          DEFAULT: "#B08D57", // accent; text-legal on the ground, navy-deep, navy glass, one .04 wash
+          light: "#C7AC7E", // link hover; gold text on any lifted ground
           dim: "#8A6F45",
         },
-        // Site redesign (design_handoff_ankora_site/README.md, "Colour"). NOTE the
-        // name inversion, kept deliberately for now: this file's `ink` is the spec's
-        // *Navy* (#0B1B33, the page ground) and this file's `paper` is the spec's
-        // *Ink* (#F8F4EC, the text on it). Renaming ink->navy / paper->ink touches 84
-        // `-ink` and 304 `-paper` occurrences across 62 files including the internal
-        // app, so it lands as its own mechanical commit after the redesign, where the
-        // diff is reviewable on its own (Ariel's decision, C14).
-        inkDeep: "#08182D",
-        // The four body/label greys from the spec's colour table. Previously
-        // hardcoded as arbitrary values -- 66 occurrences of #A9B8C9 and 39 of
-        // #7C8EA3 before this change.
-        tone: {
-          body: "#C3CEDA",
-          muted: "#A9B8C9",
-          dim: "#7C8EA3",
-          faint: "#5C6B7E",
+        body: "#C3CEDA", // lead and body copy
+        muted: "#A9B8C9", // secondary copy, mono meta -- THE FLOOR FOR TEXT
+        // NON-TEXT ONLY (C1). Neither clears 4.5:1 anywhere in the system: #5C6B7E
+        // measures 3.17 on the bare page ground and #7C8EA3 falls to 3.47 under two
+        // stacked washes. They are named as lines so that any text utility built on
+        // them reads as wrong on sight, which is the point -- these draw icon strokes,
+        // SVG nodes, dots and separators, never type.
+        line: {
+          DEFAULT: "#5C6B7E",
+          strong: "#7C8EA3",
         },
-        line: "rgba(248,244,236,0.08)",
+        hairline: "rgba(248,244,236,0.08)",
+        // Internal product app (light theme, its own handoff). Namespaced so the brand
+        // palette above can hold the role names.
+        appNavy: "#1B2A3D",
         lineDark: "rgba(27,42,61,0.14)",
         lineGold: "rgba(176,141,87,0.4)",
         // App redesign (design_handoff_ankora_app_redesign/README.md, "Design
-        // Tokens" table): semantic tones for toasts, StatusBadge, inline
-        // validation and KPI overage states. Not new brand colors - these
-        // are tone-mapped from the existing palette per the handoff doc
-        // ("צבעים סמנטיים שנוספו... אינם ב-Tailwind כרגע - להוסיף כטוקנים").
+        // Tokens"): semantic tones for toasts, StatusBadge, inline validation and KPI
+        // overage states. Tone-mapped from the existing palette, not new brand colors.
         // Nested `soft` key is each tone's low-opacity background pair.
         success: { DEFAULT: "#1F7A4D", soft: "rgba(31,122,77,0.1)" },
         error: { DEFAULT: "#B3261E", soft: "rgba(179,38,30,0.08)", "on-dark": "#E5847E" },

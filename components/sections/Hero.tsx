@@ -143,17 +143,17 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
     <div className="mt-16" aria-hidden="true">
       <HairlineGrid minCell={260}>
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-muted rtl:tracking-normal">
             {live.nowLabel}
           </span>
           <ul className="mt-4 space-y-4">
             {visible.map((task) => (
               <li key={task.text}>
-                <div className="flex items-start gap-2.5 text-sm text-tone-body">
+                <div className="flex items-start gap-2.5 text-sm text-body">
                   <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gold" />
                   <span>{task.text}</span>
                 </div>
-                <span className="mt-1 block ps-[14px] font-jbmono text-[10px] tracking-[0.1em] text-tone-muted rtl:tracking-normal">
+                <span className="mt-1 block ps-[14px] font-jbmono text-[10px] tracking-[0.1em] text-muted rtl:tracking-normal">
                   {task.domain}
                 </span>
               </li>
@@ -162,13 +162,13 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
         </HairlineGridCell>
 
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-muted rtl:tracking-normal">
             {live.closedLabel}
           </span>
-          <div className="mt-3 text-[clamp(2.6rem,4.6vw,4rem)] font-extralight tabular-nums text-paper">
+          <div className="mt-3 text-[clamp(2.6rem,4.6vw,4rem)] font-extralight tabular-nums text-cream">
             {closedToday}
           </div>
-          <p className="mt-1 text-xs text-tone-muted">{live.closedSub}</p>
+          <p className="mt-1 text-xs text-muted">{live.closedSub}</p>
           <div className="mt-6 flex h-14 items-end gap-1.5">
             {spark.map((bar, i) => (
               <span
@@ -181,18 +181,18 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
               />
             ))}
           </div>
-          <span className="mt-3 block font-jbmono text-[10px] tracking-[0.1em] text-tone-muted rtl:tracking-normal">
+          <span className="mt-3 block font-jbmono text-[10px] tracking-[0.1em] text-muted rtl:tracking-normal">
             {live.sparkLabel}
           </span>
         </HairlineGridCell>
 
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-muted rtl:tracking-normal">
             {live.orchLabel}
           </span>
           <div className="mt-4 space-y-4">
             {live.orchRows.map((row, i) => (
-              <div key={row} className="flex items-center justify-between gap-4 text-sm text-tone-body">
+              <div key={row} className="flex items-center justify-between gap-4 text-sm text-body">
                 <span>{row}</span>
                 {/* A breathing dot rather than the word "active" — option B of the
                     four treatments explored in Orchestration Cell Options. */}
@@ -230,7 +230,7 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             prototype applies this negative optical tightening in both panes. */}
         <h1 className="mt-6 max-w-[20ch] text-balance text-[clamp(2.6rem,6.2vw,6rem)] leading-[1.2] tracking-[-0.03em]">
           <Reveal delay={0.08}>
-            <span className="block font-extralight text-paper">{dict.hero.titleLine1}</span>
+            <span className="block font-extralight text-cream">{dict.hero.titleLine1}</span>
           </Reveal>
           <Reveal delay={0.16}>
             <span className="block font-light text-gold">{dict.hero.titleLine2}</span>
@@ -242,20 +242,20 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}
         >
           <Reveal delay={0.24}>
-            <p className="max-w-[40ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.85] text-tone-body">
+            <p className="max-w-[40ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.85] text-body">
               {dict.hero.sub}
             </p>
           </Reveal>
           <Reveal delay={0.32} className="flex flex-wrap items-center gap-6">
             <Link
               href={withLocale(locale, "/contact")}
-              className="bg-gold px-8 py-[17px] text-[15px] font-medium text-ink transition-colors duration-200 hover:bg-paper"
+              className="bg-gold px-8 py-[17px] text-[15px] font-medium text-navy transition-colors duration-200 hover:bg-cream"
             >
               {dict.hero.ctaPrimary}
             </Link>
             <Link
               href={withLocale(locale, "/how-it-works")}
-              className="border-b border-[rgba(232,226,214,0.28)] pb-1 text-[15px] text-paper/80 transition-colors duration-200 hover:text-gold"
+              className="border-b border-[rgba(232,226,214,0.28)] pb-1 text-[15px] text-cream/80 transition-colors duration-200 hover:text-gold"
             >
               {dict.hero.ctaSecondary}
             </Link>
@@ -263,11 +263,11 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
         </div>
 
         <Reveal delay={0.4}>
-          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-tone-muted">
+          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-muted">
             {dict.hero.definitionPre}
             <Link
               href={withLocale(locale, "/personal-operations-management")}
-              className="text-tone-muted underline decoration-[rgba(176,141,87,0.4)] underline-offset-4 transition-colors duration-200 hover:text-gold"
+              className="text-muted underline decoration-[rgba(176,141,87,0.4)] underline-offset-4 transition-colors duration-200 hover:text-gold"
             >
               {dict.hero.definitionLinked}
             </Link>

@@ -13,7 +13,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "נוצרת..." : "הוספת משימה"}
     </button>
@@ -45,13 +45,13 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
   return (
     <form action={formAction} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-navy/60">לקוח *</label>
+        <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
         <select
           name="clientId"
           required
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="">בחירת לקוח</option>
           {clients.map((c) => (
@@ -62,11 +62,11 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">קטגוריה</label>
+        <label className="block text-xs font-medium text-appNavy/60">קטגוריה</label>
         <select
           name="categoryId"
           disabled={!clientId}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="">ללא קטגוריה</option>
           {availableCategories.map((c) => (
@@ -77,11 +77,11 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">שם המשימה *</label>
+        <label className="block text-xs font-medium text-appNavy/60">שם המשימה *</label>
         <input
           name="title"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
 

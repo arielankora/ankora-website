@@ -16,12 +16,12 @@ export function NotFound({
 }) {
   return (
     <div className="flex flex-col items-center gap-3 rounded-2xl border border-lineDark bg-white px-6 py-14 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-navy/5">
-        <FileQuestion size={20} strokeWidth={1.75} className="text-navy/50" />
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-appNavy/5">
+        <FileQuestion size={20} strokeWidth={1.75} className="text-appNavy/50" />
       </span>
-      <p className="text-[15px] font-medium text-navy">{title}</p>
-      <p className="max-w-sm text-sm text-navy/60">{description}</p>
-      <Link href={backHref} className="mt-2 text-sm font-medium text-gold-dim hover:text-navy">
+      <p className="text-[15px] font-medium text-appNavy">{title}</p>
+      <p className="max-w-sm text-sm text-appNavy/60">{description}</p>
+      <Link href={backHref} className="mt-2 text-sm font-medium text-gold-dim hover:text-appNavy">
         {backLabel}
       </Link>
     </div>

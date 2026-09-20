@@ -43,7 +43,7 @@ export function OfflineBanner({ pendingSyncCount }: { pendingSyncCount?: number 
 
   return (
     <div
-      className="flex items-center gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-navy"
+      className="flex items-center gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-appNavy"
       role="status"
     >
       <WifiOff size={16} strokeWidth={1.75} className="shrink-0 text-warning" />

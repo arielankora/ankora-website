@@ -169,8 +169,8 @@ export default async function AppHomePage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">שלום, {user.name.split(" ")[0]}</h1>
-          <p className="mt-1 text-sm text-navy/60">סקירה כללית של המערכת.</p>
+          <h1 className="text-xl font-medium text-appNavy">שלום, {user.name.split(" ")[0]}</h1>
+          <p className="mt-1 text-sm text-appNavy/60">סקירה כללית של המערכת.</p>
         </div>
 
         {/* App redesign (handoff README, screen 1): primary 4-card KPI row -
@@ -232,8 +232,8 @@ export default async function AppHomePage() {
             {upcomingDates && upcomingDates.length > 0 && (
               <div className="flex flex-col rounded-2xl border border-lineDark bg-white p-5">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-navy/70">מועדים חשובים קרובים</h2>
-                  <Link href="/app/important-dates" className="text-xs text-gold-dim hover:text-navy">
+                  <h2 className="text-sm font-medium text-appNavy/70">מועדים חשובים קרובים</h2>
+                  <Link href="/app/important-dates" className="text-xs text-gold-dim hover:text-appNavy">
                     לכל המועדים
                   </Link>
                 </div>
@@ -244,11 +244,11 @@ export default async function AppHomePage() {
                       <Link
                         key={d.id}
                         href={`/app/important-dates/${d.id}`}
-                        className="flex items-center gap-3 py-2.5 transition-colors hover:bg-paper"
+                        className="flex items-center gap-3 py-2.5 transition-colors hover:bg-cream"
                       >
                         <div
                           className={`flex h-[42px] w-[42px] shrink-0 flex-col items-center justify-center rounded-xl text-center leading-none ${
-                            urgent ? "bg-error-soft text-error" : "bg-paper text-navy/70"
+                            urgent ? "bg-error-soft text-error" : "bg-cream text-appNavy/70"
                           }`}
                         >
                           {d.nextOccurrenceAt ? (
@@ -265,8 +265,8 @@ export default async function AppHomePage() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-navy">{d.title}</p>
-                          <p className="truncate text-xs text-navy/50">{d.client.name}</p>
+                          <p className="truncate text-sm font-medium text-appNavy">{d.title}</p>
+                          <p className="truncate text-xs text-appNavy/50">{d.client.name}</p>
                         </div>
                       </Link>
                     );
@@ -280,14 +280,14 @@ export default async function AppHomePage() {
         {/* App redesign: live "טיימרים פעילים כרגע" list. */}
         {activeTimerRows && activeTimerRows.length > 0 && (
           <div>
-            <h2 className="mb-3 text-sm font-medium text-navy/70">טיימרים פעילים כרגע</h2>
+            <h2 className="mb-3 text-sm font-medium text-appNavy/70">טיימרים פעילים כרגע</h2>
             <ActiveTimersList rows={activeTimerRows} longTimerHours={LONG_TIMER_HOURS} />
           </div>
         )}
 
         {cards.length > 0 && (
           <div>
-            {metrics && <h2 className="mb-3 text-sm font-medium text-navy/70">ספירות</h2>}
+            {metrics && <h2 className="mb-3 text-sm font-medium text-appNavy/70">ספירות</h2>}
             <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5">
               {cards.map((card) => (
                 <KpiCard key={card.href} href={card.href} icon={card.icon} label={card.label} value={card.value} />
@@ -305,7 +305,7 @@ export default async function AppHomePage() {
         )}
 
         {canSeeAudit && (
-          <Link href="/app/audit-log" className="inline-block text-sm text-gold-dim hover:text-navy">
+          <Link href="/app/audit-log" className="inline-block text-sm text-gold-dim hover:text-appNavy">
             צפייה ביומן הפעולות
           </Link>
         )}

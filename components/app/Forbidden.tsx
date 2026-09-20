@@ -13,8 +13,8 @@ export function Forbidden({ roleLabel }: { roleLabel?: string }) {
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-error-soft">
         <ShieldAlert size={20} strokeWidth={1.75} className="text-error" />
       </span>
-      <p className="text-[15px] font-medium text-navy">אין לך הרשאה לצפות בעמוד זה</p>
-      {roleLabel && <p className="text-sm text-navy/60">התפקיד הנוכחי שלך: {roleLabel}</p>}
+      <p className="text-[15px] font-medium text-appNavy">אין לך הרשאה לצפות בעמוד זה</p>
+      {roleLabel && <p className="text-sm text-appNavy/60">התפקיד הנוכחי שלך: {roleLabel}</p>}
     </div>
   );
 }

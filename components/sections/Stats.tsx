@@ -25,7 +25,7 @@ export function Stats({ dict }: { dict: Dictionary }) {
                 <div className="text-[clamp(1.9rem,3vw,2.8rem)] font-extralight tabular-nums leading-none text-gold">
                   {stat.value}
                 </div>
-                <p className="mt-4 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                <p className="mt-4 font-assistant text-sm font-light leading-[1.7] text-muted">
                   {stat.label}
                 </p>
               </HairlineGridCell>

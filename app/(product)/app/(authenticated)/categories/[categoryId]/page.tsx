@@ -30,11 +30,11 @@ export default async function CategoryDetailPage(props: { params: Promise<{ cate
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/categories" className="text-xs text-navy/50 hover:text-gold-dim">
+          <Link href="/app/categories" className="text-xs text-appNavy/50 hover:text-gold-dim">
             ← חזרה לרשימת הקטגוריות
           </Link>
-          <h1 className="mt-2 text-xl font-medium text-navy">{category.name}</h1>
-          <p className="mt-1 text-sm text-navy/60">
+          <h1 className="mt-2 text-xl font-medium text-appNavy">{category.name}</h1>
+          <p className="mt-1 text-sm text-appNavy/60">
             {category.visibility === "GLOBAL" ? "קטגוריה כללית" : `ספציפית ללקוח: ${category.client?.name ?? ""}`}
           </p>
         </div>

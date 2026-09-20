@@ -14,7 +14,7 @@ export default async function NewPostPage(props: { params: Promise<{ locale: str
   if (!isValidSessionToken(token)) redirect(`/${locale}/admin/login`);
 
   return (
-    <div className="bg-paper px-6 py-32">
+    <div className="bg-cream px-6 py-32">
       <PostEditor mode="new" basePath={`/${locale}/admin`} />
     </div>
   );

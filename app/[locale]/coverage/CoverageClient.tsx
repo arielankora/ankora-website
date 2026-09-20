@@ -26,7 +26,7 @@ function highlight(text: string, query: string): ReactNode {
   return (
     <>
       {text.slice(0, index)}
-      <mark className="bg-gold px-0.5 text-ink">{text.slice(index, index + query.length)}</mark>
+      <mark className="bg-gold px-0.5 text-navy">{text.slice(index, index + query.length)}</mark>
       {text.slice(index + query.length)}
     </>
   );
@@ -96,7 +96,7 @@ export default function CoverageClient({ params }: { params: { locale: string } 
       <section className="pb-[clamp(40px,6vw,88px)]">
         <WideContainer>
           <Reveal>
-            <p className="max-w-[86ch] border-t border-[rgba(243,234,219,0.12)] pt-[clamp(20px,2.6vw,30px)] font-assistant text-base font-light leading-[1.85] text-tone-muted">
+            <p className="max-w-[86ch] border-t border-[rgba(243,234,219,0.12)] pt-[clamp(20px,2.6vw,30px)] font-assistant text-base font-light leading-[1.85] text-muted">
               {p.intro}
             </p>
           </Reveal>
@@ -113,7 +113,7 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   viewBox="0 0 15 15"
                   fill="none"
                   aria-hidden="true"
-                  className="shrink-0 text-tone-muted"
+                  className="shrink-0 text-muted"
                 >
                   <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
                   <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -127,14 +127,14 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={p.searchPlaceholder}
-                  className="min-h-[44px] min-w-0 flex-1 border-0 border-b border-[rgba(243,234,219,0.22)] bg-transparent py-2 text-[15.5px] font-light text-paper outline-none transition-colors duration-[250ms] placeholder:text-tone-muted focus:border-gold [&::-webkit-search-cancel-button]:appearance-none"
+                  className="min-h-[44px] min-w-0 flex-1 border-0 border-b border-[rgba(243,234,219,0.22)] bg-transparent py-2 text-[15.5px] font-light text-cream outline-none transition-colors duration-[250ms] placeholder:text-muted focus:border-gold [&::-webkit-search-cancel-button]:appearance-none"
                 />
                 {isSearching && (
                   <button
                     type="button"
                     onClick={() => setQuery("")}
                     aria-label={p.clearSearch}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tone-muted transition-colors hover:text-gold"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-muted transition-colors hover:text-gold"
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
                       <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -148,12 +148,12 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   <span className="font-assistant text-sm font-light text-gold">{p.noResultsLabel}</span>
                 ) : (
                   <>
-                    <span className="font-assistant text-sm font-light text-tone-muted">
-                      <span className="font-jbmono tabular-nums text-paper">{filteredCategories.length}</span>{" "}
+                    <span className="font-assistant text-sm font-light text-muted">
+                      <span className="font-jbmono tabular-nums text-cream">{filteredCategories.length}</span>{" "}
                       {p.areaCountLabel}
                     </span>
-                    <span className="font-assistant text-sm font-light text-tone-muted">
-                      <span className="font-jbmono tabular-nums text-paper">{matchedServiceCount}</span>{" "}
+                    <span className="font-assistant text-sm font-light text-muted">
+                      <span className="font-jbmono tabular-nums text-cream">{matchedServiceCount}</span>{" "}
                       {p.serviceCountLabel}
                     </span>
                   </>
@@ -165,15 +165,15 @@ export default function CoverageClient({ params }: { params: { locale: string } 
           {noResults ? (
             <Reveal delay={0.1}>
               <div className="mt-[clamp(18px,2.4vw,28px)] border border-[rgba(243,234,219,0.12)] p-[clamp(24px,3.4vw,40px)] text-center">
-                <h2 className="text-[clamp(1.2rem,2vw,1.6rem)] font-light text-paper">
+                <h2 className="text-[clamp(1.2rem,2vw,1.6rem)] font-light text-cream">
                   {p.emptyStateTitle.replace("{query}", query.trim())}
                 </h2>
-                <p className="mx-auto mt-4 max-w-[52ch] font-assistant text-[1.02rem] font-light leading-[1.7] text-tone-muted">
+                <p className="mx-auto mt-4 max-w-[52ch] font-assistant text-[1.02rem] font-light leading-[1.7] text-muted">
                   {p.emptyStateBody}
                 </p>
                 <Link
                   href={withLocale(locale, "/contact")}
-                  className="mt-6 inline-flex min-h-[44px] items-center border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.1)] px-[26px] py-[13px] font-assistant text-[15px] font-semibold text-paper transition-colors duration-300 hover:bg-gold hover:text-ink"
+                  className="mt-6 inline-flex min-h-[44px] items-center border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.1)] px-[26px] py-[13px] font-assistant text-[15px] font-semibold text-cream transition-colors duration-300 hover:bg-gold hover:text-navy"
                 >
                   {p.emptyStateCta}
                 </Link>
@@ -203,10 +203,10 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   >
                     <summary className="flex cursor-pointer list-none items-start gap-[18px] p-[clamp(22px,2.8vw,32px)] transition-colors duration-[350ms] ease-out hover:bg-[rgba(176,141,87,0.08)]">
                       <div className="min-w-0 flex-1">
-                        <h2 className="text-[clamp(1.16rem,1.5vw,1.38rem)] font-normal text-paper">
+                        <h2 className="text-[clamp(1.16rem,1.5vw,1.38rem)] font-normal text-cream">
                           {highlight(cat.name, normalizedQuery)}
                         </h2>
-                        <p className="mt-2.5 font-assistant text-[1.02rem] font-light leading-[1.65] text-tone-muted">
+                        <p className="mt-2.5 font-assistant text-[1.02rem] font-light leading-[1.65] text-muted">
                           {cat.description}
                         </p>
                       </div>
@@ -214,7 +214,7 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                         <div className="font-jbmono text-[1.3rem] tabular-nums leading-none text-gold">
                           {cat.services.length}
                         </div>
-                        <div className="mt-1.5 font-assistant text-[11px] font-light text-tone-muted">
+                        <div className="mt-1.5 font-assistant text-[11px] font-light text-muted">
                           {p.serviceCountLabel}
                         </div>
                       </div>
@@ -230,10 +230,10 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                       <div className="divide-y divide-[rgba(243,234,219,0.12)]">
                         {cat.services.map((service) => (
                           <div key={service.name} className="py-3.5">
-                            <div className="text-sm font-medium text-paper">
+                            <div className="text-sm font-medium text-cream">
                               {highlight(service.name, normalizedQuery)}
                             </div>
-                            <div className="mt-1 font-assistant text-xs font-light leading-relaxed text-tone-muted">
+                            <div className="mt-1 font-assistant text-xs font-light leading-relaxed text-muted">
                               {highlight(service.description, normalizedQuery)}
                             </div>
                           </div>

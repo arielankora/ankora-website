@@ -47,7 +47,7 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
                   <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
                     {String(i + 1).padStart(2, "0")}
                   </MonoLabel>
-                  <h2 className="text-[1.34rem] font-normal leading-[1.3] text-paper">{step.title}</h2>
+                  <h2 className="text-[1.34rem] font-normal leading-[1.3] text-cream">{step.title}</h2>
                   <span className="h-0.5 min-w-10 flex-1 overflow-hidden bg-[rgba(243,234,219,0.14)]">
                     <motion.span
                       className="block h-full origin-left bg-gold rtl:origin-right"
@@ -58,7 +58,7 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
                     />
                   </span>
                 </div>
-                <p className="mt-4 max-w-[72ch] font-assistant text-[15px] font-light leading-[1.8] text-tone-muted">
+                <p className="mt-4 max-w-[72ch] font-assistant text-[15px] font-light leading-[1.8] text-muted">
                   {step.body}
                 </p>
               </div>
@@ -69,12 +69,12 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
 
       <SectionShell>
         <Reveal>
-          <h2 className="max-w-[18ch] text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+          <h2 className="max-w-[18ch] text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
             {p.vignette.title}
           </h2>
         </Reveal>
         <Reveal delay={0.08}>
-          <p className="mt-[22px] max-w-[62ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+          <p className="mt-[22px] max-w-[62ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
             {p.vignette.body}
           </p>
         </Reveal>
@@ -92,10 +92,10 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
               className="bg-[rgba(243,234,219,0.04)] p-[clamp(22px,2.6vw,34px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[16px]"
             >
               <MonoLabel className="text-gold">{item.time}</MonoLabel>
-              <div className="mt-3.5 text-[1.04rem] font-normal leading-[1.35] text-paper">
+              <div className="mt-3.5 text-[1.04rem] font-normal leading-[1.35] text-cream">
                 {item.title}
               </div>
-              <div className="mt-2 font-assistant text-[13.5px] font-light leading-[1.7] text-tone-muted">
+              <div className="mt-2 font-assistant text-[13.5px] font-light leading-[1.7] text-muted">
                 {item.note}
               </div>
             </motion.div>

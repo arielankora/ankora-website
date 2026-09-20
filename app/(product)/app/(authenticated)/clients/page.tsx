@@ -55,8 +55,8 @@ export default async function ClientsPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-navy">לקוחות</h1>
-            <p className="mt-1 text-sm text-navy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
+            <h1 className="text-xl font-medium text-appNavy">לקוחות</h1>
+            <p className="mt-1 text-sm text-appNavy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
           </div>
           <Drawer triggerLabel="+ לקוח חדש" title="לקוח חדש">
             <CreateClientForm />

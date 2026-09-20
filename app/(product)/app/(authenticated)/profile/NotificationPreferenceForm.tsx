@@ -43,8 +43,8 @@ export function NotificationPreferenceForm({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div>
-        <p className="text-sm text-navy">התראת מייל על טיימר שרץ זמן ארוך</p>
-        <p className="mt-0.5 text-xs text-navy/50">
+        <p className="text-sm text-appNavy">התראת מייל על טיימר שרץ זמן ארוך</p>
+        <p className="mt-0.5 text-xs text-appNavy/50">
           נוסף על ההתראה בתוך המערכת (מסך &quot;התראות שלי&quot;), כשטיימר רץ יותר מ-{LONG_TIMER_HOURS} שעות ברציפות.
         </p>
       </div>

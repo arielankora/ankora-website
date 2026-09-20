@@ -36,21 +36,21 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
   return (
     <div className="space-y-3 rounded-2xl border border-lineDark bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-navy">
+        <h2 className="text-sm font-medium text-appNavy">
           הטקסט מוכן להעתקה - הדביקו אותו ב-ChatGPT או Claude כדי לקבל סיכום קצר לשיתוף עם הלקוח.
         </h2>
         <div className="flex items-center gap-3">
           <button
             type="button"
             onClick={copy}
-            className="rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-ink"
+            className="rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-navy"
           >
             {copied ? "הועתק!" : "העתק ללוח"}
           </button>
           <button
             type="button"
             onClick={download}
-            className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold"
+            className="rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-appNavy transition-colors hover:border-gold"
           >
             הורדה כקובץ טקסט
           </button>
@@ -66,7 +66,7 @@ export function ClientSummaryView({ text, filename }: { text: string; filename: 
         readOnly
         value={text}
         dir="rtl"
-        className="h-[480px] w-full resize-y rounded-2xl bg-ink p-5 font-jbmono text-xs leading-loose text-cream/85 outline-none"
+        className="h-[480px] w-full resize-y rounded-2xl bg-navy p-5 font-jbmono text-xs leading-loose text-cream-warm/85 outline-none"
         onFocus={(e) => e.currentTarget.select()}
       />
     </div>

@@ -15,8 +15,8 @@ export default async function ResetPasswordPage(
 
   return (
     <AuthShell>
-      <p className="text-[22px] font-medium text-navy">בחירת סיסמה חדשה</p>
-      <p className="mb-6 mt-2 text-[13.5px] text-navy/60">לפחות 10 תווים.</p>
+      <p className="text-[22px] font-medium text-appNavy">בחירת סיסמה חדשה</p>
+      <p className="mb-6 mt-2 text-[13.5px] text-appNavy/60">לפחות 10 תווים.</p>
 
       {token ? (
         <ResetPasswordForm token={token} />
@@ -29,7 +29,7 @@ export default async function ResetPasswordPage(
         </p>
       )}
 
-      <p className="mt-6 text-center text-xs text-navy/50">
+      <p className="mt-6 text-center text-xs text-appNavy/50">
         <Link href="/app/login" className="hover:text-gold-dim">
           חזרה להתחברות
         </Link>

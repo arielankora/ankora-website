@@ -27,7 +27,7 @@ export default async function EditPostPage(
   if (!post) notFound();
 
   return (
-    <div className="bg-paper px-6 py-32">
+    <div className="bg-cream px-6 py-32">
       <PostEditor mode="edit" initial={post} basePath={`/${locale}/admin`} />
     </div>
   );

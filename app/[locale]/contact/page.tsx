@@ -76,33 +76,33 @@ export default async function ContactPage(props: { params: Promise<{ locale: str
                 <Eyebrow>{p.eyebrow}</Eyebrow>
               </Reveal>
               <Reveal delay={0.08}>
-                <h1 className="mt-6 text-balance text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-paper">
+                <h1 className="mt-6 text-balance text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-cream">
                   {p.title}
                 </h1>
               </Reveal>
               <Reveal delay={0.16}>
-                <p className="mt-6 max-w-[48ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+                <p className="mt-6 max-w-[48ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
                   {p.sub}
                 </p>
               </Reveal>
               <Reveal delay={0.22}>
                 <div className="mt-10 border-t border-[rgba(243,234,219,0.12)] pt-8">
-                  <MonoLabel tracking="0.15em" className="text-tone-muted">
+                  <MonoLabel tracking="0.15em" className="text-muted">
                     {p.directTitle}
                   </MonoLabel>
-                  <p className="mt-3 font-assistant text-sm font-light leading-[1.8] text-tone-muted">
+                  <p className="mt-3 font-assistant text-sm font-light leading-[1.8] text-muted">
                     {p.directBody}
                   </p>
                   <a
                     href="mailto:hello@ankora.co.il"
                     dir="ltr"
-                    className="mt-3 inline-flex min-h-[46px] items-center font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-paper"
+                    className="mt-3 inline-flex min-h-[46px] items-center font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-cream"
                   >
                     hello@ankora.co.il
                   </a>
                   <ul className="mt-6 flex flex-col gap-2.5">
                     {p.directPoints.map((point) => (
-                      <li key={point} className="flex items-center gap-2.5 font-assistant text-sm font-light text-paper">
+                      <li key={point} className="flex items-center gap-2.5 font-assistant text-sm font-light text-cream">
                         <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
                         {point}
                       </li>

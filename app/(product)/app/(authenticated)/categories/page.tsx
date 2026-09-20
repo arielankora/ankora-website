@@ -50,8 +50,8 @@ export default async function CategoriesPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-navy">קטגוריות</h1>
-            <p className="mt-1 text-sm text-navy/60">
+            <h1 className="text-xl font-medium text-appNavy">קטגוריות</h1>
+            <p className="mt-1 text-sm text-appNavy/60">
               קטגוריות גלובליות זמינות לכל הלקוחות. קטגוריה ייעודית מופיעה רק אצל הלקוח שלה.
             </p>
           </div>
@@ -61,20 +61,20 @@ export default async function CategoriesPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-          <div className="flex items-center gap-3.5 border-b border-lineDark bg-paper px-[18px] py-2.5 text-[11.5px] text-navy/55">
+          <div className="flex items-center gap-3.5 border-b border-lineDark bg-cream px-[18px] py-2.5 text-[11.5px] text-appNavy/55">
             <span className="flex-1">קטגוריה</span>
             <span className="w-[120px]">היקף</span>
             <span className="w-[90px] text-end">שעות החודש</span>
             <span className="w-[80px] text-end">סטטוס</span>
           </div>
           {categories.length === 0 ? (
-            <p className="px-5 py-8 text-center text-sm text-navy/50">אין עדיין קטגוריות. הוסיפו קטגוריה ראשונה למעלה.</p>
+            <p className="px-5 py-8 text-center text-sm text-appNavy/50">אין עדיין קטגוריות. הוסיפו קטגוריה ראשונה למעלה.</p>
           ) : (
             categories.map((cat, i) => (
               <a
                 key={cat.id}
                 href={`/app/categories/${cat.id}`}
-                className="flex items-center gap-3.5 border-b border-lineDark px-[18px] py-3.5 text-[13px] text-navy last:border-0 hover:bg-paper/40"
+                className="flex items-center gap-3.5 border-b border-lineDark px-[18px] py-3.5 text-[13px] text-appNavy last:border-0 hover:bg-cream/40"
               >
                 <span className="flex min-w-0 flex-1 items-center gap-2.5">
                   <span
@@ -84,10 +84,10 @@ export default async function CategoriesPage() {
                   />
                   <span className="truncate">{cat.name}</span>
                 </span>
-                <span className="w-[120px] truncate text-xs text-navy/60">
+                <span className="w-[120px] truncate text-xs text-appNavy/60">
                   {cat.visibility === "GLOBAL" ? "גלובלית" : cat.client?.name ?? "ספציפית ללקוח"}
                 </span>
-                <span dir="ltr" className="w-[90px] text-end font-jbmono text-navy">
+                <span dir="ltr" className="w-[90px] text-end font-jbmono text-appNavy">
                   {formatHM(monthlyHours.get(cat.id) ?? 0)}
                 </span>
                 <span className="w-[80px] text-end">

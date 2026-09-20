@@ -17,7 +17,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-ink disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50"
     >
       {pending ? "שומר…" : "שמירה וכניסה"}
     </button>
@@ -48,7 +48,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (state?.done) {
     return (
       <div className="space-y-4">
-        <p className="text-[13px] text-navy/70">הסיסמה נקבעה בהצלחה.</p>
+        <p className="text-[13px] text-appNavy/70">הסיסמה נקבעה בהצלחה.</p>
         <Link href="/app/login" className="block text-center text-sm text-gold-dim underline">
           מעבר להתחברות
         </Link>
@@ -60,7 +60,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     <form action={formAction}>
       <input type="hidden" name="token" value={token} />
       <label className="block">
-        <span className="mb-1.5 block text-xs text-navy/60">סיסמה חדשה</span>
+        <span className="mb-1.5 block text-xs text-appNavy/60">סיסמה חדשה</span>
         <input
           name="password"
           type="password"
@@ -69,7 +69,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           minLength={MIN_LENGTH}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-navy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
         />
       </label>
 
@@ -78,17 +78,17 @@ export function ResetPasswordForm({ token }: { token: string }) {
           <span key={i} className={`h-1 flex-1 rounded-full ${score >= i ? barColor : "bg-lineDark"}`} />
         ))}
       </div>
-      <p className="mt-1.5 text-xs text-navy/55">{label}</p>
+      <p className="mt-1.5 text-xs text-appNavy/55">{label}</p>
 
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-navy/60">אימות סיסמה</span>
+        <span className="mb-1.5 block text-xs text-appNavy/60">אימות סיסמה</span>
         <input
           name="confirm"
           type="password"
           dir="ltr"
           required
           minLength={MIN_LENGTH}
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-navy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
         />
       </label>
 

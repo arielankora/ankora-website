@@ -60,21 +60,21 @@ export function OpenAlertsPanel({ alerts }: { alerts: OpenAlertRow[] }) {
         <div key={alert.id} className="rounded-2xl border border-error/30 bg-white p-5">
           <div className="flex items-center justify-between gap-2.5">
             <span className="text-xs text-error">דורש החלטה</span>
-            <span className="text-[11px] text-navy/45">{alert.triggeredAgo}</span>
+            <span className="text-[11px] text-appNavy/45">{alert.triggeredAgo}</span>
           </div>
-          <p className="mt-2.5 text-sm text-navy">{alert.description}</p>
-          <p className="mt-1 text-xs text-navy/55">{alert.clientName}</p>
+          <p className="mt-2.5 text-sm text-appNavy">{alert.description}</p>
+          <p className="mt-1 text-xs text-appNavy/55">{alert.clientName}</p>
           <div className="mt-3.5 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => resolve(alert)}
-              className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-ink"
+              className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy"
             >
               סימון כטופל
             </button>
             <Link
               href={`/app/hour-banks?clientId=${alert.clientId}`}
-              className="rounded-full border border-lineDark px-4 py-2 text-xs text-navy transition-colors hover:border-gold"
+              className="rounded-full border border-lineDark px-4 py-2 text-xs text-appNavy transition-colors hover:border-gold"
             >
               פתיחת בנק השעות
             </Link>

@@ -15,8 +15,8 @@ export default async function LoginPage(props: { searchParams: Promise<{ passwor
   const searchParams = await props.searchParams;
   return (
     <AuthShell>
-      <p className="text-[22px] font-medium text-navy">כניסה למערכת</p>
-      <p className="mb-6 mt-2 text-[13.5px] text-navy/60">התחברות עם כתובת המייל או שם המשתמש הארגוני.</p>
+      <p className="text-[22px] font-medium text-appNavy">כניסה למערכת</p>
+      <p className="mb-6 mt-2 text-[13.5px] text-appNavy/60">התחברות עם כתובת המייל או שם המשתמש הארגוני.</p>
 
       {searchParams.passwordChanged === "1" && (
         // Phase 9 gap-fix: app/(product)/app/profile's self-service
@@ -29,12 +29,12 @@ export default async function LoginPage(props: { searchParams: Promise<{ passwor
 
       <LoginForm />
 
-      <p className="mt-8 text-center text-[11px] text-navy/40">
-        <Link href="/he/privacy" className="hover:text-navy/60">
+      <p className="mt-8 text-center text-[11px] text-appNavy/40">
+        <Link href="/he/privacy" className="hover:text-appNavy/60">
           מדיניות פרטיות
         </Link>
         {" · "}
-        <Link href="/he/terms" className="hover:text-navy/60">
+        <Link href="/he/terms" className="hover:text-appNavy/60">
           תנאי שימוש
         </Link>
       </p>

@@ -7,7 +7,7 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 type Status = "idle" | "loading" | "success" | "error";
 
 const FIELD =
-  "w-full min-h-[44px] border border-[rgba(243,234,219,0.18)] bg-[rgba(11,27,51,0.5)] px-4 py-3 text-paper outline-none transition-colors duration-200 focus:border-gold focus:bg-[rgba(176,141,87,0.06)]";
+  "w-full min-h-[44px] border border-[rgba(243,234,219,0.18)] bg-[rgba(11,27,51,0.5)] px-4 py-3 text-cream outline-none transition-colors duration-200 focus:border-gold focus:bg-[rgba(176,141,87,0.06)]";
 
 /**
  * Contact form. Labels above the fields and no placeholders: with a visible label a
@@ -49,7 +49,7 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
     }
   }
 
-  const label = "mb-2 block font-assistant text-sm text-tone-muted";
+  const label = "mb-2 block font-assistant text-sm text-muted";
 
   return (
     <GlassPanel elevated className="p-[clamp(22px,3vw,40px)]">
@@ -90,7 +90,7 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
         <button
           type="submit"
           disabled={status === "loading"}
-          className="min-h-[44px] w-full border border-gold bg-gold px-7 py-3.5 font-assistant text-[15px] font-medium text-ink transition-colors duration-200 hover:bg-paper disabled:opacity-60"
+          className="min-h-[44px] w-full border border-gold bg-gold px-7 py-3.5 font-assistant text-[15px] font-medium text-navy transition-colors duration-200 hover:bg-cream disabled:opacity-60"
         >
           {status === "loading" ? "..." : p.submit}
         </button>

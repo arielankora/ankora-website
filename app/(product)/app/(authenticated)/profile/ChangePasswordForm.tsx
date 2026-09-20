@@ -26,37 +26,37 @@ export function ChangePasswordForm({ lastChangedLabel }: { lastChangedLabel: str
 
   return (
     <div>
-      {lastChangedLabel && <p className="mb-4 text-xs text-navy/50">{lastChangedLabel}</p>}
+      {lastChangedLabel && <p className="mb-4 text-xs text-appNavy/50">{lastChangedLabel}</p>}
 
       <form action={formAction} className="space-y-3">
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-navy/60">סיסמה נוכחית</span>
+          <span className="mb-1.5 block text-xs font-medium text-appNavy/60">סיסמה נוכחית</span>
           <input
             type="password"
             name="currentPassword"
             required
             autoComplete="current-password"
-            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-gold"
+            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-navy/60">סיסמה חדשה</span>
+          <span className="mb-1.5 block text-xs font-medium text-appNavy/60">סיסמה חדשה</span>
           <input
             type="password"
             name="newPassword"
             required
             autoComplete="new-password"
-            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-gold"
+            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-xs font-medium text-navy/60">אימות סיסמה חדשה</span>
+          <span className="mb-1.5 block text-xs font-medium text-appNavy/60">אימות סיסמה חדשה</span>
           <input
             type="password"
             name="confirmPassword"
             required
             autoComplete="new-password"
-            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-gold"
+            className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-appNavy outline-none focus:border-gold"
           />
         </label>
 
@@ -64,7 +64,7 @@ export function ChangePasswordForm({ lastChangedLabel }: { lastChangedLabel: str
 
         <SubmitButton />
 
-        <p className="text-xs text-navy/50">
+        <p className="text-xs text-appNavy/50">
           לפחות 10 תווים. החלפת סיסמה מנתקת את כל ההתחברויות הפעילות, כולל זו הנוכחית - תתבקשו להתחבר מחדש.
         </p>
       </form>

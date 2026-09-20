@@ -62,7 +62,7 @@ function ProfileRow({
         <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
           {String(index + 1).padStart(2, "0")}
         </MonoLabel>
-        <span className="font-assistant text-[13.5px] font-semibold tracking-[0.05em] text-paper rtl:tracking-normal">
+        <span className="font-assistant text-[13.5px] font-semibold tracking-[0.05em] text-cream rtl:tracking-normal">
           {segment.eyebrow}
         </span>
         <span className="h-px flex-1 bg-[rgba(243,234,219,0.14)]" />
@@ -70,7 +70,7 @@ function ProfileRow({
 
       <div className="mt-6 grid gap-[clamp(24px,3.4vw,56px)] [grid-template-columns:minmax(0,1fr)] min-[860px]:[grid-template-columns:minmax(0,1.45fr)_minmax(0,1fr)]">
         <div>
-          <h2 className="text-balance text-[clamp(1.4rem,2.3vw,2.05rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+          <h2 className="text-balance text-[clamp(1.4rem,2.3vw,2.05rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
             <Link
               href={withLocale(locale, href)}
               className="transition-colors duration-200 after:absolute after:inset-0 after:content-[''] group-hover:text-gold"
@@ -78,20 +78,20 @@ function ProfileRow({
               {segment.title}
             </Link>
           </h2>
-          <p className="mt-4 max-w-[52ch] font-assistant text-[15px] font-light leading-[1.8] text-tone-muted">
+          <p className="mt-4 max-w-[52ch] font-assistant text-[15px] font-light leading-[1.8] text-muted">
             {segment.sub}
           </p>
         </div>
 
         <div>
-          <MonoLabel tracking="0.16em" className="text-tone-muted">
+          <MonoLabel tracking="0.16em" className="text-muted">
             {focusLabel}
           </MonoLabel>
           <ul className="mt-4 flex flex-col gap-px">
             {segment.bullets.map((bullet) => (
               <li
                 key={bullet.title}
-                className="flex items-start gap-2.5 border-t border-[rgba(243,234,219,0.11)] pt-3 font-assistant text-[14.5px] font-light leading-[1.6] text-tone-body first:border-t-0 first:pt-0"
+                className="flex items-start gap-2.5 border-t border-[rgba(243,234,219,0.11)] pt-3 font-assistant text-[14.5px] font-light leading-[1.6] text-body first:border-t-0 first:pt-0"
               >
                 <span className="mt-[9px] h-1 w-1 shrink-0 rounded-full bg-gold" />
                 {bullet.title}
@@ -109,7 +109,7 @@ function ProfileRow({
             and a second link to the same page would be read out twice. */}
         <span
           aria-hidden="true"
-          className="font-assistant text-[15px] font-medium text-tone-muted transition-colors duration-200 group-hover:text-gold"
+          className="font-assistant text-[15px] font-medium text-muted transition-colors duration-200 group-hover:text-gold"
         >
           {cta}
         </span>
@@ -162,12 +162,12 @@ export default function SolutionsIndexClient({ params }: { params: { locale: str
           <Eyebrow>{p.constantLabel}</Eyebrow>
         </Reveal>
         <Reveal delay={0.08}>
-          <h2 className="mt-6 max-w-[22ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+          <h2 className="mt-6 max-w-[22ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
             {p.constantTitle}
           </h2>
         </Reveal>
         <Reveal delay={0.14}>
-          <p className="mt-4 max-w-[58ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+          <p className="mt-4 max-w-[58ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
             {p.constantBody}
           </p>
         </Reveal>
@@ -194,7 +194,7 @@ export default function SolutionsIndexClient({ params }: { params: { locale: str
                   <MonoLabel script="latin" tracking="0.15em" className="text-gold">
                     {item.key}
                   </MonoLabel>
-                  <span className="text-[1.04rem] font-normal leading-[1.35] text-paper">
+                  <span className="text-[1.04rem] font-normal leading-[1.35] text-cream">
                     {item.title}
                   </span>
                 </HairlineGridCell>

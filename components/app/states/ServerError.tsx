@@ -33,13 +33,13 @@ export function ServerError({
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-error-soft">
         <ServerCrash size={20} strokeWidth={1.75} className="text-error" />
       </span>
-      <p className="text-[15px] font-medium text-navy">משהו השתבש</p>
-      <p className="max-w-sm text-sm text-navy/60">אירעה שגיאה בטעינת המסך. אפשר לנסות שוב, או לפנות לתמיכה עם הקוד הבא.</p>
+      <p className="text-[15px] font-medium text-appNavy">משהו השתבש</p>
+      <p className="max-w-sm text-sm text-appNavy/60">אירעה שגיאה בטעינת המסך. אפשר לנסות שוב, או לפנות לתמיכה עם הקוד הבא.</p>
       {errorCode && (
         <button
           type="button"
           onClick={handleCopy}
-          className="mt-1 flex items-center gap-1.5 rounded-full border border-lineDark bg-paper px-3 py-1.5 font-jbmono text-xs text-navy/70 hover:border-gold"
+          className="mt-1 flex items-center gap-1.5 rounded-full border border-lineDark bg-cream px-3 py-1.5 font-jbmono text-xs text-appNavy/70 hover:border-gold"
         >
           <span dir="ltr">{errorCode}</span>
           {copied ? <Check size={13} strokeWidth={2} className="text-success" /> : <Copy size={13} strokeWidth={1.75} />}
@@ -49,7 +49,7 @@ export function ServerError({
         <button
           type="button"
           onClick={onRetry}
-          className="mt-2 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink"
+          className="mt-2 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy"
         >
           ניסיון חוזר
         </button>

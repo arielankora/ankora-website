@@ -76,8 +76,8 @@ export default async function UsersPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-navy">משתמשים והרשאות</h1>
-            <p className="mt-1 text-sm text-navy/60">
+            <h1 className="text-xl font-medium text-appNavy">משתמשים והרשאות</h1>
+            <p className="mt-1 text-sm text-appNavy/60">
               {users.filter((u) => u.status === "ACTIVE").length} משתמשים פעילים · הרשאות נאכפות גם בשרת
             </p>
           </div>
@@ -87,7 +87,7 @@ export default async function UsersPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-          <div className="flex items-center gap-3.5 border-b border-lineDark bg-paper px-[18px] py-2.5 text-[11.5px] text-navy/55">
+          <div className="flex items-center gap-3.5 border-b border-lineDark bg-cream px-[18px] py-2.5 text-[11.5px] text-appNavy/55">
             <span className="flex-1">משתמש</span>
             <span className="w-[120px]">תפקיד</span>
             <span className="w-[130px]">כניסה אחרונה</span>
@@ -101,8 +101,8 @@ export default async function UsersPage() {
                   {initials(u.name)}
                 </span>
                 <span className="min-w-0">
-                  <span className="block truncate text-navy">{u.name}</span>
-                  <span dir="ltr" className="block truncate text-end text-[11.5px] text-navy/50">
+                  <span className="block truncate text-appNavy">{u.name}</span>
+                  <span dir="ltr" className="block truncate text-end text-[11.5px] text-appNavy/50">
                     {u.email}
                   </span>
                 </span>
@@ -112,7 +112,7 @@ export default async function UsersPage() {
                   {ROLE_LABEL[u.role]}
                 </span>
               </span>
-              <span className="w-[130px] text-xs text-navy/60">{formatLastLogin(u.lastLoginAt)}</span>
+              <span className="w-[130px] text-xs text-appNavy/60">{formatLastLogin(u.lastLoginAt)}</span>
               <span className="w-[80px]">
                 <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${STATUS_TAG_CLASSES[u.status]}`}>
                   {STATUS_LABEL[u.status]}
@@ -128,13 +128,13 @@ export default async function UsersPage() {
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-5">
-          <p className="text-[13.5px] font-medium text-navy">מה כל תפקיד רואה</p>
-          <p className="mt-1 text-xs text-navy/55">הרשאה שנשללת כאן נאכפת גם על הפעולות עצמן, לא רק על התפריט.</p>
+          <p className="text-[13.5px] font-medium text-appNavy">מה כל תפקיד רואה</p>
+          <p className="mt-1 text-xs text-appNavy/55">הרשאה שנשללת כאן נאכפת גם על הפעולות עצמן, לא רק על התפריט.</p>
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {ROLE_SCOPE_CARDS.map((card) => (
               <div key={card.role} className="rounded-xl border border-lineDark p-3.5">
-                <span className="text-[13px] font-medium text-navy">{card.role}</span>
-                <p className="mt-2 text-xs leading-relaxed text-navy/60">{card.description}</p>
+                <span className="text-[13px] font-medium text-appNavy">{card.role}</span>
+                <p className="mt-2 text-xs leading-relaxed text-appNavy/60">{card.description}</p>
               </div>
             ))}
           </div>

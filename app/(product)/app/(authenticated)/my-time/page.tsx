@@ -109,8 +109,8 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">הזמן שלי</h1>
-          <p className="mt-1 text-sm text-navy/60">רצועת השבוע, הוספת דיווח בשורה אחת, ורשימה לפי יום.</p>
+          <h1 className="text-xl font-medium text-appNavy">הזמן שלי</h1>
+          <p className="mt-1 text-sm text-appNavy/60">רצועת השבוע, הוספת דיווח בשורה אחת, ורשימה לפי יום.</p>
         </div>
 
         {/* App redesign (handoff README, screen 3): "פס שבוע" - nav +
@@ -122,24 +122,24 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
               <Link
                 href={`/app/my-time?week=${prevWeek}`}
                 aria-label="שבוע קודם"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-navy hover:border-gold"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-appNavy hover:border-gold"
               >
                 ›
               </Link>
-              <span className="text-[13.5px] font-medium text-navy">
+              <span className="text-[13.5px] font-medium text-appNavy">
                 {formatDay(weekStart)} – {formatDay(addDays(weekStart, 6))}
               </span>
               <Link
                 href={`/app/my-time?week=${nextWeek}`}
                 aria-label="שבוע הבא"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-navy hover:border-gold"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-appNavy hover:border-gold"
               >
                 ‹
               </Link>
             </div>
-            <span className="text-[12.5px] text-navy/60">
+            <span className="text-[12.5px] text-appNavy/60">
               סה&quot;כ השבוע{" "}
-              <span className="font-jbmono text-sm text-navy">{formatDuration(weekTotalSeconds)}</span> · יעד{" "}
+              <span className="font-jbmono text-sm text-appNavy">{formatDuration(weekTotalSeconds)}</span> · יעד{" "}
               {WEEKLY_TARGET_HOURS}:00
             </span>
           </div>
@@ -158,12 +158,12 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
                     isToday ? "border-2 border-gold bg-gold/6" : "border border-lineDark"
                   }`}
                 >
-                  <span className={`block text-[11px] ${isToday ? "text-gold-dim" : "text-navy/50"}`}>
+                  <span className={`block text-[11px] ${isToday ? "text-gold-dim" : "text-appNavy/50"}`}>
                     {weekday}׳ {dayMonth}
                   </span>
                   <span
                     className={`mt-1.5 block font-jbmono text-sm ${
-                      isToday ? "font-medium text-navy" : daySeconds > 0 ? "text-navy" : "text-navy/35"
+                      isToday ? "font-medium text-appNavy" : daySeconds > 0 ? "text-appNavy" : "text-appNavy/35"
                     }`}
                   >
                     {daySeconds > 0 ? formatDuration(daySeconds) : "—"}
@@ -196,9 +196,9 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
             const dayTotalSeconds = dayEntries.reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
             return (
               <div key={key} className="rounded-2xl border border-lineDark bg-white">
-                <div className="flex items-center justify-between border-b border-lineDark bg-paper px-5 py-3">
-                  <p className="text-sm font-medium text-navy">{formatDay(day)}</p>
-                  <span className="font-jbmono text-sm text-navy">{formatDuration(dayTotalSeconds)}</span>
+                <div className="flex items-center justify-between border-b border-lineDark bg-cream px-5 py-3">
+                  <p className="text-sm font-medium text-appNavy">{formatDay(day)}</p>
+                  <span className="font-jbmono text-sm text-appNavy">{formatDuration(dayTotalSeconds)}</span>
                 </div>
                 <div className="divide-y divide-lineDark">
                   {dayEntries.map((entry) => (
@@ -224,7 +224,7 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
           })}
           {entries.length === 0 && (
             <div className="rounded-2xl border border-lineDark bg-white p-8 text-center">
-              <p className="text-sm text-navy/50">אין עדיין דיווחים השבוע.</p>
+              <p className="text-sm text-appNavy/50">אין עדיין דיווחים השבוע.</p>
             </div>
           )}
         </div>

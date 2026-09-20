@@ -23,13 +23,13 @@ export function Intelligence({ dict }: { dict: Dictionary }) {
         <Eyebrow>{dict.intelligence.label}</Eyebrow>
       </Reveal>
       <Reveal delay={0.08}>
-        <h2 className="mt-6 max-w-[22ch] text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+        <h2 className="mt-6 max-w-[22ch] text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
           <span className="block">{dict.intelligence.titleLine1}</span>
           <span className="block font-light text-gold">{dict.intelligence.titleLine2}</span>
         </h2>
       </Reveal>
       <Reveal delay={0.14}>
-        <p className="mt-6 max-w-[56ch] font-assistant font-light leading-[1.75] text-tone-muted">
+        <p className="mt-6 max-w-[56ch] font-assistant font-light leading-[1.75] text-muted">
           {dict.intelligence.body}
         </p>
       </Reveal>
@@ -39,8 +39,8 @@ export function Intelligence({ dict }: { dict: Dictionary }) {
           {dict.intelligence.pillars.map((pillar) => (
             <motion.div key={pillar.key} variants={staggerItem} className="h-full">
               <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
-                <h3 className="text-[1.12rem] font-normal text-paper">{pillar.title}</h3>
-                <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                <h3 className="text-[1.12rem] font-normal text-cream">{pillar.title}</h3>
+                <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-muted">
                   {pillar.body}
                 </p>
               </HairlineGridCell>

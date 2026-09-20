@@ -37,7 +37,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
         <WideContainer className="max-w-[92ch]">
           <Reveal>
             <div className="border border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] p-[clamp(22px,3vw,40px)]">
-              <p className="text-lg leading-relaxed text-paper">{p.directAnswer}</p>
+              <p className="text-lg leading-relaxed text-cream">{p.directAnswer}</p>
             </div>
           </Reveal>
         </WideContainer>
@@ -46,7 +46,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.expectations.title}
             </h2>
           </Reveal>
@@ -68,7 +68,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
         <WideContainer>
           <Reveal><Eyebrow>{p.eyebrow}</Eyebrow></Reveal>
           <Reveal delay={0.06}>
-            <h2 className="mt-6 max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="mt-6 max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.whenPARight.title}
             </h2>
           </Reveal>
@@ -82,7 +82,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.wherePAFalls.title}
             </h2>
           </Reveal>
@@ -107,7 +107,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.ankoraModel.title}
             </h2>
           </Reveal>
@@ -119,7 +119,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
               {p.ankoraModel.points.map((pt) => (
                 <motion.div key={pt.title} variants={staggerItem}>
                   <HairlineGridCell>
-                    <h3 className="font-medium text-paper">{pt.title}</h3>
+                    <h3 className="font-medium text-cream">{pt.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{pt.body}</p>
                   </HairlineGridCell>
                 </motion.div>
@@ -133,7 +133,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.whenFullTimePA.title}
             </h2>
           </Reveal>
@@ -169,7 +169,7 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(44px,7vw,112px)]">
         <WideContainer className="max-w-2xl text-center">
           <Reveal>
-            <h2 className="mx-auto text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-paper">
+            <h2 className="mx-auto text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-cream">
               {p.ctaTitle}
             </h2>
           </Reveal>
@@ -208,41 +208,10 @@ export function PersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dic
         }
       />
 
-      <section className="bg-cream py-16 md:py-20">
+      <section className="bg-cream-warm py-16 md:py-20">
         <Container className="max-w-3xl">
           <Reveal>
-            <p className="text-lg leading-relaxed text-navy md:text-xl">{p.directAnswer}</p>
-          </Reveal>
-        </Container>
-      </section>
-
-      <section className="bg-paper py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
-              {p.expectations.title}
-            </h2>
-          </Reveal>
-          <RevealStagger className="mt-8 flex flex-wrap gap-3">
-            {p.expectations.items.map((item) => (
-              <motion.span key={item} variants={staggerItem} className="rounded-full border border-lineDark bg-cream px-5 py-2.5 text-sm text-navy/70">
-                {item}
-              </motion.span>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-
-      <section className="bg-navy py-20 md:py-28">
-        <Container>
-          <Reveal><Badge tone="dark">{p.eyebrow}</Badge></Reveal>
-          <Reveal delay={0.06}>
-            <h2 className="mt-6 max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
-              {p.whenPARight.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.12}>
-            <p className="mt-4 max-w-2xl text-paper/55">{p.whenPARight.body}</p>
+            <p className="text-lg leading-relaxed text-appNavy md:text-xl">{p.directAnswer}</p>
           </Reveal>
         </Container>
       </section>
@@ -250,16 +219,47 @@ export function PersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dic
       <section className="bg-cream py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
+              {p.expectations.title}
+            </h2>
+          </Reveal>
+          <RevealStagger className="mt-8 flex flex-wrap gap-3">
+            {p.expectations.items.map((item) => (
+              <motion.span key={item} variants={staggerItem} className="rounded-full border border-lineDark bg-cream-warm px-5 py-2.5 text-sm text-appNavy/70">
+                {item}
+              </motion.span>
+            ))}
+          </RevealStagger>
+        </Container>
+      </section>
+
+      <section className="bg-appNavy py-20 md:py-28">
+        <Container>
+          <Reveal><Badge tone="dark">{p.eyebrow}</Badge></Reveal>
+          <Reveal delay={0.06}>
+            <h2 className="mt-6 max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
+              {p.whenPARight.title}
+            </h2>
+          </Reveal>
+          <Reveal delay={0.12}>
+            <p className="mt-4 max-w-2xl text-cream/55">{p.whenPARight.body}</p>
+          </Reveal>
+        </Container>
+      </section>
+
+      <section className="bg-cream-warm py-20 md:py-28">
+        <Container>
+          <Reveal>
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
               {p.wherePAFalls.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-navy/60">{p.wherePAFalls.body}</p>
+            <p className="mt-4 max-w-2xl text-appNavy/60">{p.wherePAFalls.body}</p>
           </Reveal>
           <RevealStagger className="mt-8 grid gap-3 md:grid-cols-2">
             {p.wherePAFalls.items.map((item) => (
-              <motion.div key={item} variants={staggerItem} className="flex items-start gap-3 rounded-xl border border-lineDark bg-paper px-5 py-4 text-sm leading-relaxed text-navy/70">
+              <motion.div key={item} variants={staggerItem} className="flex items-start gap-3 rounded-xl border border-lineDark bg-cream px-5 py-4 text-sm leading-relaxed text-appNavy/70">
                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gold" />
                 {item}
               </motion.div>
@@ -268,40 +268,40 @@ export function PersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dic
         </Container>
       </section>
 
-      <section className="bg-ink py-20 md:py-28">
+      <section className="bg-navy py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
               {p.ankoraModel.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-paper/55">{p.ankoraModel.body}</p>
+            <p className="mt-4 max-w-2xl text-cream/55">{p.ankoraModel.body}</p>
           </Reveal>
           <RevealStagger className="mt-10 grid gap-4 md:grid-cols-3">
             {p.ankoraModel.points.map((pt) => (
-              <motion.div key={pt.title} variants={staggerItem} className="rounded-2xl border border-line p-7">
-                <h3 className="font-medium text-paper">{pt.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{pt.body}</p>
+              <motion.div key={pt.title} variants={staggerItem} className="rounded-2xl border border-hairline p-7">
+                <h3 className="font-medium text-cream">{pt.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-cream/50">{pt.body}</p>
               </motion.div>
             ))}
           </RevealStagger>
         </Container>
       </section>
 
-      <section className="bg-paper py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
               {p.whenFullTimePA.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-navy/60">{p.whenFullTimePA.body}</p>
+            <p className="mt-4 max-w-2xl text-appNavy/60">{p.whenFullTimePA.body}</p>
           </Reveal>
           <RevealStagger className="mt-8 grid gap-3 md:grid-cols-2">
             {p.whenFullTimePA.items.map((item) => (
-              <motion.div key={item} variants={staggerItem} className="rounded-xl border border-lineDark bg-cream/50 px-5 py-4 text-sm text-navy/70">
+              <motion.div key={item} variants={staggerItem} className="rounded-xl border border-lineDark bg-cream-warm/50 px-5 py-4 text-sm text-appNavy/70">
                 {item}
               </motion.div>
             ))}
@@ -320,16 +320,16 @@ export function PersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dic
         ]}
       />
 
-      <section className="relative overflow-hidden bg-ink py-28 md:py-40">
+      <section className="relative overflow-hidden bg-navy py-28 md:py-40">
         <div className="absolute inset-0 bg-radial-glow" />
         <Container className="relative text-center">
           <Reveal>
-            <h2 className="mx-auto max-w-2xl text-[32px] font-medium leading-[1.15] tracking-tight text-paper md:text-[48px]">
+            <h2 className="mx-auto max-w-2xl text-[32px] font-medium leading-[1.15] tracking-tight text-cream md:text-[48px]">
               {p.ctaTitle}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md text-paper/55">{p.ctaBody}</p>
+            <p className="mx-auto mt-5 max-w-md text-cream/55">{p.ctaBody}</p>
           </Reveal>
           <Reveal delay={0.2} className="mt-10 flex justify-center">
             <Button href={withLocale(locale, "/contact")}>{p.cta}</Button>

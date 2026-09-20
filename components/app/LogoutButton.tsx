@@ -8,8 +8,8 @@ import { signOut } from "next-auth/react";
 export function LogoutButton({ variant = "light" }: { variant?: "light" | "dark" }) {
   const className =
     variant === "dark"
-      ? "w-full rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-paper/70 transition-colors hover:border-gold hover:text-paper"
-      : "rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-navy/70 transition-colors hover:border-gold hover:text-navy";
+      ? "w-full rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-cream/70 transition-colors hover:border-gold hover:text-cream"
+      : "rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 transition-colors hover:border-gold hover:text-appNavy";
   return (
     <button onClick={() => signOut({ callbackUrl: "/app/login" })} className={className}>
       התנתקות

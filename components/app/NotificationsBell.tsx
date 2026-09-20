@@ -72,7 +72,7 @@ export function NotificationsBell({
         onClick={() => setOpen((v) => !v)}
         aria-label="התראות"
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-navy/60 hover:bg-navy/5 hover:text-navy"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full text-appNavy/60 hover:bg-appNavy/5 hover:text-appNavy"
       >
         <Bell size={18} strokeWidth={1.75} />
         {unreadCount > 0 && (
@@ -85,13 +85,13 @@ export function NotificationsBell({
       {open && (
         <div className="absolute end-0 top-11 z-50 w-[330px] rounded-2xl border border-lineDark bg-white shadow-[0_18px_44px_rgba(11,27,51,0.14)]">
           <div className="flex items-center justify-between border-b border-lineDark px-4 py-3">
-            <p className="text-sm font-medium text-navy">התראות</p>
+            <p className="text-sm font-medium text-appNavy">התראות</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={pending}
-                className="text-xs font-medium text-gold-dim hover:text-navy disabled:opacity-50"
+                className="text-xs font-medium text-gold-dim hover:text-appNavy disabled:opacity-50"
               >
                 סימון הכל כנקרא
               </button>
@@ -99,16 +99,16 @@ export function NotificationsBell({
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-navy/50">אין התראות</p>
+              <p className="px-4 py-8 text-center text-sm text-appNavy/50">אין התראות</p>
             ) : (
               notifications.slice(0, 8).map((n) => (
                 <div key={n.id} className="border-b border-lineDark/60 px-4 py-3 last:border-b-0">
                   <div className="flex items-start gap-2">
                     {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-navy">{n.title}</p>
-                      <p className="mt-0.5 text-xs text-navy/60">{n.body}</p>
-                      <p className="mt-1 font-jbmono text-[10.5px] text-navy/40">{relativeTime(n.createdAt)}</p>
+                      <p className="text-[13px] font-medium text-appNavy">{n.title}</p>
+                      <p className="mt-0.5 text-xs text-appNavy/60">{n.body}</p>
+                      <p className="mt-1 font-jbmono text-[10.5px] text-appNavy/40">{relativeTime(n.createdAt)}</p>
                     </div>
                   </div>
                 </div>
@@ -119,7 +119,7 @@ export function NotificationsBell({
             <Link
               href="/app/notifications"
               onClick={() => setOpen(false)}
-              className="text-xs font-medium text-gold-dim hover:text-navy"
+              className="text-xs font-medium text-gold-dim hover:text-appNavy"
             >
               כל ההתראות
             </Link>

@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "מוזמן..." : "הזמנת משתמש"}
     </button>
@@ -46,30 +46,30 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
     <div>
       <form action={formAction} className="flex flex-col gap-4">
         <div>
-          <label className="block text-xs font-medium text-navy/60">שם מלא *</label>
+          <label className="block text-xs font-medium text-appNavy/60">שם מלא *</label>
           <input
             name="name"
             required
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-navy/60">אימייל *</label>
+          <label className="block text-xs font-medium text-appNavy/60">אימייל *</label>
           <input
             name="email"
             type="email"
             required
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-navy/60">תפקיד *</label>
+          <label className="block text-xs font-medium text-appNavy/60">תפקיד *</label>
           <select
             name="role"
             required
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           >
             <option value="" disabled>
               בחירת תפקיד
@@ -88,12 +88,12 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
           // inviteUser doc comment. Exactly one client is required.
           <>
             <div>
-              <label className="block text-xs font-medium text-navy/60">לקוח *</label>
+              <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
               <select
                 name="clientIds"
                 required
                 defaultValue=""
-                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
               >
                 <option value="" disabled>
                   בחירת לקוח
@@ -106,12 +106,12 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-navy/60">תפקיד לקוח *</label>
+              <label className="block text-xs font-medium text-appNavy/60">תפקיד לקוח *</label>
               <select
                 name="clientUserRole"
                 required
                 defaultValue="VIEWER"
-                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
               >
                 <option value="VIEWER">צפייה בלבד</option>
                 <option value="ADMIN">מנהל לקוח (יכול לערוך נמענים לדוחות)</option>
@@ -121,22 +121,22 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
         ) : (
           <div>
             <div className="flex items-center justify-between">
-              <label className="block text-xs font-medium text-navy/60">גישה ללקוחות (אופציונלי)</label>
+              <label className="block text-xs font-medium text-appNavy/60">גישה ללקוחות (אופציונלי)</label>
               {clients.length > 0 && (
                 <div className="flex items-center gap-3 text-xs">
                   <button type="button" onClick={() => setAllChecked(true)} className="text-gold-dim underline">
                     בחר הכל
                   </button>
-                  <button type="button" onClick={() => setAllChecked(false)} className="text-navy/50 underline">
+                  <button type="button" onClick={() => setAllChecked(false)} className="text-appNavy/50 underline">
                     נקה הכל
                   </button>
                 </div>
               )}
             </div>
             <div ref={checkboxContainerRef} className="mt-2 flex flex-col gap-2">
-              {clients.length === 0 && <p className="text-xs text-navy/40">אין עדיין לקוחות במערכת.</p>}
+              {clients.length === 0 && <p className="text-xs text-appNavy/40">אין עדיין לקוחות במערכת.</p>}
               {clients.map((c) => (
-                <label key={c.id} className="flex items-center gap-1.5 text-sm text-navy/70">
+                <label key={c.id} className="flex items-center gap-1.5 text-sm text-appNavy/70">
                   <input type="checkbox" name="clientIds" value={c.id} className="h-4 w-4 rounded border-lineDark" />
                   {c.name}
                 </label>
@@ -150,8 +150,8 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
       </form>
 
       {state?.inviteLink && (
-        <div className="mt-4 rounded-lg border border-lineDark bg-paperDim p-4 text-sm">
-          <p className="text-navy">
+        <div className="mt-4 rounded-lg border border-lineDark bg-cream-dim p-4 text-sm">
+          <p className="text-appNavy">
             {state.invitedName} הוזמן בהצלחה. אין עדיין ספק אימייל מחובר (Phase 4) - יש להעביר את הקישור החד-פעמי
             הבא ידנית:
           </p>

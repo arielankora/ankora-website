@@ -25,12 +25,12 @@ export function Capabilities({ dict, locale }: { dict: Dictionary; locale: Local
         <Eyebrow>{dict.capabilities.label}</Eyebrow>
       </Reveal>
       <Reveal delay={0.08}>
-        <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+        <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
           {dict.capabilities.title}
         </h2>
       </Reveal>
       <Reveal delay={0.14}>
-        <p className="mt-4 max-w-[44ch] font-assistant font-light text-tone-muted">
+        <p className="mt-4 max-w-[44ch] font-assistant font-light text-muted">
           {dict.capabilities.sub}
         </p>
       </Reveal>
@@ -43,27 +43,27 @@ export function Capabilities({ dict, locale }: { dict: Dictionary; locale: Local
               // One column on a phone, the spec's three-track row from md up. The
               // three-track template on its own would squeeze the body column to zero
               // at 390px, since its first track has a 240px floor.
-              className="group grid items-center gap-6 bg-[rgba(11,27,51,0.5)] p-[clamp(22px,3vw,36px)] text-paper backdrop-blur-[12px] transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)] [grid-template-columns:minmax(0,1fr)] md:[grid-template-columns:minmax(min(100%,240px),1fr)_minmax(0,1.6fr)_auto]"
+              className="group grid items-center gap-6 bg-[rgba(11,27,51,0.5)] p-[clamp(22px,3vw,36px)] text-cream backdrop-blur-[12px] transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)] [grid-template-columns:minmax(0,1fr)] md:[grid-template-columns:minmax(min(100%,240px),1fr)_minmax(0,1.6fr)_auto]"
             >
               <div>
                 <span className="flex items-baseline gap-3">
-                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-muted">
+                  <MonoLabel script="latin" tracking="0.15em" className="text-muted">
                     {String(i + 1).padStart(2, "0")}
                   </MonoLabel>
-                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-muted">
+                  <MonoLabel script="latin" tracking="0.15em" className="text-muted">
                     {item.key}
                   </MonoLabel>
                 </span>
-                <h3 className="mt-2 text-[1.16rem] font-normal text-paper">{item.title}</h3>
+                <h3 className="mt-2 text-[1.16rem] font-normal text-cream">{item.title}</h3>
               </div>
-              <p className="font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+              <p className="font-assistant text-sm font-light leading-[1.7] text-muted">
                 {item.body}
               </p>
               {/* 44x44 is the spec's minimum touch target, and the whole row is the
                   link, so this box is a visual affordance rather than a second target. */}
               <span
                 aria-hidden="true"
-                className="flex h-11 w-11 flex-none items-center justify-center justify-self-end border border-[rgba(176,141,87,0.35)] text-[19px] leading-none text-gold transition-colors duration-[350ms] group-hover:border-gold group-hover:bg-gold group-hover:text-ink"
+                className="flex h-11 w-11 flex-none items-center justify-center justify-self-end border border-[rgba(176,141,87,0.35)] text-[19px] leading-none text-gold transition-colors duration-[350ms] group-hover:border-gold group-hover:bg-gold group-hover:text-navy"
               >
                 <span className="rtl:hidden">→</span>
                 <span className="hidden rtl:inline">←</span>

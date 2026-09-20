@@ -92,8 +92,8 @@ export function TaskRow({
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-[13.5px] ${isDone ? "text-navy/40 line-through" : "text-navy"}`}>{task.title}</p>
-        <p className="mt-0.5 truncate text-[11.5px] text-navy/50">
+        <p className={`truncate text-[13.5px] ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}>{task.title}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
           {task.clientName}
           {task.categoryName ? ` · ${task.categoryName}` : ""}
         </p>
@@ -106,13 +106,13 @@ export function TaskRow({
         className={`shrink-0 rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none disabled:opacity-50 ${STATUS_TAG_CLASSES[status]}`}
       >
         {STATUS_OPTIONS.map((opt) => (
-          <option key={opt} value={opt} className="bg-white text-navy">
+          <option key={opt} value={opt} className="bg-white text-appNavy">
             {TASK_STATUS_LABELS[opt]}
           </option>
         ))}
       </select>
 
-      <span className="w-[72px] shrink-0 text-end text-xs text-navy/50">
+      <span className="w-[72px] shrink-0 text-end text-xs text-appNavy/50">
         {task.dueDate
           ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
               new Date(task.dueDate)

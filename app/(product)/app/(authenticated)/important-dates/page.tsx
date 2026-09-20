@@ -114,8 +114,8 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-navy">מועדים חשובים</h1>
-            <p className="mt-1 text-sm text-navy/60">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
+            <h1 className="text-xl font-medium text-appNavy">מועדים חשובים</h1>
+            <p className="mt-1 text-sm text-appNavy/60">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
           </div>
           <Drawer triggerLabel="+ מועד חדש" title="מועד חשוב חדש">
             <ImportantDateForm clients={clients} users={users} categories={categoriesForAutoTask} />
@@ -129,7 +129,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
                 key={t.value}
                 href={t.value === "upcoming" ? "/app/important-dates" : `/app/important-dates?tab=${t.value}`}
                 className={`rounded-full px-4 py-1.5 text-[13px] transition-colors ${
-                  tab === t.value ? "bg-navy text-paper font-medium" : "text-navy/60 hover:text-navy"
+                  tab === t.value ? "bg-appNavy text-cream font-medium" : "text-appNavy/60 hover:text-appNavy"
                 }`}
               >
                 {t.label}
@@ -140,7 +140,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
 
         <div className="space-y-3">
           {rows.length === 0 ? (
-            <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+            <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
               אין מועדים להצגה בתצוגה הזו.
             </p>
           ) : (
@@ -148,7 +148,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
           )}
         </div>
 
-        <p className="text-xs text-navy/50">מועדים חוזרים מחושבים אוטומטית, כולל התאמה ללוח השנה העברי ולימי חג.</p>
+        <p className="text-xs text-appNavy/50">מועדים חוזרים מחושבים אוטומטית, כולל התאמה ללוח השנה העברי ולימי חג.</p>
       </div>
     </>
   );

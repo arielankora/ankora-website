@@ -58,20 +58,20 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">בנק שעות</h1>
-          <p className="mt-1 text-sm text-navy/60">מדיניות חיוב, מחזורים והתאמות ידניות לכל לקוח (ספירה 8).</p>
+          <h1 className="text-xl font-medium text-appNavy">בנק שעות</h1>
+          <p className="mt-1 text-sm text-appNavy/60">מדיניות חיוב, מחזורים והתאמות ידניות לכל לקוח (ספירה 8).</p>
         </div>
 
         <HbClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 
         {!clientId && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             בחרו לקוח כדי לצפות במדיניות החיוב ובבנק השעות שלו.
           </div>
         )}
 
         {clientId && !selectedClient && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             הלקוח לא נמצא או שהוא בארכיון.
           </div>
         )}
@@ -79,7 +79,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
         {selectedClient && (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-sm font-medium text-navy">{selectedClient.name}</h2>
+              <h2 className="text-sm font-medium text-appNavy">{selectedClient.name}</h2>
               <span className="flex-1" />
               <Drawer triggerLabel="פתיחת מחזור חדש" title={`פתיחת מחזור חדש - ${selectedClient.name}`}>
                 <OpenCycleForm clientId={selectedClient.id} />
@@ -95,19 +95,19 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                 permanently-visible card). */}
             <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
               {current ? (
-                <div className="rounded-[18px] bg-ink p-6 text-cream">
+                <div className="rounded-[18px] bg-navy p-6 text-cream-warm">
                   <div className="flex items-baseline justify-between gap-2.5">
-                    <span className="text-xs text-cream/60">מחזור נוכחי</span>
+                    <span className="text-xs text-cream-warm/60">מחזור נוכחי</span>
                     <span
                       className={`font-jbmono text-[40px] font-medium leading-none ${
-                        current.utilization.utilizationPct > 100 ? "text-error" : "text-cream"
+                        current.utilization.utilizationPct > 100 ? "text-error" : "text-cream-warm"
                       }`}
                       dir="ltr"
                     >
                       {current.utilization.utilizationPct}%
                     </span>
                   </div>
-                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream/15">
+                  <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream-warm/15">
                     <span
                       className={`block h-full rounded-full ${
                         current.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"
@@ -117,22 +117,22 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
                     <span>
-                      <span className="block text-[11px] text-cream/50">סה&quot;כ</span>
+                      <span className="block text-[11px] text-cream-warm/50">סה&quot;כ</span>
                       <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
                         {formatMinutes(current.utilization.totalMinutes)}
                       </span>
                     </span>
                     <span>
-                      <span className="block text-[11px] text-cream/50">נוצל</span>
+                      <span className="block text-[11px] text-cream-warm/50">נוצל</span>
                       <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
                         {formatMinutes(current.utilization.consumedMinutes)}
                       </span>
                     </span>
                     <span>
-                      <span className="block text-[11px] text-cream/50">נותר</span>
+                      <span className="block text-[11px] text-cream-warm/50">נותר</span>
                       <span
                         className={`mt-1 block font-jbmono text-[16px] ${
-                          current.utilization.remainingMinutes < 0 ? "text-error" : "text-cream"
+                          current.utilization.remainingMinutes < 0 ? "text-error" : "text-cream-warm"
                         }`}
                         dir="ltr"
                       >
@@ -142,14 +142,14 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   </div>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-navy/50">
+                <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-appNavy/50">
                   אין עדיין מחזור פתוח ללקוח זה. פתחו מחזור למעלה.
                 </div>
               )}
 
               <div className="rounded-2xl border border-lineDark bg-white p-5">
-                <p className="mb-1 text-sm font-medium text-navy">מדיניות חיוב</p>
-                <p className="mb-3 text-[11px] text-navy/40">
+                <p className="mb-1 text-sm font-medium text-appNavy">מדיניות חיוב</p>
+                <p className="mb-3 text-[11px] text-appNavy/40">
                   ללא מדיניות מוגדרת, הזמן החייב זהה תמיד לזמן בפועל.
                 </p>
                 <BillingPolicyForm
@@ -166,7 +166,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
               </div>
 
               <div className="rounded-2xl border border-lineDark bg-white p-5">
-                <p className="mb-3 text-sm font-medium text-navy">התאמה ידנית</p>
+                <p className="mb-3 text-sm font-medium text-appNavy">התאמה ידנית</p>
                 <AdjustmentForm clientId={selectedClient.id} currentHourBankId={current?.bank.id} />
               </div>
             </div>
@@ -174,7 +174,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
             <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
               <table className="w-full min-w-[900px] text-start text-sm">
                 <thead>
-                  <tr className="border-b border-lineDark text-xs text-navy/50">
+                  <tr className="border-b border-lineDark text-xs text-appNavy/50">
                     <th className="px-5 py-3 font-medium">מחזור</th>
                     <th className="px-5 py-3 font-medium">סטטוס</th>
                     <th className="px-5 py-3 font-medium">נרכש</th>
@@ -188,7 +188,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                 <tbody>
                   {banks.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-navy/50">
+                      <td colSpan={8} className="px-5 py-8 text-center text-appNavy/50">
                         עדיין אין מחזורי בנק שעות ללקוח זה. פתחו מחזור ראשון למעלה.
                       </td>
                     </tr>
@@ -197,35 +197,35 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                     const status = STATUS_LABEL[bank.status] ?? STATUS_LABEL.OPEN;
                     return (
                       <tr key={bank.id} className="border-b border-lineDark align-top last:border-0">
-                        <td className="px-5 py-3 text-navy/80">
+                        <td className="px-5 py-3 text-appNavy/80">
                           {formatDate(bank.cycleStart)} - {formatDate(bank.cycleEnd)}
                         </td>
                         <td className="px-5 py-3">
                           <StatusBadge label={status.label} tone={status.tone} />
                           {bank.recalculatedAt && (
-                            <p className="mt-1 text-[11px] text-navy/40">חושב מחדש: {formatDate(bank.recalculatedAt)}</p>
+                            <p className="mt-1 text-[11px] text-appNavy/40">חושב מחדש: {formatDate(bank.recalculatedAt)}</p>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-navy/70">{formatMinutes(bank.purchasedMinutes)}</td>
-                        <td className="px-5 py-3 text-navy/70">{formatMinutes(bank.rolloverInMinutes)}</td>
-                        <td className="px-5 py-3 text-navy/70">{formatMinutes(utilization.consumedMinutes)}</td>
+                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(bank.purchasedMinutes)}</td>
+                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(bank.rolloverInMinutes)}</td>
+                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(utilization.consumedMinutes)}</td>
                         {/* **קריטי ל-RTL** (handoff README): a signed number
                             (remaining minutes, adjustment amount) needs
                             dir="ltr" or the +/- renders on the wrong side. */}
                         <td
                           dir="ltr"
                           className={`px-5 py-3 text-end font-jbmono ${
-                            utilization.remainingMinutes < 0 ? "text-error" : "text-navy/70"
+                            utilization.remainingMinutes < 0 ? "text-error" : "text-appNavy/70"
                           }`}
                         >
                           {formatMinutes(utilization.remainingMinutes)}
                         </td>
-                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-error" : "text-navy/70"}`}>
+                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-error" : "text-appNavy/70"}`}>
                           {utilization.utilizationPct}%
                         </td>
-                        <td className="px-5 py-3 text-navy/70">
+                        <td className="px-5 py-3 text-appNavy/70">
                           {bank.adjustments.length === 0 ? (
-                            <span className="text-navy/30">-</span>
+                            <span className="text-appNavy/30">-</span>
                           ) : (
                             <ul className="space-y-1">
                               {bank.adjustments.map((a) => (
@@ -234,7 +234,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                                     {a.minutes > 0 ? "+" : ""}
                                     {formatMinutes(a.minutes)}
                                   </span>{" "}
-                                  <span className="text-navy/40">- {a.reason}</span>
+                                  <span className="text-appNavy/40">- {a.reason}</span>
                                 </li>
                               ))}
                             </ul>

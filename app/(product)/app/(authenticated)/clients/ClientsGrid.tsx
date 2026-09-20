@@ -75,11 +75,11 @@ export function ClientsGrid({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="חיפוש לקוח"
-        className="w-full max-w-xs rounded-full border border-lineDark bg-white px-4 py-2.5 text-sm text-navy outline-none focus:border-gold sm:w-auto"
+        className="w-full max-w-xs rounded-full border border-lineDark bg-white px-4 py-2.5 text-sm text-appNavy outline-none focus:border-gold sm:w-auto"
       />
 
       {filtered.length === 0 ? (
-        <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/55">
+        <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/55">
           {items.length === 0 ? "אין עדיין לקוחות. הוסיפו לקוח ראשון למעלה." : "לא נמצאו לקוחות התואמים את החיפוש."}
         </p>
       ) : (
@@ -91,27 +91,27 @@ export function ClientsGrid({
             return (
               <div key={client.id} className="rounded-2xl border border-lineDark bg-white p-5">
                 <div className="flex items-center justify-between gap-2.5">
-                  <Link href={`/app/clients/${client.id}`} className="text-[15px] font-medium text-navy hover:text-gold-dim">
+                  <Link href={`/app/clients/${client.id}`} className="text-[15px] font-medium text-appNavy hover:text-gold-dim">
                     {client.name}
                   </Link>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[client.status]}`}>
                     {STATUS_LABEL[client.status]}
                   </span>
                 </div>
-                <p className="mt-1.5 text-xs text-navy/55">
+                <p className="mt-1.5 text-xs text-appNavy/55">
                   {client.employeeCount === 0 ? "אין עדיין עובדים מוקצים" : `${client.employeeCount} עובדים מוקצים`}
                 </p>
 
                 <div className="mt-4 flex items-baseline justify-between gap-2.5">
-                  <span className="text-xs text-navy/55">ניצול מחזור</span>
+                  <span className="text-xs text-appNavy/55">ניצול מחזור</span>
                   <span
                     dir="ltr"
-                    className={`font-jbmono text-[15px] ${high ? "text-error" : "text-navy"}`}
+                    className={`font-jbmono text-[15px] ${high ? "text-error" : "text-appNavy"}`}
                   >
                     {pct === null ? "—" : `${pct}%`}
                   </span>
                 </div>
-                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-navy/8">
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-appNavy/8">
                   <span
                     className={`block h-full rounded-full ${high ? "bg-error" : "bg-gold-gradient"}`}
                     style={{ width: `${barPct}%` }}
@@ -122,7 +122,7 @@ export function ClientsGrid({
                   {canManageBanks && (
                     <Link
                       href={`/app/hour-banks?clientId=${client.id}`}
-                      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy hover:border-gold"
+                      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold"
                     >
                       בנק שעות
                     </Link>
@@ -130,7 +130,7 @@ export function ClientsGrid({
                   {canViewReports && (
                     <Link
                       href={`/app/reports?tab=summary&clientId=${client.id}`}
-                      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy hover:border-gold"
+                      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold"
                     >
                       דוח פעילות
                     </Link>
@@ -139,7 +139,7 @@ export function ClientsGrid({
                     <button
                       type="button"
                       onClick={() => handleArchive(client)}
-                      className="px-1.5 py-2 text-xs text-navy/50 hover:text-error"
+                      className="px-1.5 py-2 text-xs text-appNavy/50 hover:text-error"
                     >
                       העברה לארכיון
                     </button>

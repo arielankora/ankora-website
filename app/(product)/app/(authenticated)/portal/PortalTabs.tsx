@@ -27,7 +27,7 @@ export function PortalTabs({ active }: { active: "dash" | "week" | "month" | "hi
           key={tab.key}
           href={tab.href}
           className={`-mb-px border-b-2 px-4 py-2.5 text-[13.5px] ${
-            active === tab.key ? "border-gold font-medium text-navy" : "border-transparent text-navy/50 hover:text-navy"
+            active === tab.key ? "border-gold font-medium text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
           }`}
         >
           {tab.label}

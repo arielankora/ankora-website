@@ -35,15 +35,15 @@ function Row({ row, longTimerHours }: { row: ActiveTimerRow; longTimerHours: num
       <div className="flex min-w-0 items-center gap-3">
         <span className="h-2 w-2 shrink-0 animate-pulse-dot rounded-full bg-success" aria-hidden="true" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-navy">{row.userName}</p>
-          <p className="truncate text-xs text-navy/50">
+          <p className="truncate text-sm font-medium text-appNavy">{row.userName}</p>
+          <p className="truncate text-xs text-appNavy/50">
             {row.clientName} · {row.categoryName}
           </p>
         </div>
       </div>
       <div className="flex shrink-0 items-center gap-2.5">
         {isOverage && <StatusBadge label="חריגה" tone="red" />}
-        <span className="font-jbmono text-sm text-navy" dir="ltr">
+        <span className="font-jbmono text-sm text-appNavy" dir="ltr">
           {formatElapsed(elapsed)}
         </span>
       </div>

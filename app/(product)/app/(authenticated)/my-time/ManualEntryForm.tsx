@@ -13,7 +13,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="shrink-0 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="shrink-0 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
       style={{ marginInlineStart: "auto" }}
     >
       {pending ? "שומר..." : "הוספת דיווח"}
@@ -58,10 +58,10 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
       action={formAction}
       className="rounded-2xl border border-lineDark bg-white p-5"
     >
-      <p className="mb-3 text-[13px] font-medium text-navy">הוספת דיווח - שורה אחת</p>
+      <p className="mb-3 text-[13px] font-medium text-appNavy">הוספת דיווח - שורה אחת</p>
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block" style={{ flex: "0 0 150px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">תאריך</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">תאריך</span>
           <input
             type="date"
             name="date"
@@ -69,35 +69,35 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             max={todayKey()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">מ־</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">מ־</span>
           <input
             type="time"
             name="startTime"
             required
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">עד</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">עד</span>
           <input
             type="time"
             name="endTime"
             required
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 180px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">לקוח *</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">לקוח *</span>
           <select
             name="clientId"
             required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           >
             <option value="">בחירה</option>
             {clients.map((c) => (
@@ -108,12 +108,12 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 140px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">קטגוריה *</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">קטגוריה *</span>
           <select
             name="categoryId"
             required
             disabled={!clientId}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold disabled:opacity-40"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold disabled:opacity-40"
           >
             <option value="">בחירה</option>
             {availableCategories.map((cat) => (
@@ -124,11 +124,11 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-navy/55">הערה</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">הערה</span>
           <input
             name="note"
             placeholder="אופציונלי"
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <SubmitButton />
@@ -141,7 +141,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="backdateReason"
             required
             placeholder="למשל: נשכח לדווח בזמן"
-            className="flex-1 rounded-lg border border-lineDark bg-white px-2.5 py-2 text-[13px] text-navy outline-none focus:border-gold"
+            className="flex-1 rounded-lg border border-lineDark bg-white px-2.5 py-2 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </div>
       )}
