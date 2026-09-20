@@ -39,11 +39,13 @@ export function Breadcrumbs({
               </MonoLabel>
             )}
             {item.href ? (
-              // Padding plus an equal negative margin: the tap target clears 44px
-              // without the trail itself growing to 44px tall on the page.
+              // Padding plus an equal negative margin, on both axes: the tap target
+              // clears the minimum without the trail growing on the page. The
+              // horizontal pair matters for Hebrew, where a crumb can be a single
+              // short word ("ראשי" renders 22px wide) and misses 24px on width alone.
               <Link
                 href={withLocale(locale, item.href)}
-                className="inline-flex items-center py-[15px] -my-[15px]"
+                className="inline-flex items-center px-[7px] py-[15px] -mx-[7px] -my-[15px]"
               >
                 <MonoLabel size={10} tracking="0.1em" className="text-tone-muted transition-colors hover:text-gold">
                   {item.label}

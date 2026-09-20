@@ -319,6 +319,11 @@ const en: Dictionary = {
       eyebrow: "Who it's for",
       title: "One operational layer, matched to your kind of complexity",
       sub: "Four kinds of clients. The same principle: you focus on what matters, we manage everything else.",
+      profilesLabel: "Four profiles",
+      focusLabel: "In focus",
+      constantLabel: "What stays the same",
+      constantTitle: "The profile changes. The operational layer does not.",
+      constantBody: "The same six areas of responsibility, the same dedicated operations manager, the same orchestration. What changes is the centre of gravity: which areas need more attention, and which need less.",
     },
     roi: {
       eyebrow: "ROI Calculator",
@@ -484,6 +489,7 @@ const en: Dictionary = {
       placeholder: "For privacy or data security questions, please contact us directly at info@ankora.co.il.",
       termsPlaceholder: "The terms governing use of this site and Ankora’s services.",
       updated: "Last updated: August 2026",
+      contentsLabel: "Contents",
       privacySections: [
         {
           title: "Overview",

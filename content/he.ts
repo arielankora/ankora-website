@@ -314,6 +314,11 @@ const he: Dictionary = {
       eyebrow: "עבור מי",
       title: "רובד תפעולי אחד, מותאם לסוג המורכבות",
       sub: "ארבעה סוגי לקוחות. אותו עיקרון: התמקדות במה שחשוב, כשכל השאר מנוהל במקום אחר.",
+      profilesLabel: "ארבעה פרופילים",
+      focusLabel: "במוקד",
+      constantLabel: "מה שלא משתנה",
+      constantTitle: "הפרופיל משתנה. הרובד התפעולי לא.",
+      constantBody: "אותם שישה תחומי אחריות, אותו מנהל תפעול ייעודי, אותו תזמור. מה שמשתנה הוא נקודת הכובד: מה דורש יותר קשב, ומה פחות.",
     },
     roi: {
       eyebrow: "מחשבון ROI",
@@ -492,6 +497,7 @@ const he: Dictionary = {
       placeholder: "לשאלות בנושא פרטיות ואבטחת מידע, ניתן ליצור קשר ישירות בכתובת hello@ankora.co.il.",
       termsPlaceholder: "תנאי השימוש באתר ובשירותי Ankora, בקצרה.",
       updated: "עודכן לאחרונה: אוגוסט 2026",
+      contentsLabel: "תוכן העניינים",
       privacySections: [
         {
           title: "כללי",
