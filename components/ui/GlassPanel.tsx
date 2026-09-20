@@ -21,10 +21,13 @@ export function GlassPanel({
   return (
     <Comp
       className={cn(
-        "border border-[rgba(243,234,219,0.1)] transition-[background-color,border-color] duration-[350ms] ease-out",
+        "border transition-[background-color,border-color] duration-[350ms] ease-out",
         elevated
-          ? "bg-[rgba(243,234,219,0.04)] backdrop-blur-[16px]"
-          : "bg-[rgba(11,27,51,0.5)] backdrop-blur-[12px]",
+          // Heavier edge for the same reason as HairlineGridCell: a correctly
+          // composited .04 wash is 1.09:1 against the page ground, so the border is
+          // what makes the panel a panel.
+          ? "bg-[rgba(243,234,219,0.04)] border-[rgba(248,244,236,0.18)] backdrop-blur-[16px]"
+          : "bg-[rgba(11,27,51,0.5)] border-[rgba(243,234,219,0.1)] backdrop-blur-[12px]",
         className
       )}
     >

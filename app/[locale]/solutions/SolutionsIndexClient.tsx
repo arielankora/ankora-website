@@ -185,12 +185,12 @@ export default function SolutionsIndexClient({ params }: { params: { locale: str
           <HairlineGrid columns="[grid-template-columns:minmax(0,1fr)] min-[641px]:[grid-template-columns:repeat(2,minmax(0,1fr))] min-[1024px]:[grid-template-columns:repeat(3,minmax(0,1fr))]">
             {dict.capabilities.items.map((item) => (
               <motion.div key={item.id} variants={staggerItem} className="h-full">
-                {/* Not `elevated`: an elevated cell's 0.04 wash sits on top of the
-                    grid's own 0.11 hairline background, and the two together lift the
-                    ground to #2D394B, where gold measures 3.77:1 — under AA. The
-                    default navy cell keeps it at 4.9:1, and matches every other
-                    HairlineGrid on the site. */}
-                <HairlineGridCell className="flex flex-col gap-2.5">
+                {/* `elevated` again. It was dropped here as a workaround while an
+                    elevated cell inside a grid composited to #2D394B and made gold
+                    illegal at 3.77:1; with the container background gone that ground is
+                    #14233A and gold measures 5.10:1. The workaround outlived its
+                    reason. */}
+                <HairlineGridCell elevated className="flex flex-col gap-2.5">
                   <MonoLabel script="latin" tracking="0.15em" className="text-gold">
                     {item.key}
                   </MonoLabel>
