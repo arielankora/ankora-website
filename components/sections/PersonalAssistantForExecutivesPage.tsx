@@ -1,9 +1,8 @@
-"use client";
-
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
 import { plural } from "@/lib/plural";
 import { readingMinutes } from "@/lib/reading";
+import { contentUpdated } from "@/lib/content-updated";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { PageFAQ } from "@/components/sections/PageFAQ";
@@ -13,12 +12,9 @@ import { LongFormSection, Prose, ItemGrid, SubSection } from "@/components/secti
 import { WideContainer } from "@/components/ui/WideContainer";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Eyebrow } from "@/components/ui/Eyebrow";
-import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Button } from "@/components/ui/Button";
 import { Reveal } from "@/components/motion/Reveal";
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { RevealStagger, staggerItem } from "@/components/motion/Reveal";
+import { ProfileCrossLinks } from "@/components/sections/ProfileCrossLinks";
 
 /**
  * The executive segment page: the same reading engine as the other two long-form pages,
@@ -42,6 +38,7 @@ export function PersonalAssistantForExecutivesPage({
   const p = dict.pages.personalAssistantForExecutives;
   const seo = dict.pages.seo;
   const minutes = readingMinutes(p);
+  const updated = contentUpdated(locale, seo);
 
   const sections: { title: string; body: React.ReactNode }[] = [
     { title: p.expectations.title, body: <ItemGrid items={p.expectations.items} /> },
@@ -93,7 +90,7 @@ export function PersonalAssistantForExecutivesPage({
         sub={p.sub}
         meta={
           <MonoLabel className="text-muted">
-            <time dateTime={seo.updatedISO}>{seo.updated}</time>
+            <time dateTime={updated.iso}>{updated.label}</time>
             {" · "}
             {plural(seo.readingMinutes, minutes, locale)}
           </MonoLabel>
@@ -129,24 +126,7 @@ export function PersonalAssistantForExecutivesPage({
               <Reveal>
                 <Eyebrow>{dict.pages.segmentBridge.moreLabel}</Eyebrow>
               </Reveal>
-              <RevealStagger className="mt-6">
-                <HairlineGrid minCell={240}>
-                  {otherProfiles.map((item) => (
-                    <motion.div key={item.href} variants={staggerItem} className="h-full">
-                      <Link href={withLocale(locale, item.href)} className="group block h-full">
-                        <HairlineGridCell className="transition-colors duration-[350ms] group-hover:bg-[rgba(176,141,87,0.08)]">
-                          <h3 className="text-base font-medium text-cream transition-colors group-hover:text-gold">
-                            {item.label}
-                          </h3>
-                          <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-muted">
-                            {item.blurb}
-                          </p>
-                        </HairlineGridCell>
-                      </Link>
-                    </motion.div>
-                  ))}
-                </HairlineGrid>
-              </RevealStagger>
+              <ProfileCrossLinks locale={locale} items={otherProfiles} />
             </section>
 
             <RelatedLinks

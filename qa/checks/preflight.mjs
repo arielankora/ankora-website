@@ -57,18 +57,36 @@ async function databaseUp() {
   }
 }
 
-function browserAvailable() {
-  // Playwright's bundled Chromium, or the one this sandbox preinstalls.
-  return (
-    fs.existsSync("/opt/pw-browsers/chromium") ||
-    fs.existsSync(path.join(ROOT, "node_modules", "@playwright", "test"))
-  );
+async function browserAvailable() {
+  // Probe the driver AND the executable, because either one alone is a lie.
+  //
+  // An earlier revision answered `true` on the presence of
+  // `node_modules/@playwright/test`, which says nothing about whether
+  // `playwright install` was ever run, or on the presence of this sandbox's
+  // /opt/pw-browsers/chromium, which says nothing about whether any playwright
+  // package is installed to launch it. Both gave a green capability to an
+  // environment that cannot start a browser, and a check that then fails to launch
+  // one reports as a product defect - precisely the confusion this file exists to
+  // prevent. So: import the driver, ask it where chromium is, and look.
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return false;
+  }
+  if (process.env.PLAYWRIGHT_CHROMIUM) return fs.existsSync(process.env.PLAYWRIGHT_CHROMIUM);
+  try {
+    const exe = chromium.executablePath();
+    return Boolean(exe) && fs.existsSync(exe);
+  } catch {
+    return false;
+  }
 }
 
 export async function preflight() {
   capabilities.prismaClient = prismaClientGenerated();
   capabilities.database = await databaseUp();
-  capabilities.browser = browserAvailable();
+  capabilities.browser = await browserAvailable();
   capabilities.production =
     !(await egressBlocked()) && (await reachable(process.env.QA_PROD_URL ?? "https://ankora.co.il"));
 

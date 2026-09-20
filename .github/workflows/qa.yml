@@ -103,6 +103,12 @@ jobs:
             echo "value=2" >> "$GITHUB_OUTPUT"
           fi
 
+      # Only level 3 uses a browser (the accessibility check), and downloading
+      # Chromium costs about a minute - so it is not paid on the PR gate.
+      - name: Install Chromium
+        if: steps.level.outputs.value == '3'
+        run: npx playwright install --with-deps chromium
+
       - name: Run QA
         id: qa
         run: node qa/run.mjs ${{ steps.level.outputs.value }}

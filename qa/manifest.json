@@ -293,7 +293,7 @@
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:backup-export-format": {
@@ -903,6 +903,13 @@
       "area": "marketing",
       "risk": "medium",
       "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:mcp-connections": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     }
   },

@@ -1,9 +1,8 @@
-"use client";
-
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
 import { plural } from "@/lib/plural";
 import { readingMinutes } from "@/lib/reading";
+import { contentUpdated } from "@/lib/content-updated";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { ComparisonTable } from "@/components/sections/ComparisonTable";
@@ -38,6 +37,7 @@ export function PersonalOperationsManagementPage({
   const p = dict.pages.personalOperationsManagement;
   const seo = dict.pages.seo;
   const minutes = readingMinutes(p);
+  const updated = contentUpdated(locale, seo);
 
   const sections: { title: string; body: React.ReactNode }[] = [
     {
@@ -153,7 +153,7 @@ export function PersonalOperationsManagementPage({
         sub={p.sub}
         meta={
           <MonoLabel className="text-muted">
-            <time dateTime={seo.updatedISO}>{seo.updated}</time>
+            <time dateTime={updated.iso}>{updated.label}</time>
             {" · "}
             {plural(seo.readingMinutes, minutes, locale)}
           </MonoLabel>
