@@ -253,8 +253,16 @@ over the Model Context Protocol. Ten tools:
 Entries created through MCP carry `createdVia = MCP`, so they are always
 distinguishable from ones typed into the app. Nothing here deletes, and
 nothing writes on behalf of another employee — both stay in the UI. The
-full reasoning, including why this is not a Claude custom connector yet,
-is in `docs/adr/0005-mcp-server.md`.
+full reasoning is in `docs/adr/0005-mcp-server.md`.
+
+**Connecting (OAuth).** Add `https://ankora-website.vercel.app/api/mcp` as
+a custom connector in Claude and sign in with your Ankora account. Nothing
+to install and no token to copy; Claude acts with your own permissions.
+
+**Connecting (legacy bridge).** The Phase 1 stdio bridge and its personal
+access tokens still work — see `scripts/mcp-bridge.mjs` and
+`scripts/mcp-issue-token.ts`. It needs Node.js locally and a token issued
+against the database, which is why the connector replaced it.
 
 Everything runs as the employee whose token is used: the tools call
 `lib/app-domain/*` directly, so `assertCan`, the `UserClientAccess`
