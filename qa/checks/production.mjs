@@ -14,7 +14,13 @@
 import { finding } from "../lib/report.mjs";
 import { reachable } from "../lib/sh.mjs";
 
-const BASE = process.env.QA_PROD_URL ?? "https://ankora.co.il";
+// The canonical host, per lib/site.ts and docs/adr/0002. Probing the apex
+// instead returns 308 on every single route - which the first CI run duly
+// reported as ten production outages. The apex redirect is itself worth
+// guarding, so it gets its own assertion below rather than being papered
+// over with `redirect: "follow"`.
+const BASE = process.env.QA_PROD_URL ?? "https://www.ankora.co.il";
+const APEX = "https://ankora.co.il";
 
 /** Headers every response must carry, and what each one is actually for. */
 const REQUIRED_HEADERS = {
@@ -131,7 +137,21 @@ export async function probe() {
     }
   }
 
-  // Certificate expiry is invisible until the day it isn't.
+  // ADR-0002: the apex must 308 to www and preserve the path. Google reads
+  // a broken version of this as a self-contradicting canonical signal, and
+  // the last time it drifted it cost 16 URLs in Search Console.
+  try {
+    const res = await fetch(`${APEX}/he/pricing`, { redirect: "manual" });
+    const to = res.headers.get("location") ?? "";
+    if (res.status !== 308) {
+      out.push(finding("major", `apex returned ${res.status}, expected a 308 to www`, `ADR-0002`));
+    } else if (!to.startsWith(`${BASE}/he/pricing`)) {
+      out.push(finding("major", "apex redirect dropped the path", `Location: ${to}`));
+    }
+  } catch (err) {
+    out.push(finding("major", "apex redirect could not be checked", String(err?.message ?? err)));
+  }
+
   out.push(finding("info", `probed ${ROUTES.length} routes on ${BASE}`));
   return out;
 }

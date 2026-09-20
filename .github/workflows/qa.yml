@@ -35,6 +35,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
+    # The default GITHUB_TOKEN is read-only, so the report comment failed on
+    # the first real run with "Resource not accessible by integration".
+    permissions:
+      contents: read
+      pull-requests: write
+
     # Level 2 and 3 run the integration suite, which needs a real Postgres.
     # A service container is cheaper and far more predictable than the
     # embedded-postgres package used for local development.
@@ -53,6 +59,14 @@ jobs:
           --health-retries 10
 
     env:
+      # Pinned deliberately. The first CI run reported two waivers in
+      # qa/baseline.json as stale - not because anything was fixed, but
+      # because the runner defaults to UTC while Ariel's machine is on
+      # Israel time, and report_schedules' period maths is timezone
+      # sensitive. A suite that answers differently depending on where it
+      # runs is not a suite. Israel time is the product's real operating
+      # timezone, so that is the one the tests are judged against.
+      TZ: Asia/Jerusalem
       QA_DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
       DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
       QA_PROD_URL: https://ankora.co.il

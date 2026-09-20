@@ -883,6 +883,27 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/dpa": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/security": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/service-terms": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
     }
   },
   "waivers": {},
