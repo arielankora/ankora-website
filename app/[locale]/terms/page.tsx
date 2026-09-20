@@ -9,10 +9,19 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
+  const dict = getDictionary(params.locale);
+  const legal = dict.pages.legal;
   return {
+    title: `${legal.termsTitle} | Ankora`,
+    description: legal.placeholder,
     alternates: {
       canonical: `/${locale}/terms`,
       languages: { he: "/he/terms", en: "/en/terms" },
+    },
+    openGraph: {
+      title: `${legal.termsTitle} | Ankora`,
+      description: legal.placeholder,
+      type: "website",
     },
   };
 }

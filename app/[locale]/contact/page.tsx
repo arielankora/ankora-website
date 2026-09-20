@@ -8,14 +8,22 @@ import { InnerCTA } from "@/components/sections/InnerCTA";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 
-// /he: dedicated title/description so this conversion page doesn't fall back to the
-// generic site meta (flagged and fixed per Ariel's production QA pass). /en keeps its
-// prior behaviour (no override) -- untouched, per project convention.
-const heMeta = {
-  title: "שיחת היכרות | Ankora",
-  description:
-    "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
-};
+// Both locales get a dedicated title and description. The Hebrew pair was added during
+// Ariel's production QA pass; English was left on the generic site meta at the time
+// because there was no English copy to write it from. There is now, and a conversion
+// page inheriting the homepage title is a real search cost, so /en no longer falls back.
+const PAGE_META = {
+  he: {
+    title: "שיחת היכרות | Ankora",
+    description:
+      "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
+  },
+  en: {
+    title: "Book a Call | Ankora",
+    description:
+      "A twenty-minute call with Ankora. No commitment and no long forms \u2014 we get to know you, understand your needs, and show you how personal operations management could work for you.",
+  },
+} as const;
 
 export async function generateMetadata(
   props: {
@@ -24,12 +32,11 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const meta =
-    locale === "he"
-      ? { title: heMeta.title, description: heMeta.description }
-      : {};
+  const meta = PAGE_META[locale];
   return {
-    ...meta,
+    title: meta.title,
+    description: meta.description,
+    openGraph: { title: meta.title, description: meta.description, type: "website" },
     alternates: {
       canonical: `/${locale}/contact`,
       languages: { he: "/he/contact", en: "/en/contact" },
