@@ -4,6 +4,8 @@ import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TimezoneForm } from "./TimezoneForm";
 import { NameForm } from "./NameForm";
 import { NotificationPreferenceForm } from "./NotificationPreferenceForm";
+import { getMyClaudeConnection } from "@/lib/app-domain/mcp-connections";
+import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -35,13 +37,27 @@ function formatPasswordChangedLabel(date: Date | null): string | null {
 // on record).
 export default async function ProfilePage() {
   const user = await requireUser();
-  const lastPasswordChangeAt = await getLastPasswordChangeAt(user);
+
+  // The Claude (MCP) grant is personal - it is this user's own
+  // credential, with this user's own permissions - so this screen, not
+  // the SUPER_ADMIN-only /app/integrations, is where most people will
+  // ever see it. Both screens render the same card.
+  //
+  // Hidden from CLIENT_USER on purpose: none of the ten MCP tools
+  // (lib/mcp/tools.ts) are reachable with that role, so offering the
+  // connection to a client would be an invitation to a dead end.
+  const showClaudeCard = user.role !== "CLIENT_USER";
+
+  const [lastPasswordChangeAt, claude] = await Promise.all([
+    getLastPasswordChangeAt(user),
+    showClaudeCard ? getMyClaudeConnection(user) : Promise.resolve(null),
+  ]);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-xl font-medium text-appNavy">הפרופיל שלי</h1>
-        <p className="mt-1 text-sm text-appNavy/60">פרטים אישיים, אזור זמן והתראות.</p>
+        <p className="mt-1 text-sm text-appNavy/60">פרטים אישיים, אזור זמן, התראות וחיבורים.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -76,6 +92,8 @@ export default async function ProfilePage() {
             <h2 className="mb-3 text-sm font-medium text-appNavy">סיסמה</h2>
             <ChangePasswordForm lastChangedLabel={formatPasswordChangedLabel(lastPasswordChangeAt)} />
           </div>
+
+          {claude && <ClaudeConnectionCard status={claude} />}
         </div>
       </div>
     </div>

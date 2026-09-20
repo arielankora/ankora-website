@@ -29,7 +29,13 @@ export async function GET(req: Request) {
     additionalMetadata: {
       scopes_supported: [...SUPPORTED_SCOPES],
       resource_name: "Ankora Time Tracking",
-      resource_documentation: `${origin}/api/mcp`,
+      // Points at the in-app guide, not back at the MCP endpoint itself.
+      // A documentation URL that resolves to the thing it is meant to
+      // document is a self-reference, not documentation - anyone (or any
+      // client) that followed it got JSON-RPC, not an explanation. The
+      // guide anchor is the same page the Integrations and Profile cards
+      // link to, so there is exactly one set of setup instructions.
+      resource_documentation: `${origin}/app/guide#mcp-claude`,
     },
   });
 
