@@ -44,7 +44,7 @@ export default function TechnologyClient({ params }: { params: { locale: string 
       />
 
       <SectionShell>
-        <MonoLabel tracking="0.15em" className="text-tone-faint">
+        <MonoLabel tracking="0.15em" className="text-tone-muted">
           {p.orchestrationLabel}
         </MonoLabel>
 
@@ -106,7 +106,7 @@ export default function TechnologyClient({ params }: { params: { locale: string 
             {p.blocks.map((block) => (
               <motion.div key={block.title} variants={staggerItem} className="h-full">
                 <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
-                  <h3 className="text-[1.2rem] font-normal text-paper">{block.title}</h3>
+                  <h2 className="text-[1.2rem] font-normal text-paper">{block.title}</h2>
                   <p className="mt-3.5 font-assistant text-[14.5px] font-light leading-[1.8] text-tone-muted">
                     {block.body}
                   </p>

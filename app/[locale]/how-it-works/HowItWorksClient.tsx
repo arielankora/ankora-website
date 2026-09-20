@@ -47,7 +47,7 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
                   <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
                     {String(i + 1).padStart(2, "0")}
                   </MonoLabel>
-                  <h3 className="text-[1.34rem] font-normal leading-[1.3] text-paper">{step.title}</h3>
+                  <h2 className="text-[1.34rem] font-normal leading-[1.3] text-paper">{step.title}</h2>
                   <span className="h-0.5 min-w-10 flex-1 overflow-hidden bg-[rgba(243,234,219,0.14)]">
                     <motion.span
                       className="block h-full origin-left bg-gold rtl:origin-right"
@@ -95,7 +95,7 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
               <div className="mt-3.5 text-[1.04rem] font-normal leading-[1.35] text-paper">
                 {item.title}
               </div>
-              <div className="mt-2 font-assistant text-[13.5px] font-light leading-[1.7] text-tone-dim">
+              <div className="mt-2 font-assistant text-[13.5px] font-light leading-[1.7] text-tone-muted">
                 {item.note}
               </div>
             </motion.div>

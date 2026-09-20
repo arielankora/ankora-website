@@ -170,7 +170,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))" }}
         >
           <div className="bg-[rgba(11,27,51,0.5)] p-[clamp(24px,3vw,40px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[12px]">
-            <MonoLabel tracking="0.15em" className="text-tone-dim">
+            <MonoLabel tracking="0.15em" className="text-tone-muted">
               {p.personaPrompt}
             </MonoLabel>
 
@@ -197,7 +197,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
               })}
             </div>
 
-            <MonoLabel tracking="0.15em" className="text-tone-dim">
+            <MonoLabel tracking="0.15em" className="text-tone-muted">
               {p.hoursPrompt}
             </MonoLabel>
             <div className="mt-5 flex flex-col">
@@ -208,7 +208,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
                 >
                   <div className="min-w-0 flex-1">
                     <div className="text-[14.5px] font-normal leading-[1.35] text-paper">{row.label}</div>
-                    <div className="mt-1 font-assistant text-[12.5px] font-light text-tone-dim">{row.note}</div>
+                    <div className="mt-1 font-assistant text-[12.5px] font-light text-tone-muted">{row.note}</div>
                   </div>
                   <Stepper
                     value={hours[row.id]}
@@ -229,7 +229,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
 
             <div className="mt-[34px] border-t border-[rgba(243,234,219,0.12)] pt-[26px]">
               <div className="text-[14.5px] font-normal text-paper">{persona.rateLabel}</div>
-              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-dim">
+              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-muted">
                 {persona.rateHint}. {p.rateNote}
               </p>
               <Stepper
@@ -245,7 +245,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
 
             <div className="mt-7 border-t border-[rgba(243,234,219,0.12)] pt-[26px]">
               <div className="text-[14.5px] font-normal text-paper">{p.nonProductiveLabel}</div>
-              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-dim">
+              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-muted">
                 {p.nonProductiveHint}
               </p>
               <Stepper

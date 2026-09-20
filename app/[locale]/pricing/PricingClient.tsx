@@ -90,7 +90,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
               variants={staggerItem}
               className="grid gap-x-8 gap-y-6 bg-[rgba(11,27,51,0.5)] p-[clamp(22px,3vw,36px)] backdrop-blur-[12px] [grid-template-columns:minmax(0,1fr)] lg:[grid-template-columns:minmax(200px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)]"
             >
-              <MonoLabel tracking="0.12em" className="self-start text-tone-dim">
+              <MonoLabel tracking="0.12em" className="self-start text-tone-muted">
                 {row.dimension}
               </MonoLabel>
               {(
@@ -154,7 +154,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
                     tier.highlighted && "bg-[rgba(176,141,87,0.09)]"
                   )}
                 >
-                  <MonoLabel tracking="0.15em" className={tier.highlighted ? "text-gold" : "text-tone-dim"}>
+                  <MonoLabel tracking="0.15em" className={tier.highlighted ? "text-gold-light" : "text-tone-muted"}>
                     {tier.name}
                   </MonoLabel>
                   <div className="mt-4 text-[clamp(1.6rem,2.4vw,2.1rem)] font-extralight tabular-nums leading-none text-paper">

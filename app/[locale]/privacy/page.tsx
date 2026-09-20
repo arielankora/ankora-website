@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
-import { PageHero } from "@/components/sections/PageHero";
-import { Container } from "@/components/ui/Container";
-import { Reveal } from "@/components/motion/Reveal";
+import { LegalPage } from "@/components/sections/LegalPage";
 
 export async function generateMetadata(
   props: {
@@ -28,27 +26,17 @@ export async function generateMetadata(
   };
 }
 
-export default async function PrivacyPage(props: { params: Promise<{ locale: string }> }) {
+export default async function Page(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
-  const legal = dict.pages.legal;
   return (
-    <>
-      <PageHero eyebrow={dict.footer.privacy} title={legal.privacyTitle} sub={legal.placeholder} />
-      <section className="bg-cream py-20 md:py-28">
-        <Container className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-navy/45">{legal.updated}</p>
-          <div className="mt-10 space-y-10">
-            {legal.privacySections.map((s, i) => (
-              <Reveal key={s.title} delay={i * 0.04}>
-                <h3 className="text-lg font-medium text-navy">{s.title}</h3>
-                <p className="mt-3 leading-relaxed text-navy/60">{s.body}</p>
-              </Reveal>
-            ))}
-          </div>
-        </Container>
-      </section>
-    </>
+    <LegalPage
+      dict={dict}
+      locale={locale}
+      eyebrow={dict.footer.privacy}
+      title={dict.pages.legal.privacyTitle}
+      sections={dict.pages.legal.privacySections}
+    />
   );
 }

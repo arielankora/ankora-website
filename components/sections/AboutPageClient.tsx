@@ -64,9 +64,9 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
           {p.blocks.map((block, i) => (
             <Reveal key={block.title} delay={i * 0.08} className="h-full">
               <GlassPanel elevated className="h-full p-[clamp(22px,3vw,40px)]">
-                <h3 className="font-assistant text-[13px] font-semibold tracking-[0.04em] text-gold rtl:tracking-normal">
+                <h2 className="font-assistant text-[13px] font-semibold tracking-[0.04em] text-gold rtl:tracking-normal">
                   {block.title}
-                </h3>
+                </h2>
                 <p className="mt-4 font-assistant font-light leading-[1.8] text-tone-muted">
                   {block.body}
                 </p>

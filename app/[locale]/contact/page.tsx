@@ -80,7 +80,7 @@ export default async function ContactPage(props: { params: Promise<{ locale: str
               </Reveal>
               <Reveal delay={0.22}>
                 <div className="mt-10 border-t border-[rgba(243,234,219,0.12)] pt-8">
-                  <MonoLabel tracking="0.15em" className="text-tone-dim">
+                  <MonoLabel tracking="0.15em" className="text-tone-muted">
                     {p.directTitle}
                   </MonoLabel>
                   <p className="mt-3 font-assistant text-sm font-light leading-[1.8] text-tone-muted">
@@ -89,7 +89,7 @@ export default async function ContactPage(props: { params: Promise<{ locale: str
                   <a
                     href="mailto:hello@ankora.co.il"
                     dir="ltr"
-                    className="mt-4 block font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-paper"
+                    className="mt-3 inline-flex min-h-[46px] items-center font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-paper"
                   >
                     hello@ankora.co.il
                   </a>
