@@ -64,7 +64,14 @@ function analyse(parsed, r, suiteName) {
   const out = [];
   const matched = new Set();
   for (const f of failures) {
-    const entry = known.find((k) => f.name.includes(k.test) || f.file.endsWith(k.file ?? "\u0000"));
+    // Match on the test NAME, with the file as an extra constraint - never
+    // as an alternative. An earlier version used `||` here, which made every
+    // failure in a file match the file's FIRST waiver: the other two were
+    // then reported as stale on every run, and "stale waiver" is exactly the
+    // signal you want to be able to trust when pruning the baseline.
+    const entry = known.find(
+      (k) => f.name.includes(k.test) && (!k.file || f.file.endsWith(k.file)),
+    );
     if (entry) {
       matched.add(entry.test);
       out.push(

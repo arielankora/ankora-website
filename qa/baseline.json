@@ -18,7 +18,7 @@
       "suite": "unit",
       "file": "tests/unit/report-schedules.test.ts",
       "test": "returns the prior full Sun-Sat week for WEEKLY",
-      "reason": "The assertion expects UTC midnight; computeReportingPeriod() returns midnight Israel time. Red on main independently of any change. Which one is correct is a product decision (do scheduled reports cover an Israeli calendar week or a UTC one?) and must not be 'fixed' by whoever happens to notice the red. Note: these three are timezone sensitive - they pass under TZ=UTC and fail under Asia/Jerusalem, which is why CI pins TZ rather than letting the runner decide.",
+      "reason": "The assertion expects UTC midnight; computeReportingPeriod() returns midnight Israel time. Red on main independently of any change. Which one is correct is a product decision (do scheduled reports cover an Israeli calendar week or a UTC one?) and must not be 'fixed' by whoever happens to notice the red. These fail on every machine, not just some: computeReportingPeriod converts Israel-local midnight to a UTC instant (a 2-3 hour offset depending on DST) while the assertions expect UTC midnight exactly.",
       "acceptedOn": "2026-09-20",
       "owner": "ariel"
     },
@@ -26,7 +26,7 @@
       "suite": "unit",
       "file": "tests/unit/report-schedules.test.ts",
       "test": "returns the prior full calendar month for MONTHLY",
-      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above; passes under TZ=UTC, which is why CI pins TZ=Asia/Jerusalem.",
+      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above. Machine-independent, like the WEEKLY case.",
       "acceptedOn": "2026-09-20",
       "owner": "ariel"
     },
@@ -34,7 +34,7 @@
       "suite": "unit",
       "file": "tests/unit/report-schedules.test.ts",
       "test": "crosses a year boundary correctly for MONTHLY",
-      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above; passes under TZ=UTC, which is why CI pins TZ=Asia/Jerusalem.",
+      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above. Machine-independent, like the WEEKLY case.",
       "acceptedOn": "2026-09-20",
       "owner": "ariel"
     }

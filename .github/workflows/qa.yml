@@ -59,17 +59,18 @@ jobs:
           --health-retries 10
 
     env:
-      # Pinned deliberately. The first CI run reported two waivers in
-      # qa/baseline.json as stale - not because anything was fixed, but
-      # because the runner defaults to UTC while Ariel's machine is on
-      # Israel time, and report_schedules' period maths is timezone
-      # sensitive. A suite that answers differently depending on where it
-      # runs is not a suite. Israel time is the product's real operating
-      # timezone, so that is the one the tests are judged against.
+      # Pinned for determinism: date-sensitive code should not give a
+      # different answer on a UTC runner than on a machine in Israel.
+      # (It is NOT what makes the report_schedules waivers behave - those
+      # fail on every machine, because computeReportingPeriod hardcodes
+      # Asia/Jerusalem in its own signature. An earlier revision of this
+      # file claimed otherwise; that claim was wrong.)
       TZ: Asia/Jerusalem
       QA_DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
       DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
-      QA_PROD_URL: https://ankora.co.il
+      # The canonical host (lib/site.ts, ADR-0002). Pointing this at the
+      # apex overrides the code's own default and makes every route 308.
+      QA_PROD_URL: https://www.ankora.co.il
       AUTH_SECRET: ci-only-not-a-real-secret
       ADMIN_PASSWORD: ci-only-not-a-real-password
       ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
