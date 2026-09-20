@@ -38,7 +38,6 @@ function HeBlogIndexPage({
         eyebrow={b.eyebrow}
         title={b.title}
         sub={b.sub}
-        locale="he"
         breadcrumb={<Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: b.eyebrow }]} />}
       />
 

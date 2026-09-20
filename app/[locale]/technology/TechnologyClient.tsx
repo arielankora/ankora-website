@@ -1,100 +1,123 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
-import { Container } from "@/components/ui/Container";
-import { WideContainer } from "@/components/ui/WideContainer";
+import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
+import { InnerCTA } from "@/components/sections/InnerCTA";
+import { SectionShell } from "@/components/ui/SectionShell";
+import { MonoLabel } from "@/components/ui/MonoLabel";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-// /he redesign: orchestration pipeline (design_handoff_ankora_redesign/README.md,
-// "Technology"). Mono stage labels + the matching Hebrew term are new diagram chrome,
-// using vocabulary already established elsewhere in the page's own frozen copy (the
-// request / AI orchestration / the Operations Manager / the execution network) rather
-// than inventing new phrasing -- flagged in the Stage 3 report either way.
-const PIPELINE = [
-  { key: "INPUT", label: "הבקשה" },
-  { key: "LAYER", label: "תזמור AI", emphasis: true },
-  { key: "DECISION", label: "מנהל התפעול" },
-  { key: "OUTPUT", label: "רשת הביצוע" },
-];
-
-function HeTechnologyClient({ locale }: { locale: Locale }) {
-  const dict = getDictionary(locale);
-  const p = dict.pages.technology;
-
-  return (
-    <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} locale="he" />
-
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <HairlineGrid minCell={330}>
-            {PIPELINE.map((stage) => (
-              <HairlineGridCell
-                key={stage.key}
-                className={cn(
-                  "text-center",
-                  stage.emphasis ? "border border-gold bg-[rgba(176,141,87,0.09)] backdrop-blur-[12px]" : undefined
-                )}
-              >
-                <span className="font-jbmono text-[11px] tracking-[0.15em] text-[#7C8EA3]">{stage.key}</span>
-                <div className={cn("mt-3 text-lg font-medium", stage.emphasis ? "text-gold" : "text-paper")}>
-                  {stage.label}
-                </div>
-              </HairlineGridCell>
-            ))}
-          </HairlineGrid>
-        </WideContainer>
-      </section>
-
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <RevealStagger>
-            <HairlineGrid minCell={280}>
-              {p.blocks.map((b) => (
-                <motion.div key={b.title} variants={staggerItem}>
-                  <HairlineGridCell>
-                    <h3 className="text-lg font-medium text-paper">{b.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{b.body}</p>
-                  </HairlineGridCell>
-                </motion.div>
-              ))}
-            </HairlineGrid>
-          </RevealStagger>
-        </WideContainer>
-      </section>
-    </>
-  );
-}
-
+/**
+ * Technology: the four-layer diagram, then the four technology cards.
+ *
+ * Colour encodes exactly one thing on this diagram — which side does the work. The
+ * client's layer is a light card with a cream hairline; Ankora's three are uniform
+ * navy glass. That uniformity is the argument: the request enters once and everything
+ * after it is one system, not three vendors. Gold appears only in the step tags, so it
+ * never competes with the light/dark distinction that carries the meaning.
+ *
+ * It replaces a four-stage "pipeline" strip that had the same four ideas but gave the
+ * AI layer its own gold emphasis, which read as though the AI were the centre of the
+ * service rather than one layer inside it.
+ */
 export default function TechnologyClient({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
-
-  if (locale === "he") {
-    return <HeTechnologyClient locale={locale} />;
-  }
-
   const dict = getDictionary(locale);
   const p = dict.pages.technology;
 
   return (
     <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
-      <section className="bg-cream py-20 md:py-28">
-        <Container>
-          <RevealStagger className="grid gap-4 md:grid-cols-2">
-            {p.blocks.map((b) => (
-              <motion.div key={b.title} variants={staggerItem} className="rounded-2xl border border-lineDark bg-paper p-8 hover:border-gold/50 transition-colors">
-                <h3 className="text-lg font-medium text-gold">{b.title}</h3>
-                <p className="mt-3 text-sm leading-relaxed text-navy/60">{b.body}</p>
+      <PageHero
+        eyebrow={p.eyebrow}
+        title={p.title}
+        sub={p.sub}
+        breadcrumb={
+          <Breadcrumbs
+            locale={locale}
+            items={[{ label: dict.nav.home, href: "/" }, { label: p.eyebrow }]}
+          />
+        }
+      />
+
+      <SectionShell>
+        <MonoLabel tracking="0.15em" className="text-tone-faint">
+          {p.orchestrationLabel}
+        </MonoLabel>
+
+        <Reveal>
+          <div className="mt-7 bg-[rgba(243,234,219,0.04)] p-[clamp(26px,3.4vw,52px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[16px]">
+            <div
+              className="grid gap-px"
+              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))" }}
+            >
+              {p.layers.map((layer) => {
+                const isYou = layer.side === "you";
+                return (
+                  <div
+                    key={layer.tag}
+                    className={cn(
+                      "flex min-h-[170px] flex-col gap-2.5 px-[22px] py-[26px] outline outline-1",
+                      isYou
+                        ? "bg-[rgba(243,234,219,0.1)] outline-[rgba(243,234,219,0.4)]"
+                        : "bg-[rgba(11,27,51,0.6)] outline-[rgba(243,234,219,0.14)]"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "font-assistant text-[11px] font-semibold tracking-[0.14em] rtl:tracking-normal",
+                        isYou ? "text-paper" : "text-tone-muted"
+                      )}
+                    >
+                      {isYou ? p.sideYou : p.sideAnkora}
+                    </span>
+                    {/* The tag is "01 · REQUEST" in English and "01 · בקשה" in Hebrew,
+                        so it follows the page language rather than staying Latin. */}
+                    <MonoLabel tracking="0.16em" className={isYou ? "text-paper" : "text-gold"}>
+                      {layer.tag}
+                    </MonoLabel>
+                    <span className="text-[1.06rem] font-normal leading-[1.3] text-paper">
+                      {layer.title}
+                    </span>
+                    <span className="font-assistant text-[13.5px] font-light leading-[1.7] text-tone-muted">
+                      {layer.body}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-[26px] flex items-center gap-3.5 border-t border-[rgba(243,234,219,0.12)] pt-6">
+              <span className="h-[7px] w-[7px] shrink-0 animate-eyebrowPulse rounded-full bg-gold" />
+              <span className="font-assistant text-sm font-light text-tone-body">
+                {p.persistenceNote}
+              </span>
+            </div>
+          </div>
+        </Reveal>
+      </SectionShell>
+
+      <SectionShell>
+        <RevealStagger>
+          <HairlineGrid minCell={280}>
+            {p.blocks.map((block) => (
+              <motion.div key={block.title} variants={staggerItem} className="h-full">
+                <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
+                  <h3 className="text-[1.2rem] font-normal text-paper">{block.title}</h3>
+                  <p className="mt-3.5 font-assistant text-[14.5px] font-light leading-[1.8] text-tone-muted">
+                    {block.body}
+                  </p>
+                </HairlineGridCell>
               </motion.div>
             ))}
-          </RevealStagger>
-        </Container>
-      </section>
+          </HairlineGrid>
+        </RevealStagger>
+      </SectionShell>
+
+      <InnerCTA dict={dict} locale={locale} title={p.ctaTitle} />
     </>
   );
 }

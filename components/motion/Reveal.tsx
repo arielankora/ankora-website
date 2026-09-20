@@ -31,9 +31,11 @@ export function Reveal({
 export function RevealStagger({
   children,
   className,
+  style,
 }: {
   children: React.ReactNode;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -47,6 +49,7 @@ export function RevealStagger({
         show: { transition: { staggerChildren: reduceMotion ? 0 : 0.08 } },
       }}
       className={className}
+      style={style}
     >
       {children}
     </motion.div>

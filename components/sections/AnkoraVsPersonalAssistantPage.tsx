@@ -27,7 +27,6 @@ function HeAnkoraVsPersonalAssistantPage({ dict, locale }: { dict: Dictionary; l
         eyebrow={p.eyebrow}
         title={p.title}
         sub={p.sub}
-        locale="he"
         breadcrumb={
           <Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: p.eyebrow }]} />
         }
@@ -139,8 +138,7 @@ export function AnkoraVsPersonalAssistantPage({ dict, locale }: { dict: Dictiona
         title={p.title}
         sub={p.sub}
         breadcrumb={
-          <Breadcrumbs
-            locale={locale}
+          <Breadcrumbs locale={locale}
             items={[
               { label: dict.hero.eyebrow, href: "/" },
               { label: p.eyebrow },

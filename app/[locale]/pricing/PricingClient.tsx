@@ -32,7 +32,7 @@ function HePricingClient({ locale }: { locale: Locale }) {
 
   return (
     <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} locale="he" />
+      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
 
       {/* Billing model */}
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">

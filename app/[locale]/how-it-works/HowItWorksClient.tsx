@@ -1,134 +1,109 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
-import { Container } from "@/components/ui/Container";
-import { WideContainer } from "@/components/ui/WideContainer";
-import { GlassPanel } from "@/components/ui/GlassPanel";
+import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
+import { InnerCTA } from "@/components/sections/InnerCTA";
+import { SectionShell } from "@/components/ui/SectionShell";
+import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
-import { Button } from "@/components/ui/Button";
-import { withLocale } from "@/lib/nav";
-import { motion } from "framer-motion";
 
-// /he redesign: vertical gold line that fills with scroll (design_handoff_ankora_
-// redesign/README.md, "How it works"). fillFraction = clamp(0,1, (innerHeight*0.72 -
-// railTop) / (railHeight*0.82)); each step marker is an 8px gold square sitting on the
-// line, not a number -- the line itself carries the order.
-function HeSteps({ steps }: { steps: { title: string; body: string }[] }) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [fill, setFill] = useState(0);
-
-  useEffect(() => {
-    const update = () => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const railHeight = rect.height;
-      const railTop = rect.top;
-      const raw = (window.innerHeight * 0.72 - railTop) / (railHeight * 0.82);
-      setFill(Math.min(1, Math.max(0, raw)));
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-    };
-  }, []);
-
-  return (
-    <div ref={containerRef} className="relative">
-      {/* Track (grey) + fill (gold, height driven by scroll position) -- both sit at the
-          horizontal centre of the 8px marker column (w-2, so centre = 4px from its own
-          start edge, which is flush with this container's start edge). */}
-      <div className="absolute bottom-0 top-1 w-px bg-[rgba(243,234,219,0.14)]" style={{ insetInlineStart: 4 }} aria-hidden />
-      <div className="absolute top-1 w-px bg-gold" style={{ insetInlineStart: 4, height: `${fill * 100}%` }} aria-hidden />
-      <div className="flex flex-col gap-12">
-        {steps.map((step, i) => (
-          <Reveal key={step.title} delay={i * 0.06} className="flex gap-8">
-            <span className="relative z-[1] mt-1 h-2 w-2 flex-none bg-gold" aria-hidden />
-            <div>
-              <h3 className="text-lg font-medium text-paper">{step.title}</h3>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-[#A9B8C9]">{step.body}</p>
-            </div>
-          </Reveal>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function HeHowItWorksClient({ locale }: { locale: Locale }) {
-  const dict = getDictionary(locale);
-  const p = dict.pages.howItWorks;
-
-  return (
-    <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} locale="he" />
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <HeSteps steps={p.blocks} />
-        </WideContainer>
-      </section>
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer className="max-w-2xl">
-          <Reveal>
-            <GlassPanel elevated className="p-[clamp(22px,3vw,40px)] text-center">
-              <h2 className="text-[clamp(1.5rem,2.6vw,2.3rem)] font-extralight leading-[1.2] tracking-[-0.02em] text-paper">
-                {p.vignette.title}
-              </h2>
-              <p className="mt-5 font-assistant leading-relaxed text-[#A9B8C9]">{p.vignette.body}</p>
-            </GlassPanel>
-          </Reveal>
-          <Reveal delay={0.1} className="mt-9 flex justify-center">
-            <Button href={withLocale(locale, "/contact")}>{dict.hero.ctaPrimary}</Button>
-          </Reveal>
-        </WideContainer>
-      </section>
-    </>
-  );
-}
+/**
+ * How it works: five full-width step rows, then the "one day" panel.
+ *
+ * Each row's header is number, title, and a progress hairline that fills to 20 / 40 /
+ * 60 / 80 / 100% as the row comes into view — the rail reads as one continuous
+ * measure of how far through the process you are, rather than five unrelated bars.
+ * The fill is a `scaleX` transform with `transform-origin` on the inline start, so it
+ * grows in the reading direction in both locales without a mirrored stylesheet.
+ */
+const FILLS = [0.2, 0.4, 0.6, 0.8, 1];
 
 export default function HowItWorksClient({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
-
-  if (locale === "he") {
-    return <HeHowItWorksClient locale={locale} />;
-  }
-
   const dict = getDictionary(locale);
   const p = dict.pages.howItWorks;
 
   return (
     <>
-      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
-      <section className="bg-cream py-20 md:py-28">
-        <Container>
-          <RevealStagger className="grid gap-px overflow-hidden rounded-2xl border border-lineDark bg-lineDark md:grid-cols-2 lg:grid-cols-5">
-            {p.blocks.map((b, i) => (
-              <motion.div key={b.title} variants={staggerItem} className="bg-paper p-7">
-                <span className="font-mono text-xs text-gold/70">0{i + 1}</span>
-                <h3 className="mt-4 text-lg font-medium text-navy">{b.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-navy/55">{b.body}</p>
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-      <section className="bg-ink py-24 md:py-32">
-        <Container className="max-w-2xl text-center">
-          <Reveal>
-            <h2 className="text-[26px] font-medium tracking-tight text-paper md:text-[36px]">{p.vignette.title}</h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mt-5 leading-relaxed text-paper/55">{p.vignette.body}</p>
-          </Reveal>
-          <Reveal delay={0.2} className="mt-9 flex justify-center">
-            <Button href={withLocale(locale, "/contact")}>{dict.hero.ctaPrimary}</Button>
-          </Reveal>
-        </Container>
-      </section>
+      <PageHero
+        eyebrow={p.eyebrow}
+        title={p.title}
+        sub={p.sub}
+        breadcrumb={
+          <Breadcrumbs locale={locale}
+            items={[{ label: dict.nav.home, href: "/" }, { label: p.eyebrow }]}
+          />
+        }
+      />
+
+      <SectionShell>
+        <div className="flex flex-col gap-px">
+          {p.blocks.map((step, i) => (
+            <Reveal key={step.title}>
+              <div className="bg-[rgba(11,27,51,0.5)] p-[clamp(24px,3vw,40px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[12px] transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
+                <div className="flex items-center gap-[18px]">
+                  <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
+                    {String(i + 1).padStart(2, "0")}
+                  </MonoLabel>
+                  <h3 className="text-[1.34rem] font-normal leading-[1.3] text-paper">{step.title}</h3>
+                  <span className="h-0.5 min-w-10 flex-1 overflow-hidden bg-[rgba(243,234,219,0.14)]">
+                    <motion.span
+                      className="block h-full origin-left bg-gold rtl:origin-right"
+                      initial={{ scaleX: 0 }}
+                      whileInView={{ scaleX: FILLS[i] }}
+                      viewport={{ once: true, margin: "-80px" }}
+                      transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                    />
+                  </span>
+                </div>
+                <p className="mt-4 max-w-[72ch] font-assistant text-[15px] font-light leading-[1.8] text-tone-muted">
+                  {step.body}
+                </p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </SectionShell>
+
+      <SectionShell>
+        <Reveal>
+          <h2 className="max-w-[18ch] text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+            {p.vignette.title}
+          </h2>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <p className="mt-[22px] max-w-[62ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+            {p.vignette.body}
+          </p>
+        </Reveal>
+
+        {/* The four tasks the paragraph just named, as one day. auto-fit rather than a
+            fixed four, so they stack cleanly on a phone. */}
+        <RevealStagger
+          className="mt-11 grid gap-px"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" }}
+        >
+          {p.vignette.items.map((item) => (
+            <motion.div
+              key={item.title}
+              variants={staggerItem}
+              className="bg-[rgba(243,234,219,0.04)] p-[clamp(22px,2.6vw,34px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[16px]"
+            >
+              <MonoLabel className="text-gold">{item.time}</MonoLabel>
+              <div className="mt-3.5 text-[1.04rem] font-normal leading-[1.35] text-paper">
+                {item.title}
+              </div>
+              <div className="mt-2 font-assistant text-[13.5px] font-light leading-[1.7] text-tone-dim">
+                {item.note}
+              </div>
+            </motion.div>
+          ))}
+        </RevealStagger>
+      </SectionShell>
+
+      <InnerCTA dict={dict} locale={locale} />
     </>
   );
 }

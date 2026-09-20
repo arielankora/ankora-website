@@ -36,6 +36,7 @@ export function MonoLabel({
   size = 11,
   tracking = "0.12em",
   as: Comp = "span",
+  "aria-hidden": ariaHidden,
 }: {
   children: React.ReactNode;
   className?: string;
@@ -43,9 +44,11 @@ export function MonoLabel({
   size?: keyof typeof SIZE;
   tracking?: keyof typeof TRACKING;
   as?: React.ElementType;
+  "aria-hidden"?: boolean;
 }) {
   return (
     <Comp
+      aria-hidden={ariaHidden}
       className={cn(
         "font-jbmono",
         SIZE[size],

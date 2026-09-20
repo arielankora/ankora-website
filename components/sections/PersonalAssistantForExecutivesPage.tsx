@@ -28,7 +28,6 @@ function HePersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dictiona
         eyebrow={p.eyebrow}
         title={p.title}
         sub={p.sub}
-        locale="he"
         breadcrumb={
           <Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: p.eyebrow }]} />
         }
@@ -200,8 +199,7 @@ export function PersonalAssistantForExecutivesPage({ dict, locale }: { dict: Dic
         title={p.title}
         sub={p.sub}
         breadcrumb={
-          <Breadcrumbs
-            locale={locale}
+          <Breadcrumbs locale={locale}
             items={[
               { label: dict.hero.eyebrow, href: "/" },
               { label: p.eyebrow },
