@@ -14,6 +14,8 @@ export type {
   Locale,
   Dictionary,
   CapabilityId,
+  ProfileId,
+  GravityWeight,
   SegmentContent,
   SegmentBridge,
   SimplePageContent,

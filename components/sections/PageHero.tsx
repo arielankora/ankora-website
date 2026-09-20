@@ -11,11 +11,16 @@ export function PageHero({
   eyebrow,
   title,
   sub,
+  meta,
   breadcrumb,
 }: {
   eyebrow: string;
   title: string;
   sub: string;
+  /** One line under the lead. The legal pages put "last updated" here: on a document,
+   *  recency is metadata about the document rather than about its contents index, and
+   *  it is frequently the single fact a visitor came for. */
+  meta?: React.ReactNode;
   breadcrumb?: React.ReactNode;
 }) {
   return (
@@ -35,6 +40,11 @@ export function PageHero({
             {sub}
           </p>
         </Reveal>
+        {meta && (
+          <Reveal delay={0.22}>
+            <div className="mt-5">{meta}</div>
+          </Reveal>
+        )}
       </WideContainer>
     </section>
   );

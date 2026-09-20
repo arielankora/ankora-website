@@ -1,16 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { getDictionary, type Locale, type SegmentContent } from "@/content";
+import {
+  getDictionary,
+  type Dictionary,
+  type GravityWeight,
+  type Locale,
+  type ProfileId,
+  type SegmentContent,
+} from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { InnerCTA } from "@/components/sections/InnerCTA";
 import { SectionShell } from "@/components/ui/SectionShell";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { MonoLabel } from "@/components/ui/MonoLabel";
-import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
-import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
+import { Reveal } from "@/components/motion/Reveal";
 import { withLocale } from "@/lib/nav";
 
 /**
@@ -118,6 +123,126 @@ function ProfileRow({
   );
 }
 
+/**
+ * The 6 x 4 weighting: capabilities down, profiles across, three states.
+ *
+ * A real `<table>` rather than the `HairlineGrid` the handoff specified, and the
+ * vendor accepted the change as a correction rather than a departure: a filled dot, a
+ * hollow dot and a dash are meaning carried by shape alone. With `th` on both axes and
+ * a visually-hidden word in every cell, a screen reader announces "Executives, Travel,
+ * lead" instead of announcing nothing at all.
+ *
+ * Five columns, not the seven the handoff counted -- one label column plus four
+ * profiles -- and seven rows including the header.
+ *
+ * Narrow: rows become blocks, so the page gets six capability-major blocks rather than
+ * the four profile-major ones the handoff asked for. Transposing a table across axes
+ * needs a second copy of the content in the DOM, which the same handoff rules out for
+ * the comparison table and for the same reasons. The desktop orientation is the one
+ * that matters -- long capability names belong in a label column, short profile names
+ * make better headers -- so the narrow layout falls out of it.
+ */
+const PROFILE_COLUMNS: ProfileId[] = ["executives", "founders", "companies", "familyOffice"];
+
+/** Non-text marks, so the dim greys are legal here; the word beside each carries the meaning. */
+function WeightMark({ weight }: { weight: GravityWeight }) {
+  if (weight === "lead") return <span className="block h-2 w-2 rounded-full bg-gold" />;
+  if (weight === "support")
+    return <span className="block h-2 w-2 rounded-full border border-line-strong" />;
+  return <span className="block h-px w-2.5 bg-line" />;
+}
+
+function GravityMatrix({ dict }: { dict: Dictionary }) {
+  const g = dict.pages.solutionsIndex.gravity;
+  const cell = "border-t border-[rgba(243,234,219,0.11)] px-3 py-3.5 align-middle";
+
+  return (
+    <div className="mt-11">
+      {/* Breaking a table needs display:block on every level -- table, thead, tbody,
+          tr, th and td. Setting it on `tr` alone does nothing, because a tbody that is
+          still a row group rebuilds anonymous row boxes around the cells. */}
+      <table className="w-full border-collapse text-start max-[760px]:block">
+        <caption className="sr-only">
+          {dict.pages.solutionsIndex.constantTitle}
+        </caption>
+        {/* Hidden narrow: each cell carries its own profile name there. */}
+        <thead className="max-[760px]:hidden">
+          <tr>
+            <th scope="col" className="px-3 pb-3 text-start">
+              <MonoLabel tracking="0.16em" className="text-muted">
+                {g.capabilityLabel}
+              </MonoLabel>
+            </th>
+            {PROFILE_COLUMNS.map((id) => (
+              <th key={id} scope="col" className="px-3 pb-3 text-start font-normal">
+                <MonoLabel tracking="0.16em" className="text-muted">
+                  {dict.pages.segments[id].eyebrow}
+                </MonoLabel>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="max-[760px]:block">
+          {dict.capabilities.items.map((item) => (
+            <tr
+              key={item.id}
+              className="max-[760px]:block max-[760px]:border-t max-[760px]:border-[rgba(243,234,219,0.11)] max-[760px]:pb-3 max-[760px]:pt-4"
+            >
+              <th
+                scope="row"
+                className={`${cell} text-start align-top font-normal max-[760px]:block max-[760px]:border-t-0 max-[760px]:px-0 max-[760px]:pb-2 max-[760px]:pt-0`}
+              >
+                <span className="text-[15px] font-normal leading-[1.35] text-cream">
+                  {item.title}
+                </span>
+              </th>
+              {PROFILE_COLUMNS.map((id) => {
+                const weight = g.weights[id][item.id];
+                return (
+                  <td
+                    key={id}
+                    className={`${cell} max-[760px]:flex max-[760px]:items-center max-[760px]:gap-2.5 max-[760px]:border-t-0 max-[760px]:px-0 max-[760px]:py-1`}
+                  >
+                    {/* The profile name rides along at narrow widths, where the column
+                        header has scrolled far out of sight. */}
+                    <MonoLabel
+                      size={10}
+                      tracking="0.12em"
+                      className="hidden text-muted max-[760px]:inline"
+                    >
+                      {dict.pages.segments[id].eyebrow}
+                    </MonoLabel>
+                    <WeightMark weight={weight} />
+                    {/* The sr-only copy is the accessible one at every width. The
+                        visible narrow copy is aria-hidden, or the word lands in the
+                        tree twice below 760px. */}
+                    <span className="sr-only">{g.legend[weight]}</span>
+                    <span
+                      aria-hidden="true"
+                      className="hidden font-assistant text-[13px] font-light text-muted max-[760px]:inline"
+                    >
+                      {g.legend[weight]}
+                    </span>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <ul className="mt-7 flex flex-wrap items-center gap-x-7 gap-y-2.5 border-t border-[rgba(243,234,219,0.12)] pt-5">
+        {(["lead", "support", "light"] as GravityWeight[]).map((w) => (
+          <li key={w} className="flex items-center gap-2.5">
+            <WeightMark weight={w} />
+            <span className="font-assistant text-[13px] font-light text-muted">{g.legend[w]}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function SolutionsIndexClient({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
@@ -176,32 +301,21 @@ export default function SolutionsIndexClient({ params }: { params: { locale: str
             carries the bodies; repeating them here would be the same mistake this
             page was already making. Titles alone make the argument: this list is
             identical whichever profile you came from. */}
-        {/* Explicit columns, not auto-fit: six items divide evenly by 3, 2 and 1, and
-            auto-fit was landing on five across — one orphan on a second row, with the
-            grid's own hairline background showing through the five empty tracks as a
-            solid slab. The five-step grid on the home page takes the same approach for
-            the same reason. */}
-        <RevealStagger className="mt-11">
-          <HairlineGrid columns="[grid-template-columns:minmax(0,1fr)] min-[641px]:[grid-template-columns:repeat(2,minmax(0,1fr))] min-[1024px]:[grid-template-columns:repeat(3,minmax(0,1fr))]">
-            {dict.capabilities.items.map((item) => (
-              <motion.div key={item.id} variants={staggerItem} className="h-full">
-                {/* `elevated` again. It was dropped here as a workaround while an
-                    elevated cell inside a grid composited to #2D394B and made gold
-                    illegal at 3.77:1; with the container background gone that ground is
-                    #14233A and gold measures 5.10:1. The workaround outlived its
-                    reason. */}
-                <HairlineGridCell elevated className="flex flex-col gap-2.5">
-                  <MonoLabel script="latin" tracking="0.15em" className="text-gold">
-                    {item.key}
-                  </MonoLabel>
-                  <span className="text-[1.04rem] font-normal leading-[1.35] text-cream">
-                    {item.title}
-                  </span>
-                </HairlineGridCell>
-              </motion.div>
-            ))}
-          </HairlineGrid>
-        </RevealStagger>
+        <Reveal delay={0.2}>
+          <GravityMatrix dict={dict} />
+        </Reveal>
+
+        <Reveal delay={0.26}>
+          <p className="mt-10 font-assistant text-[15px] font-light text-muted">
+            {p.undecided.label}{" "}
+            <Link
+              href={withLocale(locale, "/roi")}
+              className="text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors duration-200 hover:text-gold-light"
+            >
+              {p.undecided.link}
+            </Link>
+          </p>
+        </Reveal>
       </SectionShell>
 
       <InnerCTA dict={dict} locale={locale} />

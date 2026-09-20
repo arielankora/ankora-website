@@ -319,6 +319,17 @@ const he: Dictionary = {
       constantLabel: "מה שלא משתנה",
       constantTitle: "הפרופיל משתנה. הרובד התפעולי לא.",
       constantBody: "אותם שישה תחומי אחריות, אותו מנהל תפעול ייעודי, אותו תזמור. מה שמשתנה הוא נקודת הכובד: מה דורש יותר קשב, ומה פחות.",
+      gravity: {
+        capabilityLabel: "תחום",
+        legend: { lead: "מוביל", support: "תומך", light: "קל" },
+        weights: {
+          executives: { business: "light", vendors: "support", personal: "lead", admin: "lead", travel: "lead", property: "light" },
+          founders: { business: "lead", vendors: "support", personal: "lead", admin: "support", travel: "light", property: "light" },
+          companies: { business: "lead", vendors: "lead", personal: "light", admin: "support", travel: "support", property: "light" },
+          familyOffice: { business: "light", vendors: "lead", personal: "lead", admin: "support", travel: "support", property: "lead" },
+        },
+      },
+      undecided: { label: "עדיין לא בטוחים?", link: "נסו את מחשבון ה-ROI" },
     },
     roi: {
       eyebrow: "מחשבון ROI",
@@ -497,7 +508,14 @@ const he: Dictionary = {
       placeholder: "לשאלות בנושא פרטיות ואבטחת מידע, ניתן ליצור קשר ישירות בכתובת hello@ankora.co.il.",
       termsPlaceholder: "תנאי השימוש באתר ובשירותי Ankora, בקצרה.",
       updated: "עודכן לאחרונה: אוגוסט 2026",
+      updatedISO: "2026-08",
       contentsLabel: "תוכן העניינים",
+      // Anchors on these two pages are positional -- #section-1 .. #section-8, derived
+      // from array order, matching the numbering rule the rest of the site uses. They
+      // are stable across both locales and survive rewording, but NOT reordering: a
+      // clause inserted in the middle silently retargets every anchor below it, and a
+      // link somebody filed in a contract then points at the wrong clause.
+      // Sections may be appended. They must not be reordered or inserted.
       privacySections: [
         {
           title: "כללי",

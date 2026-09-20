@@ -324,6 +324,17 @@ const en: Dictionary = {
       constantLabel: "What stays the same",
       constantTitle: "The profile changes. The operational layer does not.",
       constantBody: "The same six areas of responsibility, the same dedicated operations manager, the same orchestration. What changes is the centre of gravity: which areas need more attention, and which need less.",
+      gravity: {
+        capabilityLabel: "Area",
+        legend: { lead: "Lead", support: "Support", light: "Light" },
+        weights: {
+          executives: { business: "light", vendors: "support", personal: "lead", admin: "lead", travel: "lead", property: "light" },
+          founders: { business: "lead", vendors: "support", personal: "lead", admin: "support", travel: "light", property: "light" },
+          companies: { business: "lead", vendors: "lead", personal: "light", admin: "support", travel: "support", property: "light" },
+          familyOffice: { business: "light", vendors: "lead", personal: "lead", admin: "support", travel: "support", property: "lead" },
+        },
+      },
+      undecided: { label: "Not sure which one you are?", link: "Try the ROI calculator" },
     },
     roi: {
       eyebrow: "ROI Calculator",
@@ -489,7 +500,14 @@ const en: Dictionary = {
       placeholder: "For privacy or data security questions, please contact us directly at hello@ankora.co.il.",
       termsPlaceholder: "The terms governing use of this site and Ankora’s services.",
       updated: "Last updated: August 2026",
+      updatedISO: "2026-08",
       contentsLabel: "Contents",
+      // Anchors on these two pages are positional -- #section-1 .. #section-8, derived
+      // from array order, matching the numbering rule the rest of the site uses. They
+      // are stable across both locales and survive rewording, but NOT reordering: a
+      // clause inserted in the middle silently retargets every anchor below it, and a
+      // link somebody filed in a contract then points at the wrong clause.
+      // Sections may be appended. They must not be reordered or inserted.
       privacySections: [
         {
           title: "Overview",

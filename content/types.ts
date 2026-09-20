@@ -13,6 +13,15 @@ export type CapabilityId =
   | "travel"
   | "property";
 
+/**
+ * The four "who it's for" profiles, keyed rather than positional so the gravity matrix
+ * cannot silently misalign with the segment content it is read against.
+ */
+export type ProfileId = "executives" | "founders" | "companies" | "familyOffice";
+
+/** How much of a profile's operational weight a capability carries. */
+export type GravityWeight = "lead" | "support" | "light";
+
 export interface Dictionary {
   meta: {
     title: string;
@@ -235,6 +244,25 @@ export interface PagesContent {
     constantLabel: string;
     constantTitle: string;
     constantBody: string;
+    /**
+     * The 6 x 4 weighting behind the closing section: capabilities against profiles,
+     * three states. It is what makes that section argue its own headline -- the centre
+     * of gravity moves, the layer does not -- instead of repeating six titles the
+     * visitor has already read twice.
+     *
+     * Keyed both ways rather than the positional `[4][6]` the handoff proposed: an
+     * array of arrays is correct only as long as two orders stay in step, and the
+     * capability order has already changed once (C01).
+     */
+    gravity: {
+      /** Column head over the capability labels. */
+      capabilityLabel: string;
+      /** Read out per cell and shown in the legend -- the states are not colour-only. */
+      legend: Record<GravityWeight, string>;
+      weights: Record<ProfileId, Record<CapabilityId, GravityWeight>>;
+    };
+    /** One line under the closing section, pointing undecided readers at the ROI page. */
+    undecided: { label: string; link: string };
   };
   roi: {
     eyebrow: string;
@@ -346,7 +374,12 @@ export interface PagesContent {
     termsTitle: string;
     placeholder: string;
     termsPlaceholder: string;
+    /** Rendered in the page hero, marked up as <time>. Recency is metadata about the
+     *  document, not about its contents index, and it is often the one fact a visitor
+     *  came for. */
     updated: string;
+    /** ISO YYYY-MM behind `updated`, for the <time datetime> attribute. */
+    updatedISO: string;
     /** Heading over the sticky section index on the legal pages. */
     contentsLabel: string;
     privacySections: { title: string; body: string }[];
