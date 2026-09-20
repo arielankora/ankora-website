@@ -3,14 +3,18 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Pointer-following glow, `/he`-only page furniture (design_handoff_ankora_redesign/
- * README.md, "Page-level furniture" + "Interactions & behaviour"). A rAF loop lerps
+ * Ambient background glow, on every page in both locales. The two radial gradients and
+ * the 18s drift are exactly the spec's "Ambient background" block; the pointer-follow
+ * on top of them is a carry-over from the earlier /he round that the site spec is
+ * silent about rather than opposed to, kept deliberately (Ariel's decision, C15).
+ *
+ * A rAF loop lerps
  * a wrapper's translate toward the pointer at factor 0.045, amplitude ±90px
  * horizontal / ±70px vertical. The 18s drift keyframe animates a *nested* element's
  * transform (Tailwind's `animate-glowDrift`) so the CSS animation and the JS pointer
  * transform don't fight over the same property on the same node. Skipped entirely on
  * touch devices and when the user prefers reduced motion — falls back to the static
- * position. Never rendered on /en.
+ * position.
  */
 export function PageGlow() {
   const wrapperRef = useRef<HTMLDivElement>(null);

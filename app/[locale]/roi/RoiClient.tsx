@@ -15,13 +15,15 @@ import { cn } from "@/lib/utils";
 
 // Flat illustrative Ankora rate used for this calculator (kept distinct from the
 // tiered example rates on /pricing, per the flat per-hour assumption requested).
-const ANKORA_RATE: Record<Locale, number> = { he: 130, en: 35 };
+// One rate, not one per locale: the English site sells the same Israeli service at
+// the same price, and the previous $35 figure had drifted from ₪130 (Ariel's
+// decision, C05 -- the spec's "currency formats as he-IL" applies to both locales).
+const ANKORA_RATE = 130;
 // Employer-overhead multiplier applied to the direct hourly cost entered by the visitor.
 const EMPLOYER_OVERHEAD_MULTIPLIER = 1.33;
 
-function formatCurrency(n: number, locale: Locale) {
-  const rounded = Math.round(n);
-  return locale === "he" ? `₪${rounded.toLocaleString("he-IL")}` : `$${rounded.toLocaleString("en-US")}`;
+function formatCurrency(n: number) {
+  return `₪${Math.round(n).toLocaleString("he-IL")}`;
 }
 
 // Number input with explicit tap targets for +/- (native number-input spinners
@@ -160,11 +162,11 @@ function HeRoiClient({ locale }: { locale: Locale }) {
     const nonProductiveFraction = Math.min(0.9, Math.max(0, nonProductivePct / 100));
     const fullyLoadedRate = (Math.max(0, rate) * EMPLOYER_OVERHEAD_MULTIPLIER) / (1 - nonProductiveFraction);
     const valueFreed = hoursPerMonth * fullyLoadedRate;
-    const cost = hoursPerMonth * ANKORA_RATE[locale];
+    const cost = hoursPerMonth * ANKORA_RATE;
     const netValue = valueFreed - cost;
     const multiple = cost > 0 ? valueFreed / cost : 0;
     return { hoursPerMonth, valueFreed, cost, netValue, multiple };
-  }, [totalHoursPerWeek, rate, nonProductivePct, locale]);
+  }, [totalHoursPerWeek, rate, nonProductivePct]);
 
   const personaLabels = p.personas.map((pr) => dict.pages.segments[pr.key].eyebrow);
 
@@ -273,20 +275,20 @@ function HeRoiClient({ locale }: { locale: Locale }) {
                   <div className="border-b border-[rgba(243,234,219,0.16)] pb-4">
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm text-[#D8CAB5]">{p.results.valueFreedLabel}</span>
-                      <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed, locale)}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed)}</span>
                     </div>
                     <p className="mt-1 text-xs text-[#D8CAB5]/70">{p.results.valueFreedHint}</p>
                   </div>
                   <div className="border-b border-[rgba(243,234,219,0.16)] pb-4">
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm text-[#D8CAB5]">{p.results.costLabel}</span>
-                      <span className="text-lg font-medium text-paper">{formatCurrency(results.cost, locale)}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.cost)}</span>
                     </div>
                     <p className="mt-1 text-xs text-[#D8CAB5]/70">{p.results.costHint}</p>
                   </div>
                   <div className="flex items-baseline justify-between border-b border-[rgba(243,234,219,0.16)] pb-4">
                     <span className="text-sm text-[#D8CAB5]">{p.results.netValueLabel}</span>
-                    <span className="text-lg font-medium text-gold">{formatCurrency(results.netValue, locale)}</span>
+                    <span className="text-lg font-medium text-gold">{formatCurrency(results.netValue)}</span>
                   </div>
                   <div className="flex items-baseline justify-between pt-1">
                     <span className="text-sm text-[#D8CAB5]">{p.results.multipleLabel}</span>
@@ -384,11 +386,11 @@ function EnRoiClient({ locale }: { locale: Locale }) {
     const nonProductiveFraction = Math.min(0.9, Math.max(0, nonProductivePct / 100));
     const fullyLoadedRate = (Math.max(0, rate) * EMPLOYER_OVERHEAD_MULTIPLIER) / (1 - nonProductiveFraction);
     const valueFreed = hoursPerMonth * fullyLoadedRate;
-    const cost = hoursPerMonth * ANKORA_RATE[locale];
+    const cost = hoursPerMonth * ANKORA_RATE;
     const netValue = valueFreed - cost;
     const multiple = cost > 0 ? valueFreed / cost : 0;
     return { hoursPerMonth, valueFreed, cost, netValue, multiple };
-  }, [totalHoursPerWeek, rate, nonProductivePct, locale]);
+  }, [totalHoursPerWeek, rate, nonProductivePct]);
 
   const personaLabels = p.personas.map((pr) => dict.pages.segments[pr.key].eyebrow);
 
@@ -504,20 +506,20 @@ function EnRoiClient({ locale }: { locale: Locale }) {
                   <div className="border-b border-line pb-4">
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm text-paper/60">{p.results.valueFreedLabel}</span>
-                      <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed, locale)}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.valueFreed)}</span>
                     </div>
                     <p className="mt-1 text-xs text-paper/35">{p.results.valueFreedHint}</p>
                   </div>
                   <div className="border-b border-line pb-4">
                     <div className="flex items-baseline justify-between">
                       <span className="text-sm text-paper/60">{p.results.costLabel}</span>
-                      <span className="text-lg font-medium text-paper">{formatCurrency(results.cost, locale)}</span>
+                      <span className="text-lg font-medium text-paper">{formatCurrency(results.cost)}</span>
                     </div>
                     <p className="mt-1 text-xs text-paper/35">{p.results.costHint}</p>
                   </div>
                   <div className="flex items-baseline justify-between border-b border-line pb-4">
                     <span className="text-sm text-paper/60">{p.results.netValueLabel}</span>
-                    <span className="text-lg font-medium text-gold-light">{formatCurrency(results.netValue, locale)}</span>
+                    <span className="text-lg font-medium text-gold-light">{formatCurrency(results.netValue)}</span>
                   </div>
                   <div className="flex items-baseline justify-between pt-1">
                     <span className="text-sm text-paper/60">{p.results.multipleLabel}</span>

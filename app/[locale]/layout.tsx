@@ -84,7 +84,7 @@ export default async function LocaleLayout(
         />
       </head>
       <body className="font-sans antialiased">
-        <PageShell locale={locale}>
+        <PageShell>
           <Header dict={dict} locale={locale} />
           <main>{children}</main>
           <Footer dict={dict} locale={locale} />

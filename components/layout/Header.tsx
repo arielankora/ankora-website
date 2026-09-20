@@ -7,16 +7,20 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
-import { Container } from "@/components/ui/Container";
-import { Button } from "@/components/ui/Button";
 import { LanguageToggle } from "@/components/layout/LanguageToggle";
-import { cn } from "@/lib/utils";
 
-// Flat top-level links per design_handoff_ankora_redesign/design-files/Site Nav.dc.html —
-// no Solutions dropdown in the redesigned /he nav (the 4 segment routes stay reachable via
-// the footer's "עבור מי" column and in-page links). Flagged to Ariel in the Stage 1 report
-// as an IA change, not a silent decision.
-function heNavLinks(dict: Dictionary) {
+/**
+ * Site header: sticky, translucent navy over a 14px blur, one hairline along the
+ * bottom.
+ *
+ * One header for both languages. The English side used to carry a "Who it's for"
+ * dropdown that Hebrew had already dropped, which meant the two locales had different
+ * internal link graphs — the four segment routes stay reachable from the footer's
+ * "who it's for" column and from the home page's own cards, in both languages.
+ *
+ * The nav is a flat list of six, collapsing to a 44x44 burger below lg.
+ */
+function navLinks(dict: Dictionary) {
   return [
     { href: "/how-it-works", label: dict.nav.howItWorks },
     { href: "/technology", label: dict.nav.technology },
@@ -28,9 +32,6 @@ function heNavLinks(dict: Dictionary) {
 }
 
 export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  const isHe = locale === "he";
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -38,21 +39,20 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  // Lock background scroll while the mobile menu is open. Without this, the
-  // page behind the fixed drawer can still scroll (notably on iOS Safari),
-  // which leaves gaps where the underlying page shows through the menu.
+  // Lock background scroll while the drawer is open. Without this the page behind
+  // the fixed drawer still scrolls (notably on iOS Safari), leaving gaps where the
+  // underlying page shows through the menu.
   useEffect(() => {
     if (!mobileOpen) return;
     const scrollY = window.scrollY;
     const { style } = document.body;
-    const prev = { position: style.position, top: style.top, left: style.left, right: style.right, width: style.width };
+    const prev = {
+      position: style.position,
+      top: style.top,
+      left: style.left,
+      right: style.right,
+      width: style.width,
+    };
     style.position = "fixed";
     style.top = `-${scrollY}px`;
     style.left = "0";
@@ -68,7 +68,20 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
     };
   }, [mobileOpen]);
 
-  const mobileMenu = mounted &&
+  // Escape closes the drawer — it is a modal surface and should behave like one.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
+  const links = navLinks(dict);
+
+  const mobileMenu =
+    mounted &&
     createPortal(
       <AnimatePresence>
         {mobileOpen && (
@@ -77,44 +90,46 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             animate={{ y: 0 }}
             exit={{ y: -16 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            role="dialog"
+            aria-modal="true"
             className="fixed inset-0 z-[60] flex flex-col bg-ink px-6 py-6 lg:hidden"
             style={{ backgroundColor: "#0B1B33", opacity: 1 }}
           >
             <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-paper">ANKORA</span>
-              <button aria-label="Close" onClick={() => setMobileOpen(false)} className="h-10 w-10">
-                <svg width="18" height="18" viewBox="0 0 18 18">
+              <span className="font-assistant text-base font-light tracking-[0.3em] text-cream">
+                ANKORA
+              </span>
+              <button
+                aria-label="Close"
+                onClick={() => setMobileOpen(false)}
+                className="flex h-11 w-11 items-center justify-center"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
                   <path d="M1 1L17 17M1 17L17 1" stroke="#F8F4EC" strokeWidth="1.4" />
                 </svg>
               </button>
             </div>
             <nav className="mt-12 flex flex-col gap-7">
-              {(isHe
-                ? heNavLinks(dict)
-                : [
-                    { label: dict.nav.solutions, href: "/solutions" },
-                    { label: dict.nav.howItWorks, href: "/how-it-works" },
-                    { label: dict.nav.technology, href: "/technology" },
-                    { label: dict.nav.about, href: "/about" },
-                    { label: dict.nav.pricing, href: "/pricing" },
-                    { label: dict.nav.roi, href: "/roi" },
-                    { label: dict.nav.blog, href: "/blog" },
-                  ]
-              ).map((item) => (
+              {links.map((item) => (
                 <Link
                   key={item.href}
                   href={withLocale(locale, item.href)}
                   onClick={() => setMobileOpen(false)}
-                  className="text-2xl font-medium text-paper"
+                  className="text-2xl font-light text-paper"
                 >
                   {item.label}
                 </Link>
               ))}
             </nav>
-            <div className="mt-auto flex flex-col gap-4">
-              <Button href={withLocale(locale, "/contact")} className="w-full">
+            <div className="mt-auto flex flex-col gap-5">
+              <LanguageToggle locale={locale} />
+              <Link
+                href={withLocale(locale, "/contact")}
+                onClick={() => setMobileOpen(false)}
+                className="flex min-h-[44px] items-center justify-center border border-gold bg-gold px-6 py-3 font-assistant text-[15px] font-medium text-ink"
+              >
                 {dict.nav.cta}
-              </Button>
+              </Link>
             </div>
           </motion.div>
         )}
@@ -122,153 +137,65 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
       document.body
     );
 
-  if (isHe) {
-    return (
-      <>
-        <header
-          className="sticky top-0 z-50 border-b border-[rgba(243,234,219,0.09)] bg-[rgba(11,27,51,0.62)] font-assistant backdrop-blur-[20px] [backdrop-filter:blur(20px)_saturate(1.2)]"
-        >
-          <div className="mx-auto flex max-w-wide items-center gap-[clamp(14px,3vw,44px)] px-[clamp(18px,4vw,56px)] py-[15px]">
-            <Link href={withLocale(locale, "/")} className="flex shrink-0 items-center">
-              <Image src="/logo-cream.jpg" alt="Ankora" width={40} height={40} />
-            </Link>
-
-            <nav className="hidden flex-1 flex-wrap items-center gap-[clamp(10px,1.8vw,26px)] text-[14.5px] lg:flex">
-              {heNavLinks(dict).map((item) => (
-                <Link
-                  key={item.href}
-                  href={withLocale(locale, item.href)}
-                  className="text-[#B6C4D4] transition-colors hover:text-gold"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-
-            <div className="hidden shrink-0 items-center gap-[14px] lg:flex">
-              <Link
-                href="/en"
-                className="font-jbmono text-[12px] tracking-[0.1em] text-[#7C8EA3] transition-colors hover:text-gold"
-              >
-                EN
-              </Link>
-              <Link
-                href={withLocale(locale, "/contact")}
-                className="border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-5 py-[11px] text-[14.5px] font-medium text-paper transition-colors duration-300 ease-out hover:border-gold hover:bg-gold hover:text-ink"
-              >
-                {dict.nav.cta}
-              </Link>
-            </div>
-
-            <div className="flex items-center gap-3 lg:hidden">
-              <button
-                aria-label="Menu"
-                className="flex h-10 w-10 items-center justify-center"
-                onClick={() => setMobileOpen(true)}
-              >
-                <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
-                  <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </header>
-        {mobileMenu}
-      </>
-    );
-  }
-
   return (
     <>
-    <header
-      className={cn(
-        "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-        scrolled ? "bg-ink/90 backdrop-blur-md border-b border-line" : "bg-transparent"
-      )}
-    >
-      <Container className="flex h-20 items-center justify-between">
-        <Link href={withLocale(locale, "/")} className="flex items-center shrink-0">
-          <Image src="/logo-cream.jpg" alt="Ankora" width={64} height={64} />
-        </Link>
-
-        <nav className="hidden items-center gap-8 lg:flex">
-          <div
-            className="relative"
-            onMouseEnter={() => setMenuOpen(true)}
-            onMouseLeave={() => setMenuOpen(false)}
+      <header className="sticky top-0 z-20 border-b border-[rgba(243,234,219,0.1)] bg-[rgba(11,27,51,0.72)] font-assistant backdrop-blur-[14px]">
+        <div className="mx-auto flex max-w-wide items-center gap-8 px-[clamp(18px,4vw,32px)] py-[18px]">
+          <Link
+            href={withLocale(locale, "/")}
+            className="flex flex-none items-center gap-[11px]"
+            aria-label="Ankora"
           >
-            <button className="flex items-center gap-1.5 text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-              {dict.nav.solutions}
-              <svg width="10" height="6" viewBox="0 0 10 6" className={cn("transition-transform", menuOpen && "rotate-180")}>
-                <path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.4" fill="none" strokeLinecap="round" />
-              </svg>
-            </button>
-            <AnimatePresence>
-              {menuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.18 }}
-                  className="absolute top-full grid w-[560px] grid-cols-2 gap-1 rounded-2xl border border-line bg-navy/98 p-3 shadow-2xl backdrop-blur-xl start-1/2 -translate-x-1/2 rtl:translate-x-1/2"
-                >
-                  {dict.nav.solutionsMenu.map((item) => (
-                    <Link
-                      key={item.href}
-                      href={withLocale(locale, item.href)}
-                      className="rounded-xl p-4 transition-colors hover:bg-white/[0.04]"
-                    >
-                      <div className="text-[15px] font-medium text-paper">{item.label}</div>
-                      <div className="mt-1 text-sm text-paper/55">{item.blurb}</div>
-                    </Link>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <Image
+              src="/logo-mark-gold.png"
+              alt=""
+              width={30}
+              height={30}
+              priority
+              className="block h-[30px] w-[30px] object-contain"
+            />
+            {/* Latin wordmark, so the .3em tracking stays in both locales. The matching
+                padding-inline-start balances the trailing letter-space the tracking
+                adds after the final A. */}
+            <span className="font-light text-base tracking-[0.3em] text-cream ps-[0.3em]">
+              ANKORA
+            </span>
+          </Link>
+
+          <nav className="hidden flex-1 flex-nowrap items-center gap-[clamp(10px,1.8vw,26px)] whitespace-nowrap text-[14.5px] font-light text-tone-muted lg:flex">
+            {links.map((item) => (
+              <Link
+                key={item.href}
+                href={withLocale(locale, item.href)}
+                className="border-b border-transparent pb-[3px] transition-colors duration-[250ms] hover:border-gold hover:text-paper"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+
+          <div className="ms-auto hidden items-center gap-[18px] lg:flex">
+            <LanguageToggle locale={locale} />
+            <Link
+              href={withLocale(locale, "/contact")}
+              className="whitespace-nowrap border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-[22px] py-[11px] text-[14.5px] font-medium text-paper transition-colors duration-300 hover:border-gold hover:bg-gold hover:text-ink"
+            >
+              {dict.nav.cta}
+            </Link>
           </div>
 
-          <Link href={withLocale(locale, "/how-it-works")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.howItWorks}
-          </Link>
-          <Link href={withLocale(locale, "/technology")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.technology}
-          </Link>
-          <Link href={withLocale(locale, "/about")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.about}
-          </Link>
-          <Link href={withLocale(locale, "/pricing")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.pricing}
-          </Link>
-          <Link href={withLocale(locale, "/roi")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.roi}
-          </Link>
-          <Link href={withLocale(locale, "/blog")} className="text-[15px] text-paper/85 transition-colors hover:text-gold-light">
-            {dict.nav.blog}
-          </Link>
-        </nav>
-
-        <div className="hidden items-center gap-4 lg:flex">
-          <LanguageToggle locale={locale} />
-          <Button href={withLocale(locale, "/contact")} variant="primary" className="text-sm px-5 py-2.5">
-            {dict.nav.cta}
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-3 lg:hidden">
-          <LanguageToggle locale={locale} />
           <button
             aria-label="Menu"
-            className="flex h-10 w-10 items-center justify-center"
+            aria-expanded={mobileOpen}
+            className="ms-auto flex h-11 w-11 items-center justify-center lg:hidden"
             onClick={() => setMobileOpen(true)}
           >
-            <svg width="22" height="14" viewBox="0 0 22 14" fill="none">
+            <svg width="22" height="14" viewBox="0 0 22 14" fill="none" aria-hidden="true">
               <path d="M0 1H22M0 7H22M0 13H22" stroke="#F8F4EC" strokeWidth="1.4" />
             </svg>
           </button>
         </div>
-      </Container>
-
-    </header>
+      </header>
       {mobileMenu}
     </>
   );

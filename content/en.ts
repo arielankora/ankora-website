@@ -33,14 +33,43 @@ const en: Dictionary = {
   },
   hero: {
     eyebrow: "Operational Intelligence",
-    title: "You run the business.\nWho runs everything else?",
-    sub: "Ankora combines AI orchestration with dedicated human Operations Managers to remove the operational complexity of modern life — so you can focus on what matters.",
+    titleLine1: "You run the business.",
+    titleLine2: "Who runs everything else?",
+    // Replaces a longer subline that explained the mechanism. The category words it
+    // carried (AI orchestration, Operations Manager) are still on screen -- the
+    // definition paragraph directly below the hero states both (Ariel's decision, C08).
+    sub: "Ankora runs everything around it, so you can focus on what actually matters: the business.",
     ctaPrimary: "Book a Strategy Call",
     ctaSecondary: "How it works",
     definitionPre: "Ankora is a ",
     definitionLinked: "Personal Operations Management",
     definitionPost: " service for executives, founders and busy families in Israel — an outsourced alternative to hiring another full-time assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
+    live: {
+      nowLabel: "IN PROGRESS",
+      closedLabel: "CLOSED TODAY",
+      closedSub: "items that never reached you",
+      sparkLabel: "LAST SEVEN DAYS",
+      orchLabel: "ORCHESTRATION LAYER",
+      orchRows: ["Preference memory", "Deadline monitoring", "Proactive updates"],
+      businessTasks: [
+        { text: "Flight booked, meetings linked", domain: "TRAVEL & LOGISTICS" },
+        { text: "Two vendor quotes compared", domain: "VENDOR COORDINATION" },
+        { text: "Filing with the municipality", domain: "ADMINISTRATIVE LIAISON" },
+        { text: "Client collection followed up", domain: "BUSINESS OPERATIONS" },
+      ],
+      personalTasks: [
+        { text: "Car insurance policy renewed", domain: "PERSONAL ADMIN" },
+        { text: "HVAC technician scheduled", domain: "PROPERTY & HOUSEHOLD" },
+        { text: "Dental appointment booked", domain: "PERSONAL OPERATIONS" },
+      ],
+    },
   },
+  stats: [
+    { value: "1", label: "One point of contact, across every domain" },
+    { value: "24/7", label: "Deadlines and commitments monitored" },
+    { value: "0", label: "Intake forms or long-term commitment" },
+    { value: "20 min", label: "A strategy call is all it takes" },
+  ],
   problem: {
     label: "The problem",
     title: "Your success requires hundreds of decisions a day.",
@@ -67,29 +96,39 @@ const en: Dictionary = {
       { title: "Execution", body: "The work is managed end to end, with full ownership, as if it were our own." },
       { title: "Proactive Update", body: "You hear from us before you have to ask — when things are on track, and when they're not." },
     ],
+    railLabel: "One task, two routes",
+    attentionLabel: "YOUR ATTENTION",
+    laneWithout: "Without Ankora",
+    laneWith: "With Ankora",
+    noteWithout:
+      "The task stalls at every obstacle and comes back to you: a vendor who never replied, a missing form, a question only you can answer. Each stop is another interruption in your day, and the outcome is not guaranteed.",
+    noteWith:
+      "You explain it once. An experienced Operations Manager carries the task to the end, clears the obstacles directly, and closes it before you think to ask where it stands.",
   },
   intelligence: {
     label: "Technology",
-    title: "AI that remembers. People who decide.",
+    titleLine1: "AI that remembers.",
+    titleLine2: "People who decide.",
     body: "Our system remembers your preferences, schedules work, tracks progress, and flags what needs attention. Our Operations Managers bring judgment, empathy, and accountability — the parts AI shouldn't replace.",
     pillars: [
-      { title: "Memory", body: "Every preference, every decision, always available — without repeating yourself." },
-      { title: "Orchestration", body: "Many tasks, many parties, one transparent coordination layer." },
-      { title: "Monitoring", body: "Continuous tracking of every open thread, so you don't have to check." },
-      { title: "Prediction", body: "Flagging what needs attention before it becomes a problem." },
+      { key: "MEMORY", title: "Memory", body: "Every preference, every decision, always available — without repeating yourself." },
+      { key: "ORCHESTRATION", title: "Orchestration", body: "Many tasks, many parties, one transparent coordination layer." },
+      { key: "MONITORING", title: "Monitoring", body: "Continuous tracking of every open thread, so you don't have to check." },
+      { key: "PREDICTION", title: "Prediction", body: "Flagging what needs attention before it becomes a problem." },
     ],
   },
   capabilities: {
     label: "Capabilities",
     title: "One operational layer, instead of a dozen open tabs",
     sub: "Every domain is owned by a dedicated Operations Manager, backed by AI orchestration.",
+    // Same order as content/he.ts -- business operations first (Ariel's decision, C01).
     items: [
-      { title: "Personal Operations", body: "Your daily tasks, time, and commitments, managed in one place." },
-      { title: "Vendor & Service Coordination", body: "Selection, coordination, and quality control across a vetted network." },
-      { title: "Administrative Liaison", body: "Handling institutions and authorities on your behalf, start to finish." },
-      { title: "Business Operations Support", body: "Ongoing operational support for small teams and growing companies." },
-      { title: "Property & Household Operations", body: "Maintenance, coordination, and quality control for your home and property." },
-      { title: "Travel & Logistics", body: "Planning, bookings, and changes — coordinated ahead of time." },
+      { key: "BUSINESS OPS", title: "Business Operations Support", body: "Ongoing operational support for small teams and growing companies." },
+      { key: "VENDORS", title: "Vendor & Service Coordination", body: "Selection, coordination, and quality control across a vetted network." },
+      { key: "PERSONAL OPS", title: "Personal Operations", body: "Your daily tasks, time, and commitments, managed in one place." },
+      { key: "ADMIN", title: "Administrative Liaison", body: "Handling institutions and authorities on your behalf, start to finish." },
+      { key: "TRAVEL", title: "Travel & Logistics", body: "Planning, bookings, and changes — coordinated ahead of time." },
+      { key: "PROPERTY", title: "Property & Household Operations", body: "Maintenance, coordination, and quality control for your home and property." },
     ],
   },
   humanAI: {
@@ -104,6 +143,7 @@ const en: Dictionary = {
   industries: {
     label: "Who it's for",
     title: "Built for people whose time and attention are their most valuable resource",
+    itemCta: "Learn more →",
     items: [
       { title: "Executives", body: "Focus on the decisions that actually require you.", href: "/solutions/executives" },
       { title: "Founders", body: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
@@ -114,8 +154,12 @@ const en: Dictionary = {
   trust: {
     label: "Trust",
     title: "Discretion is the default, not an add-on",
-    body: "Every piece of information is handled in full confidentiality. Access is limited to those who genuinely need it, under a privacy policy built around the trust you place in us.",
-    badges: ["Full privacy", "Registered Israeli business", "Human availability", "No long-term commitment"],
+    // Leading sentence added to match the Hebrew, which already opened on who the
+    // people are rather than on data handling (Ariel's decision, C08).
+    body: "Our Operations Managers are experienced senior professionals, carefully vetted and trained for discretion and operational excellence. Every piece of information is handled in full confidentiality. Access is limited to those who genuinely need it, under a privacy policy built around the trust you place in us.",
+    // Three badges, matching Hebrew. "Registered Israeli business" had no Hebrew
+    // counterpart and the asymmetry was resolved downwards (Ariel's decision, C07).
+    badges: ["Full privacy", "Human availability", "No long-term commitment"],
   },
   faq: {
     label: "FAQ",
@@ -239,7 +283,7 @@ const en: Dictionary = {
       eyebrow: "About",
       title: "We exist to give busy people back their most valuable resource.",
       sub: "Not time. Attention.",
-      entityDefinition: "Ankora is an Israeli Personal Operations Management company. We give executives, founders and busy families a dedicated human Operations Manager, backed by AI orchestration, who takes end-to-end ownership of personal, household, vendor, administrative, travel and selected business operations. Ankora operates in Israel, serving clients across Tel Aviv and the surrounding area. This model, a human Operations Manager combined with AI orchestration and persistent operational memory, is what we call Operational Intelligence.",
+      entityDefinition: "Ankora is an Israeli Personal Operations Management company. We give executives, founders and busy families a dedicated human Operations Manager, backed by AI orchestration, who takes end-to-end ownership of personal, household, vendor, administrative, travel and selected business operations. Ankora operates in Israel. This model, a human Operations Manager combined with AI orchestration and persistent operational memory, is what we call Operational Intelligence.",
       blocks: [
         { title: "Vision", body: "The world is full of small tasks that together create enormous mental load. We believe people shouldn't have to carry that load alone." },
         { title: "Mission", body: "To give people managing a lot — a business, a family, a career — one operational layer they can trust completely." },
@@ -280,7 +324,7 @@ const en: Dictionary = {
           ],
           rateLabel: "What's the direct hourly cost of your time?",
           rateHint: "Direct cost of your working hour, before employer overhead",
-          rateDefault: 400,
+          rateDefault: 450,
         },
         {
           key: "founders",
@@ -306,7 +350,7 @@ const en: Dictionary = {
           ],
           rateLabel: "What's the direct hourly cost of whoever does this today?",
           rateHint: "You, an office manager, or a team member",
-          rateDefault: 300,
+          rateDefault: 380,
         },
         {
           key: "familyOffice",
@@ -319,7 +363,7 @@ const en: Dictionary = {
           ],
           rateLabel: "What's the direct hourly cost of whoever does this today?",
           rateHint: "You, or a team member",
-          rateDefault: 250,
+          rateDefault: 300,
         },
       ],
       results: {
@@ -328,13 +372,13 @@ const en: Dictionary = {
         valueFreedLabel: "Full employer cost of the time spent today",
         valueFreedHint: "The direct hourly cost you entered, plus about 33% employer overhead and non-productive paid time",
         costLabel: "Estimated Ankora cost",
-        costHint: "Based on an example rate of $35/hour",
+        costHint: "Based on an example rate of ₪130/hour",
         netValueLabel: "Net monthly savings",
         multipleLabel: "A return of",
         multipleSuffix: "on every dollar spent",
         ctaBody: "These numbers are an estimate. A short intro call will give you an exact picture.",
         cta: "Book an intro call",
-        footnote: "* This calculation is illustrative only: the cost of time spent today is the direct hourly cost entered, multiplied by 1.33 to reflect employer overhead, then divided by the productive share of paid time (100% minus the non-productive percentage entered). Ankora's cost is based on an example rate of $35/hour. It does not constitute a price quote or commitment.",
+        footnote: "* This calculation is illustrative only: the cost of time spent today is the direct hourly cost entered, multiplied by 1.33 to reflect employer overhead, then divided by the productive share of paid time (100% minus the non-productive percentage entered). Ankora's cost is based on an example rate of ₪130/hour. Amounts on screen are rounded for display, so a simple subtraction between them may be off by a shekel or two. It does not constitute a price quote or commitment.",
       },
       hiddenCost: {
         label: "Beyond the numbers",
