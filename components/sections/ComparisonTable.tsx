@@ -1,113 +1,118 @@
 import { Reveal } from "@/components/motion/Reveal";
-import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
+import { MonoLabel } from "@/components/ui/MonoLabel";
+import { cn } from "@/lib/utils";
 
-// /he redesign comparison-row pattern, built to the design_handoff_ankora_redesign/
-// README.md spec word for word (this went through several iterations during design):
-// each row is its own block in a 1px grid; the row label is a full-width, start-aligned
-// hairline-underlined header spanning BOTH columns (never centred -- centring makes it
-// read as belonging to the gold column); below it, two values in an auto-fit row, each
-// delineated by a border-inline-start (translucent cream for the comparison side, solid
-// gold for the Ankora side). Never a fixed three-column grid -- one was tried here and
-// failed badly at narrow widths (one-word-per-line).
-function HeComparisonTable({
-  columnA,
-  columnB,
-  rows,
-}: {
-  columnA: string;
-  columnB: string;
-  rows: { dimension: string; a: string; b: string }[];
-}) {
-  return (
-    <Reveal delay={0.1}>
-      <HairlineGrid minCell={9999}>
-        {rows.map((row) => (
-          <HairlineGridCell key={row.dimension}>
-            <div className="border-b border-[rgba(243,234,219,0.16)] pb-3.5 text-start text-[14.5px] font-semibold tracking-[0.02em] text-cream">
-              {row.dimension}
-            </div>
-            <div
-              className="mt-[18px] grid gap-x-8 gap-y-4"
-              style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))" }}
-            >
-              <div className="border-[rgba(243,234,219,0.18)] ps-3.5" style={{ borderInlineStartWidth: 1, borderInlineStartStyle: "solid" }}>
-                <div className="text-[12.5px] font-semibold text-[#7C8EA3]">{columnA}</div>
-                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-[#A9B8C9]">{row.a}</div>
-              </div>
-              <div className="border-gold ps-3.5" style={{ borderInlineStartWidth: 1, borderInlineStartStyle: "solid" }}>
-                <div className="text-[12.5px] font-semibold text-gold">{columnB}</div>
-                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-cream">{row.b}</div>
-              </div>
-            </div>
-          </HairlineGridCell>
-        ))}
-      </HairlineGrid>
-    </Reveal>
-  );
-}
-
+/**
+ * Criterion · alternative · Ankora, as one real table.
+ *
+ * It is the one place in the system that draws its rules with `border-block-start` on
+ * cells rather than with 1px grid gaps, and that is deliberate: table semantics have to
+ * survive. The comparison page is an objection-handling page that search engines read
+ * as a comparison, and `display: grid` on a table element throws that away. The visual
+ * result is identical.
+ *
+ * One DOM, CSS switch. The previous version rendered the table *and* a full stacked
+ * repeat of the same content for narrow screens — every criterion and value in the DOM
+ * twice, so a screen reader heard the comparison twice and a crawler saw duplicated
+ * body content on the page whose whole job is ranking for a comparison query. It also
+ * carried a forked `locale === "he"` branch, which is the last of those on this page.
+ *
+ * The Ankora column is the only gold in the table: one rule under its header and the
+ * header text in gold. That single rule is the table saying which column is the answer,
+ * and it says it once. No icons — no ticks, no crosses. Both models are legitimate, the
+ * page says so in its own lead, and a column of green ticks against a column of red
+ * crosses contradicts the copy.
+ */
 export function ComparisonTable({
   columnA,
   columnB,
+  criterionLabel,
   rows,
-  locale,
+  stickyHeader,
 }: {
   columnA: string;
   columnB: string;
+  /** Header over the criterion column. */
+  criterionLabel: string;
   rows: { dimension: string; a: string; b: string }[];
-  locale?: "he" | "en";
+  /** Defaults to auto above 12 rows: a 16-row table is unreadable by row 12 otherwise. */
+  stickyHeader?: boolean;
 }) {
-  if (locale === "he") {
-    return <HeComparisonTable columnA={columnA} columnB={columnB} rows={rows} />;
-  }
+  const sticky = stickyHeader ?? rows.length > 12;
+  const rule = "border-t border-[rgba(243,234,219,0.12)]";
 
   return (
-    <Reveal delay={0.1}>
-      {/* Desktop / tablet: a real semantic table, kept in the DOM at every
-          breakpoint (only its display is toggled) so the comparison data
-          stays crawlable regardless of viewport. */}
-      <div className="hidden overflow-hidden rounded-2xl border border-lineDark md:block">
-        <table className="w-full border-collapse text-start">
-          <thead>
-            <tr className="border-b border-lineDark bg-cream-warm">
-              <th className="w-[28%] p-4 text-start text-xs font-semibold uppercase tracking-[0.12em] text-appNavy/35">
-                &nbsp;
+    <Reveal>
+      <table className="mt-[26px] w-full border-separate border-spacing-0 text-start max-[900px]:block">
+        {/* Hidden narrow: each cell reproduces its own column label there. */}
+        <thead
+          className={cn(
+            "max-[900px]:hidden",
+            sticky && "sticky top-[86px] z-[5] bg-navy"
+          )}
+        >
+          <tr>
+            <th scope="col" className="w-[24%] pb-2.5 text-start font-normal">
+              <MonoLabel size={10} className="text-muted">
+                {criterionLabel}
+              </MonoLabel>
+            </th>
+            <th scope="col" className="w-[38%] px-[18px] pb-2.5 text-start font-normal">
+              <MonoLabel size={10} className="text-muted">
+                {columnA}
+              </MonoLabel>
+            </th>
+            {/* The one gold rule. */}
+            <th
+              scope="col"
+              className="w-[38%] border-b border-gold px-[18px] pb-2.5 text-start font-normal"
+            >
+              <MonoLabel size={10} className="text-gold">
+                {columnB}
+              </MonoLabel>
+            </th>
+          </tr>
+        </thead>
+        <tbody className="max-[900px]:block">
+          {rows.map((row) => (
+            <tr
+              key={row.dimension}
+              // Written out, not interpolated: Tailwind cannot see a class built from a
+              // variable, and `max-[900px]:${rule}` would also only have applied the
+              // variant to the first of the two utilities.
+              className="max-[900px]:grid max-[900px]:grid-cols-2 max-[900px]:border-t max-[900px]:border-[rgba(243,234,219,0.12)]"
+            >
+              {/* Spans both value cells narrow, as the group heading. Side by side and
+                  not stacked below it: the reader is comparing two things, and stacking
+                  them puts a scroll between the two halves of every comparison. */}
+              <th
+                scope="row"
+                className={`${rule} py-4 text-start align-top font-assistant text-[14px] font-normal leading-[1.5] text-muted max-[900px]:col-span-2 max-[900px]:border-t-0 max-[900px]:pb-1.5 max-[900px]:pt-3.5 max-[900px]:text-cream`}
+              >
+                {row.dimension}
               </th>
-              <th className="p-4 text-start text-sm font-medium text-appNavy/60">{columnA}</th>
-              <th className="p-4 text-start text-sm font-medium text-appNavy">{columnB}</th>
+              <td
+                className={`${rule} px-[18px] py-4 align-top font-assistant text-[15px] font-light leading-[1.65] text-muted max-[900px]:border-t-0 max-[900px]:pb-4 max-[900px]:pe-3.5 max-[900px]:ps-0 max-[900px]:pt-1.5 max-[900px]:text-[14px]`}
+              >
+                <MonoLabel size={10} className="mb-1 hidden text-muted max-[900px]:block">
+                  {columnA}
+                </MonoLabel>
+                {row.a}
+              </td>
+              {/* Navy glass down the full height, making a lane. Navy and not the cream
+                  wash: under a cream wash gold measures 3.8:1. */}
+              <td
+                className={`${rule} bg-[rgba(11,27,51,0.5)] px-[18px] py-4 align-top font-assistant text-[15px] font-light leading-[1.65] text-cream max-[900px]:border-t-0 max-[900px]:pb-4 max-[900px]:pe-0 max-[900px]:ps-3.5 max-[900px]:pt-1.5 max-[900px]:text-[14px]`}
+              >
+                <MonoLabel size={10} className="mb-1 hidden text-gold max-[900px]:block">
+                  {columnB}
+                </MonoLabel>
+                {row.b}
+              </td>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.dimension} className="border-b border-lineDark last:border-0 even:bg-cream-warm/40">
-                <td className="p-4 text-sm font-medium text-appNavy/70">{row.dimension}</td>
-                <td className="p-4 text-sm leading-relaxed text-appNavy/50">{row.a}</td>
-                <td className="p-4 text-sm leading-relaxed text-appNavy">{row.b}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Narrow viewports: the same data as stacked cards, so nothing gets
-          clipped by horizontal table scroll on RTL / small screens. */}
-      <div className="flex flex-col gap-3 md:hidden">
-        {rows.map((row) => (
-          <div key={row.dimension} className="rounded-2xl border border-lineDark bg-cream-warm/40 p-5">
-            <h3 className="text-sm font-medium text-appNavy">{row.dimension}</h3>
-            <dl className="mt-3 flex flex-col gap-2.5">
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="shrink-0 text-xs text-appNavy/40">{columnA}</dt>
-                <dd className="text-sm leading-relaxed text-appNavy/60">{row.a}</dd>
-              </div>
-              <div className="flex items-baseline justify-between gap-4">
-                <dt className="shrink-0 text-xs font-medium text-appNavy/50">{columnB}</dt>
-                <dd className="text-sm font-medium leading-relaxed text-appNavy">{row.b}</dd>
-              </div>
-            </dl>
-          </div>
-        ))}
-      </div>
+          ))}
+        </tbody>
+      </table>
     </Reveal>
   );
 }

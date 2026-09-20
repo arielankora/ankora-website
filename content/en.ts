@@ -890,6 +890,15 @@ const en: Dictionary = {
         },
       ],
     },
+    seo: {
+      summaryLabel: "In short",
+      navLabel: "On this page",
+      navCount: { one: "1 chapter", other: "{n} chapters" },
+      criterionLabel: "Criterion",
+      updated: "Last updated: August 2026",
+      updatedISO: "2026-08",
+      readingMinutes: { one: "1 minute read", other: "{n} minute read" },
+    },
     personalOperationsManagement: {
       eyebrow: "Personal Operations Management",
       title: "What Is Personal Operations Management?",
@@ -1074,6 +1083,7 @@ const en: Dictionary = {
       title: "Ankora vs. Personal Assistant: Which One Do You Actually Need?",
       sub: "A genuine comparison, not a sales pitch. Both models are legitimate. They fit different situations.",
       directAnswer: "A Personal Assistant is best when you need someone physically present with you, managing real-time scheduling and in-person tasks. Ankora is best when the real problem is fragmented operational ownership across personal, household, vendor, administrative, travel and business areas that need continuous, proactive management rather than task-by-task execution. Ankora is an outsourced service, not a new hire: you get a dedicated Operations Manager without adding an employee.",
+      tableTitle: "The comparison, row by row",
       columnA: "Personal Assistant",
       columnB: "Ankora",
       table: [

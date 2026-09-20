@@ -1,4 +1,7 @@
+import type { PluralString } from "@/lib/plural";
+
 export type Locale = "he" | "en";
+export type { PluralString };
 
 /**
  * The six operational domains, in the order the site presents them. Used by the
@@ -421,6 +424,26 @@ export interface PagesContent {
       services: { name: string; description: string }[];
     }[];
   };
+  /**
+   * Chrome shared by the three long-form SEO pages: the contents rail, the comparison
+   * tables and the hero meta line. One copy, because three pages each carrying their
+   * own "on this page" string is three chances for them to drift.
+   */
+  seo: {
+    /** "In short" over the summary panel. POM already had its own `directAnswerLabel`
+     *  with the same word; this is the shared one for the pages that did not. */
+    summaryLabel: string;
+    navLabel: string;
+    /** Counted, so a page that gains a section does not still read "10 chapters" at nine. */
+    navCount: PluralString;
+    /** Header over the comparison table's criterion column. */
+    criterionLabel: string;
+    updated: string;
+    /** ISO YYYY-MM, for the <time datetime> attribute. */
+    updatedISO: string;
+    /** Computed from the dictionary, never authored -- see lib/reading.ts. */
+    readingMinutes: PluralString;
+  };
   personalOperationsManagement: {
     eyebrow: string;
     title: string;
@@ -495,6 +518,10 @@ export interface PagesContent {
     title: string;
     sub: string;
     directAnswer: string;
+    /** Heading over section 01, which is the table. The page had no heading for it,
+     *  because the previous design opened straight into the table with no section
+     *  structure at all. */
+    tableTitle: string;
     columnA: string;
     columnB: string;
     table: { dimension: string; a: string; b: string }[];

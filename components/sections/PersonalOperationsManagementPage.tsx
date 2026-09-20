@@ -2,27 +2,148 @@
 
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
+import { plural } from "@/lib/plural";
+import { readingMinutes } from "@/lib/reading";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { ComparisonTable } from "@/components/sections/ComparisonTable";
 import { PageFAQ } from "@/components/sections/PageFAQ";
 import { RelatedLinks } from "@/components/sections/RelatedLinks";
-import { Container } from "@/components/ui/Container";
+import { SummaryPanel } from "@/components/sections/SummaryPanel";
+import { LongFormNav } from "@/components/sections/LongFormNav";
+import { LongFormSection, Prose, ItemGrid, SubSection } from "@/components/sections/LongForm";
 import { WideContainer } from "@/components/ui/WideContainer";
-import { Eyebrow } from "@/components/ui/Eyebrow";
-import { GlassPanel } from "@/components/ui/GlassPanel";
-import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
+import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
-import { motion } from "framer-motion";
+import { Reveal } from "@/components/motion/Reveal";
 
-// /he redesign: long-form SEO page (design_handoff_ankora_redesign/README.md, section
-// "13. What is POM"). Section order already matches the spec almost exactly; this branch
-// restyles each section to the established WideContainer/Eyebrow/HairlineGrid/GlassPanel
-// visual language rather than changing structure or copy.
-function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+/**
+ * The category-definition page, and the most important SEO/GEO asset on the site.
+ *
+ * Ten movements, so the structure is doing as much work as the type. It replaces a
+ * forked pair of he/en implementations, each of which restyled the marketing language
+ * onto a page three times the length of anything that language was designed for.
+ *
+ * The section list is built once and used twice -- by the contents rail and by the
+ * article -- so the rail cannot describe a page the article does not render. Indices
+ * and anchors derive from position.
+ */
+export function PersonalOperationsManagementPage({
+  dict,
+  locale,
+}: {
+  dict: Dictionary;
+  locale: Locale;
+}) {
   const p = dict.pages.personalOperationsManagement;
+  const seo = dict.pages.seo;
+  const minutes = readingMinutes(p);
+
+  const sections: { title: string; body: React.ReactNode }[] = [
+    {
+      title: p.problem.title,
+      body: (
+        <>
+          <Prose>{p.problem.intro}</Prose>
+          <ItemGrid items={p.problem.items} />
+          <Prose className="mt-[22px]">{p.problem.closing}</Prose>
+        </>
+      ),
+    },
+    {
+      title: p.whatManagerDoes.title,
+      body: (
+        <>
+          <Prose>{p.whatManagerDoes.body}</Prose>
+          {p.whatManagerDoes.examples.map((e) => (
+            <SubSection key={e.title} title={e.title}>
+              <Prose className="mt-3">{e.body}</Prose>
+            </SubSection>
+          ))}
+        </>
+      ),
+    },
+    {
+      title: p.comparisonPA.title,
+      body: (
+        <>
+          <Prose>{p.comparisonPA.intro}</Prose>
+          <ComparisonTable
+            criterionLabel={seo.criterionLabel}
+            columnA={p.comparisonPA.columnA}
+            columnB={p.comparisonPA.columnB}
+            rows={p.comparisonPA.rows}
+          />
+        </>
+      ),
+    },
+    {
+      title: p.comparisonConcierge.title,
+      body: (
+        <>
+          <Prose>{p.comparisonConcierge.intro}</Prose>
+          <ComparisonTable
+            criterionLabel={seo.criterionLabel}
+            columnA={p.comparisonConcierge.columnA}
+            columnB={p.comparisonConcierge.columnB}
+            rows={p.comparisonConcierge.rows}
+          />
+        </>
+      ),
+    },
+    {
+      title: p.humanAI.title,
+      body: (
+        <>
+          <Prose>{p.humanAI.body}</Prose>
+          {p.humanAI.points.map((pt) => (
+            <SubSection key={pt.title} title={pt.title}>
+              <Prose className="mt-3">{pt.body}</Prose>
+            </SubSection>
+          ))}
+        </>
+      ),
+    },
+    {
+      title: p.whoFor.title,
+      body: <ItemGrid items={p.whoFor.items} />,
+    },
+    {
+      title: p.examples.title,
+      body: (
+        <>
+          {p.examples.items.map((item) => (
+            <SubSection key={item.scenario} title={item.scenario} quote={item.shallow}>
+              <Prose className="mt-3">{item.deep}</Prose>
+            </SubSection>
+          ))}
+        </>
+      ),
+    },
+    {
+      // The honesty section, and it keeps the same treatment as every other one -- no
+      // dimming, no warning colour, no smaller type. A disclaimer set quieter than the
+      // pitch is not a disclaimer.
+      title: p.notRightFit.title,
+      body: (
+        <>
+          <Prose>{p.notRightFit.body}</Prose>
+          <ItemGrid items={p.notRightFit.items} />
+        </>
+      ),
+    },
+    {
+      title: dict.faq.label,
+      body: (
+        <PageFAQ
+          items={p.faq}
+          linkify={{ phrase: dict.nav.pricing, href: withLocale(locale, "/pricing") }}
+        />
+      ),
+    },
+  ];
+
+  const navItems = sections.map((s, i) => ({ id: `section-${i + 1}`, title: s.title }));
 
   return (
     <>
@@ -30,449 +151,71 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
         eyebrow={p.eyebrow}
         title={p.title}
         sub={p.sub}
-        breadcrumb={
-          <Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: p.eyebrow }]} />
+        meta={
+          <MonoLabel className="text-muted">
+            <time dateTime={seo.updatedISO}>{seo.updated}</time>
+            {" · "}
+            {plural(seo.readingMinutes, minutes, locale)}
+          </MonoLabel>
         }
-      />
-
-      {/* Direct answer, first, for humans and AI systems -- gold summary box ("בקצרה") */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer className="max-w-[92ch]">
-          <Reveal>
-            <div className="border border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] p-[clamp(22px,3vw,40px)]">
-              <span className="font-jbmono text-[12px] tracking-[0.15em] text-gold">{p.directAnswerLabel}</span>
-              <p className="mt-4 text-lg leading-relaxed text-cream">{p.directAnswer}</p>
-            </div>
-          </Reveal>
-        </WideContainer>
-      </section>
-
-      {/* The problem */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.problem.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-xl font-assistant text-[#A9B8C9]">{p.problem.intro}</p>
-          </Reveal>
-          <RevealStagger className="mt-8 flex flex-wrap gap-3">
-            {p.problem.items.map((item) => (
-              <motion.span
-                key={item}
-                variants={staggerItem}
-                className="border border-[rgba(243,234,219,0.18)] bg-[rgba(243,234,219,0.04)] px-5 py-2.5 text-sm text-[#C3CEDA]"
-              >
-                {item}
-              </motion.span>
-            ))}
-          </RevealStagger>
-          <Reveal delay={0.16}>
-            <p className="mt-8 max-w-2xl font-assistant leading-relaxed text-[#A9B8C9]">{p.problem.closing}</p>
-          </Reveal>
-        </WideContainer>
-      </section>
-
-      {/* What a Personal Operations Manager does */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.whatManagerDoes.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl font-assistant text-[#A9B8C9]">{p.whatManagerDoes.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-10">
-            <HairlineGrid minCell={280}>
-              {p.whatManagerDoes.examples.map((ex) => (
-                <motion.div key={ex.title} variants={staggerItem}>
-                  <HairlineGridCell>
-                    <h3 className="font-medium text-cream">{ex.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{ex.body}</p>
-                  </HairlineGridCell>
-                </motion.div>
-              ))}
-            </HairlineGrid>
-          </RevealStagger>
-        </WideContainer>
-      </section>
-
-      {/* Comparison: PA vs Ops Manager */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal><Eyebrow>{p.comparisonPA.title}</Eyebrow></Reveal>
-          <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl font-assistant text-[#A9B8C9]">{p.comparisonPA.intro}</p>
-          </Reveal>
-          <div className="mt-8">
-            <ComparisonTable columnA={p.comparisonPA.columnA} columnB={p.comparisonPA.columnB} rows={p.comparisonPA.rows} locale="he" />
-          </div>
-        </WideContainer>
-      </section>
-
-      {/* Comparison: Concierge */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal><Eyebrow>{p.comparisonConcierge.title}</Eyebrow></Reveal>
-          <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl font-assistant text-[#A9B8C9]">{p.comparisonConcierge.intro}</p>
-          </Reveal>
-          <div className="mt-8">
-            <ComparisonTable columnA={p.comparisonConcierge.columnA} columnB={p.comparisonConcierge.columnB} rows={p.comparisonConcierge.rows} locale="he" />
-          </div>
-        </WideContainer>
-      </section>
-
-      {/* Human + AI */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.humanAI.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl font-assistant text-[#A9B8C9]">{p.humanAI.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-10">
-            <HairlineGrid minCell={280}>
-              {p.humanAI.points.map((pt) => (
-                <motion.div key={pt.title} variants={staggerItem}>
-                  <HairlineGridCell>
-                    <h3 className="font-medium text-cream">{pt.title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{pt.body}</p>
-                  </HairlineGridCell>
-                </motion.div>
-              ))}
-            </HairlineGrid>
-          </RevealStagger>
-        </WideContainer>
-      </section>
-
-      {/* Who is it for -- five stacked rows */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.whoFor.title}
-            </h2>
-          </Reveal>
-          <RevealStagger className="mt-8 divide-y divide-[rgba(243,234,219,0.12)] border-y border-[rgba(243,234,219,0.12)]">
-            {p.whoFor.items.map((item) => (
-              <motion.div key={item} variants={staggerItem} className="py-4 text-sm leading-relaxed text-[#C3CEDA]">
-                {item}
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </WideContainer>
-      </section>
-
-      {/* Examples -- gold pull-quote above a hairline, then the deep answer */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.examples.title}
-            </h2>
-          </Reveal>
-          <div className="mt-10 grid gap-6" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))" }}>
-            {p.examples.items.map((ex, i) => (
-              <Reveal key={ex.scenario} delay={i * 0.08}>
-                <GlassPanel elevated className="h-full p-[clamp(22px,3vw,40px)]">
-                  <h3 className="text-sm font-medium text-cream">{ex.scenario}</h3>
-                  <p className="mt-4 text-sm italic leading-relaxed text-gold">{ex.shallow}</p>
-                  <div className="mt-4 h-px bg-[rgba(243,234,219,0.16)]" />
-                  <p className="mt-4 text-sm leading-relaxed text-[#A9B8C9]">{ex.deep}</p>
-                </GlassPanel>
-              </Reveal>
-            ))}
-          </div>
-        </WideContainer>
-      </section>
-
-      {/* When it's not the right fit -- muted rows */}
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-        <WideContainer>
-          <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
-              {p.notRightFit.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl font-assistant text-[#A9B8C9]">{p.notRightFit.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-8">
-            <HairlineGrid minCell={280}>
-              {p.notRightFit.items.map((item) => (
-                <motion.div key={item} variants={staggerItem}>
-                  <HairlineGridCell className="text-sm leading-relaxed text-[#7C8EA3]">{item}</HairlineGridCell>
-                </motion.div>
-              ))}
-            </HairlineGrid>
-          </RevealStagger>
-        </WideContainer>
-      </section>
-
-      <PageFAQ label={p.eyebrow} title="FAQ" items={p.faq} locale="he" linkify={{ phrase: "דף התמחור", href: "/he/pricing" }} />
-
-      <RelatedLinks
-        locale={locale}
-        label={dict.nav.relatedReading}
-        items={[
-          { label: dict.nav.personalAssistantForExecutives, href: "/personal-assistant-for-executives" },
-          { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
-          { label: dict.nav.coverage, href: "/coverage" },
-        ]}
-      />
-
-      <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(44px,7vw,112px)]">
-        <WideContainer className="max-w-2xl text-center">
-          <Reveal>
-            <h2 className="mx-auto text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-cream">
-              {p.ctaTitle}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md font-assistant text-[#A9B8C9]">{p.ctaBody}</p>
-          </Reveal>
-          <Reveal delay={0.2} className="mt-10 flex justify-center">
-            <Button href={withLocale(locale, "/contact")}>{p.cta}</Button>
-          </Reveal>
-        </WideContainer>
-      </section>
-    </>
-  );
-}
-
-export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  if (locale === "he") {
-    return <HePersonalOperationsManagementPage dict={dict} locale={locale} />;
-  }
-
-  const p = dict.pages.personalOperationsManagement;
-
-  return (
-    <>
-      <PageHero
-        eyebrow={p.eyebrow}
-        title={p.title}
-        sub={p.sub}
         breadcrumb={
-          <Breadcrumbs locale={locale}
-            items={[
-              { label: dict.hero.eyebrow, href: "/" },
-              { label: p.eyebrow },
-            ]}
+          <Breadcrumbs
+            locale={locale}
+            items={[{ label: dict.nav.home, href: "/" }, { label: p.eyebrow }]}
           />
         }
       />
 
-      {/* Direct answer, first, for humans and AI systems */}
-      <section className="bg-cream-warm py-16 md:py-20">
-        <Container className="max-w-3xl">
-          <Reveal>
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gold">{p.directAnswerLabel}</span>
-            <p className="mt-4 text-lg leading-relaxed text-appNavy md:text-xl">{p.directAnswer}</p>
-          </Reveal>
-        </Container>
-      </section>
+      <WideContainer>
+        <div className="grid items-start gap-[clamp(32px,5vw,72px)] lg:grid-cols-[238px_minmax(0,1fr)]">
+          <LongFormNav
+            label={seo.navLabel}
+            countLabel={plural(seo.navCount, navItems.length, locale)}
+            sections={navItems}
+          />
 
-      {/* The problem */}
-      <section className="bg-cream py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
-              {p.problem.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-xl text-appNavy/60">{p.problem.intro}</p>
-          </Reveal>
-          <RevealStagger className="mt-8 grid gap-3 md:grid-cols-2">
-            {p.problem.items.map((item) => (
-              <motion.div
-                key={item}
-                variants={staggerItem}
-                className="flex items-center gap-3 rounded-xl border border-lineDark bg-cream-warm/50 px-5 py-3.5 text-sm text-appNavy/70"
-              >
-                <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
-                {item}
-              </motion.div>
+          <article className="lg:max-w-[900px]">
+            <Reveal>
+              <SummaryPanel label={p.directAnswerLabel}>{p.directAnswer}</SummaryPanel>
+            </Reveal>
+
+            {sections.map((s, i) => (
+              <LongFormSection key={s.title} id={navItems[i].id} index={i} title={s.title}>
+                {s.body}
+              </LongFormSection>
             ))}
-          </RevealStagger>
-          <Reveal delay={0.16}>
-            <p className="mt-8 max-w-2xl text-appNavy/60">{p.problem.closing}</p>
-          </Reveal>
-        </Container>
-      </section>
 
-      {/* What a Personal Operations Manager does */}
-      <section className="bg-appNavy py-20 md:py-28">
-        <Container>
+            <RelatedLinks
+              locale={locale}
+              label={dict.nav.relatedReading}
+              items={[
+                { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
+                { label: dict.nav.personalAssistantForExecutives, href: "/personal-assistant-for-executives" },
+                { label: dict.nav.coverage, href: "/coverage" },
+              ]}
+            />
+          </article>
+        </div>
+      </WideContainer>
+
+      <section className="mt-[clamp(56px,7vw,100px)] border-t border-[rgba(243,234,219,0.12)] py-[clamp(48px,7vw,96px)] text-center">
+        <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
-              {p.whatManagerDoes.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-cream/55">{p.whatManagerDoes.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-10 grid gap-4 md:grid-cols-3">
-            {p.whatManagerDoes.examples.map((ex) => (
-              <motion.div key={ex.title} variants={staggerItem} className="rounded-2xl border border-hairline p-7">
-                <h3 className="font-medium text-cream">{ex.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-cream/50">{ex.body}</p>
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-
-      {/* Comparison: PA vs Ops Manager */}
-      <section className="bg-cream-warm py-20 md:py-28">
-        <Container>
-          <Reveal><Badge tone="light">{p.comparisonPA.title}</Badge></Reveal>
-          <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl text-appNavy/60">{p.comparisonPA.intro}</p>
-          </Reveal>
-          <div className="mt-8">
-            <ComparisonTable columnA={p.comparisonPA.columnA} columnB={p.comparisonPA.columnB} rows={p.comparisonPA.rows} />
-          </div>
-        </Container>
-      </section>
-
-      {/* Comparison: Concierge */}
-      <section className="bg-cream py-20 md:py-28">
-        <Container>
-          <Reveal><Badge tone="light">{p.comparisonConcierge.title}</Badge></Reveal>
-          <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl text-appNavy/60">{p.comparisonConcierge.intro}</p>
-          </Reveal>
-          <div className="mt-8">
-            <ComparisonTable columnA={p.comparisonConcierge.columnA} columnB={p.comparisonConcierge.columnB} rows={p.comparisonConcierge.rows} />
-          </div>
-        </Container>
-      </section>
-
-      {/* Human + AI */}
-      <section className="bg-navy py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
-              {p.humanAI.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-cream/55">{p.humanAI.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-10 grid gap-4 md:grid-cols-2">
-            {p.humanAI.points.map((pt) => (
-              <motion.div key={pt.title} variants={staggerItem} className="rounded-2xl border border-hairline p-7">
-                <h3 className="font-medium text-cream">{pt.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-cream/50">{pt.body}</p>
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-
-      {/* Who is it for */}
-      <section className="bg-cream-warm py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
-              {p.whoFor.title}
-            </h2>
-          </Reveal>
-          <RevealStagger className="mt-8 flex flex-wrap gap-3">
-            {p.whoFor.items.map((item) => (
-              <motion.span
-                key={item}
-                variants={staggerItem}
-                className="rounded-full border border-lineDark bg-cream px-5 py-2.5 text-sm text-appNavy/70"
-              >
-                {item}
-              </motion.span>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-
-      {/* Examples */}
-      <section className="bg-cream py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
-              {p.examples.title}
-            </h2>
-          </Reveal>
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
-            {p.examples.items.map((ex, i) => (
-              <Reveal key={ex.scenario} delay={i * 0.08}>
-                <div className="h-full rounded-2xl border border-lineDark bg-cream-warm/40 p-7">
-                  <h3 className="text-sm font-medium text-appNavy">{ex.scenario}</h3>
-                  <p className="mt-4 text-sm italic leading-relaxed text-appNavy/40">{ex.shallow}</p>
-                  <div className="mt-4 h-px bg-lineDark" />
-                  <p className="mt-4 text-sm leading-relaxed text-appNavy/70">{ex.deep}</p>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </Container>
-      </section>
-
-      {/* When it's not the right fit */}
-      <section className="bg-appNavy py-20 md:py-28">
-        <Container>
-          <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
-              {p.notRightFit.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-cream/55">{p.notRightFit.body}</p>
-          </Reveal>
-          <RevealStagger className="mt-8 grid gap-3 md:grid-cols-3">
-            {p.notRightFit.items.map((item) => (
-              <motion.div key={item} variants={staggerItem} className="rounded-xl border border-hairline px-5 py-4 text-sm text-cream/60">
-                {item}
-              </motion.div>
-            ))}
-          </RevealStagger>
-        </Container>
-      </section>
-
-      <PageFAQ label={p.eyebrow} title="FAQ" items={p.faq} tone="light" />
-
-      <RelatedLinks
-        locale={locale}
-        label={dict.nav.relatedReading}
-        items={[
-          { label: dict.nav.personalAssistantForExecutives, href: "/personal-assistant-for-executives" },
-          { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
-          { label: dict.nav.coverage, href: "/coverage" },
-        ]}
-      />
-
-      <section className="relative overflow-hidden bg-navy py-28 md:py-40">
-        <div className="absolute inset-0 bg-radial-glow" />
-        <Container className="relative text-center">
-          <Reveal>
-            <h2 className="mx-auto max-w-2xl text-[32px] font-medium leading-[1.15] tracking-tight text-cream md:text-[48px]">
+            <h2 className="mx-auto max-w-[20ch] text-[clamp(1.7rem,3.4vw,2.7rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
               {p.ctaTitle}
             </h2>
           </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md text-cream/55">{p.ctaBody}</p>
+          <Reveal delay={0.08}>
+            <p className="mx-auto mt-4 max-w-[44ch] font-assistant text-[1.02rem] font-light leading-[1.8] text-body">
+              {p.ctaBody}
+            </p>
           </Reveal>
-          <Reveal delay={0.2} className="mt-10 flex justify-center">
-            <Button href={withLocale(locale, "/contact")}>{p.cta}</Button>
+          <Reveal delay={0.16}>
+            <div className="mt-7 flex justify-center">
+              <Button href={withLocale(locale, "/contact")}>{p.cta}</Button>
+            </div>
           </Reveal>
-        </Container>
+        </WideContainer>
       </section>
     </>
   );
