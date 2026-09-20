@@ -167,7 +167,10 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
               <Link
                 key={item.href}
                 href={withLocale(locale, item.href)}
-                className="border-b border-transparent pb-[3px] transition-colors duration-[250ms] hover:border-gold hover:text-paper"
+                // px/-mx pair: the shortest Hebrew item ("בלוג") is 23px wide, a
+                // pixel under the 24x24 minimum. The negative margin keeps the nav's
+                // own spacing exactly as designed.
+                className="border-b border-transparent px-[5px] pb-[3px] -mx-[5px] transition-colors duration-[250ms] hover:border-gold hover:text-paper"
               >
                 {item.label}
               </Link>

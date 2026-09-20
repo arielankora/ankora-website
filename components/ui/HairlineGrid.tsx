@@ -11,10 +11,21 @@ import { cn } from "@/lib/utils";
 export function HairlineGrid({
   children,
   className,
+  columns,
   minCell = 280,
 }: {
   children: React.ReactNode;
   className?: string;
+  /**
+   * Explicit column tracks as a class string, for the cases where auto-fit picks a
+   * count that leaves orphans — six cells auto-fitting to five across strands one on
+   * a second row, and the grid's own hairline background then shows through the five
+   * empty tracks as a solid slab rather than a line. Pass the breakpoints you want
+   * (`[grid-template-columns:…] min-[1024px]:[grid-template-columns:…]`) and the
+   * responsive `minmax(min(100%, …))` default is skipped entirely — the inline style
+   * would otherwise win over any class.
+   */
+  columns?: string;
   minCell?: number;
 }) {
   return (
@@ -24,9 +35,14 @@ export function HairlineGrid({
       // the bug below by adding items-start/items-baseline.
       className={cn(
         "grid items-stretch gap-px bg-[rgba(243,234,219,0.11)] border border-[rgba(243,234,219,0.11)]",
+        columns,
         className
       )}
-      style={{ gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minCell}px), 1fr))` }}
+      style={
+        columns
+          ? undefined
+          : { gridTemplateColumns: `repeat(auto-fit, minmax(min(100%, ${minCell}px), 1fr))` }
+      }
     >
       {children}
     </div>

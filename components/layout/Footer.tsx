@@ -30,7 +30,13 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))" }}
       >
         <div>
-          <Link href={withLocale(locale, "/")} className="mb-4 flex items-center gap-2.5" aria-label="Ankora">
+          {/* py/-my pair: the mark is 22px and the row came out 23px tall, a pixel
+            under the minimum, without changing where the wordmark sits. */}
+          <Link
+            href={withLocale(locale, "/")}
+            className="mb-4 flex items-center gap-2.5 py-[3px] -my-[3px]"
+            aria-label="Ankora"
+          >
             <Image
               src="/logo-mark-gold.png"
               alt=""

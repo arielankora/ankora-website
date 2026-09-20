@@ -219,7 +219,23 @@ export interface PagesContent {
     principlesLabel: string;
     principles: { title: string; body: string }[];
   };
-  solutionsIndex: { eyebrow: string; title: string; sub: string };
+  solutionsIndex: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    /** Eyebrow above the four profile rows. */
+    profilesLabel: string;
+    /** Mono label above each row's three focus areas. */
+    focusLabel: string;
+    /**
+     * The closing argument: the profile changes, the operating layer does not. It is
+     * what makes this an index worth reading rather than four links -- the four
+     * profile pages cannot make this point, because each of them only sees one.
+     */
+    constantLabel: string;
+    constantTitle: string;
+    constantBody: string;
+  };
   roi: {
     eyebrow: string;
     title: string;
@@ -331,6 +347,8 @@ export interface PagesContent {
     placeholder: string;
     termsPlaceholder: string;
     updated: string;
+    /** Heading over the sticky section index on the legal pages. */
+    contentsLabel: string;
     privacySections: { title: string; body: string }[];
     termsSections: { title: string; body: string }[];
   };
