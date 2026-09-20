@@ -85,3 +85,5 @@ Do not run `npm audit fix --force` on this project. Every remaining
 advisory's "fix" is a major downgrade of a package we depend on. New
 advisories should be traced to a call site the way the two above were,
 and either fixed properly or documented here.
+
+<!-- neon cleanup workflow verification: safe to delete -->
