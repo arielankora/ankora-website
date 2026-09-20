@@ -49,6 +49,11 @@ export function LegalPage({
         eyebrow={eyebrow}
         title={title}
         sub={sub}
+        meta={
+          <MonoLabel tracking="0.15em" className="text-muted">
+            <time dateTime={dict.pages.legal.updatedISO}>{dict.pages.legal.updated}</time>
+          </MonoLabel>
+        }
         breadcrumb={
           <Breadcrumbs locale={locale} items={[{ label: dict.nav.home, href: "/" }, { label: eyebrow }]} />
         }
@@ -82,9 +87,6 @@ export function LegalPage({
                 </li>
               ))}
             </ol>
-            <p className="mt-6 border-t border-[rgba(243,234,219,0.11)] pt-5 font-assistant text-[13px] font-light text-muted">
-              {dict.pages.legal.updated}
-            </p>
           </nav>
 
           <div className="flex flex-col gap-px">
@@ -92,8 +94,11 @@ export function LegalPage({
               <Reveal key={section.title}>
                 <section
                   id={idFor(i)}
-                  // Clears the fixed header when an index link jumps here.
-                  className="scroll-mt-32 bg-[rgba(11,27,51,0.5)] p-[clamp(22px,2.6vw,38px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[12px]"
+                  // scroll-mt clears the fixed header when an index link jumps here.
+                  // target: a visitor arriving on /privacy#section-4 from a shared link
+                  // otherwise lands with no confirmation of having arrived anywhere in
+                  // particular. A persistent gold edge on the inline start, no motion.
+                  className="scroll-mt-32 border-s-2 border-transparent bg-[rgba(11,27,51,0.5)] p-[clamp(22px,2.6vw,38px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[12px] target:border-s-gold"
                 >
                   <div className="flex items-center gap-[18px]">
                     <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
