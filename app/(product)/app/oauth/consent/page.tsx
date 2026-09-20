@@ -33,8 +33,8 @@ type Params = {
 function Problem({ title, detail }: { title: string; detail: string }) {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6">
-      <h1 className="text-xl font-semibold text-navy">{title}</h1>
-      <p className="mt-2 text-sm leading-relaxed text-navy/70">{detail}</p>
+      <h1 className="text-xl font-semibold text-appNavy">{title}</h1>
+      <p className="mt-2 text-sm leading-relaxed text-appNavy/70">{detail}</p>
     </main>
   );
 }
@@ -76,19 +76,19 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6" dir="rtl">
-      <h1 className="text-xl font-semibold text-navy">חיבור Claude לאנקורה</h1>
-      <p className="mt-2 text-sm leading-relaxed text-navy/70">
-        אתה מחובר כ־<strong className="font-medium text-navy">{user.name}</strong> ({user.email}).
+      <h1 className="text-xl font-semibold text-appNavy">חיבור Claude לאנקורה</h1>
+      <p className="mt-2 text-sm leading-relaxed text-appNavy/70">
+        אתה מחובר כ־<strong className="font-medium text-appNavy">{user.name}</strong> ({user.email}).
       </p>
 
-      <div className="mt-6 rounded-lg border border-navy/10 bg-paper p-4 text-sm leading-relaxed text-navy/80">
-        <p className="font-medium text-navy">מה Claude יוכל לעשות</p>
+      <div className="mt-6 rounded-lg border border-appNavy/10 bg-cream p-4 text-sm leading-relaxed text-appNavy/80">
+        <p className="font-medium text-appNavy">מה Claude יוכל לעשות</p>
         <ul className="mt-2 list-disc space-y-1 pe-5">
           <li>לראות את הלקוחות והקטגוריות שאתה רשאי לדווח עליהם</li>
           <li>לקרוא את דיווחי הזמן שלך</li>
           <li>להפעיל ולעצור טיימר, ולרשום זמן בשמך</li>
         </ul>
-        <p className="mt-3 text-navy/60">
+        <p className="mt-3 text-appNavy/60">
           Claude פועל בהרשאות שלך בלבד — בדיוק מה שאתה רואה במערכת, לא יותר. מחיקה אינה אפשרית דרך החיבור
           הזה.
         </p>
@@ -106,7 +106,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
           type="submit"
           name="decision"
           value="approve"
-          className="flex-1 rounded-md bg-navy px-4 py-2.5 text-sm font-medium text-paper transition hover:opacity-90"
+          className="flex-1 rounded-md bg-appNavy px-4 py-2.5 text-sm font-medium text-cream transition hover:opacity-90"
         >
           אישור חיבור
         </button>
@@ -114,7 +114,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
           type="submit"
           name="decision"
           value="deny"
-          className="flex-1 rounded-md border border-navy/20 px-4 py-2.5 text-sm font-medium text-navy transition hover:bg-navy/5"
+          className="flex-1 rounded-md border border-appNavy/20 px-4 py-2.5 text-sm font-medium text-appNavy transition hover:bg-appNavy/5"
         >
           ביטול
         </button>
