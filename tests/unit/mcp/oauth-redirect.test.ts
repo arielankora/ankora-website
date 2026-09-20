@@ -196,3 +196,41 @@ describe("safeCallbackUrl()", () => {
     expect(safeCallbackUrl(new File([], "x") as unknown as FormDataEntryValue)).toBe("/app");
   });
 });
+
+describe("safeCallbackUrl() — the absolute form Auth.js actually sends", () => {
+  const SELF = "https://ankora-website.vercel.app";
+
+  it("accepts an absolute URL on this app's own origin", () => {
+    // Auth.js middleware writes callbackUrl as a full URL. Refusing it
+    // would send every real sign-in to the dashboard instead of back to
+    // the consent screen - found by following the chain on a deployment.
+    expect(safeCallbackUrl(`${SELF}/app/oauth/consent?client_id=x`, SELF)).toBe(
+      "/app/oauth/consent?client_id=x"
+    );
+  });
+
+  it("refuses an absolute URL on any other origin", () => {
+    expect(safeCallbackUrl("https://evil.com/app/oauth/consent", SELF)).toBe("/app");
+  });
+
+  it("refuses a lookalike host that merely starts with ours", () => {
+    // The reason the origin is compared parsed, not as a string prefix.
+    expect(safeCallbackUrl("https://ankora-website.vercel.app.evil.com/app/x", SELF)).toBe("/app");
+  });
+
+  it("refuses an absolute URL on our origin but outside the product", () => {
+    expect(safeCallbackUrl(`${SELF}/he/blog`, SELF)).toBe("/app");
+  });
+
+  it("refuses a scheme change on our own host", () => {
+    expect(safeCallbackUrl("http://ankora-website.vercel.app/app/x", SELF)).toBe("/app");
+  });
+
+  it("still accepts the relative form when an origin is supplied", () => {
+    expect(safeCallbackUrl("/app/oauth/consent?a=1", SELF)).toBe("/app/oauth/consent?a=1");
+  });
+
+  it("refuses an absolute URL when no origin is known", () => {
+    expect(safeCallbackUrl(`${SELF}/app/oauth/consent`)).toBe("/app");
+  });
+});

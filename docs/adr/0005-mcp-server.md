@@ -281,9 +281,21 @@ form may submit, not where a page may navigate.
 
 **Login now honours a validated `callbackUrl`.** It was hardcoded to
 `/app`, which would have dropped anyone who had to sign in mid-connection
-onto the dashboard with no sign that the authorization was abandoned. The
-validator is deliberately strict — relative paths under `/app/` only —
-because an open redirect on a login page is a phishing aid.
+onto the dashboard with no sign that the authorization was abandoned. An
+open redirect on a login page is a phishing aid, so the validator accepts
+only a relative path under `/app/`, or an absolute URL whose **parsed
+origin** equals this deployment's own — never a string prefix, because
+`https://ankora-website.vercel.app.evil.com/app/x` starts with the real
+origin's characters and is a different site.
+
+The absolute form is not hypothetical politeness. Following the redirect
+chain on a preview deployment showed that Auth.js's middleware intercepts
+the unauthenticated request to the consent screen before the page's own
+redirect runs, and writes `callbackUrl` as a full URL. The first cut
+accepted relative paths only, and would therefore have sent every real
+sign-in to the dashboard — the exact silent break the validator exists to
+prevent, arriving from the other direction. Reasoning did not find it;
+walking the chain did.
 
 ### Verification
 

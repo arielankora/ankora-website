@@ -31,6 +31,16 @@ const LOGIN_IP_WINDOW_MS = 15 * 60 * 1000;
 // threshold and let them tune their rate to stay under it.
 const GENERIC_ERROR = "פרטי ההתחברות שגויים, או שהחשבון חסום זמנית.";
 
+/// This deployment's own origin, from the proxy headers Vercel sets.
+/// Used only to recognise an absolute callbackUrl as our own - never to
+/// build a destination.
+async function selfOrigin(): Promise<string | undefined> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host");
+  if (!host) return undefined;
+  return `${h.get("x-forwarded-proto") ?? "https"}://${host}`;
+}
+
 export async function loginAction(_prevState: { error?: string } | undefined, formData: FormData) {
   const ip = clientIpFrom(await headers());
   if (!(await checkRateLimit(`app-login:${ip}`, LOGIN_IP_LIMIT, LOGIN_IP_WINDOW_MS)).allowed) {
@@ -44,7 +54,7 @@ export async function loginAction(_prevState: { error?: string } | undefined, fo
     await signIn("credentials", {
       identifier,
       password,
-      redirectTo: safeCallbackUrl(formData.get("callbackUrl")),
+      redirectTo: safeCallbackUrl(formData.get("callbackUrl"), await selfOrigin()),
     });
     return {};
   } catch (err) {
