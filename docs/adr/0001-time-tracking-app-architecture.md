@@ -3299,6 +3299,20 @@ account has no storage quota, so files it writes into a My Drive folder can
 fail with `storageQuotaExceeded` regardless of size, and a Shared drive's
 files outlive any individual person's account.
 
+**A second implementation detail, learned the expensive way:** the first
+deployment of this design failed on every upload with "VERCEL_OIDC_TOKEN is
+not set", because it read `process.env.VERCEL_OIDC_TOKEN`. Vercel delivers
+that token through the *request context*, per invocation, not as a
+build-time environment variable - obvious in hindsight, since the token's
+own `exp` claim is one hour and a production deployment lives far longer
+than that. The fix is `getVercelOidcToken()` from `@vercel/oidc`, which
+reads the context and falls back to the env var. That is the one place this
+module accepts an npm dependency, deliberately: reading a request context
+correctly is not worth reimplementing from an undocumented header name.
+The unit tests now mock that helper and include a regression test that sets
+a decoy `process.env.VERCEL_OIDC_TOKEN` and asserts it is ignored - because
+the original mistake passed its tests and still failed in production.
+
 **What it costs.** Setup is more involved than downloading a JSON key: a
 workload identity pool, a provider, an attribute condition and an IAM
 binding, all documented step-by-step in `.env.example`. The attribute

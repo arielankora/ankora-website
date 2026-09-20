@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { getVercelOidcToken } from "@vercel/oidc";
 import { uploadFileToDriveFolder, DRIVE_FOLDER_EXCEL_REPORTS, DRIVE_FOLDER_DB_DUMPS } from "@/lib/google-drive";
+
+// Vercel hands the OIDC token to the running function through the request
+// context, which only exists inside a real invocation - so it is mocked
+// here. A previous version of this module read process.env.VERCEL_OIDC_TOKEN
+// instead; that passed its tests and then failed in production with an
+// empty token, which is why these tests now assert against this helper.
+vi.mock("@vercel/oidc", () => ({ getVercelOidcToken: vi.fn() }));
+const mockedGetToken = vi.mocked(getVercelOidcToken);
 
 // This module authenticates with Workload Identity Federation and holds no
 // secret at all - see lib/google-drive.ts's doc comment and docs/adr/0001
@@ -18,13 +27,14 @@ describe("google-drive", () => {
     process.env.GCP_WORKLOAD_IDENTITY_POOL_ID = "test-pool";
     process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID = "test-provider";
     process.env.GCP_SERVICE_ACCOUNT_EMAIL = "test@example.iam.gserviceaccount.com";
-    process.env.VERCEL_OIDC_TOKEN = FAKE_OIDC_TOKEN;
+    mockedGetToken.mockResolvedValue(FAKE_OIDC_TOKEN as any);
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
     process.env = { ...originalEnv };
     vi.restoreAllMocks();
+    vi.mocked(getVercelOidcToken).mockReset();
   });
 
   function upload(folderId: string = DRIVE_FOLDER_EXCEL_REPORTS) {
@@ -54,16 +64,49 @@ describe("google-drive", () => {
     expect(result.error).not.toMatch(/GCP_WORKLOAD_IDENTITY_POOL_ID/);
   });
 
-  it("returns ok:false (never throws) when VERCEL_OIDC_TOKEN is absent, without calling out to Google", async () => {
-    delete process.env.VERCEL_OIDC_TOKEN;
+  it("returns ok:false (never throws) when no OIDC token is available, without calling out to Google", async () => {
+    mockedGetToken.mockResolvedValue(undefined as any);
     const fetchSpy = vi.fn();
     global.fetch = fetchSpy as any;
 
     const result = await upload();
 
     expect(result.ok).toBe(false);
-    expect(result.error).toMatch(/VERCEL_OIDC_TOKEN/);
+    expect(result.error).toMatch(/OIDC token/);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns ok:false (never throws) when the request context itself throws", async () => {
+    mockedGetToken.mockRejectedValue(new Error("no request context") as any);
+    const fetchSpy = vi.fn();
+    global.fetch = fetchSpy as any;
+
+    const result = await upload();
+
+    expect(result.ok).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("reads the token from the Vercel request context, not from process.env", async () => {
+    // Regression guard: process.env.VERCEL_OIDC_TOKEN is empty at runtime in
+    // a Vercel function. If this module ever goes back to reading it, the
+    // context mock below would be ignored and this assertion would fail.
+    process.env.VERCEL_OIDC_TOKEN = "stale-env-token-that-must-not-be-used";
+    global.fetch = vi.fn(async (url: any) => {
+      if (String(url).includes("sts.googleapis.com")) {
+        return new Response(JSON.stringify({ access_token: "federated-token" }), { status: 200 });
+      }
+      if (String(url).includes("iamcredentials.googleapis.com")) {
+        return new Response(JSON.stringify({ accessToken: "sa-access-token" }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ id: "x" }), { status: 200 });
+    }) as any;
+
+    await upload();
+
+    expect(mockedGetToken).toHaveBeenCalled();
+    const stsCall = (global.fetch as any).mock.calls.find((c: any[]) => String(c[0]).includes("sts.googleapis.com"));
+    expect(JSON.parse(stsCall[1].body).subjectToken).toBe(FAKE_OIDC_TOKEN);
   });
 
   it("returns ok:false (never throws) when STS rejects the OIDC token", async () => {

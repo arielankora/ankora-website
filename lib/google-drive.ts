@@ -1,5 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
+import { getVercelOidcToken } from "@vercel/oidc";
 
 // Phase 11 follow-up: uploads the two nightly backup attachments
 // (Excel report + gzipped DB dump - see lib/app-domain/backup-export.ts)
@@ -18,7 +19,7 @@ import { randomUUID } from "node:crypto";
 // HOW IT AUTHENTICATES, and why that matters (section 22.8): this module
 // holds NO secret. It authenticates with Workload Identity Federation -
 // Vercel issues this deployment a short-lived, signed OIDC identity token
-// at runtime (VERCEL_OIDC_TOKEN), Google's Security Token Service is
+// at runtime, Google's Security Token Service is
 // configured to trust that issuer for this one Vercel project, and the
 // resulting federated token is used to impersonate the dedicated service
 // account for exactly one hour. Every value this module reads from the
@@ -194,16 +195,31 @@ async function getAccessToken(): Promise<{ ok: true; token: string } | { ok: fal
     return { ok: false, error: configResult.error };
   }
 
-  // Injected by Vercel into every deployment that has OIDC federation
-  // enabled. Absent when running locally or outside Vercel - in that case
-  // the upload reports a clear error and the nightly email (an entirely
-  // independent delivery path) still carries both attachments.
-  const oidcToken = process.env.VERCEL_OIDC_TOKEN;
+  // Vercel delivers this token per invocation through the REQUEST CONTEXT,
+  // not as a build-time environment variable - `getVercelOidcToken()` reads
+  // the context first and falls back to the env var. That distinction cost
+  // us a failed run: a token minted at build time would expire within the
+  // hour (see its own `exp` claim), so a long-lived production deployment
+  // could never rely on one, and `process.env.VERCEL_OIDC_TOKEN` is simply
+  // empty at runtime. The helper is also why `@vercel/oidc` is a dependency
+  // here despite this module's otherwise strict no-new-dependency stance:
+  // reading the request context correctly is not something to reimplement
+  // from an undocumented header name.
+  //
+  // Absent when running locally or outside Vercel - in that case the upload
+  // reports a clear error and the nightly email (an entirely independent
+  // delivery path) still carries both attachments.
+  let oidcToken: string | undefined;
+  try {
+    oidcToken = await getVercelOidcToken();
+  } catch {
+    oidcToken = undefined;
+  }
   if (!oidcToken) {
     return {
       ok: false,
       error:
-        "VERCEL_OIDC_TOKEN is not set - OIDC federation is either disabled for this project or this code is not running on Vercel",
+        "No Vercel OIDC token available - OIDC federation is either disabled for this project, or this code is not running inside a Vercel request context",
     };
   }
 

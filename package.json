@@ -25,6 +25,7 @@
     "@modelcontextprotocol/server": "^2.0.0",
     "@prisma/client": "6.19.3",
     "@umalqura/core": "^0.0.7",
+    "@vercel/oidc": "^3.8.8",
     "bcryptjs": "^3.0.3",
     "clsx": "2.1.1",
     "date-easter": "^1.0.3",
