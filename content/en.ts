@@ -481,12 +481,12 @@ const en: Dictionary = {
       directBody: "Write to us and we'll respond within one business day.",
       directPoints: ["A twenty-minute call", "No commitment"],
       successMessage: "Thank you! We've received your message and will get back to you soon.",
-      errorMessage: "Something went wrong sending this. Please try again, or email us directly at info@ankora.co.il.",
+      errorMessage: "Something went wrong sending this. Please try again, or email us directly at hello@ankora.co.il.",
     },
     legal: {
       privacyTitle: "Privacy Policy",
       termsTitle: "Terms of Use",
-      placeholder: "For privacy or data security questions, please contact us directly at info@ankora.co.il.",
+      placeholder: "For privacy or data security questions, please contact us directly at hello@ankora.co.il.",
       termsPlaceholder: "The terms governing use of this site and Ankora’s services.",
       updated: "Last updated: August 2026",
       contentsLabel: "Contents",
@@ -521,7 +521,7 @@ const en: Dictionary = {
         },
         {
           title: "Contact",
-          body: "For questions about this policy or the personal information we hold, please contact us at info@ankora.co.il.",
+          body: "For questions about this policy or the personal information we hold, please contact us at hello@ankora.co.il.",
         },
       ],
       termsSections: [
@@ -555,7 +555,7 @@ const en: Dictionary = {
         },
         {
           title: "Contact",
-          body: "For questions about these terms, please contact us at info@ankora.co.il.",
+          body: "For questions about these terms, please contact us at hello@ankora.co.il.",
         },
       ],
     },
