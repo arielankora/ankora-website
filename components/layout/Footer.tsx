@@ -84,6 +84,9 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             </Link>
             <Link href={withLocale(locale, "/privacy")} className={LINK}>{dict.footer.privacy}</Link>
             <Link href={withLocale(locale, "/terms")} className={LINK}>{dict.footer.terms}</Link>
+            <Link href={withLocale(locale, "/service-terms")} className={LINK}>{dict.footer.serviceTerms}</Link>
+            <Link href={withLocale(locale, "/security")} className={LINK}>{dict.footer.security}</Link>
+            <Link href={withLocale(locale, "/dpa")} className={LINK}>{dict.footer.dpa}</Link>
           </div>
         </div>
       </div>

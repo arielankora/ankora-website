@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { LegalPage } from "@/components/sections/LegalPage";
 
-const PAGE = "terms" as const;
-const PATH = "/terms";
+const PAGE = "dpa" as const;
+const PATH = "/dpa";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;

@@ -170,8 +170,49 @@ export interface Dictionary {
     rights: string;
     privacy: string;
     terms: string;
+    security: string;
+    serviceTerms: string;
+    dpa: string;
   };
 }
+
+/** One clause of a legal document. */
+export interface LegalSection {
+  /** Explicit and shared between the locales, so /he/privacy#recording and
+   *  /en/privacy#recording are the same clause. Anchors used to be positional
+   *  (#section-4), which meant a clause inserted anywhere above silently retargeted
+   *  every link below it, including links filed inside signed proposals. Ids are
+   *  append-and-keep: never rename one that is in use. */
+  id: string;
+  title: string;
+  /** One paragraph per entry. `**bold**` marks the lead-in of a clause. */
+  body: string[];
+  table?: { head: string[]; rows: string[][] };
+}
+
+export interface LegalDocument {
+  title: string;
+  /** The standfirst in the page hero: what this document covers and what it does not. */
+  sub: string;
+  sections: LegalSection[];
+}
+
+/**
+ * The five documents share one shape and one renderer. `service` is the standing annex
+ * the commercial proposal points at, and `dpa` is the processing addendum a business
+ * client signs, so both need a public address even though neither is a website policy.
+ */
+export interface LegalContent {
+  updated: string;
+  /** ISO YYYY-MM behind `updated`, for the <time datetime> attribute. */
+  updatedISO: string;
+  contentsLabel: string;
+  /** Accessible caption for the one table in these documents, the sub-processor list. */
+  tableLabel: string;
+  pages: Record<LegalPageKey, LegalDocument>;
+}
+
+export type LegalPageKey = "terms" | "privacy" | "service" | "security" | "dpa";
 
 export interface SegmentContent {
   eyebrow: string;
@@ -372,22 +413,7 @@ export interface PagesContent {
     successMessage: string;
     errorMessage: string;
   };
-  legal: {
-    privacyTitle: string;
-    termsTitle: string;
-    placeholder: string;
-    termsPlaceholder: string;
-    /** Rendered in the page hero, marked up as <time>. Recency is metadata about the
-     *  document, not about its contents index, and it is often the one fact a visitor
-     *  came for. */
-    updated: string;
-    /** ISO YYYY-MM behind `updated`, for the <time datetime> attribute. */
-    updatedISO: string;
-    /** Heading over the sticky section index on the legal pages. */
-    contentsLabel: string;
-    privacySections: { title: string; body: string }[];
-    termsSections: { title: string; body: string }[];
-  };
+  legal: LegalContent;
   segmentBridge: SegmentBridge;
   segments: {
     executives: SegmentContent;

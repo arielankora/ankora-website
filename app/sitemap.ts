@@ -23,6 +23,9 @@ const routes: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "/solutions/family-office", priority: 0.7, changeFrequency: "monthly" },
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/service-terms", priority: 0.3, changeFrequency: "yearly" },
+  { path: "/security", priority: 0.5, changeFrequency: "monthly" },
+  { path: "/dpa", priority: 0.3, changeFrequency: "yearly" },
 ];
 
 const base = SITE_URL;

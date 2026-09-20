@@ -20,4 +20,8 @@ export type {
   SegmentBridge,
   SimplePageContent,
   PagesContent,
+  LegalContent,
+  LegalDocument,
+  LegalSection,
+  LegalPageKey,
 } from "./types";
