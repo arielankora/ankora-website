@@ -235,6 +235,8 @@ const he: Dictionary = {
     title: "רשומות שטח על ניהול תפעולי",
     sub: "מחשבות מעשיות על תפעול, זמן וניהול חיים או חברה בלי לשאת הכל בראש.",
     emptyState: "כתבות חדשות בדרך. חזרו לבקר בקרוב.",
+    emptyCategory: "אין כתבות בנושא הזה",
+    countLabel: { one: "כתבה אחת", other: "{n} כתבות" },
     readMore: "לקריאת הכתבה",
     minRead: "דקות קריאה",
     allCategories: "הכל",

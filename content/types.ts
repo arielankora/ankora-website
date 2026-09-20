@@ -157,6 +157,11 @@ export interface Dictionary {
     title: string;
     sub: string;
     emptyState: string;
+    /** Shown when a category filter matches nothing, which is a different state from
+     *  an empty blog and should not read like one. */
+    emptyCategory: string;
+    /** Counted, under the filters. */
+    countLabel: PluralString;
     readMore: string;
     minRead: string;
     allCategories: string;
