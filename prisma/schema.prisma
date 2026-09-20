@@ -366,6 +366,20 @@ model AuditEvent {
 // to drift on this specific index, the migration is the source of truth;
 // do not let a Prisma-generated migration silently drop it.
 
+/// Phase 14 (MCP server writes, docs/adr/0005): WHERE an entry was created
+/// from, which is a different question from TimeEntrySource's HOW (a timer
+/// vs a typed form). Both matter: "Claude started a timer" is TIMER+MCP,
+/// "Ariel typed one in" is MANUAL+APP.
+///
+/// Without this column there is no way to tell an entry a person typed
+/// from one an agent created, and the first bad write would be
+/// untraceable - AuditEvent records who acted, not through what. Defaults
+/// to APP so every existing row is correctly labelled by the migration.
+enum EntryOrigin {
+  APP
+  MCP
+}
+
 enum TimeEntrySource {
   MANUAL
   TIMER
@@ -449,6 +463,10 @@ model TimeEntry {
   /// True once any post-creation edit has produced a TimeEntryRevision.
   /// Spec 6.4: "כל עריכה ידנית מסומנת באייקון פנימי 'Edited'."
   isEdited Boolean         @default(false)
+
+  /// Phase 14: APP for anything created through the web app, MCP for
+  /// anything created through /api/mcp. See the EntryOrigin enum above.
+  createdVia EntryOrigin @default(APP)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt

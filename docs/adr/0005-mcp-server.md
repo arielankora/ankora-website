@@ -173,24 +173,58 @@ The migration is hand-authored for the same reason as every prior phase's
 
 ## What comes after
 
-**Phase 2 — writes.** `start_timer`, `stop_timer`, `update_timer_note`,
-`create_time_entry`. Three things land before the first one ships:
+**Phase 2 — writes and team visibility. Built.**
 
-1. **A `createdVia` marker on `TimeEntry`.** `TimeEntrySource` is
-   `MANUAL | TIMER` today, which cannot distinguish an entry a person
-   typed from one Claude created. Without it the first bad write is
-   untraceable. This is a ten-line migration and it is not optional.
-2. **Name resolution wired into every write tool** (`lib/mcp/resolve.ts`,
-   already built and tested).
-3. **RBAC integration tests** under `tests/integration/mcp/`, running each
-   tool against a seeded user of each of the four roles. A permission leak
-   is the only bug on this surface that is genuinely dangerous; the
-   regression-test pattern in `tests/unit/permissions.test.ts` is the
-   model to follow.
+Four write tools (`start_timer`, `stop_timer`, `update_timer_note`,
+`create_time_entry`) and two admin-only read tools (`list_team_members`,
+`list_team_time_entries`). Ten tools in all.
 
-Write tools also flip the `annotations` block in `lib/mcp/tools.ts` —
-`readOnlyHint: true` is what tells a client these are safe to call without
-asking, and copying it onto a write tool would be a real mistake.
+The three prerequisites this ADR set for writes were met before the first
+one shipped:
+
+1. **`createdVia` on `TimeEntry`** — a new `EntryOrigin` enum (`APP` |
+   `MCP`), defaulted so the migration labels every existing row correctly.
+   Deliberately separate from `TimeEntrySource`, which records *how* an
+   entry was made (timer vs typed form) rather than *where from*; a timer
+   Claude starts is `TIMER` + `MCP`. `AuditEvent` already records who
+   acted, but not through what.
+2. **Name resolution on every write** (`lib/mcp/lookup.ts` over
+   `lib/mcp/resolve.ts`), always against what that actor may see.
+3. **The read/write split pinned by test.** `lib/mcp/annotations.ts` is a
+   pure module holding every tool's annotations, and
+   `tests/unit/mcp/annotations.test.ts` fails if a write tool is ever
+   marked `readOnlyHint: true` — the hint that tells a client it is safe
+   to call without asking a human.
+
+### Team visibility reuses an existing rule rather than inventing one
+
+"What did Hadas do last week" needs one decision: who may read another
+person's time. That question was already answered twice in this codebase —
+`app/(product)/app/(authenticated)/time-entries/page.tsx` gates its screen
+on `time_entry.edit_others`, and `app/api/time-entries/export/route.ts`
+gates the same data on the same permission. The MCP tools use it too, so
+there is one answer and not three. In practice: SUPER_ADMIN and
+ANKORA_ADMIN yes, ANKORA_EMPLOYEE and CLIENT_USER no.
+
+`listTimeEntriesForAdmin` carries no permission check of its own, and the
+export route has a comment saying so deliberately — the caller gates it.
+The MCP tool follows that established convention rather than changing a
+shared signature, and asserts the same permission at the tool boundary.
+`lib/mcp/lookup.ts` asserts it a second time inside the team lookups,
+because listing colleagues is a disclosure in its own right and should not
+be reachable through a mistake in one tool's gating.
+
+### Two things Phase 2 deliberately did not do
+
+**No `delete_time_entry`.** Deletion stays in the UI, where a human can
+see what is about to disappear. Every annotation in this surface carries
+`destructiveHint: false`, and a test asserts it.
+
+**No writing on behalf of someone else.** `createManualEntry` supports it
+(`assertCan(... "time_entry.edit_others")` when the target is not the
+actor), and the MCP tool passes `actor.id` unconditionally. An admin
+correcting an employee's timesheet does it on the screen, where the
+audit trail has a human looking at what changed.
 
 **Phase 3 — OAuth**, which retires the bridge and opens claude.ai, mobile
 and Cowork. This is also the prerequisite for anything client-facing: the

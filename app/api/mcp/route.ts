@@ -46,10 +46,11 @@ const handler = createMcpHandler(registerAnkoraTools, {
   // stop the most common failure modes - inventing an id, and assuming a
   // write succeeded.
   instructions: [
-    "This server exposes Ankora's Time Tracking app for the signed-in employee only.",
-    "Identity comes from the connection, not from arguments: there is no way to read or change another employee's data, and you should not ask for a user id.",
-    "Never invent an Ankora id. Call list_my_clients first and use the names it returns exactly as written.",
-    "This phase is read-only. If the user asks to start a timer or record time, tell them it is not available yet rather than implying it was done.",
+    "This server exposes Ankora's Time Tracking app for the signed-in employee.",
+    "Identity comes from the connection, not from arguments: you never pass a user id, and you cannot act as anyone else.",
+    "Never invent an Ankora id. Call list_my_clients and list_categories first and use the names they return exactly as written; if a name does not resolve, ask the user rather than guessing.",
+    "Reading another person's time needs a manager or admin role. If a team tool is refused, say so plainly instead of retrying.",
+    "Writes create real records that colleagues and clients see. Confirm the client, category and times with the user before calling a write tool, and never call create_time_entry twice for the same work - it makes two entries.",
   ].join(" "),
   verboseLogs: process.env.NODE_ENV !== "production",
 });

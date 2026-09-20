@@ -242,10 +242,19 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to an employee's Claude Desktop
-over the Model Context Protocol. **Phase 1 is read-only** — three tools:
-`list_my_clients`, `get_active_timer`, `list_my_time_entries`. Writes are
-Phase 2. The full reasoning, including why this is not a Claude custom
-connector yet, is in `docs/adr/0005-mcp-server.md`.
+over the Model Context Protocol. Ten tools:
+
+| | |
+| --- | --- |
+| Read (own) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries` |
+| Write (own) | `start_timer`, `stop_timer`, `update_timer_note`, `create_time_entry` |
+| Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
+
+Entries created through MCP carry `createdVia = MCP`, so they are always
+distinguishable from ones typed into the app. Nothing here deletes, and
+nothing writes on behalf of another employee — both stay in the UI. The
+full reasoning, including why this is not a Claude custom connector yet,
+is in `docs/adr/0005-mcp-server.md`.
 
 Everything runs as the employee whose token is used: the tools call
 `lib/app-domain/*` directly, so `assertCan`, the `UserClientAccess`

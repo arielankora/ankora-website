@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   elapsedMinutes,
   serializeClient,
+  serializeTeamTimeEntry,
   serializeTimeEntry,
   toMinutes,
   type TimeEntryLike,
@@ -83,6 +84,7 @@ describe("serializeTimeEntry()", () => {
         "billableMinutes",
         "category",
         "client",
+        "createdVia",
         "edited",
         "endAt",
         "id",
@@ -121,5 +123,40 @@ describe("serializeClient()", () => {
   it("emits id, name and status and nothing else", () => {
     const result = serializeClient({ id: "c1", name: "Globex", status: "ACTIVE" });
     expect(result).toEqual({ id: "c1", name: "Globex", status: "ACTIVE" });
+  });
+});
+
+// ---------------------------------------------------------------- Phase 14
+
+describe("createdVia", () => {
+  it("passes MCP through, so an entry Claude made is identifiable", () => {
+    expect(serializeTimeEntry(entry({ createdVia: "MCP" })).createdVia).toBe("MCP");
+  });
+
+  it("defaults an unset value to APP, matching the migration's backfill", () => {
+    // Rows created before Phase 14 have no origin of their own; the column
+    // defaults to APP in the database and must read the same way here.
+    expect(serializeTimeEntry(entry({ createdVia: null })).createdVia).toBe("APP");
+    expect(serializeTimeEntry(entry({ createdVia: undefined })).createdVia).toBe("APP");
+  });
+});
+
+describe("serializeTeamTimeEntry()", () => {
+  it("adds the employee name", () => {
+    const result = serializeTeamTimeEntry(entry({ user: { name: "הדס" } }));
+    expect(result.employee).toBe("הדס");
+    expect(result.client).toBe("Globex");
+  });
+
+  it("tolerates a missing user relation", () => {
+    expect(serializeTeamTimeEntry(entry({ user: null })).employee).toBeNull();
+  });
+
+  it("never lets the employee name reach the self-scoped payload", () => {
+    // The two payloads are separate functions precisely so this cannot be
+    // undone by editing one object literal.
+    const self = serializeTimeEntry(entry({ user: { name: "הדס" } })) as Record<string, unknown>;
+    expect(Object.keys(self)).not.toContain("employee");
+    expect(Object.values(self)).not.toContain("הדס");
   });
 });

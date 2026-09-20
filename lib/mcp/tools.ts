@@ -1,73 +1,113 @@
 import "server-only";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
+import type { User } from "@prisma/client";
 import { actorFromAuthInfo } from "@/lib/mcp/auth";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import {
   elapsedMinutes,
   serializeClient,
+  serializeTeamTimeEntry,
   serializeTimeEntry,
   type SerializedTimeEntry,
 } from "@/lib/mcp/serialize";
+import {
+  canSeeOthersTime,
+  lookupCategory,
+  lookupClient,
+  lookupTeamMember,
+  teamMembers,
+  usableCategories,
+} from "@/lib/mcp/lookup";
+import { assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { getActiveTimer, listMyTimeEntries } from "@/lib/app-domain/time-entries";
+import {
+  combineWallClockTime,
+  createManualEntry,
+  getActiveTimer,
+  listMyTimeEntries,
+  listTimeEntriesForAdmin,
+  startTimer,
+  stopTimer,
+  updateActiveTimerNote,
+} from "@/lib/app-domain/time-entries";
 import { localDateTimeToUtc } from "@/lib/timezone";
+import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 
-// Phase 13 (MCP server, docs/adr/0005): the tool surface.
+// Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
-// Phase 1 is READ ONLY, on purpose. docs/adr/0005 records the reasoning:
-// these three tools exercise the entire chain - token -> User ->
-// assertCan/listAccessibleClients -> lib/app-domain -> serialised output -
-// on the smallest surface that can prove it works. Write tools land in
-// Phase 2, once `createdVia` exists on TimeEntry and the RBAC integration
-// tests are in place.
-//
-// Two conventions every tool here follows:
+// Conventions every tool here follows:
 //
 //   * It calls lib/app-domain/* and NOTHING else. No Prisma query lives in
 //     this file. That is what makes the MCP surface inherit `assertCan`,
 //     the UserClientAccess scoping, the audit trail and the billing rules
-//     for free instead of re-deriving them - and it is why a permission
-//     fix in the domain layer fixes the MCP server at the same time.
-//   * It never trusts the model for identity. `userId` is taken from the
-//     resolved token, never from a tool argument, so there is no shape of
-//     call that reads another employee's hours.
+//     instead of re-deriving them - and it is why a permission fix in the
+//     domain layer fixes the MCP server at the same time.
+//   * It never trusts the model for identity. The acting user comes from
+//     the verified token, never from a tool argument.
+//   * It never takes a raw id. Ids are cuids; a model given one as a
+//     required argument will eventually invent it, and in a write tool
+//     that means time booked against the wrong client - silent, plausible
+//     and unnoticed for a month. Everything resolves by name through
+//     lib/mcp/lookup.ts, against what THIS actor may see.
 
-/// Registered on every tool. `readOnlyHint` is what lets a client present
-/// these as safe to call without asking - and is exactly why it must not
-/// be copy-pasted onto the Phase 2 write tools.
-const READ_ONLY = {
-  readOnlyHint: true,
-  destructiveHint: false,
-  idempotentHint: true,
-  openWorldHint: false,
-} as const;
-
-/// An upper bound on rows returned in one call. A model asking for "this
-/// year" on a busy employee would otherwise pull several thousand entries
-/// into the context in a single result.
 const MAX_ENTRIES = 200;
 
+const DATE = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
+const CLOCK = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, "Use 24-hour HH:MM");
+
+function actorOf(ctx: ServerContext): User {
+  return actorFromAuthInfo(ctx.http?.authInfo);
+}
+
 export function registerAnkoraTools(server: McpServer): void {
+  // ---------------------------------------------------------------- reads
+
   server.registerTool(
     "list_my_clients",
     {
       title: "List my clients",
       description:
-        "Lists the Ankora clients the signed-in employee is allowed to log time against. Call this before any tool that takes a client name, and use the names exactly as returned. Admins see every active client; other employees see only the clients explicitly assigned to them.",
+        "Lists the Ankora clients the signed-in employee is allowed to log time against. Call this before any tool that takes a client name, and use the names exactly as returned. Admins see every active client; other employees see only the clients assigned to them.",
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
     async (_args: unknown, ctx: ServerContext) => {
       try {
-        const actor = actorFromAuthInfo(ctx.http?.authInfo);
+        const actor = actorOf(ctx);
         const clients = await listAccessibleClients(actor);
-        return toolJson({
-          count: clients.length,
-          clients: clients.map(serializeClient),
-        });
+        return toolJson({ count: clients.length, clients: clients.map(serializeClient) });
       } catch (err) {
         console.error("[mcp] list_my_clients failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_categories",
+    {
+      title: "List categories for a client",
+      description:
+        "Lists the activity categories that can be used when logging time against one client. Every time entry needs one. Some categories are global and some belong to a single client, so always pass the client you are about to log against rather than assuming a category exists everywhere.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (args: { client: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const categories = await usableCategories(client.value.id);
+        return toolJson({ client: client.value.name, count: categories.length, categories });
+      } catch (err) {
+        console.error("[mcp] list_categories failed", err);
         return toolFailure(err);
       }
     }
@@ -84,18 +124,11 @@ export function registerAnkoraTools(server: McpServer): void {
     },
     async (_args: unknown, ctx: ServerContext) => {
       try {
-        const actor = actorFromAuthInfo(ctx.http?.authInfo);
+        const actor = actorOf(ctx);
         const entry = await getActiveTimer(actor.id);
-        if (!entry) {
-          return toolText("No timer is currently running for this user.");
-        }
-        // getActiveTimer includes client/category/task, which is what
-        // TimeEntryLike asks for - serializeTimeEntry is structurally typed
-        // precisely so this file never re-declares Prisma's generated
-        // include type.
-        const serialized = serializeTimeEntry(entry);
+        if (!entry) return toolText("No timer is currently running for this user.");
         return toolJson({
-          ...serialized,
+          ...serializeTimeEntry(entry),
           elapsedMinutes: elapsedMinutes(entry.startAt),
           userTimezone: actor.timezone,
         });
@@ -111,52 +144,28 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List my time entries",
       description:
-        "Lists the signed-in employee's own Ankora time entries, newest first. Only their own - this tool cannot read another employee's hours. `from` is inclusive and `to` is exclusive, both as YYYY-MM-DD dates interpreted in the user's own timezone (returned as `userTimezone`). Omit both for the most recent entries.",
+        "Lists the signed-in employee's own Ankora time entries, newest first. Only their own - use list_team_time_entries for anyone else. `from` is inclusive and `to` is exclusive, both as YYYY-MM-DD dates. Omit both for the most recent entries.",
       inputSchema: z.object({
-        from: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
-          .optional()
-          .describe("Inclusive start date, YYYY-MM-DD."),
-        to: z
-          .string()
-          .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
-          .optional()
-          .describe("Exclusive end date, YYYY-MM-DD. To cover a single day, set it to the next day."),
-        limit: z
-          .number()
-          .int()
-          .min(1)
-          .max(MAX_ENTRIES)
-          .optional()
-          .describe(`Maximum entries to return (default and maximum ${MAX_ENTRIES}).`),
+        from: DATE.optional().describe("Inclusive start date, YYYY-MM-DD."),
+        to: DATE.optional().describe("Exclusive end date. For a single day, set it to the next day."),
+        limit: z.number().int().min(1).max(MAX_ENTRIES).optional(),
       }),
       annotations: READ_ONLY,
     },
-    async (
-      args: { from?: string; to?: string; limit?: number },
-      ctx: ServerContext
-    ) => {
+    async (args: { from?: string; to?: string; limit?: number }, ctx: ServerContext) => {
       try {
-        const actor = actorFromAuthInfo(ctx.http?.authInfo);
-        // Resolved through localDateTimeToUtc against the USER's timezone,
-        // never `new Date("YYYY-MM-DDT00:00:00")`. That constructor parses
-        // in the *server's* local zone, which on Vercel is UTC - so on the
-        // Israel winter offset a "from" of 2026-01-01 would silently
-        // include entries logged on 2025-12-31 after 22:00 local. This is
-        // the same class of bug lib/timezone.ts's header documents finding
-        // in reports.ts and client-portal.ts.
+        const actor = actorOf(ctx);
+        // Resolved against the USER's timezone, never `new Date("...T00:00:00")`,
+        // which parses in the server's zone (UTC on Vercel) and would pull in
+        // entries from the previous evening. Same class of bug lib/timezone.ts's
+        // header documents finding in reports.ts and client-portal.ts.
         const entries = await listMyTimeEntries(actor.id, {
           from: args.from ? localDateTimeToUtc(args.from, "00:00", actor.timezone) : undefined,
           to: args.to ? localDateTimeToUtc(args.to, "00:00", actor.timezone) : undefined,
         });
-
-        const limit = args.limit ?? MAX_ENTRIES;
-        const page = entries.slice(0, limit);
+        const page = entries.slice(0, args.limit ?? MAX_ENTRIES);
         const serialized: SerializedTimeEntry[] = [];
-        for (const entry of page) {
-          serialized.push(serializeTimeEntry(entry));
-        }
+        for (const entry of page) serialized.push(serializeTimeEntry(entry));
         return toolJson({
           count: page.length,
           truncated: entries.length > page.length,
@@ -170,4 +179,287 @@ export function registerAnkoraTools(server: McpServer): void {
       }
     }
   );
+
+  // ------------------------------------------------------- team (admin only)
+
+  server.registerTool(
+    "list_team_members",
+    {
+      title: "List team members",
+      description:
+        "Lists the active Ankora staff whose time the signed-in user is allowed to see. Only managers and admins may call this. Use it to get exact names before calling list_team_time_entries.",
+      inputSchema: z.object({}),
+      annotations: READ_ONLY,
+    },
+    async (_args: unknown, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        // Same permission the admin time-entries screen and the CSV export
+        // route already gate this data on - see canSeeOthersTime.
+        assertCan(actor.role, "time_entry.edit_others");
+        const members = await teamMembers(actor);
+        return toolJson({ count: members.length, members });
+      } catch (err) {
+        console.error("[mcp] list_team_members failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_team_time_entries",
+    {
+      title: "List a teammate's time entries",
+      description:
+        "Lists Ankora time entries across the team, optionally filtered to one person and/or one client. Only managers and admins may call this; an employee asking about a colleague will be refused. Answers questions like 'what did Hadas work on last week'. `from` is inclusive, `to` is exclusive, both YYYY-MM-DD.",
+      inputSchema: z.object({
+        person: z
+          .string()
+          .optional()
+          .describe("Teammate's name or email, as list_team_members returned it. Omit for the whole team."),
+        client: z.string().optional().describe("Client name. Omit for all clients."),
+        from: DATE.optional(),
+        to: DATE.optional(),
+        limit: z.number().int().min(1).max(MAX_ENTRIES).optional(),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (
+      args: { person?: string; client?: string; from?: string; to?: string; limit?: number },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        assertCan(actor.role, "time_entry.edit_others");
+
+        let userId: string | undefined;
+        let personName: string | null = null;
+        if (args.person) {
+          const person = await lookupTeamMember(actor, args.person);
+          if (!person.ok) return toolText(person.message);
+          userId = person.value.id;
+          personName = person.value.name;
+        }
+
+        let clientId: string | undefined;
+        if (args.client) {
+          const client = await lookupClient(actor, args.client);
+          if (!client.ok) return toolText(client.message);
+          clientId = client.value.id;
+        }
+
+        // listTimeEntriesForAdmin carries no permission check of its own -
+        // see the comment on it, and the identical assertCan in
+        // app/api/time-entries/export/route.ts. The gate above is what
+        // authorises this call.
+        const entries = await listTimeEntriesForAdmin({
+          userId,
+          clientId,
+          from: args.from ? localDateTimeToUtc(args.from, "00:00", actor.timezone) : undefined,
+          to: args.to ? localDateTimeToUtc(args.to, "00:00", actor.timezone) : undefined,
+        });
+        const page = entries.slice(0, args.limit ?? MAX_ENTRIES);
+        const serialized = [];
+        for (const entry of page) serialized.push(serializeTeamTimeEntry(entry));
+        return toolJson({
+          person: personName,
+          count: page.length,
+          truncated: entries.length > page.length,
+          totalMatching: entries.length,
+          timezone: actor.timezone,
+          entries: serialized,
+        });
+      } catch (err) {
+        console.error("[mcp] list_team_time_entries failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // --------------------------------------------------------------- writes
+
+  server.registerTool(
+    "start_timer",
+    {
+      title: "Start a timer",
+      description:
+        "Starts a running Ankora timer for the signed-in employee, against one client and category. Ankora allows exactly one running timer per user, so call get_active_timer first - if one is already running this will refuse. The entry is recorded as created through Claude.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        category: z.string().describe("Category name, exactly as list_categories returned it for this client."),
+        note: z.string().optional().describe("What the user is working on. Free text, shown in Ankora."),
+      }),
+      annotations: WRITES,
+    },
+    async (args: { client: string; category: string; note?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const category = await lookupCategory(actor, client.value.id, args.category);
+        if (!category.ok) return toolText(category.message);
+
+        const entry = await startTimer(actor, {
+          clientId: client.value.id,
+          categoryId: category.value.id,
+          note: args.note ?? null,
+          createdVia: "MCP",
+        });
+        return toolJson({
+          started: true,
+          client: client.value.name,
+          category: category.value.name,
+          startAt: entry.startAt.toISOString(),
+          entryId: entry.id,
+        });
+      } catch (err) {
+        console.error("[mcp] start_timer failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "stop_timer",
+    {
+      title: "Stop the running timer",
+      description:
+        "Stops the signed-in employee's running timer and records the elapsed time. Refuses if no timer is running. An optional note replaces whatever note the timer was carrying.",
+      inputSchema: z.object({
+        note: z.string().optional().describe("Final note for the entry. Omit to keep the existing one."),
+      }),
+      annotations: WRITES,
+    },
+    async (args: { note?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        // The id comes from the server, never from the model: there is
+        // exactly one running timer per user, so asking for it would only
+        // create an opportunity to stop the wrong entry.
+        const running = await getActiveTimer(actor.id);
+        if (!running) {
+          return toolText(
+            "No timer is running for this user, so there is nothing to stop. If the user meant to record time they already spent, use create_time_entry instead."
+          );
+        }
+        const entry = await stopTimer(actor, running.id, args.note ? { note: args.note } : undefined);
+        return toolJson({
+          stopped: true,
+          entryId: entry.id,
+          actualMinutes: entry.actualSeconds === null ? null : Math.round(entry.actualSeconds / 60),
+          billableMinutes: entry.billableSeconds === null ? null : Math.round(entry.billableSeconds / 60),
+        });
+      } catch (err) {
+        console.error("[mcp] stop_timer failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_timer_note",
+    {
+      title: "Update the running timer's note",
+      description:
+        "Replaces the note on the signed-in employee's running timer, without stopping it. Use this when the user says what they are working on while the clock is already going.",
+      inputSchema: z.object({
+        note: z.string().describe("The new note. Replaces the existing one entirely."),
+      }),
+      annotations: { ...WRITES, idempotentHint: true },
+    },
+    async (args: { note: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const running = await getActiveTimer(actor.id);
+        if (!running) return toolText("No timer is running for this user, so there is no note to update.");
+        await updateActiveTimerNote(actor, running.id, args.note);
+        return toolJson({ updated: true, entryId: running.id, note: args.note });
+      } catch (err) {
+        console.error("[mcp] update_timer_note failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_time_entry",
+    {
+      title: "Record time already spent",
+      description:
+        "Creates a completed Ankora time entry for the signed-in employee - time they already spent, rather than a running timer. Times are the wall clock in Ankora's own timezone (Asia/Jerusalem), matching what the app's manual-entry form does. Calling this twice creates two entries, so confirm with the user before retrying. Entries more than a couple of days old need `backdateReason`.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        category: z.string().describe("Category name, exactly as list_categories returned it for this client."),
+        date: DATE.describe("The day the work happened, YYYY-MM-DD."),
+        start: CLOCK.describe("Start time, 24-hour HH:MM."),
+        end: CLOCK.describe("End time, 24-hour HH:MM. Must be after start."),
+        note: z.string().optional().describe("What the work was."),
+        backdateReason: z
+          .string()
+          .optional()
+          .describe("Why this is being recorded late. Required for older entries; Ankora will say so if it is."),
+      }),
+      annotations: WRITES,
+    },
+    async (
+      args: {
+        client: string;
+        category: string;
+        date: string;
+        start: string;
+        end: string;
+        note?: string;
+        backdateReason?: string;
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const category = await lookupCategory(actor, client.value.id, args.category);
+        if (!category.ok) return toolText(category.message);
+
+        // combineWallClockTime, not the actor's own timezone: this is the
+        // exact helper the manual-entry form uses, and an entry created
+        // here must land on the same instant as the same input typed into
+        // the screen. (Reads above filter by the actor's timezone, which is
+        // the more correct choice for a question about "my Tuesday" - the
+        // asymmetry is deliberate.)
+        const startAt = combineWallClockTime(args.date, args.start);
+        const endAt = combineWallClockTime(args.date, args.end);
+        if (endAt <= startAt) {
+          return toolText(
+            `The end time (${args.end}) is not after the start time (${args.start}). Ankora does not record entries that span midnight as one row - split them into two days.`
+          );
+        }
+
+        const entry = await createManualEntry(actor, actor.id, {
+          clientId: client.value.id,
+          categoryId: category.value.id,
+          startAt,
+          endAt,
+          note: args.note ?? null,
+          backdateReason: args.backdateReason ?? null,
+          createdVia: "MCP",
+        });
+        return toolJson({
+          created: true,
+          entryId: entry.id,
+          client: client.value.name,
+          category: category.value.name,
+          startAt: entry.startAt.toISOString(),
+          endAt: entry.endAt ? entry.endAt.toISOString() : null,
+          actualMinutes: entry.actualSeconds === null ? null : Math.round(entry.actualSeconds / 60),
+          billableMinutes: entry.billableSeconds === null ? null : Math.round(entry.billableSeconds / 60),
+        });
+      } catch (err) {
+        console.error("[mcp] create_time_entry failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
 }
+
+export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";
+export { canSeeOthersTime };
