@@ -9,3 +9,6 @@ tsconfig.tsbuildinfo
 .env
 .env.local
 .env.*.local
+
+# QA suite run artefacts (the reports are per-run, not source of truth)
+qa/reports/

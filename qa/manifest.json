@@ -1,0 +1,911 @@
+{
+  "version": 1,
+  "defaultLevel": 2,
+  "capabilities": {
+    "action:(product)/app/(authenticated)/alerts/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/categories/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/clients/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/hour-banks/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/important-dates/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/my-time/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/notifications/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/portal/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/profile/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/report-schedules/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/tasks/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/time-entries/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/timer/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/(authenticated)/users/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/forgot-password/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/login/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "action:(product)/app/reset-password/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/admin/login": {
+      "kind": "api",
+      "area": "blog-admin",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/admin/logout": {
+      "kind": "api",
+      "area": "blog-admin",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/admin/posts": {
+      "kind": "api",
+      "area": "blog-admin",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/admin/posts/[locale]/[slug]": {
+      "kind": "api",
+      "area": "blog-admin",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/admin/upload-image": {
+      "kind": "api",
+      "area": "blog-admin",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/audit-log/export": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/auth/[...nextauth]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/contact": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/cron/alerts-reconcile": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/cron/scheduled-reports": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/health": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/authorize": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/consent": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/metadata/authorization-server": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/metadata/protected-resource": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/register": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/mcp/oauth/token": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/portal/export": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/reports/export": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "api:/api/time-entries/export": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "cron:/api/cron/alerts-reconcile": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "cron:/api/cron/scheduled-reports": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:alerts": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:backup-export": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:backup-export-format": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:billing": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:categories": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:client-portal": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:clients": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:hour-banks": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:important-dates": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:important-dates-holidays": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:important-dates-job": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:important-dates-recurrence": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:important-dates-reminders": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:integrations": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:notifications": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:overview-trend": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:profile": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:report-schedules": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:reports": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:tasks": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:time-entries": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "domain:users": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:create_time_entry": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:get_active_timer": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:list_categories": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:list_my_clients": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:list_my_time_entries": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:list_team_members": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:list_team_time_entries": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:start_timer": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:stop_timer": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "mcp:update_timer_note": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/about": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/admin": {
+      "kind": "page",
+      "area": "blog-admin",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/admin/login": {
+      "kind": "page",
+      "area": "blog-admin",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/admin/posts/edit": {
+      "kind": "page",
+      "area": "blog-admin",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/admin/posts/new": {
+      "kind": "page",
+      "area": "blog-admin",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/ankora-vs-personal-assistant": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/blog": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/blog/[slug]": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/contact": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/coverage": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/how-it-works": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/personal-assistant-for-executives": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/personal-operations-management": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/pricing": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/privacy": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/roi": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/solutions": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/solutions/companies": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/solutions/executives": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/solutions/family-office": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/solutions/founders": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/technology": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/terms": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/alerts": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/audit-log": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/categories": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/categories/[categoryId]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/clients": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/clients/[clientId]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/forgot-password": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/guide": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/hour-banks": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/important-dates": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/important-dates/[id]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/integrations": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/login": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/my-time": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/notifications": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/oauth/consent": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/portal": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/portal/history": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/portal/monthly": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/portal/weekly": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/profile": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/report-schedules": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/reports": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/reset-password": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/tasks": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/time-entries": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/timer": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/users": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "screen:/app/users/[userId]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/dpa": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/security": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    },
+    "page:/[locale]/service-terms": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-20"
+    }
+  },
+  "waivers": {},
+  "lastScan": "2026-09-20"
+}

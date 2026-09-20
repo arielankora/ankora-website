@@ -1,0 +1,139 @@
+# Automated QA.
+#
+# Three entry points, one runner:
+#   - every pull request        -> level 1, blocking. ~4 minutes.
+#   - every night at 03:00 UTC  -> level 2 against main, reporting.
+#   - manual dispatch           -> any level, on demand.
+#
+# Why CI and not only the agent: this repo's own tooling notes record that
+# ankora.co.il and binaries.prisma.sh are unreachable from the assistant's
+# sandbox and from the device bridge. GitHub's runners have neither
+# restriction, so CI is the only place the full suite can actually run -
+# and it runs whether or not anyone is at a keyboard.
+
+name: QA
+
+on:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      level:
+        description: "QA level (1 = quick, 2 = deep, 3 = fault hunt)"
+        required: false
+        default: "2"
+        type: choice
+        options: ["1", "2", "3"]
+
+concurrency:
+  group: qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    # The default GITHUB_TOKEN is read-only, so the report comment failed on
+    # the first real run with "Resource not accessible by integration".
+    permissions:
+      contents: read
+      pull-requests: write
+
+    # Level 2 and 3 run the integration suite, which needs a real Postgres.
+    # A service container is cheaper and far more predictable than the
+    # embedded-postgres package used for local development.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ankora
+          POSTGRES_PASSWORD: ankora_ci_only
+          POSTGRES_DB: ankora_ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      # Pinned for determinism: date-sensitive code should not give a
+      # different answer on a UTC runner than on a machine in Israel.
+      # (It is NOT what makes the report_schedules waivers behave - those
+      # fail on every machine, because computeReportingPeriod hardcodes
+      # Asia/Jerusalem in its own signature. An earlier revision of this
+      # file claimed otherwise; that claim was wrong.)
+      TZ: Asia/Jerusalem
+      QA_DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
+      DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
+      # The canonical host (lib/site.ts, ADR-0002). Pointing this at the
+      # apex overrides the code's own default and makes every route 308.
+      QA_PROD_URL: https://www.ankora.co.il
+      AUTH_SECRET: ci-only-not-a-real-secret
+      ADMIN_PASSWORD: ci-only-not-a-real-password
+      ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      # The level: an explicit dispatch input wins; a pull request is
+      # always level 1 so the gate stays fast; anything else is the
+      # default deep regression.
+      - name: Choose level
+        id: level
+        run: |
+          if [ -n "${{ inputs.level }}" ]; then
+            echo "value=${{ inputs.level }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "value=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=2" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run QA
+        id: qa
+        run: node qa/run.mjs ${{ steps.level.outputs.value }}
+
+      # Always upload, especially on failure - the report is the artefact
+      # worth reading, not the scrolled-past log.
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report-level-${{ steps.level.outputs.value }}
+          path: qa/reports/
+          retention-days: 30
+
+      - name: Comment on the pull request
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'qa/reports/last.md';
+            if (!fs.existsSync(path)) return;
+            const body = fs.readFileSync(path, 'utf8');
+            const marker = '<!-- ankora-qa -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+              .data.find(c => c.body.includes(marker));
+            const payload = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: payload });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: payload });
+            }
