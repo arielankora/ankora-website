@@ -3289,6 +3289,16 @@ upload path below it is unchanged.
   `sub` claim; and the service account itself reaches only the two shared
   Drive folders.
 
+**One implementation detail worth recording,** because it would have been
+a confusing failure at 03:00: the two destination folders live in a Shared
+drive, not in anyone's My Drive, so the upload call must send
+`supportsAllDrives=true`. Without it Drive v3 returns a 404 on the *parent
+folder* rather than a permission error, which reads like a wrong folder ID.
+The Shared drive is also the right home on its own merits - a service
+account has no storage quota, so files it writes into a My Drive folder can
+fail with `storageQuotaExceeded` regardless of size, and a Shared drive's
+files outlive any individual person's account.
+
 **What it costs.** Setup is more involved than downloading a JSON key: a
 workload identity pool, a provider, an attribute condition and an IAM
 binding, all documented step-by-step in `.env.example`. The attribute

@@ -39,8 +39,15 @@ import { randomUUID } from "node:crypto";
 // other workload is useless here: Vercel signs tokens only for this team;
 // the pool provider's attribute condition accepts only this project's
 // subject claim; and the service account itself can only reach the two
-// Drive folders below, which were shared with it individually as Editor
-// (not domain-wide delegation, not Ariel's wider Drive).
+// Drive folders below, which were shared with it individually as Content
+// manager (not domain-wide delegation, not Ariel's wider Drive).
+//
+// Those folders live in a Shared drive rather than someone's My Drive,
+// which matters twice over: uploaded files are owned by the Shared drive
+// rather than by the service account (service accounts have no storage
+// quota of their own, so My Drive parents can fail with
+// storageQuotaExceeded regardless of file size), and they survive any
+// individual person leaving the organisation.
 //
 // The `drive` scope (rather than the narrower `drive.file`) is required
 // because `drive.file` only grants access to files the app itself created
@@ -54,7 +61,13 @@ import { randomUUID } from "node:crypto";
 // PR #42's rate limiting (see claude/security-review-2026-09.md).
 
 const STS_URL = "https://sts.googleapis.com/v1/token";
-const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id";
+// `supportsAllDrives=true` is required, not optional: both destination
+// folders live in a Shared drive ("Ankora"), and Drive API v3 refuses to
+// resolve a Shared-drive parent without it - the upload fails with a
+// confusing 404 on the parent folder rather than a permission error. It
+// is harmless for My Drive parents, so it stays set unconditionally.
+const UPLOAD_URL =
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id&supportsAllDrives=true";
 const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 const CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 

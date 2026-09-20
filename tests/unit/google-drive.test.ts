@@ -150,6 +150,9 @@ describe("google-drive", () => {
 
     const uploadCall = calls.find((c) => c.url.includes("/upload/drive/v3/files"))!;
     expect(uploadCall).toBeTruthy();
+    // Both destination folders live in a Shared drive; without this flag
+    // Drive v3 cannot resolve the parent and the upload 404s.
+    expect(uploadCall.url).toContain("supportsAllDrives=true");
     expect(uploadCall.init.headers.Authorization).toBe("Bearer sa-access-token");
     expect(uploadCall.init.headers["Content-Type"]).toMatch(/^multipart\/related; boundary=/);
 
