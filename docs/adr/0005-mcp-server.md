@@ -147,9 +147,26 @@ Postgres.
 
 ### Verification
 
-`tests/unit/mcp/` covers the four pure modules (59 assertions). The rest
-of `lib/mcp/` is Prisma-touching and falls under the same sandbox
-limitation documented in `tests/unit/reports.test.ts`.
+`tests/unit/mcp/` covers all five modules — the four pure ones and
+`auth.ts` — in 81 assertions.
+
+`auth.ts` was initially assumed to need a database and shipped unverified.
+It does not: its only runtime import from the app is `prisma` itself
+(`@prisma/client` and `@modelcontextprotocol/server` are both
+`import type`, and `server-only` is already aliased in
+`vitest.config.ts`), so mocking `@/lib/prisma` reaches every branch
+without Postgres and without the Prisma engine this sandbox cannot
+download. Each of the four `getCurrentUser` checks — `revokedAt`,
+`expiresAt`, `deletedAt`/`status`, `tokenVersion` — has a test that fails
+when that check is deleted, confirmed by mutation rather than assumed.
+
+Still not covered by any test: the Prisma query itself. A typo in the
+`include` or a schema drift would pass these tests and fail in
+production. The Vercel Preview build catches the schema half of that
+(`npm run build` runs `prisma generate && prisma migrate deploy`, so the
+migration is applied to a real Neon branch and the code is typechecked
+against the generated client), which leaves a genuine first run against a
+database as the remaining step — see the README.
 
 The migration is hand-authored for the same reason as every prior phase's
 — see that file's header.
