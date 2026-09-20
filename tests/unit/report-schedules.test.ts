@@ -90,26 +90,54 @@ describe("isScheduleDue() - spec 15 cadence, ADR addendum 13.5", () => {
 });
 
 describe("computeReportingPeriod() - spec 15's \"עבור השבוע/החודש הקודם\"", () => {
+  // These three assertions were written against UTC midnight and stayed that
+  // way after the Phase 8 fix (docs/adr/0001, and the long note at the top of
+  // lib/timezone.ts) made the boundaries Israel-local. They have been red on
+  // main ever since - not flaky, not environmental, just never updated.
+  //
+  // Ariel confirmed the product rule on 2026-09-20: a reporting period covers
+  // an ISRAELI calendar week or month. That makes the code right and these
+  // expectations wrong, so the expectations move.
+  //
+  // The boundaries below are the real UTC instants of Israeli midnight, and
+  // the offset is not constant: Israel is UTC+3 under IDT (late March to late
+  // October) and UTC+2 under IST. September and August are +3; December and
+  // January are +2. Both cases are covered on purpose - a single-season test
+  // would pass all summer and start failing in November.
   it("returns the prior full Sun-Sat week for WEEKLY (spec: 'עבור השבוע הקודם')", () => {
     // 2026-09-09 is a Wednesday; this week starts Sunday 2026-09-06.
     const now = new Date(Date.UTC(2026, 8, 9, 6, 0, 0));
     const { from, to } = computeReportingPeriod("WEEKLY", now);
-    expect(to.toISOString()).toBe(new Date(Date.UTC(2026, 8, 6)).toISOString());
-    expect(from.toISOString()).toBe(new Date(Date.UTC(2026, 7, 30)).toISOString());
+    // Israeli midnight on 2026-09-06, in IDT (UTC+3).
+    expect(to.toISOString()).toBe("2026-09-05T21:00:00.000Z");
+    expect(from.toISOString()).toBe("2026-08-29T21:00:00.000Z");
   });
 
   it("returns the prior full calendar month for MONTHLY (spec: 'עבור החודש הקודם')", () => {
     const now = new Date(Date.UTC(2026, 8, 15, 6, 0, 0)); // any day in September 2026
     const { from, to } = computeReportingPeriod("MONTHLY", now);
-    expect(to.toISOString()).toBe(new Date(Date.UTC(2026, 8, 1)).toISOString());
-    expect(from.toISOString()).toBe(new Date(Date.UTC(2026, 7, 1)).toISOString());
+    expect(to.toISOString()).toBe("2026-08-31T21:00:00.000Z");
+    expect(from.toISOString()).toBe("2026-07-31T21:00:00.000Z");
   });
 
   it("crosses a year boundary correctly for MONTHLY (January -> prior December)", () => {
     const now = new Date(Date.UTC(2027, 0, 10));
     const { from, to } = computeReportingPeriod("MONTHLY", now);
-    expect(to.toISOString()).toBe(new Date(Date.UTC(2027, 0, 1)).toISOString());
-    expect(from.toISOString()).toBe(new Date(Date.UTC(2026, 11, 1)).toISOString());
+    // Winter: IST (UTC+2), so these are 22:00, not 21:00. A test that assumed
+    // a fixed +3 would pass in September and break the first week of November.
+    expect(to.toISOString()).toBe("2026-12-31T22:00:00.000Z");
+    expect(from.toISOString()).toBe("2026-11-30T22:00:00.000Z");
+  });
+
+  it("puts an entry logged just after UTC midnight in the right month", () => {
+    // The bug the Phase 8 fix existed to kill, stated as a test: 22:30 UTC on
+    // 30 November is already 00:30 on 1 December in Israel. A UTC-boundary
+    // period would file that hour under November and quietly move an hour of
+    // billable time between two clients' monthly reports.
+    const now = new Date(Date.UTC(2026, 11, 15));
+    const { from } = computeReportingPeriod("MONTHLY", now);
+    const justAfterUtcMidnight = new Date(Date.UTC(2026, 10, 30, 22, 30));
+    expect(justAfterUtcMidnight >= from).toBe(true);
   });
 });
 
