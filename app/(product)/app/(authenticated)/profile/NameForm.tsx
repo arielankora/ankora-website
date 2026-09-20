@@ -8,7 +8,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-4 w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="mt-4 w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "נשמר..." : "שמירה"}
     </button>
@@ -25,13 +25,13 @@ export function NameForm({ name }: { name: string }) {
   return (
     <form action={formAction}>
       <label className="block">
-        <span className="mb-1.5 block text-xs font-medium text-navy/60">שם לתצוגה</span>
+        <span className="mb-1.5 block text-xs font-medium text-appNavy/60">שם לתצוגה</span>
         <input
           name="name"
           defaultValue={name}
           required
           maxLength={100}
-          className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-navy outline-none focus:border-gold"
+          className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-appNavy outline-none focus:border-gold"
         />
       </label>
 

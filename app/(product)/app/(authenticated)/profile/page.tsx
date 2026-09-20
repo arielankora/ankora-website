@@ -40,8 +40,8 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-navy">הפרופיל שלי</h1>
-        <p className="mt-1 text-sm text-navy/60">פרטים אישיים, אזור זמן והתראות.</p>
+        <h1 className="text-xl font-medium text-appNavy">הפרופיל שלי</h1>
+        <p className="mt-1 text-sm text-appNavy/60">פרטים אישיים, אזור זמן והתראות.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -52,8 +52,8 @@ export default async function ProfilePage() {
                 {initials(user.name)}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-base font-medium text-navy">{user.name}</p>
-                <p dir="ltr" className="truncate text-end text-xs text-navy/50">
+                <p className="truncate text-base font-medium text-appNavy">{user.name}</p>
+                <p dir="ltr" className="truncate text-end text-xs text-appNavy/50">
                   {user.email}
                 </p>
               </div>
@@ -68,12 +68,12 @@ export default async function ProfilePage() {
 
         <div className="space-y-6">
           <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-navy">התראות אישיות</h2>
+            <h2 className="mb-3 text-sm font-medium text-appNavy">התראות אישיות</h2>
             <NotificationPreferenceForm enabled={user.notifyLongRunningTimerByEmail} />
           </div>
 
           <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-navy">סיסמה</h2>
+            <h2 className="mb-3 text-sm font-medium text-appNavy">סיסמה</h2>
             <ChangePasswordForm lastChangedLabel={formatPasswordChangedLabel(lastPasswordChangeAt)} />
           </div>
         </div>

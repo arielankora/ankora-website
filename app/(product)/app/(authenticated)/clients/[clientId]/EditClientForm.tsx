@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "נשמר..." : "שמירת שינויים"}
     </button>
@@ -23,44 +23,44 @@ export function EditClientForm({ client }: { client: Client }) {
     <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="clientId" value={client.id} />
       <div>
-        <label className="block text-xs font-medium text-navy/60">שם הלקוח</label>
+        <label className="block text-xs font-medium text-appNavy/60">שם הלקוח</label>
         <input
           name="name"
           defaultValue={client.name}
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">שם משפטי</label>
+        <label className="block text-xs font-medium text-appNavy/60">שם משפטי</label>
         <input
           name="legalName"
           defaultValue={client.legalName ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">איש קשר</label>
+        <label className="block text-xs font-medium text-appNavy/60">איש קשר</label>
         <input
           name="primaryContact"
           defaultValue={client.primaryContact ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">אזור זמן</label>
+        <label className="block text-xs font-medium text-appNavy/60">אזור זמן</label>
         <input
           name="timezone"
           defaultValue={client.timezone}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">סטטוס</label>
+        <label className="block text-xs font-medium text-appNavy/60">סטטוס</label>
         <select
           name="status"
           defaultValue={client.status}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="ACTIVE">פעיל</option>
           <option value="PAUSED">מושהה</option>

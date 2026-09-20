@@ -21,7 +21,7 @@ export default async function AdminHomePage(props: { params: Promise<{ locale: s
   ].sort((a, b) => (a.publishedAt < b.publishedAt ? 1 : -1));
 
   return (
-    <div className="bg-paper px-6 py-32">
+    <div className="bg-cream px-6 py-32">
       <div className="mx-auto max-w-content">
         <AdminDashboard posts={posts} basePath={`/${locale}/admin`} githubConfigured={isGithubConfigured()} />
       </div>

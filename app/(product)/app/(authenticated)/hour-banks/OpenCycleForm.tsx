@@ -10,7 +10,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "פותח..." : "פתיחת מחזור חדש"}
     </button>
@@ -31,70 +31,70 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
       <input type="hidden" name="clientId" value={clientId} />
 
       <div>
-        <label className="block text-xs font-medium text-navy/60">תחילת מחזור *</label>
+        <label className="block text-xs font-medium text-appNavy/60">תחילת מחזור *</label>
         <input
           type="date"
           name="cycleStart"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">סיום מחזור *</label>
+        <label className="block text-xs font-medium text-appNavy/60">סיום מחזור *</label>
         <input
           type="date"
           name="cycleEnd"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">דקות שנרכשו *</label>
+        <label className="block text-xs font-medium text-appNavy/60">דקות שנרכשו *</label>
         <input
           type="number"
           name="purchasedMinutes"
           min={0}
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">Rollover למחזור הבא</label>
+        <label className="block text-xs font-medium text-appNavy/60">Rollover למחזור הבא</label>
         <select
           name="rolloverMode"
           value={rolloverMode}
           onChange={(e) => setRolloverMode(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="NONE">ללא</option>
           <option value="FULL">מלא</option>
           <option value="CAPPED">מוגבל (Cap)</option>
           <option value="MANUAL">ידני</option>
         </select>
-        <p className="mt-1 text-[11px] text-navy/40">קובע כמה יעבור מהמחזור הזה למחזור הבא כשייפתח.</p>
+        <p className="mt-1 text-[11px] text-appNavy/40">קובע כמה יעבור מהמחזור הזה למחזור הבא כשייפתח.</p>
       </div>
 
       {rolloverMode === "CAPPED" && (
         <div>
-          <label className="block text-xs font-medium text-navy/60">תקרת Rollover (דקות)</label>
+          <label className="block text-xs font-medium text-appNavy/60">תקרת Rollover (דקות)</label>
           <input
             type="number"
             name="rolloverCapMinutes"
             min={0}
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-navy/60">Rollover ידני מהמחזור הקודם</label>
+        <label className="block text-xs font-medium text-appNavy/60">Rollover ידני מהמחזור הקודם</label>
         <input
           type="number"
           name="manualRolloverInMinutes"
           min={0}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
-        <p className="mt-1 text-[11px] text-navy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
+        <p className="mt-1 text-[11px] text-appNavy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
       </div>
 
       {state?.error && <p className="text-sm text-error">{state.error}</p>}

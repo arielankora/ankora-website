@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-ink disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50"
     >
       {pending ? "מתחבר…" : "כניסה"}
     </button>
@@ -41,7 +41,7 @@ export function LoginForm() {
   return (
     <form action={formAction}>
       <label className="block">
-        <span className="mb-1.5 block text-xs text-navy/60">אימייל או שם משתמש</span>
+        <span className="mb-1.5 block text-xs text-appNavy/60">אימייל או שם משתמש</span>
         <input
           name="identifier"
           type="text"
@@ -49,11 +49,11 @@ export function LoginForm() {
           dir="ltr"
           required
           placeholder="name@ankora.co.il"
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-navy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
         />
       </label>
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-navy/60">סיסמה</span>
+        <span className="mb-1.5 block text-xs text-appNavy/60">סיסמה</span>
         <input
           name="password"
           type="password"
@@ -61,7 +61,7 @@ export function LoginForm() {
           dir="ltr"
           required
           placeholder="••••••••"
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-navy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
         />
       </label>
 

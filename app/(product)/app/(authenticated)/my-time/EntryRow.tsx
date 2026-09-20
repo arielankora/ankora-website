@@ -30,7 +30,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
     >
       {pending ? "שומר..." : "שמירה"}
     </button>
@@ -86,55 +86,55 @@ export function EntryRow({ entry }: { entry: Entry }) {
         <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-navy/60">תאריך</label>
+            <label className="block text-xs font-medium text-appNavy/60">תאריך</label>
             <input
               type="date"
               name="date"
               defaultValue={dateKeyOf(entry.startAt)}
               max={todayKey()}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-navy/60">התחלה</label>
+            <label className="block text-xs font-medium text-appNavy/60">התחלה</label>
             <input
               type="time"
               name="startTime"
               defaultValue={timeKey(entry.startAt)}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-navy/60">סיום</label>
+            <label className="block text-xs font-medium text-appNavy/60">סיום</label>
             <input
               type="time"
               name="endTime"
               defaultValue={entry.endAt ? timeKey(entry.endAt) : ""}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-navy/60">הערה</label>
+            <label className="block text-xs font-medium text-appNavy/60">הערה</label>
             <input
               name="note"
               defaultValue={entry.note ?? ""}
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-navy/60">סיבת עריכה (מומלץ)</label>
+          <label className="block text-xs font-medium text-appNavy/60">סיבת עריכה (מומלץ)</label>
           <input
             name="reason"
-            className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold sm:w-1/2"
+            className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold sm:w-1/2"
           />
         </div>
         <div className="flex items-center gap-3">
           <SubmitButton />
-          <button type="button" onClick={() => setEditing(false)} className="text-xs text-navy/60 hover:text-navy">
+          <button type="button" onClick={() => setEditing(false)} className="text-xs text-appNavy/60 hover:text-appNavy">
             ביטול
           </button>
           {state?.error && <p className="text-xs text-red-600">{state.error}</p>}
@@ -150,10 +150,10 @@ export function EntryRow({ entry }: { entry: Entry }) {
     <div className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
       <span className="h-[34px] w-[3px] shrink-0 rounded-full bg-gold/60" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] text-navy">
+        <p className="truncate text-[13.5px] text-appNavy">
           {entry.note || `${entry.clientName} · ${entry.categoryName}`}
         </p>
-        <p className="mt-0.5 truncate text-[11.5px] text-navy/50">
+        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
           {entry.clientName} · {entry.categoryName} · {timeKey(entry.startAt)}
           {entry.endAt ? `–${timeKey(entry.endAt)}` : ""}
         </p>
@@ -161,17 +161,17 @@ export function EntryRow({ entry }: { entry: Entry }) {
       <div className="flex shrink-0 items-center gap-2.5">
         {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
         {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
-        <span className="font-jbmono text-[13.5px] text-navy">{formatDuration(entry.actualSeconds)}</span>
+        <span className="font-jbmono text-[13.5px] text-appNavy">{formatDuration(entry.actualSeconds)}</span>
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-lg border border-lineDark px-3 py-1.5 text-xs text-navy/70 hover:border-gold hover:text-navy"
+          className="rounded-lg border border-lineDark px-3 py-1.5 text-xs text-appNavy/70 hover:border-gold hover:text-appNavy"
         >
           עריכה
         </button>
         <form action={deleteMyEntryAction}>
           <input type="hidden" name="timeEntryId" value={entry.id} />
-          <button type="submit" className="text-xs text-navy/50 hover:text-error">
+          <button type="submit" className="text-xs text-appNavy/50 hover:text-error">
             מחיקה
           </button>
         </form>

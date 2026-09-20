@@ -59,7 +59,7 @@ export function LegalPage({
           {/* Sticky on desktop, a plain list above the document on a phone, where a
               sticky rail would eat a third of the screen. */}
           <nav aria-label={dict.pages.legal.contentsLabel} className="lg:sticky lg:top-32 lg:self-start">
-            <MonoLabel tracking="0.15em" className="text-tone-muted">
+            <MonoLabel tracking="0.15em" className="text-muted">
               {dict.pages.legal.contentsLabel}
             </MonoLabel>
             <ol className="mt-5 flex flex-col">
@@ -67,13 +67,13 @@ export function LegalPage({
                 <li key={section.title} className="border-t border-[rgba(243,234,219,0.11)] first:border-t-0">
                   <a
                     href={`#${idFor(i)}`}
-                    className="flex items-baseline gap-3 py-[11px] font-assistant text-[14px] font-light leading-[1.5] text-tone-muted transition-colors duration-200 hover:text-gold"
+                    className="flex items-baseline gap-3 py-[11px] font-assistant text-[14px] font-light leading-[1.5] text-muted transition-colors duration-200 hover:text-gold"
                   >
                     <MonoLabel
                       script="latin"
                       size={10}
                       tracking="0.12em"
-                      className="flex-none text-tone-muted"
+                      className="flex-none text-muted"
                     >
                       {String(i + 1).padStart(2, "0")}
                     </MonoLabel>
@@ -82,7 +82,7 @@ export function LegalPage({
                 </li>
               ))}
             </ol>
-            <p className="mt-6 border-t border-[rgba(243,234,219,0.11)] pt-5 font-assistant text-[13px] font-light text-tone-muted">
+            <p className="mt-6 border-t border-[rgba(243,234,219,0.11)] pt-5 font-assistant text-[13px] font-light text-muted">
               {dict.pages.legal.updated}
             </p>
           </nav>
@@ -99,12 +99,12 @@ export function LegalPage({
                     <MonoLabel script="latin" tracking="0.15em" className="flex-none text-gold">
                       {String(i + 1).padStart(2, "0")}
                     </MonoLabel>
-                    <h2 className="text-[1.16rem] font-normal leading-[1.3] text-paper">
+                    <h2 className="text-[1.16rem] font-normal leading-[1.3] text-cream">
                       {section.title}
                     </h2>
                     <span className="h-px flex-1 bg-[rgba(243,234,219,0.14)]" />
                   </div>
-                  <p className="mt-4 max-w-[68ch] font-assistant text-[15px] font-light leading-[1.85] text-tone-muted">
+                  <p className="mt-4 max-w-[68ch] font-assistant text-[15px] font-light leading-[1.85] text-muted">
                     {section.body}
                   </p>
                 </section>

@@ -75,8 +75,8 @@ export default async function TasksPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">משימות</h1>
-          <p className="mt-1 text-sm text-navy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+          <h1 className="text-xl font-medium text-appNavy">משימות</h1>
+          <p className="mt-1 text-sm text-appNavy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -86,7 +86,7 @@ export default async function TasksPage(
                 key={pill.value}
                 href={pill.value === "ALL" ? "/app/tasks" : `/app/tasks?status=${pill.value}`}
                 className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                  activePill === pill.value ? "bg-navy text-paper" : "text-navy/60 hover:text-navy"
+                  activePill === pill.value ? "bg-appNavy text-cream" : "text-appNavy/60 hover:text-appNavy"
                 }`}
               >
                 {pill.label}

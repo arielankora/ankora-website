@@ -30,12 +30,12 @@ export function EditorialSection({
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}
       >
         <Reveal delay={0.08}>
-          <h2 className="max-w-xl text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+          <h2 className="max-w-xl text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
             {title}
           </h2>
         </Reveal>
         <Reveal delay={0.14}>
-          <p className="max-w-2xl font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+          <p className="max-w-2xl font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
             {body}
           </p>
         </Reveal>

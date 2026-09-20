@@ -22,12 +22,12 @@ function SectionHead({ label, title, body }: { label: string; title: string; bod
         <Eyebrow>{label}</Eyebrow>
       </Reveal>
       <Reveal delay={0.08}>
-        <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+        <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
           {title}
         </h2>
       </Reveal>
       <Reveal delay={0.14}>
-        <p className="mt-6 max-w-[60ch] font-assistant font-light leading-[1.8] text-tone-muted">{body}</p>
+        <p className="mt-6 max-w-[60ch] font-assistant font-light leading-[1.8] text-muted">{body}</p>
       </Reveal>
     </>
   );
@@ -40,8 +40,8 @@ function PointGrid({ points, minCell = 260 }: { points: { title: string; body: s
         {points.map((point) => (
           <motion.div key={point.title} variants={staggerItem} className="h-full">
             <HairlineGridCell>
-              <h3 className="text-[1.12rem] font-normal text-paper">{point.title}</h3>
-              <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+              <h3 className="text-[1.12rem] font-normal text-cream">{point.title}</h3>
+              <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-muted">
                 {point.body}
               </p>
             </HairlineGridCell>
@@ -90,7 +90,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
               variants={staggerItem}
               className="grid gap-x-8 gap-y-6 bg-[rgba(11,27,51,0.5)] p-[clamp(22px,3vw,36px)] backdrop-blur-[12px] [grid-template-columns:minmax(0,1fr)] lg:[grid-template-columns:minmax(200px,0.8fr)_minmax(0,1fr)_minmax(0,1fr)]"
             >
-              <MonoLabel tracking="0.12em" className="self-start text-tone-muted">
+              <MonoLabel tracking="0.12em" className="self-start text-muted">
                 {row.dimension}
               </MonoLabel>
               {(
@@ -105,7 +105,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
                       "border-b pb-2.5 font-assistant text-[13px] font-semibold tracking-[0.04em] rtl:tracking-normal",
                       column.gold
                         ? "border-[rgba(176,141,87,0.35)] text-gold"
-                        : "border-[rgba(243,234,219,0.16)] text-tone-muted"
+                        : "border-[rgba(243,234,219,0.16)] text-muted"
                     )}
                   >
                     {column.title}
@@ -114,12 +114,12 @@ export default function PricingClient({ params }: { params: { locale: string } }
                     {column.items.map((item) => (
                       <li
                         key={item}
-                        className="flex items-start gap-2.5 font-assistant text-sm font-light text-paper"
+                        className="flex items-start gap-2.5 font-assistant text-sm font-light text-cream"
                       >
                         <span
                           className={cn(
                             "mt-[7px] h-1 w-1 shrink-0 rounded-full",
-                            column.gold ? "bg-gold" : "bg-tone-dim"
+                            column.gold ? "bg-gold" : "bg-line-strong"
                           )}
                         />
                         {item}
@@ -154,14 +154,14 @@ export default function PricingClient({ params }: { params: { locale: string } }
                     tier.highlighted && "bg-[rgba(176,141,87,0.09)]"
                   )}
                 >
-                  <MonoLabel tracking="0.15em" className={tier.highlighted ? "text-gold-light" : "text-tone-muted"}>
+                  <MonoLabel tracking="0.15em" className={tier.highlighted ? "text-gold-light" : "text-muted"}>
                     {tier.name}
                   </MonoLabel>
-                  <div className="mt-4 text-[clamp(1.6rem,2.4vw,2.1rem)] font-extralight tabular-nums leading-none text-paper">
+                  <div className="mt-4 text-[clamp(1.6rem,2.4vw,2.1rem)] font-extralight tabular-nums leading-none text-cream">
                     {tier.rate}
                   </div>
-                  <div className="mt-2 font-assistant text-sm text-tone-muted">{tier.hours}</div>
-                  <p className="mt-5 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                  <div className="mt-2 font-assistant text-sm text-muted">{tier.hours}</div>
+                  <p className="mt-5 font-assistant text-sm font-light leading-[1.7] text-muted">
                     {tier.blurb}
                   </p>
                 </HairlineGridCell>
@@ -170,7 +170,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
           </HairlineGrid>
         </RevealStagger>
         <Reveal delay={0.1}>
-          <p className="mt-6 font-assistant text-xs font-light leading-[1.7] text-tone-muted">
+          <p className="mt-6 font-assistant text-xs font-light leading-[1.7] text-muted">
             {p.tiers.footnote}
           </p>
         </Reveal>
@@ -181,12 +181,12 @@ export default function PricingClient({ params }: { params: { locale: string } }
       <section className="relative overflow-hidden border-t border-[rgba(243,234,219,0.12)] py-[clamp(64px,9vw,130px)]">
         <WideContainer className="relative flex flex-col items-center gap-5 text-center">
           <Reveal>
-            <h2 className="mx-auto max-w-[18ch] text-balance text-[clamp(2rem,4.4vw,3.6rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-paper">
+            <h2 className="mx-auto max-w-[18ch] text-balance text-[clamp(2rem,4.4vw,3.6rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-cream">
               {p.closing.title}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <p className="mx-auto font-assistant text-[1.05rem] font-light text-tone-muted">
+            <p className="mx-auto font-assistant text-[1.05rem] font-light text-muted">
               {p.closing.body}
             </p>
           </Reveal>
@@ -195,7 +195,7 @@ export default function PricingClient({ params }: { params: { locale: string } }
             {p.closing.secondaryCta && (
               <Link
                 href={withLocale(locale, "/roi")}
-                className="inline-flex min-h-[44px] items-center border-b border-[rgba(232,226,214,0.28)] font-assistant text-[15px] text-paper/80 transition-colors duration-200 hover:text-gold"
+                className="inline-flex min-h-[44px] items-center border-b border-[rgba(232,226,214,0.28)] font-assistant text-[15px] text-cream/80 transition-colors duration-200 hover:text-gold"
               >
                 {p.closing.secondaryCta}
               </Link>

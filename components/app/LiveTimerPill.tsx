@@ -32,7 +32,7 @@ export function LiveTimerPill({ startAt, className = "" }: { startAt: string; cl
   return (
     <Link
       href="/app/timer"
-      className={`flex items-center gap-2 rounded-full bg-ink px-3 py-1.5 text-cream transition-opacity hover:opacity-90 ${className}`}
+      className={`flex items-center gap-2 rounded-full bg-navy px-3 py-1.5 text-cream-warm transition-opacity hover:opacity-90 ${className}`}
     >
       <span className="h-1.5 w-1.5 shrink-0 animate-pulse-dot rounded-full bg-gold" aria-hidden="true" />
       <span className="font-jbmono text-[12.5px]" dir="ltr">

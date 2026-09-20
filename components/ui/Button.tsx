@@ -18,10 +18,10 @@ export function Button({ href, children, variant = "primary", className }: Butto
     "inline-flex items-center justify-center gap-2 px-7 py-3.5 text-[15px] font-medium tracking-tight transition-colors duration-200 ease-out";
 
   const variants = {
-    primary: "bg-gold text-ink hover:bg-gold-light",
+    primary: "bg-gold text-navy hover:bg-gold-light",
     secondary:
-      "border border-line text-paper hover:border-lineGold hover:text-gold-light bg-transparent",
-    ghost: "text-paper/80 hover:text-gold-light",
+      "border border-hairline text-cream hover:border-lineGold hover:text-gold-light bg-transparent",
+    ghost: "text-cream/80 hover:text-gold-light",
   };
 
   return (

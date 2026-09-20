@@ -28,12 +28,12 @@ export default async function NotificationsPage() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-navy">התראות שלי</h1>
-            <p className="mt-1 text-sm text-navy/60">חריגות, טיימרים ארוכים והתראות פנימיות.</p>
+            <h1 className="text-xl font-medium text-appNavy">התראות שלי</h1>
+            <p className="mt-1 text-sm text-appNavy/60">חריגות, טיימרים ארוכים והתראות פנימיות.</p>
           </div>
           {unreadCount > 0 && (
             <form action={markAllNotificationsReadAction}>
-              <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-navy hover:border-gold">
+              <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:border-gold">
                 סימון הכול כנקרא
               </button>
             </form>
@@ -42,22 +42,22 @@ export default async function NotificationsPage() {
 
         <div className="divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
           {notifications.length === 0 && (
-            <p className="px-5 py-8 text-center text-sm text-navy/50">אין התראות כרגע.</p>
+            <p className="px-5 py-8 text-center text-sm text-appNavy/50">אין התראות כרגע.</p>
           )}
           {notifications.map((n) => (
             <div key={n.id} className="flex items-start justify-between gap-4 px-5 py-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-navy">{n.title}</p>
+                  <p className="font-medium text-appNavy">{n.title}</p>
                   {!n.readAt && <StatusBadge label="חדש" tone="amber" />}
                 </div>
-                <p className="mt-1 text-sm text-navy/70">{n.body}</p>
-                <p className="mt-1 text-xs text-navy/40">{formatDateTime(n.createdAt)}</p>
+                <p className="mt-1 text-sm text-appNavy/70">{n.body}</p>
+                <p className="mt-1 text-xs text-appNavy/40">{formatDateTime(n.createdAt)}</p>
               </div>
               {!n.readAt && (
                 <form action={markNotificationReadAction}>
                   <input type="hidden" name="notificationId" value={n.id} />
-                  <button type="submit" className="whitespace-nowrap text-xs text-navy/50 hover:text-navy">
+                  <button type="submit" className="whitespace-nowrap text-xs text-appNavy/50 hover:text-appNavy">
                     סימון כנקרא
                   </button>
                 </form>

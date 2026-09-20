@@ -63,8 +63,8 @@ export default async function TimerPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">טיימר</h1>
-          <p className="mt-1 text-sm text-navy/60">טיימר פעיל, לקוח וקטגוריה, שילובים אחרונים.</p>
+          <h1 className="text-xl font-medium text-appNavy">טיימר</h1>
+          <p className="mt-1 text-sm text-appNavy/60">טיימר פעיל, לקוח וקטגוריה, שילובים אחרונים.</p>
         </div>
 
         <TimerWidget

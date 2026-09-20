@@ -48,7 +48,7 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
         const current = target === locale;
         const className = cn(
           "flex items-center px-3.5 font-assistant text-[13px] font-semibold tracking-[0.08em] transition-colors duration-[250ms]",
-          current ? "bg-gold text-ink" : "text-tone-muted hover:text-gold"
+          current ? "bg-gold text-navy" : "text-muted hover:text-gold"
         );
         return current ? (
           <span key={target} aria-current="true" className={className}>

@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "נשמר..." : "שמירת שינויים"}
     </button>
@@ -23,12 +23,12 @@ export function EditRoleStatusForm({ targetUser, isSelf }: { targetUser: User; i
     <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="userId" value={targetUser.id} />
       <div>
-        <label className="block text-xs font-medium text-navy/60">תפקיד</label>
+        <label className="block text-xs font-medium text-appNavy/60">תפקיד</label>
         <select
           name="role"
           defaultValue={targetUser.role}
           disabled={isSelf}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="SUPER_ADMIN">מנהל-על</option>
           <option value="ANKORA_ADMIN">מנהל Ankora</option>
@@ -37,12 +37,12 @@ export function EditRoleStatusForm({ targetUser, isSelf }: { targetUser: User; i
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">סטטוס</label>
+        <label className="block text-xs font-medium text-appNavy/60">סטטוס</label>
         <select
           name="status"
           defaultValue={targetUser.status}
           disabled={isSelf}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="INVITED">הוזמן</option>
           <option value="ACTIVE">פעיל</option>
@@ -52,7 +52,7 @@ export function EditRoleStatusForm({ targetUser, isSelf }: { targetUser: User; i
       </div>
 
       {isSelf && (
-        <p className="text-xs text-navy/40 sm:col-span-2">
+        <p className="text-xs text-appNavy/40 sm:col-span-2">
           לא ניתן לשנות תפקיד או סטטוס עבור המשתמש המחובר, כדי למנוע נעילה עצמית בטעות.
         </p>
       )}

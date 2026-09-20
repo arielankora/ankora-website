@@ -61,7 +61,7 @@ function formatDate(dateStr: string, locale: Locale) {
 }
 
 // /he redesign: this page (unlike the blog index) never received a dark-theme He
-// variant -- it kept rendering the pre-redesign bg-paper light theme under /he too,
+// variant -- it kept rendering the pre-redesign bg-cream light theme under /he too,
 // same root cause as the pricing page (see PricingClient.tsx). The article body itself
 // (MDX prose via the shared `.blog-article` CSS class) is hardcoded to dark-navy-on-
 // light colors, so it needed a `.blog-article-dark` companion class (added to
@@ -120,7 +120,7 @@ export default async function BlogPostPage(
               <Badge>{categoryLabel}</Badge>
             </Reveal>
             <Reveal delay={0.12}>
-              <h1 className="mt-6 max-w-3xl text-[clamp(2rem,4.4vw,3.4rem)] font-extralight leading-[1.1] tracking-[-0.02em] text-paper">
+              <h1 className="mt-6 max-w-3xl text-[clamp(2rem,4.4vw,3.4rem)] font-extralight leading-[1.1] tracking-[-0.02em] text-cream">
                 {post.title}
               </h1>
             </Reveal>
@@ -194,7 +194,7 @@ export default async function BlogPostPage(
     <>
       <JsonLd id="blogpost-schema" data={articleSchema} />
 
-      <section className="relative overflow-hidden bg-ink pb-16 pt-40 md:pb-20 md:pt-48">
+      <section className="relative overflow-hidden bg-navy pb-16 pt-40 md:pb-20 md:pt-48">
         <div className="absolute inset-0 bg-radial-glow opacity-70" />
         <Container className="relative">
           <Breadcrumbs
@@ -208,12 +208,12 @@ export default async function BlogPostPage(
             <Badge>{categoryLabel}</Badge>
           </Reveal>
           <Reveal delay={0.12}>
-            <h1 className="mt-6 max-w-3xl text-[30px] font-medium leading-[1.2] tracking-tight text-paper md:text-[46px]">
+            <h1 className="mt-6 max-w-3xl text-[30px] font-medium leading-[1.2] tracking-tight text-cream md:text-[46px]">
               {post.title}
             </h1>
           </Reveal>
           <Reveal delay={0.18}>
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-paper/50">
+            <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-cream/50">
               <span>{post.author}</span>
               <span aria-hidden>·</span>
               <span>{formatDate(post.publishedAt, locale)}</span>
@@ -227,7 +227,7 @@ export default async function BlogPostPage(
       </section>
 
       {post.coverImage && (
-        <section className="bg-paper">
+        <section className="bg-cream">
           {/* Deliberately not <Container> here: Container's own max-w-content
               (1440px) and this max-w-3xl have equal CSS specificity, and
               clsx doesn't dedupe conflicting Tailwind utilities, so
@@ -245,7 +245,7 @@ export default async function BlogPostPage(
         </section>
       )}
 
-      <section className={post.coverImage ? "bg-paper pb-20 md:pb-28" : "bg-paper py-16 md:py-24"}>
+      <section className={post.coverImage ? "bg-cream pb-20 md:pb-28" : "bg-cream py-16 md:py-24"}>
         <Container className="max-w-3xl">
           <div className="blog-article">
             <MDXRemote source={post.content} />
@@ -260,9 +260,9 @@ export default async function BlogPostPage(
       </section>
 
       {related.length > 0 && (
-        <section className="border-t border-lineDark bg-paper py-16 md:py-20">
+        <section className="border-t border-lineDark bg-cream py-16 md:py-20">
           <Container>
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-navy/35">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-appNavy/35">
               {dict.blog.relatedTitle}
             </span>
             <div className="mt-6 grid gap-6 md:grid-cols-3">
@@ -274,16 +274,16 @@ export default async function BlogPostPage(
         </section>
       )}
 
-      <section className="relative overflow-hidden bg-ink py-24 md:py-32">
+      <section className="relative overflow-hidden bg-navy py-24 md:py-32">
         <div className="absolute inset-0 bg-radial-glow" />
         <Container className="relative text-center">
           <Reveal>
-            <h2 className="mx-auto max-w-2xl text-[28px] font-medium leading-[1.15] tracking-tight text-paper md:text-[40px]">
+            <h2 className="mx-auto max-w-2xl text-[28px] font-medium leading-[1.15] tracking-tight text-cream md:text-[40px]">
               {dict.finalCta.title}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md text-paper/55">{dict.finalCta.body}</p>
+            <p className="mx-auto mt-5 max-w-md text-cream/55">{dict.finalCta.body}</p>
           </Reveal>
           <Reveal delay={0.2} className="mt-10 flex justify-center">
             <Button href={withLocale(locale, "/contact")}>{dict.finalCta.cta}</Button>

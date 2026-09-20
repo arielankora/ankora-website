@@ -8,7 +8,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy transition-colors hover:border-gold disabled:opacity-50"
+      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy transition-colors hover:border-gold disabled:opacity-50"
     >
       {pending ? "שומר..." : "הוספה"}
     </button>
@@ -30,22 +30,22 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
 
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block w-[84px]">
-          <span className="mb-1 block text-[11px] text-navy/55">דקות</span>
+          <span className="mb-1 block text-[11px] text-appNavy/55">דקות</span>
           <input
             type="number"
             name="minutes"
             required
             dir="ltr"
-            className="w-full rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0 flex-1">
-          <span className="mb-1 block text-[11px] text-navy/55">סיבה</span>
+          <span className="mb-1 block text-[11px] text-appNavy/55">סיבה</span>
           <input
             name="reason"
             required
             placeholder="למשל: זיכוי חד-פעמי"
-            className="w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-[13px] text-navy outline-none focus:border-gold"
+            className="w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
         <SubmitButton />
@@ -53,7 +53,7 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
 
       {state?.error && <p className="text-xs text-error">{state.error}</p>}
       {state?.ok && <p className="text-xs text-success">ההתאמה נוספה.</p>}
-      <p className="text-[11px] text-navy/45">כל התאמה נרשמת ביומן הפעולות עם שם המבצע.</p>
+      <p className="text-[11px] text-appNavy/45">כל התאמה נרשמת ביומן הפעולות עם שם המבצע.</p>
     </form>
   );
 }

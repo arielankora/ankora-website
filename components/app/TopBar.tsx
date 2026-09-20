@@ -42,7 +42,7 @@ export function TopBar({
         {showPrimaryCta && (
           <Link
             href="/app/my-time"
-            className="flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-[13px] font-medium text-ink"
+            className="flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-[13px] font-medium text-navy"
           >
             <Plus size={15} strokeWidth={2.25} />
             דיווח חדש
@@ -52,8 +52,8 @@ export function TopBar({
 
       {/* Left (end) side: breadcrumb + screen title. */}
       <div className="min-w-0 text-end">
-        {current?.group && <p className="truncate text-[11px] text-navy/45">{current.group}</p>}
-        <p className="truncate text-[16.5px] font-medium text-navy">{current?.label ?? "Ankora"}</p>
+        {current?.group && <p className="truncate text-[11px] text-appNavy/45">{current.group}</p>}
+        <p className="truncate text-[16.5px] font-medium text-appNavy">{current?.label ?? "Ankora"}</p>
       </div>
     </header>
   );

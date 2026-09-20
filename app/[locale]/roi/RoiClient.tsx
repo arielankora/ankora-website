@@ -68,7 +68,7 @@ function Stepper({
 }) {
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const button =
-    "flex h-11 w-11 flex-none items-center justify-center border border-[rgba(243,234,219,0.2)] text-[17px] leading-none text-paper transition-colors duration-200 hover:border-gold hover:text-gold disabled:opacity-40 disabled:hover:border-[rgba(243,234,219,0.2)] disabled:hover:text-paper";
+    "flex h-11 w-11 flex-none items-center justify-center border border-[rgba(243,234,219,0.2)] text-[17px] leading-none text-cream transition-colors duration-200 hover:border-gold hover:text-gold disabled:opacity-40 disabled:hover:border-[rgba(243,234,219,0.2)] disabled:hover:text-cream";
 
   return (
     <div className="flex flex-none items-center gap-0.5">
@@ -170,7 +170,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))" }}
         >
           <div className="bg-[rgba(11,27,51,0.5)] p-[clamp(24px,3vw,40px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[12px]">
-            <MonoLabel tracking="0.15em" className="text-tone-muted">
+            <MonoLabel tracking="0.15em" className="text-muted">
               {p.personaPrompt}
             </MonoLabel>
 
@@ -188,7 +188,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
                     aria-pressed={active}
                     className={cn(
                       "min-h-12 px-3.5 py-3 font-assistant text-[13.5px] font-semibold transition-colors duration-[250ms]",
-                      active ? "bg-gold text-ink" : "bg-ink text-tone-muted hover:text-gold"
+                      active ? "bg-gold text-navy" : "bg-navy text-muted hover:text-gold"
                     )}
                   >
                     {dict.pages.segments[item.key].eyebrow}
@@ -197,7 +197,7 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
               })}
             </div>
 
-            <MonoLabel tracking="0.15em" className="text-tone-muted">
+            <MonoLabel tracking="0.15em" className="text-muted">
               {p.hoursPrompt}
             </MonoLabel>
             <div className="mt-5 flex flex-col">
@@ -207,8 +207,8 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
                   className="flex items-center gap-4 border-b border-[rgba(243,234,219,0.1)] py-4 last:border-b-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <div className="text-[14.5px] font-normal leading-[1.35] text-paper">{row.label}</div>
-                    <div className="mt-1 font-assistant text-[12.5px] font-light text-tone-muted">{row.note}</div>
+                    <div className="text-[14.5px] font-normal leading-[1.35] text-cream">{row.label}</div>
+                    <div className="mt-1 font-assistant text-[12.5px] font-light text-muted">{row.note}</div>
                   </div>
                   <Stepper
                     value={hours[row.id]}
@@ -223,13 +223,13 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
             </div>
 
             <div className="mt-5 flex items-baseline justify-between gap-3">
-              <span className="font-assistant text-sm font-semibold text-paper">{p.hoursTotalLabel}</span>
+              <span className="font-assistant text-sm font-semibold text-cream">{p.hoursTotalLabel}</span>
               <span className="font-jbmono text-base tabular-nums text-gold">{weeklyHours}</span>
             </div>
 
             <div className="mt-[34px] border-t border-[rgba(243,234,219,0.12)] pt-[26px]">
-              <div className="text-[14.5px] font-normal text-paper">{persona.rateLabel}</div>
-              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-muted">
+              <div className="text-[14.5px] font-normal text-cream">{persona.rateLabel}</div>
+              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-muted">
                 {persona.rateHint}. {p.rateNote}
               </p>
               <Stepper
@@ -244,8 +244,8 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
             </div>
 
             <div className="mt-7 border-t border-[rgba(243,234,219,0.12)] pt-[26px]">
-              <div className="text-[14.5px] font-normal text-paper">{p.nonProductiveLabel}</div>
-              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-tone-muted">
+              <div className="text-[14.5px] font-normal text-cream">{p.nonProductiveLabel}</div>
+              <p className="mb-3.5 mt-1.5 font-assistant text-[12.5px] font-light leading-[1.65] text-muted">
                 {p.nonProductiveHint}
               </p>
               <Stepper
@@ -267,28 +267,28 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
 
             <dl className="mt-6 space-y-5">
               <div className="flex items-baseline justify-between gap-4 border-b border-[rgba(243,234,219,0.16)] pb-4">
-                <dt className="font-assistant text-sm text-tone-body">{p.results.hoursFreedLabel}</dt>
-                <dd className="text-lg font-medium tabular-nums text-paper">
+                <dt className="font-assistant text-sm text-body">{p.results.hoursFreedLabel}</dt>
+                <dd className="text-lg font-medium tabular-nums text-cream">
                   {Math.round(results.monthlyHours)}
                 </dd>
               </div>
               <div className="border-b border-[rgba(243,234,219,0.16)] pb-4">
                 <div className="flex items-baseline justify-between gap-4">
-                  <dt className="font-assistant text-sm text-tone-body">{p.results.valueFreedLabel}</dt>
-                  <dd className="text-lg font-medium tabular-nums text-paper">
+                  <dt className="font-assistant text-sm text-body">{p.results.valueFreedLabel}</dt>
+                  <dd className="text-lg font-medium tabular-nums text-cream">
                     {formatCurrency(results.currentCost)}
                   </dd>
                 </div>
-                <p className="mt-1 font-assistant text-xs text-tone-muted">{p.results.valueFreedHint}</p>
+                <p className="mt-1 font-assistant text-xs text-muted">{p.results.valueFreedHint}</p>
               </div>
               <div className="border-b border-[rgba(243,234,219,0.16)] pb-4">
                 <div className="flex items-baseline justify-between gap-4">
-                  <dt className="font-assistant text-sm text-tone-body">{p.results.costLabel}</dt>
-                  <dd className="text-lg font-medium tabular-nums text-paper">
+                  <dt className="font-assistant text-sm text-body">{p.results.costLabel}</dt>
+                  <dd className="text-lg font-medium tabular-nums text-cream">
                     {formatCurrency(results.ankoraCost)}
                   </dd>
                 </div>
-                <p className="mt-1 font-assistant text-xs text-tone-muted">{p.results.costHint}</p>
+                <p className="mt-1 font-assistant text-xs text-muted">{p.results.costHint}</p>
               </div>
             </dl>
 
@@ -297,25 +297,25 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
                 of the same list as the inputs' echo. */}
             <div className="mt-6 border border-gold/60 p-5">
               <div className="flex items-baseline justify-between gap-4">
-                <span className="font-assistant text-sm text-tone-body">{p.results.netValueLabel}</span>
+                <span className="font-assistant text-sm text-body">{p.results.netValueLabel}</span>
                 <span className="text-[1.6rem] font-light tabular-nums text-gold">
                   {formatCurrency(results.saving)}
                 </span>
               </div>
               <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-gold/25 pt-3">
-                <span className="font-assistant text-sm text-tone-body">{p.results.multipleLabel}</span>
+                <span className="font-assistant text-sm text-body">{p.results.multipleLabel}</span>
                 <span className="font-jbmono text-xl tabular-nums text-gold">
                   {results.multiple.toFixed(1)}x
                 </span>
               </div>
-              <p className="mt-2 font-assistant text-xs text-tone-muted">{p.results.multipleSuffix}</p>
+              <p className="mt-2 font-assistant text-xs text-muted">{p.results.multipleSuffix}</p>
             </div>
 
-            <p className="mt-7 font-assistant text-sm leading-relaxed text-tone-body">{p.results.ctaBody}</p>
+            <p className="mt-7 font-assistant text-sm leading-relaxed text-body">{p.results.ctaBody}</p>
             <Button href={withLocale(locale, "/contact")} className="mt-5 w-full">
               {p.results.cta}
             </Button>
-            <p className="mt-5 font-assistant text-xs font-light leading-[1.7] text-tone-muted">
+            <p className="mt-5 font-assistant text-xs font-light leading-[1.7] text-muted">
               {p.results.footnote}
             </p>
           </div>
@@ -327,12 +327,12 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
           <Eyebrow>{p.hiddenCost.label}</Eyebrow>
         </Reveal>
         <Reveal delay={0.08}>
-          <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+          <h2 className="mt-6 max-w-[24ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
             {p.hiddenCost.title}
           </h2>
         </Reveal>
         <Reveal delay={0.14}>
-          <p className="mt-4 max-w-[60ch] font-assistant font-light leading-[1.8] text-tone-muted">
+          <p className="mt-4 max-w-[60ch] font-assistant font-light leading-[1.8] text-muted">
             {p.hiddenCost.body}
           </p>
         </Reveal>
@@ -341,8 +341,8 @@ export default function RoiClient({ params }: { params: { locale: string } }) {
             {p.hiddenCost.items.map((item) => (
               <motion.div key={item.title} variants={staggerItem} className="h-full">
                 <HairlineGridCell>
-                  <h3 className="text-[1.12rem] font-normal text-paper">{item.title}</h3>
-                  <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                  <h3 className="text-[1.12rem] font-normal text-cream">{item.title}</h3>
+                  <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-muted">
                     {item.body}
                   </p>
                 </HairlineGridCell>

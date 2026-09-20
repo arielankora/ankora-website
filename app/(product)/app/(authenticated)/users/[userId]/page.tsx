@@ -38,20 +38,20 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/users" className="text-xs text-navy/50 hover:text-gold-dim">
+          <Link href="/app/users" className="text-xs text-appNavy/50 hover:text-gold-dim">
             ← חזרה לרשימת המשתמשים
           </Link>
-          <h1 className="mt-2 text-xl font-medium text-navy">{targetUser.name}</h1>
-          <p className="mt-1 text-sm text-navy/60">{targetUser.email}</p>
+          <h1 className="mt-2 text-xl font-medium text-appNavy">{targetUser.name}</h1>
+          <p className="mt-1 text-sm text-appNavy/60">{targetUser.email}</p>
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-navy">תפקיד וסטטוס</h2>
+          <h2 className="mb-4 text-sm font-medium text-appNavy">תפקיד וסטטוס</h2>
           <EditRoleStatusForm targetUser={targetUser} isSelf={isSelf} />
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-navy">גישה ללקוחות</h2>
+          <h2 className="mb-4 text-sm font-medium text-appNavy">גישה ללקוחות</h2>
           <ClientAccessForm
             userId={targetUser.id}
             clients={clients.filter((c) => c.status === "ACTIVE").map((c) => ({ id: c.id, name: c.name }))}
@@ -60,15 +60,15 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="text-sm font-medium text-navy">אבטחה</h2>
-          <p className="mt-1 text-sm text-navy/60">
+          <h2 className="text-sm font-medium text-appNavy">אבטחה</h2>
+          <p className="mt-1 text-sm text-appNavy/60">
             ניתוק כל ההתחברויות הפעילות של המשתמש. שימושי אם יש חשד שהחשבון נפגע.
           </p>
           <form action={logoutAllSessionsAction} className="mt-3">
             <input type="hidden" name="userId" value={targetUser.id} />
             <button
               type="submit"
-              className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-navy/70 hover:border-gold hover:text-navy"
+              className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-gold hover:text-appNavy"
             >
               ניתוק כל ההתחברויות
             </button>

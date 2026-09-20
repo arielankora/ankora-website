@@ -24,7 +24,7 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="relative z-[1] border-t border-[rgba(243,234,219,0.12)] bg-inkDeep font-assistant text-[#93A5B8]">
+    <footer className="relative z-[1] border-t border-[rgba(243,234,219,0.12)] bg-navy-deep font-assistant text-[#93A5B8]">
       <div
         className="mx-auto grid max-w-wide gap-[clamp(24px,4vw,52px)] px-[clamp(18px,4vw,32px)] py-[clamp(36px,5vw,62px)]"
         style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))" }}
@@ -44,7 +44,7 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
               height={22}
               className="block h-[22px] w-[22px] object-contain"
             />
-            <span className="text-[15px] font-light tracking-[0.3em] text-cream ps-[0.3em]">ANKORA</span>
+            <span className="text-[15px] font-light tracking-[0.3em] text-cream-warm ps-[0.3em]">ANKORA</span>
           </Link>
           <p className="max-w-xs text-[0.98rem] font-light leading-relaxed text-[#8798AB]">
             {dict.footer.tagline}

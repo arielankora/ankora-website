@@ -24,17 +24,17 @@ export default function ProductError({
   }, [error]);
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-paper px-6">
+    <div className="flex min-h-screen items-center justify-center bg-cream px-6">
       <div className="w-full max-w-sm rounded-2xl border border-lineDark bg-white p-8 text-center shadow-sm">
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-dim">Ankora</p>
-        <h1 className="mt-4 text-lg font-semibold text-navy">משהו השתבש</h1>
-        <p className="mt-2 text-sm text-navy/60">
+        <h1 className="mt-4 text-lg font-semibold text-appNavy">משהו השתבש</h1>
+        <p className="mt-2 text-sm text-appNavy/60">
           אירעה תקלה בלתי צפויה. אפשר לנסות שוב, ואם זה חוזר - לפנות לתמיכה.
         </p>
         <button
           type="button"
           onClick={() => reset()}
-          className="mt-6 w-full rounded-full bg-navy px-6 py-3 text-sm font-medium text-white"
+          className="mt-6 w-full rounded-full bg-appNavy px-6 py-3 text-sm font-medium text-white"
         >
           ניסיון חוזר
         </button>

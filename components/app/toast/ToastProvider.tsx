@@ -141,14 +141,14 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
           <Icon size={14} strokeWidth={2.25} className={iconClass} />
         </span>
         <div className="min-w-0 flex-1 pt-0.5">
-          <p className="text-[13.5px] font-medium text-navy">{toast.title}</p>
-          {toast.description && <p className="mt-0.5 text-xs text-navy/60">{toast.description}</p>}
+          <p className="text-[13.5px] font-medium text-appNavy">{toast.title}</p>
+          {toast.description && <p className="mt-0.5 text-xs text-appNavy/60">{toast.description}</p>}
           {toast.undo && (
             <button
               type="button"
               onClick={handleUndo}
               disabled={undoing}
-              className="mt-1.5 text-xs font-medium text-gold-dim hover:text-navy disabled:opacity-50"
+              className="mt-1.5 text-xs font-medium text-gold-dim hover:text-appNavy disabled:opacity-50"
             >
               {undoing ? "מבטל…" : "ביטול"}
             </button>
@@ -158,7 +158,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
           type="button"
           onClick={onDismiss}
           aria-label="סגירה"
-          className="shrink-0 rounded-full p-1 text-navy/30 hover:bg-navy/5 hover:text-navy/60"
+          className="shrink-0 rounded-full p-1 text-appNavy/30 hover:bg-appNavy/5 hover:text-appNavy/60"
         >
           <X size={14} strokeWidth={2} />
         </button>

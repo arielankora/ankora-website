@@ -49,7 +49,7 @@ function HeBlogIndexPage({
               className={cn(
                 "border px-4 py-1.5 text-sm transition-colors",
                 !activeCategory
-                  ? "border-gold bg-gold text-ink"
+                  ? "border-gold bg-gold text-navy"
                   : "border-[rgba(243,234,219,0.18)] text-[#A9B8C9] hover:border-gold/50"
               )}
             >
@@ -62,7 +62,7 @@ function HeBlogIndexPage({
                 className={cn(
                   "border px-4 py-1.5 text-sm transition-colors",
                   activeCategory === cat
-                    ? "border-gold bg-gold text-ink"
+                    ? "border-gold bg-gold text-navy"
                     : "border-[rgba(243,234,219,0.18)] text-[#A9B8C9] hover:border-gold/50"
                 )}
               >
@@ -119,7 +119,7 @@ export function BlogIndexPage({
         breadcrumb={<Breadcrumbs locale={locale} items={[{ label: b.eyebrow }]} />}
       />
 
-      <section className="bg-paper py-16 md:py-24">
+      <section className="bg-cream py-16 md:py-24">
         <Container>
           <div className="flex flex-wrap gap-2">
             <Link
@@ -127,8 +127,8 @@ export function BlogIndexPage({
               className={cn(
                 "rounded-full border px-4 py-1.5 text-sm transition-colors",
                 !activeCategory
-                  ? "border-gold bg-gold/10 text-navy"
-                  : "border-lineDark text-navy/55 hover:border-gold/50"
+                  ? "border-gold bg-gold/10 text-appNavy"
+                  : "border-lineDark text-appNavy/55 hover:border-gold/50"
               )}
             >
               {b.allCategories}
@@ -140,8 +140,8 @@ export function BlogIndexPage({
                 className={cn(
                   "rounded-full border px-4 py-1.5 text-sm transition-colors",
                   activeCategory === cat
-                    ? "border-gold bg-gold/10 text-navy"
-                    : "border-lineDark text-navy/55 hover:border-gold/50"
+                    ? "border-gold bg-gold/10 text-appNavy"
+                    : "border-lineDark text-appNavy/55 hover:border-gold/50"
                 )}
               >
                 {b.categories[cat] || cat}
@@ -151,7 +151,7 @@ export function BlogIndexPage({
 
           {filtered.length === 0 ? (
             <Reveal className="mt-16 rounded-2xl border border-dashed border-lineDark px-8 py-20 text-center">
-              <p className="text-navy/50">{b.emptyState}</p>
+              <p className="text-appNavy/50">{b.emptyState}</p>
             </Reveal>
           ) : (
             <RevealStagger className="mt-10 grid gap-6 md:grid-cols-2 lg:grid-cols-3">

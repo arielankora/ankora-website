@@ -53,22 +53,22 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-medium text-navy">פעילות שבועית</h1>
-          <p className="mt-1 text-sm text-navy/60">
+          <h1 className="text-xl font-medium text-appNavy">פעילות שבועית</h1>
+          <p className="mt-1 text-sm text-appNavy/60">
             {formatDate(activity.from)} – {formatDate(new Date(activity.to.getTime() - 86_400_000))}
           </p>
         </div>
         <div className="flex gap-2 text-sm">
           <a
             href={`/app/portal/weekly?weekOffset=${weekOffset - 1}`}
-            className="rounded-full border border-lineDark px-4 py-2 text-navy/70 hover:border-gold"
+            className="rounded-full border border-lineDark px-4 py-2 text-appNavy/70 hover:border-gold"
           >
             שבוע קודם
           </a>
           {weekOffset < 0 && (
             <a
               href={`/app/portal/weekly?weekOffset=${weekOffset + 1}`}
-              className="rounded-full border border-lineDark px-4 py-2 text-navy/70 hover:border-gold"
+              className="rounded-full border border-lineDark px-4 py-2 text-appNavy/70 hover:border-gold"
             >
               שבוע הבא
             </a>
@@ -78,9 +78,9 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
 
       <div className="rounded-2xl border border-lineDark bg-white p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2.5">
-          <span className="text-sm text-navy/60">
+          <span className="text-sm text-appNavy/60">
             סה&quot;כ{" "}
-            <span dir="ltr" className="font-jbmono text-sm text-navy">
+            <span dir="ltr" className="font-jbmono text-sm text-appNavy">
               {formatHours(activity.totalMinutes)}
             </span>
           </span>
@@ -89,14 +89,14 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
           {activity.dailyTotals.map((d) => (
             <span key={d.date} className="flex h-full flex-col justify-end">
               <span
-                className={`rounded-t-md ${d.minutes > 0 ? "bg-gold/60" : "bg-navy/10"}`}
+                className={`rounded-t-md ${d.minutes > 0 ? "bg-gold/60" : "bg-appNavy/10"}`}
                 style={{ height: `${Math.max(4, (d.minutes / maxMinutes) * 100)}%` }}
                 title={`${d.date}: ${formatHours(d.minutes)}`}
               />
             </span>
           ))}
         </div>
-        <div className="mt-2 grid grid-cols-7 gap-2 text-center text-[11px] text-navy/50">
+        <div className="mt-2 grid grid-cols-7 gap-2 text-center text-[11px] text-appNavy/50">
           {WEEKDAY_SHORT.map((label) => (
             <span key={label}>{label}</span>
           ))}
@@ -104,9 +104,9 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
       </div>
 
       <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-        <div className="border-b border-lineDark px-5 py-3.5 text-[13.5px] font-medium text-navy">מה נעשה השבוע</div>
+        <div className="border-b border-lineDark px-5 py-3.5 text-[13.5px] font-medium text-appNavy">מה נעשה השבוע</div>
         {activity.topActivities.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-navy/50">אין עדיין דיווחים לשבוע זה.</p>
+          <p className="px-5 py-8 text-center text-sm text-appNavy/50">אין עדיין דיווחים לשבוע זה.</p>
         ) : (
           activity.topActivities.map((a, i) => (
             <div
@@ -115,8 +115,8 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
                 i < activity.topActivities.length - 1 ? "border-b border-lineDark/60" : ""
               }`}
             >
-              <span className="text-navy">{a.activity}</span>
-              <span dir="ltr" className="font-jbmono text-navy/60">
+              <span className="text-appNavy">{a.activity}</span>
+              <span dir="ltr" className="font-jbmono text-appNavy/60">
                 {formatHours(a.minutes)}
               </span>
             </div>
@@ -133,7 +133,7 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
       <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
         <table className="w-full min-w-[640px] text-start text-sm">
           <thead>
-            <tr className="border-b border-lineDark text-xs text-navy/50">
+            <tr className="border-b border-lineDark text-xs text-appNavy/50">
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">פעילות</th>
               <th className="px-5 py-3 font-medium">קטגוריה</th>
@@ -144,18 +144,18 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
           <tbody>
             {activity.rows.length === 0 && (
               <tr>
-                <td colSpan={activity.showEmployeeNames ? 5 : 4} className="px-5 py-8 text-center text-navy/50">
+                <td colSpan={activity.showEmployeeNames ? 5 : 4} className="px-5 py-8 text-center text-appNavy/50">
                   אין עדיין דיווחים לשבוע זה.
                 </td>
               </tr>
             )}
             {activity.rows.map((row, i) => (
               <tr key={i} className="border-b border-lineDark last:border-0">
-                <td className="px-5 py-3 text-navy/70">{row.date}</td>
-                <td className="px-5 py-3 text-navy/80">{row.activity}</td>
-                <td className="px-5 py-3 text-navy/70">{row.category}</td>
-                {activity.showEmployeeNames && <td className="px-5 py-3 text-navy/70">{row.employee}</td>}
-                <td className="px-5 py-3 text-navy/70">{row.billableMinutes}</td>
+                <td className="px-5 py-3 text-appNavy/70">{row.date}</td>
+                <td className="px-5 py-3 text-appNavy/80">{row.activity}</td>
+                <td className="px-5 py-3 text-appNavy/70">{row.category}</td>
+                {activity.showEmployeeNames && <td className="px-5 py-3 text-appNavy/70">{row.employee}</td>}
+                <td className="px-5 py-3 text-appNavy/70">{row.billableMinutes}</td>
               </tr>
             ))}
           </tbody>

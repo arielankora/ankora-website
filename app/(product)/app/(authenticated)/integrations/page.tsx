@@ -40,8 +40,8 @@ export default async function IntegrationsPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">אינטגרציות</h1>
-          <p className="mt-1 text-sm text-navy/60">
+          <h1 className="text-xl font-medium text-appNavy">אינטגרציות</h1>
+          <p className="mt-1 text-sm text-appNavy/60">
             חיבור מערכות חיצוניות. בשלב זה מוצג רק סטטוס - אין עדיין חיבור פעיל לאף מערכת.
           </p>
         </div>
@@ -53,10 +53,10 @@ export default async function IntegrationsPage() {
             return (
               <div key={connection.id} className="rounded-2xl border border-lineDark bg-white p-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-base font-medium text-navy">{label}</h2>
+                  <h2 className="text-base font-medium text-appNavy">{label}</h2>
                   <StatusBadge label={STATUS_LABEL[connection.status] ?? connection.status} tone={connection.status === "CONNECTED" ? "green" : connection.status === "ERROR" ? "red" : "gray"} />
                 </div>
-                <p className="mt-2 text-sm text-navy/60">
+                <p className="mt-2 text-sm text-appNavy/60">
                   {provider ? "בקרוב - טרם פותח חיבור אמיתי." : "ספק לא ידוע."}
                 </p>
               </div>

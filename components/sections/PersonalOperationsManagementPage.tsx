@@ -41,7 +41,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
           <Reveal>
             <div className="border border-[rgba(176,141,87,0.35)] bg-[rgba(176,141,87,0.09)] p-[clamp(22px,3vw,40px)]">
               <span className="font-jbmono text-[12px] tracking-[0.15em] text-gold">{p.directAnswerLabel}</span>
-              <p className="mt-4 text-lg leading-relaxed text-paper">{p.directAnswer}</p>
+              <p className="mt-4 text-lg leading-relaxed text-cream">{p.directAnswer}</p>
             </div>
           </Reveal>
         </WideContainer>
@@ -51,7 +51,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.problem.title}
             </h2>
           </Reveal>
@@ -79,7 +79,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.whatManagerDoes.title}
             </h2>
           </Reveal>
@@ -91,7 +91,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
               {p.whatManagerDoes.examples.map((ex) => (
                 <motion.div key={ex.title} variants={staggerItem}>
                   <HairlineGridCell>
-                    <h3 className="font-medium text-paper">{ex.title}</h3>
+                    <h3 className="font-medium text-cream">{ex.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{ex.body}</p>
                   </HairlineGridCell>
                 </motion.div>
@@ -131,7 +131,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.humanAI.title}
             </h2>
           </Reveal>
@@ -143,7 +143,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
               {p.humanAI.points.map((pt) => (
                 <motion.div key={pt.title} variants={staggerItem}>
                   <HairlineGridCell>
-                    <h3 className="font-medium text-paper">{pt.title}</h3>
+                    <h3 className="font-medium text-cream">{pt.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-[#A9B8C9]">{pt.body}</p>
                   </HairlineGridCell>
                 </motion.div>
@@ -157,7 +157,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.whoFor.title}
             </h2>
           </Reveal>
@@ -175,7 +175,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.examples.title}
             </h2>
           </Reveal>
@@ -183,7 +183,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
             {p.examples.items.map((ex, i) => (
               <Reveal key={ex.scenario} delay={i * 0.08}>
                 <GlassPanel elevated className="h-full p-[clamp(22px,3vw,40px)]">
-                  <h3 className="text-sm font-medium text-paper">{ex.scenario}</h3>
+                  <h3 className="text-sm font-medium text-cream">{ex.scenario}</h3>
                   <p className="mt-4 text-sm italic leading-relaxed text-gold">{ex.shallow}</p>
                   <div className="mt-4 h-px bg-[rgba(243,234,219,0.16)]" />
                   <p className="mt-4 text-sm leading-relaxed text-[#A9B8C9]">{ex.deep}</p>
@@ -198,7 +198,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
         <WideContainer>
           <Reveal>
-            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-paper">
+            <h2 className="max-w-2xl text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.14] tracking-[-0.02em] text-cream">
               {p.notRightFit.title}
             </h2>
           </Reveal>
@@ -232,7 +232,7 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
       <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(44px,7vw,112px)]">
         <WideContainer className="max-w-2xl text-center">
           <Reveal>
-            <h2 className="mx-auto text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-paper">
+            <h2 className="mx-auto text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.05] tracking-[-0.03em] text-cream">
               {p.ctaTitle}
             </h2>
           </Reveal>
@@ -272,32 +272,32 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       />
 
       {/* Direct answer, first, for humans and AI systems */}
-      <section className="bg-cream py-16 md:py-20">
+      <section className="bg-cream-warm py-16 md:py-20">
         <Container className="max-w-3xl">
           <Reveal>
             <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gold">{p.directAnswerLabel}</span>
-            <p className="mt-4 text-lg leading-relaxed text-navy md:text-xl">{p.directAnswer}</p>
+            <p className="mt-4 text-lg leading-relaxed text-appNavy md:text-xl">{p.directAnswer}</p>
           </Reveal>
         </Container>
       </section>
 
       {/* The problem */}
-      <section className="bg-paper py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
               {p.problem.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-xl text-navy/60">{p.problem.intro}</p>
+            <p className="mt-4 max-w-xl text-appNavy/60">{p.problem.intro}</p>
           </Reveal>
           <RevealStagger className="mt-8 grid gap-3 md:grid-cols-2">
             {p.problem.items.map((item) => (
               <motion.div
                 key={item}
                 variants={staggerItem}
-                className="flex items-center gap-3 rounded-xl border border-lineDark bg-cream/50 px-5 py-3.5 text-sm text-navy/70"
+                className="flex items-center gap-3 rounded-xl border border-lineDark bg-cream-warm/50 px-5 py-3.5 text-sm text-appNavy/70"
               >
                 <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
                 {item}
@@ -305,27 +305,27 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
             ))}
           </RevealStagger>
           <Reveal delay={0.16}>
-            <p className="mt-8 max-w-2xl text-navy/60">{p.problem.closing}</p>
+            <p className="mt-8 max-w-2xl text-appNavy/60">{p.problem.closing}</p>
           </Reveal>
         </Container>
       </section>
 
       {/* What a Personal Operations Manager does */}
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-appNavy py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
               {p.whatManagerDoes.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-paper/55">{p.whatManagerDoes.body}</p>
+            <p className="mt-4 max-w-2xl text-cream/55">{p.whatManagerDoes.body}</p>
           </Reveal>
           <RevealStagger className="mt-10 grid gap-4 md:grid-cols-3">
             {p.whatManagerDoes.examples.map((ex) => (
-              <motion.div key={ex.title} variants={staggerItem} className="rounded-2xl border border-line p-7">
-                <h3 className="font-medium text-paper">{ex.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{ex.body}</p>
+              <motion.div key={ex.title} variants={staggerItem} className="rounded-2xl border border-hairline p-7">
+                <h3 className="font-medium text-cream">{ex.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-cream/50">{ex.body}</p>
               </motion.div>
             ))}
           </RevealStagger>
@@ -333,11 +333,11 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* Comparison: PA vs Ops Manager */}
-      <section className="bg-cream py-20 md:py-28">
+      <section className="bg-cream-warm py-20 md:py-28">
         <Container>
           <Reveal><Badge tone="light">{p.comparisonPA.title}</Badge></Reveal>
           <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl text-navy/60">{p.comparisonPA.intro}</p>
+            <p className="mt-5 max-w-xl text-appNavy/60">{p.comparisonPA.intro}</p>
           </Reveal>
           <div className="mt-8">
             <ComparisonTable columnA={p.comparisonPA.columnA} columnB={p.comparisonPA.columnB} rows={p.comparisonPA.rows} />
@@ -346,11 +346,11 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* Comparison: Concierge */}
-      <section className="bg-paper py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
           <Reveal><Badge tone="light">{p.comparisonConcierge.title}</Badge></Reveal>
           <Reveal delay={0.06}>
-            <p className="mt-5 max-w-xl text-navy/60">{p.comparisonConcierge.intro}</p>
+            <p className="mt-5 max-w-xl text-appNavy/60">{p.comparisonConcierge.intro}</p>
           </Reveal>
           <div className="mt-8">
             <ComparisonTable columnA={p.comparisonConcierge.columnA} columnB={p.comparisonConcierge.columnB} rows={p.comparisonConcierge.rows} />
@@ -359,21 +359,21 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* Human + AI */}
-      <section className="bg-ink py-20 md:py-28">
+      <section className="bg-navy py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
               {p.humanAI.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-paper/55">{p.humanAI.body}</p>
+            <p className="mt-4 max-w-2xl text-cream/55">{p.humanAI.body}</p>
           </Reveal>
           <RevealStagger className="mt-10 grid gap-4 md:grid-cols-2">
             {p.humanAI.points.map((pt) => (
-              <motion.div key={pt.title} variants={staggerItem} className="rounded-2xl border border-line p-7">
-                <h3 className="font-medium text-paper">{pt.title}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-paper/50">{pt.body}</p>
+              <motion.div key={pt.title} variants={staggerItem} className="rounded-2xl border border-hairline p-7">
+                <h3 className="font-medium text-cream">{pt.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-cream/50">{pt.body}</p>
               </motion.div>
             ))}
           </RevealStagger>
@@ -381,10 +381,10 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* Who is it for */}
-      <section className="bg-cream py-20 md:py-28">
+      <section className="bg-cream-warm py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
               {p.whoFor.title}
             </h2>
           </Reveal>
@@ -393,7 +393,7 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
               <motion.span
                 key={item}
                 variants={staggerItem}
-                className="rounded-full border border-lineDark bg-paper px-5 py-2.5 text-sm text-navy/70"
+                className="rounded-full border border-lineDark bg-cream px-5 py-2.5 text-sm text-appNavy/70"
               >
                 {item}
               </motion.span>
@@ -403,21 +403,21 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* Examples */}
-      <section className="bg-paper py-20 md:py-28">
+      <section className="bg-cream py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-navy md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-appNavy md:text-[36px]">
               {p.examples.title}
             </h2>
           </Reveal>
           <div className="mt-10 grid gap-6 md:grid-cols-3">
             {p.examples.items.map((ex, i) => (
               <Reveal key={ex.scenario} delay={i * 0.08}>
-                <div className="h-full rounded-2xl border border-lineDark bg-cream/40 p-7">
-                  <h3 className="text-sm font-medium text-navy">{ex.scenario}</h3>
-                  <p className="mt-4 text-sm italic leading-relaxed text-navy/40">{ex.shallow}</p>
+                <div className="h-full rounded-2xl border border-lineDark bg-cream-warm/40 p-7">
+                  <h3 className="text-sm font-medium text-appNavy">{ex.scenario}</h3>
+                  <p className="mt-4 text-sm italic leading-relaxed text-appNavy/40">{ex.shallow}</p>
                   <div className="mt-4 h-px bg-lineDark" />
-                  <p className="mt-4 text-sm leading-relaxed text-navy/70">{ex.deep}</p>
+                  <p className="mt-4 text-sm leading-relaxed text-appNavy/70">{ex.deep}</p>
                 </div>
               </Reveal>
             ))}
@@ -426,19 +426,19 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
       </section>
 
       {/* When it's not the right fit */}
-      <section className="bg-navy py-20 md:py-28">
+      <section className="bg-appNavy py-20 md:py-28">
         <Container>
           <Reveal>
-            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-paper md:text-[36px]">
+            <h2 className="max-w-2xl text-[26px] font-medium leading-[1.2] tracking-tight text-cream md:text-[36px]">
               {p.notRightFit.title}
             </h2>
           </Reveal>
           <Reveal delay={0.08}>
-            <p className="mt-4 max-w-2xl text-paper/55">{p.notRightFit.body}</p>
+            <p className="mt-4 max-w-2xl text-cream/55">{p.notRightFit.body}</p>
           </Reveal>
           <RevealStagger className="mt-8 grid gap-3 md:grid-cols-3">
             {p.notRightFit.items.map((item) => (
-              <motion.div key={item} variants={staggerItem} className="rounded-xl border border-line px-5 py-4 text-sm text-paper/60">
+              <motion.div key={item} variants={staggerItem} className="rounded-xl border border-hairline px-5 py-4 text-sm text-cream/60">
                 {item}
               </motion.div>
             ))}
@@ -458,16 +458,16 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
         ]}
       />
 
-      <section className="relative overflow-hidden bg-ink py-28 md:py-40">
+      <section className="relative overflow-hidden bg-navy py-28 md:py-40">
         <div className="absolute inset-0 bg-radial-glow" />
         <Container className="relative text-center">
           <Reveal>
-            <h2 className="mx-auto max-w-2xl text-[32px] font-medium leading-[1.15] tracking-tight text-paper md:text-[48px]">
+            <h2 className="mx-auto max-w-2xl text-[32px] font-medium leading-[1.15] tracking-tight text-cream md:text-[48px]">
               {p.ctaTitle}
             </h2>
           </Reveal>
           <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md text-paper/55">{p.ctaBody}</p>
+            <p className="mx-auto mt-5 max-w-md text-cream/55">{p.ctaBody}</p>
           </Reveal>
           <Reveal delay={0.2} className="mt-10 flex justify-center">
             <Button href={withLocale(locale, "/contact")}>{p.cta}</Button>

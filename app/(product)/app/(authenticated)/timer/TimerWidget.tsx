@@ -242,33 +242,33 @@ export function TimerWidget({
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1.35fr_1fr]">
       {/* Hero card - App redesign (handoff README, screen 2): "כרטיס גיבור
           כהה (ink, radius 20px, זוהר רדיאלי זהוב)". */}
-      <div className="relative overflow-hidden rounded-[20px] bg-ink p-6 text-paper md:p-8">
+      <div className="relative overflow-hidden rounded-[20px] bg-navy p-6 text-cream md:p-8">
         <div className="absolute inset-0 bg-[radial-gradient(60%_60%_at_70%_20%,rgba(176,141,87,0.22)_0%,rgba(176,141,87,0)_70%)]" />
         <div className="relative">
           {active ? (
             <div>
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 shrink-0 animate-pulse-dot rounded-full bg-gold-light" aria-hidden="true" />
-                <span className="text-xs tracking-[.06em] text-cream/60">טיימר פעיל</span>
+                <span className="text-xs tracking-[.06em] text-cream-warm/60">טיימר פעיל</span>
               </div>
-              <p className="mt-3.5 font-jbmono text-[42px] font-medium tracking-tight tabular-nums text-paper sm:text-[58px]">
+              <p className="mt-3.5 font-jbmono text-[42px] font-medium tracking-tight tabular-nums text-cream sm:text-[58px]">
                 {formatElapsed(elapsed)}
               </p>
-              <p className="mt-2.5 text-sm text-cream/75">
+              <p className="mt-2.5 text-sm text-cream-warm/75">
                 {activeClient?.name ?? "לקוח"} · {activeCategory?.name ?? "קטגוריה"}
               </p>
               {isLongRunning && (
-                <p className="mt-3.5 inline-flex items-center gap-1.5 rounded-full border border-gold-light/40 bg-gold/22 px-3 py-1.5 text-xs text-cream">
+                <p className="mt-3.5 inline-flex items-center gap-1.5 rounded-full border border-gold-light/40 bg-gold/22 px-3 py-1.5 text-xs text-cream-warm">
                   הטיימר רץ מעל 8 שעות — כדאי לבדוק
                 </p>
               )}
               <label className="mt-5 block">
-                <span className="mb-1.5 block text-[11.5px] text-cream/60">הערה — נשמרת תוך כדי עבודה</span>
+                <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">הערה — נשמרת תוך כדי עבודה</span>
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="על מה עובדים עכשיו?"
-                  className="w-full rounded-[10px] border border-gold-light/40 bg-line px-3 py-2.5 text-sm text-paper outline-none placeholder:text-cream/40 focus:border-gold-light"
+                  className="w-full rounded-[10px] border border-gold-light/40 bg-hairline px-3 py-2.5 text-sm text-cream outline-none placeholder:text-cream-warm/40 focus:border-gold-light"
                 />
               </label>
               <div className="mt-4 flex flex-wrap gap-2.5">
@@ -276,7 +276,7 @@ export function TimerWidget({
                   type="button"
                   onClick={handleStop}
                   disabled={pending || discarding}
-                  className="rounded-full bg-gold-gradient px-6 py-3 text-[14.5px] font-medium text-ink disabled:opacity-50"
+                  className="rounded-full bg-gold-gradient px-6 py-3 text-[14.5px] font-medium text-navy disabled:opacity-50"
                 >
                   {pending ? "עוצר..." : "עצירה ושמירה"}
                 </button>
@@ -284,54 +284,54 @@ export function TimerWidget({
                   type="button"
                   onClick={handleDiscard}
                   disabled={pending || discarding}
-                  className="rounded-full border border-paper/16 bg-line px-5 py-3 text-sm text-cream/80 hover:bg-paper/14 disabled:opacity-50"
+                  className="rounded-full border border-cream/16 bg-hairline px-5 py-3 text-sm text-cream-warm/80 hover:bg-cream/14 disabled:opacity-50"
                 >
                   {discarding ? "מוחק..." : "מחיקה ללא שמירה"}
                 </button>
               </div>
-              <p className="mt-4 text-[11.5px] text-cream/45">העצירה נשמרת מיד. אפשר לבטל מההודעה שתופיע.</p>
+              <p className="mt-4 text-[11.5px] text-cream-warm/45">העצירה נשמרת מיד. אפשר לבטל מההודעה שתופיע.</p>
             </div>
           ) : (
             <div>
-              <span className="text-xs tracking-[.06em] text-cream/60">אין טיימר פעיל</span>
-              <p className="mt-3.5 font-jbmono text-[42px] font-medium text-cream/30 sm:text-[58px]">00:00:00</p>
-              <p className="mb-5 mt-2.5 text-sm text-cream/70">
+              <span className="text-xs tracking-[.06em] text-cream-warm/60">אין טיימר פעיל</span>
+              <p className="mt-3.5 font-jbmono text-[42px] font-medium text-cream-warm/30 sm:text-[58px]">00:00:00</p>
+              <p className="mb-5 mt-2.5 text-sm text-cream-warm/70">
                 בוחרים לקוח וקטגוריה, או מתחילים משילוב אחרון בלחיצה אחת.
               </p>
               <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3">
                 <label className="block">
-                  <span className="mb-1.5 block text-[11.5px] text-cream/60">לקוח</span>
+                  <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">לקוח</span>
                   <select
                     value={clientId}
                     onChange={(e) => {
                       setClientId(e.target.value);
                       setCategoryId("");
                     }}
-                    className="w-full rounded-[10px] border border-paper/18 bg-line px-3 py-2.5 text-sm text-paper outline-none focus:border-gold-light"
+                    className="w-full rounded-[10px] border border-cream/18 bg-hairline px-3 py-2.5 text-sm text-cream outline-none focus:border-gold-light"
                   >
-                    <option value="" className="text-navy">
+                    <option value="" className="text-appNavy">
                       בחירת לקוח
                     </option>
                     {clients.map((c) => (
-                      <option key={c.id} value={c.id} className="text-navy">
+                      <option key={c.id} value={c.id} className="text-appNavy">
                         {c.name}
                       </option>
                     ))}
                   </select>
                 </label>
                 <label className="block">
-                  <span className="mb-1.5 block text-[11.5px] text-cream/60">קטגוריה</span>
+                  <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">קטגוריה</span>
                   <select
                     value={categoryId}
                     onChange={(e) => setCategoryId(e.target.value)}
                     disabled={!clientId}
-                    className="w-full rounded-[10px] border border-paper/18 bg-line px-3 py-2.5 text-sm text-paper outline-none focus:border-gold-light disabled:opacity-40"
+                    className="w-full rounded-[10px] border border-cream/18 bg-hairline px-3 py-2.5 text-sm text-cream outline-none focus:border-gold-light disabled:opacity-40"
                   >
-                    <option value="" className="text-navy">
+                    <option value="" className="text-appNavy">
                       בחירת קטגוריה
                     </option>
                     {availableCategories.map((cat) => (
-                      <option key={cat.id} value={cat.id} className="text-navy">
+                      <option key={cat.id} value={cat.id} className="text-appNavy">
                         {cat.name}
                       </option>
                     ))}
@@ -339,17 +339,17 @@ export function TimerWidget({
                 </label>
               </div>
               <label className="mt-3 block">
-                <span className="mb-1.5 block text-[11.5px] text-cream/60">משימה / הערה</span>
+                <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">משימה / הערה</span>
                 <input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder="למשל: עדכון דוח שבועי"
-                  className="w-full rounded-[10px] border border-paper/18 bg-line px-3 py-2.5 text-sm text-paper outline-none placeholder:text-cream/40 focus:border-gold-light"
+                  className="w-full rounded-[10px] border border-cream/18 bg-hairline px-3 py-2.5 text-sm text-cream outline-none placeholder:text-cream-warm/40 focus:border-gold-light"
                 />
               </label>
               {error && (
                 <p
-                  className="mt-3 flex items-center gap-2 rounded-[10px] px-3 py-2.5 text-[12.5px] text-cream"
+                  className="mt-3 flex items-center gap-2 rounded-[10px] px-3 py-2.5 text-[12.5px] text-cream-warm"
                   style={{ background: "rgba(179,38,30,.3)", border: "1px solid rgba(179,38,30,.5)" }}
                 >
                   {error}
@@ -359,7 +359,7 @@ export function TimerWidget({
                 type="button"
                 onClick={handleStart}
                 disabled={pending || !clientId || !categoryId}
-                className="mt-5 rounded-full bg-gold-gradient px-7 py-3 text-[14.5px] font-medium text-ink disabled:opacity-50"
+                className="mt-5 rounded-full bg-gold-gradient px-7 py-3 text-[14.5px] font-medium text-navy disabled:opacity-50"
               >
                 {pending ? "מתחיל..." : "התחלת טיימר"}
               </button>
@@ -372,15 +372,15 @@ export function TimerWidget({
       <div className="flex flex-col gap-3.5">
         {!active && recent.length > 0 && (
           <div className="rounded-2xl border border-lineDark bg-white p-[18px]">
-            <p className="text-[13px] font-medium text-navy">התחלה מהירה</p>
-            <p className="mb-2.5 mt-1 text-[11.5px] text-navy/55">
+            <p className="text-[13px] font-medium text-appNavy">התחלה מהירה</p>
+            <p className="mb-2.5 mt-1 text-[11.5px] text-appNavy/55">
               הערה קצרה עכשיו חוסכת שחזור בסוף החודש ונכנסת לדוח ללקוח.
             </p>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="על מה עובדים? (מומלץ)"
-              className="mb-2.5 w-full rounded-[10px] border border-gold/45 bg-paper px-3 py-2.5 text-[13px] text-navy outline-none focus:border-gold"
+              className="mb-2.5 w-full rounded-[10px] border border-gold/45 bg-cream px-3 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
             />
             <div className="flex flex-col gap-2">
               {recent.map((r, i) => (
@@ -389,16 +389,16 @@ export function TimerWidget({
                   type="button"
                   onClick={() => handleQuickStart(r)}
                   disabled={pending}
-                  className="flex items-center gap-2.5 rounded-xl border border-lineDark bg-paper px-3.5 py-2.5 text-start transition-colors hover:border-gold hover:bg-white disabled:opacity-50"
+                  className="flex items-center gap-2.5 rounded-xl border border-lineDark bg-cream px-3.5 py-2.5 text-start transition-colors hover:border-gold hover:bg-white disabled:opacity-50"
                 >
                   <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-gold-dim">
                     <ChevronLeft size={13} strokeWidth={2.25} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[13px] text-navy">
+                    <span className="block truncate text-[13px] text-appNavy">
                       {r.clientName} · {r.categoryName}
                     </span>
-                    <span className="block text-[11px] text-navy/50">אחרון: {formatLastUsed(r.lastUsedAt)}</span>
+                    <span className="block text-[11px] text-appNavy/50">אחרון: {formatLastUsed(r.lastUsedAt)}</span>
                   </span>
                 </button>
               ))}
@@ -409,20 +409,20 @@ export function TimerWidget({
         {/* App redesign (handoff README, screen 2): "היום — שלוש שורות עם
             סכום". */}
         <div className="rounded-2xl border border-lineDark bg-white p-[18px]">
-          <p className="text-[13px] font-medium text-navy">היום</p>
-          <p className="mb-3.5 mt-1 text-[11.5px] text-navy/50">
+          <p className="text-[13px] font-medium text-appNavy">היום</p>
+          <p className="mb-3.5 mt-1 text-[11.5px] text-appNavy/50">
             {todayEntries.length} דיווחים · סה&quot;כ {formatHM(todayTotalSeconds)}
           </p>
           {todayEntries.length === 0 ? (
-            <p className="text-[12.5px] text-navy/45">אין עדיין דיווחים סגורים היום.</p>
+            <p className="text-[12.5px] text-appNavy/45">אין עדיין דיווחים סגורים היום.</p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {todayEntries.map((entry) => (
                 <div key={entry.id} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="flex-1 truncate text-navy/75">
+                  <span className="flex-1 truncate text-appNavy/75">
                     {entry.clientName} · {entry.categoryName}
                   </span>
-                  <span className="font-jbmono text-navy">{formatHM(entry.actualSeconds)}</span>
+                  <span className="font-jbmono text-appNavy">{formatHM(entry.actualSeconds)}</span>
                 </div>
               ))}
             </div>

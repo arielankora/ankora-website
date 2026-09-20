@@ -68,20 +68,20 @@ export function ImportantDateRow({ date }: { date: DateRow }) {
         <span className="block text-[10.5px]">{date.month}</span>
       </span>
       <div className="min-w-0 flex-1 basis-[220px]">
-        <Link href={`/app/important-dates/${date.id}`} className="block truncate text-sm text-navy hover:text-gold-dim">
+        <Link href={`/app/important-dates/${date.id}`} className="block truncate text-sm text-appNavy hover:text-gold-dim">
           {date.title}
         </Link>
-        <p className="mt-0.5 truncate text-[11.5px] text-navy/50">{date.meta}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">{date.meta}</p>
       </div>
       <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
         {isHandled ? "טופל" : date.tag}
       </span>
-      <span className="text-[11.5px] text-navy/50">{date.remind}</span>
+      <span className="text-[11.5px] text-appNavy/50">{date.remind}</span>
       <button
         type="button"
         disabled={pending}
         onClick={() => changeStatus(isHandled ? date.previousStatus : "HANDLED_CURRENT")}
-        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy hover:border-gold disabled:opacity-50"
+        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold disabled:opacity-50"
       >
         {isHandled ? "פתיחה מחדש" : "סימון כטופל"}
       </button>

@@ -91,8 +91,8 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">התראות</h1>
-          <p className="mt-1 text-sm text-navy/60">
+          <h1 className="text-xl font-medium text-appNavy">התראות</h1>
+          <p className="mt-1 text-sm text-appNavy/60">
             כללי התראה על ניצול בנק שעות, היסטוריית אירועים וסטטוס שליחת מיילים (ספירה 9).
           </p>
         </div>
@@ -102,13 +102,13 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
         <AlertsClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 
         {!clientId && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             בחרו לקוח כדי לצפות בכללי ההתראה שלו וליצור כלל חדש.
           </div>
         )}
 
         {clientId && !selectedClient && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
             הלקוח לא נמצא או שהוא בארכיון.
           </div>
         )}
@@ -116,7 +116,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
         {selectedClient && (
           <>
             <div>
-              <h2 className="text-sm font-medium text-navy">כלל התראה חדש - {selectedClient.name}</h2>
+              <h2 className="text-sm font-medium text-appNavy">כלל התראה חדש - {selectedClient.name}</h2>
               <div className="mt-3">
                 <AlertRuleForm clientId={selectedClient.id} />
               </div>
@@ -124,7 +124,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
 
             <div className="space-y-4">
               {rules.length === 0 && (
-                <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-navy/50">
+                <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
                   עדיין אין כללי התראה ללקוח זה.
                 </div>
               )}
@@ -134,35 +134,35 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                   <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lineDark px-5 py-4">
                     <div className="flex items-center gap-3">
                       <StatusBadge label={rule.enabled ? "פעיל" : "מושבת"} tone={rule.enabled ? "green" : "gray"} />
-                      <span className="text-sm font-medium text-navy">
+                      <span className="text-sm font-medium text-appNavy">
                         {describeThreshold(rule.type, rule.thresholdValue)}
                       </span>
                       {rule.allowRetrigger && (
-                        <span className="text-[11px] text-navy/40">(התראה חוזרת מופעלת)</span>
+                        <span className="text-[11px] text-appNavy/40">(התראה חוזרת מופעלת)</span>
                       )}
                     </div>
                     <RuleActions ruleId={rule.id} enabled={rule.enabled} />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-navy/60 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-appNavy/60 sm:grid-cols-2">
                     <div>
-                      <span className="font-medium text-navy/70">נמענים Ankora: </span>
-                      {rule.recipientsAnkora.length ? rule.recipientsAnkora.join(", ") : <span className="text-navy/30">-</span>}
+                      <span className="font-medium text-appNavy/70">נמענים Ankora: </span>
+                      {rule.recipientsAnkora.length ? rule.recipientsAnkora.join(", ") : <span className="text-appNavy/30">-</span>}
                     </div>
                     <div>
-                      <span className="font-medium text-navy/70">נמענים לקוח: </span>
-                      {rule.recipientsClient.length ? rule.recipientsClient.join(", ") : <span className="text-navy/30">-</span>}
+                      <span className="font-medium text-appNavy/70">נמענים לקוח: </span>
+                      {rule.recipientsClient.length ? rule.recipientsClient.join(", ") : <span className="text-appNavy/30">-</span>}
                     </div>
                   </div>
 
                   {rule.events.length > 0 && (
                     <div className="border-t border-lineDark px-5 py-4">
-                      <p className="mb-2 text-xs font-medium text-navy/50">אירועים אחרונים</p>
+                      <p className="mb-2 text-xs font-medium text-appNavy/50">אירועים אחרונים</p>
                       <ul className="space-y-2">
                         {rule.events.map((event) => (
-                          <li key={event.id} className="rounded-lg bg-navy/[0.03] px-3 py-2 text-xs">
+                          <li key={event.id} className="rounded-lg bg-appNavy/[0.03] px-3 py-2 text-xs">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-navy/70">
+                              <span className="text-appNavy/70">
                                 {formatDateTime(event.triggeredAt)} - ערך {event.value}
                               </span>
                               <StatusBadge
@@ -173,7 +173,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                             {event.emailDeliveries.length > 0 && (
                               <ul className="mt-2 space-y-1">
                                 {event.emailDeliveries.map((d) => (
-                                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-navy/50">
+                                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-appNavy/50">
                                     <span>
                                       {d.template === "ankora_internal" ? "Ankora" : "לקוח"} - {d.recipients.join(", ")}
                                     </span>

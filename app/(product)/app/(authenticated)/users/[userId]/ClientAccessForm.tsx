@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "נשמר..." : "עדכון גישה"}
     </button>
@@ -49,20 +49,20 @@ export function ClientAccessForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="userId" value={userId} />
       {clients.length === 0 ? (
-        <p className="text-sm text-navy/50">אין עדיין לקוחות במערכת.</p>
+        <p className="text-sm text-appNavy/50">אין עדיין לקוחות במערכת.</p>
       ) : (
         <>
           <div className="flex items-center gap-3 text-xs">
             <button type="button" onClick={() => setAllChecked(true)} className="text-gold-dim underline">
               בחר הכל
             </button>
-            <button type="button" onClick={() => setAllChecked(false)} className="text-navy/50 underline">
+            <button type="button" onClick={() => setAllChecked(false)} className="text-appNavy/50 underline">
               נקה הכל
             </button>
           </div>
           <div ref={checkboxContainerRef} className="flex flex-wrap gap-3">
             {clients.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-sm text-navy/70">
+              <label key={c.id} className="flex items-center gap-1.5 text-sm text-appNavy/70">
                 <input
                   type="checkbox"
                   name="clientIds"

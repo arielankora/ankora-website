@@ -29,7 +29,7 @@ function linkifyCoverage(text: string, locale: Locale): React.ReactNode {
       {text.slice(0, index)}
       <Link
         href={withLocale(locale, "/coverage")}
-        className="text-gold underline decoration-gold/40 underline-offset-4 transition-colors hover:text-paper"
+        className="text-gold underline decoration-gold/40 underline-offset-4 transition-colors hover:text-cream"
       >
         {phrase}
       </Link>
@@ -47,7 +47,7 @@ export function FAQ({ dict, locale }: { dict: Dictionary; locale: Locale }) {
         <Eyebrow>{dict.faq.label}</Eyebrow>
       </Reveal>
       <Reveal delay={0.08}>
-        <h2 className="mb-11 mt-6 max-w-[26ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+        <h2 className="mb-11 mt-6 max-w-[26ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
           {dict.faq.title}
         </h2>
       </Reveal>
@@ -66,7 +66,7 @@ export function FAQ({ dict, locale }: { dict: Dictionary; locale: Locale }) {
                   onClick={() => setOpen(isOpen ? null : i)}
                   aria-expanded={isOpen}
                   aria-controls={panelId}
-                  className="flex w-full items-center gap-5 py-6 text-start text-[clamp(1rem,1.5vw,1.2rem)] font-light leading-[1.4] text-paper transition-colors duration-[250ms] hover:text-gold-light"
+                  className="flex w-full items-center gap-5 py-6 text-start text-[clamp(1rem,1.5vw,1.2rem)] font-light leading-[1.4] text-cream transition-colors duration-[250ms] hover:text-gold-light"
                 >
                   <span className="flex-1">{item.q}</span>
                   {/* Mono + / − rather than a rotating plus, per the spec. */}
@@ -89,7 +89,7 @@ export function FAQ({ dict, locale }: { dict: Dictionary; locale: Locale }) {
                 transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                 className="overflow-hidden"
               >
-                <p className="max-w-[76ch] pb-7 font-assistant text-[15.5px] font-light leading-[1.85] text-tone-muted">
+                <p className="max-w-[76ch] pb-7 font-assistant text-[15.5px] font-light leading-[1.85] text-muted">
                   {linkifyCoverage(item.a, locale)}
                 </p>
               </motion.div>

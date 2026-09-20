@@ -34,8 +34,8 @@ export function HolidayCalendarsPanel({
         return (
           <li key={cal.calendarKey} className="flex items-center justify-between gap-3 text-sm">
             <div>
-              <span className="text-navy">{cal.label}</span>
-              <span className="ms-2 text-xs text-navy/40">({cal.holidayCount} מועדים)</span>
+              <span className="text-appNavy">{cal.label}</span>
+              <span className="ms-2 text-xs text-appNavy/40">({cal.holidayCount} מועדים)</span>
             </div>
             <div className="flex items-center gap-3">
               <StatusBadge label={enabled ? "רשום" : "לא רשום"} tone={enabled ? "green" : "gray"} />
@@ -45,7 +45,7 @@ export function HolidayCalendarsPanel({
                 onClick={() =>
                   startTransition(() => toggleHolidayCalendarSubscriptionAction(clientId, cal.calendarKey, !enabled))
                 }
-                className="text-xs font-medium text-navy/70 underline decoration-navy/30 underline-offset-2 disabled:opacity-50"
+                className="text-xs font-medium text-appNavy/70 underline decoration-appNavy/30 underline-offset-2 disabled:opacity-50"
               >
                 {enabled ? "ביטול רישום" : "רישום"}
               </button>

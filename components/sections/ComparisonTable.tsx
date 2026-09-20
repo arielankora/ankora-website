@@ -23,7 +23,7 @@ function HeComparisonTable({
       <HairlineGrid minCell={9999}>
         {rows.map((row) => (
           <HairlineGridCell key={row.dimension}>
-            <div className="border-b border-[rgba(243,234,219,0.16)] pb-3.5 text-start text-[14.5px] font-semibold tracking-[0.02em] text-paper">
+            <div className="border-b border-[rgba(243,234,219,0.16)] pb-3.5 text-start text-[14.5px] font-semibold tracking-[0.02em] text-cream">
               {row.dimension}
             </div>
             <div
@@ -36,7 +36,7 @@ function HeComparisonTable({
               </div>
               <div className="border-gold ps-3.5" style={{ borderInlineStartWidth: 1, borderInlineStartStyle: "solid" }}>
                 <div className="text-[12.5px] font-semibold text-gold">{columnB}</div>
-                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-paper">{row.b}</div>
+                <div className="mt-1.5 text-[14.5px] font-light leading-relaxed text-cream">{row.b}</div>
               </div>
             </div>
           </HairlineGridCell>
@@ -69,20 +69,20 @@ export function ComparisonTable({
       <div className="hidden overflow-hidden rounded-2xl border border-lineDark md:block">
         <table className="w-full border-collapse text-start">
           <thead>
-            <tr className="border-b border-lineDark bg-cream">
-              <th className="w-[28%] p-4 text-start text-xs font-semibold uppercase tracking-[0.12em] text-navy/35">
+            <tr className="border-b border-lineDark bg-cream-warm">
+              <th className="w-[28%] p-4 text-start text-xs font-semibold uppercase tracking-[0.12em] text-appNavy/35">
                 &nbsp;
               </th>
-              <th className="p-4 text-start text-sm font-medium text-navy/60">{columnA}</th>
-              <th className="p-4 text-start text-sm font-medium text-navy">{columnB}</th>
+              <th className="p-4 text-start text-sm font-medium text-appNavy/60">{columnA}</th>
+              <th className="p-4 text-start text-sm font-medium text-appNavy">{columnB}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.dimension} className="border-b border-lineDark last:border-0 even:bg-cream/40">
-                <td className="p-4 text-sm font-medium text-navy/70">{row.dimension}</td>
-                <td className="p-4 text-sm leading-relaxed text-navy/50">{row.a}</td>
-                <td className="p-4 text-sm leading-relaxed text-navy">{row.b}</td>
+              <tr key={row.dimension} className="border-b border-lineDark last:border-0 even:bg-cream-warm/40">
+                <td className="p-4 text-sm font-medium text-appNavy/70">{row.dimension}</td>
+                <td className="p-4 text-sm leading-relaxed text-appNavy/50">{row.a}</td>
+                <td className="p-4 text-sm leading-relaxed text-appNavy">{row.b}</td>
               </tr>
             ))}
           </tbody>
@@ -93,16 +93,16 @@ export function ComparisonTable({
           clipped by horizontal table scroll on RTL / small screens. */}
       <div className="flex flex-col gap-3 md:hidden">
         {rows.map((row) => (
-          <div key={row.dimension} className="rounded-2xl border border-lineDark bg-cream/40 p-5">
-            <h3 className="text-sm font-medium text-navy">{row.dimension}</h3>
+          <div key={row.dimension} className="rounded-2xl border border-lineDark bg-cream-warm/40 p-5">
+            <h3 className="text-sm font-medium text-appNavy">{row.dimension}</h3>
             <dl className="mt-3 flex flex-col gap-2.5">
               <div className="flex items-baseline justify-between gap-4">
-                <dt className="shrink-0 text-xs text-navy/40">{columnA}</dt>
-                <dd className="text-sm leading-relaxed text-navy/60">{row.a}</dd>
+                <dt className="shrink-0 text-xs text-appNavy/40">{columnA}</dt>
+                <dd className="text-sm leading-relaxed text-appNavy/60">{row.a}</dd>
               </div>
               <div className="flex items-baseline justify-between gap-4">
-                <dt className="shrink-0 text-xs font-medium text-navy/50">{columnB}</dt>
-                <dd className="text-sm font-medium leading-relaxed text-navy">{row.b}</dd>
+                <dt className="shrink-0 text-xs font-medium text-appNavy/50">{columnB}</dt>
+                <dd className="text-sm font-medium leading-relaxed text-appNavy">{row.b}</dd>
               </div>
             </dl>
           </div>

@@ -67,49 +67,49 @@ export default async function PortalDashboardPage() {
       <PortalTabs active="dash" />
 
       <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
-        <p className="text-xl font-medium text-navy">שלום, {client.name}</p>
+        <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
         {snapshot ? (
-          <p className="mt-1.5 text-[13.5px] text-navy/60">
+          <p className="mt-1.5 text-[13.5px] text-appNavy/60">
             מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} – {formatDate(snapshot.bank.cycleEnd)}
             {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
           </p>
         ) : (
-          <p className="mt-1.5 text-[13.5px] text-navy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
+          <p className="mt-1.5 text-[13.5px] text-appNavy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
         )}
 
         {snapshot && (
           <>
             <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-navy/55">סה&quot;כ בבנק</span>
-                <p className="mt-2 font-jbmono text-2xl text-navy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
+                <span className="text-xs text-appNavy/55">סה&quot;כ בבנק</span>
+                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-navy/55">נוצל</span>
-                <p className="mt-2 font-jbmono text-2xl text-navy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
+                <span className="text-xs text-appNavy/55">נוצל</span>
+                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-navy/55">נותר</span>
+                <span className="text-xs text-appNavy/55">נותר</span>
                 <p
                   dir="ltr"
                   className={`mt-2 text-end font-jbmono text-2xl ${
-                    snapshot.utilization.remainingMinutes < 0 ? "text-error" : "text-navy"
+                    snapshot.utilization.remainingMinutes < 0 ? "text-error" : "text-appNavy"
                   }`}
                 >
                   {formatMinutes(snapshot.utilization.remainingMinutes)}
                 </p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-navy/55">ניצול</span>
-                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-error" : "text-navy"}`}>
+                <span className="text-xs text-appNavy/55">ניצול</span>
+                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-error" : "text-appNavy"}`}>
                   {snapshot.utilization.utilizationPct}%
                 </p>
-                <p className="mt-1 text-[11.5px] text-navy/50">
+                <p className="mt-1 text-[11.5px] text-appNavy/50">
                   {formatMinutes(snapshot.utilization.consumedMinutes)} שעות מתוך {formatMinutes(snapshot.utilization.totalMinutes)}
                 </p>
               </div>
             </div>
-            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-navy/8">
+            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-appNavy/8">
               <span
                 className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"}`}
                 style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
@@ -121,20 +121,20 @@ export default async function PortalDashboardPage() {
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <div className="rounded-2xl border border-lineDark bg-white p-5">
-          <p className="mb-4 text-[13.5px] font-medium text-navy">פילוח לפי תחום · החודש</p>
+          <p className="mb-4 text-[13.5px] font-medium text-appNavy">פילוח לפי תחום · החודש</p>
           {categorySummary.rows.length === 0 ? (
-            <p className="text-sm text-navy/50">אין עדיין נתונים לחודש הנוכחי.</p>
+            <p className="text-sm text-appNavy/50">אין עדיין נתונים לחודש הנוכחי.</p>
           ) : (
             <div className="flex flex-col gap-3.5">
               {categorySummary.rows.map((row, i) => (
                 <div key={row.category}>
                   <div className="flex justify-between text-sm">
-                    <span className="text-navy">{row.category}</span>
-                    <span className="font-jbmono text-navy/60">
+                    <span className="text-appNavy">{row.category}</span>
+                    <span className="font-jbmono text-appNavy/60">
                       {formatMinutes(row.minutes)} · {row.pctOfTotal}%
                     </span>
                   </div>
-                  <span className="mt-1.5 block h-1.5 rounded-full bg-navy/7">
+                  <span className="mt-1.5 block h-1.5 rounded-full bg-appNavy/7">
                     <span
                       className={`block h-full rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
                       style={{ width: `${totalCategoryMinutes > 0 ? row.pctOfTotal : 0}%` }}
@@ -148,13 +148,13 @@ export default async function PortalDashboardPage() {
 
         <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
           <div className="flex items-center justify-between border-b border-lineDark px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-navy">פעילות השבוע</span>
+            <span className="text-[13.5px] font-medium text-appNavy">פעילות השבוע</span>
             <Link href="/app/portal/monthly" className="text-xs text-gold-dim hover:underline">
               הורדת דוח חודשי
             </Link>
           </div>
           {weekly.topActivities.length === 0 ? (
-            <p className="px-[18px] py-8 text-center text-sm text-navy/50">אין עדיין פעילות השבוע.</p>
+            <p className="px-[18px] py-8 text-center text-sm text-appNavy/50">אין עדיין פעילות השבוע.</p>
           ) : (
             weekly.topActivities.map((a, i) => (
               <div
@@ -163,8 +163,8 @@ export default async function PortalDashboardPage() {
                   i < weekly.topActivities.length - 1 ? "border-b border-lineDark/60" : ""
                 }`}
               >
-                <span className="text-navy">{a.activity}</span>
-                <span className="font-jbmono text-navy/60">{formatMinutes(a.minutes)}</span>
+                <span className="text-appNavy">{a.activity}</span>
+                <span className="font-jbmono text-appNavy/60">{formatMinutes(a.minutes)}</span>
               </div>
             ))
           )}

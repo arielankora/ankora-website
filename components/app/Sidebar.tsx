@@ -68,12 +68,12 @@ export function Sidebar({
   let lastGroup: string | undefined;
 
   return (
-    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-navy md:sticky md:top-0 md:flex md:h-screen">
+    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-appNavy md:sticky md:top-0 md:flex md:h-screen">
       <div className="flex items-center gap-2 px-5 pb-3 pt-6">
         <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-light">
           Ankora
         </Link>
-        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-paper/50">
+        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-cream/50">
           OPS
         </span>
       </div>
@@ -82,11 +82,11 @@ export function Sidebar({
         <button
           type="button"
           onClick={openCommandPalette}
-          className="flex w-full items-center gap-2 rounded-[10px] bg-[rgba(248,244,236,0.06)] px-2.5 py-2 text-start text-[13px] text-paper/60 transition-colors hover:bg-[rgba(248,244,236,0.1)]"
+          className="flex w-full items-center gap-2 rounded-[10px] bg-[rgba(248,244,236,0.06)] px-2.5 py-2 text-start text-[13px] text-cream/60 transition-colors hover:bg-[rgba(248,244,236,0.1)]"
         >
           <Search size={15} strokeWidth={1.75} className="shrink-0" />
           <span className="flex-1 truncate">חיפוש או פעולה</span>
-          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-paper/40">
+          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-cream/40">
             ⌘K
           </kbd>
         </button>
@@ -120,12 +120,12 @@ export function Sidebar({
                 className={`flex items-center gap-2.5 rounded-[10px] border-s-2 px-2.5 py-[9px] text-[13px] transition-colors ${
                   active
                     ? "border-gold bg-gold/[0.18] font-medium text-[#F8F4EC]"
-                    : "border-transparent text-[rgba(243,234,219,0.68)] hover:bg-[rgba(248,244,236,0.06)] hover:text-paper"
+                    : "border-transparent text-[rgba(243,234,219,0.68)] hover:bg-[rgba(248,244,236,0.06)] hover:text-cream"
                 }`}
               >
                 <Icon size={16} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" />
                 <span className="flex-1 truncate">{item.label}</span>
-                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-paper/45">{counter}</span>}
+                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-cream/45">{counter}</span>}
               </Link>
             </div>
           );
@@ -133,8 +133,8 @@ export function Sidebar({
       </nav>
 
       <div className="border-t border-white/10 px-4 py-4">
-        <p className="truncate text-sm font-medium text-paper">{userName}</p>
-        <p className="mb-3 truncate text-xs text-paper/50">{roleLabel}</p>
+        <p className="truncate text-sm font-medium text-cream">{userName}</p>
+        <p className="mb-3 truncate text-xs text-cream/50">{roleLabel}</p>
         <LogoutButton variant="dark" />
       </div>
     </aside>

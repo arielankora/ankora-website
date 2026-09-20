@@ -66,7 +66,7 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
         type="button"
         disabled={sending}
         onClick={handleSendNow}
-        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-navy transition-colors hover:border-gold disabled:opacity-50"
+        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy transition-colors hover:border-gold disabled:opacity-50"
       >
         {sending ? "שולח..." : "שליחה עכשיו"}
       </button>

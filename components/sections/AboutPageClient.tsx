@@ -36,7 +36,7 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
             <Eyebrow>{p.eyebrow}</Eyebrow>
           </Reveal>
           <Reveal delay={0.08}>
-            <h1 className="mt-6 max-w-3xl text-balance text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-paper">
+            <h1 className="mt-6 max-w-3xl text-balance text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-cream">
               {p.title}
             </h1>
           </Reveal>
@@ -50,7 +50,7 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
 
       <SectionShell>
         <Reveal>
-          <p className="max-w-[88ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-tone-body">
+          <p className="max-w-[88ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
             {p.entityDefinition}
           </p>
         </Reveal>
@@ -67,7 +67,7 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
                 <h2 className="font-assistant text-[13px] font-semibold tracking-[0.04em] text-gold rtl:tracking-normal">
                   {block.title}
                 </h2>
-                <p className="mt-4 font-assistant font-light leading-[1.8] text-tone-muted">
+                <p className="mt-4 font-assistant font-light leading-[1.8] text-muted">
                   {block.body}
                 </p>
               </GlassPanel>
@@ -85,8 +85,8 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
             {p.principles.map((principle) => (
               <motion.div key={principle.title} variants={staggerItem} className="h-full">
                 <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
-                  <h3 className="text-[1.12rem] font-normal text-paper">{principle.title}</h3>
-                  <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                  <h3 className="text-[1.12rem] font-normal text-cream">{principle.title}</h3>
+                  <p className="mt-2 font-assistant text-sm font-light leading-[1.7] text-muted">
                     {principle.body}
                   </p>
                 </HairlineGridCell>

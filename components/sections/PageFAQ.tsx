@@ -22,7 +22,7 @@ function linkifyPhrase(text: string, linkify?: { phrase: string; href: string })
   return (
     <>
       {text.slice(0, idx)}
-      <Link href={linkify.href} className="text-gold underline decoration-gold/40 underline-offset-4 hover:text-paper">
+      <Link href={linkify.href} className="text-gold underline decoration-gold/40 underline-offset-4 hover:text-cream">
         {linkify.phrase}
       </Link>
       {text.slice(idx + linkify.phrase.length)}
@@ -48,7 +48,7 @@ function HePageFAQ({
       <WideContainer className="max-w-[104ch]">
         <Reveal><Eyebrow>{label}</Eyebrow></Reveal>
         <Reveal delay={0.08}>
-          <h2 className="mt-6 text-[clamp(1.5rem,2.6vw,2.3rem)] font-extralight leading-[1.2] tracking-[-0.02em] text-paper">
+          <h2 className="mt-6 text-[clamp(1.5rem,2.6vw,2.3rem)] font-extralight leading-[1.2] tracking-[-0.02em] text-cream">
             {title}
           </h2>
         </Reveal>
@@ -63,7 +63,7 @@ function HePageFAQ({
                   className="flex w-full items-center justify-between py-6 text-start"
                   aria-expanded={isOpen}
                 >
-                  <span className="text-base font-medium text-paper md:text-lg">{item.q}</span>
+                  <span className="text-base font-medium text-cream md:text-lg">{item.q}</span>
                   <span className={cn("ms-6 shrink-0 text-xl text-gold transition-transform duration-[250ms] ease-out", isOpen && "rotate-45")}>+</span>
                 </button>
                 <motion.div
@@ -108,21 +108,21 @@ export function PageFAQ({
   }
 
   return (
-    <section className={cn("py-24 md:py-36", isLight ? "bg-paper" : "bg-navy")}>
+    <section className={cn("py-24 md:py-36", isLight ? "bg-cream" : "bg-appNavy")}>
       <Container className="max-w-3xl">
         <Reveal><Badge tone={isLight ? "light" : "dark"}>{label}</Badge></Reveal>
         <Reveal delay={0.08}>
           <h2
             className={cn(
               "mt-6 text-[28px] font-medium leading-[1.2] tracking-tight md:text-[38px]",
-              isLight ? "text-navy" : "text-paper"
+              isLight ? "text-appNavy" : "text-cream"
             )}
           >
             {title}
           </h2>
         </Reveal>
 
-        <div className={cn("mt-12 divide-y border-y", isLight ? "divide-lineDark border-lineDark" : "divide-line border-line")}>
+        <div className={cn("mt-12 divide-y border-y", isLight ? "divide-lineDark border-lineDark" : "divide-hairline border-hairline")}>
           {items.map((item, i) => {
             const isOpen = open === i;
             return (
@@ -132,7 +132,7 @@ export function PageFAQ({
                   className="flex w-full items-center justify-between py-6 text-start"
                   aria-expanded={isOpen}
                 >
-                  <span className={cn("text-base font-medium md:text-lg", isLight ? "text-navy" : "text-paper")}>
+                  <span className={cn("text-base font-medium md:text-lg", isLight ? "text-appNavy" : "text-cream")}>
                     {item.q}
                   </span>
                   <span
@@ -152,7 +152,7 @@ export function PageFAQ({
                   transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
                   className="overflow-hidden"
                 >
-                  <p className={cn("pb-6 text-sm leading-relaxed md:text-base", isLight ? "text-navy/60" : "text-paper/55")}>
+                  <p className={cn("pb-6 text-sm leading-relaxed md:text-base", isLight ? "text-appNavy/60" : "text-cream/55")}>
                     {item.a}
                   </p>
                 </motion.div>

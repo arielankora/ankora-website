@@ -23,7 +23,7 @@ function DottedList({
       </div>
       <div className="mt-4 flex flex-col gap-[11px]">
         {items.map((item) => (
-          <div key={item} className="flex items-center gap-2.5 font-assistant text-sm font-light text-paper">
+          <div key={item} className="flex items-center gap-2.5 font-assistant text-sm font-light text-cream">
             <span className={`h-1 w-1 shrink-0 rounded-full ${dotClass}`} />
             {item}
           </div>
@@ -50,10 +50,10 @@ export function HumanAI({ dict }: { dict: Dictionary }) {
       <Reveal>
         <div className="border border-[rgba(243,234,219,0.11)] bg-[rgba(243,234,219,0.04)] p-[clamp(28px,4vw,56px)] backdrop-blur-[16px]">
           <Eyebrow>{dict.humanAI.label}</Eyebrow>
-          <h2 className="mt-6 text-[clamp(1.7rem,2.8vw,2.6rem)] font-extralight leading-[1.16] tracking-[-0.02em] text-paper">
+          <h2 className="mt-6 text-[clamp(1.7rem,2.8vw,2.6rem)] font-extralight leading-[1.16] tracking-[-0.02em] text-cream">
             {dict.humanAI.title}
           </h2>
-          <p className="mb-8 mt-[18px] max-w-[48ch] font-assistant font-light leading-[1.8] text-tone-body">
+          <p className="mb-8 mt-[18px] max-w-[48ch] font-assistant font-light leading-[1.8] text-body">
             {dict.humanAI.body}
           </p>
 
@@ -64,7 +64,7 @@ export function HumanAI({ dict }: { dict: Dictionary }) {
             <DottedList
               label={dict.humanAI.humanTitle}
               items={dict.humanAI.human}
-              dotClass="bg-tone-dim"
+              dotClass="bg-line-strong"
               ruleClass="border-[rgba(243,234,219,0.16)]"
             />
             <DottedList

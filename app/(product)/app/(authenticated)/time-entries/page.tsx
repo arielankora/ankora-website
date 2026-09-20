@@ -68,8 +68,8 @@ export default async function AdminTimeEntriesPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">דיווחי זמן</h1>
-          <p className="mt-1 text-sm text-navy/60">טבלה חוצת לקוחות, עם עריכה והיסטוריית שינויים.</p>
+          <h1 className="text-xl font-medium text-appNavy">דיווחי זמן</h1>
+          <p className="mt-1 text-sm text-appNavy/60">טבלה חוצת לקוחות, עם עריכה והיסטוריית שינויים.</p>
         </div>
 
         <FilterBar

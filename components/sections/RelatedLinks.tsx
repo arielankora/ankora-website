@@ -21,7 +21,7 @@ function HeRelatedLinks({
             <Link
               key={item.href}
               href={withLocale(locale, item.href)}
-              className="border-b border-[rgba(176,141,87,0.45)] pb-0.5 text-sm font-medium text-paper transition-colors hover:text-gold"
+              className="border-b border-[rgba(176,141,87,0.45)] pb-0.5 text-sm font-medium text-cream transition-colors hover:text-gold"
             >
               {item.label}
             </Link>
@@ -46,15 +46,15 @@ export function RelatedLinks({
   }
 
   return (
-    <section className="bg-paper py-14 md:py-16">
+    <section className="bg-cream py-14 md:py-16">
       <div className="mx-auto w-full max-w-content px-6 md:px-10 lg:px-14">
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-navy/35">{label}</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-appNavy/35">{label}</span>
         <div className="mt-5 flex flex-wrap gap-x-8 gap-y-3">
           {items.map((item) => (
             <Link
               key={item.href}
               href={withLocale(locale, item.href)}
-              className="text-sm font-medium text-navy/70 underline decoration-gold/40 underline-offset-4 transition-colors hover:text-navy hover:decoration-gold"
+              className="text-sm font-medium text-appNavy/70 underline decoration-gold/40 underline-offset-4 transition-colors hover:text-appNavy hover:decoration-gold"
             >
               {item.label}
             </Link>

@@ -72,16 +72,16 @@ export default async function PortalHistoryPage() {
         <PortalTabs active="history" />
 
         <div>
-          <h1 className="text-xl font-medium text-navy">היסטוריה</h1>
-          <p className="mt-1 text-sm text-navy/60">מחזורי בנק שעות קודמים ודוחות שנשלחו.</p>
+          <h1 className="text-xl font-medium text-appNavy">היסטוריה</h1>
+          <p className="mt-1 text-sm text-appNavy/60">מחזורי בנק שעות קודמים ודוחות שנשלחו.</p>
         </div>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-navy/70">מחזורים קודמים</h2>
+          <h2 className="text-sm font-medium text-appNavy/70">מחזורים קודמים</h2>
           <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
             <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
-                <tr className="border-b border-lineDark text-xs text-navy/50">
+                <tr className="border-b border-lineDark text-xs text-appNavy/50">
                   <th className="px-5 py-3 font-medium">תחילת מחזור</th>
                   <th className="px-5 py-3 font-medium">סוף מחזור</th>
                   <th className="px-5 py-3 font-medium">סטטוס</th>
@@ -91,7 +91,7 @@ export default async function PortalHistoryPage() {
               <tbody>
                 {history.cycles.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-5 py-8 text-center text-navy/50">
+                    <td colSpan={4} className="px-5 py-8 text-center text-appNavy/50">
                       אין עדיין מחזורים.
                     </td>
                   </tr>
@@ -100,12 +100,12 @@ export default async function PortalHistoryPage() {
                   const status = STATUS_LABEL[c.status] ?? STATUS_LABEL.OPEN;
                   return (
                     <tr key={i} className="border-b border-lineDark last:border-0">
-                      <td className="px-5 py-3 text-navy/70">{formatDate(c.cycleStart)}</td>
-                      <td className="px-5 py-3 text-navy/70">{formatDate(c.cycleEnd)}</td>
+                      <td className="px-5 py-3 text-appNavy/70">{formatDate(c.cycleStart)}</td>
+                      <td className="px-5 py-3 text-appNavy/70">{formatDate(c.cycleEnd)}</td>
                       <td className="px-5 py-3">
                         <StatusBadge label={status.label} tone={status.tone} />
                       </td>
-                      <td className="px-5 py-3 text-navy/70">
+                      <td className="px-5 py-3 text-appNavy/70">
                         {formatMinutes(c.consumedMinutes)} / {formatMinutes(c.totalMinutes)} ({Math.round(c.utilizationPct)}%)
                       </td>
                     </tr>
@@ -117,11 +117,11 @@ export default async function PortalHistoryPage() {
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-navy/70">דוחות שנשלחו</h2>
+          <h2 className="text-sm font-medium text-appNavy/70">דוחות שנשלחו</h2>
           <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
             <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
-                <tr className="border-b border-lineDark text-xs text-navy/50">
+                <tr className="border-b border-lineDark text-xs text-appNavy/50">
                   <th className="px-5 py-3 font-medium">סוג דוח</th>
                   <th className="px-5 py-3 font-medium">תקופה</th>
                   <th className="px-5 py-3 font-medium">נשלח בתאריך</th>
@@ -131,18 +131,18 @@ export default async function PortalHistoryPage() {
               <tbody>
                 {history.reportRuns.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-5 py-8 text-center text-navy/50">
+                    <td colSpan={4} className="px-5 py-8 text-center text-appNavy/50">
                       טרם נשלחו דוחות.
                     </td>
                   </tr>
                 )}
                 {history.reportRuns.map((r) => (
                   <tr key={r.id} className="border-b border-lineDark last:border-0">
-                    <td className="px-5 py-3 text-navy/80">{REPORT_TYPE_LABEL[r.reportType] ?? r.reportType}</td>
-                    <td className="px-5 py-3 text-navy/70">
+                    <td className="px-5 py-3 text-appNavy/80">{REPORT_TYPE_LABEL[r.reportType] ?? r.reportType}</td>
+                    <td className="px-5 py-3 text-appNavy/70">
                       {formatDate(r.periodStart)} - {formatDate(r.periodEnd)}
                     </td>
-                    <td className="px-5 py-3 text-navy/70">{formatDate(r.sentAt)}</td>
+                    <td className="px-5 py-3 text-appNavy/70">{formatDate(r.sentAt)}</td>
                     <td className="px-5 py-3 text-end">
                       {r.reportType === "MONTHLY_DETAILED" && (
                         <a
@@ -162,13 +162,13 @@ export default async function PortalHistoryPage() {
 
         {history.canManageRecipients && (
           <section className="space-y-3">
-            <h2 className="text-sm font-medium text-navy/70">ניהול נמענים לדוחות מתוזמנים</h2>
-            <p className="text-sm text-navy/60">
+            <h2 className="text-sm font-medium text-appNavy/70">ניהול נמענים לדוחות מתוזמנים</h2>
+            <p className="text-sm text-appNavy/60">
               כמנהל לקוח, ניתן לערוך כאן את רשימת הנמענים לכל דוח מתוזמן. סוג הדוח, התדירות וההפעלה/השבתה נשארים בשליטת Ankora.
             </p>
             <div className="space-y-3">
               {history.schedules.length === 0 && (
-                <p className="rounded-xl border border-lineDark bg-white px-5 py-6 text-center text-sm text-navy/50">
+                <p className="rounded-xl border border-lineDark bg-white px-5 py-6 text-center text-sm text-appNavy/50">
                   אין עדיין דוחות מתוזמנים עבור לקוח זה.
                 </p>
               )}

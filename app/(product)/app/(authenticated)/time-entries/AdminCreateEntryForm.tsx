@@ -12,7 +12,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "שומר..." : "הוספת דיווח לעובד"}
     </button>
@@ -53,7 +53,7 @@ export function AdminCreateEntryForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-full border border-lineDark bg-white px-5 py-2.5 text-sm font-medium text-navy hover:border-gold"
+        className="rounded-full border border-lineDark bg-white px-5 py-2.5 text-sm font-medium text-appNavy hover:border-gold"
       >
         + דיווח עבור עובד
       </button>
@@ -66,11 +66,11 @@ export function AdminCreateEntryForm({
       className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div>
-        <label className="block text-xs font-medium text-navy/60">עובד *</label>
+        <label className="block text-xs font-medium text-appNavy/60">עובד *</label>
         <select
           name="userId"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="">בחירה</option>
           {users.map((u) => (
@@ -81,7 +81,7 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">תאריך *</label>
+        <label className="block text-xs font-medium text-appNavy/60">תאריך *</label>
         <input
           type="date"
           name="date"
@@ -89,35 +89,35 @@ export function AdminCreateEntryForm({
           max={todayKey()}
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">שעת התחלה *</label>
+        <label className="block text-xs font-medium text-appNavy/60">שעת התחלה *</label>
         <input
           type="time"
           name="startTime"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">שעת סיום *</label>
+        <label className="block text-xs font-medium text-appNavy/60">שעת סיום *</label>
         <input
           type="time"
           name="endTime"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">לקוח *</label>
+        <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
         <select
           name="clientId"
           required
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="">בחירה</option>
           {clients.map((c) => (
@@ -128,12 +128,12 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-navy/60">קטגוריה *</label>
+        <label className="block text-xs font-medium text-appNavy/60">קטגוריה *</label>
         <select
           name="categoryId"
           required
           disabled={!clientId}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="">בחירה</option>
           {availableCategories.map((cat) => (
@@ -144,25 +144,25 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-navy/60">הערה</label>
+        <label className="block text-xs font-medium text-appNavy/60">הערה</label>
         <input
           name="note"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
       {isBackdated && (
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-navy/60">סיבת דיווח ליום קודם *</label>
+          <label className="block text-xs font-medium text-appNavy/60">סיבת דיווח ליום קודם *</label>
           <input
             name="backdateReason"
             required
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-navy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
       )}
       <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
         <input type="checkbox" id="allowOverlapOverride" name="allowOverlapOverride" className="h-4 w-4" />
-        <label htmlFor="allowOverlapOverride" className="text-xs text-navy/60">
+        <label htmlFor="allowOverlapOverride" className="text-xs text-appNavy/60">
           לאפשר שמירה גם אם קיימת חפיפה עם דיווח אחר (override)
         </label>
       </div>
@@ -170,7 +170,7 @@ export function AdminCreateEntryForm({
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
         <div className="ms-auto flex gap-3">
-          <button type="button" onClick={() => setOpen(false)} className="text-sm text-navy/60 hover:text-navy">
+          <button type="button" onClick={() => setOpen(false)} className="text-sm text-appNavy/60 hover:text-appNavy">
             ביטול
           </button>
           <SubmitButton />

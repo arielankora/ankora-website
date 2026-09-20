@@ -12,19 +12,19 @@ import type { ReactNode } from "react";
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
-      <div className="relative flex flex-col justify-between overflow-hidden bg-ink px-8 py-12 text-cream sm:px-10">
+      <div className="relative flex flex-col justify-between overflow-hidden bg-navy px-8 py-12 text-cream-warm sm:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_55%_at_65%_30%,rgba(176,141,87,0.24)_0%,rgba(176,141,87,0)_70%)]" />
         <span className="relative font-assistant text-sm font-semibold tracking-[0.2em] text-gold-light">ANKORA</span>
         <div className="relative max-w-[380px]">
           <p className="text-2xl font-normal leading-relaxed">אינטליגנציה תפעולית שמחזירה זמן.</p>
-          <p className="mt-3.5 text-sm text-cream/60">
+          <p className="mt-3.5 text-sm text-cream-warm/60">
             מערכת התפעול הפנימית של Ankora. הגישה מוגבלת למשתמשים מורשים.
           </p>
         </div>
-        <span className="relative text-[11.5px] text-cream/40">Tel Aviv, Israel</span>
+        <span className="relative text-[11.5px] text-cream-warm/40">Tel Aviv, Israel</span>
       </div>
 
-      <div className="flex flex-col items-center justify-center bg-paper px-8 py-12 sm:px-10">
+      <div className="flex flex-col items-center justify-center bg-cream px-8 py-12 sm:px-10">
         <div className="w-full max-w-[380px]">{children}</div>
       </div>
     </div>

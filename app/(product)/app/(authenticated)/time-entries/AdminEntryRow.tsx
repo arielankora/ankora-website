@@ -43,7 +43,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
     >
       {pending ? "שומר..." : "שמירה"}
     </button>
@@ -151,63 +151,63 @@ export function AdminEntryRow({
             <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
-                <label className="block text-xs font-medium text-navy/60">תאריך</label>
+                <label className="block text-xs font-medium text-appNavy/60">תאריך</label>
                 <input
                   type="date"
                   name="date"
                   defaultValue={dateKeyOf(entry.startAt)}
                   max={todayKey()}
                   required
-                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-navy/60">התחלה</label>
+                <label className="block text-xs font-medium text-appNavy/60">התחלה</label>
                 <input
                   type="time"
                   name="startTime"
                   defaultValue={timeKey(entry.startAt)}
                   required
-                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-navy/60">סיום</label>
+                <label className="block text-xs font-medium text-appNavy/60">סיום</label>
                 <input
                   type="time"
                   name="endTime"
                   defaultValue={entry.endAt ? timeKey(entry.endAt) : ""}
                   required
-                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-navy/60">הערה</label>
+                <label className="block text-xs font-medium text-appNavy/60">הערה</label>
                 <input
                   name="note"
                   defaultValue={entry.note ?? ""}
-                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
                 />
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex-1 min-w-[200px]">
-                <label className="block text-xs font-medium text-navy/60">סיבת עריכה</label>
+                <label className="block text-xs font-medium text-appNavy/60">סיבת עריכה</label>
                 <input
                   name="reason"
-                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-navy outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
                 />
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id={`override-${entry.id}`} name="allowOverlapOverride" className="h-4 w-4" />
-                <label htmlFor={`override-${entry.id}`} className="text-xs text-navy/60">
+                <label htmlFor={`override-${entry.id}`} className="text-xs text-appNavy/60">
                   אפשר חפיפה (override)
                 </label>
               </div>
             </div>
             <div className="flex items-center gap-3">
               <SubmitButton />
-              <button type="button" onClick={() => setEditing(false)} className="text-xs text-navy/60 hover:text-navy">
+              <button type="button" onClick={() => setEditing(false)} className="text-xs text-appNavy/60 hover:text-appNavy">
                 ביטול
               </button>
               {state?.error && <p className="text-xs text-red-600">{state.error}</p>}
@@ -227,24 +227,24 @@ export function AdminEntryRow({
             onClick={onToggleSelect}
             aria-label="בחירה"
             className={`flex h-5 w-5 items-center justify-center rounded-md border text-[11px] ${
-              selected ? "border-gold bg-gold-gradient text-ink" : "border-lineDark bg-white text-transparent"
+              selected ? "border-gold bg-gold-gradient text-navy" : "border-lineDark bg-white text-transparent"
             }`}
           >
             ✓
           </button>
         </td>
-        <td className="px-5 py-3 text-navy/80">{formatDateTime(entry.startAt)}</td>
-        <td className="px-5 py-3 text-navy/80">{entry.userName}</td>
-        <td className="px-5 py-3 text-navy/80">{entry.clientName}</td>
-        <td className="px-5 py-3 text-navy/80">{entry.categoryName}</td>
-        <td className="px-5 py-3 text-navy/80">{formatDuration(entry.actualSeconds)}</td>
-        <td className="max-w-[220px] px-5 py-3 text-navy/80">
+        <td className="px-5 py-3 text-appNavy/80">{formatDateTime(entry.startAt)}</td>
+        <td className="px-5 py-3 text-appNavy/80">{entry.userName}</td>
+        <td className="px-5 py-3 text-appNavy/80">{entry.clientName}</td>
+        <td className="px-5 py-3 text-appNavy/80">{entry.categoryName}</td>
+        <td className="px-5 py-3 text-appNavy/80">{formatDuration(entry.actualSeconds)}</td>
+        <td className="max-w-[220px] px-5 py-3 text-appNavy/80">
           {entry.note ? (
             <span className="line-clamp-2 break-words" title={entry.note}>
               {entry.note}
             </span>
           ) : (
-            <span className="text-navy/30">—</span>
+            <span className="text-appNavy/30">—</span>
           )}
         </td>
         <td className="px-5 py-3">
@@ -255,33 +255,33 @@ export function AdminEntryRow({
         </td>
         <td className="px-5 py-3 text-end">
           <div className="flex items-center justify-end gap-3">
-            <button type="button" onClick={toggleHistory} className="text-xs text-navy/60 hover:text-navy">
+            <button type="button" onClick={toggleHistory} className="text-xs text-appNavy/60 hover:text-appNavy">
               היסטוריה
             </button>
-            <button type="button" onClick={() => setEditing(true)} className="text-xs text-navy/60 hover:text-navy">
+            <button type="button" onClick={() => setEditing(true)} className="text-xs text-appNavy/60 hover:text-appNavy">
               עריכה
             </button>
-            <button type="button" onClick={handleDelete} className="text-xs text-navy/50 hover:text-red-600">
+            <button type="button" onClick={handleDelete} className="text-xs text-appNavy/50 hover:text-red-600">
               מחיקה
             </button>
           </div>
         </td>
       </tr>
       {showHistory && (
-        <tr className="border-b border-lineDark bg-paper/60">
+        <tr className="border-b border-lineDark bg-cream/60">
           <td colSpan={9} className="px-5 py-4">
-            {loadingHistory && <p className="text-xs text-navy/50">טוען היסטוריה...</p>}
+            {loadingHistory && <p className="text-xs text-appNavy/50">טוען היסטוריה...</p>}
             {!loadingHistory && revisions && revisions.length === 0 && (
-              <p className="text-xs text-navy/50">אין עריכות קודמות לדיווח זה.</p>
+              <p className="text-xs text-appNavy/50">אין עריכות קודמות לדיווח זה.</p>
             )}
             {!loadingHistory && revisions && revisions.length > 0 && (
               <ul className="space-y-2">
                 {revisions.map((rev) => (
                   <li key={rev.id} className="rounded-lg border border-lineDark bg-white p-3 text-xs">
-                    <p className="font-medium text-navy">
+                    <p className="font-medium text-appNavy">
                       גרסה {rev.version} · {formatDateTime(rev.changedAt)} · {rev.changedByName}
                     </p>
-                    {rev.reason && <p className="mt-1 text-navy/60">סיבה: {rev.reason}</p>}
+                    {rev.reason && <p className="mt-1 text-appNavy/60">סיבה: {rev.reason}</p>}
                   </li>
                 ))}
               </ul>

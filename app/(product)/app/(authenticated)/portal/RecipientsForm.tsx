@@ -15,7 +15,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-ink disabled:opacity-50"
+      className="rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-navy disabled:opacity-50"
     >
       {pending ? "שומר..." : "שמירת נמענים"}
     </button>
@@ -40,7 +40,7 @@ export function RecipientsForm({
   return (
     <form action={formAction} className="flex flex-col gap-2 rounded-xl border border-lineDark p-4 sm:flex-row sm:items-center sm:justify-between">
       <input type="hidden" name="scheduleId" value={scheduleId} />
-      <div className="text-sm font-medium text-navy">{REPORT_TYPE_LABEL[reportType] ?? reportType}</div>
+      <div className="text-sm font-medium text-appNavy">{REPORT_TYPE_LABEL[reportType] ?? reportType}</div>
       <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
         <input
           name="recipients"

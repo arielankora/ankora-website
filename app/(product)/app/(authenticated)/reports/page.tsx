@@ -101,7 +101,7 @@ export default async function AdminReportsPage(
       <Link
         href="/app/reports"
         className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "numeric" ? "border-gold text-navy" : "border-transparent text-navy/50 hover:text-navy"
+          tab === "numeric" ? "border-gold text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
         }`}
       >
         דוחות
@@ -109,7 +109,7 @@ export default async function AdminReportsPage(
       <Link
         href="/app/reports?tab=summary"
         className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "summary" ? "border-gold text-navy" : "border-transparent text-navy/50 hover:text-navy"
+          tab === "summary" ? "border-gold text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
         }`}
       >
         תקציר פעילות ללקוח
@@ -157,8 +157,8 @@ export default async function AdminReportsPage(
       <>
         <div className="space-y-6">
           <div>
-            <h1 className="text-xl font-medium text-navy">דוחות</h1>
-            <p className="mt-1 text-sm text-navy/60">
+            <h1 className="text-xl font-medium text-appNavy">דוחות</h1>
+            <p className="mt-1 text-sm text-appNavy/60">
               תקציר פעילות גולמי ללקוח נבחר, מוכן להדבקה ב-ChatGPT/Claude לצורך ניסוח סיכום לשיתוף עם הלקוח.
             </p>
           </div>
@@ -171,7 +171,7 @@ export default async function AdminReportsPage(
           />
 
           {!client && (
-            <div className="rounded-2xl border border-lineDark bg-white px-5 py-8 text-center text-sm text-navy/50">
+            <div className="rounded-2xl border border-lineDark bg-white px-5 py-8 text-center text-sm text-appNavy/50">
               בחרו לקוח כדי ליצור תקציר פעילות.
             </div>
           )}
@@ -203,8 +203,8 @@ export default async function AdminReportsPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-navy">דוחות</h1>
-          <p className="mt-1 text-sm text-navy/60">דוחות פנימיים לניהול, עם סינון וייצוא ל-CSV.</p>
+          <h1 className="text-xl font-medium text-appNavy">דוחות</h1>
+          <p className="mt-1 text-sm text-appNavy/60">דוחות פנימיים לניהול, עם סינון וייצוא ל-CSV.</p>
         </div>
 
         {tabs}
@@ -229,11 +229,11 @@ export default async function AdminReportsPage(
 
         <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
           <div className="border-b border-lineDark px-5 py-3">
-            <h2 className="text-sm font-medium text-navy">{result.title}</h2>
+            <h2 className="text-sm font-medium text-appNavy">{result.title}</h2>
           </div>
           <table className="w-full min-w-[700px] text-start text-sm">
             <thead>
-              <tr className="border-b border-lineDark text-xs text-navy/50">
+              <tr className="border-b border-lineDark text-xs text-appNavy/50">
                 {result.columns.map((col) => (
                   <th key={col.key} className="px-5 py-3 font-medium">
                     {col.label}
@@ -244,7 +244,7 @@ export default async function AdminReportsPage(
             <tbody>
               {result.rows.length === 0 && (
                 <tr>
-                  <td colSpan={result.columns.length} className="px-5 py-8 text-center text-navy/50">
+                  <td colSpan={result.columns.length} className="px-5 py-8 text-center text-appNavy/50">
                     אין נתונים התואמים את הסינון.
                   </td>
                 </tr>
@@ -252,7 +252,7 @@ export default async function AdminReportsPage(
               {result.rows.map((row, i) => (
                 <tr key={i} className="border-b border-lineDark last:border-0">
                   {result.columns.map((col) => (
-                    <td key={col.key} className="px-5 py-3 text-navy">
+                    <td key={col.key} className="px-5 py-3 text-appNavy">
                       {formatCell(row[col.key], col.type)}
                     </td>
                   ))}

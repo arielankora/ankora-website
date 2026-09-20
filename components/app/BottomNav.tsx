@@ -47,7 +47,7 @@ export function BottomNav({
               key={item.href}
               href={item.href}
               className={`flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] ${
-                active ? "text-navy" : "text-navy/50"
+                active ? "text-appNavy" : "text-appNavy/50"
               }`}
             >
               <Icon size={20} strokeWidth={active ? 2.25 : 1.75} />
@@ -60,7 +60,7 @@ export function BottomNav({
           onClick={() => setMoreOpen(true)}
           aria-label="עוד אפשרויות"
           aria-expanded={moreOpen}
-          className="flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] text-navy/50"
+          className="flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] text-appNavy/50"
         >
           <MoreHorizontal size={20} strokeWidth={1.75} />
           <span>עוד</span>
@@ -73,12 +73,12 @@ export function BottomNav({
             type="button"
             aria-label="סגירה"
             onClick={() => setMoreOpen(false)}
-            className="absolute inset-0 bg-navy/30"
+            className="absolute inset-0 bg-appNavy/30"
           />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-lineDark bg-white px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-lg">
             <div className="mb-4 border-b border-lineDark pb-4">
-              <p className="text-sm font-medium text-navy">{userName}</p>
-              <p className="text-xs text-navy/50">{roleLabel}</p>
+              <p className="text-sm font-medium text-appNavy">{userName}</p>
+              <p className="text-xs text-appNavy/50">{roleLabel}</p>
             </div>
             {overflow.length > 0 && (
               <nav className="mb-4 flex flex-col gap-4">
@@ -87,7 +87,7 @@ export function BottomNav({
                     key={item.href}
                     href={item.href}
                     onClick={() => setMoreOpen(false)}
-                    className="flex items-center gap-3 text-sm text-navy/80"
+                    className="flex items-center gap-3 text-sm text-appNavy/80"
                   >
                     {(() => {
                       const Icon = NAV_ICONS[item.href] ?? Home;
@@ -100,7 +100,7 @@ export function BottomNav({
             )}
             <button
               onClick={() => signOut({ callbackUrl: "/app/login" })}
-              className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full border border-lineDark px-4 text-sm font-medium text-navy/70"
+              className="flex w-full min-h-[44px] items-center justify-center gap-2 rounded-full border border-lineDark px-4 text-sm font-medium text-appNavy/70"
             >
               <LogOut size={16} strokeWidth={1.75} />
               התנתקות

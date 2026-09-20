@@ -23,12 +23,12 @@ export function InnerCTA({
     <section className="relative overflow-hidden border-t border-[rgba(243,234,219,0.12)] py-[clamp(64px,9vw,130px)]">
       <WideContainer className="relative flex flex-col items-center gap-5 text-center">
         <Reveal>
-          <h2 className="mx-auto max-w-[18ch] text-balance text-[clamp(2rem,4.4vw,3.6rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-paper">
+          <h2 className="mx-auto max-w-[18ch] text-balance text-[clamp(2rem,4.4vw,3.6rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-cream">
             {title ?? dict.finalCta.title}
           </h2>
         </Reveal>
         <Reveal delay={0.1}>
-          <p className="mx-auto font-assistant text-[1.05rem] font-light text-tone-muted">
+          <p className="mx-auto font-assistant text-[1.05rem] font-light text-muted">
             {dict.finalCta.body}
           </p>
         </Reveal>

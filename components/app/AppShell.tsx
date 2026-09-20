@@ -138,7 +138,7 @@ export function AppShell({
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
-    <div className="min-h-screen bg-paper md:flex">
+    <div className="min-h-screen bg-cream md:flex">
       <Sidebar
         items={items}
         userName={user.name}

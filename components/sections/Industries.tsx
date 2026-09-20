@@ -25,7 +25,7 @@ export function Industries({ dict, locale }: { dict: Dictionary; locale: Locale 
         <Eyebrow>{dict.industries.label}</Eyebrow>
       </Reveal>
       <Reveal delay={0.08}>
-        <h2 className="mb-14 mt-6 max-w-[26ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-paper">
+        <h2 className="mb-14 mt-6 max-w-[26ch] text-pretty text-[clamp(1.8rem,3.3vw,3rem)] font-extralight leading-[1.24] tracking-[-0.02em] text-cream">
           {dict.industries.title}
         </h2>
       </Reveal>
@@ -39,8 +39,8 @@ export function Industries({ dict, locale }: { dict: Dictionary; locale: Locale 
                   to it would be dropped and the card would render as a dead link. */}
               <Link href={withLocale(locale, item.href)} className="group block h-full">
                 <HairlineGridCell className="flex min-h-[230px] flex-col gap-3 transition-colors duration-[350ms] group-hover:bg-[rgba(176,141,87,0.09)]">
-                  <h3 className="text-[1.22rem] font-normal text-paper">{item.title}</h3>
-                  <p className="flex-1 font-assistant text-sm font-light leading-[1.7] text-tone-muted">
+                  <h3 className="text-[1.22rem] font-normal text-cream">{item.title}</h3>
+                  <p className="flex-1 font-assistant text-sm font-light leading-[1.7] text-muted">
                     {item.body}
                   </p>
                   <span className="inline-flex items-center self-start border-b border-[rgba(176,141,87,0.4)] pb-[9px] pt-2.5 font-assistant text-[15px] font-medium text-gold transition-colors duration-300 group-hover:border-gold-light group-hover:text-gold-light">
