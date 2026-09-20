@@ -1,0 +1,71 @@
+# Deletes this PR's Neon preview branch when the PR closes.
+#
+# WHY THIS EXISTS
+#
+# Vercel's Neon integration creates a Postgres branch for every preview
+# deployment. It does NOT delete that branch when the git branch is deleted
+# or when the PR is merged - that is documented behaviour, not a
+# misconfiguration. Branch lifetime is instead tied to Vercel's DEPLOYMENT
+# retention, which defaults to 180 days:
+# https://neon.com/docs/guides/vercel-branch-cleanup
+#
+# The Neon free plan allows 10 branches per project. One of those is `main`
+# (production), so nine preview branches is the real ceiling. In practice
+# this project hit it twice in two days: once the cap is reached, EVERY
+# preview deployment fails at "Provisioning Integrations" in about a
+# second, before the build even starts - which looks exactly like a broken
+# build and is not. It blocked two people's work simultaneously.
+#
+# Neon's own recommended fix is this action, and it is the only option that
+# fires on merge rather than after a retention window. Lowering Vercel's
+# retention period is the alternative, but it is a paid-plan setting and
+# still would not free a branch at merge time.
+#
+# SETUP (one-time, both live in GitHub repo settings)
+#   - Variable  NEON_PROJECT_ID = restless-shape-94278275
+#   - Secret    NEON_API_KEY    = a Neon API key
+#       Neon Console -> Account settings -> API keys -> Create.
+#       Scope it to this project if the plan allows; it needs only branch
+#       deletion on project restless-shape-94278275.
+#
+# Until both exist this workflow runs and fails harmlessly on closed PRs
+# without touching anything - see `continue-on-error` below.
+
+name: Delete Neon preview branch
+
+on:
+  pull_request:
+    # `closed` covers both merged and abandoned PRs, which is what we want:
+    # an abandoned branch consumes a slot exactly like a merged one.
+    types: [closed]
+
+# Nothing here reads or writes repository contents. The action talks only
+# to Neon's API, so the token gets no permissions at all.
+permissions: {}
+
+# If a PR is closed, reopened and closed again, let the later run win
+# rather than racing the earlier one.
+concurrency:
+  group: neon-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  delete-neon-branch:
+    runs-on: ubuntu-latest
+    # Never block anything. A missing secret, an already-deleted branch, or
+    # a Neon outage must not put a red X on a PR that was merged fine - the
+    # worst case is simply that a branch survives and is cleaned up by hand,
+    # which is the situation this workflow improves on, not a regression.
+    continue-on-error: true
+    steps:
+      - name: Delete the preview branch for this PR
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: ${{ vars.NEON_PROJECT_ID }}
+          # Vercel's integration prefixes the git branch with `preview/`.
+          # Verified against the live console: git branch
+          # `security/next15-upgrade` produced the Neon branch
+          # `preview/security/next15-upgrade`. github.head_ref is the PR's
+          # source branch, unprefixed, so the prefix is added here.
+          branch: preview/${{ github.head_ref }}
+          api_key: ${{ secrets.NEON_API_KEY }}
