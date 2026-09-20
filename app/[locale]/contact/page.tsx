@@ -8,14 +8,22 @@ import { InnerCTA } from "@/components/sections/InnerCTA";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 
-// /he: dedicated title/description so this conversion page doesn't fall back to the
-// generic site meta (flagged and fixed per Ariel's production QA pass). /en keeps its
-// prior behaviour (no override) -- untouched, per project convention.
-const heMeta = {
-  title: "שיחת היכרות | Ankora",
-  description:
-    "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
-};
+// Both locales get a dedicated title and description. The Hebrew pair was added during
+// Ariel's production QA pass; English was left on the generic site meta at the time
+// because there was no English copy to write it from. There is now, and a conversion
+// page inheriting the homepage title is a real search cost, so /en no longer falls back.
+const PAGE_META = {
+  he: {
+    title: "שיחת היכרות | Ankora",
+    description:
+      "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
+  },
+  en: {
+    title: "Book a Call | Ankora",
+    description:
+      "A twenty-minute call with Ankora. No commitment and no long forms \u2014 we get to know you, understand your needs, and show you how personal operations management could work for you.",
+  },
+} as const;
 
 export async function generateMetadata(
   props: {
@@ -24,12 +32,11 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const meta =
-    locale === "he"
-      ? { title: heMeta.title, description: heMeta.description }
-      : {};
+  const meta = PAGE_META[locale];
   return {
-    ...meta,
+    title: meta.title,
+    description: meta.description,
+    openGraph: { title: meta.title, description: meta.description, type: "website" },
     alternates: {
       canonical: `/${locale}/contact`,
       languages: { he: "/he/contact", en: "/en/contact" },
@@ -80,7 +87,7 @@ export default async function ContactPage(props: { params: Promise<{ locale: str
               </Reveal>
               <Reveal delay={0.22}>
                 <div className="mt-10 border-t border-[rgba(243,234,219,0.12)] pt-8">
-                  <MonoLabel tracking="0.15em" className="text-tone-dim">
+                  <MonoLabel tracking="0.15em" className="text-tone-muted">
                     {p.directTitle}
                   </MonoLabel>
                   <p className="mt-3 font-assistant text-sm font-light leading-[1.8] text-tone-muted">
@@ -89,7 +96,7 @@ export default async function ContactPage(props: { params: Promise<{ locale: str
                   <a
                     href="mailto:hello@ankora.co.il"
                     dir="ltr"
-                    className="mt-4 block font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-paper"
+                    className="mt-3 inline-flex min-h-[46px] items-center font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-paper"
                   >
                     hello@ankora.co.il
                   </a>

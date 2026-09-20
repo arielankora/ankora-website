@@ -47,10 +47,10 @@ export function Capabilities({ dict, locale }: { dict: Dictionary; locale: Local
             >
               <div>
                 <span className="flex items-baseline gap-3">
-                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-faint">
+                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-muted">
                     {String(i + 1).padStart(2, "0")}
                   </MonoLabel>
-                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-dim">
+                  <MonoLabel script="latin" tracking="0.15em" className="text-tone-muted">
                     {item.key}
                   </MonoLabel>
                 </span>

@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
-import { PageHero } from "@/components/sections/PageHero";
-import { Container } from "@/components/ui/Container";
-import { Reveal } from "@/components/motion/Reveal";
+import { LegalPage } from "@/components/sections/LegalPage";
 
 export async function generateMetadata(
   props: {
@@ -11,35 +9,35 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
+  const dict = getDictionary(params.locale);
+  const legal = dict.pages.legal;
   return {
+    title: `${legal.termsTitle} | Ankora`,
+    description: legal.termsPlaceholder,
     alternates: {
       canonical: `/${locale}/terms`,
       languages: { he: "/he/terms", en: "/en/terms" },
     },
+    openGraph: {
+      title: `${legal.termsTitle} | Ankora`,
+      description: legal.termsPlaceholder,
+      type: "website",
+    },
   };
 }
 
-export default async function TermsPage(props: { params: Promise<{ locale: string }> }) {
+export default async function Page(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
-  const legal = dict.pages.legal;
   return (
-    <>
-      <PageHero eyebrow={dict.footer.terms} title={legal.termsTitle} sub={legal.termsPlaceholder} />
-      <section className="bg-cream py-20 md:py-28">
-        <Container className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-navy/45">{legal.updated}</p>
-          <div className="mt-10 space-y-10">
-            {legal.termsSections.map((s, i) => (
-              <Reveal key={s.title} delay={i * 0.04}>
-                <h3 className="text-lg font-medium text-navy">{s.title}</h3>
-                <p className="mt-3 leading-relaxed text-navy/60">{s.body}</p>
-              </Reveal>
-            ))}
-          </div>
-        </Container>
-      </section>
-    </>
+    <LegalPage
+      dict={dict}
+      locale={locale}
+      eyebrow={dict.footer.terms}
+      title={dict.pages.legal.termsTitle}
+      sub={dict.pages.legal.termsPlaceholder}
+      sections={dict.pages.legal.termsSections}
+    />
   );
 }

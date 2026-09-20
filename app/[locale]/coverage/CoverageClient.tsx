@@ -113,7 +113,7 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   viewBox="0 0 15 15"
                   fill="none"
                   aria-hidden="true"
-                  className="shrink-0 text-tone-dim"
+                  className="shrink-0 text-tone-muted"
                 >
                   <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
                   <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -127,14 +127,14 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={p.searchPlaceholder}
-                  className="min-w-0 flex-1 border-0 border-b border-[rgba(243,234,219,0.22)] bg-transparent py-2 text-[15.5px] font-light text-paper outline-none transition-colors duration-[250ms] placeholder:text-tone-dim focus:border-gold [&::-webkit-search-cancel-button]:appearance-none"
+                  className="min-h-[44px] min-w-0 flex-1 border-0 border-b border-[rgba(243,234,219,0.22)] bg-transparent py-2 text-[15.5px] font-light text-paper outline-none transition-colors duration-[250ms] placeholder:text-tone-muted focus:border-gold [&::-webkit-search-cancel-button]:appearance-none"
                 />
                 {isSearching && (
                   <button
                     type="button"
                     onClick={() => setQuery("")}
                     aria-label={p.clearSearch}
-                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tone-dim transition-colors hover:text-gold"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-tone-muted transition-colors hover:text-gold"
                   >
                     <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">
                       <path d="M1 1L13 13M1 13L13 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -203,9 +203,9 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                   >
                     <summary className="flex cursor-pointer list-none items-start gap-[18px] p-[clamp(22px,2.8vw,32px)] transition-colors duration-[350ms] ease-out hover:bg-[rgba(176,141,87,0.08)]">
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-[clamp(1.16rem,1.5vw,1.38rem)] font-normal text-paper">
+                        <h2 className="text-[clamp(1.16rem,1.5vw,1.38rem)] font-normal text-paper">
                           {highlight(cat.name, normalizedQuery)}
-                        </h3>
+                        </h2>
                         <p className="mt-2.5 font-assistant text-[1.02rem] font-light leading-[1.65] text-tone-muted">
                           {cat.description}
                         </p>
@@ -214,7 +214,7 @@ export default function CoverageClient({ params }: { params: { locale: string } 
                         <div className="font-jbmono text-[1.3rem] tabular-nums leading-none text-gold">
                           {cat.services.length}
                         </div>
-                        <div className="mt-1.5 font-assistant text-[11px] font-light text-tone-dim">
+                        <div className="mt-1.5 font-assistant text-[11px] font-light text-tone-muted">
                           {p.serviceCountLabel}
                         </div>
                       </div>

@@ -42,7 +42,7 @@ function LaneHeader({ label, attention, gold }: { label: string; attention: stri
       >
         {label}
       </span>
-      <MonoLabel className="text-tone-dim">{attention}</MonoLabel>
+      <MonoLabel className="text-tone-muted">{attention}</MonoLabel>
     </div>
   );
 }
@@ -54,7 +54,7 @@ function SwimLanes({ dict }: { dict: Dictionary }) {
     // Decorative animation carrying an argument the two notes below state in words,
     // so the lanes themselves are hidden from assistive tech and the notes are not.
     <div className="bg-[rgba(243,234,219,0.04)] p-[clamp(24px,3.4vw,44px)] outline outline-1 outline-[rgba(243,234,219,0.11)] backdrop-blur-[16px]">
-      <MonoLabel size={10} tracking="0.16em" className="text-tone-faint">
+      <MonoLabel size={10} tracking="0.16em" className="text-tone-muted">
         {h.railLabel}
       </MonoLabel>
 

@@ -143,7 +143,7 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
     <div className="mt-16" aria-hidden="true">
       <HairlineGrid minCell={260}>
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
             {live.nowLabel}
           </span>
           <ul className="mt-4 space-y-4">
@@ -153,7 +153,7 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
                   <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gold" />
                   <span>{task.text}</span>
                 </div>
-                <span className="mt-1 block ps-[14px] font-jbmono text-[10px] tracking-[0.1em] text-tone-faint rtl:tracking-normal">
+                <span className="mt-1 block ps-[14px] font-jbmono text-[10px] tracking-[0.1em] text-tone-muted rtl:tracking-normal">
                   {task.domain}
                 </span>
               </li>
@@ -162,13 +162,13 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
         </HairlineGridCell>
 
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
             {live.closedLabel}
           </span>
           <div className="mt-3 text-[clamp(2.6rem,4.6vw,4rem)] font-extralight tabular-nums text-paper">
             {closedToday}
           </div>
-          <p className="mt-1 text-xs text-tone-dim">{live.closedSub}</p>
+          <p className="mt-1 text-xs text-tone-muted">{live.closedSub}</p>
           <div className="mt-6 flex h-14 items-end gap-1.5">
             {spark.map((bar, i) => (
               <span
@@ -181,13 +181,13 @@ function LiveOpsPanels({ dict }: { dict: Dictionary }) {
               />
             ))}
           </div>
-          <span className="mt-3 block font-jbmono text-[10px] tracking-[0.1em] text-tone-faint rtl:tracking-normal">
+          <span className="mt-3 block font-jbmono text-[10px] tracking-[0.1em] text-tone-muted rtl:tracking-normal">
             {live.sparkLabel}
           </span>
         </HairlineGridCell>
 
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-muted rtl:tracking-normal">
             {live.orchLabel}
           </span>
           <div className="mt-4 space-y-4">
@@ -263,7 +263,7 @@ export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
         </div>
 
         <Reveal delay={0.4}>
-          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-tone-dim">
+          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-tone-muted">
             {dict.hero.definitionPre}
             <Link
               href={withLocale(locale, "/personal-operations-management")}
