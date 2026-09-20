@@ -1,0 +1,42 @@
+{
+  "$comment": [
+    "Accepted, known-failing tests. Every entry here is a promise that someone looked at",
+    "this failure, understood it, and decided not to fix it yet - not that it was ignored.",
+    "",
+    "The rule the runner enforces: a failure listed here reports as `info` with its age in",
+    "days; ANY failure not listed here is a blocker. That is the whole point. A suite with",
+    "standing red tests and no baseline teaches its owner to skim past red, and the fourth",
+    "failure - the real one - sails through. With a baseline, red means red again.",
+    "",
+    "An entry that stops matching is reported as a stale waiver, because a baseline nobody",
+    "prunes slowly turns into a blindfold. Remove it when the test goes green.",
+    "",
+    "Shape: { suite, file, test, reason, acceptedOn, owner }"
+  ],
+  "knownFailures": [
+    {
+      "suite": "unit",
+      "file": "tests/unit/report-schedules.test.ts",
+      "test": "returns the prior full Sun-Sat week for WEEKLY",
+      "reason": "The assertion expects UTC midnight; computeReportingPeriod() returns midnight Israel time. Red on main independently of any change. Which one is correct is a product decision (do scheduled reports cover an Israeli calendar week or a UTC one?) and must not be 'fixed' by whoever happens to notice the red.",
+      "acceptedOn": "2026-09-20",
+      "owner": "ariel"
+    },
+    {
+      "suite": "unit",
+      "file": "tests/unit/report-schedules.test.ts",
+      "test": "returns the prior full calendar month for MONTHLY",
+      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above.",
+      "acceptedOn": "2026-09-20",
+      "owner": "ariel"
+    },
+    {
+      "suite": "unit",
+      "file": "tests/unit/report-schedules.test.ts",
+      "test": "crosses a year boundary correctly for MONTHLY",
+      "reason": "Same UTC-vs-Israel midnight mismatch as the WEEKLY case above.",
+      "acceptedOn": "2026-09-20",
+      "owner": "ariel"
+    }
+  ]
+}

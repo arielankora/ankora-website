@@ -15,7 +15,13 @@
     "test": "vitest run tests/unit",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
-    "test:all": "vitest run"
+    "test:all": "vitest run",
+    "qa": "node qa/run.mjs",
+    "qa:1": "node qa/run.mjs 1",
+    "qa:2": "node qa/run.mjs 2",
+    "qa:3": "node qa/run.mjs 3",
+    "qa:scan": "node qa/scan.mjs",
+    "qa:sync": "node qa/scan.mjs --sync"
   },
   "dependencies": {
     "@fontsource/assistant": "^5.3.0",
