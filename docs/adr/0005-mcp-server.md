@@ -323,3 +323,74 @@ Do not expand the tool list from a guess. Run Phase 2 with two or three
 employees for a fortnight first — what people actually ask for will not be
 the list anyone drew up in advance, and it is cheaper to discover that at
 seven tools than at thirty.
+
+---
+
+## Phase 3 — making the connection visible (2026-09-21)
+
+Phases 1 and 2 built a working MCP server and a working OAuth flow, and
+then showed neither of them anywhere in the product. The grants existed
+in `oauth_tokens`; the only way to answer "is Claude connected to my
+account" was a `psql` query. A capability nobody can see is, for
+practical purposes, a capability nobody has — and `/app/integrations`
+actively said the opposite, in so many words: "אין עדיין חיבור פעיל לאף
+מערכת".
+
+Three things changed.
+
+**A card, in two places.** `components/app/ClaudeConnectionCard.tsx` is
+rendered by both `/app/integrations` and `/app/profile`. Integrations is
+where the request started, and it is the right home for an integration —
+but it is `SUPER_ADMIN`-only, while the grant is personal: each employee
+authorizes their own account, with their own permissions. A card that
+lived only there would have been visible exclusively to the one person
+who least needs instructions. So both, from one component, differing by a
+single prop (the org-wide adoption line).
+
+**Liveness computed the same way the server computes it.**
+`lib/app-domain/mcp-connections.ts` re-applies `lib/mcp/auth.ts`'s four
+checks — not revoked, not expired, user still ACTIVE and not
+soft-deleted, `tokenVersion` unmoved — rather than trusting the token row.
+Check 4 is the one that earns its keep: "logout all sessions" works by
+bumping that counter, so an admin who revokes a departing employee's
+sessions sees them drop off this screen immediately, instead of reading
+"מחובר" off a grant that now 401s.
+
+Two deliberate departures from a naive reading of the table:
+
+- Liveness is judged on the **refresh** horizon, not the access-token
+  one. Access tokens live about an hour; keying the badge to them would
+  show "לא מחובר" for a healthy connection that has merely been idle
+  since lunch.
+- `rotatedToId: null` is required. Refresh rotation writes a new row and
+  points the old one at it, so every connection trails superseded rows.
+  Counting those would render one connector as a dozen connections,
+  growing hourly.
+
+**One set of instructions, in the guide.** The setup steps live in
+`/app/guide#mcp-claude` — the standing rule from ADR 0001 section 10 —
+and the cards link to it rather than carrying their own copy. The RFC
+9728 `resource_documentation` field now points there too; it previously
+pointed at `/api/mcp`, which returned JSON-RPC to anyone who followed it.
+
+### Not done, and why
+
+**No in-app "disconnect" button.** Revocation today means removing the
+connector in Claude, or an act that bumps `tokenVersion` (changing your
+own password; an admin's "logout all sessions"). A real per-grant revoke
+button is a write action on a credential — it wants an `AuditEvent`, a
+confirmation step, and a decision about whether an admin may revoke
+someone else's grant — and none of that was in scope for making the
+thing visible. It is the obvious next increment. Until it exists, the
+card says precisely what does revoke a grant rather than implying a
+control that is not there.
+
+**No per-user list on the Integrations screen.** The org view reports
+`X of Y` and stops. Naming which employees have connected Claude would
+be a new disclosure of per-person tooling on a screen that currently
+reveals nothing about individuals, and no decision on that screen needs
+it.
+
+**`CLIENT_USER` never sees the card.** None of the ten tools are
+reachable with that role, so offering the connection would be an
+invitation to a dead end.

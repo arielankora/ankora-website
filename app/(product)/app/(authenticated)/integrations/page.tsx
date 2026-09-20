@@ -1,8 +1,10 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listIntegrationConnections, getProvider } from "@/lib/app-domain/integrations";
+import { getMyClaudeConnection, getClaudeOrgSummary } from "@/lib/app-domain/mcp-connections";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
+import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -23,6 +25,14 @@ const STATUS_LABEL: Record<string, string> = {
 // "Connect" button that does anything: it shows the current
 // IntegrationConnection status per provider and nothing more, per
 // integration.manage (SUPER_ADMIN-only, permissions.ts's Phase 8 comment).
+//
+// Since then one integration stopped being hypothetical: the MCP server
+// (docs/adr/0005) is live, employees connect Claude to it over OAuth, and
+// none of that appeared anywhere in the product. So this screen now has
+// two halves, and the order is the point - the connector that really
+// works comes first, the placeholder second. The old copy ("אין עדיין
+// חיבור פעיל לאף מערכת") was true when it was written and is not any
+// more.
 export default async function IntegrationsPage() {
   const user = await requireUser();
 
@@ -34,7 +44,11 @@ export default async function IntegrationsPage() {
     );
   }
 
-  const connections = await listIntegrationConnections(user);
+  const [connections, claude, claudeOrg] = await Promise.all([
+    listIntegrationConnections(user),
+    getMyClaudeConnection(user),
+    getClaudeOrgSummary(user),
+  ]);
 
   return (
     <>
@@ -42,26 +56,31 @@ export default async function IntegrationsPage() {
         <div>
           <h1 className="text-xl font-medium text-appNavy">אינטגרציות</h1>
           <p className="mt-1 text-sm text-appNavy/60">
-            חיבור מערכות חיצוניות. בשלב זה מוצג רק סטטוס - אין עדיין חיבור פעיל לאף מערכת.
+            חיבור מערכות חיצוניות לאפליקציית ניהול הזמן.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          {connections.map((connection) => {
-            const provider = getProvider(connection.provider);
-            const label = PROVIDER_LABEL[connection.provider] ?? connection.provider;
-            return (
-              <div key={connection.id} className="rounded-2xl border border-lineDark bg-white p-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-base font-medium text-appNavy">{label}</h2>
-                  <StatusBadge label={STATUS_LABEL[connection.status] ?? connection.status} tone={connection.status === "CONNECTED" ? "green" : connection.status === "ERROR" ? "red" : "gray"} />
+        <ClaudeConnectionCard status={claude} orgSummary={claudeOrg} />
+
+        <div>
+          <h2 className="text-sm font-medium text-appNavy/50">בפיתוח</h2>
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
+            {connections.map((connection) => {
+              const provider = getProvider(connection.provider);
+              const label = PROVIDER_LABEL[connection.provider] ?? connection.provider;
+              return (
+                <div key={connection.id} className="rounded-2xl border border-lineDark bg-white p-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-base font-medium text-appNavy">{label}</h3>
+                    <StatusBadge label={STATUS_LABEL[connection.status] ?? connection.status} tone={connection.status === "CONNECTED" ? "green" : connection.status === "ERROR" ? "red" : "gray"} />
+                  </div>
+                  <p className="mt-2 text-sm text-appNavy/60">
+                    {provider ? "בקרוב - טרם פותח חיבור אמיתי." : "ספק לא ידוע."}
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-appNavy/60">
-                  {provider ? "בקרוב - טרם פותח חיבור אמיתי." : "ספק לא ידוע."}
-                </p>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
     </>

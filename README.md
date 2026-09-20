@@ -255,9 +255,23 @@ distinguishable from ones typed into the app. Nothing here deletes, and
 nothing writes on behalf of another employee — both stay in the UI. The
 full reasoning is in `docs/adr/0005-mcp-server.md`.
 
-**Connecting (OAuth).** Add `https://ankora-website.vercel.app/api/mcp` as
-a custom connector in Claude and sign in with your Ankora account. Nothing
-to install and no token to copy; Claude acts with your own permissions.
+**Connecting (OAuth).** Add `https://www.ankora.co.il/api/mcp` as a custom
+connector in Claude and sign in with your Ankora account. Nothing to
+install and no token to copy; Claude acts with your own permissions.
+
+The canonical host matters: the apex redirects to `www`, and the OAuth
+`resource` is bound to the URL as typed (RFC 8707), so a connector added
+against the bare apex or the `.vercel.app` alias starts a flow whose
+resource indicator does not match the one the metadata advertises.
+
+**Where this shows up in the product.** `/app/profile` and
+`/app/integrations` both render `ClaudeConnectionCard` — live/not-live
+badge, active grants, last use, and the connector URL to copy — and both
+link to the setup steps in the in-app guide (`/app/guide#mcp-claude`),
+which is also what `resource_documentation` in the RFC 9728 metadata
+points at. Liveness is computed in `lib/app-domain/mcp-connections.ts`
+against the same checks `lib/mcp/auth.ts` applies, on the refresh horizon
+rather than the one-hour access-token one.
 
 **Connecting (legacy bridge).** The Phase 1 stdio bridge and its personal
 access tokens still work — see `scripts/mcp-bridge.mjs` and
@@ -289,7 +303,7 @@ List and revoke with `--list` and `--revoke <tokenId>`.
       "command": "node",
       "args": ["/absolute/path/to/ankora-website/scripts/mcp-bridge.mjs"],
       "env": {
-        "ANKORA_MCP_URL": "https://ankora-website.vercel.app/api/mcp",
+        "ANKORA_MCP_URL": "https://www.ankora.co.il/api/mcp",
         "ANKORA_MCP_TOKEN": "ank_mcp_..."
       }
     }
