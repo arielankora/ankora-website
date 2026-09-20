@@ -39,7 +39,12 @@ export function Breadcrumbs({
               </MonoLabel>
             )}
             {item.href ? (
-              <Link href={withLocale(locale, item.href)}>
+              // Padding plus an equal negative margin: the tap target clears 44px
+              // without the trail itself growing to 44px tall on the page.
+              <Link
+                href={withLocale(locale, item.href)}
+                className="inline-flex items-center py-[15px] -my-[15px]"
+              >
                 <MonoLabel size={10} tracking="0.1em" className="text-tone-dim transition-colors hover:text-gold">
                   {item.label}
                 </MonoLabel>

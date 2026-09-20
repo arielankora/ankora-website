@@ -124,12 +124,12 @@ const he: Dictionary = {
     // bodies are unchanged from the previous order -- only the sequence and the
     // mono keys moved.
     items: [
-      { key: "BUSINESS OPS", title: "תפעול עסקי", body: "תמיכה תפעולית שוטפת לצוותים קטנים וחברות בצמיחה." },
-      { key: "VENDORS", title: "תיאום ספקים ונותני שירות", body: "בחירה, תיאום ובקרת איכות מול רשת ספקים מאושרת." },
-      { key: "PERSONAL OPS", title: "ניהול תפעולי אישי", body: "ניהול הזמן, המשימות והמחויבויות היומיומיות, במקום אחד." },
-      { key: "ADMIN", title: "ליווי אדמיניסטרטיבי", body: "טיפול מול רשויות, מוסדות וגופים, מתחילת התהליך ועד סיומו." },
-      { key: "TRAVEL", title: "תיאום נסיעות ולוגיסטיקה", body: "תכנון, הזמנות וטיפול בשינויים, מתואם מראש." },
-      { key: "PROPERTY", title: "ניהול נכסים ומשק בית", body: "תחזוקה, תיאום ובקרת איכות עבור הבית והנכסים." },
+      { id: "business", key: "BUSINESS OPS", title: "תפעול עסקי", body: "תמיכה תפעולית שוטפת לצוותים קטנים וחברות בצמיחה." },
+      { id: "vendors", key: "VENDORS", title: "תיאום ספקים ונותני שירות", body: "בחירה, תיאום ובקרת איכות מול רשת ספקים מאושרת." },
+      { id: "personal", key: "PERSONAL OPS", title: "ניהול תפעולי אישי", body: "ניהול הזמן, המשימות והמחויבויות היומיומיות, במקום אחד." },
+      { id: "admin", key: "ADMIN", title: "ליווי אדמיניסטרטיבי", body: "טיפול מול רשויות, מוסדות וגופים, מתחילת התהליך ועד סיומו." },
+      { id: "travel", key: "TRAVEL", title: "תיאום נסיעות ולוגיסטיקה", body: "תכנון, הזמנות וטיפול בשינויים, מתואם מראש." },
+      { id: "property", key: "PROPERTY", title: "ניהול נכסים ומשק בית", body: "תחזוקה, תיאום ובקרת איכות עבור הבית והנכסים." },
     ],
   },
   humanAI: {
@@ -320,6 +320,15 @@ const he: Dictionary = {
       title: "כמה זמן וכסף Ankora יכולה להחזיר לכם",
       sub: "בחרו את הפרופיל שהכי מתאים לכם, התאימו את המספרים למציאות שלכם, וקבלו הערכה מיידית.",
       personaPrompt: "מי אתם?",
+      hoursPrompt: "כמה שעות שבועיות זה לוקח לכם היום?",
+      hourNotes: {
+        business: "גבייה, מעקב מול לקוחות, תמיכה שוטפת בצוות",
+        vendors: "בחירה, השוואת הצעות ובקרת איכות",
+        personal: "יומן, תורים, מחויבויות יומיומיות",
+        admin: "רשויות, בנקים, ביטוח לאומי, ניירת וחידושים",
+        travel: "טיסות, מלונות, שינויים וסידורים",
+        property: "תחזוקה, תיקונים והרכב",
+      },
       hoursUnitLabel: "שעות בשבוע",
       hoursTotalLabel: "סה\"כ שעות בשבוע",
       rateNote: "זו העלות הישירה של הזמן. המערכת מוסיפה כ-33% עלויות מעסיק (פנסיה, ביטוח לאומי, הפרשות) כדי לשקף את העלות המלאה בפועל.",
@@ -329,13 +338,7 @@ const he: Dictionary = {
       personas: [
         {
           key: "executives",
-          hourQuestions: [
-            { label: "תיאום יומן, פגישות ותורים", hint: "יומן אישי ומקצועי, תורים", default: 2 },
-            { label: "טיפול מול רשויות, ביטוח לאומי ובנקים", hint: "מס הכנסה, ביטוח לאומי, בנק", default: 1.5 },
-            { label: "תיאום נסיעות עבודה ולוגיסטיקה", hint: "טיסות, מלונות, סידורים", default: 1.5 },
-            { label: "תחזוקת הבית והרכב", hint: "ספקים, תיקונים, טיפולים", default: 2 },
-            { label: "ניירת, חידושים ומסמכים", hint: "דרכון, רישיון, טפסים", default: 1 },
-          ],
+          hours: { business: 1, vendors: 1, personal: 2, admin: 2, travel: 1, property: 1 },
           rateLabel: "מה עלות השעה הישירה שלכם?",
           rateHint: "עלות ישירה של שעת עבודה שלכם, לפני עלויות מעסיק",
           // Aligned to spec (was 400, a transcription slip from the original ROI build
@@ -344,26 +347,14 @@ const he: Dictionary = {
         },
         {
           key: "founders",
-          hourQuestions: [
-            { label: "תיאום ספקים ונותני שירות לעסק", hint: "בירורים, הזמנות, מעקב", default: 2.5 },
-            { label: "הנהלת חשבונות ודיווחים לרשויות", hint: "דוחות, מע\"מ, מס הכנסה", default: 2 },
-            { label: "מנהלה אישית שוטפת", hint: "בנק, ביטוח לאומי, קופת חולים", default: 1.5 },
-            { label: "שיווק ונוכחות דיגיטלית", hint: "תוכן, רשתות, קמפיינים", default: 2 },
-            { label: "תחזוקת בית ומטלות אישיות", hint: "ספקים, תיקונים, סידורים", default: 1.5 },
-          ],
+          hours: { business: 3, vendors: 2, personal: 1, admin: 2, travel: 1, property: 1 },
           rateLabel: "מה עלות השעה הישירה שלכם?",
           rateHint: "עלות ישירה של שעת עבודה שלכם, לפני עלויות מעסיק",
           rateDefault: 350,
         },
         {
           key: "companies",
-          hourQuestions: [
-            { label: "תיאום ספקים ונותני שירות", hint: "בחירה, הזמנות, בקרת איכות", default: 3 },
-            { label: "תמיכה טכנית ו-IT", hint: "ציוד, מערכות, תקלות", default: 2 },
-            { label: "רכש וציוד משרדי", hint: "הזמנות, ספקים, מלאי", default: 2 },
-            { label: "מנהלה מול רשויות ורגולציה", hint: "רישוי, דוחות, אישורים", default: 2.5 },
-            { label: "ארגון נסיעות ואירועי צוות", hint: "טיסות, אירוח, לוגיסטיקה", default: 2.5 },
-          ],
+          hours: { business: 4, vendors: 3, personal: 1, admin: 2, travel: 1, property: 1 },
           rateLabel: "מה עלות השעה הישירה של מי שמבצע את זה היום?",
           rateHint: "אתם, מנהל/ת משרד, או איש/אשת צוות",
           // Aligned to spec (was 300, same transcription slip as executives above).
@@ -371,13 +362,7 @@ const he: Dictionary = {
         },
         {
           key: "familyOffice",
-          hourQuestions: [
-            { label: "תיאום ספקים ונותני שירות", hint: "בחירה, תיאום, בקרת איכות", default: 2 },
-            { label: "טיפול מול רשויות ובנקים", hint: "מס הכנסה, ביטוח לאומי, בנק", default: 1.5 },
-            { label: "מנהלה ומסמכים שוטפים", hint: "ניירת, חידושים, טפסים", default: 1.5 },
-            { label: "תחזוקת המשרד והציוד", hint: "ציוד, IT, תיקונים", default: 1.5 },
-            { label: "תיאום פגישות ולוגיסטיקה", hint: "יומן, נסיעות, אירועים", default: 1.5 },
-          ],
+          hours: { business: 1, vendors: 2, personal: 1, admin: 2, travel: 1, property: 1 },
           rateLabel: "מה עלות השעה הישירה של מי שמבצע את זה היום?",
           rateHint: "אתם, או איש/אשת צוות",
           // Aligned to spec (was 250, same transcription slip as the other personas above).
@@ -443,9 +428,19 @@ const he: Dictionary = {
         title: "המחיר שאתם משלמים הוא המחיר המלא",
         body: "בגיוס עובד פנימי, המשכורת היא רק ההתחלה. פנסיה, ימי חופשה, ימי מחלה, קרן השתלמות, ביטוח לאומי, גיוס והכשרה ומרחב עבודה כולם מתווספים לעלות בפועל. אצל Ankora, מחיר השעה כולל הכל.",
         inHouseTitle: "גיוס פנימי",
-        inHouseItems: ["שכר בסיס", "הפרשות פנסיה", "ימי חופשה וימי מחלה", "קרן השתלמות", "ביטוח לאומי מעסיק", "גיוס, הכשרה וניהול"],
         ankoraTitle: "Ankora",
-        ankoraItems: ["רק שעות העבודה בפועל", "אין עלויות נלוות", "אין התחייבות ארוכת טווח"],
+      rows: [
+        {
+          dimension: "מה נכלל בעלות בפועל",
+          inHouse: ["שכר בסיס", "הפרשות פנסיה", "ימי חופשה וימי מחלה", "קרן השתלמות", "ביטוח לאומי מעסיק", "גיוס, הכשרה וניהול"],
+          ankora: ["רק שעות העבודה בפועל"],
+        },
+        {
+          dimension: "מה נדרש מכם מעבר לתשלום",
+          inHouse: ["גיוס, קליטה וניהול שוטף", "מרחב עבודה", "התחייבות מתמשכת"],
+          ankora: ["אין עלויות נלוות", "אין התחייבות ארוכת טווח"],
+        },
+      ],
       },
       hourBank: {
         label: "המבנה הכלכלי",
@@ -455,18 +450,6 @@ const he: Dictionary = {
           { title: "שעות שלא נוצלו עוברות הלאה", body: "כל עוד ממשיכים לחדש את החבילה, שום דבר לא הולך לאיבוד." },
           { title: "בלי התחייבות ארוכת טווח", body: "אפשר לעצור את החבילה בכל חודש, בלי קנס ובלי הסברים." },
         ],
-        // New /he UI chrome: the 3-month bar chart illustrating the rollover mechanic,
-        // and its legend. Sample numbers for illustration only, same convention as the
-        // tiers footnote below. Flagged per project convention, not a rewrite.
-        chart: {
-          usedLabel: "שעות שנוצלו",
-          rolloverLabel: "יתרה שעוברת לחודש הבא",
-          months: [
-            { label: "חודש 1", used: 14, rollover: 6 },
-            { label: "חודש 2", used: 20, rollover: 6 },
-            { label: "חודש 3", used: 18, rollover: 8 },
-          ],
-        },
       },
       tiers: {
         label: "החבילות",
@@ -578,6 +561,14 @@ const he: Dictionary = {
         },
       ],
     },
+    segmentBridge: {
+      pre: "זהו יישום של ",
+      categoryLink: "ניהול תפעול אישי",
+      mid: " מבית Ankora, ",
+      comparisonLink: "חלופה להעסקת עוזר אישי",
+      post: " למנהלים בכירים, יזמים ומשרדי משפחה.",
+      moreLabel: "פתרונות נוספים",
+    },
     segments: {
       executives: {
         eyebrow: "מנהלים בכירים",
@@ -630,12 +621,15 @@ const he: Dictionary = {
       sub: "כל מה שיכול ליצור עומס תפעולי, יש לו כתובת אחת.",
       intro: "תחומי הפעולה של Ankora הם הליבה של שירות ניהול התפעול האישי שלנו למנהלים בכירים, יזמים ומשפחות עסוקות בישראל: ניהול ספקים, ניהול נסיעות, מנהלה אישית, ניהול משק הבית, בירוקרטיה מול רשויות ומוסדות ותפעול עסקי נבחר, הכל באחריות מלאה מקצה לקצה של מנהל תפעול ייעודי אחד. הרשימה הבאה היא דוגמה לסוג הדברים שאנחנו מנהלים עבור הלקוחות שלנו. אם משהו לא מופיע כאן, כדאי לשאול אותנו בכל מקרה.",
       searchPlaceholder: "חיפוש לפי מילה, למשל \"רכב\" או \"רשויות\"",
-      searchNoResults: "לא נמצאו תוצאות. נסו מילה אחרת, או פשוט תשאלו אותנו.",
+      noResultsLabel: "אין תוצאות",
       // New UI chrome for the /he redesign card-grid layout (not on the live site before
       // this change) -- flagged per project convention, not a rewrite of existing copy.
       areaCountLabel: "תחומים",
       serviceCountLabel: "שירותים",
       emptyStateCta: "לשאול אותנו",
+      clearSearch: "ניקוי החיפוש",
+      emptyStateTitle: 'לא נמצא שירות בשם "{query}"',
+      emptyStateBody: "הרשימה היא דוגמה ולא רשימה סגורה. אם משהו לא מופיע כאן, כדאי לשאול אותנו בכל מקרה.",
       categories: [
         {
           name: "מול הרשויות והמוסדות",

@@ -1,5 +1,18 @@
 export type Locale = "he" | "en";
 
+/**
+ * The six operational domains, in the order the site presents them. Used by the
+ * capabilities list on the home page and by the ROI calculator's hour rows, which
+ * are deliberately the same six things.
+ */
+export type CapabilityId =
+  | "business"
+  | "vendors"
+  | "personal"
+  | "admin"
+  | "travel"
+  | "property";
+
 export interface Dictionary {
   meta: {
     title: string;
@@ -91,7 +104,12 @@ export interface Dictionary {
     // than in a parallel array in the component, which is how the previous version
     // drifted out of step with the item order. The 01..06 index is derived from
     // position at render time for the same reason -- it cannot go stale.
-    items: { key: string; title: string; body: string }[];
+    //
+    // `id` is the stable identifier the ROI calculator's hour rows reference. The
+    // calculator measures the same six domains this list names, so its rows take
+    // their labels from here rather than repeating them: renaming a capability
+    // renames its ROI row, and the two can never describe different taxonomies.
+    items: { id: CapabilityId; key: string; title: string; body: string }[];
   };
   humanAI: {
     label: string;
@@ -151,6 +169,21 @@ export interface SegmentContent {
   closing: string;
 }
 
+/**
+ * The bridge paragraph at the top of a segment page, carrying two inline links --
+ * one to the category explainer, one to the personal-assistant comparison. Stored in
+ * fragments because the links sit mid-sentence and the word order differs between
+ * Hebrew and English.
+ */
+export interface SegmentBridge {
+  pre: string;
+  categoryLink: string;
+  mid: string;
+  comparisonLink: string;
+  post: string;
+  moreLabel: string;
+}
+
 export interface SimplePageContent {
   eyebrow: string;
   title: string;
@@ -192,15 +225,25 @@ export interface PagesContent {
     title: string;
     sub: string;
     personaPrompt: string;
+    // Heading above the six hour rows.
+    hoursPrompt: string;
     hoursUnitLabel: string;
     hoursTotalLabel: string;
     rateNote: string;
     nonProductiveLabel: string;
     nonProductiveHint: string;
     nonProductiveDefault: number;
+    // One row per capability, in capability order. Only the hint lives here -- the
+    // row's label comes from `capabilities.items`, so the calculator and the
+    // capabilities list can never drift into describing different domains.
+    hourNotes: Record<CapabilityId, string>;
     personas: {
       key: "executives" | "founders" | "companies" | "familyOffice";
-      hourQuestions: { label: string; hint: string; default: number }[];
+      // Starting hours per domain. Shared rows, per-persona weights: a growing
+      // company and a family office run very different operations, and flattening
+      // them to one profile was the thing worth avoiding when the calculator moved
+      // from four bespoke questionnaires to one shared set (Ariel's decision, C02).
+      hours: Record<CapabilityId, number>;
       rateLabel: string;
       rateHint: string;
       rateDefault: number;
@@ -241,22 +284,17 @@ export interface PagesContent {
       title: string;
       body: string;
       inHouseTitle: string;
-      inHouseItems: string[];
       ankoraTitle: string;
-      ankoraItems: string[];
+      // Two dimensions rather than two flat lists: the old shape put six in-house
+      // costs beside three Ankora lines and left the reader to work out which
+      // answered which. Each row now asks one question of both columns.
+      rows: { dimension: string; inHouse: string[]; ankora: string[] }[];
     };
     hourBank: {
       label: string;
       title: string;
       body: string;
       points: { title: string; body: string }[];
-      // /he only: the 3-month rollover bar chart + its legend (Ariel: "without the legend
-      // the diagram isn't understandable"). Optional so /en doesn't need it.
-      chart?: {
-        usedLabel: string;
-        rolloverLabel: string;
-        months: { label: string; used: number; rollover: number }[];
-      };
     };
     tiers: {
       label: string;
@@ -296,6 +334,7 @@ export interface PagesContent {
     privacySections: { title: string; body: string }[];
     termsSections: { title: string; body: string }[];
   };
+  segmentBridge: SegmentBridge;
   segments: {
     executives: SegmentContent;
     founders: SegmentContent;
@@ -308,13 +347,23 @@ export interface PagesContent {
     sub: string;
     intro: string;
     searchPlaceholder: string;
-    searchNoResults: string;
+    // Short label shown in place of the counter when nothing matches. The long
+    // "no results, try another word" sentence it replaces is superseded by the
+    // empty-state block below, which says the same thing and offers a way forward.
+    noResultsLabel: string;
     // /he redesign new UI chrome (design_handoff_ankora_redesign/README.md, "10. Coverage"):
     // the live "N domains / M services" counter labels and the empty-state CTA button.
     // Optional so /en (unchanged design, no counter/CTA button in that layout) doesn't need them.
-    areaCountLabel?: string;
-    serviceCountLabel?: string;
-    emptyStateCta?: string;
+    areaCountLabel: string;
+    serviceCountLabel: string;
+    emptyStateCta: string;
+    clearSearch: string;
+    // Shown when a search matches nothing. `emptyStateTitle` takes the query, so it
+    // carries a single {query} placeholder rather than being assembled from
+    // fragments in the component -- Hebrew and English put the quoted term in
+    // different places.
+    emptyStateTitle: string;
+    emptyStateBody: string;
     categories: {
       name: string;
       description: string;
