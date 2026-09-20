@@ -12,106 +12,107 @@ body {
   color: #F8F4EC;
 }
 
-.blog-article {
-  color: rgba(11, 27, 51, 0.82);
+/* The long-form prose scope. One reading engine for the blog post's MDX and for any
+   authored HTML that lands in the SEO pages, matching the React primitives in
+   components/sections/LongForm.tsx value for value.
+
+   It replaces a light `.blog-article` plus a `.blog-article-dark` companion that
+   overrode roughly half of it — two classes that had to be applied together and kept in
+   step by source order. There is one theme on this site now, so there is one scope. */
+.longform {
+  color: #C3CEDA;
   font-size: 17px;
   line-height: 1.85;
+  max-width: 64ch;
 }
-.blog-article > * + * {
-  margin-top: 1.4em;
+.longform > * + * {
+  margin-top: 20px;
 }
-.blog-article h2 {
-  font-size: 26px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: #0B1B33;
-  margin-top: 2.2em;
-  line-height: 1.3;
+/* h2 opens a movement: hairline above, generous clear. No number — the MDX has no
+   position to derive one from, and an authored number is the thing the rest of the
+   system exists to avoid. */
+.longform h2 {
+  margin-top: clamp(52px, 6vw, 80px);
+  padding-top: 22px;
+  border-top: 1px solid rgba(243, 234, 219, 0.12);
+  font-family: Heebo, system-ui, sans-serif;
+  font-size: clamp(1.5rem, 2.4vw, 2.05rem);
+  font-weight: 200;
+  line-height: 1.28;
+  letter-spacing: -0.02em;
+  color: #F8F4EC;
+  max-width: 24ch;
 }
-.blog-article h3 {
-  font-size: 20px;
-  font-weight: 500;
-  color: #0B1B33;
-  margin-top: 1.8em;
-  line-height: 1.3;
+/* h3 subdivides quietly: no hairline, no number, a rule on the inline-start edge so it
+   reads as indented without an indent that breaks in RTL. */
+.longform h3 {
+  margin-top: 34px;
+  padding-inline-start: 18px;
+  border-inline-start: 1px solid rgba(243, 234, 219, 0.14);
+  font-family: Heebo, system-ui, sans-serif;
+  font-size: 1.18rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #F8F4EC;
 }
-.blog-article p {
-  margin-top: 1.4em;
-}
-.blog-article ul,
-.blog-article ol {
-  margin-top: 1.4em;
-  padding-inline-start: 1.4em;
+.longform ul,
+.longform ol {
   display: flex;
   flex-direction: column;
-  gap: 0.6em;
+  gap: 7px;
+  padding-inline-start: 1.3em;
 }
-.blog-article ul {
-  list-style: disc;
-}
-.blog-article ol {
-  list-style: decimal;
-}
-.blog-article a {
-  color: #8A6F45;
+.longform ul { list-style: disc; }
+.longform ol { list-style: decimal; }
+.longform li::marker { color: #7C8EA3; }
+.longform a {
+  color: #B08D57;
   text-decoration: underline;
+  text-decoration-thickness: 1px;
   text-decoration-color: rgba(176, 141, 87, 0.4);
-  text-underline-offset: 3px;
+  text-underline-offset: 4px;
 }
-.blog-article a:hover {
-  text-decoration-color: #B08D57;
+.longform a:hover { color: #C7AC7E; text-decoration-color: #C7AC7E; }
+.longform strong { color: #F8F4EC; font-weight: 400; }
+/* The pull quote. No quotation marks, no italics, no centring: a gold hairline on the
+   inline-start edge and room around it. One gold element inside the body, and a post
+   gets one. */
+.longform blockquote {
+  margin-top: 28px;
+  margin-bottom: 28px;
+  padding-inline-start: 20px;
+  border-inline-start: 1px solid #B08D57;
+  font-family: Heebo, system-ui, sans-serif;
+  font-size: 1.32rem;
+  font-weight: 300;
+  line-height: 1.55;
+  color: #F8F4EC;
+  font-style: normal;
+  max-width: none;
 }
-.blog-article strong {
-  color: #0B1B33;
-  font-weight: 600;
+.longform blockquote p { margin: 0; font: inherit; color: inherit; }
+/* A bare URL inside Hebrew prose: Latin, so it stays LTR and keeps mono treatment, and
+   it has to be allowed to break or it pushes the column wide. */
+.longform a[href]:not([href^="/"]):not([href*="ankora"]) {
+  word-break: break-word;
 }
-.blog-article blockquote {
-  margin-top: 1.8em;
-  border-inline-start: 2px solid rgba(176, 141, 87, 0.5);
-  padding-inline-start: 1.2em;
-  font-style: italic;
-  color: rgba(11, 27, 51, 0.65);
+.longform code {
+  direction: ltr;
+  unicode-bidi: isolate;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  word-break: break-all;
+  padding-block: 4px;
 }
-.blog-article img {
-  margin-top: 1.8em;
-  border-radius: 16px;
+.longform img {
   width: 100%;
   height: auto;
+  outline: 1px solid rgba(243, 234, 219, 0.11);
 }
-.blog-article hr {
-  margin-top: 2.4em;
-  border-color: rgba(27, 42, 61, 0.14);
-}
-
-/* /he redesign: dark-theme companion to .blog-article above. .blog-article sets the
-   layout (font-size, line-height, spacing, list markers) which stays identical in both
-   themes; this class only overrides the colors that were hardcoded for a light
-   background, applied together as `className="blog-article blog-article-dark"`. Source
-   order (this block comes after .blog-article) is what makes these overrides win at
-   equal selector specificity -- not the order the two classes appear in the element's
-   className. */
-.blog-article-dark {
-  color: #A9B8C9;
-}
-.blog-article-dark h2,
-.blog-article-dark h3 {
-  color: #F8F4EC;
-}
-.blog-article-dark a {
-  color: #C7AC7E;
-  text-decoration-color: rgba(176, 141, 87, 0.4);
-}
-.blog-article-dark a:hover {
-  text-decoration-color: #C7AC7E;
-}
-.blog-article-dark strong {
-  color: #F8F4EC;
-}
-.blog-article-dark blockquote {
-  color: rgba(243, 234, 219, 0.6);
-}
-.blog-article-dark hr {
-  border-color: rgba(243, 234, 219, 0.12);
+.longform hr {
+  border: 0;
+  border-top: 1px solid rgba(243, 234, 219, 0.12);
+  margin-top: 34px;
 }
 
 @media (prefers-reduced-motion: reduce) {

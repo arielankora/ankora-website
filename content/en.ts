@@ -240,6 +240,8 @@ const en: Dictionary = {
     title: "Field notes on operational clarity",
     sub: "Practical thinking on operations, time, and running a life or company without carrying it all in your head.",
     emptyState: "New articles are on the way. Check back soon.",
+    emptyCategory: "No articles in this category yet",
+    countLabel: { one: "1 article", other: "{n} articles" },
     readMore: "Read article",
     minRead: "min read",
     allCategories: "All",
