@@ -10,6 +10,7 @@ export interface Dictionary {
     aboutDescription: string;
   };
   nav: {
+    home: string;
     solutions: string;
     howItWorks: string;
     technology: string;
@@ -158,8 +159,28 @@ export interface SimplePageContent {
 }
 
 export interface PagesContent {
-  howItWorks: SimplePageContent & { vignette: { title: string; body: string } };
-  technology: SimplePageContent;
+  howItWorks: SimplePageContent & {
+    vignette: {
+      title: string;
+      body: string;
+      // The four tasks the paragraph names, laid out as one day. `time` is a mono
+      // label (morning / midday / afternoon / evening), not a clock reading.
+      items: { time: string; title: string; note: string }[];
+    };
+  };
+  technology: SimplePageContent & {
+    // The four-layer diagram above the technology cards. `side` is the one thing
+    // colour encodes on this page — who does the work — so it is data rather than a
+    // class name chosen at the call site: the first layer is the client's, the other
+    // three are Ankora's.
+    orchestrationLabel: string;
+    sideYou: string;
+    sideAnkora: string;
+    layers: { tag: string; side: "you" | "ankora"; title: string; body: string }[];
+    persistenceNote: string;
+    // Only this page overrides the shared closing CTA heading.
+    ctaTitle: string;
+  };
   about: SimplePageContent & {
     entityDefinition: string;
     principlesLabel: string;
@@ -261,6 +282,8 @@ export interface PagesContent {
     submit: string;
     directTitle: string;
     directBody: string;
+    // Two short reassurances beside the direct-contact details.
+    directPoints: string[];
     successMessage: string;
     errorMessage: string;
   };

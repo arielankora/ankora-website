@@ -30,7 +30,6 @@ function HePersonalOperationsManagementPage({ dict, locale }: { dict: Dictionary
         eyebrow={p.eyebrow}
         title={p.title}
         sub={p.sub}
-        locale="he"
         breadcrumb={
           <Breadcrumbs locale={locale} items={[{ label: dict.hero.eyebrow, href: "/" }, { label: p.eyebrow }]} />
         }
@@ -263,8 +262,7 @@ export function PersonalOperationsManagementPage({ dict, locale }: { dict: Dicti
         title={p.title}
         sub={p.sub}
         breadcrumb={
-          <Breadcrumbs
-            locale={locale}
+          <Breadcrumbs locale={locale}
             items={[
               { label: dict.hero.eyebrow, href: "/" },
               { label: p.eyebrow },

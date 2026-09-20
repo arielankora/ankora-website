@@ -89,7 +89,7 @@ function HeCoverageClient({ locale, dict }: { locale: Locale; dict: ReturnType<t
 
   return (
     <>
-      <PageHero locale="he" eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
+      <PageHero eyebrow={p.eyebrow} title={p.title} sub={p.sub} />
 
       <section className="pb-[clamp(40px,6vw,88px)]">
         <WideContainer>

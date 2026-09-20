@@ -11,6 +11,8 @@ const en: Dictionary = {
     aboutDescription: "Ankora is an Israeli Personal Operations Management company. Learn about our Human + AI model, the Operational Intelligence philosophy behind it, and who we serve.",
   },
   nav: {
+    // Breadcrumb root label.
+    home: "Home",
     solutions: "Who it's for",
     howItWorks: "How it works",
     technology: "Technology",
@@ -265,13 +267,30 @@ const en: Dictionary = {
       ],
       vignette: {
         title: "One day, without you noticing",
-        body: "A passport renewed, a vendor coordinated, a flight rebooked in time, a gift that arrived on the right day — four completely different tasks, coordinated by the same operational layer, without you having to remember any of them.",
+        body: "A collection closed, a work trip rebooked in time, a passport renewed and a technician who showed up — four completely different tasks, two from the business and two from life, coordinated by the same operational layer, without you having to remember any of them.",
+        items: [
+          { time: "Morning", title: "A collection closed", note: "An unpaid invoice was spotted, a reminder went out, and the payment came in." },
+          { time: "Midday", title: "A work trip rebooked in time", note: "The change was caught before the penalty and settled with the airline." },
+          { time: "Afternoon", title: "A passport renewed", note: "Filed, approved, collected. No reminder needed." },
+          { time: "Evening", title: "A technician who showed up", note: "Two quotes compared, one chosen, the work done the same day." },
+        ],
       },
     },
     technology: {
       eyebrow: "Technology",
       title: "The layer that remembers you, so you don't have to explain again.",
       sub: "Our system isn't a chatbot executing commands. It's an orchestration layer connecting your request, your Operations Manager, and the execution network — with persistent memory that stays with you.",
+      orchestrationLabel: "ORCHESTRATION LAYER",
+      sideYou: "YOU",
+      sideAnkora: "ANKORA",
+      layers: [
+        { tag: "01 · REQUEST", side: "you", title: "What needs to happen", body: "You get in touch however suits you — a call, a message or an email" },
+        { tag: "02 · OPERATIONS MANAGER", side: "ankora", title: "Human judgment", body: "Decides what is right, what is urgent, and what genuinely needs you." },
+        { tag: "03 · AI ORCHESTRATION", side: "ankora", title: "Memory, monitoring, prediction", body: "Holds the context and flags delays before they land." },
+        { tag: "04 · EXECUTION NETWORK", side: "ankora", title: "Vendors and service providers", body: "Coordinated, supervised and quality-checked end to end." },
+      ],
+      persistenceNote: "The memory persists across all four stages, which is why the next request is shorter than the last.",
+      ctaTitle: "Want to see how this would work for you?",
       blocks: [
         { title: "Persistent memory", body: "Every preference you've shared, every decision you've made, is stored and used the next time — without repeating yourself." },
         { title: "Multi-party orchestration", body: "When a task touches several vendors or parties, the system coordinates between them and keeps information consistent everywhere." },
@@ -460,6 +479,7 @@ const en: Dictionary = {
       submit: "Send & book a call",
       directTitle: "Or directly",
       directBody: "Write to us and we'll respond within one business day.",
+      directPoints: ["A twenty-minute call", "No commitment"],
       successMessage: "Thank you! We've received your message and will get back to you soon.",
       errorMessage: "Something went wrong sending this. Please try again, or email us directly at info@ankora.co.il.",
     },
