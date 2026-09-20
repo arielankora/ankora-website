@@ -1,6 +1,6 @@
 # ADR 0005 — MCP server: letting Ankora employees reach the app through Claude
 
-Status: accepted (Phase 1 built; Phases 2–3 planned, not started)
+Status: accepted (Phases 1–3 built)
 Date: 2026-09-20
 Context: Ariel asked for two-way communication between the Ankora app and
 Claude. This document records the scope that was chosen, the two findings
@@ -9,7 +9,7 @@ that shaped it, and what is deliberately left for later.
 ## Scope
 
 Ankora **employees** read and write their own Time Tracking data through
-Claude Desktop. Client-facing access (a `CLIENT_USER` reaching the Client
+Claude, and managers read the team's. Client-facing access (a `CLIENT_USER` reaching the Client
 Portal through Claude) is out of scope here and is discussed only in
 "What comes after", because one decision below is load-bearing for it.
 
@@ -226,14 +226,81 @@ actor), and the MCP tool passes `actor.id` unconditionally. An admin
 correcting an employee's timesheet does it on the screen, where the
 audit trail has a human looking at what changed.
 
-**Phase 3 — OAuth**, which retires the bridge and opens claude.ai, mobile
-and Cowork. This is also the prerequisite for anything client-facing: the
-permission split already exists (`report.client.view` vs
-`report.internal.view`, and `client-portal.ts`'s `resolvePortalClient`
-scoping), so a `CLIENT_USER` surface is mostly a narrower tool list over
-`lib/app-domain/client-portal.ts` — but only once each client user
-authenticates as themselves, which is exactly what Finding 2 says the
-static-header path cannot do.
+**Phase 3 — OAuth. Built.**
+
+Ankora is now its own OAuth 2.1 authorization server, so Claude connects
+by URL and the person signs in with their Ankora account. No bridge, no
+Node install, no token to copy — which is what makes a third and fourth
+employee possible at all. The stdio bridge and its personal access tokens
+keep working side by side; `resolveMcpActor` tells the two credential
+kinds apart by prefix and runs the identical four checks on each.
+
+Auth.js could not do this. It is an OAuth *client* — it knows how to send
+you to sign in somewhere else. What was needed is the opposite: the thing
+Claude is sent to. An external IdP was considered and rejected, because
+identity already lives here (the `users` table, bcrypt, `tokenVersion`),
+and adopting one would mean either migrating every user or running two
+systems that each believe they are the source of truth.
+
+| Piece | Path |
+| --- | --- |
+| Discovery (RFC 8414 / RFC 9728) | `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource` |
+| Dynamic client registration (RFC 7591) | `/api/mcp/oauth/register` |
+| Authorization + consent | `/api/mcp/oauth/authorize` → `/app/oauth/consent` → `/api/mcp/oauth/consent` |
+| Token exchange and refresh | `/api/mcp/oauth/token` |
+
+### Decisions worth not re-litigating
+
+**PKCE S256 only.** `plain` is refused outright. Accepting it would let
+whoever intercepted an authorization code also satisfy the challenge,
+which is the entire threat PKCE exists for, and a downgrade attack gets it
+by simply asking.
+
+**Only https and loopback http may be registered as redirect URIs.** A
+first cut accepted any `scheme://host`; a unit test immediately showed
+that also accepts `data://text/html,x`. The fix was not a better filter —
+it was deleting the branch. The shape of a scheme is a bad proxy for
+whether it is safe to hand an authorization code to.
+
+**No redirect before the redirect URI is validated.** RFC 6749 section
+4.1.2.1, and the reason is the open-redirect class: an error delivered to
+an unvalidated URI is the primitive an attacker wants. Both the authorize
+endpoint and the consent handler render a plain error page instead.
+
+**Refresh tokens rotate, and reuse revokes the grant.** Rotation writes a
+new row and points the old one at it. A legitimate client never replays a
+rotated token, so a replay means the token leaked or two clients share one
+grant — both answered by revoking.
+
+**The consent hand-off is a self-navigating document, not a 302.** The
+`form-action 'self'` directive in this app's CSP is enforced against the
+target of a post-submission redirect by some browsers and not others. The
+flow would have worked in one browser and died at the final step in
+another, with a console error no user reads. `form-action` governs where a
+form may submit, not where a page may navigate.
+
+**Login now honours a validated `callbackUrl`.** It was hardcoded to
+`/app`, which would have dropped anyone who had to sign in mid-connection
+onto the dashboard with no sign that the authorization was abandoned. The
+validator is deliberately strict — relative paths under `/app/` only —
+because an open redirect on a login page is a phishing aid.
+
+### Verification
+
+325 unit assertions pass, up from 278. PKCE is checked against RFC 7636's
+own appendix B vector rather than only against itself. The redirect
+matcher, the PKCE verifier and the login validator were each
+mutation-tested.
+
+One finding worth recording: mutation testing showed the
+protocol-relative guard in `safeCallbackUrl` is unreachable — the `/app/`
+prefix check already rejects those forms. It is kept as the layer that
+holds if that check is ever loosened, and is now documented as redundant
+rather than left looking load-bearing.
+
+**Not verified:** no flow has run end to end against a browser. The
+authorization code path, the consent screen and refresh rotation have not
+been exercised against a deployment.
 
 **Not planned:** exposing user management, password operations,
 `integration.manage`, hour-bank adjustments or billing-policy edits

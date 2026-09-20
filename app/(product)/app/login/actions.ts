@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
+import { safeCallbackUrl } from "@/lib/app-auth/callback-url";
 
 // Security review (OWASP A07:2021 - Identification and Authentication
 // Failures). lib/app-auth/login-attempts.ts's graduated lockout is
@@ -40,7 +41,11 @@ export async function loginAction(_prevState: { error?: string } | undefined, fo
   const password = String(formData.get("password") || "");
 
   try {
-    await signIn("credentials", { identifier, password, redirectTo: "/app" });
+    await signIn("credentials", {
+      identifier,
+      password,
+      redirectTo: safeCallbackUrl(formData.get("callbackUrl")),
+    });
     return {};
   } catch (err) {
     if (err instanceof AuthError) {

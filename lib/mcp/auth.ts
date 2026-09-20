@@ -3,6 +3,8 @@ import type { AuthInfo } from "@modelcontextprotocol/server";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
+import { looksLikeOAuthAccessToken } from "@/lib/mcp/oauth/pkce";
+import { resolveOAuthAccessToken } from "@/lib/mcp/oauth/store";
 
 // Phase 13 (MCP server, docs/adr/0005): "who is making this MCP request,
 // and are they still allowed to".
@@ -50,6 +52,24 @@ const LAST_USED_THROTTLE_MS = 15 * 60 * 1000;
 /// belongs to a deactivated user all return the same 401, so an attacker
 /// holding a stale token learns nothing about why it stopped working.
 export async function resolveMcpActor(rawToken: string): Promise<User | null> {
+  // Phase 15: two credential kinds reach this function now - OAuth access
+  // tokens (ank_oat_) and the Phase 13 personal access tokens (ank_mcp_).
+  // They are told apart by prefix, with no database round trip, and each
+  // is resolved by its own store.
+  //
+  // Both paths run the SAME four checks (the token's own validity, then
+  // the user's deletedAt, status and tokenVersion) - see
+  // resolveOAuthAccessToken for the OAuth half. An OAuth grant is not a
+  // reason to skip any of them.
+  //
+  // The PAT path is kept deliberately, not left behind: it is what the
+  // stdio bridge uses, so existing installs keep working while people
+  // migrate to the connector. It becomes removable once nobody is on the
+  // bridge, and that is a one-line deletion here plus dropping a table.
+  if (looksLikeOAuthAccessToken(rawToken)) {
+    return resolveOAuthAccessToken(rawToken);
+  }
+
   // Cheap shape check first: rejects a scanner spraying random bearer
   // values without touching Postgres at all.
   if (!looksLikeMcpToken(rawToken)) return null;

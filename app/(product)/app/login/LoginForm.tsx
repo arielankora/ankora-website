@@ -35,11 +35,16 @@ function SubmitButton() {
 // message exists to close. Building a safe, non-enumerating version of
 // that counter (e.g. per-IP rather than per-account) is a real feature,
 // but a new one - out of scope for a visual pass.
-export function LoginForm() {
+export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction] = useFormState(loginAction, {});
 
   return (
     <form action={formAction}>
+      {/* Phase 15: carries the OAuth consent screen's destination through
+          the sign-in. Validated server-side in actions.ts - never trusted
+          as given. Empty for a normal direct login, which falls back to
+          /app. */}
+      <input type="hidden" name="callbackUrl" value={callbackUrl ?? ""} />
       <label className="block">
         <span className="mb-1.5 block text-xs text-appNavy/60">אימייל או שם משתמש</span>
         <input

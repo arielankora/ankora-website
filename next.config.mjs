@@ -65,6 +65,30 @@ const nextConfig = {
   // apex (ankora.co.il) to www.ankora.co.il, preserving the full path - that
   // redirect is NOT duplicated here to avoid an unnecessary redirect chain.
   // These are the only three URL-level redirects the app itself owns.
+  // Phase 15 (MCP OAuth, docs/adr/0005). OAuth discovery lives at fixed
+  // /.well-known/ paths that clients probe directly, and the 401 challenge
+  // from /api/mcp already names the first of them. The handlers live at
+  // ordinary route paths and are mapped here rather than in a dot-prefixed
+  // directory under app/, because Next does not clearly document whether
+  // those are routable - and a wrong guess fails only at deploy time, as a
+  // 404 that reads like a discovery bug rather than a routing one.
+  async rewrites() {
+    return [
+      {
+        source: '/.well-known/oauth-authorization-server',
+        destination: '/api/mcp/oauth/metadata/authorization-server',
+      },
+      // Some clients probe the resource-suffixed form first, per RFC 9728.
+      {
+        source: '/.well-known/oauth-protected-resource',
+        destination: '/api/mcp/oauth/metadata/protected-resource',
+      },
+      {
+        source: '/.well-known/oauth-protected-resource/:path*',
+        destination: '/api/mcp/oauth/metadata/protected-resource',
+      },
+    ];
+  },
   async redirects() {
     return [
       // Old flat "/solutions/*" URLs predate locale-prefixed routing. The

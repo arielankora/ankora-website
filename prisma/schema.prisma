@@ -141,6 +141,10 @@ model User {
   // Phase 13: MCP server (docs/adr/0005).
   mcpAccessTokens McpAccessToken[]
 
+  // Phase 15: MCP OAuth (docs/adr/0005).
+  oauthCodes  OAuthAuthorizationCode[]
+  oauthTokens OAuthToken[]
+
   @@index([role, status])
   @@map("users")
 }
@@ -201,6 +205,107 @@ model McpAccessToken {
 
   @@index([userId, revokedAt])
   @@map("mcp_access_tokens")
+}
+
+/// Phase 15 (MCP OAuth, docs/adr/0005): an OAuth client Claude registered
+/// with us.
+///
+/// Claude registers a fresh client on every new connection via Dynamic
+/// Client Registration (RFC 7591), so rows here accumulate one per
+/// connection rather than one per product. That is expected and is why
+/// `lastUsedAt` exists - stale rows are prunable.
+///
+/// `clientSecretHash` is nullable because DCR registers Claude as a
+/// PUBLIC client: it authenticates at the token endpoint with PKCE and no
+/// secret. A secret is stored only if a confidential client ever
+/// registers one, and it is hashed for the same reason every other
+/// credential in this schema is.
+model OAuthClient {
+  id               String    @id @default(cuid())
+  clientId         String    @unique
+  clientSecretHash String?
+  clientName       String
+  /// Exact strings the client registered. Matching is exact, except for
+  /// RFC 8252 loopback URIs where the port is ignored - see
+  /// lib/mcp/oauth/redirect.ts for why that exception is required and how
+  /// narrowly it is applied.
+  redirectUris     String[]
+  grantTypes       String[]
+  scopes           String[]
+  createdAt        DateTime  @default(now())
+  lastUsedAt       DateTime?
+
+  codes  OAuthAuthorizationCode[]
+  tokens OAuthToken[]
+
+  @@map("oauth_clients")
+}
+
+/// Phase 15: a single-use authorization code, bound to a PKCE challenge.
+///
+/// Short-lived by design (RFC 6749 recommends under ten minutes) and
+/// single-use: `consumedAt` is what makes a replayed code fail. Only the
+/// hash is stored, same principle as PasswordResetToken and
+/// McpAccessToken.
+model OAuthAuthorizationCode {
+  id                  String    @id @default(cuid())
+  codeHash            String    @unique
+  clientId            String
+  userId              String
+  redirectUri         String
+  scope               String
+  codeChallenge       String
+  codeChallengeMethod String
+  /// RFC 8707 resource indicator: which MCP server this code is for. Bound
+  /// at authorization time and echoed into the token, so a code minted for
+  /// one resource cannot be exchanged for a token valid at another.
+  resource            String?
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+  @@index([userId])
+  @@map("oauth_authorization_codes")
+}
+
+/// Phase 15: an issued access token and the refresh token that renews it.
+///
+/// One row per access/refresh pair. Refresh rotation (required for public
+/// clients by the MCP authorization spec) creates a NEW row and points the
+/// old one at it via `rotatedToId`, rather than mutating in place - so a
+/// stolen-and-replayed refresh token is visible as an attempt to reuse a
+/// row that already rotated, instead of being indistinguishable from
+/// normal use.
+///
+/// `tokenVersion` snapshots User.tokenVersion at issue, exactly as
+/// McpAccessToken does, so "logout all sessions" revokes OAuth grants too.
+model OAuthToken {
+  id               String    @id @default(cuid())
+  clientId         String
+  userId           String
+  accessTokenHash  String    @unique
+  refreshTokenHash String?   @unique
+  scope            String
+  resource         String?
+  tokenVersion     Int       @default(0)
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime?
+  revokedAt        DateTime?
+  /// Set when this row's refresh token was exchanged for a new pair.
+  rotatedToId      String?
+  lastUsedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  client OAuthClient @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  user   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([clientId])
+  @@map("oauth_tokens")
 }
 
 /// A customer of Ankora. Billing policy / hour bank fields are
