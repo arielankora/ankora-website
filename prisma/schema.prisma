@@ -138,6 +138,9 @@ model User {
   importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
   holidaySubscriptionsOwned  HolidayCalendarSubscription[]  @relation("HolidaySubscriptionResponsible")
 
+  // Phase 13: MCP server (docs/adr/0005).
+  mcpAccessTokens McpAccessToken[]
+
   @@index([role, status])
   @@map("users")
 }
@@ -157,6 +160,47 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// Phase 13 (docs/adr/0005): a personal access token that lets ONE Ankora
+/// employee reach the MCP server at /api/mcp from their own Claude
+/// Desktop. Deliberately per-user and never per-organization: every tool
+/// call resolves this row to a real `User` and runs through the same
+/// `assertCan`/`listAccessibleClients` checks a screen does, so a shared
+/// credential would erase the entire RBAC model (lib/app-auth/
+/// permissions.ts) and leave every AuditEvent pointing at the same actor.
+///
+/// Only the SHA-256 hash is stored, exactly like PasswordResetToken above
+/// and for the identical reason. Note this is a *different* pattern from
+/// lib/cron-auth.ts's constant-time compare, on purpose: that endpoint
+/// compares one presented string against one known secret, which needs
+/// timingSafeEqual; here the presented token is hashed first and used as
+/// an indexed lookup key, so a wrong token simply finds no row and there
+/// is no per-byte comparison to time.
+///
+/// `expiresAt` is mandatory (no never-expiring tokens). Revocation has two
+/// independent paths: `revokedAt` on this row, and User.tokenVersion - see
+/// lib/mcp/auth.ts for why the second one matters.
+model McpAccessToken {
+  id         String    @id @default(cuid())
+  userId     String
+  /// Human-readable label so a user can tell two of their own tokens apart
+  /// when revoking one ("MacBook Air", "old laptop").
+  label      String
+  tokenHash  String    @unique
+  /// Snapshot of User.tokenVersion when the token was issued. A later
+  /// "logout all sessions" bumps the user's counter past this value and
+  /// the token stops resolving - see lib/mcp/auth.ts.
+  tokenVersion Int     @default(0)
+  lastUsedAt DateTime?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@map("mcp_access_tokens")
 }
 
 /// A customer of Ankora. Billing policy / hour bank fields are

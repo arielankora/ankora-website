@@ -239,6 +239,61 @@ existed.
   1 - it's an append-only table with a read-only filtered viewer;
   retention/export was never a stated acceptance criterion for any phase.
 
+### Claude Desktop (MCP)
+
+`/api/mcp` exposes the Time Tracking app to an employee's Claude Desktop
+over the Model Context Protocol. **Phase 1 is read-only** — three tools:
+`list_my_clients`, `get_active_timer`, `list_my_time_entries`. Writes are
+Phase 2. The full reasoning, including why this is not a Claude custom
+connector yet, is in `docs/adr/0005-mcp-server.md`.
+
+Everything runs as the employee whose token is used: the tools call
+`lib/app-domain/*` directly, so `assertCan`, the `UserClientAccess`
+scoping and the audit trail all apply exactly as they do on screen. There
+is no shared or system-level credential.
+
+**1. Issue a token** (needs database access; one per person per machine):
+
+```bash
+DATABASE_URL="postgresql://..." npx tsx scripts/mcp-issue-token.ts \
+    --email someone@ankora.co.il --label "MacBook Air"
+```
+
+The token is printed once and is not recoverable. It expires in 90 days.
+List and revoke with `--list` and `--revoke <tokenId>`.
+
+**2. Point Claude Desktop at the bridge.** In
+`~/Library/Application Support/Claude/claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "ankora": {
+      "command": "node",
+      "args": ["/absolute/path/to/ankora-website/scripts/mcp-bridge.mjs"],
+      "env": {
+        "ANKORA_MCP_URL": "https://ankora-website.vercel.app/api/mcp",
+        "ANKORA_MCP_TOKEN": "ank_mcp_..."
+      }
+    }
+  }
+}
+```
+
+Restart Claude Desktop. `scripts/mcp-bridge.mjs` is a dependency-free
+stdio↔HTTP relay — it needs Node 20+ and nothing installed.
+
+**Revoking access.** Either `--revoke <tokenId>`, or the existing "logout
+all sessions" action: `McpAccessToken` snapshots `User.tokenVersion` at
+issue time, so bumping that counter invalidates the person's MCP tokens
+along with their browser sessions. Deactivating or soft-deleting the user
+does the same.
+
+**Troubleshooting.** The bridge logs to stderr, which Claude Desktop
+surfaces in its MCP log (`~/Library/Logs/Claude/mcp*.log`). A `401` there
+means the token is revoked, expired, or the account is no longer active —
+issue a new one.
+
 ## Not yet built (flagged in the plan, out of v1 scope)
 
 - `/insights` content hub (SEO keyword targets — reserved but empty)
