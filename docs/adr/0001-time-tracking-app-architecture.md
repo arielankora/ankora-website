@@ -3234,11 +3234,96 @@ folder IDs themselves, are unchanged from the original relay task - see
 `lib/google-drive.ts`'s `DRIVE_FOLDER_EXCEL_REPORTS`/
 `DRIVE_FOLDER_DB_DUMPS` constants.
 
-**Status:** implemented, not yet deployed. Needs, in order: (1) Ariel
-creates the GCP service account and shares both folders with it (steps
-in `.env.example`), (2) the two env vars set in Vercel, (3) this PR
-merged and deployed, (4) one live nightly run watched end-to-end before
-considering the old Claude-relay task safe to retire.
+**Status: SUPERSEDED before it ever shipped - see section 22.8 below.**
+The code described above was merged (PR #51) but could not be activated:
+creating the service-account key it depends on is blocked by a Google
+organisation policy. The Drive upload described here still happens; only
+the way it authenticates changed, and the "new credential in Vercel env
+vars" tradeoff agonised over above no longer applies at all.
+
+### 22.8 The tradeoff in 22.7 turned out to be unnecessary (2026-09-20)
+
+Section 22.7 accepted, reluctantly and explicitly, that reversing 22.2's
+"no Google credential in this app" decision was the price of a reliable
+nightly Drive backup. It was not. The price was avoidable, and we found
+that out because Google refused to sell us the thing we were trying to buy.
+
+**What happened.** Creating the service-account JSON key that 22.7's design
+needs failed with `iam.managed.disableServiceAccountKeyCreation`, an
+organisation policy Google now enforces by default on newly created
+organisations - ours was minutes old. The console's own error text says it
+plainly: *"Service account keys are a security risk if not managed
+correctly. You should choose a more secure alternative."*
+
+We could have suppressed that policy for this one project; the role to do
+it was two clicks away. We deliberately did not. A guardrail that fires on
+day one of an organisation's life, telling you the design you are about to
+ship is the risky one, is information - and `claude/soc2-readiness-gaps.md`
+already tracks long-lived secrets as a known weakness. Punching the first
+hole in a fresh security baseline to ship a backup job would have been
+exactly the kind of small, locally-reasonable decision that these documents
+exist to prevent.
+
+**What we do instead.** Workload Identity Federation. Vercel issues each
+deployment a short-lived, signed OIDC token (`VERCEL_OIDC_TOKEN`); Google's
+Security Token Service is configured to trust that issuer for this one
+Vercel project; the resulting federated token impersonates the same
+dedicated service account for one hour. `lib/google-drive.ts` performs both
+exchanges with plain `fetch` - still no new npm dependency - and the Drive
+upload path below it is unchanged.
+
+**What this buys, concretely:**
+
+- **No secret exists.** The four new env vars (`GCP_PROJECT_NUMBER`,
+  `GCP_WORKLOAD_IDENTITY_POOL_ID`,
+  `GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID`, `GCP_SERVICE_ACCOUNT_EMAIL`)
+  are public identifiers. There is nothing to leak, rotate, or discover
+  has expired at 03:00 on a Saturday. This closes a `soc2-readiness-gaps.md`
+  item rather than opening one.
+- **22.2's original reasoning survives intact.** That section's concern was
+  a Google credential living in this app. There isn't one. 22.7 read as a
+  reversal of 22.2; 22.8 is not - it is 22.2's requirement met by a
+  mechanism that did not exist in this stack when 22.2 was written.
+- **Compromise is bounded three ways.** Vercel signs tokens only for this
+  team; the provider's attribute condition accepts only this project's
+  `sub` claim; and the service account itself reaches only the two shared
+  Drive folders.
+
+**One implementation detail worth recording,** because it would have been
+a confusing failure at 03:00: the two destination folders live in a Shared
+drive, not in anyone's My Drive, so the upload call must send
+`supportsAllDrives=true`. Without it Drive v3 returns a 404 on the *parent
+folder* rather than a permission error, which reads like a wrong folder ID.
+The Shared drive is also the right home on its own merits - a service
+account has no storage quota, so files it writes into a My Drive folder can
+fail with `storageQuotaExceeded` regardless of size, and a Shared drive's
+files outlive any individual person's account.
+
+**What it costs.** Setup is more involved than downloading a JSON key: a
+workload identity pool, a provider, an attribute condition and an IAM
+binding, all documented step-by-step in `.env.example`. The attribute
+condition in particular is load-bearing - without it, any deployment on the
+Vercel team could federate in - so it is called out there rather than left
+as an exercise. And unlike a key, this cannot be tested locally: there is no
+`VERCEL_OIDC_TOKEN` outside Vercel, so the module reports a clear error and
+the email path carries the data, which is the same graceful-degradation
+contract as before.
+
+**A note on how this decision got made,** because it is the reusable part:
+the blocking error was not treated as an obstacle to route around. Twice now
+on this feature - first the sandbox's classifier refusing to move backup
+bytes, now Google's policy refusing to mint a key - a security control said
+no, and both times the control was pointing at a real design flaw rather
+than getting in the way. The first "no" moved the upload out of an AI relay
+and into this app. The second removed the credential entirely. The feature
+is better for both refusals than the version originally designed.
+
+**Status:** implemented. Needs, in order: (1) Ariel creates the workload
+identity pool and provider and grants the pool access to the service
+account, (2) the two Drive folders shared with the service account as
+Editor, (3) the four env vars set in Vercel, (4) this PR merged and
+deployed, (5) one live nightly run watched end-to-end before considering the
+old Claude-relay task safe to retire.
 
 ## 23. Addendum: Profile & Guide screens redesign (screen 18)
 
