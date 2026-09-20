@@ -10,4 +10,12 @@ export function getDictionary(locale: string): Dictionary {
   return dictionaries[(locale as Locale) in dictionaries ? (locale as Locale) : defaultLocale];
 }
 
-export type { Locale, Dictionary, SegmentContent, SimplePageContent, PagesContent } from "./types";
+export type {
+  Locale,
+  Dictionary,
+  CapabilityId,
+  SegmentContent,
+  SegmentBridge,
+  SimplePageContent,
+  PagesContent,
+} from "./types";

@@ -44,12 +44,11 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
   const dict = getDictionary(locale);
   return (
     <SegmentPage
+      dict={dict}
       content={dict.pages.segments.founders}
       locale={locale}
       cta={dict.hero.ctaPrimary}
       currentHref="/solutions/founders"
-      solutionsMenu={dict.nav.solutionsMenu}
-      crossLinkLabel={locale === "he" ? "פתרונות נוספים" : "More Solutions"}
     />
   );
 }
