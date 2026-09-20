@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote-client/rsc";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
-import { Container } from "@/components/ui/Container";
 import { WideContainer } from "@/components/ui/WideContainer";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
-import { Eyebrow } from "@/components/ui/Eyebrow";
+import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { BlogCard } from "@/components/sections/BlogCard";
 import { FinalCTA } from "@/components/sections/FinalCTA";
@@ -60,15 +58,36 @@ function formatDate(dateStr: string, locale: Locale) {
   }
 }
 
-// /he redesign: this page (unlike the blog index) never received a dark-theme He
-// variant -- it kept rendering the pre-redesign bg-cream light theme under /he too,
-// same root cause as the pricing page (see PricingClient.tsx). The article body itself
-// (MDX prose via the shared `.blog-article` CSS class) is hardcoded to dark-navy-on-
-// light colors, so it needed a `.blog-article-dark` companion class (added to
-// globals.css) rather than just dropping the section backgrounds -- otherwise the text
-// would render dark-on-dark. Everything else follows the same PageHero/WideContainer/
-// Eyebrow/hairline conventions as every other /he page; the "related posts" grid reuses
-// the existing HeBlogCard (already correct, already h-full) unchanged.
+
+/**
+ * Three of the four posts open with an `# ` heading repeating the frontmatter title,
+ * so the page rendered two `h1`s and the title twice as body copy. The duplicate is
+ * dropped when it matches, and any other `h1` the body might carry is demoted, because
+ * the page's own title is the only first-level heading a post can have.
+ */
+function stripDuplicateTitle(content: string, title: string) {
+  const norm = (v: string) => v.replace(/\\/g, "").replace(/\s+/g, " ").trim();
+  return content.replace(/^\s*#\s+(.+?)\s*$/m, (match, heading: string) =>
+    norm(heading) === norm(title) ? "" : match
+  );
+}
+
+const MDX_COMPONENTS = {
+  h1: (props: React.ComponentProps<"h2">) => <h2 {...props} />,
+};
+
+/**
+ * A post reads like the rest of the publication: the same reading engine as the three
+ * SEO pages, via the `.longform` scope, so a post and a category page feel like one
+ * site rather than two.
+ *
+ * The hero image sits **below** the title, never behind it. Text over photography
+ * cannot be contrast-audited, and a right-to-left headline over a left-to-right
+ * composition crops wrongly in one of the two locales.
+ *
+ * This replaces a forked pair, the /he half of which had never been written — the page
+ * rendered the pre-redesign cream theme under /he too.
+ */
 export default async function BlogPostPage(
   props: {
     params: Promise<{ locale: string; slug: string }>;
@@ -102,194 +121,103 @@ export default async function BlogPostPage(
     mainEntityOfPage: { "@type": "WebPage", "@id": `${base}/${locale}/blog/${post.slug}` },
   };
 
-  if (locale === "he") {
-    return (
-      <>
-        <JsonLd id="blogpost-schema" data={articleSchema} />
-
-        <section className="relative overflow-hidden pb-16 pt-40 md:pb-20 md:pt-48">
-          <WideContainer className="relative z-[1]">
-            <Breadcrumbs
-              locale={locale}
-              items={[
-                { label: dict.blog.eyebrow, href: "/blog" },
-                { label: post.title },
-              ]}
-            />
-            <Reveal delay={0.06} className="mt-8">
-              <Badge>{categoryLabel}</Badge>
-            </Reveal>
-            <Reveal delay={0.12}>
-              <h1 className="mt-6 max-w-3xl text-[clamp(2rem,4.4vw,3.4rem)] font-extralight leading-[1.1] tracking-[-0.02em] text-cream">
-                {post.title}
-              </h1>
-            </Reveal>
-            <Reveal delay={0.18}>
-              <div className="mt-6 flex flex-wrap items-center gap-3 font-jbmono text-[11px] tracking-[0.1em] text-[#7C8EA3]">
-                <span>{post.author}</span>
-                <span aria-hidden>·</span>
-                <span>{formatDate(post.publishedAt, locale)}</span>
-                <span aria-hidden>·</span>
-                <span>
-                  {post.readingMinutes} {dict.blog.minRead}
-                </span>
-              </div>
-            </Reveal>
-          </WideContainer>
-        </section>
-
-        {post.coverImage && (
-          <section>
-            <WideContainer>
-              <div className="mx-auto w-full max-w-3xl py-10 md:py-14">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={post.coverImage}
-                  alt={post.title}
-                  className={`w-full border border-[rgba(243,234,219,0.12)] object-cover ${coverPositionClass(post.coverImagePosition)}`}
-                  style={{ maxHeight: 520 }}
-                />
-              </div>
-            </WideContainer>
-          </section>
-        )}
-
-        <section className={post.coverImage ? "pb-20 md:pb-28" : "py-16 md:py-24"}>
-          <WideContainer>
-            <div className="mx-auto w-full max-w-3xl">
-              <div className="blog-article blog-article-dark">
-                <MDXRemote source={post.content} />
-              </div>
-
-              <div className="mt-16">
-                <Button href={withLocale(locale, "/blog")} variant="secondary">
-                  {dict.blog.backToBlog}
-                </Button>
-              </div>
-            </div>
-          </WideContainer>
-        </section>
-
-        {related.length > 0 && (
-          <section className="border-t border-[rgba(243,234,219,0.12)] py-[clamp(36px,6vw,80px)]">
-            <WideContainer>
-              <Eyebrow>{dict.blog.relatedTitle}</Eyebrow>
-              <div className="mt-8 grid gap-6 md:grid-cols-3">
-                {related.map((p, i) => (
-                  <Reveal key={`${p.locale}-${p.slug}`} delay={i * 0.08}>
-                    <BlogCard post={p} dict={dict} locale={locale} />
-                  </Reveal>
-                ))}
-              </div>
-            </WideContainer>
-          </section>
-        )}
-
-        <FinalCTA dict={dict} locale={locale} />
-      </>
-    );
-  }
-
   return (
     <>
       <JsonLd id="blogpost-schema" data={articleSchema} />
 
-      <section className="relative overflow-hidden bg-navy pb-16 pt-40 md:pb-20 md:pt-48">
-        <div className="absolute inset-0 bg-radial-glow opacity-70" />
-        <Container className="relative">
-          <Breadcrumbs
-            locale={locale}
-            items={[
-              { label: dict.blog.eyebrow, href: "/blog" },
-              { label: post.title },
-            ]}
-          />
-          <Reveal delay={0.06} className="mt-8">
-            <Badge>{categoryLabel}</Badge>
-          </Reveal>
-          <Reveal delay={0.12}>
-            <h1 className="mt-6 max-w-3xl text-[30px] font-medium leading-[1.2] tracking-tight text-cream md:text-[46px]">
-              {post.title}
-            </h1>
-          </Reveal>
-          <Reveal delay={0.18}>
-            <div className="mt-6 flex flex-wrap items-center gap-3 text-sm text-cream/50">
-              <span>{post.author}</span>
-              <span aria-hidden>·</span>
-              <span>{formatDate(post.publishedAt, locale)}</span>
-              <span aria-hidden>·</span>
-              <span>
-                {post.readingMinutes} {dict.blog.minRead}
-              </span>
-            </div>
-          </Reveal>
-        </Container>
-      </section>
-
-      {post.coverImage && (
-        <section className="bg-cream">
-          {/* Deliberately not <Container> here: Container's own max-w-content
-              (1440px) and this max-w-3xl have equal CSS specificity, and
-              clsx doesn't dedupe conflicting Tailwind utilities, so
-              max-w-content was silently winning and rendering this image
-              far wider than the article text column below it. */}
-          <div className="mx-auto w-full max-w-3xl px-6 py-10 md:px-10 md:py-14 lg:px-14">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={post.coverImage}
-              alt={post.title}
-              className={`w-full rounded-2xl object-cover ${coverPositionClass(post.coverImagePosition)}`}
-              style={{ maxHeight: 520 }}
+      <section className="relative overflow-hidden pb-10 pt-40 md:pt-48">
+        <WideContainer className="relative z-[1]">
+          <div className="mx-auto max-w-[900px]">
+            <Breadcrumbs
+              locale={locale}
+              items={[
+                { label: dict.nav.home, href: "/" },
+                { label: dict.blog.eyebrow, href: "/blog" },
+                { label: post.title },
+              ]}
             />
-          </div>
-        </section>
-      )}
 
-      <section className={post.coverImage ? "bg-cream pb-20 md:pb-28" : "bg-cream py-16 md:py-24"}>
-        <Container className="max-w-3xl">
-          <div className="blog-article">
-            <MDXRemote source={post.content} />
-          </div>
+            <Reveal delay={0.06}>
+              <div className="mt-8">
+                <MonoLabel script="latin" size={10} tracking="0.12em" className="text-gold">
+                  {post.category.replace(/-/g, " ").toUpperCase()}
+                </MonoLabel>
+              </div>
+            </Reveal>
 
-          <div className="mt-16">
-            <Button href={withLocale(locale, "/blog")} variant="secondary">
-              {dict.blog.backToBlog}
-            </Button>
+            <Reveal delay={0.12}>
+              <h1 className="mt-4 max-w-[26ch] text-[clamp(1.95rem,3.8vw,3rem)] font-extralight leading-[1.2] tracking-[-0.03em] text-cream">
+                {post.title}
+              </h1>
+            </Reveal>
+
+            <Reveal delay={0.18}>
+              <div className="mt-6 flex flex-wrap items-center gap-2.5">
+                {/* The author is Latin in both dictionaries and keeps its tracking; the
+                    date follows the page language and drops it. */}
+                <MonoLabel script="latin" className="text-muted">
+                  {post.author}
+                </MonoLabel>
+                <MonoLabel aria-hidden className="text-line">·</MonoLabel>
+                <MonoLabel className="text-muted">
+                  <time dateTime={post.publishedAt}>{formatDate(post.publishedAt, locale)}</time>
+                </MonoLabel>
+                <MonoLabel aria-hidden className="text-line">·</MonoLabel>
+                <MonoLabel className="text-muted">
+                  {post.readingMinutes} {dict.blog.minRead}
+                </MonoLabel>
+              </div>
+            </Reveal>
           </div>
-        </Container>
+        </WideContainer>
       </section>
 
-      {related.length > 0 && (
-        <section className="border-t border-lineDark bg-cream py-16 md:py-20">
-          <Container>
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-appNavy/35">
-              {dict.blog.relatedTitle}
-            </span>
-            <div className="mt-6 grid gap-6 md:grid-cols-3">
-              {related.map((p) => (
-                <BlogCard key={`${p.locale}-${p.slug}`} post={p} dict={dict} locale={locale} />
-              ))}
-            </div>
-          </Container>
-        </section>
-      )}
+      <WideContainer>
+        <div className="mx-auto max-w-[900px]">
+          {post.coverImage && (
+            <Reveal>
+              <figure className="m-0">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={post.coverImage}
+                  alt=""
+                  className={`aspect-[16/7] w-full object-cover outline outline-1 outline-[rgba(243,234,219,0.11)] ${coverPositionClass(post.coverImagePosition)}`}
+                />
+              </figure>
+            </Reveal>
+          )}
 
-      <section className="relative overflow-hidden bg-navy py-24 md:py-32">
-        <div className="absolute inset-0 bg-radial-glow" />
-        <Container className="relative text-center">
-          <Reveal>
-            <h2 className="mx-auto max-w-2xl text-[28px] font-medium leading-[1.15] tracking-tight text-cream md:text-[40px]">
-              {dict.finalCta.title}
-            </h2>
-          </Reveal>
-          <Reveal delay={0.1}>
-            <p className="mx-auto mt-5 max-w-md text-cream/55">{dict.finalCta.body}</p>
-          </Reveal>
-          <Reveal delay={0.2} className="mt-10 flex justify-center">
-            <Button href={withLocale(locale, "/contact")}>{dict.finalCta.cta}</Button>
-          </Reveal>
-        </Container>
-      </section>
+          <div className="longform mt-[clamp(28px,4vw,44px)]">
+            <MDXRemote source={stripDuplicateTitle(post.content, post.title)} components={MDX_COMPONENTS} />
+          </div>
+
+          <div className="mt-[clamp(40px,5vw,64px)] border-t border-[rgba(243,234,219,0.12)] pt-6">
+            <Link
+              href={withLocale(locale, "/blog")}
+              className="inline-flex min-h-[44px] items-center transition-colors hover:text-gold"
+            >
+              <MonoLabel className="text-muted transition-colors hover:text-gold">
+                {locale === "he" ? "←" : "→"} {dict.blog.backToBlog}
+              </MonoLabel>
+            </Link>
+          </div>
+
+          {related.length > 0 && (
+            <section className="mt-[clamp(40px,5vw,64px)] border-t border-[rgba(243,234,219,0.12)] pt-[22px]">
+              <MonoLabel size={10} className="text-muted">
+                {dict.blog.relatedTitle}
+              </MonoLabel>
+              <div className="mt-4 flex flex-col gap-px">
+                {related.slice(0, 3).map((r) => (
+                  <BlogCard key={r.slug} post={r} dict={dict} locale={locale} variant="related" />
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      </WideContainer>
+
+      <FinalCTA dict={dict} locale={locale} />
     </>
   );
 }
