@@ -29,9 +29,11 @@ export type TimeEntryLike = {
   source: string;
   isManual: boolean;
   isEdited: boolean;
+  createdVia?: string | null;
   client?: { name: string } | null;
   category?: { name: string } | null;
   task?: { title: string } | null;
+  user?: { name: string } | null;
 };
 
 export type SerializedTimeEntry = {
@@ -46,6 +48,7 @@ export type SerializedTimeEntry = {
   billableMinutes: number | null;
   note: string | null;
   source: string;
+  createdVia: string;
   edited: boolean;
 };
 
@@ -71,8 +74,24 @@ export function serializeTimeEntry(entry: TimeEntryLike): SerializedTimeEntry {
     billableMinutes: toMinutes(entry.billableSeconds),
     note: entry.note,
     source: entry.source,
+    // Phase 14: emitted on every entry, not only ones Claude made, so a
+    // model summarising a week can say how much of it came through the
+    // agent without a second call. Older rows are APP by migration.
+    createdVia: entry.createdVia ?? "APP",
     edited: entry.isEdited,
   };
+}
+
+/// An entry as an admin sees it: the same shape plus whose it is.
+///
+/// A separate function rather than an optional field on the one above,
+/// because the employee name must never appear on the self-scoped tools -
+/// keeping the two payloads physically distinct is what makes that
+/// impossible to get wrong by editing one object literal.
+export function serializeTeamTimeEntry(
+  entry: TimeEntryLike
+): SerializedTimeEntry & { employee: string | null } {
+  return { ...serializeTimeEntry(entry), employee: entry.user?.name ?? null };
 }
 
 /// How long a running timer has been going. Taken from `now` rather than

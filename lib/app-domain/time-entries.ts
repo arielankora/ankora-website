@@ -6,7 +6,7 @@ import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
-import type { User, TimeEntry, Prisma } from "@prisma/client";
+import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
 // revisions." Everything here backs spec 18.1's timer/start, timer/stop and
@@ -209,7 +209,16 @@ export async function getActiveTimer(userId: string): Promise<TimeEntry | null> 
 
 export async function startTimer(
   actor: User,
-  input: { clientId: string; categoryId: string; taskId?: string | null; note?: string | null }
+  input: {
+    clientId: string;
+    categoryId: string;
+    taskId?: string | null;
+    note?: string | null;
+    /// Phase 14: where this entry is being created from. Optional and
+    /// defaulted so every existing caller (the timer screen) keeps its
+    /// current behaviour without a change.
+    createdVia?: EntryOrigin;
+  }
 ) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
@@ -237,6 +246,7 @@ export async function startTimer(
         note: input.note?.trim() || null,
         source: "TIMER",
         isManual: false,
+        createdVia: input.createdVia ?? "APP",
       },
     });
   } catch (err: any) {
@@ -401,6 +411,8 @@ export async function createManualEntry(
     note?: string | null;
     backdateReason?: string | null;
     allowOverlapOverride?: boolean;
+    /// Phase 14 - see startTimer's own createdVia.
+    createdVia?: EntryOrigin;
   }
 ) {
   const isSelf = targetUserId === actor.id;
@@ -442,6 +454,7 @@ export async function createManualEntry(
       note: input.note?.trim() || null,
       source: "MANUAL",
       isManual: true,
+      createdVia: input.createdVia ?? "APP",
     },
   });
 
