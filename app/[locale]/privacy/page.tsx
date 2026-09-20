@@ -2,25 +2,25 @@ import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { LegalPage } from "@/components/sections/LegalPage";
 
-export async function generateMetadata(
-  props: {
-    params: Promise<{ locale: string }>;
-  }
-): Promise<Metadata> {
+const PAGE = "privacy" as const;
+const PATH = "/privacy";
+
+export async function generateMetadata(props: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const dict = getDictionary(params.locale);
-  const legal = dict.pages.legal;
+  const doc = getDictionary(params.locale).pages.legal.pages[PAGE];
   return {
-    title: `${legal.privacyTitle} | Ankora`,
-    description: legal.placeholder,
+    title: `${doc.title} | Ankora`,
+    description: doc.sub,
     alternates: {
-      canonical: `/${locale}/privacy`,
-      languages: { he: "/he/privacy", en: "/en/privacy" },
+      canonical: `/${locale}${PATH}`,
+      languages: { he: `/he${PATH}`, en: `/en${PATH}` },
     },
     openGraph: {
-      title: `${legal.privacyTitle} | Ankora`,
-      description: legal.placeholder,
+      title: `${doc.title} | Ankora`,
+      description: doc.sub,
       type: "website",
     },
   };
@@ -29,15 +29,5 @@ export async function generateMetadata(
 export default async function Page(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
-  const dict = getDictionary(locale);
-  return (
-    <LegalPage
-      dict={dict}
-      locale={locale}
-      eyebrow={dict.footer.privacy}
-      title={dict.pages.legal.privacyTitle}
-      sub={dict.pages.legal.placeholder}
-      sections={dict.pages.legal.privacySections}
-    />
-  );
+  return <LegalPage dict={getDictionary(locale)} locale={locale} page={PAGE} />;
 }

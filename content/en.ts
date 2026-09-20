@@ -1,4 +1,5 @@
 import type { Dictionary } from "./types";
+import legal from "./legal/en";
 
 const en: Dictionary = {
   meta: {
@@ -494,89 +495,7 @@ const en: Dictionary = {
       successMessage: "Thank you! We've received your message and will get back to you soon.",
       errorMessage: "Something went wrong sending this. Please try again, or email us directly at hello@ankora.co.il.",
     },
-    legal: {
-      privacyTitle: "Privacy Policy",
-      termsTitle: "Terms of Use",
-      placeholder: "For privacy or data security questions, please contact us directly at hello@ankora.co.il.",
-      termsPlaceholder: "The terms governing use of this site and Ankora’s services.",
-      updated: "Last updated: August 2026",
-      updatedISO: "2026-08",
-      contentsLabel: "Contents",
-      // Anchors on these two pages are positional -- #section-1 .. #section-8, derived
-      // from array order, matching the numbering rule the rest of the site uses. They
-      // are stable across both locales and survive rewording, but NOT reordering: a
-      // clause inserted in the middle silently retargets every anchor below it, and a
-      // link somebody filed in a contract then points at the wrong clause.
-      // Sections may be appended. They must not be reordered or inserted.
-      privacySections: [
-        {
-          title: "Overview",
-          body: "Ankora (\"the company\", \"we\") operates an operational management platform combining human oversight with AI. This policy explains what information we collect, how it is used, and how it is stored and protected.",
-        },
-        {
-          title: "Information we collect",
-          body: "Contact details (name, phone, email), the content of requests submitted to us, and operational information required to carry out defined tasks, including calendar details, preferences, and relevant correspondence shared with us.",
-        },
-        {
-          title: "How information is used",
-          body: "Information is used to operate the service, personalize it to each client's needs, coordinate with external parties on the client's behalf, and continuously improve service quality. It is never used for purposes unrelated to the service without explicit consent.",
-        },
-        {
-          title: "Sharing with third parties",
-          body: "Information is shared with external providers only to the extent required to complete a specific requested task, and only after those providers have been vetted. Ankora does not sell, rent, or transfer personal information for third-party marketing purposes.",
-        },
-        {
-          title: "Data security",
-          body: "We apply industry-standard technical and organizational safeguards, including restricted access permissions, encryption in transit and at rest, and confidentiality commitments from all staff and authorized providers.",
-        },
-        {
-          title: "Retention and your rights",
-          body: "Information is retained for as long as needed to provide the service and comply with legal requirements. You may contact us at any time to review, correct, or delete your information.",
-        },
-        {
-          title: "Cookies and analytics",
-          body: "The site makes limited use of basic analytics tools to understand and improve usage. Cookies can be blocked through your browser settings without affecting the site's functionality.",
-        },
-        {
-          title: "Contact",
-          body: "For questions about this policy or the personal information we hold, please contact us at hello@ankora.co.il.",
-        },
-      ],
-      termsSections: [
-        {
-          title: "General",
-          body: "Use of this site and Ankora's services is subject to the terms below. Using the site or requesting an intro call constitutes acceptance of these terms.",
-        },
-        {
-          title: "The service",
-          body: "Ankora provides an operational management layer that combines a dedicated human operations manager with technology that supports coordination, tracking, and follow-up. The service does not make financial, legal, or medical decisions on a client's behalf, and is not a substitute for professional advice in those areas.",
-        },
-        {
-          title: "Getting started",
-          body: "Engagements begin with an intro call to assess fit, after which scope and commercial terms are agreed individually. There is no long-term commitment, and either party may end the engagement per the terms agreed between them.",
-        },
-        {
-          title: "Client responsibilities",
-          body: "Clients are responsible for providing accurate, up-to-date information and any access required to carry out defined tasks. Ankora acts based on the information and instructions provided by the client.",
-        },
-        {
-          title: "Limitation of liability",
-          body: "Ankora takes reasonable care in selecting external providers but is not liable for their failures beyond that reasonable vetting. The service is provided \"as is\", and nothing here extends Ankora's liability beyond what is required by law.",
-        },
-        {
-          title: "Confidentiality and IP",
-          body: "All information shared as part of an engagement is treated as strictly confidential. All content, design, and technology on this site are the property of Ankora and may not be used without prior written permission.",
-        },
-        {
-          title: "Governing law",
-          body: "These terms are governed exclusively by the laws of the State of Israel, and the competent courts of the Tel Aviv district shall have exclusive jurisdiction.",
-        },
-        {
-          title: "Contact",
-          body: "For questions about these terms, please contact us at hello@ankora.co.il.",
-        },
-      ],
-    },
+    legal,
     segmentBridge: {
       pre: "This is Ankora's ",
       categoryLink: "Personal Operations Management",
@@ -1146,6 +1065,9 @@ const en: Dictionary = {
     rights: "All rights reserved",
     privacy: "Privacy",
     terms: "Terms",
+    security: "Security and Trust",
+    serviceTerms: "Service Terms",
+    dpa: "Data Processing Addendum",
   },
 };
 
