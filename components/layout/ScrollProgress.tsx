@@ -3,10 +3,13 @@
 import { useEffect, useRef } from "react";
 
 /**
- * Scroll progress bar, `/he`-only (design_handoff_ankora_redesign/README.md,
- * "Page-level furniture" #2). Fixed, 2px, z-60. The fill anchors to the RTL
- * start edge (`insetInlineStart: 0`) so it grows right-to-left, per the hard
- * constraint that progress bars fill right-to-left in this redesign.
+ * Scroll progress bar. Fixed, 2px, z-60. The fill anchors to the inline start edge,
+ * so it grows right-to-left in Hebrew and left-to-right in English on its own.
+ *
+ * Now rendered in both locales (the site redesign collapses the /he-only page
+ * furniture). The gradient has no logical-direction keyword in CSS, so it is
+ * declared twice and keyed off `dir`: faint at the start edge, solid at the
+ * leading edge, in both directions.
  */
 export function ScrollProgress() {
   const barRef = useRef<HTMLDivElement>(null);
@@ -30,12 +33,8 @@ export function ScrollProgress() {
     <div className="fixed inset-x-0 top-0 z-[60] h-[2px]" aria-hidden="true">
       <div
         ref={barRef}
-        className="absolute top-0 h-full"
-        style={{
-          insetInlineStart: 0,
-          width: "0%",
-          background: "linear-gradient(to left, #B08D57, rgba(176,141,87,0.2))",
-        }}
+        className="absolute top-0 h-full bg-[linear-gradient(to_right,rgba(176,141,87,0.2),#B08D57)] rtl:bg-[linear-gradient(to_left,rgba(176,141,87,0.2),#B08D57)]"
+        style={{ insetInlineStart: 0, width: "0%" }}
       />
     </div>
   );

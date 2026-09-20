@@ -27,14 +27,33 @@ export interface Dictionary {
   };
   hero: {
     eyebrow: string;
-    title: string;
+    // Two lines, not one string: the spec styles them differently (line 1 #F8F4EC
+    // weight 200, line 2 #B08D57 weight 300) and reveals them with a stagger, so the
+    // split has to exist in the data rather than in a `\n` the component guesses at.
+    titleLine1: string;
+    titleLine2: string;
     sub: string;
     ctaPrimary: string;
     ctaSecondary: string;
     definitionPre: string;
     definitionLinked: string;
     definitionPost: string;
+    // The three live panels under the hero. `businessTasks` and `personalTasks` are
+    // two separate pools on purpose: the rotation is composed, always two business
+    // items and one personal one, never a random draw from a single list.
+    live: {
+      nowLabel: string;
+      closedLabel: string;
+      closedSub: string;
+      sparkLabel: string;
+      orchLabel: string;
+      orchRows: string[];
+      businessTasks: { text: string; domain: string }[];
+      personalTasks: { text: string; domain: string }[];
+    };
   };
+  // The four-cell stats strip under the hero.
+  stats: { value: string; label: string }[];
   problem: { label: string; title: string; body: string };
   insight: { label: string; title: string; body: string };
   category: { label: string; title: string; body: string };
@@ -43,18 +62,35 @@ export interface Dictionary {
     title: string;
     sub: string;
     steps: { title: string; body: string }[];
+    // The home page's two-lane comparison ("one task, two routes"): the same task
+    // with and without Ankora, with the five interruption ticks rendered on the
+    // "without" lane only. The inner /how-it-works page uses `steps` and its own
+    // sticky progress rail instead.
+    railLabel: string;
+    attentionLabel: string;
+    laneWithout: string;
+    laneWith: string;
+    noteWithout: string;
+    noteWith: string;
   };
   intelligence: {
     label: string;
-    title: string;
+    // Two lines; line 2 is gold. Same reasoning as hero.titleLine1/2.
+    titleLine1: string;
+    titleLine2: string;
     body: string;
-    pillars: { title: string; body: string }[];
+    // `key` is the Latin mono key above the title (MEMORY, ORCHESTRATION, ...).
+    pillars: { key: string; title: string; body: string }[];
   };
   capabilities: {
     label: string;
     title: string;
     sub: string;
-    items: { title: string; body: string }[];
+    // `key` is the Latin mono key (BUSINESS OPS, VENDORS, ...). It lives here rather
+    // than in a parallel array in the component, which is how the previous version
+    // drifted out of step with the item order. The 01..06 index is derived from
+    // position at render time for the same reason -- it cannot go stale.
+    items: { key: string; title: string; body: string }[];
   };
   humanAI: {
     label: string;
@@ -68,6 +104,9 @@ export interface Dictionary {
   industries: {
     label: string;
     title: string;
+    // Card link label. It carries its own arrow glyph, which points in the reading
+    // direction of its own language, so the component never has to flip it.
+    itemCta: string;
     items: { title: string; body: string; href: string }[];
   };
   trust: {

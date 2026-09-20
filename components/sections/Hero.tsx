@@ -1,87 +1,205 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
-import { Container } from "@/components/ui/Container";
 import { WideContainer } from "@/components/ui/WideContainer";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
 import { Eyebrow } from "@/components/ui/Eyebrow";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Reveal } from "@/components/motion/Reveal";
 
-// Decorative demo data for the /he redesign's "live operations panel" (design_handoff_
-// ankora_redesign/README.md, Home section). Illustrative only -- not a real feed, per
-// the spec's own note ("keep the rotation client-side -- it reads as illustrative, not
-// as a dashboard"). Hebrew strings are copied verbatim from the design spec, which is
-// new UI chrome (not existing page copy), so this is not covered by the frozen-copy rule.
-//
-// Split into two pools (business / personal) rather than one flat list so the visible
-// composition can be guaranteed -- 2 business + 1 personal every tick -- instead of
-// left to chance. "מעקב גבייה מול לקוח" is the one new string added here (approved);
-// every other string already existed in the previous flat LIVE_TASKS list.
-const BUSINESS_TASKS = [
-  { text: "הזמנת טיסה וקישור לפגישות", domain: "נסיעות ולוגיסטיקה" },
-  { text: "השוואת הצעות מול שני ספקים", domain: "תיאום ספקים" },
-  { text: "מסמכים לרשות המקומית", domain: "ליווי אדמיניסטרטיבי" },
-  { text: "מעקב גבייה מול לקוח", domain: "תפעול עסקי" },
+/**
+ * The convergence graphic (design_handoff_ankora_site/README.md, "Hero"): seven
+ * inbound threads resolve into a single hub, and one clean line leaves it. Many
+ * sources, one point of contact, one outcome.
+ *
+ * Authored left-to-right — sources on the left, resolved line on the right — and
+ * mirrored as a whole for Hebrew, so the resolved line always runs in the reading
+ * direction. That mirror is the spec's own mechanism and the pattern any future
+ * directional graphic should copy; it is not a forked layout.
+ */
+const FEEDS = [
+  { x: 26, y: 64, delay: "0s" },
+  { x: 14, y: 152, delay: "0.35s" },
+  { x: 34, y: 230, delay: "0.7s" },
+  { x: 14, y: 308, delay: "1.05s" },
+  { x: 26, y: 396, delay: "1.4s" },
+  { x: 158, y: 22, delay: "1.75s" },
+  { x: 148, y: 438, delay: "2.1s" },
 ];
-const PERSONAL_TASKS = [
-  { text: "חידוש פוליסת ביטוח רכב", domain: "מנהלה אישית" },
-  { text: "תיאום טכנאי מיזוג בדירה", domain: "נכסים ומשק בית" },
-  { text: "תור למרפאת שיניים", domain: "תפעול אישי" },
-];
-const ORCHESTRATION_ROWS = ["זיכרון העדפות", "ניטור מועדים", "עדכון יזום"];
 
-function LiveOpsPanel() {
+const HUB = { x: 560, y: 230 };
+const RESOLVED_END_X = 878;
+// Straight horizontal line, so its length is just the run. Used as both the dash
+// array and the starting dash offset, which is what makes `drawLine` draw it once.
+const RESOLVED_LENGTH = RESOLVED_END_X - HUB.x;
+
+function ConvergenceGraphic({ locale }: { locale: Locale }) {
+  return (
+    // Decorative, so it is dropped below the md breakpoint rather than allowed to sit
+    // behind the headline at phone widths, where a 58%-wide graphic would run under the
+    // text and cost contrast.
+    <svg
+      viewBox="0 0 900 460"
+      preserveAspectRatio="xMidYMid meet"
+      aria-hidden="true"
+      className="pointer-events-none absolute top-0 hidden h-[56%] w-[58%] opacity-85 md:block"
+      style={{ insetInlineEnd: 0 }}
+    >
+      <g transform={locale === "he" ? "translate(900,0) scale(-1,1)" : undefined}>
+        {FEEDS.map((f) => (
+          <line
+            key={`thread-${f.x}-${f.y}`}
+            x1={f.x}
+            y1={f.y}
+            x2={HUB.x}
+            y2={HUB.y}
+            stroke="#B08D57"
+            strokeWidth={1.1}
+            strokeOpacity={0.5}
+            strokeDasharray="4 10"
+            className="animate-flow"
+            style={{ animationDelay: f.delay }}
+          />
+        ))}
+
+        {FEEDS.map((f) => (
+          <circle
+            key={`node-${f.x}-${f.y}`}
+            cx={f.x}
+            cy={f.y}
+            r={4}
+            fill="#7C8EA3"
+            className="animate-nodePulse"
+            style={{ animationDelay: f.delay }}
+          />
+        ))}
+
+        {/* Hairline ring around the hub, 26px across. */}
+        <circle cx={HUB.x} cy={HUB.y} r={26} fill="none" stroke="#B08D57" strokeOpacity={0.28} strokeWidth={1} />
+        <circle cx={HUB.x} cy={HUB.y} r={9} fill="#B08D57" className="animate-hubPulse" />
+
+        {/* The one resolved outcome: solid, drawn once on load, ending in a cream dot. */}
+        <line
+          x1={HUB.x}
+          y1={HUB.y}
+          x2={RESOLVED_END_X}
+          y2={HUB.y}
+          stroke="#B08D57"
+          strokeWidth={2}
+          strokeDasharray={RESOLVED_LENGTH}
+          strokeDashoffset={RESOLVED_LENGTH}
+          className="animate-drawLine"
+        />
+        <circle
+          cx={RESOLVED_END_X}
+          cy={HUB.y}
+          r={4.5}
+          fill="#F8F4EC"
+          className="animate-nodePulse"
+          style={{ animationDelay: "1.8s" }}
+        />
+      </g>
+    </svg>
+  );
+}
+
+/** Seven-bar sparkline whose bars breathe on each tick. Decorative. */
+const SPARK_BASE = [42, 64, 38, 80, 56, 72, 100];
+
+function LiveOpsPanels({ dict }: { dict: Dictionary }) {
+  const live = dict.hero.live;
   const [tick, setTick] = useState(0);
   const [closedToday, setClosedToday] = useState(12);
 
   useEffect(() => {
     const id = setInterval(() => {
       setTick((t) => t + 1);
-      setClosedToday((n) => (n >= 16 ? 12 : n + 1));
+      // Cycles 12 -> 17 inclusive, then restarts. The previous implementation
+      // stopped at 16.
+      setClosedToday((n) => (n >= 17 ? 12 : n + 1));
     }, 3200);
     return () => clearInterval(id);
   }, []);
 
-  // Always exactly 2 business + 1 personal: two items advance through the business
-  // pool per tick (indices t*2 and t*2+1), one advances through the personal pool.
+  // Always exactly two business items and one personal one: two indices advance
+  // through the business pool per tick, one through the personal pool. Composed,
+  // not sampled — the mix is the point the panel is making.
   const visible = [
-    BUSINESS_TASKS[(tick * 2) % BUSINESS_TASKS.length],
-    BUSINESS_TASKS[(tick * 2 + 1) % BUSINESS_TASKS.length],
-    PERSONAL_TASKS[tick % PERSONAL_TASKS.length],
+    live.businessTasks[(tick * 2) % live.businessTasks.length],
+    live.businessTasks[(tick * 2 + 1) % live.businessTasks.length],
+    live.personalTasks[tick % live.personalTasks.length],
   ];
 
+  const spark = SPARK_BASE.map((h, i) => ({
+    height: `${Math.max(14, Math.round(h * (0.7 + 0.3 * Math.abs(Math.sin(tick * 0.7 + i)))))}%`,
+    last: i === SPARK_BASE.length - 1,
+  }));
+
   return (
+    // Illustrative, not a real feed: hidden from assistive tech so it is never read
+    // out as live operational data.
     <div className="mt-16" aria-hidden="true">
       <HairlineGrid minCell={260}>
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-[#7C8EA3]">בטיפול כרגע</span>
-          <ul className="mt-4 space-y-3">
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+            {live.nowLabel}
+          </span>
+          <ul className="mt-4 space-y-4">
             {visible.map((task) => (
-              <li key={task.text} className="flex items-center gap-2.5 text-sm text-[#C3CEDA]">
-                <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
-                {task.text}
+              <li key={task.text}>
+                <div className="flex items-start gap-2.5 text-sm text-tone-body">
+                  <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-gold" />
+                  <span>{task.text}</span>
+                </div>
+                <span className="mt-1 block ps-[14px] font-jbmono text-[10px] tracking-[0.1em] text-tone-faint rtl:tracking-normal">
+                  {task.domain}
+                </span>
               </li>
             ))}
           </ul>
         </HairlineGridCell>
+
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-[#7C8EA3]">נסגר היום</span>
-          <div className="mt-3 text-[clamp(2.6rem,4.6vw,4rem)] font-extralight text-paper">{closedToday}</div>
-          <p className="mt-1 text-xs text-[#7C8EA3]">פריטים שלא הגיעו אליך</p>
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+            {live.closedLabel}
+          </span>
+          <div className="mt-3 text-[clamp(2.6rem,4.6vw,4rem)] font-extralight tabular-nums text-paper">
+            {closedToday}
+          </div>
+          <p className="mt-1 text-xs text-tone-dim">{live.closedSub}</p>
+          <div className="mt-6 flex h-14 items-end gap-1.5">
+            {spark.map((bar, i) => (
+              <span
+                key={i}
+                className="flex-1 transition-[height] duration-700 ease-out"
+                style={{
+                  height: bar.height,
+                  background: bar.last ? "#B08D57" : "rgba(176,141,87,0.32)",
+                }}
+              />
+            ))}
+          </div>
+          <span className="mt-3 block font-jbmono text-[10px] tracking-[0.1em] text-tone-faint rtl:tracking-normal">
+            {live.sparkLabel}
+          </span>
         </HairlineGridCell>
+
         <HairlineGridCell elevated>
-          <span className="font-jbmono text-[11px] tracking-[0.12em] text-[#7C8EA3]">שכבת התזמור</span>
-          <div className="mt-4 space-y-3">
-            {ORCHESTRATION_ROWS.map((r) => (
-              <div key={r} className="flex items-center justify-between text-sm text-[#C3CEDA]">
-                <span>{r}</span>
-                <span className="font-jbmono text-[11px] text-gold">פעיל</span>
+          <span className="font-jbmono text-[11px] tracking-[0.12em] text-tone-dim rtl:tracking-normal">
+            {live.orchLabel}
+          </span>
+          <div className="mt-4 space-y-4">
+            {live.orchRows.map((row, i) => (
+              <div key={row} className="flex items-center justify-between gap-4 text-sm text-tone-body">
+                <span>{row}</span>
+                {/* A breathing dot rather than the word "active" — option B of the
+                    four treatments explored in Orchestration Cell Options. */}
+                <span
+                  className="h-1.5 w-1.5 shrink-0 animate-eyebrowPulse rounded-full bg-gold"
+                  style={{ animationDelay: `${i * 0.6}s` }}
+                />
               </div>
             ))}
           </div>
@@ -91,59 +209,65 @@ function LiveOpsPanel() {
   );
 }
 
-function HeHero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  // The live copy is one frozen sentence ("X. Y?"); split it on the period so the
-  // redesign's two-tone two-line treatment can apply without altering a single
-  // character of the underlying string. Falls back to one line if the copy ever
-  // changes shape.
-  const splitAt = dict.hero.title.indexOf(". ");
-  const titleLine1 = splitAt === -1 ? dict.hero.title : dict.hero.title.slice(0, splitAt + 1);
-  const titleLine2 = splitAt === -1 ? "" : dict.hero.title.slice(splitAt + 2);
-
+export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   return (
-    <section className="relative overflow-hidden pb-24 pt-40 md:pb-32 md:pt-48">
+    <section className="relative overflow-hidden pb-24 pt-[clamp(72px,9vw,150px)] md:pb-32">
+      <ConvergenceGraphic locale={locale} />
+
       <WideContainer className="relative z-[1]">
         <Reveal>
           <Eyebrow>{dict.hero.eyebrow}</Eyebrow>
         </Reveal>
-        <Reveal delay={0.08}>
-          <h1 className="mt-6 max-w-4xl text-[clamp(2.6rem,6.6vw,6rem)] leading-[1.02] tracking-[-0.03em]">
-            <span className="block font-extralight text-paper">{titleLine1}</span>
-            {titleLine2 && <span className="block font-light text-gold">{titleLine2}</span>}
-          </h1>
-        </Reveal>
+
+        {/* line-height 1.2, not the 1.12 in the spec's type-scale table: the prototype
+            itself renders 1.2, and that is the version that was reviewed on screen with
+            real Hebrew, where the tall ascenders need the extra room the README's own
+            Hebrew paragraph argues for.
+
+            The -0.03em stays on Hebrew. The spec's "never letter-spacing on Hebrew"
+            rule is about positive tracking, which breaks Hebrew's reading rhythm --
+            every example it gives is positive (.05em eyebrow, .1-.16em mono) -- and the
+            prototype applies this negative optical tightening in both panes. */}
+        <h1 className="mt-6 max-w-[20ch] text-balance text-[clamp(2.6rem,6.2vw,6rem)] leading-[1.2] tracking-[-0.03em]">
+          <Reveal delay={0.08}>
+            <span className="block font-extralight text-paper">{dict.hero.titleLine1}</span>
+          </Reveal>
+          <Reveal delay={0.16}>
+            <span className="block font-light text-gold">{dict.hero.titleLine2}</span>
+          </Reveal>
+        </h1>
 
         <div
           className="mt-10 grid items-end gap-8"
           style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))" }}
         >
-          <Reveal delay={0.16}>
-            <p className="max-w-[38ch] font-assistant text-[clamp(1.06rem,1.4vw,1.32rem)] font-extralight leading-[1.55] text-[#D8CAB5]">
+          <Reveal delay={0.24}>
+            <p className="max-w-[40ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.85] text-tone-body">
               {dict.hero.sub}
             </p>
           </Reveal>
-          <Reveal delay={0.24} className="flex flex-wrap items-center gap-6">
+          <Reveal delay={0.32} className="flex flex-wrap items-center gap-6">
             <Link
               href={withLocale(locale, "/contact")}
-              className="bg-gold px-8 py-[17px] text-[15px] font-medium text-ink transition-colors hover:bg-paper"
+              className="bg-gold px-8 py-[17px] text-[15px] font-medium text-ink transition-colors duration-200 hover:bg-paper"
             >
               {dict.hero.ctaPrimary}
             </Link>
             <Link
               href={withLocale(locale, "/how-it-works")}
-              className="border-b border-[rgba(232,226,214,0.28)] pb-1 text-[15px] text-paper/80 transition-colors hover:text-gold"
+              className="border-b border-[rgba(232,226,214,0.28)] pb-1 text-[15px] text-paper/80 transition-colors duration-200 hover:text-gold"
             >
               {dict.hero.ctaSecondary}
             </Link>
           </Reveal>
         </div>
 
-        <Reveal delay={0.32}>
-          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-[#7C8EA3]">
+        <Reveal delay={0.4}>
+          <p className="mt-14 max-w-2xl border-t border-[rgba(243,234,219,0.12)] pt-7 text-sm leading-relaxed text-tone-dim">
             {dict.hero.definitionPre}
             <Link
               href={withLocale(locale, "/personal-operations-management")}
-              className="text-[#A9B8C9] underline decoration-[rgba(176,141,87,0.4)] underline-offset-4 transition-colors hover:text-gold"
+              className="text-tone-muted underline decoration-[rgba(176,141,87,0.4)] underline-offset-4 transition-colors duration-200 hover:text-gold"
             >
               {dict.hero.definitionLinked}
             </Link>
@@ -151,132 +275,10 @@ function HeHero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           </p>
         </Reveal>
 
-        <Reveal delay={0.4}>
-          <LiveOpsPanel />
+        <Reveal delay={0.48}>
+          <LiveOpsPanels dict={dict} />
         </Reveal>
       </WideContainer>
-    </section>
-  );
-}
-
-function OrbitField() {
-  const nodes = [
-    { cx: 120, cy: 90, r: 3 },
-    { cx: 340, cy: 40, r: 2.4 },
-    { cx: 520, cy: 140, r: 3.4 },
-    { cx: 260, cy: 220, r: 2.2 },
-    { cx: 460, cy: 260, r: 2.8 },
-    { cx: 80, cy: 260, r: 2 },
-  ];
-  return (
-    <svg
-      viewBox="0 0 600 320"
-      className="pointer-events-none absolute inset-0 h-full w-full opacity-70"
-      aria-hidden
-    >
-      <defs>
-        <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#B08D57" stopOpacity="0.5" />
-          <stop offset="100%" stopColor="#B08D57" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {nodes.map((n, i) =>
-        nodes.slice(i + 1).map((m, j) => (
-          <line
-            key={`${i}-${j}`}
-            x1={n.cx}
-            y1={n.cy}
-            x2={m.cx}
-            y2={m.cy}
-            stroke="url(#line-grad)"
-            strokeWidth="0.6"
-          />
-        ))
-      )}
-      {nodes.map((n, i) => (
-        <motion.circle
-          key={i}
-          cx={n.cx}
-          cy={n.cy}
-          r={n.r}
-          fill="#C7AC7E"
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 3 + i, repeat: Infinity, ease: "easeInOut", delay: i * 0.3 }}
-        />
-      ))}
-    </svg>
-  );
-}
-
-export function Hero({ dict, locale }: { dict: Dictionary; locale: Locale }) {
-  if (locale === "he") {
-    return <HeHero dict={dict} locale={locale} />;
-  }
-
-  return (
-    <section className="relative flex min-h-[92vh] items-center overflow-hidden bg-ink pt-28">
-      <div className="absolute inset-0 bg-radial-glow" />
-      <div className="absolute inset-x-0 top-1/3 h-[420px] opacity-60 md:top-1/4">
-        <OrbitField />
-      </div>
-
-      <Container className="relative z-10">
-        <motion.div
-          initial={{ opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-        >
-          <Badge>{dict.hero.eyebrow}</Badge>
-        </motion.div>
-
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 max-w-4xl whitespace-pre-line text-[40px] font-medium leading-[1.08] tracking-tight text-paper md:text-[64px] lg:text-[76px]"
-        >
-          {dict.hero.title}
-        </motion.h1>
-
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.22, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-7 max-w-xl text-lg leading-relaxed text-paper/60 md:text-xl"
-        >
-          {dict.hero.sub}
-        </motion.p>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.34, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-10 flex flex-wrap items-center gap-4"
-        >
-          <Button href={withLocale(locale, "/contact")} variant="primary">
-            {dict.hero.ctaPrimary}
-          </Button>
-          <Button href={withLocale(locale, "/how-it-works")} variant="secondary">
-            {dict.hero.ctaSecondary}
-          </Button>
-        </motion.div>
-
-        <motion.p
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.44, ease: [0.16, 1, 0.3, 1] }}
-          className="mt-14 max-w-2xl border-t border-line pt-7 text-sm leading-relaxed text-paper/45"
-        >
-          {dict.hero.definitionPre}
-          <Link
-            href={withLocale(locale, "/personal-operations-management")}
-            className="text-paper/70 underline decoration-gold/40 underline-offset-4 transition-colors hover:text-gold-light"
-          >
-            {dict.hero.definitionLinked}
-          </Link>
-          {dict.hero.definitionPost}
-        </motion.p>
-      </Container>
     </section>
   );
 }

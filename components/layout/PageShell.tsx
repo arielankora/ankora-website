@@ -1,16 +1,16 @@
-import type { Locale } from "@/content";
 import { PageGlow } from "./PageGlow";
 import { ScrollProgress } from "./ScrollProgress";
 
 /**
- * Page-level furniture wrapper, `/he`-only (design_handoff_ankora_redesign/README.md,
- * "Page-level furniture present on nearly every page", point 4: `isolation: isolate`,
- * `overflow-x: hidden`, content sits at `position: relative; z-index: 1` above the glow).
- * On /en this is a no-op passthrough — zero visual or behavioural change there.
+ * Page-level furniture, present on every page in both locales
+ * (design_handoff_ankora_site/README.md, "Ambient background": the two fixed radial
+ * glows sit behind the content at z-index 0, content at 10, header at 20).
+ *
+ * This used to be a /he-only wrapper with an `en` passthrough, from the round where
+ * only Hebrew had been redesigned. The site redesign brings both locales onto the same
+ * visual language, so the fork is gone and the `locale` prop with it.
  */
-export function PageShell({ locale, children }: { locale: Locale; children: React.ReactNode }) {
-  if (locale !== "he") return <>{children}</>;
-
+export function PageShell({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ isolation: "isolate", overflowX: "hidden" }}>
       <PageGlow />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { Hero } from "@/components/sections/Hero";
+import { Stats } from "@/components/sections/Stats";
 import { EditorialSection } from "@/components/sections/EditorialSection";
 import { HowItWorks } from "@/components/sections/HowItWorks";
 import { Intelligence } from "@/components/sections/Intelligence";
@@ -87,15 +88,16 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
       <JsonLd id="service-schema" data={serviceSchema} />
       <JsonLd id="faq-schema" data={faqSchema} />
       <Hero dict={dict} locale={locale} />
-      <EditorialSection label={dict.problem.label} title={dict.problem.title} body={dict.problem.body} tone="light" locale={locale} />
-      <EditorialSection label={dict.insight.label} title={dict.insight.title} body={dict.insight.body} tone="dark" locale={locale} />
-      <EditorialSection label={dict.category.label} title={dict.category.title} body={dict.category.body} tone="light" locale={locale} />
-      <HowItWorks dict={dict} locale={locale} />
-      <Intelligence dict={dict} locale={locale} />
+      <Stats dict={dict} />
+      <EditorialSection label={dict.problem.label} title={dict.problem.title} body={dict.problem.body} />
+      <EditorialSection label={dict.insight.label} title={dict.insight.title} body={dict.insight.body} />
+      <EditorialSection label={dict.category.label} title={dict.category.title} body={dict.category.body} />
+      <HowItWorks dict={dict} />
+      <Intelligence dict={dict} />
       <Capabilities dict={dict} locale={locale} />
-      <HumanAI dict={dict} locale={locale} />
+      <HumanAI dict={dict} />
       <Industries dict={dict} locale={locale} />
-      <Trust dict={dict} locale={locale} />
+      <Trust dict={dict} />
       <FAQ dict={dict} locale={locale} />
       <FinalCTA dict={dict} locale={locale} />
     </>
