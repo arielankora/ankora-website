@@ -5,6 +5,7 @@ import { sendEmail } from "@/lib/email";
 import { toXlsxWorkbook } from "@/lib/xlsx";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { localDateKey } from "@/lib/timezone";
+import { uploadFileToDriveFolder, DRIVE_FOLDER_EXCEL_REPORTS, DRIVE_FOLDER_DB_DUMPS } from "@/lib/google-drive";
 import {
   CLIENTS_SHEET_NAME,
   CLIENTS_SHEET_HEADERS,
@@ -21,11 +22,14 @@ import {
 // Phase 11: nightly backup + data export to email, per Ariel's direct
 // request (see this project's Claude Doc "תוכנית גיבוי, שמירה ושחזור -
 // ankora.co.il" for the full plan this implements, and docs/adr/0001's
-// Phase 11 addendum for the implementation notes). Two deliverables in
-// one nightly email, both attached to the SAME message so the Drive-
-// filing step (a separate Claude-side scheduled task that reads this
-// exact email via Gmail and re-uploads each attachment to its own Drive
-// folder) only has to watch one inbox rule:
+// Phase 11 addendum for the implementation notes). Two deliverables,
+// both attached to the same nightly email AND uploaded directly to their
+// own Google Drive folder from this same function (see
+// lib/google-drive.ts's doc comment for why the Drive upload moved here
+// from a separate Claude-side Gmail-relay task - short version: that
+// relay broke twice on the exact base64-encoding step, a structural
+// sandbox limitation, not a fixable bug, so this app now uploads both
+// files itself instead of depending on an external relay each night):
 //
 //  1. An Excel workbook (clients / time entries / tasks) - the
 //     human-readable nightly report Ariel asked for directly ("את כל
@@ -43,6 +47,13 @@ import {
 //     human would actually need to reconstruct "who is owed what" if
 //     the database were lost outright. Extend the `dumpCoreTables()`
 //     model list below if that scope ever needs to grow.
+//
+// The email stays (Ariel reads it directly, and it's a second, fully
+// independent delivery path - if Drive's service-account credentials
+// ever expire/break, the data still reaches him). Drive upload failure
+// and email failure are reported and logged independently, and neither
+// blocks the other (Promise.all, not a chain) - matches this function's
+// existing "never throw, always report" contract.
 //
 // Security note: User rows are dumped WITHOUT passwordHash (even though
 // it's an irreversible bcrypt hash, not a plaintext secret) - this dump
@@ -70,6 +81,10 @@ interface NightlyExportResult {
   ok: boolean;
   counts: { clients: number; timeEntries: number; tasks: number };
   error?: string;
+  drive?: {
+    excel: { ok: boolean; fileId?: string; error?: string };
+    dbDump: { ok: boolean; fileId?: string; error?: string };
+  };
 }
 
 async function fetchClientsSheetData() {
@@ -181,25 +196,48 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
     const dateLabel = localDateKey(now);
     const summary = summaryLine(counts);
 
-    const result = await sendEmail({
-      to: RECIPIENTS,
-      subject: `Ankora - דוח נתונים וגיבוי יומי - ${dateLabel}`,
-      text: [
-        `מצורפים דוח הנתונים היומי וגיבוי מסד הנתונים של אנקורה, נכון להלילה.`,
-        ``,
-        `הדוח כולל ${summary}.`,
-        ``,
-        `שני קבצים מצורפים: אקסל מסודר לקריאה, וקובץ גיבוי דחוס (JSON) שמיועד לארכוב בלבד ולא לקריאה ישירה.`,
-      ].join("\n"),
-      attachments: [
-        { filename: `ankora-נתונים-${dateLabel}.xlsx`, content: excelBuffer },
-        {
-          filename: `ankora-database-dump-${dateLabel}.json.gz`,
-          content: dumpGz,
-          contentType: "application/gzip",
-        },
-      ],
-    });
+    const excelFilename = `ankora-נתונים-${dateLabel}.xlsx`;
+    const dumpFilename = `ankora-database-dump-${dateLabel}.json.gz`;
+
+    // Three independent outbound calls (email + two Drive uploads) -
+    // Promise.all, not a chain, so one failing does not block or delay
+    // the others, and each is reported separately below.
+    const [result, driveExcel, driveDump] = await Promise.all([
+      sendEmail({
+        to: RECIPIENTS,
+        subject: `Ankora - דוח נתונים וגיבוי יומי - ${dateLabel}`,
+        text: [
+          `מצורפים דוח הנתונים היומי וגיבוי מסד הנתונים של אנקורה, נכון להלילה.`,
+          ``,
+          `הדוח כולל ${summary}.`,
+          ``,
+          `שני קבצים מצורפים: אקסל מסודר לקריאה, וקובץ גיבוי דחוס (JSON) שמיועד לארכוב בלבד ולא לקריאה ישירה.`,
+        ].join("\n"),
+        attachments: [
+          { filename: excelFilename, content: excelBuffer },
+          {
+            filename: dumpFilename,
+            content: dumpGz,
+            contentType: "application/gzip",
+          },
+        ],
+      }),
+      uploadFileToDriveFolder({
+        name: excelFilename,
+        mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        content: excelBuffer,
+        folderId: DRIVE_FOLDER_EXCEL_REPORTS,
+      }),
+      uploadFileToDriveFolder({
+        name: dumpFilename,
+        mimeType: "application/gzip",
+        content: dumpGz,
+        folderId: DRIVE_FOLDER_DB_DUMPS,
+      }),
+    ]);
+
+    if (!driveExcel.ok) console.error("Drive upload (Excel report) failed:", driveExcel.error);
+    if (!driveDump.ok) console.error("Drive upload (DB dump) failed:", driveDump.error);
 
     await prisma.emailDelivery.create({
       data: {
@@ -221,10 +259,19 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
       actorId: null,
       action: "backup.nightly_export.sent",
       entityType: "System",
-      after: { ok: result.ok, counts },
+      after: {
+        ok: result.ok,
+        counts,
+        drive: { excel: driveExcel.ok, dbDump: driveDump.ok },
+      },
     });
 
-    return { ok: result.ok, counts, error: result.error };
+    return {
+      ok: result.ok,
+      counts,
+      error: result.error,
+      drive: { excel: driveExcel, dbDump: driveDump },
+    };
   } catch (err: any) {
     // Never throw - see doc comment above. Logged (Vercel's runtime
     // logs) rather than silently swallowed.
