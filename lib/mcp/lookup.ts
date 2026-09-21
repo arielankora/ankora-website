@@ -4,6 +4,7 @@ import { assertCan, can } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { listUsers } from "@/lib/app-domain/users";
+import { OPEN_STATUSES, assignableUsers, listTasks } from "@/lib/app-domain/tasks";
 import { describeResolveFailure, resolveByName, normalizeName } from "@/lib/mcp/resolve";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
@@ -27,6 +28,10 @@ import { describeResolveFailure, resolveByName, normalizeName } from "@/lib/mcp/
 type Named = { id: string; name: string };
 type TeamMember = Named & { email: string };
 type CategoryRow = Named & { active: boolean; visibility: string; clientId: string | null };
+/// A task as the resolver sees it: `name` is the title (resolveByName
+/// matches on `name`), and the client rides along so callers do not need
+/// a second query for it.
+type TaskCandidate = Named & { clientId: string; clientName: string | null };
 type UserRow = TeamMember & { role: string; status: string; deletedAt: Date | null };
 
 export type Lookup<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -111,6 +116,80 @@ export async function lookupTeamMember(
   const result = resolveByName(nameOrEmail, candidates);
   if (result.status === "ok") return { ok: true, value: result.match };
   return { ok: false, message: describeResolveFailure(result, "team member", candidates) };
+}
+
+// ------------------------------------------------------- Phase 16: tasks
+
+/// Resolves the person a task is being assigned to.
+///
+/// Deliberately NOT lookupTeamMember(). That one asserts
+/// `time_entry.edit_others` because it exists to unlock a colleague's
+/// HOURS; assigning work is a much smaller thing to be allowed to do, and
+/// gating it on the hours permission would have meant only admins could
+/// hand out tasks. assignableUsers() in lib/app-domain/tasks.ts carries
+/// the narrower rule - anyone who logs time, limited to colleagues who
+/// share the client - and this function is a thin name-matcher over it.
+///
+/// The candidate list is per-client for the same reason: it is both the
+/// correct scope and the smaller disclosure.
+export async function lookupAssignee(
+  actor: User,
+  clientId: string,
+  nameOrEmail: string
+): Promise<Lookup<TeamMember>> {
+  // Annotated rather than inferred, for the same reason the structural
+  // types at the top of this file exist: without a generated Prisma
+  // client the domain function's return type widens to `any`, and the
+  // generic on resolveByName would silently fall back to NamedEntity.
+  const rows: TeamMember[] = await assignableUsers(actor, clientId);
+  const candidates: TeamMember[] = rows.map((u: TeamMember) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+  }));
+
+  const q = normalizeName(nameOrEmail);
+  const byEmail = candidates.find((u: TeamMember) => normalizeName(u.email) === q);
+  if (byEmail) return { ok: true, value: { id: byEmail.id, name: byEmail.name, email: byEmail.email } };
+
+  const result = resolveByName(nameOrEmail, candidates);
+  if (result.status === "ok") return { ok: true, value: result.match };
+  return { ok: false, message: describeResolveFailure(result, "team member", candidates) };
+}
+
+/// Resolves a task by its title, among the tasks this actor may see.
+///
+/// Scoped to unfinished tasks by default: titles repeat across months
+/// ("Monthly report"), and matching against the whole history would make
+/// ambiguity the normal case rather than the exception. Pass
+/// `includeClosed` when the user is plainly talking about something they
+/// already finished.
+export async function lookupTask(
+  actor: User,
+  title: string,
+  opts: { clientId?: string; includeClosed?: boolean } = {}
+): Promise<Lookup<TaskCandidate>> {
+  const tasks = await listTasks(actor, {
+    clientId: opts.clientId,
+    statusIn: opts.includeClosed ? undefined : OPEN_STATUSES,
+  });
+
+  // resolveByName works on `name`; a task's is its title. The client rides
+  // along so a tool can echo "on RIMED" back to the user, and so that
+  // validating a new assignee or category does not need a second query
+  // for the client the task actually sits on.
+  const candidates: TaskCandidate[] = tasks.map(
+    (t: { id: string; title: string; clientId: string; client?: { name: string } | null }) => ({
+      id: t.id,
+      name: t.title,
+      clientId: t.clientId,
+      clientName: t.client?.name ?? null,
+    })
+  );
+
+  const result = resolveByName(title, candidates);
+  if (result.status === "ok") return { ok: true, value: result.match };
+  return { ok: false, message: describeResolveFailure(result, "task", candidates) };
 }
 
 /// The team roster for the admin-only list tool. Same permission, same

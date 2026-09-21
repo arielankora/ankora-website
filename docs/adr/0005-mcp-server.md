@@ -469,3 +469,104 @@ audited action has to be registered, and nothing enforces it. A test
 asserting that every `recordAudit` call site in `lib/` has a label would
 close that permanently, and is worth doing the next time a third action
 slips through.
+
+---
+
+## Phase 5 — tasks (2026-09-21)
+
+(Numbered 5 in this document's own sequence. The code comments call it
+Phase 16, which is the repo-wide phase number the MCP work has used
+since Phase 13 — the two schemes have coexisted throughout this ADR.)
+
+The ten tools could answer "where did my week go" and record time, but
+not "what do I need to do". That asymmetry made the connector a
+reporting surface rather than an operational one, and it is the gap this
+phase closes: `list_tasks`, `list_assignable_people`, `create_task`,
+`update_task`, plus a `task` argument on `start_timer` and
+`create_time_entry`.
+
+### What this phase actually found
+
+The intended work was to expose existing domain functions. It turned out
+the domain functions were not there to expose.
+
+Phase 10 added `Task.assignedToId` and `Task.dueDate` and wired
+`important-dates-job.ts` to write both when it auto-creates a task from
+an important date. Nothing was ever added to read or change them.
+`createTask` took a title and a client; `updateTaskStatus` was the only
+mutation; `listTasks` could filter by client, category and status and
+nothing else. So production has carried tasks with an owner and a
+deadline that no screen, no server action and no export could show —
+data written by a cron job into columns with no readers.
+
+That is why most of this change is in `lib/app-domain/tasks.ts` rather
+than in the MCP layer. The MCP tools are one caller of the completed
+domain; the Tasks screen is the other, and it gets the same fix for
+free (including a `dueDate` leg in the sort order, so the list finally
+reads soonest-first instead of ignoring deadlines it was already
+storing).
+
+### Decisions worth not re-litigating
+
+**Assignment is gated on `time_entry.create_self`, not
+`time_entry.edit_others`.** The obvious move was to reuse
+`lookupTeamMember`, which already resolves a colleague by name. It
+asserts the hours permission, because listing who works here in order to
+read their timesheet is a real disclosure. Assigning work is a much
+smaller thing to be allowed to do, and reusing that gate would have made
+task assignment admin-only — which is not how a five-person operations
+team works. `assignableUsers()` carries the narrower rule instead:
+anyone who logs time may assign, and the people they can see are the
+ones who share the client.
+
+**An assignee must have access to the task's client.** Task visibility
+has always been derived from client access, so assigning a task to
+someone without access to that client files it where its owner can never
+find it — a silent dead letter that looks exactly like success. The
+domain layer refuses, with a message that says what to do about it.
+
+**A due date is stored at the end of its day, in the user's timezone.**
+Storing the start of the day would make every task due today read as
+overdue from one minute past midnight. `overdue` is computed on the
+server for the same reason `dueDate` is emitted as `YYYY-MM-DD` rather
+than an instant: a model handed a bare date and left to compare it
+against "now" gets the boundary day wrong about half the time.
+
+**A finished task is never overdue.** Otherwise the archive reads as a
+list of fires.
+
+**`update_task` takes a patch, and clearing is explicit.** Omitting a
+field leaves it alone; `clearAssignee` / `clearDue` empty it. A whole-
+object update would let "change the due date" silently unassign the
+task, and passing an empty string for "no owner" is exactly the kind of
+ambiguity a model resolves confidently and wrongly.
+
+### A pre-existing bug this surfaced
+
+`TimeEntry.taskId` has been writable since Phase 2 and nothing ever
+checked that the task belonged to the same client as the entry. The
+invariant held only because the timer screen's picker is scoped to the
+chosen client — precisely the "don't rely on the UI having hidden a
+button" failure `permissions.ts` warns about. A second caller made it
+reachable, so `assertTaskMatchesClient()` now runs in both `startTimer`
+and `createManualEntry`. A mismatched pair would have filed one client's
+hours under another client's task and corrupted both clients' reports,
+quietly.
+
+### Verification
+
+- 400 unit assertions pass, up from 370; 20 of the new ones are on the
+  task tools and 13 on the serializer
+- `tests/unit/mcp/write-tools.test.ts` was extended rather than
+  replaced: its exact-match assertion on `startTimer`'s arguments now
+  names `taskId: null` deliberately, because an absent key and an
+  explicit null are different instructions to the domain layer
+- The contradiction guard and the end-of-day due date were each
+  mutation-tested — removing the check fails exactly the test that
+  should catch it
+
+**Not verified: no task tool has run against a database.** The preview
+build confirms the code typechecks against the real Prisma client and
+that the existing suites still pass; it does not confirm that
+`create_task` writes a row Ankora's own screen then shows. That is the
+first thing to do after this merges.

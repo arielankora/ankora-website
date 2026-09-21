@@ -134,6 +134,25 @@ async function assertActiveTargets(actor: User, clientId: string, categoryId: st
   }
 }
 
+/// Phase 16 (MCP tasks, docs/adr/0005): a TimeEntry's task must belong to
+/// the same client as the entry.
+///
+/// TimeEntry.taskId has been writable since Phase 2, and nothing ever
+/// checked this - the timer screen's task picker is scoped to the chosen
+/// client, so the invariant held only because the UI happened to enforce
+/// it. permissions.ts's own rule ("אין להסתמך על הסתרת כפתור ב-UI") says
+/// that is not enough, and a second caller (the MCP server) made it real:
+/// a mismatched pair would file a client's hours under another client's
+/// task and quietly corrupt both clients' reports.
+async function assertTaskMatchesClient(clientId: string, taskId: string | null | undefined) {
+  if (!taskId) return;
+  const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
+  if (!task) throw new Error("Task not found.");
+  if (task.clientId !== clientId) {
+    throw new Error("That task belongs to a different client than this time entry.");
+  }
+}
+
 /// Spec 5.1: "TimeEntry חייב start_at < end_at." When endAt is null (an
 /// active timer) there is nothing to compare yet.
 function assertValidRange(startAt: Date, endAt: Date | null) {
@@ -223,6 +242,7 @@ export async function startTimer(
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   await assertActiveTargets(actor, input.clientId, input.categoryId);
+  await assertTaskMatchesClient(input.clientId, input.taskId);
 
   // Friendly pre-check (spec 5.1: "טיימר פעיל אחד לכל משתמש כברירת מחדל.
   // ניסיון להפעיל שני מציג החלטה: עצור קודם / בטל."). The database's
@@ -431,6 +451,7 @@ export async function createManualEntry(
   // isn't individually assigned to.
   await assertClientAccess({ ...actor, id: targetUserId } as User, input.clientId);
   await assertActiveTargets(actor, input.clientId, input.categoryId);
+  await assertTaskMatchesClient(input.clientId, input.taskId);
 
   if (isBackdated(input.startAt) && !input.backdateReason?.trim()) {
     throw new BackdateReasonRequiredError();
