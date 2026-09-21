@@ -78,12 +78,20 @@ export async function e2e() {
     const results = (spec.tests ?? []).flatMap((t) => t.results ?? []);
     const status = spec.tests?.[0]?.status ?? "unknown";
     if (spec.ok && results.length > 1) {
-      // The name, not just the count. "5 tests only passed on retry" is
-      // a number nobody can act on: it says something is wrong without
-      // saying where, so it gets read, noted and left. Naming them turns
-      // the same finding into a list of things to go and fix.
+      // The name AND why it failed the first time.
+      //
+      // "5 tests only passed on retry" is a number nobody can act on: it
+      // says something is wrong without saying where, so it gets read,
+      // noted and left. The name makes it findable; the first attempt's
+      // error is the thing that actually ends the guessing, because a
+      // passing retry throws that error away and the next run has to
+      // reproduce it from nothing.
       const where = (spec.file ?? "").split("/").pop();
-      flakyNames.push(`${where ? `${where} — ` : ""}${spec.title}`);
+      const why = results.find((x) => x.error)?.error?.message ?? "";
+      const oneLine = why.replace(/\s+/g, " ").trim().slice(0, 160);
+      flakyNames.push(
+        `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    first attempt: ${oneLine}` : ""}`,
+      );
     }
     if (spec.ok) {
       passed += 1;
@@ -104,7 +112,7 @@ export async function e2e() {
       finding(
         "major",
         `${flakyNames.length} browser test(s) only passed on retry`,
-        ["Flaky tests erode trust in every other result.", "", ...flakyNames].join("\n").slice(0, 900),
+        ["Flaky tests erode trust in every other result.", "", ...flakyNames].join("\n").slice(0, 1800),
       ),
     );
   }

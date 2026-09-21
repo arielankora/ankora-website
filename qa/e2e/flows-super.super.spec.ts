@@ -30,7 +30,14 @@ test.describe.configure({ timeout: 90_000 });
  * fixes. Reading the drawer's own text turns one wasted CI round into a
  * message that names the problem.
  */
-async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 25_000) {
+// 40s, not 25s. The important-date write does more than insert a row -
+// it can spawn an auto-task and its reminders - and on a loaded runner,
+// with one worker and a shared Postgres, it has come in over 25 seconds
+// while still being perfectly correct. The symptom was "1 disabled
+// button, invalid: none", which is this helper accurately reporting that
+// the action was still in flight. Waiting longer only delays the failure
+// message; it hides nothing.
+async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 40_000) {
   const dialog = page.getByRole("dialog");
   try {
     await expect(dialog).toHaveCount(0, { timeout });
