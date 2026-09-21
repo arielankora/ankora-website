@@ -30,7 +30,13 @@ export default defineConfig({
   // hiccup; not enough to hide a test that fails half the time - the
   // report still marks it flaky, which is the signal worth keeping.
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // One worker in CI. Every spec that writes shares ONE database and ONE
+  // build, and two of them at once made three different tests flake on
+  // different runs - each time looking like a fault in the screen under test
+  // rather than contention. Same lesson the integration suite learned in #76,
+  // arriving through a different door. The suite costs a couple of minutes
+  // more and stops lying.
+  workers: process.env.CI ? 1 : undefined,
   timeout: 30_000,
   expect: { timeout: 10_000 },
 

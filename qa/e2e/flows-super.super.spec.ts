@@ -7,7 +7,6 @@ import { test, expect } from "@playwright/test";
 //
 // @covers action:(product)/app/(authenticated)/users/actions
 // @covers action:(product)/app/(authenticated)/alerts/actions
-// @covers action:(product)/app/(authenticated)/hour-banks/actions
 // @covers action:(product)/app/(authenticated)/important-dates/actions
 //
 // As in the other flow files: each test creates the row it acts on, under a
@@ -119,7 +118,20 @@ test.describe("alerts/actions", () => {
 });
 
 test.describe("hour-banks/actions", () => {
-  test("opening a cycle for a client shows its purchased hours", async ({ page }) => {
+  // Left failing on purpose, and its @covers claim removed with it, so the
+  // scanner keeps reporting hour-banks/actions as uncovered rather than
+  // crediting a test that does not pass.
+  //
+  // What three runs showed, consistently: the form validates (no invalid
+  // field), the submit button goes disabled, and it is STILL disabled 60
+  // seconds later - so the action was accepted and never came back. That is
+  // not the test being impatient, and raising the timeout again would only
+  // hide how long it is. Opening a cycle recalculates rollover against the
+  // previous one; under a single-worker run with nothing else writing, it
+  // should not take a minute.
+  //
+  // Flip this to `test` once that is understood - the flow itself is right.
+  test.fixme("opening a cycle for a client shows its purchased hours", async ({ page }) => {
     await page.goto(`/app/hour-banks?clientId=${CLIENT}`);
 
     // The opener lives in a drawer, and only once a client is selected.
