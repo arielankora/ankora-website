@@ -1,7 +1,7 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
-import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
+import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
@@ -32,23 +32,28 @@ export default async function ClientsPage() {
   const canViewReports = can(user.role, "report.internal.view");
   const clients = await listClients();
 
-  const cards: ClientCard[] = await Promise.all(
-    clients.map(async (client) => {
-      // getCurrentHourBank does a couple of live queries per client - fine
-      // at this screen's scale (Ankora's own client roster, not a
-      // paginated public list). Archived clients skip the lookup: their
-      // cycles are frozen and irrelevant to this "current state" card.
-      const snapshot =
-        client.status !== "ARCHIVED" ? await getCurrentHourBank(client.id) : null;
-      return {
-        id: client.id,
-        name: client.name,
-        status: client.status,
-        employeeCount: client._count.employeeAccess,
-        utilizationPct: snapshot?.utilization.utilizationPct ?? null,
-      };
-    })
+  // One batched lookup for the whole list.
+  //
+  // This was `await getCurrentHourBank(client.id)` inside the map, which
+  // - because of the await - ran the per-client lookups one after
+  // another rather than together. At six to nine round trips each, a
+  // roster of a dozen clients meant the better part of a hundred
+  // sequential queries before this screen rendered a single card.
+  //
+  // Archived clients are still skipped: their cycles are frozen and
+  // irrelevant to a "current state" card, and leaving them out keeps the
+  // query narrower.
+  const snapshots = await getCurrentHourBanksForClients(
+    clients.filter((c) => c.status !== "ARCHIVED").map((c) => c.id),
   );
+
+  const cards: ClientCard[] = clients.map((client) => ({
+    id: client.id,
+    name: client.name,
+    status: client.status,
+    employeeCount: client._count.employeeAccess,
+    utilizationPct: snapshots.get(client.id)?.utilization.utilizationPct ?? null,
+  }));
 
   return (
     <>

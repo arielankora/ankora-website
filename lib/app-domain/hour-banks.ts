@@ -2,7 +2,11 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { computeConsumedMinutesForRange } from "@/lib/app-domain/billing";
+import {
+  computeConsumedMinutesForRange,
+  consumedMinutesFromEntries,
+  type ConsumableEntry,
+} from "@/lib/app-domain/billing";
 import type { User, HourBank, HourBankStatus, RolloverMode } from "@prisma/client";
 
 // Phase 3 domain service: spec section 8 ("לקוחות ובנק שעות"). Owns cycle
@@ -115,21 +119,175 @@ export async function listHourBanksForClient(clientId: string) {
 /// spec doesn't define this edge case, so falling back to "last known
 /// cycle" rather than throwing keeps the snapshot screen from erroring
 /// out for a client between cycles).
+/// No `adjustments` include, deliberately.
+///
+/// Both queries used to pull every adjustment row for the cycle, and
+/// getHourBankSnapshot then ignored them and asked the database for the
+/// sum separately. Nothing that calls this function reads `.adjustments`
+/// off the result - listHourBanksForClient, which does need them, keeps
+/// its own include - so fetching them here was two round trips of rows
+/// nobody looked at, on every call, on five different screens.
 export async function getCurrentHourBank(clientId: string) {
   const now = new Date();
   const current = await prisma.hourBank.findFirst({
     where: { clientId, deletedAt: null, cycleStart: { lte: now }, cycleEnd: { gt: now } },
-    include: { adjustments: { orderBy: { effectiveAt: "desc" } } },
   });
   const bank =
     current ??
     (await prisma.hourBank.findFirst({
       where: { clientId, deletedAt: null },
       orderBy: { cycleStart: "desc" },
-      include: { adjustments: { orderBy: { effectiveAt: "desc" } } },
     }));
   if (!bank) return null;
   return getHourBankSnapshot(bank);
+}
+
+/// The same answer as getCurrentHourBank, for many clients, in a bounded
+/// number of queries - and without writing anything.
+///
+/// WHY THIS EXISTS
+///
+/// getCurrentHourBank is the right shape for a screen about one client.
+/// It is the wrong shape for a screen about all of them, and two screens
+/// were calling it in a loop: the dashboard (in parallel) and the clients
+/// list (sequentially, which is worse). Each call costs, per client:
+///
+///   1-2  hourBank.findFirst, each with an `adjustments` include that
+///        getHourBankSnapshot then ignores in favour of its own aggregate
+///     1  hourBankAdjustment.aggregate
+///     1  billingPolicy.findUnique
+///     1  timeEntry.findMany - every entry in the cycle, in full
+///   0-2  hourBank.update - a WRITE, on a page render
+///
+/// So roughly six to nine round trips per client, two of them writes, one
+/// of them unbounded in the number of rows it materialises. Twelve
+/// clients is around eighty round trips against a pool of five
+/// connections, which is how a dashboard render, and every write that
+/// revalidates it, came to take tens of seconds. Measured at over ninety
+/// on a CI runner; see claude/perf-dashboard-n-plus-one-2026-09.
+///
+/// This version is five queries whatever the client count.
+///
+/// READ-ONLY, DELIBERATELY
+///
+/// getHourBankSnapshot writes twice: closeIfExpired flips an expired
+/// cycle to CLOSED, and the consumedMinutes cache is refreshed when it
+/// has drifted. Both are reasonable on the Hour Banks admin screen, which
+/// is about one client and is where an admin is actually looking at that
+/// cycle. Neither belongs on a page that renders a summary of everyone:
+/// writing N rows on every render of a read-only screen turns a dashboard
+/// into a source of lock contention, and makes two people loading the
+/// same page fight each other.
+///
+/// So this computes the expired-cycle status in memory - the same value
+/// closeIfExpired would have persisted - and leaves the write to the
+/// screens that own the cycle. The number a viewer sees is identical; the
+/// difference is that looking at it no longer changes it.
+export async function getCurrentHourBanksForClients(
+  clientIds: string[]
+): Promise<Map<string, { bank: HourBank; utilization: HourBankUtilization }>> {
+  const out = new Map<string, { bank: HourBank; utilization: HourBankUtilization }>();
+  if (clientIds.length === 0) return out;
+
+  const now = new Date();
+
+  // 1. The cycle covering now, for whichever clients have one.
+  const covering = await prisma.hourBank.findMany({
+    where: { clientId: { in: clientIds }, deletedAt: null, cycleStart: { lte: now }, cycleEnd: { gt: now } },
+  });
+
+  // 2. For the rest, their most recent cycle - same fallback
+  //    getCurrentHourBank makes for a client between cycles. Done as a
+  //    groupBy for the max cycleStart and then one fetch of those rows,
+  //    rather than reading every cycle a client has ever had: this runs
+  //    on a page render, and history grows without bound.
+  const covered = new Set(covering.map((b) => b.clientId));
+  const uncovered = clientIds.filter((id) => !covered.has(id));
+
+  let fallbacks: HourBank[] = [];
+  if (uncovered.length > 0) {
+    const latest = await prisma.hourBank.groupBy({
+      by: ["clientId"],
+      where: { clientId: { in: uncovered }, deletedAt: null },
+      _max: { cycleStart: true },
+    });
+    const pairs = latest
+      .filter((r): r is typeof r & { _max: { cycleStart: Date } } => r._max.cycleStart !== null)
+      .map((r) => ({ clientId: r.clientId, cycleStart: r._max.cycleStart }));
+
+    if (pairs.length > 0) {
+      fallbacks = await prisma.hourBank.findMany({ where: { deletedAt: null, OR: pairs } });
+    }
+  }
+
+  // A client can in principle have two cycles starting at the same
+  // instant; keep one, the same way findFirst would.
+  const banks = new Map<string, HourBank>();
+  for (const b of [...covering, ...fallbacks]) {
+    if (!banks.has(b.clientId)) banks.set(b.clientId, b);
+  }
+  if (banks.size === 0) return out;
+
+  const bankList = [...banks.values()];
+
+  // 3-5. Adjustments, policies and entries, one query each for the whole
+  //      set rather than one each per client.
+  const [adjustmentRows, policies, entries] = await Promise.all([
+    prisma.hourBankAdjustment.groupBy({
+      by: ["hourBankId"],
+      where: { hourBankId: { in: bankList.map((b) => b.id) } },
+      _sum: { minutes: true },
+    }),
+    prisma.billingPolicy.findMany({ where: { clientId: { in: bankList.map((b) => b.clientId) } } }),
+    // One window covering every cycle, narrowed per client below. The
+    // alternative - a query per cycle range - is the N+1 this function
+    // exists to remove, and the widest window is bounded by the cycles
+    // themselves rather than by history.
+    prisma.timeEntry.findMany({
+      where: {
+        clientId: { in: bankList.map((b) => b.clientId) },
+        deletedAt: null,
+        endAt: { not: null },
+        startAt: {
+          gte: new Date(Math.min(...bankList.map((b) => b.cycleStart.getTime()))),
+          lt: new Date(Math.max(...bankList.map((b) => b.cycleEnd.getTime()))),
+        },
+      },
+      select: { clientId: true, actualSeconds: true, billableSeconds: true, taskId: true, startAt: true },
+    }),
+  ]);
+
+  const adjustmentMinutesByBank = new Map(adjustmentRows.map((r) => [r.hourBankId, r._sum.minutes ?? 0]));
+  const policyByClient = new Map(policies.map((p) => [p.clientId, p]));
+  const entriesByClient = new Map<string, ConsumableEntry[]>();
+  for (const e of entries) {
+    const list = entriesByClient.get(e.clientId);
+    if (list) list.push(e);
+    else entriesByClient.set(e.clientId, [e]);
+  }
+
+  for (const bank of bankList) {
+    // The same per-client window getCurrentHourBank would have queried,
+    // applied to the batch instead of asking the database again.
+    const mine = (entriesByClient.get(bank.clientId) ?? []).filter(
+      (e) => e.startAt >= bank.cycleStart && e.startAt < bank.cycleEnd,
+    );
+    const consumedMinutes = consumedMinutesFromEntries(mine, policyByClient.get(bank.clientId) ?? null);
+    const adjustmentMinutes = adjustmentMinutesByBank.get(bank.id) ?? 0;
+
+    // closeIfExpired's answer, computed rather than written.
+    const effective: HourBank =
+      bank.status === "OPEN" && bank.cycleEnd.getTime() <= now.getTime()
+        ? { ...bank, status: "CLOSED" as HourBankStatus }
+        : bank;
+
+    out.set(bank.clientId, {
+      bank: { ...effective, consumedMinutes },
+      utilization: computeUtilization(effective, adjustmentMinutes, consumedMinutes),
+    });
+  }
+
+  return out;
 }
 
 /// Spec 8.2's four rollover modes, applied to the cycle that is ENDING to

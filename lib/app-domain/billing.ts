@@ -90,22 +90,28 @@ export async function computeEntryBillableSeconds(clientId: string, actualSecond
 /// minimum/rounding once per group. PER_ENTRY scope (the default) is
 /// simply the sum of each entry's own billableSeconds, unchanged from
 /// Phase 2 behavior.
-export async function computeConsumedMinutesForRange(
-  clientId: string,
-  range: { from: Date; to: Date }
-): Promise<number> {
-  const policy = await getBillingPolicy(clientId);
-  const scope: BillingAggregationScope = policy?.aggregationScope ?? "PER_ENTRY";
+/// The entry fields the consumption math actually reads. Naming the shape
+/// rather than taking a full TimeEntry keeps the pure function below
+/// callable from a batched query that selects the same four columns for
+/// many clients at once.
+export type ConsumableEntry = {
+  actualSeconds: number | null;
+  billableSeconds: number | null;
+  taskId: string | null;
+  startAt: Date;
+};
 
-  const entries = await prisma.timeEntry.findMany({
-    where: {
-      clientId,
-      deletedAt: null,
-      startAt: { gte: range.from, lt: range.to },
-      endAt: { not: null }, // an active timer has no actualSeconds yet
-    },
-    select: { actualSeconds: true, billableSeconds: true, taskId: true, startAt: true },
-  });
+/// The whole of spec 7.1's consumption math, as a pure function.
+///
+/// Extracted so that the single-client path below and the batched path in
+/// hour-banks.ts compute the same number from the same code. Two
+/// implementations of a billing rule is one implementation and one bug
+/// waiting to be discovered by a client reading their invoice.
+export function consumedMinutesFromEntries(
+  entries: ConsumableEntry[],
+  policy: PolicyLike | null
+): number {
+  const scope: BillingAggregationScope = policy?.aggregationScope ?? "PER_ENTRY";
 
   if (scope === "PER_ENTRY") {
     const totalSeconds = entries.reduce((sum, e) => sum + (e.billableSeconds ?? 0), 0);
@@ -126,6 +132,25 @@ export async function computeConsumedMinutesForRange(
     totalSeconds += applyBillingPolicy(groupActualSeconds, policy);
   }
   return Math.round(totalSeconds / 60);
+}
+
+export async function computeConsumedMinutesForRange(
+  clientId: string,
+  range: { from: Date; to: Date }
+): Promise<number> {
+  const policy = await getBillingPolicy(clientId);
+
+  const entries = await prisma.timeEntry.findMany({
+    where: {
+      clientId,
+      deletedAt: null,
+      startAt: { gte: range.from, lt: range.to },
+      endAt: { not: null }, // an active timer has no actualSeconds yet
+    },
+    select: { actualSeconds: true, billableSeconds: true, taskId: true, startAt: true },
+  });
+
+  return consumedMinutesFromEntries(entries, policy);
 }
 
 // ---------------------------------------------------------------------

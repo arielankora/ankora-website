@@ -118,8 +118,19 @@ jobs:
           elif [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "value=2" >> "$GITHUB_OUTPUT"
           elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-               | grep -qE '^qa/(e2e/|playwright\.config\.ts)'; then
-            echo "touches the browser suite - running level 2"
+               | grep -qE '^(qa/(e2e/|playwright\.config\.ts)|tests/integration/|lib/app-domain/|prisma/)'; then
+            # Level 1 runs types, lint and the unit suite. It does not run
+            # the integration suite, and it does not open a browser - so a
+            # pull request that changes domain logic, or adds an
+            # integration test to prove it, was being gated by checks that
+            # cannot see either. The tests went green without running.
+            #
+            # Found by a pull request that batched the hour-bank queries
+            # and shipped equivalence tests to prove the batched answer
+            # matched the per-client one. Those tests are the entire
+            # argument for the change, and level 1 would have skipped
+            # every one of them.
+            echo "touches domain logic, the schema or a suite level 1 cannot run - running level 2"
             echo "value=2" >> "$GITHUB_OUTPUT"
           else
             echo "value=1" >> "$GITHUB_OUTPUT"
