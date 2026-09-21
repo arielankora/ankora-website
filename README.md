@@ -314,11 +314,23 @@ List and revoke with `--list` and `--revoke <tokenId>`.
 Restart Claude Desktop. `scripts/mcp-bridge.mjs` is a dependency-free
 stdio↔HTTP relay — it needs Node 20+ and nothing installed.
 
-**Revoking access.** Either `--revoke <tokenId>`, or the existing "logout
-all sessions" action: `McpAccessToken` snapshots `User.tokenVersion` at
-issue time, so bumping that counter invalidates the person's MCP tokens
-along with their browser sessions. Deactivating or soft-deleting the user
-does the same.
+**Revoking access.** In the product: each grant has its own "ניתוק"
+button on the Claude card (`/app/profile`, `/app/integrations`), and an
+admin can cut every grant a user holds from that user's page under
+`/app/users` — separate from "logout all sessions", which is the blunter
+instrument and also ends their browser sessions. Both write an
+`AuditEvent` (`mcp_grant.revoke`, `mcp_grant.revoke_all`).
+
+Revocation is a soft revoke (`revokedAt`), never a delete, and there is
+no undo — re-authorizing in Claude is the recovery path. An OAuth
+disconnect revokes every live row for that client, not only the current
+one in the rotation chain, so no rotated-away access token outlives the
+click.
+
+Out of band, the old paths still hold: `--revoke <tokenId>` for a
+bridge token, and anything that bumps `User.tokenVersion` (a password
+change, "logout all sessions", deactivating or soft-deleting the user)
+invalidates every grant along with the browser sessions.
 
 **Troubleshooting.** The bridge logs to stderr, which Claude Desktop
 surfaces in its MCP log (`~/Library/Logs/Claude/mcp*.log`). A `401` there

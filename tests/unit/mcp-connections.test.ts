@@ -17,18 +17,36 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // same reason, as tests/unit/mcp/auth.test.ts.
 
 const oAuthTokenFindMany = vi.fn();
+const oAuthTokenFindFirst = vi.fn();
+const oAuthTokenUpdateMany = vi.fn();
 const mcpAccessTokenFindMany = vi.fn();
+const mcpAccessTokenUpdateMany = vi.fn();
 const userCount = vi.fn();
+const auditCreate = vi.fn();
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    oAuthToken: { findMany: (...args: unknown[]) => oAuthTokenFindMany(...args) },
-    mcpAccessToken: { findMany: (...args: unknown[]) => mcpAccessTokenFindMany(...args) },
+    oAuthToken: {
+      findMany: (...args: unknown[]) => oAuthTokenFindMany(...args),
+      findFirst: (...args: unknown[]) => oAuthTokenFindFirst(...args),
+      updateMany: (...args: unknown[]) => oAuthTokenUpdateMany(...args),
+    },
+    mcpAccessToken: {
+      findMany: (...args: unknown[]) => mcpAccessTokenFindMany(...args),
+      updateMany: (...args: unknown[]) => mcpAccessTokenUpdateMany(...args),
+    },
     user: { count: (...args: unknown[]) => userCount(...args) },
+    auditEvent: { create: (...args: unknown[]) => auditCreate(...args) },
   },
 }));
 
-const { getMyClaudeConnection, getClaudeOrgSummary } = await import("@/lib/app-domain/mcp-connections");
+const {
+  getMyClaudeConnection,
+  getClaudeOrgSummary,
+  countClaudeGrantsForUser,
+  revokeMyClaudeGrant,
+  revokeClaudeGrantsForUser,
+} = await import("@/lib/app-domain/mcp-connections");
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
@@ -49,6 +67,8 @@ function actor(overrides: Record<string, unknown> = {}) {
 /// A token row as the queries in the module select it, healthy by default.
 function oauthRow(overrides: Record<string, unknown> = {}) {
   return {
+    id: "oa1",
+    clientId: "client-a",
     userId: "u1",
     tokenVersion: 3,
     lastUsedAt: new Date(Date.now() - 2 * HOUR),
@@ -62,6 +82,7 @@ function oauthRow(overrides: Record<string, unknown> = {}) {
 
 function patRow(overrides: Record<string, unknown> = {}) {
   return {
+    id: "pat1",
     userId: "u1",
     tokenVersion: 3,
     label: "MacBook Air",
@@ -74,8 +95,13 @@ function patRow(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   oAuthTokenFindMany.mockReset();
+  oAuthTokenFindFirst.mockReset();
+  oAuthTokenUpdateMany.mockReset();
   mcpAccessTokenFindMany.mockReset();
+  mcpAccessTokenUpdateMany.mockReset();
   userCount.mockReset();
+  auditCreate.mockReset();
+  auditCreate.mockResolvedValue({});
 });
 
 describe("getMyClaudeConnection", () => {
@@ -225,5 +251,157 @@ describe("getClaudeOrgSummary", () => {
     expect(where.role.in).not.toContain("CLIENT_USER");
     expect(where.status).toBe("ACTIVE");
     expect(where.deletedAt).toBeNull();
+  });
+});
+
+// Revocation is the half of this module that writes, and the half where a
+// mistake is a security bug rather than a display bug. Two properties
+// carry the weight: a person can only ever revoke their own grant, and
+// "disconnected" has to mean disconnected — including the access token
+// that a rotated-away row might still be holding for another hour.
+describe("revokeMyClaudeGrant", () => {
+  it("rejects a malformed grant id without touching the database", async () => {
+    for (const bad of ["", "oauth:", "nonsense", "pat", ":abc"]) {
+      const result = await revokeMyClaudeGrant(actor(), bad);
+      expect(result.ok).toBe(false);
+    }
+    expect(oAuthTokenUpdateMany).not.toHaveBeenCalled();
+    expect(mcpAccessTokenUpdateMany).not.toHaveBeenCalled();
+    expect(auditCreate).not.toHaveBeenCalled();
+  });
+
+  // The important one. Ownership lives in the WHERE clause, so a guessed
+  // or replayed id belonging to somebody else matches nothing — there is
+  // no window where the row is found first and the check comes second.
+  it("scopes every write to the acting user", async () => {
+    oAuthTokenFindFirst.mockResolvedValue({ clientId: "client-a" });
+    oAuthTokenUpdateMany.mockResolvedValue({ count: 1 });
+
+    await revokeMyClaudeGrant(actor({ id: "u1" }), "oauth:someone-elses-row");
+
+    expect(oAuthTokenFindFirst.mock.calls[0][0].where.userId).toBe("u1");
+    expect(oAuthTokenUpdateMany.mock.calls[0][0].where.userId).toBe("u1");
+  });
+
+  it("refuses an OAuth grant that is not the caller's, and writes nothing", async () => {
+    oAuthTokenFindFirst.mockResolvedValue(null);
+
+    const result = await revokeMyClaudeGrant(actor(), "oauth:oa1");
+
+    expect(result.ok).toBe(false);
+    expect(oAuthTokenUpdateMany).not.toHaveBeenCalled();
+    expect(auditCreate).not.toHaveBeenCalled();
+  });
+
+  // Rotation writes a new row per renewal and revokes the one it
+  // supersedes, but a row rotated away and not yet revoked would keep a
+  // live access token for up to an hour past the click. Revoking by
+  // client, not by row, is what closes that window.
+  it("revokes every live row for the same OAuth client, not just the named row", async () => {
+    oAuthTokenFindFirst.mockResolvedValue({ clientId: "client-a" });
+    oAuthTokenUpdateMany.mockResolvedValue({ count: 3 });
+
+    const result = await revokeMyClaudeGrant(actor(), "oauth:oa1");
+
+    expect(result).toEqual({ ok: true, revoked: 3 });
+    const where = oAuthTokenUpdateMany.mock.calls[0][0].where;
+    expect(where.clientId).toBe("client-a");
+    expect(where.revokedAt).toBeNull();
+    expect(where.id).toBeUndefined();
+    expect(oAuthTokenUpdateMany.mock.calls[0][0].data.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("revokes a personal access token by its own row", async () => {
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 1 });
+
+    const result = await revokeMyClaudeGrant(actor(), "pat:pat1");
+
+    expect(result).toEqual({ ok: true, revoked: 1 });
+    const where = mcpAccessTokenUpdateMany.mock.calls[0][0].where;
+    expect(where).toMatchObject({ id: "pat1", userId: "u1", revokedAt: null });
+  });
+
+  it("reports failure, and records nothing, when the grant was already revoked", async () => {
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 0 });
+
+    const result = await revokeMyClaudeGrant(actor(), "pat:pat1");
+
+    expect(result.ok).toBe(false);
+    expect(auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("soft-revokes rather than deleting, and leaves an audit row", async () => {
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 1 });
+
+    await revokeMyClaudeGrant(actor(), "pat:pat1");
+
+    const audit = auditCreate.mock.calls[0][0].data;
+    expect(audit.action).toBe("mcp_grant.revoke");
+    expect(audit.entityType).toBe("McpGrant");
+    expect(audit.actorId).toBe("u1");
+  });
+});
+
+describe("revokeClaudeGrantsForUser", () => {
+  it("refuses a role without user.manage", async () => {
+    for (const role of ["ANKORA_ADMIN", "ANKORA_EMPLOYEE", "CLIENT_USER"]) {
+      await expect(revokeClaudeGrantsForUser(actor({ role }), "u2")).rejects.toThrow();
+    }
+    expect(oAuthTokenUpdateMany).not.toHaveBeenCalled();
+    expect(mcpAccessTokenUpdateMany).not.toHaveBeenCalled();
+  });
+
+  it("revokes both credential kinds for the target user and reports the total", async () => {
+    oAuthTokenUpdateMany.mockResolvedValue({ count: 2 });
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 1 });
+
+    const result = await revokeClaudeGrantsForUser(actor({ role: "SUPER_ADMIN" }), "u2");
+
+    expect(result).toEqual({ ok: true, revoked: 3 });
+    expect(oAuthTokenUpdateMany.mock.calls[0][0].where).toMatchObject({ userId: "u2", revokedAt: null });
+    expect(mcpAccessTokenUpdateMany.mock.calls[0][0].where).toMatchObject({ userId: "u2", revokedAt: null });
+  });
+
+  // "An admin cut this person's Claude access" is worth recording even
+  // when there was nothing live to cut — otherwise the absence of a row
+  // reads as nobody having tried.
+  it("records the attempt even when nothing was live", async () => {
+    oAuthTokenUpdateMany.mockResolvedValue({ count: 0 });
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 0 });
+
+    const result = await revokeClaudeGrantsForUser(actor({ role: "SUPER_ADMIN" }), "u2");
+
+    expect(result).toEqual({ ok: true, revoked: 0 });
+    expect(auditCreate.mock.calls[0][0].data.action).toBe("mcp_grant.revoke_all");
+  });
+
+  // Distinct from "logout all sessions" on purpose: cutting the
+  // integration should not also throw the person out of the app.
+  it("does not bump tokenVersion", async () => {
+    oAuthTokenUpdateMany.mockResolvedValue({ count: 1 });
+    mcpAccessTokenUpdateMany.mockResolvedValue({ count: 0 });
+
+    await revokeClaudeGrantsForUser(actor({ role: "SUPER_ADMIN" }), "u2");
+
+    const written = JSON.stringify([oAuthTokenUpdateMany.mock.calls, mcpAccessTokenUpdateMany.mock.calls]);
+    expect(written).not.toContain("tokenVersion");
+  });
+});
+
+describe("countClaudeGrantsForUser", () => {
+  it("refuses a role without user.manage", async () => {
+    await expect(countClaudeGrantsForUser(actor({ role: "ANKORA_ADMIN" }), "u2")).rejects.toThrow();
+  });
+
+  it("counts live grants of both kinds, applying the same validity checks", async () => {
+    oAuthTokenFindMany.mockResolvedValue([
+      oauthRow({ userId: "u2", user: { id: "u2", status: "ACTIVE", deletedAt: null, tokenVersion: 3 } }),
+      oauthRow({ userId: "u2", user: { id: "u2", status: "SUSPENDED", deletedAt: null, tokenVersion: 3 } }),
+    ]);
+    mcpAccessTokenFindMany.mockResolvedValue([
+      patRow({ userId: "u2", user: { id: "u2", status: "ACTIVE", deletedAt: null, tokenVersion: 3 } }),
+    ]);
+
+    expect(await countClaudeGrantsForUser(actor({ role: "SUPER_ADMIN" }), "u2")).toBe(2);
   });
 });

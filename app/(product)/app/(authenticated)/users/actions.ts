@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
 import { inviteUser, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
+import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
@@ -92,5 +93,22 @@ export async function logoutAllSessionsAction(formData: FormData) {
   if (!userId) return;
 
   await logoutAllSessions(actor, userId);
+  revalidatePath(`/app/users/${userId}`);
+}
+
+/// Cuts a user's Claude access without touching their browser sessions.
+///
+/// Sits beside logoutAllSessionsAction rather than inside it: the two
+/// answer different questions. "This account may be compromised" wants
+/// every session gone, which bumping tokenVersion already does (and which
+/// takes the Claude grants with it). "This person no longer needs the
+/// integration" wants only the integration gone, and should not log them
+/// out of the app they are working in.
+export async function revokeClaudeGrantsAction(formData: FormData) {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return;
+
+  await revokeClaudeGrantsForUser(actor, userId);
   revalidatePath(`/app/users/${userId}`);
 }

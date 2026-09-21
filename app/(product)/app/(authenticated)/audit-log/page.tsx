@@ -20,6 +20,14 @@ const ENTITY_TYPES = [
   "AlertEvent",
   "EmailDelivery",
   "ReportSchedule",
+  // Both halves of a Claude grant's life: "OAuthClient" is what consent
+  // records when access is given, "McpGrant" what revoking records when
+  // it is taken away. Neither was filterable before - the granted rows
+  // had been landing in this table since Phase 15 with no way to select
+  // them and no Hebrew label, which a live run of the audit screen is
+  // how we noticed.
+  "OAuthClient",
+  "McpGrant",
 ];
 
 const ACTION_LABEL: Record<string, string> = {
@@ -64,6 +72,11 @@ const ACTION_LABEL: Record<string, string> = {
   "task.create": "יצירת משימה",
   "task.status_change": "שינוי סטטוס משימה",
   "profile.password_change": "החלפת סיסמה עצמית",
+  // Claude (MCP) grants, both directions: the consent endpoint has
+  // recorded "granted" since Phase 15, revoking is new in Phase 4.
+  "mcp.oauth.granted": "אישור חיבור Claude",
+  "mcp_grant.revoke": "ניתוק חיבור Claude",
+  "mcp_grant.revoke_all": "ניתוק כל חיבורי Claude של משתמש",
   "profile.timezone_update": "עדכון אזור זמן",
 };
 
@@ -84,7 +97,17 @@ function classifyAction(action: string): { label: string; tone: "green" | "amber
   if (action.includes("failure")) return { label: "כשלון", tone: "red" };
   if (action.startsWith("login.") || action === "logout" || action.includes("logout_all_sessions"))
     return { label: "התחברות", tone: "gray" };
-  if (action.includes("role_status_change") || action.includes("client_access_change") || action.includes("invite"))
+  if (
+    action.includes("role_status_change") ||
+    action.includes("client_access_change") ||
+    action.includes("invite") ||
+    // Giving or revoking a credential is an access change, not an edit -
+    // without this both would fall through to the generic "עריכה" tag
+    // and read as routine on a screen an admin scans for exactly these
+    // events.
+    action.includes(".revoke") ||
+    action.includes(".granted")
+  )
     return { label: "הרשאות", tone: "amber" };
   if (action.includes(".delete") || action.includes(".archive")) return { label: "מחיקה", tone: "red" };
   if (action.includes(".create") || action.includes(".requested")) return { label: "יצירה", tone: "green" };
