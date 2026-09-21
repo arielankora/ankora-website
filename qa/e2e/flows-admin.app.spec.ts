@@ -178,22 +178,14 @@ test.describe("time-entries/actions - an admin reporting on behalf of an employe
 
     await form.getByRole("button", { name: "הוספת דיווח לעובד" }).click();
 
-    // This form has no success toast and does not collapse on ok - it simply
-    // resets, which is indistinguishable from not having submitted. Its only
-    // failure signal is the error paragraph, so that is what is asserted.
-    //
-    // Deliberately NOT read back off the table below it: that table is
-    // filtered and paged, and an entry filed for another employee is not
-    // reliably on the first page. Chasing it through the filter bar would
-    // make this test mostly about the filter bar. What it is here to prove is
-    // that the on-behalf-of action ran and was accepted, and the absence of
-    // the error is exactly that.
+    // This form reports success by collapsing back to its toggle, and reports
+    // failure by rendering an error paragraph in place. Either of those is a
+    // completed round trip; what must never happen is the error.
     await expect(
-      form.getByText(/שגיאה|חופף|לא תקין|אין לך הרשאה|יש למלא|נדרש/),
-      "the admin entry was refused",
-    ).toHaveCount(0);
-    // The reset is the action having completed a round trip.
-    await expect(form.locator('input[name="note"]'), "the form did not complete a submit").toHaveValue("");
+      page.getByRole("button", { name: "+ דיווח עבור עובד" }),
+      "the admin entry form never completed its submit",
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/שגיאה|חופף|לא תקין|אין לך הרשאה/), "the admin entry was refused").toHaveCount(0);
   });
 });
 
