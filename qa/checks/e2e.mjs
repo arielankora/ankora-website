@@ -18,6 +18,23 @@ const REPORT = path.join(ROOT, "qa", "reports", "e2e.json");
 export async function e2e() {
   fs.rmSync(REPORT, { force: true });
 
+  // Re-seed immediately before the browser runs, every time.
+  //
+  // The CI job seeds once, up front - and then the integration suite runs
+  // and TRUNCATEs every table, users included, because that is exactly
+  // what resetDb() is for. By the time Playwright tried to sign in, the
+  // demo accounts no longer existed, so the only spec that needed a real
+  // session sat on the login screen until it timed out. A failed login
+  // looked identical to a broken one.
+  //
+  // Seeding here rather than earlier in the workflow makes this check
+  // self-sufficient: it does not care what ran before it, which is the
+  // property any check in a suite this long needs to have.
+  const seed = await sh("npm", ["run", "db:seed"], { timeoutMs: 3 * 60_000 });
+  if (seed.code !== 0) {
+    return [finding("blocker", "could not seed the fixtures the browser signs in as", tail(seed.all, 20))];
+  }
+
   // No PLAYWRIGHT_BROWSERS_PATH default here, on purpose. An earlier
   // version defaulted it to /opt/pw-browsers - correct for the sandbox
   // this suite was written in, and wrong everywhere else. In CI,
