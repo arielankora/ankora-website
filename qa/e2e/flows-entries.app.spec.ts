@@ -25,39 +25,40 @@ function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
 }
 
+/** Yesterday, in the timezone the product reasons in. */
+function yesterdayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(
+    new Date(Date.now() - 86_400_000),
+  );
+}
+
 /**
- * A finished window earlier today, or null if one will not fit.
+ * A fixed window on YESTERDAY, shifted by the attempt number.
  *
- * Same constraint the other flow files work around: the domain refuses an
- * entry more than five minutes in the future, and an entry dated
- * yesterday demands a backdate reason. So the window is walked back from
- * the current hour and must land inside today; shortly after local
- * midnight it cannot, and these tests skip saying so rather than
- * inventing a time the product is right to reject.
+ * The first version of this file carved out a band of today - roughly 5
+ * to 7 hours back - on the theory that the other flow files write nearer
+ * the present. They do, except on retry: every one of them shifts its
+ * window an hour further back per attempt, and flows-admin's band starts
+ * at 5h20m. The two overlapped exactly, for the same employee, which is
+ * the one collision this product refuses outright. Both files then
+ * reported the other one's entry as their own failure to save.
  *
- * The band here is this file's own - roughly 5 to 7 hours back. The other
- * two flow files write nearer the present, and two entries for the same
- * employee at the same moment is exactly the overlap this product
- * refuses. Files that collide there make each other look broken.
+ * Dividing one day between four files and their retries does not work:
+ * every band added pushes the next one deeper, and a band deep enough is
+ * a test that skips itself on the nightly run at six in the morning.
+ *
+ * Yesterday has no other tenants, and dating an entry there means the
+ * form demands a reason for it - a required field that no other spec
+ * exercises. The conflict is gone and the coverage is wider.
  */
-function windowEarlierToday(): { start: string; end: string } | null {
-  const [hh, mm] = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Jerusalem",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  })
-    .format(new Date())
-    .split(":")
-    .map(Number);
-
-  const nowMinutes = hh * 60 + mm;
-  const end = nowMinutes - 300;
-  const start = end - 45;
-  if (start < 0) return null;
-
+function windowYesterday(attempt = 0): { start: string; end: string } {
+  // 09:00 onwards, one hour per attempt. Well clear of midnight at both
+  // ends, so no timezone rounding can push it into today or the day
+  // before - a window that drifts across a date boundary is a test that
+  // fails once a year for a reason nobody will find.
+  const startMinutes = 9 * 60 + attempt * 60;
   const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
-  return { start: fmt(start), end: fmt(end) };
+  return { start: fmt(startMinutes), end: fmt(startMinutes + 45) };
 }
 
 async function openCreateForm(page: import("@playwright/test").Page) {
@@ -70,9 +71,7 @@ async function openCreateForm(page: import("@playwright/test").Page) {
 
 test.describe("filing time for someone else", () => {
   test("an entry created for an employee appears with its note", async ({ page }) => {
-    const window = windowEarlierToday();
-    test.skip(window === null, "no finished window fits inside today yet (runs shortly after local midnight)");
-
+    const window = windowYesterday(test.info().retry);
     const note = tag("[E2E] דיווח");
     await openCreateForm(page);
 
@@ -83,24 +82,44 @@ test.describe("filing time for someone else", () => {
     await page.locator('select[name="userId"]').selectOption({ index: 1 });
     await page.locator('select[name="clientId"]').selectOption({ index: 1 });
     await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
-    await page.locator('input[name="date"]').fill(todayKey());
-    await page.locator('input[name="startTime"]').fill(window!.start);
-    await page.locator('input[name="endTime"]').fill(window!.end);
+    await page.locator('input[name="date"]').fill(yesterdayKey());
+    await page.locator('input[name="startTime"]').fill(window.start);
+    await page.locator('input[name="endTime"]').fill(window.end);
     await page.locator('[name="note"]').fill(note);
+
+    // The reason field only renders once the date is not today, so this
+    // also proves the form notices the change. Without it the domain
+    // refuses the write, which is the rule being exercised here.
+    const reason = page.locator('[name="backdateReason"]');
+    await expect(reason, "the backdate reason field did not appear for a past date").toBeVisible({
+      timeout: 10_000,
+    });
+    await reason.fill("דיווח מאוחר - בדיקה אוטומטית");
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
     await page.waitForLoadState("networkidle");
-    await page.reload();
 
-    await expect(page.getByText(note, { exact: false }).first(), "the entry was not created").toBeVisible({
-      timeout: 15_000,
-    });
+    // Say what the form said, if it said no.
+    //
+    // "the entry was not created" is true and useless: a refused write
+    // and a slow one look identical from the row that is missing. The
+    // form renders its reason, so a failure here should carry it rather
+    // than send the next person to read the server log.
+    const refusal = (await page.locator("body").innerText()).match(
+      /יש (?:לציין|לבחור|להזין)[^\n]{0,80}|חופף[^\n]{0,80}|לא ניתן[^\n]{0,80}/,
+    );
+
+    await page.reload();
+    await expect(
+      page.getByText(note, { exact: false }).first(),
+      `the entry was not created${refusal ? ` - the form said: ${refusal[0]}` : ""}`,
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("refuses an end time before the start, without creating anything", async ({ page }) => {
-    const window = windowEarlierToday();
-    test.skip(window === null, "no finished window fits inside today yet");
-
+    // Stays on today: this write is meant to be refused, so it creates
+    // nothing and can share a band with anyone.
+    const window = windowYesterday(0);
     const note = tag("[E2E] הפוך");
     await openCreateForm(page);
 
@@ -109,8 +128,8 @@ test.describe("filing time for someone else", () => {
     await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
     await page.locator('input[name="date"]').fill(todayKey());
     // Inverted on purpose.
-    await page.locator('input[name="startTime"]').fill(window!.end);
-    await page.locator('input[name="endTime"]').fill(window!.start);
+    await page.locator('input[name="startTime"]').fill(window.end);
+    await page.locator('input[name="endTime"]').fill(window.start);
     await page.locator('[name="note"]').fill(note);
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
