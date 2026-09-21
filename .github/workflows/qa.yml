@@ -72,6 +72,14 @@ jobs:
       # apex overrides the code's own default and makes every route 308.
       QA_PROD_URL: https://www.ankora.co.il
       AUTH_SECRET: ci-only-not-a-real-secret
+      # Auth.js v5 will not build a redirect for an origin it does not
+      # trust, and 127.0.0.1:3100 is not one it infers. Without these, the
+      # sign-in POST lands on /api/auth/callback/credentials and simply
+      # stops there - which looks exactly like a broken login button, and
+      # is really a missing environment variable. Production sets its own
+      # host, so this gap only ever showed up here.
+      AUTH_URL: http://127.0.0.1:3100
+      AUTH_TRUST_HOST: "true"
       ADMIN_PASSWORD: ci-only-not-a-real-password
       ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
 
