@@ -55,6 +55,7 @@ export type Outcome = (typeof OUTCOMES)[number];
 export type RelatedSolution =
   | "/personal-operations-management"
   | "/ankora-vs-personal-assistant"
+  | "/ankora-vs-ai-assistants"
   | "/personal-assistant-for-executives"
   | "/how-it-works"
   | "/solutions/executives"
