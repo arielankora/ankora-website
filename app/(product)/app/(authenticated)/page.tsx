@@ -6,7 +6,7 @@ import { KpiCard } from "@/components/app/KpiCard";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { listClients } from "@/lib/app-domain/clients";
-import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
+import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import { getHoursTrend } from "@/lib/app-domain/overview-trend";
@@ -56,9 +56,18 @@ async function loadOperationalMetrics() {
     listClients().then((clients) => clients.filter((c) => c.status === "ACTIVE")),
   ]);
 
-  const bankSnapshots = (await Promise.all(activeClients.map((c) => getCurrentHourBank(c.id)))).filter(
-    (s): s is NonNullable<typeof s> => s !== null
-  );
+  // One batched lookup, not one per client.
+  //
+  // This was `activeClients.map((c) => getCurrentHourBank(c.id))`, which
+  // cost six to nine round trips per client - two of them writes - on
+  // every render of this page, and on every Server Action that
+  // revalidates it. Creating an important date was measured at over
+  // ninety seconds because of it. See the note on
+  // getCurrentHourBanksForClients, and
+  // claude/perf-dashboard-n-plus-one-2026-09.
+  const bankSnapshots = [
+    ...(await getCurrentHourBanksForClients(activeClients.map((c) => c.id))).values(),
+  ];
   const avgUtilizationPct =
     bankSnapshots.length > 0
       ? Math.round(bankSnapshots.reduce((sum, s) => sum + s.utilization.utilizationPct, 0) / bankSnapshots.length)
