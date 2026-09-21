@@ -24,10 +24,30 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     );
   }
 
+  // `select`, not `include`. This row is handed to EditRoleStatusForm,
+  // which is a client component - so every field on it is serialised into
+  // the RSC payload and shipped inside the page HTML. `include` fetches
+  // the whole User, which means passwordHash: the bcrypt hash of every
+  // user an admin has ever opened, sitting in page source, available to
+  // any browser extension, cache or proxy in the path, and crackable
+  // offline at leisure.
+  //
+  // Nothing rendered here ever needed it - the form reads id, role and
+  // status, and nothing else. Caught by a browser test that greps the
+  // served HTML for a bcrypt prefix, which is a check worth keeping for
+  // exactly this reason: the leak is invisible on screen.
   const [targetUser, clients] = await Promise.all([
     prisma.user.findFirst({
       where: { id: params.userId, deletedAt: null },
-      include: { clientAccess: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        clientAccess: true,
+      },
     }),
     listClients(),
   ]);
@@ -50,7 +70,14 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="mb-4 text-sm font-medium text-appNavy">תפקיד וסטטוס</h2>
-          <EditRoleStatusForm targetUser={targetUser} isSelf={isSelf} />
+          {/* An explicit literal, not the row. The narrowed prop type on the
+              component is the declaration; this is the enforcement - a prop
+              typed narrower still serialises every field the object actually
+              carries, because a variable is allowed to exceed its type. */}
+          <EditRoleStatusForm
+            targetUser={{ id: targetUser.id, role: targetUser.role, status: targetUser.status }}
+            isSelf={isSelf}
+          />
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">

@@ -16,7 +16,19 @@ function SubmitButton() {
   );
 }
 
-export function EditRoleStatusForm({ targetUser, isSelf }: { targetUser: User; isSelf: boolean }) {
+// `Pick`, not `User`. Declaring the whole row invited the page to pass
+// the whole row, and a client component's props are serialised into the
+// page HTML - which is how the bcrypt hash of every user an admin opened
+// ended up in page source. Narrowing the type here is what makes that
+// mistake impossible to repeat quietly: the page cannot hand over a
+// field this component has not asked for.
+export function EditRoleStatusForm({
+  targetUser,
+  isSelf,
+}: {
+  targetUser: Pick<User, "id" | "role" | "status">;
+  isSelf: boolean;
+}) {
   const [state, formAction] = useFormState(updateUserRoleStatusAction, {});
 
   return (

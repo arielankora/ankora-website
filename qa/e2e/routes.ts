@@ -83,3 +83,19 @@ const IGNORED_CONSOLE = [
 export function isRealConsoleError(text: string): boolean {
   return !IGNORED_CONSOLE.some((re) => re.test(text));
 }
+
+/**
+ * Credential material that must never appear in a served document.
+ *
+ * Lives here rather than in one spec because the same sweep runs under
+ * more than one session: a screen can be empty for an employee and full
+ * of rows for a Super Admin, and the leak is in the rows.
+ *
+ * The bcrypt pattern matches the format, not a known value, so it also
+ * catches a hash belonging to a user seeded after this was written.
+ */
+export const CREDENTIAL_PATTERNS: { pattern: RegExp; what: string }[] = [
+  { pattern: /\$2[aby]\$\d\d\$/, what: "a bcrypt hash" },
+  { pattern: /passwordHash/, what: "a passwordHash field" },
+  { pattern: /tokenHash/, what: "a token hash field" },
+];
