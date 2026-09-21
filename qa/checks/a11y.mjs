@@ -92,8 +92,19 @@ function auditPage() {
       el.tagName === "A" && p && getComputedStyle(el).display.startsWith("inline") &&
       [...p.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim().length > 2);
     if (inlineInSentence) continue;
-    if (r.width < 24 || r.height < 24) {
-      out.targets.push({ text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 30), w: Math.round(r.width), h: Math.round(r.height) });
+    // Half a pixel of tolerance. Sub-pixel layout routinely gives a link a measured
+    // height of 23.99 where every rule in the stylesheet says 24, and the first run of
+    // this check reported 128 of those -- every one of them printed as "305x24 below
+    // the 24x24 floor", a sentence that contradicts itself. A defect a reader can see
+    // is nonsense is worse than no check, because it trains them to skim the whole
+    // section. The measurements are reported to one decimal for the same reason.
+    const MIN = 23.5;
+    if (r.width < MIN || r.height < MIN) {
+      out.targets.push({
+        text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 30),
+        w: +r.width.toFixed(1),
+        h: +r.height.toFixed(1),
+      });
     }
   }
 
