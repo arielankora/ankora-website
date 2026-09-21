@@ -133,8 +133,15 @@ test.describe("customer stories", () => {
       expect(response?.status(), `${route} HTTP status`).toBe(200);
       await expect(page.locator("h1").first()).toBeVisible();
 
-      const robots = await page.locator('meta[name="robots"]').first().getAttribute("content");
-      expect(robots ?? "", `${route} must not be noindex`).not.toContain("noindex");
+      // evaluateAll, not getAttribute: a public page has no robots meta at all,
+      // and a locator that resolves to nothing makes getAttribute WAIT for it -
+      // which is a 30-second test timeout reported as "the page did not render",
+      // for a page that rendered fine. The absence is the pass here, so the
+      // check has to be able to see an empty list.
+      const robots = await page
+        .locator('meta[name="robots"]')
+        .evaluateAll((nodes) => nodes.map((n) => n.getAttribute("content") ?? "").join(" "));
+      expect(robots, `${route} must not be noindex`).not.toContain("noindex");
     });
   }
 
