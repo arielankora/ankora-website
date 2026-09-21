@@ -175,20 +175,21 @@ test.describe("tasks/actions - create and complete", () => {
     await dialog.locator('input[name="title"]').fill(title);
     await dialog.getByRole("button", { name: "הוספת משימה" }).click();
 
-    const row = page.getByText(title, { exact: false }).first();
-    await expect(row, "the task was not created").toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText(title, { exact: true }), "the task was not created").toBeVisible({ timeout: 15_000 });
 
-    // Completing it flips the row's own control, which is the only place the
-    // two states are distinguishable without reading the database.
-    const done = page
-      .locator("tr,li,div")
-      .filter({ hasText: title })
-      .getByRole("button", { name: "סימון כהושלמה" })
-      .first();
-    await done.click();
-    await expect(
-      page.locator("tr,li,div").filter({ hasText: title }).getByRole("button", { name: "סימון כפתוחה" }).first(),
-    ).toBeVisible({ timeout: 15_000 });
+    // The row's toggle is a `role="checkbox"` button sitting as the immediate
+    // sibling of the block holding the title, so it is reached from the title
+    // rather than from a class name - the styling here is redesigned often
+    // and a test pinned to it would break for cosmetic reasons.
+    const toggle = page.locator(
+      `xpath=//button[@role="checkbox"][following-sibling::div[.//*[normalize-space(text())=${JSON.stringify(title)}]]]`,
+    );
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await toggle.click();
+    await expect(toggle, "marking the task done did not stick").toHaveAttribute("aria-checked", "true", {
+      timeout: 15_000,
+    });
   });
 });
 
