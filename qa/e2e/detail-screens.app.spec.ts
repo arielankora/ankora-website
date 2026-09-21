@@ -113,11 +113,26 @@ test.describe("a detail page is not a way around client scoping", () => {
 
       expect(status, `${route} returned a server error for a bad id`).toBeLessThan(500);
 
-      const body = await page.locator("body").innerText();
-      expect(body).not.toMatch(/Application error|Internal Server Error/);
-      // Whatever it shows - a not-found, a redirect, an empty state - it
-      // must not be a populated record.
-      expect(body).not.toMatch(/\[DEMO\]/);
+      // A retrying assertion, not a one-shot innerText read.
+      //
+      // `domcontentloaded` can return before the not-found body is
+      // painted, and reading innerText at that instant gets an empty
+      // string - so the test failed on the first attempt and passed on
+      // the retry, three runs in a row. A test that only passes the
+      // second time is worse than one that fails: it teaches everyone to
+      // press the button again.
+      await expect(page.locator("body")).not.toContainText(/Application error|Internal Server Error/, {
+        timeout: 10_000,
+      });
+
+      if (status !== 404) {
+        // Whatever it shows - a not-found, a redirect, an empty state -
+        // it must not be a populated record.
+        await expect(
+          page.locator("body"),
+          `${route} rendered something for an id that does not exist`,
+        ).toContainText(/לא נמצא|404|אין לך הרשאה|Not Found/, { timeout: 10_000 });
+      }
     });
   }
 });

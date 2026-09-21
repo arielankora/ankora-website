@@ -103,8 +103,13 @@ test.describe("a detail page is not a way around scoping", () => {
       const status = response?.status() ?? 0;
 
       expect(status, `${route} returned a server error for a bad id`).toBeLessThan(500);
-      const body = await page.locator("body").innerText();
-      expect(body).not.toMatch(/Application error|Internal Server Error/);
+
+      // Retrying assertions, not one-shot innerText reads: see the note
+      // on the same test in detail-screens.app.spec.ts. `domcontentloaded`
+      // can return before the not-found body is painted.
+      await expect(page.locator("body")).not.toContainText(/Application error|Internal Server Error/, {
+        timeout: 10_000,
+      });
 
       // Refused, not merely empty.
       //
@@ -116,8 +121,12 @@ test.describe("a detail page is not a way around scoping", () => {
       //
       // What actually matters is that a fabricated id produces a refusal
       // rather than somebody else's row, so that is what this asserts.
-      const refused = status === 404 || /לא נמצא|404|אין לך הרשאה|Not Found/.test(body);
-      expect(refused, `${route} rendered something for an id that does not exist`).toBe(true);
+      if (status !== 404) {
+        await expect(
+          page.locator("body"),
+          `${route} rendered something for an id that does not exist`,
+        ).toContainText(/לא נמצא|404|אין לך הרשאה|Not Found/, { timeout: 10_000 });
+      }
     });
   }
 });
