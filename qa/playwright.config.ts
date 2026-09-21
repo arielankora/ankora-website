@@ -76,7 +76,12 @@ export default defineConfig({
         // .next there, and died before a single spec was collected. The
         // check reported green in two seconds, because a run that
         // collects nothing fails nothing.
-        cwd: path.resolve(import.meta.dirname, ".."),
+        //
+        // `__dirname`, not `import.meta.dirname`: Playwright compiles this
+        // config to CommonJS, and a single `import.meta` in the file flips
+        // its loader into ESM handling, which then dies on the `exports`
+        // the compiler just emitted.
+        cwd: path.resolve(__dirname, ".."),
         url: `${BASE_URL}/api/health`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

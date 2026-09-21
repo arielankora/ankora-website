@@ -96,7 +96,15 @@ describe("hours_by_employee - spec 14.2", () => {
 
 describe("hours_by_client - spec 14.2 client isolation via filter", () => {
   it("clientId filter narrows Hours by Client to only that client", async () => {
-    const { superAdmin, clientA, clientB } = await setup();
+    const { superAdmin, employee, clientA, clientB, category } = await setup();
+    // Both clients get time logged, so the assertion below is about the
+    // FILTER and nothing else. The original logged none at all and still
+    // expected one row back, which quietly depended on hours_by_client
+    // listing a client with zero hours - a separate question about the
+    // report's shape, and not the one this test is named for.
+    await createTestTimeEntry({ userId: employee.id, clientId: clientA.id, categoryId: category.id });
+    await createTestTimeEntry({ userId: employee.id, clientId: clientB.id, categoryId: category.id });
+
     const result = await runReport(superAdmin, "hours_by_client", { clientId: clientA.id });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].client).toBe(clientA.name);
