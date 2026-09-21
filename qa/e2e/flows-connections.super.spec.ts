@@ -55,6 +55,29 @@ function revokeTriggers(page: import("@playwright/test").Page) {
   return page.getByRole("button", { name: "ניתוק" });
 }
 
+/**
+ * How many connections are listed, after giving the list a chance to render.
+ *
+ * A bare `count()` straight after a navigation answers "how many are on
+ * the page right now", which just after a reload is often "none yet".
+ * The two tests below both use that number to decide whether to skip,
+ * so reading it too early does not fail loudly - it SKIPS, and a
+ * disconnect test that silently skipped is a disconnect test nobody is
+ * running. Waiting for the first control first turns "not rendered yet"
+ * into "rendered, and here is the real number", and leaves a genuine
+ * zero as a genuine zero.
+ */
+async function countRevokeTriggers(page: import("@playwright/test").Page): Promise<number> {
+  await revokeTriggers(page)
+    .first()
+    .waitFor({ state: "visible", timeout: 10_000 })
+    .catch(() => {
+      // Genuinely none listed. The callers treat that as a skip, which
+      // is the honest outcome when there is no fixture to revoke.
+    });
+  return revokeTriggers(page).count();
+}
+
 test.describe("the connections list", () => {
   test("lists the seeded connection on both screens that render it", async ({ page }) => {
     // The card is shared between Profile and Integrations on purpose, and
@@ -88,7 +111,7 @@ test.describe("the connections list", () => {
 test.describe("disconnecting", () => {
   test("asks for confirmation first, and does nothing until it is given", async ({ page }) => {
     await page.goto("/app/integrations");
-    const before = await revokeTriggers(page).count();
+    const before = await countRevokeTriggers(page);
     test.skip(before === 0, "no connection listed to disconnect");
 
     await revokeTriggers(page).first().click();
@@ -98,12 +121,26 @@ test.describe("disconnecting", () => {
     // has already acted by the time it asks is not a confirm step.
     await page.getByRole("button", { name: "ביטול" }).first().click();
     await page.reload();
-    expect(await revokeTriggers(page).count(), "backing out removed the connection anyway").toBe(before);
+
+    // expect.poll, not a one-shot count().
+    //
+    // `await locator.count()` samples the page once, the instant it is
+    // called. A reload resolves as soon as the document is ready, which
+    // can be before the list has rendered - so the count comes back 0
+    // and the test reports "backing out removed the connection anyway",
+    // which is the most alarming sentence this file can produce and, in
+    // that case, not true. Same class of bug as the fabricated-id and
+    // portal specs; this is the third place it has appeared.
+    await expect
+      .poll(() => revokeTriggers(page).count(), {
+        message: "backing out removed the connection anyway",
+      })
+      .toBe(before);
   });
 
   test("a confirmed disconnect removes the connection and it stays gone", async ({ page }) => {
     await page.goto("/app/integrations");
-    const before = await revokeTriggers(page).count();
+    const before = await countRevokeTriggers(page);
     test.skip(before === 0, "no connection listed to disconnect");
 
     await revokeTriggers(page).first().click();
@@ -114,9 +151,10 @@ test.describe("disconnecting", () => {
     // whether the row was revoked in the database, not whether React
     // stopped drawing it.
     await page.reload();
-    expect(
-      await revokeTriggers(page).count(),
-      "the connection came back after a reload - the revoke did not persist",
-    ).toBe(before - 1);
+    await expect
+      .poll(() => revokeTriggers(page).count(), {
+        message: "the connection came back after a reload - the revoke did not persist",
+      })
+      .toBe(before - 1);
   });
 });
