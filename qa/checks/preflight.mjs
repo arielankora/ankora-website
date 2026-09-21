@@ -16,10 +16,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../lib/discover.mjs";
 import { finding } from "../lib/report.mjs";
-import { reachable } from "../lib/sh.mjs";
+import { unreachableBecause } from "../lib/sh.mjs";
 import { egressBlocked } from "./production.mjs";
 
 /** Filled by `preflight()`, read by the runner's `skipIf` hooks. */
+/** Set by `preflight()`; why production could not be reached, if it could not. */
+let productionCause = null;
+
 export const capabilities = {
   prismaClient: false,
   database: false,
@@ -92,8 +95,13 @@ export async function preflight() {
   capabilities.prismaClient = prismaClientGenerated();
   capabilities.database = await databaseUp();
   capabilities.browser = await browserAvailable();
-  capabilities.production =
-    !(await egressBlocked()) && (await reachable(process.env.QA_PROD_URL ?? "https://ankora.co.il"));
+  // Default to the CANONICAL host. The apex is a different hostname that 308s
+  // every route, and probing it here made "is production reachable" depend on
+  // a redirect this file does not care about.
+  productionCause = (await egressBlocked())
+    ? "blocked by this network's egress policy"
+    : await unreachableBecause(process.env.QA_PROD_URL ?? "https://www.ankora.co.il");
+  capabilities.production = productionCause === null;
 
   const out = [];
   const state = Object.entries(capabilities)
@@ -115,7 +123,11 @@ export async function preflight() {
   }
   if (!capabilities.production) {
     out.push(
-      finding("minor", "Production not reachable — live probe will be skipped", "Expected locally; the probe is meant to run in CI."),
+      finding(
+        "minor",
+        `Production not reachable — live probe will be skipped (${productionCause})`,
+        "Expected locally; the probe is meant to run in CI.",
+      ),
     );
   }
   return out;
@@ -126,5 +138,5 @@ export const needs = {
   prisma: async () => (capabilities.prismaClient ? null : "Prisma client not generated in this environment"),
   database: async () => (capabilities.database ? null : "no database reachable"),
   browser: async () => (capabilities.browser ? null : "no browser available"),
-  production: async () => (capabilities.production ? null : "production not reachable from here"),
+  production: async () => (capabilities.production ? null : `production not reachable from here (${productionCause})`),
 };

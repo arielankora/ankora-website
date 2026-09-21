@@ -12,7 +12,7 @@
 // which has no such restriction - that is the intended home for it.
 
 import { finding } from "../lib/report.mjs";
-import { reachable } from "../lib/sh.mjs";
+import { fetchOnce, unreachableBecause } from "../lib/sh.mjs";
 
 // The canonical host, per lib/site.ts and docs/adr/0002. Probing the apex
 // instead returns 308 on every single route - which the first CI run duly
@@ -65,21 +65,21 @@ const ROUTES = [
  * headers never reached Ankora at all.
  */
 export async function egressBlocked() {
-  try {
-    const res = await fetch(`${BASE}/api/health`, { redirect: "manual", headers: { "user-agent": "ankora-qa/1" } });
-    if (res.status !== 403 && res.status !== 407) return false;
-    const ours = ["strict-transport-security", "content-security-policy", "x-frame-options"].some((h) =>
-      res.headers.get(h),
-    );
-    return !ours;
-  } catch {
-    return false; // a transport error is a real unreachability, handled below
-  }
+  const { res } = await fetchOnce(`${BASE}/api/health`, { timeoutMs: 10_000, retries: 0 });
+  if (!res) return false; // a transport error is real unreachability, handled below
+  if (res.status !== 403 && res.status !== 407) return false;
+  const ours = ["strict-transport-security", "content-security-policy", "x-frame-options"].some((h) =>
+    res.headers.get(h),
+  );
+  return !ours;
 }
 
 export const skipIfUnreachable = async () => {
   if (await egressBlocked()) return `${BASE} blocked by this network's egress policy — the probe belongs in CI`;
-  if (!(await reachable(BASE))) return `${BASE} not reachable from here`;
+  // Name the cause. "not reachable" on its own cannot be acted on, and on a CI
+  // runner it is the difference between "the site is down" and "DNS hiccuped".
+  const why = await unreachableBecause(BASE);
+  if (why) return `${BASE} not reachable from here (${why})`;
   return null;
 };
 
@@ -88,11 +88,9 @@ export async function probe() {
 
   for (const route of ROUTES) {
     const url = `${BASE}${route.path}`;
-    let res;
-    try {
-      res = await fetch(url, { redirect: "manual", headers: { "user-agent": "ankora-qa/1" } });
-    } catch (err) {
-      out.push(finding("blocker", `${route.path} unreachable`, String(err?.message ?? err)));
+    const { res, error } = await fetchOnce(url);
+    if (!res) {
+      out.push(finding("blocker", `${route.path} unreachable`, error));
       continue;
     }
 
@@ -140,16 +138,29 @@ export async function probe() {
   // ADR-0002: the apex must 308 to www and preserve the path. Google reads
   // a broken version of this as a self-contradicting canonical signal, and
   // the last time it drifted it cost 16 URLs in Search Console.
-  try {
-    const res = await fetch(`${APEX}/he/pricing`, { redirect: "manual" });
-    const to = res.headers.get("location") ?? "";
-    if (res.status !== 308) {
-      out.push(finding("major", `apex returned ${res.status}, expected a 308 to www`, `ADR-0002`));
+  //
+  // The apex is a SEPARATE hostname from the canonical one, so it can fail to
+  // resolve on a runner while www answers every route fine - which is exactly
+  // what happened once, reported as an unactionable "fetch failed". A
+  // transport failure here is therefore reported with its cause and as a
+  // minor: it says nothing about whether the apex redirect is correct, only
+  // that this machine could not ask. A wrong ANSWER is still major.
+  const apex = await fetchOnce(`${APEX}/he/pricing`);
+  if (!apex.res) {
+    out.push(
+      finding(
+        "minor",
+        "apex redirect could not be checked from this runner",
+        `${apex.error} — ${APEX} did not answer, while ${BASE} served every route above. That is a property of this machine's DNS/network, not evidence about the redirect.`,
+      ),
+    );
+  } else {
+    const to = apex.res.headers.get("location") ?? "";
+    if (apex.res.status !== 308) {
+      out.push(finding("major", `apex returned ${apex.res.status}, expected a 308 to www`, "ADR-0002"));
     } else if (!to.startsWith(`${BASE}/he/pricing`)) {
       out.push(finding("major", "apex redirect dropped the path", `Location: ${to}`));
     }
-  } catch (err) {
-    out.push(finding("major", "apex redirect could not be checked", String(err?.message ?? err)));
   }
 
   out.push(finding("info", `probed ${ROUTES.length} routes on ${BASE}`));
