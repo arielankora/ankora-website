@@ -38,6 +38,8 @@ export interface ExportTimeEntryRow {
   note: string | null;
   isManual: boolean;
   isEdited: boolean;
+  /// Phase 12 (spec "אישור דיווח שעות חופף בין לקוחות שונים").
+  isOverlapConfirmed: boolean;
 }
 
 export interface ExportTaskRow {
@@ -65,6 +67,7 @@ export const TIME_ENTRIES_SHEET_HEADERS = [
   "הערה",
   "ידני",
   "נערך",
+  "חפיפה מאושרת",
 ];
 
 export const TASKS_SHEET_NAME = "משימות";
@@ -97,6 +100,7 @@ export function timeEntriesToSheetRows(entries: ExportTimeEntryRow[]): (string |
     e.note ?? "",
     e.isManual ? "כן" : "לא",
     e.isEdited ? "כן" : "לא",
+    e.isOverlapConfirmed ? "כן" : "לא",
   ]);
 }
 

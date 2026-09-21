@@ -939,6 +939,20 @@
       "risk": "critical",
       "riskAssigned": false,
       "firstSeen": "2026-09-21"
+    },
+    "action:(product)/app/(authenticated)/mcp-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
+    },
+    "domain:time-entry-overlap": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-21"
     }
   },
   "waivers": {},

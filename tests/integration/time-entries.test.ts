@@ -259,6 +259,109 @@ describe("createManualEntry - spec 6.3", () => {
     ).rejects.toBeInstanceOf(OverlapError);
   });
 
+  // Spec "אישור דיווח שעות חופף בין לקוחות שונים". The decision RULE is unit
+  // tested in tests/unit/time-entry-overlap.test.ts; what can only be tested
+  // here is the wiring - which conflicting row the query picks, whether the
+  // clientId comparison uses the right value, and whether the flag actually
+  // lands on the persisted row.
+  //
+  async function setupTwoClients() {
+    const { employee, superAdmin, client, category } = await setupEmployeeWithClient();
+    const otherClient = await createTestClient({ name: "Other Client" });
+    const otherCategory = await createTestCategory({ clientId: otherClient.id });
+    await setUserClientAccess(superAdmin, employee.id, [client.id, otherClient.id]);
+    return { employee, superAdmin, client, category, otherClient, otherCategory };
+  }
+
+  it("reports a cross-client conflict as confirmable, not as a same-client block", async () => {
+    const { employee, client, category, otherClient, otherCategory } = await setupTwoClients();
+    const base = new Date(Date.now() - 4 * 3600_000);
+    await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: base,
+      endAt: new Date(base.getTime() + 3600_000),
+      backdateReason: PAST_REASON,
+    });
+
+    const err = await createManualEntry(employee, employee.id, {
+      clientId: otherClient.id,
+      categoryId: otherCategory.id,
+      startAt: new Date(base.getTime() + 1_800_000),
+      endAt: new Date(base.getTime() + 5_400_000),
+      backdateReason: PAST_REASON,
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(OverlapError);
+    expect(err.sameClient).toBe(false);
+    expect(err.conflicting.client.name).toBe(client.name);
+  });
+
+  it("saves a confirmed cross-client overlap and flags only the new row", async () => {
+    const { employee, client, category, otherClient, otherCategory } = await setupTwoClients();
+    const base = new Date(Date.now() - 4 * 3600_000);
+    const first = await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: base,
+      endAt: new Date(base.getTime() + 3600_000),
+      backdateReason: PAST_REASON,
+    });
+
+    const entry = await createManualEntry(employee, employee.id, {
+      clientId: otherClient.id,
+      categoryId: otherCategory.id,
+      startAt: new Date(base.getTime() + 1_800_000),
+      endAt: new Date(base.getTime() + 5_400_000),
+      allowOverlapOverride: true,
+      backdateReason: PAST_REASON,
+    });
+
+    expect(entry.isOverlapConfirmed).toBe(true);
+    // Confirming is not retroactive - the entry that was already there is not
+    // relabelled by someone else's decision.
+    const unchanged = await prisma.timeEntry.findUniqueOrThrow({ where: { id: first.id } });
+    expect(unchanged.isOverlapConfirmed).toBe(false);
+  });
+
+  // This is why findOverlap() asks for a same-client conflict before asking for
+  // any conflict at all. A single findFirst() across all clients returns an
+  // arbitrary row; if it returned the cross-client one here, this save would be
+  // offered "save anyway", and confirming it would double-book the SAME client,
+  // which the rule says can never be confirmed.
+  it("still blocks when the range overlaps both a same-client and a cross-client entry", async () => {
+    const { employee, client, category, otherClient, otherCategory } = await setupTwoClients();
+    const base = new Date(Date.now() - 6 * 3600_000);
+
+    await createManualEntry(employee, employee.id, {
+      clientId: otherClient.id,
+      categoryId: otherCategory.id,
+      startAt: base,
+      endAt: new Date(base.getTime() + 3600_000),
+      backdateReason: PAST_REASON,
+    });
+    await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(base.getTime() + 1_800_000),
+      endAt: new Date(base.getTime() + 5_400_000),
+      allowOverlapOverride: true,
+      backdateReason: PAST_REASON,
+    });
+
+    const err = await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(base.getTime() + 900_000),
+      endAt: new Date(base.getTime() + 4_500_000),
+      allowOverlapOverride: true,
+      backdateReason: PAST_REASON,
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(OverlapError);
+    expect(err.sameClient).toBe(true);
+  });
+
   it("records actor distinct from userId when an admin enters time for an employee (spec 6.3 audit rule)", async () => {
     const { employee, superAdmin, client, category } = await setupEmployeeWithClient();
     const { startAt, endAt } = pastWindow();

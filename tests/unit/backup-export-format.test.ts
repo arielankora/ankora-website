@@ -47,9 +47,10 @@ describe("timeEntriesToSheetRows()", () => {
         note: null,
         isManual: false,
         isEdited: true,
+        isOverlapConfirmed: true,
       },
     ]);
-    expect(rows).toEqual([["2026-01-01", "לקוח", "נועה", "פיתוח", "משימה א", 90, 90, "", "לא", "כן"]]);
+    expect(rows).toEqual([["2026-01-01", "לקוח", "נועה", "פיתוח", "משימה א", 90, 90, "", "לא", "כן", "כן"]]);
   });
 
   it("treats a still-running timer (null actual/billable seconds) as zero minutes, not NaN or a crash", () => {
@@ -65,10 +66,12 @@ describe("timeEntriesToSheetRows()", () => {
         note: "הערה",
         isManual: true,
         isEdited: false,
+        isOverlapConfirmed: false,
       },
     ]);
     expect(rows[0].slice(5, 7)).toEqual([0, 0]);
     expect(rows[0][4]).toBe(""); // no task title
+    expect(rows[0][10]).toBe("לא"); // isOverlapConfirmed
   });
 });
 
