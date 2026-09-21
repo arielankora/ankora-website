@@ -1,9 +1,24 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "redirects": [
     { "source": "/", "destination": "/he", "permanent": false }
   ],
   "crons": [
     { "path": "/api/cron/alerts-reconcile", "schedule": "0 5 * * *" },
     { "path": "/api/cron/scheduled-reports", "schedule": "0 0 * * *" }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "qa/*": false,
+      "qa/**": false,
+      "docs/*": false,
+      "docs/**": false,
+      "chore/*": false,
+      "chore/**": false,
+      "claude/*": false,
+      "claude/**": false,
+      "test/*": false,
+      "test/**": false
+    }
+  }
 }
