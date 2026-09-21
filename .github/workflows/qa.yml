@@ -72,11 +72,23 @@ jobs:
       # apex overrides the code's own default and makes every route 308.
       QA_PROD_URL: https://www.ankora.co.il
       AUTH_SECRET: ci-only-not-a-real-secret
+      # Auth.js v5 will not build a redirect for an origin it does not
+      # trust, and 127.0.0.1:3100 is not one it infers. Without these, the
+      # sign-in POST lands on /api/auth/callback/credentials and simply
+      # stops there - which looks exactly like a broken login button, and
+      # is really a missing environment variable. Production sets its own
+      # host, so this gap only ever showed up here.
+      AUTH_URL: http://127.0.0.1:3100
+      AUTH_TRUST_HOST: "true"
       ADMIN_PASSWORD: ci-only-not-a-real-password
       ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
 
     steps:
+      # Full history: the level-selection step below diffs against the
+      # base branch, which a shallow clone cannot see.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -90,24 +102,47 @@ jobs:
         run: npx prisma migrate deploy
 
       # The level: an explicit dispatch input wins; a pull request is
-      # always level 1 so the gate stays fast; anything else is the
-      # default deep regression.
+      # level 1 so the gate stays fast; anything else is the default deep
+      # regression.
+      #
+      # The one exception: a pull request that changes the browser suite
+      # itself runs at level 2, because level 1 does not open a browser -
+      # so without this, a change to the e2e specs would merge having
+      # never once been executed. The suite has to be able to test the
+      # thing it is made of.
       - name: Choose level
         id: level
         run: |
           if [ -n "${{ inputs.level }}" ]; then
             echo "value=${{ inputs.level }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "value=1" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "value=2" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+               | grep -qE '^qa/(e2e/|playwright\.config\.ts)'; then
+            echo "touches the browser suite - running level 2"
+            echo "value=2" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=1" >> "$GITHUB_OUTPUT"
           fi
 
-      # Only level 3 uses a browser (the accessibility check), and downloading
-      # Chromium costs about a minute - so it is not paid on the PR gate.
+      # From level 2, not just level 3. Two checks need a browser now -
+      # the accessibility audit at level 3, and the end-to-end suite at
+      # level 2 - so installing only at level 3 would leave the browser
+      # suite with nothing to launch. Still not paid on the PR gate,
+      # which is the point of the condition.
       - name: Install Chromium
-        if: steps.level.outputs.value == '3'
+        if: steps.level.outputs.value != '1'
         run: npx playwright install --with-deps chromium
+
+      # The demo fixtures the browser suite signs in as. Safe here and
+      # nowhere else: this database is created empty by the service
+      # container above and destroyed with the job, and every fixture is
+      # prefixed "[DEMO]" so it is unmistakable if it ever turns up
+      # somewhere it should not. The e2e check re-seeds immediately before
+      # it runs as well, because the integration suite truncates.
+      - name: Seed demo fixtures
+        if: steps.level.outputs.value != '1'
+        run: npm run db:seed
 
       - name: Run QA
         id: qa

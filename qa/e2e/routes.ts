@@ -1,0 +1,60 @@
+import fs from "node:fs";
+import path from "node:path";
+
+// The list of pages to sweep is derived from qa/manifest.json, not typed
+// out here.
+//
+// This is the same principle the rest of the suite runs on: a
+// hand-written list of routes is a second inventory, and it goes stale
+// the first time someone adds a page. Reading the manifest means the day
+// a new marketing page or product screen lands, the sweep already covers
+// it - and if nobody has run `npm run qa:sync`, the drift check says so
+// loudly on the same run.
+
+type Manifest = { capabilities: Record<string, { kind: string; area: string }> };
+
+const manifest: Manifest = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "qa", "manifest.json"), "utf8"),
+);
+
+const ids = Object.entries(manifest.capabilities);
+
+/** Public marketing pages, expanded across both locales. */
+export const MARKETING_ROUTES: string[] = ids
+  .filter(([id, c]) => c.kind === "page" && c.area === "marketing" && !id.includes("["))
+  .flatMap(([id]) => {
+    const route = id.slice("page:".length);
+    return ["he", "en"].map((locale) => route.replace("/[locale]", `/${locale}`));
+  })
+  .sort();
+
+/**
+ * Product screens behind the session. Dynamic segments are excluded: a
+ * route like /app/clients/[clientId] needs a real id, so it belongs in a
+ * flow test that creates one rather than in a blind sweep.
+ */
+export const APP_SCREENS: string[] = ids
+  .filter(([id, c]) => c.kind === "screen" && !id.includes("["))
+  .map(([id]) => id.slice("screen:".length))
+  .filter((route) => !["/app/login", "/app/forgot-password", "/app/reset-password"].includes(route))
+  .sort();
+
+/** The unauthenticated entry points, which have their own spec. */
+export const AUTH_SCREENS = ["/app/login", "/app/forgot-password", "/app/reset-password"];
+
+/**
+ * Console noise that is not a product fault.
+ *
+ * Kept deliberately short. Every entry here is a hole in the check, so
+ * the bar is "this cannot be caused by our code" - not "this is annoying
+ * and I want the test to pass".
+ */
+const IGNORED_CONSOLE = [
+  /favicon\.ico/i,
+  /Download the React DevTools/i,
+  /\[Fast Refresh\]/i,
+];
+
+export function isRealConsoleError(text: string): boolean {
+  return !IGNORED_CONSOLE.some((re) => re.test(text));
+}

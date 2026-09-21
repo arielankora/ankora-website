@@ -25,13 +25,14 @@ function daysSince(iso) {
   return Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }
 
-async function runSuite(dir, env = {}) {
+async function runSuite(dir, env = {}, extraArgs = []) {
   const outFile = path.join(ROOT, "qa", "reports", `vitest-${path.basename(dir)}.json`);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
-  const r = await sh("npx", ["vitest", "run", dir, "--reporter=json", `--outputFile=${outFile}`], {
-    env,
-    timeoutMs: 15 * 60_000,
-  });
+  const r = await sh(
+    "npx",
+    ["vitest", "run", dir, ...extraArgs, "--reporter=json", `--outputFile=${outFile}`],
+    { env, timeoutMs: 15 * 60_000 },
+  );
   let parsed = null;
   try {
     parsed = JSON.parse(fs.readFileSync(outFile, "utf8"));
@@ -109,6 +110,20 @@ export async function integration() {
       process.env.DATABASE_URL ??
       "postgresql://ankora:ankora_dev_only@127.0.0.1:55432/ankora_dev",
   };
-  const { r, parsed } = await runSuite("tests/integration", env);
+  // --no-file-parallelism is not a performance choice, it is a
+  // correctness one.
+  //
+  // Every file under tests/integration shares ONE database and calls
+  // resetDb() - a TRUNCATE of every table - in its own beforeEach. Run
+  // two files at once and one of them truncates the rows the other is
+  // mid-way through using. The first CI run showed exactly that: 67
+  // failures, foreign-key violations on creates across a dozen unrelated
+  // tables, and assertions like "expected 90 to be 150" where rows had
+  // simply vanished underneath the test.
+  //
+  // It reads as 67 broken features. It is one broken assumption. The
+  // suite has raced itself since it was written; running the files in
+  // sequence is what makes any of its results mean anything.
+  const { r, parsed } = await runSuite("tests/integration", env, ["--no-file-parallelism"]);
   return analyse(parsed, r, "integration");
 }

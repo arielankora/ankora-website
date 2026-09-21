@@ -63,7 +63,14 @@ export async function createTestTimeEntry(overrides: {
   source?: "MANUAL" | "TIMER";
   isManual?: boolean;
 }) {
-  const startAt = overrides.startAt ?? new Date();
+  // The hour that just ended, not the hour about to start. The previous
+  // default put endAt an hour into the FUTURE: this factory writes
+  // straight through Prisma, so the domain's future-entry guard never
+  // saw it, and the rows were created happily - but every report query
+  // bounded by "now" then failed to find them. `hours_by_client` was
+  // asserting on an empty result for that reason alone. Recorded time is
+  // time already spent, which is what this now models.
+  const startAt = overrides.startAt ?? new Date(Date.now() - 3600_000);
   const endAt = overrides.endAt === undefined ? new Date(startAt.getTime() + 3600_000) : overrides.endAt;
   return prisma.timeEntry.create({
     data: {
