@@ -37,8 +37,25 @@ export default defineConfig({
   // arriving through a different door. The suite costs a couple of minutes
   // more and stops lying.
   workers: process.env.CI ? 1 : undefined,
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  timeout: 60_000,
+  // 20s, not 10s - and this is compensation for a product fault, not a
+  // preference.
+  //
+  // Writes in this app are slow in a way that has now been measured:
+  // creating an important date takes between 40 and 90 seconds, and
+  // every write that revalidates the dashboard pays for one hour-bank
+  // query per active client (claude/perf-dashboard-n-plus-one-2026-09).
+  // Seven different specs went flaky on it in one run, each one waiting
+  // for a row that was still being written.
+  //
+  // Four of those were padded one at a time before the pattern was
+  // clear. That was the wrong shape of fix: a per-spec timeout hides the
+  // cause in the spec that noticed it. One default, one comment, and one
+  // report pointing at the product is honest about what is actually
+  // happening. When the N+1 is fixed, this comes back down - and it
+  // should, because a 20-second default also hides screens that are slow
+  // for their own reasons.
+  expect: { timeout: 20_000 },
 
   // Resolve `@/...` through the app's tsconfig, explicitly.
   //
