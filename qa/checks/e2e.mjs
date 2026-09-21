@@ -146,8 +146,33 @@ export async function e2e() {
   // entirely, and evidence nobody reads is evidence nobody has. Twelve
   // lines because that is what the comment renders.
   if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
-    const output = tail(r.all, 12);
-    if (output) out.push(finding("minor", "what the app logged while the browser ran", output));
+    // The error lines, not the last twelve lines.
+    //
+    // The first version took the tail, and the tail of a Node stack
+    // trace is twelve frames of next-server internals - the one line
+    // that says what actually went wrong is at the top, scrolled away.
+    // This keeps the lines that name a fault and drops the frames, so
+    // twelve lines of budget hold twelve distinct problems rather than
+    // one problem's plumbing.
+    const seen = new Set();
+    const errors = String(r.all ?? "")
+      .split("\n")
+      .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+      .filter((l) => l && !/^\s+at\s/.test(l))
+      .filter((l) => /error|invalid|timeout|ECONN|Prisma|denied|failed|unhandled/i.test(l))
+      .filter((l) => {
+        // Collapse repeats: one bad request repeated forty times is one
+        // fact, and forty copies of it crowd out the other thirty-nine.
+        const key = l.slice(0, 120);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 12);
+
+    if (errors.length) {
+      out.push(finding("minor", "what the app logged while the browser ran", errors.join("\n")));
+    }
   }
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
