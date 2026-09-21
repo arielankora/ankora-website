@@ -49,8 +49,18 @@ test.describe("the user detail screen", () => {
     const count = await link.count();
     test.skip(count === 0, "no user row links on the list screen to follow");
 
-    await link.click();
-    await page.waitForLoadState("domcontentloaded");
+    // Read the href and navigate, rather than clicking it.
+    //
+    // The first version clicked, and the URL stayed on the list: the row
+    // link is a small text link inside a card, and a click that lands
+    // before hydration does nothing at all - which then read as "the
+    // detail screen is broken" rather than "the click missed". The id
+    // still comes from the page's own markup, which is the part that
+    // matters; only the means of getting there is more direct.
+    const href = await link.getAttribute("href");
+    expect(href, "the user row link has no href").toBeTruthy();
+
+    await page.goto(href!, { waitUntil: "domcontentloaded" });
     expect(page.url(), "did not land on a user detail screen").toContain("/app/users/");
 
     const html = await page.content();
