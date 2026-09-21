@@ -69,8 +69,25 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
   if (!input.title) return { error: "יש להזין כותרת." };
   if (!input.category) return { error: "יש לבחור קטגוריה." };
   if (!input.responsibleUserId) return { error: "יש לבחור אחראי." };
-  if (!input.month || input.month < 1 || input.month > 13) return { error: "חודש לא תקין." };
-  if (!input.day || input.day < 1 || input.day > 31) return { error: "יום לא תקין." };
+
+  // A ONCE date carries its whole date in `onceDate`; the form renders that
+  // field INSTEAD of month/day, so both arrive empty. This validation ran
+  // unconditionally and rejected every one-off date with "חודש לא תקין",
+  // which no amount of filling the form could get past - the field it named
+  // is not on screen for that recurrence. Found by the browser suite; the
+  // one-off path had no coverage before it.
+  //
+  // month/day are NOT NULL columns and are, by the schema's own comment,
+  // ignored for ONCE - so they are derived from the chosen date rather than
+  // made nullable, which would be a migration for no behavioural gain.
+  if (input.recurrence === "ONCE") {
+    if (!input.onceDate || Number.isNaN(input.onceDate.getTime())) return { error: "יש לבחור תאריך." };
+    input.month = input.onceDate.getUTCMonth() + 1;
+    input.day = input.onceDate.getUTCDate();
+  } else {
+    if (!input.month || input.month < 1 || input.month > 13) return { error: "חודש לא תקין." };
+    if (!input.day || input.day < 1 || input.day > 31) return { error: "יום לא תקין." };
+  }
 
   try {
     await createImportantDate(user, input);
