@@ -37,7 +37,16 @@ function todayKey() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
 }
 
-function windowEarlierToday(lengthMinutes = 25, gapMinutes = 150): { start: string; end: string } | null {
+/**
+ * A finished window earlier today, in THIS file's own band of the clock.
+ *
+ * Every spec file writes time entries for the same user against the same
+ * client, and two entries for one client at one time is the collision this
+ * product refuses outright - so the files have to agree not to overlap each
+ * other. flows-time works the last ~4 hours; this one stays well behind it,
+ * and shifts again on a retry so it cannot collide with its own last attempt.
+ */
+function windowEarlierToday(lengthMinutes = 25, gapMinutes = 320): { start: string; end: string } | null {
   const [hh, mm] = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Asia/Jerusalem",
     hour: "2-digit",
@@ -133,7 +142,7 @@ test.describe("profile/actions", () => {
 
 test.describe("time-entries/actions - an admin reporting on behalf of an employee", () => {
   test("an entry created for another user shows up under their name", async ({ page }) => {
-    const window = windowEarlierToday();
+    const window = windowEarlierToday(25, 320 + 60 * test.info().retry);
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
     const note = tag("e2e-admin-entry");

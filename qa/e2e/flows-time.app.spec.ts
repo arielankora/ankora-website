@@ -41,6 +41,13 @@ function todayKey() {
  * and must fit inside today; in the first hour or so after local midnight it
  * does not, and these two tests skip with that stated rather than inventing a
  * time the product is right to reject.
+ *
+ * The bands here (roughly the last 20-240 minutes) are this file's alone.
+ * flows-admin.app.spec.ts writes further back on purpose: both files file
+ * time for the same user against the same client, and two entries for one
+ * client at one time is exactly the collision this product refuses - which
+ * is what made the first of these look "refused" when the other file had
+ * simply got there first.
  */
 function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: string; end: string } | null {
   const [hh, mm] = new Intl.DateTimeFormat("en-GB", {
