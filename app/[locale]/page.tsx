@@ -10,6 +10,8 @@ import { Capabilities } from "@/components/sections/Capabilities";
 import { HumanAI } from "@/components/sections/HumanAI";
 import { Industries } from "@/components/sections/Industries";
 import { Trust } from "@/components/sections/Trust";
+import { CustomerProof } from "@/components/sections/CustomerProof";
+import { getFeaturedStories } from "@/lib/customer-stories";
 import { FAQ } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { JsonLd } from "@/components/seo/JsonLd";
@@ -41,6 +43,7 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
+  const featuredStories = getFeaturedStories(locale, 1);
   const base = SITE_URL;
 
   const organizationSchema = {
@@ -96,6 +99,7 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
       <Intelligence dict={dict} />
       <Capabilities dict={dict} locale={locale} />
       <HumanAI dict={dict} />
+      <CustomerProof locale={locale} stories={featuredStories} />
       <Industries dict={dict} locale={locale} />
       <Trust dict={dict} />
       <FAQ dict={dict} locale={locale} />

@@ -46,8 +46,15 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
     >
       {LOCALES.map((target) => {
         const current = target === locale;
+        // Tracking is a property of the STRING, not of the page - the same rule
+        // MonoLabel encodes. This control is the one place where both scripts sit
+        // side by side in one component, so it cannot be resolved by an `rtl:`
+        // variant: "עברית" is Hebrew on the English page too, and letter-spacing
+        // it pulls the letters apart there exactly as it does on /he. Keyed off
+        // the label's own language instead.
         const className = cn(
-          "flex items-center px-3.5 font-assistant text-[13px] font-semibold tracking-[0.08em] transition-colors duration-[250ms]",
+          "flex items-center px-3.5 font-assistant text-[13px] font-semibold transition-colors duration-[250ms]",
+          target === "he" ? "tracking-normal" : "tracking-[0.08em]",
           current ? "bg-gold text-navy" : "text-muted hover:text-gold"
         );
         return current ? (

@@ -28,6 +28,15 @@ const PATHS = [
   "/solutions", "/technology", "/privacy", "/terms", "/blog",
   "/personal-operations-management", "/ankora-vs-personal-assistant",
   "/personal-assistant-for-executives",
+  // The evidence section. The hub is a new layout (portrait + row) rather than a
+  // variant of an existing one, and the story page is the only long-form page on
+  // the marketing site, so neither is covered by any path above.
+  //
+  // One story is named on purpose. This list samples LAYOUTS, not URLs - every
+  // story renders through the same component, so the second one would re-test
+  // the same CSS at four widths in two locales for nothing. The complete route
+  // sweep lives in qa/e2e/routes.ts, which derives itself from the content.
+  "/customer-stories", "/customer-stories/gilad-komorov",
 ];
 
 /** Runs in the page. Kept as one function so it can be passed to page.evaluate. */

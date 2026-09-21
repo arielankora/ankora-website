@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
+import { storiesUi } from "@/content/customer-stories/ui";
 
 /**
  * Site footer, shared by both locales: the wordmark and tagline, three link columns,
@@ -22,6 +23,7 @@ const COLUMN_HEAD = "mb-3.5 font-assistant text-[13px] font-semibold tracking-[0
 
 export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
   const year = new Date().getFullYear();
+  const stories = storiesUi(locale);
 
   return (
     <footer className="relative z-[1] border-t border-[rgba(243,234,219,0.12)] bg-navy-deep font-assistant text-[#93A5B8]">
@@ -66,6 +68,7 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           <div className={COLUMN_HEAD}>{dict.nav.about}</div>
           <div className="grid gap-2">
             <Link href={withLocale(locale, "/how-it-works")} className={LINK}>{dict.nav.howItWorks}</Link>
+            <Link href={withLocale(locale, "/customer-stories")} className={LINK}>{stories.navLabel}</Link>
             <Link href={withLocale(locale, "/technology")} className={LINK}>{dict.nav.technology}</Link>
             <Link href={withLocale(locale, "/pricing")} className={LINK}>{dict.nav.pricing}</Link>
             <Link href={withLocale(locale, "/roi")} className={LINK}>{dict.nav.roi}</Link>
