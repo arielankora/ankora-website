@@ -22,11 +22,21 @@ const ids = Object.entries(manifest.capabilities);
 
 /** Public marketing pages, expanded across both locales. */
 export const MARKETING_ROUTES: string[] = ids
-  .filter(([id, c]) => c.kind === "page" && c.area === "marketing" && !id.includes("["))
-  .flatMap(([id]) => {
-    const route = id.slice("page:".length);
-    return ["he", "en"].map((locale) => route.replace("/[locale]", `/${locale}`));
-  })
+  .filter(([id, c]) => c.kind === "page" && c.area === "marketing")
+  .map(([id]) => id.slice("page:".length))
+  // `[locale]` is not a dynamic segment in the sense that matters here - it
+  // is expanded to he and en below. Every OTHER bracket is: /blog/[slug]
+  // needs a real slug, so it belongs in a test that creates or names one.
+  //
+  // The original tested the raw id for a bracket, before stripping
+  // `[locale]`. Every marketing page id contains `[locale]`, so the filter
+  // matched all 26 of them and MARKETING_ROUTES came out EMPTY. The sweep
+  // ran, collected zero pages, and passed - which is the exact failure this
+  // suite exists to catch, committed by the suite itself. The scanner had
+  // been reporting it honestly as 20 uncovered pages the whole time; I read
+  // the critical rows and skipped the medium ones.
+  .filter((route) => !route.replace("/[locale]", "").includes("["))
+  .flatMap((route) => ["he", "en"].map((locale) => route.replace("/[locale]", `/${locale}`)))
   .sort();
 
 /**
