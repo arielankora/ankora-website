@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { APP_SCREENS, isRealConsoleError } from "./routes";
+import { APP_SCREENS, CREDENTIAL_PATTERNS, isRealConsoleError } from "./routes";
 
 // The product sweep: every screen behind the session, signed in.
 //
@@ -36,6 +36,35 @@ test.describe("authenticated screens", () => {
       expect(body, `${route} error boundary`).not.toMatch(/Application error|Internal Server Error|500/);
 
       expect(errors, `${route} console`).toEqual([]);
+    });
+  }
+});
+
+// Credentials must not appear in what the server sends.
+//
+// This is a sweep rather than a test of one screen because the fault it
+// looks for is invisible: a client component's props are serialised into
+// the page HTML, so handing one a database row ships every column on
+// that row to the browser - including passwordHash - while the screen
+// itself looks completely normal. Three screens were doing exactly that
+// when this was written, and nothing on any of them looked wrong.
+//
+// TypeScript does not catch it. A variable is allowed to carry extra
+// properties past a narrower prop type, so the types read as correct.
+// The only reliable check is to look at the bytes that left the server.
+test.describe("credentials never reach the browser", () => {
+  for (const route of APP_SCREENS) {
+    test(`${route} ships no credential material`, async ({ page }) => {
+      const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+      test.skip(response?.status() !== 200, "screen did not render for this session");
+
+      // page.content() is the served document plus the RSC payload
+      // embedded in it, which is precisely where a serialised prop lands.
+      const html = await page.content();
+
+      for (const { pattern, what } of CREDENTIAL_PATTERNS) {
+        expect(html, `${route} served ${what}`).not.toMatch(pattern);
+      }
     });
   }
 });

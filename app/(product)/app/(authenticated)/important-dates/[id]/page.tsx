@@ -72,9 +72,12 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
               </p>
             </div>
             <Drawer triggerLabel="עריכה" title="עריכת מועד חשוב">
+              {/* Mapped, not passed whole - same reason as the list screen:
+                  this is a client component, and listUsers() rows carry
+                  passwordHash. */}
               <ImportantDateForm
-                clients={clients}
-                users={users}
+                clients={clients.map((c) => ({ id: c.id, name: c.name }))}
+                users={users.map((u) => ({ id: u.id, name: u.name, role: u.role }))}
                 categories={categoriesForAutoTask}
                 existing={{
                   id: date.id,

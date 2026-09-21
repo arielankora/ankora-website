@@ -118,7 +118,19 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
             <p className="mt-1 text-sm text-appNavy/60">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
           </div>
           <Drawer triggerLabel="+ מועד חדש" title="מועד חשוב חדש">
-            <ImportantDateForm clients={clients} users={users} categories={categoriesForAutoTask} />
+            {/* `users` is mapped down to the three fields the form declares,
+                not passed whole. ImportantDateForm is a client component, so
+                whatever reaches it is serialised into this page's HTML - and
+                listUsers() returns full User rows, passwordHash included.
+                TypeScript does not catch this: a variable (unlike an object
+                literal) is allowed to carry extra properties past a narrower
+                prop type, so the types looked right while every user's bcrypt
+                hash shipped to the browser on this screen. */}
+            <ImportantDateForm
+              clients={clients.map((c) => ({ id: c.id, name: c.name }))}
+              users={users.map((u) => ({ id: u.id, name: u.name, role: u.role }))}
+              categories={categoriesForAutoTask}
+            />
           </Drawer>
         </div>
 
