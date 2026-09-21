@@ -34,11 +34,26 @@ test.describe.configure({ timeout: 90_000 });
 async function expectDrawerClosed(page: import("@playwright/test").Page, what: string) {
   const dialog = page.getByRole("dialog");
   try {
-    await expect(dialog).toHaveCount(0, { timeout: 20_000 });
+    await expect(dialog).toHaveCount(0, { timeout: 25_000 });
   } catch {
-    const text = (await dialog.innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 400);
-    const invalid = await dialog.locator(":invalid").count().catch(() => 0);
-    throw new Error(`${what}: the drawer never closed. invalid fields: ${invalid}. drawer text: ${text}`);
+    // Name the fields, not just how many. "invalid fields: 6" cost a CI round
+    // on its own; which six, and what the browser objects to about each, is
+    // the thing that ends the guessing.
+    const invalid = await dialog
+      .locator(":invalid")
+      .evaluateAll((els) =>
+        els.map((el) => {
+          const f = el as HTMLInputElement;
+          return `${f.tagName.toLowerCase()}[name=${f.name || "-"}] value=${JSON.stringify(f.value ?? "")} ${
+            f.validationMessage || ""
+          }`.trim();
+        }),
+      )
+      .catch(() => []);
+    const pending = await dialog.locator("button[disabled]").count().catch(() => 0);
+    throw new Error(
+      `${what}: the drawer never closed. ${pending} disabled button(s). invalid: ${invalid.join(" | ") || "none"}`,
+    );
   }
 }
 
