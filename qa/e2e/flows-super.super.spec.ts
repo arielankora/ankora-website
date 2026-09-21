@@ -18,10 +18,10 @@ import { test, expect } from "@playwright/test";
 // Refer to modules in words, never as paths, or an unrelated action gets
 // credited for a test that never touched it.
 
-// 150s: the drawer helper alone may wait 90 (see its own note on why),
-// and a test timeout below its longest wait turns a specific diagnostic
-// message into a generic "test timeout exceeded".
-test.describe.configure({ timeout: 150_000 });
+// 90s: comfortably above the drawer helper's own longest wait. A test
+// timeout below that turns a specific diagnostic message into a generic
+// "test timeout exceeded".
+test.describe.configure({ timeout: 90_000 });
 
 /**
  * Wait for a drawer to close, and if it does not, fail with the reason the
@@ -33,25 +33,27 @@ test.describe.configure({ timeout: 150_000 });
  * fixes. Reading the drawer's own text turns one wasted CI round into a
  * message that names the problem.
  */
-// 90 seconds, and that number is a finding rather than a preference.
+// 30 seconds, down from 90, because the reason for 90 is gone.
 //
-// The wait went 25s, then 40s, on the assumption that a loaded runner
-// was the cause. It was not an assumption worth making twice. Naming the
-// disabled button settled it: the label reads "נוצר...", which is this
-// form's own pending state, so the Server Action really is in flight
-// past forty seconds, with nothing in the server log and no error on
-// screen. Creating an important date inserts two rows and an audit
-// record; it has no business taking that long, and a person doing it
-// waits the same forty seconds this test does.
+// The history is worth keeping, because the number was evidence before
+// it was a setting. The wait went 25s, then 40s, on the assumption that
+// a loaded runner was the cause - an assumption not worth making twice.
+// Naming the disabled button settled it: the label reads "נוצר...",
+// which is this form's own pending state, so the Server Action really
+// was in flight past forty seconds, with nothing in the server log and
+// no error on screen. Raising it to 90 rather than skipping the test
+// turned the problem into a number somebody could act on.
 //
-// The wait is raised rather than the test quarantined, because a number
-// is worth more than a skip: if it passes at 90s, the product question
-// is "why forty seconds", which is answerable. If it fails at 90s, that
-// is a different and larger problem, and the message now carries the
-// evidence either way. Raised in the suite, reported to Ariel as a
-// product question - not fixed here, because a test file is the wrong
-// place to fix a slow write.
-async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 90_000) {
+// Somebody did: the dashboard's per-client hour-bank queries (#86) and
+// alert evaluation running inside every write (#87). Creating an
+// important date inserts two rows and an audit record, and now takes
+// about that long.
+//
+// So the wait comes back down. A timeout raised for a known reason has
+// to fall when that reason does, or it stops being a measurement and
+// becomes a blindfold - 90 seconds would now absorb a regression three
+// times worse than the one that prompted it, in silence.
+async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 30_000) {
   const dialog = page.getByRole("dialog");
   try {
     await expect(dialog).toHaveCount(0, { timeout });
