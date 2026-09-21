@@ -18,9 +18,19 @@ const REPORT = path.join(ROOT, "qa", "reports", "e2e.json");
 export async function e2e() {
   fs.rmSync(REPORT, { force: true });
 
+  // No PLAYWRIGHT_BROWSERS_PATH default here, on purpose. An earlier
+  // version defaulted it to /opt/pw-browsers - correct for the sandbox
+  // this suite was written in, and wrong everywhere else. In CI,
+  // `playwright install` puts Chromium in its own cache, and that
+  // override then pointed Playwright at an empty directory: every spec
+  // failed with "Executable doesn't exist", which reads like a broken
+  // product and is really a broken assumption about one machine.
+  //
+  // sh() already inherits process.env, so an environment that genuinely
+  // pre-installs browsers somewhere (the sandbox does) still works, and
+  // one that does not gets Playwright's own default.
   const r = await sh("npx", ["playwright", "test", "-c", "qa/playwright.config.ts"], {
     timeoutMs: 25 * 60_000,
-    env: { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH ?? "/opt/pw-browsers" },
   });
 
   let report = null;
