@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toPdfTable } from "@/lib/pdf";
+import { toPdfTable, layoutRtlColumns } from "@/lib/pdf";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2, spec 14.4). Like
@@ -153,5 +153,41 @@ describe("RTL glyph order (docs/adr/0001 section 19.12)", () => {
     // no such treatment from fontkit and keeps its own left-to-right
     // character order exactly as typed:
     expect(drawn).toBe(" 2026ראוניב 2026 - 31 ראוניב1 ");
+  });
+});
+
+// The RTL column layout, asserted directly rather than through a rendered page.
+// Every report in this app currently has equal-width columns, where the correct
+// mapping and the broken one agree - which is exactly why this was worth
+// pinning: the bug only appears the first time someone passes columnWeights,
+// and by then it looks like a new bug rather than an old one.
+describe("layoutRtlColumns()", () => {
+  const LEFT = 40;
+
+  it("gives column 0 the rightmost slot", () => {
+    const widths = [100, 100, 100];
+    const x = layoutRtlColumns(widths, LEFT);
+    expect(x[0]).toBe(LEFT + 200);
+    expect(x[2]).toBe(LEFT);
+  });
+
+  it("pairs each column with its OWN width when the widths differ", () => {
+    // Widths 60 / 100 / 140, total 300. Right to left: col0 occupies the last
+    // 60pt, col1 the 100pt before it, col2 the first 140pt.
+    const widths = [60, 100, 140];
+    const x = layoutRtlColumns(widths, LEFT);
+
+    expect(x).toEqual([LEFT + 240, LEFT + 140, LEFT]);
+    // Every column ends exactly where the next one to its right begins, and the
+    // run covers the full width with no gap and no overlap. The pre-fix version
+    // put column 0 at LEFT + 160 and failed both.
+    for (let i = widths.length - 1; i > 0; i--) {
+      expect(x[i] + widths[i]).toBe(x[i - 1]);
+    }
+    expect(x[0] + widths[0]).toBe(LEFT + 300);
+  });
+
+  it("handles a single column", () => {
+    expect(layoutRtlColumns([300], LEFT)).toEqual([LEFT]);
   });
 });

@@ -168,6 +168,32 @@ function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, w
   }
 }
 
+/// x positions for RTL columns: header[0] is the RIGHTMOST column on the page.
+///
+/// Exported only so the invariant below can be asserted directly - the drawing
+/// path is the only caller.
+///
+/// Lays the slots out left-to-right using the REVERSED width order, then maps
+/// each original column index onto its slot. The obvious version - walk the
+/// un-reversed widths accumulating positions, then reverse that flat array -
+/// pairs every column with another column's x as soon as the widths are not all
+/// equal: column 0 lands at the start of a slot sized for the LAST column, and
+/// only the outermost pair happens to line up.
+///
+/// Dormant today: no caller passes columnWeights, so every report has equal
+/// columns and the two agree. Fixed, and pinned by a test, before the first
+/// uneven report makes it visible. (Salvaged from PR #16, whose other two
+/// fixes main had already landed independently.)
+export function layoutRtlColumns(colWidths: number[], left: number): number[] {
+  const slotX: number[] = [];
+  let acc = left;
+  for (const w of [...colWidths].reverse()) {
+    slotX.push(acc);
+    acc += w;
+  }
+  return colWidths.map((_, i) => slotX[colWidths.length - 1 - i]);
+}
+
 export interface PdfTableOptions {
   title: string;
   subtitle?: string;
@@ -223,14 +249,7 @@ export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
     const weights = opts.columnWeights ?? opts.headers.map(() => 1);
     const weightSum = weights.reduce((a, b) => a + b, 0);
     const colWidths = weights.map((w) => (w / weightSum) * pageWidth);
-    // RTL columns: first header is rightmost on the page.
-    const colX: number[] = [];
-    let acc = doc.page.margins.left;
-    for (const w of colWidths) {
-      colX.push(acc);
-      acc += w;
-    }
-    colX.reverse(); // header[0] gets the rightmost x
+    const colX = layoutRtlColumns(colWidths, doc.page.margins.left);
 
     drawCell(doc, opts.title, doc.page.margins.left, doc.page.margins.top, pageWidth, { size: 16 });
     let y = doc.page.margins.top + 26;
