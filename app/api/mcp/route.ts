@@ -41,6 +41,29 @@ const handler = createMcpHandler(registerAnkoraTools, {
     name: "ankora-time-tracking",
     version: "0.1.0",
   },
+  // Refuse `subscriptions/listen` instead of opening a stream for it.
+  //
+  // This endpoint cost 362 sixty-second function timeouts across 26 users in
+  // the seventeen hours after /app/integrations started inviting people to
+  // connect Claude. Every one of them was this: the 2026 protocol lets a client
+  // open a long-lived SSE stream to receive server-initiated notifications, the
+  // SDK's default allows 1024 of them, and it keep-alives the stream so it
+  // never idles out. On a serverless function that means the platform kills it
+  // at maxDuration, the client reads a stream that closed without a result as a
+  // disconnect (the SDK says so in as many words), and reconnects. Forever.
+  //
+  // Nothing was ever going to arrive on that stream. `legacy: "stateless"`
+  // inside mcp-handler builds a fresh McpServer per request, so there is no
+  // process that outlives a response and could emit a notification into one;
+  // and this server registers fourteen tools and zero resources, prompts or
+  // subscribable anything. The stream was structurally incapable of carrying a
+  // single event, and it was the loudest thing in the runtime log - which is
+  // the real damage, because it buried a genuine 500 on the Hebrew export for a
+  // week.
+  //
+  // 0 makes the SDK answer -32603 and return, with no stream and no timeout.
+  // This is the option the library documents for exactly this situation.
+  maxSubscriptions: 0,
   // Read by the model before it picks a tool. Worth as much care as the
   // tool descriptions themselves: the rules below are the ones that stop
   // the most common failure modes - inventing an id, and assuming a write
