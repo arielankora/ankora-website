@@ -570,3 +570,60 @@ build confirms the code typechecks against the real Prisma client and
 that the existing suites still pass; it does not confirm that
 `create_task` writes a row Ankora's own screen then shows. That is the
 first thing to do after this merges.
+
+---
+
+## Phase 6 — the cost of a preamble (2026-09-21)
+
+(Phase 17 in the code's repo-wide numbering.)
+
+First real use of the task tools surfaced a complaint that had nothing
+to do with tasks: "it keeps asking for permission, and that is not how
+other connectors feel."
+
+### What was actually happening
+
+In Claude, each tool call is a permission prompt somebody has to click.
+This server's instructions opened with **"Call list_my_clients and
+list_categories first and use the names they return exactly as
+written"**, and most tool descriptions repeated it per argument
+("exactly as list_my_clients returned it"). `start_timer` told the model
+to call `get_active_timer` first. `create_task` told it to call
+`list_assignable_people` first.
+
+So "open a task on RIMED for next week" was four tool calls and four
+clicks, three of them preamble. Logging time was three. The connector
+felt like it was asking permission constantly because it was — and the
+prompts were for calls the user never asked for.
+
+### Why the preamble was never needed
+
+It was belt and braces, and the braces were always enough. Every tool
+resolves names through `lib/mcp/lookup.ts`, which answers a miss with
+"did you mean X or Y", built from what *this actor* may see. The
+listing tools never told the model anything it could not learn by
+simply trying the name and reading the refusal.
+
+The same is true of the timer check: `start_timer` refuses when one is
+already running, and `errors.ts` maps `ActiveTimerExistsError` to a
+message that names the recovery. Checking first bought a click and
+nothing else.
+
+Listing is now what happens when a name does not resolve, or when the
+user actually asks what exists.
+
+### What this does not fix
+
+The permission prompt itself is Claude's, not ours. `readOnlyHint` is a
+hint a client may act on or ignore, and the annotations were already
+correct — the read tools have carried `readOnlyHint: true` since Phase
+13. Reducing the call count is the only lever this codebase has; whether
+a given Claude surface offers "Allow always" is a client-side question.
+
+### Guarded
+
+`tests/unit/mcp/write-tools.test.ts` now fails on any tool description
+or argument description that reinstates a "call X first" instruction, in
+either its imperative form or the softer "exactly as list_X returned it".
+It caught one on its first run — `create_task` still carried a
+`list_assignable_people` preamble that the manual pass had missed.
