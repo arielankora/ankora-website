@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
 
 // Browser end-to-end configuration.
 //
@@ -70,6 +71,12 @@ export default defineConfig({
     ? undefined
     : {
         command: `npx next start -p ${PORT}`,
+        // Playwright defaults a webServer's cwd to the directory holding
+        // this config file - so `next start` ran inside qa/, found no
+        // .next there, and died before a single spec was collected. The
+        // check reported green in two seconds, because a run that
+        // collects nothing fails nothing.
+        cwd: path.resolve(import.meta.dirname, ".."),
         url: `${BASE_URL}/api/health`,
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,

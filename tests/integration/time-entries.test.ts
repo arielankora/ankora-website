@@ -117,8 +117,13 @@ describe("stopTimer - spec 6.1 / 18.1 timer/stop, 18.2 idempotency", () => {
 describe("createManualEntry - spec 6.3", () => {
   it("creates a manual entry with actualSeconds computed from start/end", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 2 * 3600_000);
+    // Two hours that have already happened. The original wrote `new Date()`
+    // to `new Date() + 2h` - an entry two hours in the future - which the
+    // product deliberately refuses (assertNotFuture, added in the overnight
+    // bug hunt, and asserted by its own tests further down this file). The
+    // guard is right; these assertions were left behind by it.
+    const endAt = new Date();
+    const startAt = new Date(endAt.getTime() - 2 * 3600_000);
 
     const entry = await createManualEntry(employee, employee.id, {
       clientId: client.id,
@@ -208,12 +213,14 @@ describe("createManualEntry - spec 6.3", () => {
 
   it("blocks an overlapping entry unless override + edit_others (spec 6.3)", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 3600_000);
+    // Both windows in the past, for the same reason as above - the overlap
+    // rule is what is under test here, not the future-date guard.
+    const endAt = new Date();
+    const startAt = new Date(endAt.getTime() - 3600_000);
     await createManualEntry(employee, employee.id, { clientId: client.id, categoryId: category.id, startAt, endAt });
 
     const overlapStart = new Date(startAt.getTime() + 1_800_000); // 30 min into the first entry
-    const overlapEnd = new Date(overlapStart.getTime() + 3600_000);
+    const overlapEnd = new Date(overlapStart.getTime() + 1_800_000);
 
     await expect(
       createManualEntry(employee, employee.id, {
@@ -238,8 +245,8 @@ describe("createManualEntry - spec 6.3", () => {
 
   it("records actor distinct from userId when an admin enters time for an employee (spec 6.3 audit rule)", async () => {
     const { employee, superAdmin, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 3600_000);
+    const endAt = new Date();
+    const startAt = new Date(endAt.getTime() - 3600_000);
 
     const entry = await createManualEntry(superAdmin, employee.id, {
       clientId: client.id,
