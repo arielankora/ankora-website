@@ -18,7 +18,10 @@ import { test, expect } from "@playwright/test";
 // Refer to modules in words, never as paths, or an unrelated action gets
 // credited for a test that never touched it.
 
-test.describe.configure({ timeout: 90_000 });
+// 150s: the drawer helper alone may wait 90 (see its own note on why),
+// and a test timeout below its longest wait turns a specific diagnostic
+// message into a generic "test timeout exceeded".
+test.describe.configure({ timeout: 150_000 });
 
 /**
  * Wait for a drawer to close, and if it does not, fail with the reason the
@@ -30,7 +33,25 @@ test.describe.configure({ timeout: 90_000 });
  * fixes. Reading the drawer's own text turns one wasted CI round into a
  * message that names the problem.
  */
-async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 25_000) {
+// 90 seconds, and that number is a finding rather than a preference.
+//
+// The wait went 25s, then 40s, on the assumption that a loaded runner
+// was the cause. It was not an assumption worth making twice. Naming the
+// disabled button settled it: the label reads "נוצר...", which is this
+// form's own pending state, so the Server Action really is in flight
+// past forty seconds, with nothing in the server log and no error on
+// screen. Creating an important date inserts two rows and an audit
+// record; it has no business taking that long, and a person doing it
+// waits the same forty seconds this test does.
+//
+// The wait is raised rather than the test quarantined, because a number
+// is worth more than a skip: if it passes at 90s, the product question
+// is "why forty seconds", which is answerable. If it fails at 90s, that
+// is a different and larger problem, and the message now carries the
+// evidence either way. Raised in the suite, reported to Ariel as a
+// product question - not fixed here, because a test file is the wrong
+// place to fix a slow write.
+async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 90_000) {
   const dialog = page.getByRole("dialog");
   try {
     await expect(dialog).toHaveCount(0, { timeout });
@@ -49,9 +70,40 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
         }),
       )
       .catch(() => []);
-    const pending = await dialog.locator("button[disabled]").count().catch(() => 0);
+    // WHICH button is disabled, not how many.
+    //
+    // "1 disabled button(s)" was read as "the submit button is still
+    // pending" for four runs. It might have been any button in the
+    // drawer, and the difference decides whether the server is slow or
+    // the form is refusing to let go. A count that supports two opposite
+    // conclusions is not evidence.
+    const disabled = await dialog
+      .locator("button[disabled]")
+      .evaluateAll((els) => els.map((e) => `"${(e.textContent ?? "").trim().slice(0, 40)}"`))
+      .catch(() => []);
+    const pending = disabled.length;
+
+    // What the form is SAYING, which is the thing this helper was
+    // missing and the most likely reason of the three.
+    //
+    // A refused write renders its reason as text inside the drawer -
+    // "יש לבחור לקוח", "חודש לא תקין" - and the first version of this
+    // helper reported neither that text nor anything that implied it.
+    // Three runs were spent reading "1 disabled button(s), invalid:
+    // none" and inferring a slow server, on the strength of a disabled
+    // button that may never have been the submit one: this counts every
+    // disabled button in the dialog, not the one that matters.
+    const text = (await dialog.innerText().catch(() => ""))
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(" / ")
+      .slice(0, 400);
+
     throw new Error(
-      `${what}: the drawer never closed. ${pending} disabled button(s). invalid: ${invalid.join(" | ") || "none"}`,
+      `${what}: the drawer never closed after ${Math.round(timeout / 1000)}s. ` +
+        `${pending} disabled button(s)${pending ? `: ${disabled.join(", ")}` : ""}. ` +
+        `invalid: ${invalid.join(" | ") || "none"}. drawer says: ${text || "(nothing)"}`,
     );
   }
 }

@@ -11,10 +11,12 @@ import path from "node:path";
 
 const STATE = path.join("qa", "reports", ".auth", "employee.json");
 const SUPER_STATE = path.join("qa", "reports", ".auth", "superadmin.json");
+const CLIENT_STATE = path.join("qa", "reports", ".auth", "clientadmin.json");
 
 export const DEMO = {
   superAdmin: { identifier: "demo.superadmin@ankora.co.il", password: "DemoPass!2026" },
   admin: { identifier: "demo.admin@ankora.co.il", password: "DemoPass!2026" },
+  clientAdmin: { identifier: "demo.clientadmin@ankora.co.il", password: "DemoPass!2026" },
   employee: { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026" },
   suspended: { identifier: "demo.suspended@ankora.co.il", password: "DemoPass!2026" },
 };
@@ -55,4 +57,25 @@ setup("sign in as super admin and store that session too", async ({ page }) => {
   await expect(page.locator('input[name="password"]')).toHaveCount(0);
 
   await page.context().storageState({ path: SUPER_STATE });
+});
+
+// A third session, for the one write capability that belongs to a
+// CLIENT_USER rather than to Ankora staff: a Client Admin managing who
+// their scheduled reports are emailed to (spec 13). It cannot be driven
+// from either session above - both are staff, and the domain checks
+// ClientUserRole, not UserRole - so a staff session here would assert a
+// refusal and call that coverage.
+setup("sign in as the client admin and store that session too", async ({ page }) => {
+  await page.goto("/app/login");
+
+  await page.fill('input[name="identifier"]', DEMO.clientAdmin.identifier);
+  await page.fill('input[name="password"]', DEMO.clientAdmin.password);
+  await page.click('button[type="submit"]');
+
+  await page.waitForURL((url) => url.pathname.startsWith("/app") && !url.pathname.includes("/login"), {
+    timeout: 20_000,
+  });
+  await expect(page.locator('input[name="password"]')).toHaveCount(0);
+
+  await page.context().storageState({ path: CLIENT_STATE });
 });

@@ -204,6 +204,12 @@ test.describe("tasks/actions - create and complete", () => {
 
     // Same as the other drawers: read the row back off a fresh render rather
     // than trusting the drawer to have closed.
+    //
+    // The wait is not decoration. Reloading straight after the click can
+    // out-race the Server Action's round trip, and the reloaded page then
+    // legitimately does not have the row yet - which reports as "the task
+    // was not created" on a loaded runner and passes everywhere else.
+    await page.waitForLoadState("networkidle");
     await page.reload();
     await expect(page.getByText(title, { exact: true }), "the task was not created").toBeVisible({ timeout: 15_000 });
 

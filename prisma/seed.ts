@@ -20,6 +20,11 @@ const prisma = new PrismaClient();
 // production password policy.
 const DEMO_PASSWORD = "DemoPass!2026";
 
+/// Not a hash OF anything - see the note where it is used. Fixed so the
+/// seed is idempotent, and obviously synthetic so nobody mistakes it for
+/// a credential.
+const DEMO_GRANT_HASH = "demo-grant-not-a-real-token-hash-0000000000000000000000000000";
+
 async function main() {
   console.log("Seeding Phase 1 demo fixtures...");
   const passwordHash = await hashPassword(DEMO_PASSWORD);
@@ -246,6 +251,80 @@ async function main() {
     },
   });
 
+  // A Claude connection for the Ankora Admin, so the "disconnect" path on
+  // the Profile and Integrations screens has something to disconnect.
+  //
+  // The browser suite needs a grant to exist before it can test revoking
+  // one, and an OAuth grant would mean seeding a whole authorization
+  // flow. A personal access token is the same thing from the screen's
+  // point of view - one row, one label, one revoke button - and it is
+  // one insert.
+  //
+  // `tokenHash` is a SHA-256-shaped string that hashes nothing: no real
+  // token exists for it, so it cannot authenticate anything. That is
+  // deliberate. A seeded credential that actually worked would be a
+  // usable key sitting in a public repository, which is a worse problem
+  // than the one it solves.
+  await prisma.mcpAccessToken.upsert({
+    where: { tokenHash: DEMO_GRANT_HASH },
+    update: {},
+    create: {
+      // The Super Admin, not the Ankora Admin. /app/integrations is
+      // gated on integration.manage, which is Super-Admin-only, and the
+      // card shows the CALLING user's own grants - so a grant on anyone
+      // else is a grant the browser test can never see.
+      userId: superAdmin.id,
+      label: "[DEMO] MacBook Air",
+      tokenHash: DEMO_GRANT_HASH,
+      tokenVersion: 0,
+      expiresAt: new Date(Date.now() + 365 * 86_400_000),
+    },
+  });
+
+  // A Client Admin, and a scheduled report for them to manage.
+  //
+  // Spec 13 gives a Client Admin one write capability of their own -
+  // editing who a scheduled report is emailed to - and it is the only
+  // write path in the product that belongs to a client-side user rather
+  // than to Ankora staff. It had no browser coverage because it had no
+  // fixture: the seed created no ClientUser at all, so there was nobody
+  // to sign in as and nothing for them to edit.
+  //
+  // Both rows are scoped to clientA, so a Client Admin of clientA
+  // attempting anything against clientB remains a genuine cross-client
+  // test rather than a vacuous one.
+  const clientAdminUser = await prisma.user.upsert({
+    where: { email: "demo.clientadmin@ankora.co.il" },
+    update: {},
+    create: {
+      name: "[DEMO] מנהל לקוח - אורביט",
+      email: "demo.clientadmin@ankora.co.il",
+      username: "demo.clientadmin",
+      passwordHash,
+      role: "CLIENT_USER",
+      status: "ACTIVE",
+    },
+  });
+
+  await prisma.clientUser.upsert({
+    where: { clientId_userId: { clientId: clientA.id, userId: clientAdminUser.id } },
+    update: { role: "ADMIN" },
+    create: { userId: clientAdminUser.id, clientId: clientA.id, role: "ADMIN" },
+  });
+
+  await prisma.reportSchedule.upsert({
+    where: { id: "demo-report-schedule-orbit" },
+    update: {},
+    create: {
+      id: "demo-report-schedule-orbit",
+      clientId: clientA.id,
+      reportType: "MONTHLY_DETAILED",
+      frequency: "MONTHLY",
+      recipients: ["demo.clientadmin@ankora.co.il"],
+      dayOfMonth: 1,
+    },
+  });
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);
@@ -253,6 +332,7 @@ async function main() {
   console.log(`  ${employeeOne.email} (ANKORA_EMPLOYEE, assigned to ${clientA.name})`);
   console.log(`  ${employeeTwo.email} (ANKORA_EMPLOYEE, assigned to ${clientB.name})`);
   console.log(`  ${suspendedEmployee.email} (ANKORA_EMPLOYEE, SUSPENDED - login must be blocked)`);
+  console.log(`  ${clientAdminUser.email} (CLIENT_USER, Client Admin of ${clientA.name})`);
 }
 
 main()

@@ -72,12 +72,27 @@ export async function e2e() {
 
   const out = [];
   let passed = 0;
-  let flaky = 0;
+  const flakyNames = [];
 
   for (const spec of specs) {
     const results = (spec.tests ?? []).flatMap((t) => t.results ?? []);
     const status = spec.tests?.[0]?.status ?? "unknown";
-    if (spec.ok && results.length > 1) flaky += 1;
+    if (spec.ok && results.length > 1) {
+      // The name AND why it failed the first time.
+      //
+      // "5 tests only passed on retry" is a number nobody can act on: it
+      // says something is wrong without saying where, so it gets read,
+      // noted and left. The name makes it findable; the first attempt's
+      // error is the thing that actually ends the guessing, because a
+      // passing retry throws that error away and the next run has to
+      // reproduce it from nothing.
+      const where = (spec.file ?? "").split("/").pop();
+      const why = results.find((x) => x.error)?.error?.message ?? "";
+      const oneLine = why.replace(/\s+/g, " ").trim().slice(0, 160);
+      flakyNames.push(
+        `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    first attempt: ${oneLine}` : ""}`,
+      );
+    }
     if (spec.ok) {
       passed += 1;
       continue;
@@ -92,9 +107,13 @@ export async function e2e() {
   // Flaky is reported, never swallowed. A test that passes on the retry
   // is a test nobody can trust the next time it goes red, and the whole
   // value of this suite is that red means something.
-  if (flaky) {
+  if (flakyNames.length) {
     out.push(
-      finding("major", `${flaky} browser test(s) only passed on retry`, "Flaky tests erode trust in every other result."),
+      finding(
+        "major",
+        `${flakyNames.length} browser test(s) only passed on retry`,
+        ["Flaky tests erode trust in every other result.", "", ...flakyNames].join("\n").slice(0, 1800),
+      ),
     );
   }
 
@@ -106,6 +125,60 @@ export async function e2e() {
     out.push(
       finding("major", "browser suite ran no specs at all", tail(r.all, 30) || "no output from Playwright"),
     );
+  }
+
+  // When anything went wrong, keep the server's own output.
+  //
+  // Three consecutive runs failed on different write actions - a time
+  // entry, an important date, a task - each one reported as "the form
+  // did not do anything", which is what the browser can see and the
+  // whole truth of what it can see. The next question is always the same
+  // and has never been answerable from the report: what did the server
+  // say while that click was in flight? Playwright pipes the app's
+  // stderr into its own output, so the answer is already being produced
+  // and then discarded.
+  //
+  // A Prisma pool timeout, an unhandled rejection, a slow query warning:
+  // any of them turns "flaky suite" into a fact. Only on failure, so a
+  // green run stays short.
+  //
+  // "minor", not "info": the PR comment filters info findings out
+  // entirely, and evidence nobody reads is evidence nobody has. Twelve
+  // lines because that is what the comment renders.
+  if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
+    // The error lines, not the last twelve lines.
+    //
+    // The first version took the tail, and the tail of a Node stack
+    // trace is twelve frames of next-server internals - the one line
+    // that says what actually went wrong is at the top, scrolled away.
+    // This keeps the lines that name a fault and drops the frames, so
+    // twelve lines of budget hold twelve distinct problems rather than
+    // one problem's plumbing.
+    //
+    // Only [WebServer] lines. Playwright's own reporter writes to the
+    // same stream, so without this the "what the app logged" block fills
+    // up with the test failures printed directly above it - the one
+    // thing the reader already has.
+    const seen = new Set();
+    const errors = String(r.all ?? "")
+      .split("\n")
+      .filter((l) => l.startsWith("[WebServer]"))
+      .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+      .filter((l) => l && !/^\s+at\s/.test(l))
+      .filter((l) => /error|invalid|timeout|ECONN|Prisma|denied|failed|unhandled/i.test(l))
+      .filter((l) => {
+        // Collapse repeats: one bad request repeated forty times is one
+        // fact, and forty copies of it crowd out the other thirty-nine.
+        const key = l.slice(0, 120);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .slice(0, 12);
+
+    if (errors.length) {
+      out.push(finding("minor", "what the app logged while the browser ran", errors.join("\n")));
+    }
   }
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
