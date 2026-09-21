@@ -3,6 +3,7 @@ import { prisma } from "./setup";
 import { createTestUser, createTestClient, createTestCategory, createTestTimeEntry } from "./factories";
 import { runReport } from "@/lib/app-domain/reports";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { openHourBankCycle } from "@/lib/app-domain/hour-banks";
 
 // Phase 5 - spec 14 (reports), 21.2 ("Report aggregates equal raw time
 // entry sums"), and 4.1 ("כל Endpoint בשרת בודק Authorization"). Needs a
@@ -95,8 +96,31 @@ describe("hours_by_employee - spec 14.2", () => {
 });
 
 describe("hours_by_client - spec 14.2 client isolation via filter", () => {
+  // hoursByClient() reads each client's CURRENT hour bank and drops any client
+  // that has none (getCurrentHourBank returns null). This test used to assert a
+  // row without opening one, so an empty result was the correct answer and the
+  // expectation was simply wrong - it had not run since the whole integration
+  // suite was being skipped in CI. Both clients get a cycle here, which is also
+  // what makes "narrows to only that client" a real assertion: without clientB
+  // in the unfiltered result there is nothing for the filter to exclude.
   it("clientId filter narrows Hours by Client to only that client", async () => {
     const { superAdmin, clientA, clientB } = await setup();
+    const cycleStart = new Date(Date.now() - 7 * 86_400_000);
+    const cycleEnd = new Date(Date.now() + 7 * 86_400_000);
+    for (const c of [clientA, clientB]) {
+      await openHourBankCycle(superAdmin, c.id, {
+        cycleStart,
+        cycleEnd,
+        purchasedMinutes: 600,
+        rolloverMode: "NONE",
+      });
+    }
+
+    const unfiltered = await runReport(superAdmin, "hours_by_client", {});
+    expect(unfiltered.rows.map((r) => r.client)).toEqual(
+      expect.arrayContaining([clientA.name, clientB.name])
+    );
+
     const result = await runReport(superAdmin, "hours_by_client", { clientId: clientA.id });
     expect(result.rows).toHaveLength(1);
     expect(result.rows[0].client).toBe(clientA.name);
