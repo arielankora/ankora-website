@@ -269,7 +269,11 @@ async function main() {
     where: { tokenHash: DEMO_GRANT_HASH },
     update: {},
     create: {
-      userId: ankoraAdmin.id,
+      // The Super Admin, not the Ankora Admin. /app/integrations is
+      // gated on integration.manage, which is Super-Admin-only, and the
+      // card shows the CALLING user's own grants - so a grant on anyone
+      // else is a grant the browser test can never see.
+      userId: superAdmin.id,
       label: "[DEMO] MacBook Air",
       tokenHash: DEMO_GRANT_HASH,
       tokenVersion: 0,

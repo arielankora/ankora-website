@@ -29,6 +29,12 @@ test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 const HISTORY = "/app/portal/history";
 
+// The button's actual label. The first version guessed at
+// /שמירה|עדכון|שמור/, which matches none of it - "שמירת" is not
+// "שמירה" - so every click waited out the ninety-second test timeout on
+// a locator that resolved to nothing.
+const SAVE = "שמירת נמענים";
+
 async function recipientsField(page: import("@playwright/test").Page) {
   await page.goto(HISTORY, { waitUntil: "domcontentloaded" });
   const field = page.locator('[name="recipients"]').first();
@@ -79,7 +85,7 @@ test.describe("managing recipients", () => {
     const added = "ops+e2e@ankora.co.il";
 
     await field.fill(before.includes(added) ? before : `${before}, ${added}`);
-    await page.getByRole("button", { name: /שמירה|עדכון|שמור/ }).first().click();
+    await page.getByRole("button", { name: SAVE }).first().click();
     await page.waitForLoadState("networkidle");
     await page.reload();
 
@@ -89,7 +95,7 @@ test.describe("managing recipients", () => {
     // Put it back, so a rerun starts where this one did. The database is
     // rebuilt per CI run, but a local run is not.
     await page.locator('[name="recipients"]').first().fill(before);
-    await page.getByRole("button", { name: /שמירה|עדכון|שמור/ }).first().click();
+    await page.getByRole("button", { name: SAVE }).first().click();
     await page.waitForLoadState("networkidle");
   });
 
@@ -99,7 +105,7 @@ test.describe("managing recipients", () => {
 
     const before = await field.inputValue();
     await field.fill("   ");
-    await page.getByRole("button", { name: /שמירה|עדכון|שמור/ }).first().click();
+    await page.getByRole("button", { name: SAVE }).first().click();
     await page.waitForLoadState("networkidle");
     await page.reload();
 

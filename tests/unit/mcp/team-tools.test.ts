@@ -224,7 +224,14 @@ describe("list_team_time_entries", () => {
   it("reads the date window in the actor's timezone, not the server's", async () => {
     await tools.get("list_team_time_entries")!.handler({ from: "2026-09-01", to: "2026-10-01" }, CTX);
 
-    const [args] = domain.listTimeEntriesForAdmin.mock.calls[0];
+    // The mock's parameter is optional, so destructuring gives
+    // `T | undefined` and reading through it does not typecheck.
+    // Asserting the call happened first is better than a `!`: if the
+    // query never ran, this says so instead of failing on a property of
+    // undefined three lines later.
+    expect(domain.listTimeEntriesForAdmin).toHaveBeenCalledTimes(1);
+    const args = domain.listTimeEntriesForAdmin.mock.calls[0][0] ?? {};
+
     // Israeli midnight on 1 September is 21:00 UTC on 31 August (IDT,
     // UTC+3). A UTC-midnight window would silently move three hours of
     // one month's work into the next one's answer.

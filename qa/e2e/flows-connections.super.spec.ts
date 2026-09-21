@@ -33,9 +33,17 @@ import { test, expect } from "@playwright/test";
 // straight to the database, which is a door worth not opening.
 test.describe.configure({ mode: "serial", timeout: 90_000 });
 
-// The seed gives the Ankora Admin one connection, labelled "[DEMO]
-// MacBook Air", whose token hash hashes nothing - it exists to be listed
-// and revoked, and cannot authenticate anything.
+// Super Admin, not employee. The first version of this file was named
+// `.app.spec.ts` and ran under the employee session, where
+// /app/integrations renders a permission notice and nothing else:
+// integration.manage is Super-Admin-only. The test reported "the seeded
+// grant did not reach this screen" - true, and for a reason that had
+// nothing to do with the seed. The grant moved to the Super Admin in the
+// same change, because the card shows the calling user's own grants.
+//
+// The seed gives that user one connection, labelled "[DEMO] MacBook
+// Air", whose token hash hashes nothing - it exists to be listed and
+// revoked, and cannot authenticate anything.
 //
 // The tests find it by its own disconnect control rather than by that
 // label. The first run looked for the label and found nothing, which

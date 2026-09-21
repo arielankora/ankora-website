@@ -74,7 +74,14 @@ async function createClientAndOpenItsBank(
   expect(clientId, `could not find the id of the client just created (${name})`).toBeTruthy();
 
   await page.goto(`/app/hour-banks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(name, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+  // The heading, not the name anywhere on the page. The screen has a
+  // client picker, so the name also appears as a hidden <option> - which
+  // getByText matched first and then waited fifteen seconds for an
+  // <option> to become "visible", which it never is.
+  await expect(
+    page.getByRole("heading", { name, exact: false }),
+    "the hour-bank screen did not load for this client",
+  ).toBeVisible({ timeout: 15_000 });
 }
 
 /** Open the "new cycle" drawer and return its form scope. */
@@ -101,12 +108,16 @@ test.describe("opening a cycle", () => {
 
     // 600 minutes is ten hours. Asserting on the raw number and on a
     // formatted duration both fail for different reasons on a wording
-    // change, so this asserts the client now HAS a cycle at all - the row
-    // exists where before there was none - and leaves the arithmetic to
-    // the domain tests, which can see it exactly.
+    // change, so this asserts the client now HAS a cycle at all - the
+    // adjustment form only renders once there is an open cycle to adjust,
+    // so its presence is the screen's own statement that the cycle took.
+    // The arithmetic is left to the domain tests, which can see it exactly.
     const body = await page.locator("body").innerText();
-    expect(body, "the new cycle is not listed").toContain(clientName);
     expect(body).not.toMatch(/Application error|Internal Server Error/);
+    await expect(
+      page.locator('input[name="minutes"]').first(),
+      "no open cycle on this client after the form was submitted",
+    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("refuses a cycle that ends before it starts, and says so", async ({ page }) => {
@@ -154,7 +165,11 @@ test.describe("recording an adjustment", () => {
     // Reason left empty on purpose. A manual adjustment to a client's
     // balance with no recorded reason is an unexplained change to what
     // they are billed, which is why the domain demands one.
-    await page.getByRole("button", { name: /רישום תיאום|תיאום|שמירה/ }).first().click();
+    //
+    // "הוספה" is the button's actual label. The first version guessed at
+    // /רישום תיאום|תיאום|שמירה/, matched nothing, and waited out the
+    // test timeout on a click that never happened.
+    await page.getByRole("button", { name: "הוספה" }).first().click();
     await page.waitForLoadState("networkidle");
 
     const body = await page.locator("body").innerText();
