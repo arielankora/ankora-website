@@ -127,6 +127,29 @@ export async function e2e() {
     );
   }
 
+  // When anything went wrong, keep the server's own output.
+  //
+  // Three consecutive runs failed on different write actions - a time
+  // entry, an important date, a task - each one reported as "the form
+  // did not do anything", which is what the browser can see and the
+  // whole truth of what it can see. The next question is always the same
+  // and has never been answerable from the report: what did the server
+  // say while that click was in flight? Playwright pipes the app's
+  // stderr into its own output, so the answer is already being produced
+  // and then discarded.
+  //
+  // A Prisma pool timeout, an unhandled rejection, a slow query warning:
+  // any of them turns "flaky suite" into a fact. Only on failure, so a
+  // green run stays short.
+  //
+  // "minor", not "info": the PR comment filters info findings out
+  // entirely, and evidence nobody reads is evidence nobody has. Twelve
+  // lines because that is what the comment renders.
+  if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
+    const output = tail(r.all, 12);
+    if (output) out.push(finding("minor", "what the app logged while the browser ran", output));
+  }
+
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
   return out;
 }
