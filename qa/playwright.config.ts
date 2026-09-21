@@ -72,7 +72,7 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts$/ },
     {
       name: "public",
-      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/, /\.super\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/, /\.super\.spec\.ts$/, /\.client\.spec\.ts$/],
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -88,6 +88,14 @@ export default defineConfig({
       testMatch: /\.super\.spec\.ts$/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/superadmin.json" },
+    },
+    // And the one capability that belongs to a client-side user rather than
+    // to Ankora staff - see the third setup in auth.setup.ts.
+    {
+      name: "app-client",
+      testMatch: /\.client\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/clientadmin.json" },
     },
   ],
 
