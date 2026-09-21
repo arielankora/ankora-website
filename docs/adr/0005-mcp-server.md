@@ -394,3 +394,78 @@ it.
 **`CLIENT_USER` never sees the card.** None of the ten tools are
 reachable with that role, so offering the connection would be an
 invitation to a dead end.
+
+---
+
+## Phase 4 — revoking a grant from inside the product (2026-09-21)
+
+Phase 3 made the connection visible and said plainly what it did not
+build: a way to end one. Revocation meant removing the connector inside
+Claude, or an act that bumps `tokenVersion` — a password change, or an
+admin's "logout all sessions". All three work. None of them is what an
+admin reaches for when somebody leaves, and "change your password" is
+not an answer to "how do you cut a third party's access to client data",
+which is the form the question takes in a SOC 2 review.
+
+**Two controls, because there are two situations.**
+
+`revokeMyClaudeGrant` is self-service, per grant, on the card. Ownership
+lives in the `WHERE` clause (`{ id, userId: actor.id }`) rather than in a
+read-then-compare: a guessed or replayed id matches nothing, and a zero
+count is the same answer for a wrong id as for someone else's, so a
+caller learns nothing about grants that are not theirs.
+
+`revokeClaudeGrantsForUser` is the admin path, gated on `user.manage`,
+all-or-nothing, on the user detail screen next to "logout all sessions".
+It deliberately does **not** bump `tokenVersion`. The two answer
+different questions: "this account may be compromised" wants every
+session gone, and already takes the Claude grants with it; "this person
+no longer needs the integration" wants only the integration gone and
+should not log them out of the app they are working in. The screen shows
+the live grant count beside the button, because a control that looks
+identical whether there are three grants or none gets pressed on a hunch.
+
+### Decisions worth not re-litigating
+
+**Soft revoke, never delete.** `revokedAt` is set; the row stays.
+`lib/mcp/auth.ts` already treats a revoked row as a 401, so deleting
+would buy nothing and lose the evidence that the grant existed and when
+it ended. Consistent with the schema's own soft-delete-only convention.
+
+**An OAuth disconnect revokes by client, not by row.** Rotation writes a
+new row per renewal and revokes the one it supersedes, but a row that
+rotated away and was not yet revoked would keep a valid access token
+alive for up to an hour after the click. "Disconnect" has to mean
+disconnected, so every live row for that `(userId, clientId)` goes.
+
+**Confirm before, rather than undo after.** This is a deliberate
+exception to the toast provider's rule that destructive actions offer a
+real Undo. Un-revoking would resurrect a credential the person just
+decided to kill. The recovery path is honest and takes seconds —
+authorize again in Claude — so the safety sits in an explicit second
+press, inline in the card, not in a reversal. No `window.confirm`: a
+native modal blocks the page and looks nothing like the rest of this UI.
+
+**`mcp_grant.revoke` classifies as הרשאות, not עריכה.** The audit
+screen's `classifyAction` derives its tag from the action string.
+Revoking a credential is an access change; left to fall through it would
+have been tagged as a routine edit on the one screen an admin scans for
+exactly this kind of event.
+
+### Found by running it
+
+Exercising the flow end to end on the preview — register a client,
+approve consent, call `/api/mcp` with the token, press disconnect, call
+again — turned up something the code review had not. The consent
+endpoint has been writing an `mcp.oauth.granted` audit row since Phase
+15, correctly, but the audit screen had no Hebrew label for that action
+and no `OAuthClient` entry in its entity filter. So every grant since
+Phase 15 has been landing in the log as a raw `mcp.oauth.granted`
+string that could not be filtered for.
+
+Fixed here, alongside the revoke labels. The lesson is the ordinary one:
+`classifyAction` and `ACTION_LABEL` are a second place that every new
+audited action has to be registered, and nothing enforces it. A test
+asserting that every `recordAudit` call site in `lib/` has a label would
+close that permanently, and is worth doing the next time a third action
+slips through.

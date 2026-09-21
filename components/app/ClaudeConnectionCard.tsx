@@ -2,6 +2,7 @@ import Link from "next/link";
 import { SITE_URL } from "@/lib/site";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { CopyValue } from "@/components/app/CopyValue";
+import { ClaudeGrantList, type GrantRow } from "@/components/app/ClaudeGrantList";
 import type { ClaudeConnectionStatus, ClaudeOrgSummary } from "@/lib/app-domain/mcp-connections";
 
 // The Claude (MCP) connection card, shown in two places on purpose:
@@ -46,6 +47,15 @@ function formatDate(date: Date | null): string | null {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
+function toGrantRow(grant: ClaudeConnectionStatus["grants"][number]): GrantRow {
+  return {
+    id: grant.id,
+    label: grant.label,
+    expiresLabel: formatDate(grant.expiresAt),
+    isBridge: grant.kind === "PAT",
+  };
+}
+
 export function ClaudeConnectionCard({
   status,
   orgSummary,
@@ -86,24 +96,14 @@ export function ClaudeConnectionCard({
           </div>
           {/* Listed one by one because "two connections" with no way to
               tell them apart is not actionable - a person revoking an old
-              laptop needs to know which is which. */}
+              laptop needs to know which is which, and now has a button to
+              act on the answer. Dates are formatted here, on the server,
+              so the client half never needs its own opinion about
+              timezones. */}
           <div className="pt-1">
             <dt className="sr-only">רשימת החיבורים</dt>
             <dd>
-              <ul className="space-y-1.5">
-                {status.grants.map((grant, i) => {
-                  const expires = formatDate(grant.expiresAt);
-                  return (
-                    <li key={i} className="flex flex-wrap items-center justify-between gap-2 text-xs text-appNavy/60">
-                      <span className="font-medium text-appNavy/80">
-                        {grant.label}
-                        {grant.kind === "PAT" ? " (גשר מקומי)" : ""}
-                      </span>
-                      {expires && <span>בתוקף עד {expires}</span>}
-                    </li>
-                  );
-                })}
-              </ul>
+              <ClaudeGrantList grants={status.grants.map(toGrantRow)} />
             </dd>
           </div>
         </dl>
@@ -124,16 +124,13 @@ export function ClaudeConnectionCard({
         <Link href={MCP_GUIDE_HREF} className="text-sm font-medium text-gold-dim hover:underline">
           איך מחברים את Claude →
         </Link>
-        {/* Deliberately precise about what actually revokes a grant
-            today: there is no self-service "disconnect" button in this
-            app yet, and implying one would send people looking for a
-            control that does not exist. Changing your own password bumps
-            tokenVersion (lib/app-domain/profile.ts) and so does kill the
-            grant - that IS the self-service path, it is just not named
-            like one. */}
+        {/* The card now owns disconnection (the "ניתוק" button on each
+            row above), so this line no longer has to stand in for a
+            missing control - it just names the other paths that also end
+            a grant, which people do still run into. */}
         {status.connected && (
           <span className="text-xs text-appNavy/50">
-            לניתוק - הסירו את המחבר ב-Claude. גם שינוי סיסמה מבטל את החיבור מיידית.
+            ניתוק כאן מבטל את ההרשאה מיידית. גם שינוי סיסמה עושה זאת.
           </span>
         )}
       </div>
