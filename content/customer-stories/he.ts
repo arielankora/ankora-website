@@ -71,6 +71,7 @@ const stories: CustomerStory[] = [
       "/personal-operations-management",
       "/solutions/executives",
       "/ankora-vs-personal-assistant",
+      "/ankora-vs-ai-assistants",
     ],
     publishedDate: "2026-09-21",
   },

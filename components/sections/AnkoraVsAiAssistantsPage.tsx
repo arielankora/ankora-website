@@ -1,7 +1,8 @@
 import Link from "next/link";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
-import { storiesUi } from "@/content/customer-stories/ui";
+import { getStoriesForSolution } from "@/lib/customer-stories";
+import { CustomerProof } from "@/components/sections/CustomerProof";
 import { plural } from "@/lib/plural";
 import { readingMinutes } from "@/lib/reading";
 import { contentUpdated } from "@/lib/content-updated";
@@ -45,7 +46,10 @@ export function AnkoraVsAiAssistantsPage({
 }) {
   const p = dict.pages.ankoraVsAiAssistants;
   const seo = dict.pages.seo;
-  const stories = storiesUi(locale);
+  // The page argues that someone owns the outcome. The proof block is where that
+  // stops being an argument, so it sits between the last section and the CTA,
+  // in the same slot the other long-form pages use.
+  const proof = getStoriesForSolution(locale, "/ankora-vs-ai-assistants", 2);
   const minutes = readingMinutes(p);
   const updated = contentUpdated(locale, seo);
 
@@ -176,9 +180,6 @@ export function AnkoraVsAiAssistantsPage({
               label={dict.nav.relatedReading}
               items={[
                 { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
-                // The page argues accountability; the stories are where a reader goes
-                // to check whether the claim survives contact with a real client.
-                { label: stories.navLabel, href: "/customer-stories" },
                 { label: dict.nav.technology, href: "/technology" },
                 { label: dict.nav.pricing, href: "/pricing" },
               ]}
@@ -186,6 +187,8 @@ export function AnkoraVsAiAssistantsPage({
           </article>
         </div>
       </WideContainer>
+
+      <CustomerProof locale={locale} stories={proof} />
 
       <section className="mt-[clamp(56px,7vw,100px)] border-t border-[rgba(243,234,219,0.12)] py-[clamp(48px,7vw,96px)] text-center">
         <WideContainer>
