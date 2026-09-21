@@ -57,8 +57,27 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
       )
       .catch(() => []);
     const pending = await dialog.locator("button[disabled]").count().catch(() => 0);
+
+    // What the form is SAYING, which is the thing this helper was
+    // missing and the most likely reason of the three.
+    //
+    // A refused write renders its reason as text inside the drawer -
+    // "יש לבחור לקוח", "חודש לא תקין" - and the first version of this
+    // helper reported neither that text nor anything that implied it.
+    // Three runs were spent reading "1 disabled button(s), invalid:
+    // none" and inferring a slow server, on the strength of a disabled
+    // button that may never have been the submit one: this counts every
+    // disabled button in the dialog, not the one that matters.
+    const text = (await dialog.innerText().catch(() => ""))
+      .split("\n")
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(" / ")
+      .slice(0, 400);
+
     throw new Error(
-      `${what}: the drawer never closed. ${pending} disabled button(s). invalid: ${invalid.join(" | ") || "none"}`,
+      `${what}: the drawer never closed. ${pending} disabled button(s). ` +
+        `invalid: ${invalid.join(" | ") || "none"}. drawer says: ${text || "(nothing)"}`,
     );
   }
 }
