@@ -60,7 +60,12 @@ function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: strin
   return { start: fmt(start), end: fmt(end) };
 }
 
-test.describe.configure({ timeout: 90_000 });
+// Serial within this file. Every test here writes time entries for the SAME
+// signed-in user, and the overlap rule is deliberately sensitive to what that
+// user already has on the clock - so running them at once makes each one's
+// result depend on another's timing. Files still run in parallel with each
+// other; it is only this one's internal ordering that has to be fixed.
+test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 test.describe("timer/actions - start and stop", () => {
   test("starting a timer, then stopping it, leaves a finished entry", async ({ page }) => {
@@ -110,12 +115,14 @@ test.describe("my-time/actions - manual entry", () => {
     await page.locator('input[name="note"]').fill(note);
     await page.getByRole("button", { name: "הוספת דיווח" }).click();
 
-    // The list is server-rendered. Re-fetch rather than wait on a
-    // revalidation reaching this router cache - that race is not the thing
-    // under test, and it made this assertion flaky across runs.
+    // The toast is the action reporting ok, and it is what this test is
+    // actually about - that the Server Action ran and accepted the entry.
+    // The list below is a second, weaker read through a server render.
+    await expect(page.getByText("הדיווח נשמר"), "the manual entry was refused").toBeVisible({ timeout: 20_000 });
+
     await page.reload();
     const row = page.getByText(note, { exact: false }).first();
-    await expect(row, "the manual entry was not created").toBeVisible({ timeout: 15_000 });
+    await expect(row, "the saved entry is not on the week's list").toBeVisible({ timeout: 15_000 });
 
     // Edit it. The row's own edit control opens the inline form.
     await row.click();
@@ -148,8 +155,9 @@ test.describe("my-time/actions - manual entry", () => {
     await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
     await page.locator('input[name="note"]').fill(first);
     await page.getByRole("button", { name: "הוספת דיווח" }).click();
-    await page.reload();
-    await expect(page.getByText(first, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+    // A precondition, not the subject - so it is confirmed by the action's own
+    // success signal rather than by reading it back off a re-rendered list.
+    await expect(page.getByText("הדיווח נשמר"), "the first entry was refused").toBeVisible({ timeout: 20_000 });
 
     // Same window again, same client: this one must be refused outright and
     // must NOT offer the confirmation.

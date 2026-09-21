@@ -21,6 +21,27 @@ import { test, expect } from "@playwright/test";
 
 test.describe.configure({ timeout: 90_000 });
 
+/**
+ * Wait for a drawer to close, and if it does not, fail with the reason the
+ * screen is showing.
+ *
+ * "expected 0, received 1" says the drawer stayed open and nothing else. It
+ * is the same symptom whether the server refused the write or the browser
+ * blocked the submit on a required field left empty, and those need opposite
+ * fixes. Reading the drawer's own text turns one wasted CI round into a
+ * message that names the problem.
+ */
+async function expectDrawerClosed(page: import("@playwright/test").Page, what: string) {
+  const dialog = page.getByRole("dialog");
+  try {
+    await expect(dialog).toHaveCount(0, { timeout: 20_000 });
+  } catch {
+    const text = (await dialog.innerText().catch(() => "")).replace(/\s+/g, " ").slice(0, 400);
+    const invalid = await dialog.locator(":invalid").count().catch(() => 0);
+    throw new Error(`${what}: the drawer never closed. invalid fields: ${invalid}. drawer text: ${text}`);
+  }
+}
+
 function tag(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -99,7 +120,7 @@ test.describe("hour-banks/actions", () => {
     await dialog.locator('select[name="rolloverMode"]').selectOption("NONE");
     await dialog.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
 
-    await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+    await expectDrawerClosed(page, "opening an hour-bank cycle");
     await page.reload();
 
     // 600 minutes is ten hours; the screen renders banks in H:MM, so the
@@ -132,7 +153,7 @@ test.describe("important-dates/actions", () => {
     await dialog.locator('select[name="responsibleUserId"]').selectOption({ index: 1 });
     await dialog.locator("button[type=submit]").first().click();
 
-    await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+    await expectDrawerClosed(page, "creating an important date");
     await page.reload();
     await expect(page.getByText(title, { exact: false }).first(), "the important date was not created").toBeVisible({
       timeout: 15_000,
