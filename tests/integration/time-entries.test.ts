@@ -27,6 +27,24 @@ async function setupEmployeeWithClient() {
   return { employee, superAdmin, client, category };
 }
 
+/// A finished window that ended a moment ago.
+///
+/// assertNotFuture allows five minutes of grace, so the `new Date()` +N hours
+/// these tests were originally written with is an hour in the FUTURE and is
+/// rejected outright. They predate that guard (added in the overnight bug-hunt,
+/// docs/adr/0001 section 19.2) and had not run since, because the whole
+/// integration suite was being skipped in CI - so nothing reported them.
+///
+/// Going backwards instead can cross the Asia/Jerusalem midnight depending on
+/// when the suite runs, which would then demand a backdate reason, so callers
+/// pass `backdateReason` unconditionally; it is ignored when the entry is
+/// same-day.
+function pastWindow(hours = 1, endedMinutesAgo = 10) {
+  const endAt = new Date(Date.now() - endedMinutesAgo * 60_000);
+  return { startAt: new Date(endAt.getTime() - hours * 3600_000), endAt };
+}
+const PAST_REASON = "fixture: window in the past";
+
 describe("startTimer - spec 6.1 / 18.1 timer/start", () => {
   it("creates a running entry (endAt null, source TIMER)", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
@@ -117,8 +135,7 @@ describe("stopTimer - spec 6.1 / 18.1 timer/stop, 18.2 idempotency", () => {
 describe("createManualEntry - spec 6.3", () => {
   it("creates a manual entry with actualSeconds computed from start/end", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 2 * 3600_000);
+    const { startAt, endAt } = pastWindow(2);
 
     const entry = await createManualEntry(employee, employee.id, {
       clientId: client.id,
@@ -126,6 +143,7 @@ describe("createManualEntry - spec 6.3", () => {
       startAt,
       endAt,
       note: "Weekly report",
+      backdateReason: PAST_REASON,
     });
 
     expect(entry.isManual).toBe(true);
@@ -208,9 +226,14 @@ describe("createManualEntry - spec 6.3", () => {
 
   it("blocks an overlapping entry unless override + edit_others (spec 6.3)", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 3600_000);
-    await createManualEntry(employee, employee.id, { clientId: client.id, categoryId: category.id, startAt, endAt });
+    const { startAt, endAt } = pastWindow(1, 120);
+    await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      startAt,
+      endAt,
+      backdateReason: PAST_REASON,
+    });
 
     const overlapStart = new Date(startAt.getTime() + 1_800_000); // 30 min into the first entry
     const overlapEnd = new Date(overlapStart.getTime() + 3600_000);
@@ -238,14 +261,14 @@ describe("createManualEntry - spec 6.3", () => {
 
   it("records actor distinct from userId when an admin enters time for an employee (spec 6.3 audit rule)", async () => {
     const { employee, superAdmin, client, category } = await setupEmployeeWithClient();
-    const startAt = new Date();
-    const endAt = new Date(startAt.getTime() + 3600_000);
+    const { startAt, endAt } = pastWindow();
 
     const entry = await createManualEntry(superAdmin, employee.id, {
       clientId: client.id,
       categoryId: category.id,
       startAt,
       endAt,
+      backdateReason: PAST_REASON,
     });
 
     expect(entry.userId).toBe(employee.id);
