@@ -105,7 +105,19 @@ test.describe("a detail page is not a way around scoping", () => {
       expect(status, `${route} returned a server error for a bad id`).toBeLessThan(500);
       const body = await page.locator("body").innerText();
       expect(body).not.toMatch(/Application error|Internal Server Error/);
-      expect(body).not.toMatch(/\[DEMO\]/);
+
+      // Refused, not merely empty.
+      //
+      // The first version asserted the body contained no "[DEMO]" - the
+      // seed's own prefix - reasoning that a leaked record would show a
+      // seeded name. It fails on a correctly refused page, because the
+      // app shell's command palette lists every client on every screen,
+      // 404s included. The shell is not the record.
+      //
+      // What actually matters is that a fabricated id produces a refusal
+      // rather than somebody else's row, so that is what this asserts.
+      const refused = status === 404 || /לא נמצא|404|אין לך הרשאה|Not Found/.test(body);
+      expect(refused, `${route} rendered something for an id that does not exist`).toBe(true);
     });
   }
 });

@@ -72,12 +72,19 @@ export async function e2e() {
 
   const out = [];
   let passed = 0;
-  let flaky = 0;
+  const flakyNames = [];
 
   for (const spec of specs) {
     const results = (spec.tests ?? []).flatMap((t) => t.results ?? []);
     const status = spec.tests?.[0]?.status ?? "unknown";
-    if (spec.ok && results.length > 1) flaky += 1;
+    if (spec.ok && results.length > 1) {
+      // The name, not just the count. "5 tests only passed on retry" is
+      // a number nobody can act on: it says something is wrong without
+      // saying where, so it gets read, noted and left. Naming them turns
+      // the same finding into a list of things to go and fix.
+      const where = (spec.file ?? "").split("/").pop();
+      flakyNames.push(`${where ? `${where} — ` : ""}${spec.title}`);
+    }
     if (spec.ok) {
       passed += 1;
       continue;
@@ -92,9 +99,13 @@ export async function e2e() {
   // Flaky is reported, never swallowed. A test that passes on the retry
   // is a test nobody can trust the next time it goes red, and the whole
   // value of this suite is that red means something.
-  if (flaky) {
+  if (flakyNames.length) {
     out.push(
-      finding("major", `${flaky} browser test(s) only passed on retry`, "Flaky tests erode trust in every other result."),
+      finding(
+        "major",
+        `${flakyNames.length} browser test(s) only passed on retry`,
+        ["Flaky tests erode trust in every other result.", "", ...flakyNames].join("\n").slice(0, 900),
+      ),
     );
   }
 
