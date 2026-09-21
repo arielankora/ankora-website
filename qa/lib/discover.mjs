@@ -250,9 +250,14 @@ export function computeCoverage(caps) {
       const hits = files.filter((f) => needles.some((n) => f.text.includes(n))).map((f) => f.file);
       if (hits.length) coverage[suite] = hits;
     }
-    if (sweeps[cap.kind] && !cap.id.includes("[")) {
-      // Dynamic routes are excluded from the sweeps themselves (they need
-      // a real id), so they must not be credited by one either.
+    // Dynamic routes are excluded from the sweeps themselves (they need a
+    // real id), so they must not be credited by one either - but `[locale]`
+    // does not count as dynamic, because the sweep expands it to he and en.
+    // Testing the raw id credited nothing at all for marketing pages, whose
+    // ids all carry `[locale]`; the routes.ts side had the identical bug,
+    // and the two agreed with each other while both were wrong.
+    const dynamicBeyondLocale = cap.id.replace("/[locale]", "").includes("[");
+    if (sweeps[cap.kind] && !dynamicBeyondLocale) {
       coverage.e2e = [...new Set([...(coverage.e2e ?? []), ...sweepFiles(cap.kind)])];
     }
     for (const d of declared.get(cap.id) ?? []) {
