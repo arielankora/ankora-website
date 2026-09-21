@@ -71,6 +71,16 @@ export async function e2e() {
     );
   }
 
+  // Zero specs is not success. The first CI run reported the browser
+  // check as green in 2.1 seconds, which is less time than it takes to
+  // start a server - a suite that runs nothing passes everything, and
+  // that is the single most dangerous state this file can be in.
+  if (specs.length === 0) {
+    out.push(
+      finding("major", "browser suite ran no specs at all", tail(r.all, 30) || "no output from Playwright"),
+    );
+  }
+
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
   return out;
 }
