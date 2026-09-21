@@ -51,11 +51,24 @@ const lookup = vi.hoisted(() => ({
   canSeeOthersTime: vi.fn(() => false),
 }));
 
+// listTasks and assignableUsers declare their parameters rather than
+// taking none: `vi.fn(async () => [])` types its own `mock.calls` as
+// `[]`, so every assertion about what the tool passed would need a cast
+// through `unknown` - which is exactly the kind of cast that silently
+// stops checking anything.
+type TaskFilterArg = {
+  clientId?: string;
+  assignedToId?: string;
+  unassigned?: boolean;
+  dueBefore?: Date;
+  statusIn?: string[];
+};
+
 const tasks = vi.hoisted(() => ({
-  listTasks: vi.fn(async () => []),
+  listTasks: vi.fn(async (_actor: unknown, _filters: TaskFilterArg = {}) => [] as unknown[]),
   createTask: vi.fn(),
   updateTask: vi.fn(),
-  assignableUsers: vi.fn(async () => []),
+  assignableUsers: vi.fn(async (_actor: unknown, _clientId: string) => [] as unknown[]),
   OPEN_STATUSES: ["OPEN", "IN_PROGRESS"],
 }));
 
@@ -452,14 +465,14 @@ describe("list_tasks", () => {
 
   it("defaults to unfinished tasks", async () => {
     await tools.get("list_tasks")!.handler({}, CTX);
-    const [, filters] = tasks.listTasks.mock.calls[0] as [unknown, { statusIn?: string[] }];
-    expect(filters.statusIn).toEqual(["OPEN", "IN_PROGRESS"]);
+    const [, filters] = tasks.listTasks.mock.calls[0]!;
+    expect(filters!.statusIn).toEqual(["OPEN", "IN_PROGRESS"]);
   });
 
   it("scopes `mine` to the token's user, never to a name the model supplied", async () => {
     await tools.get("list_tasks")!.handler({ mine: true, person: "Dana" }, CTX);
-    const [, filters] = tasks.listTasks.mock.calls[0] as [unknown, { assignedToId?: string }];
-    expect(filters.assignedToId).toBe(ACTOR.id);
+    const [, filters] = tasks.listTasks.mock.calls[0]!;
+    expect(filters!.assignedToId).toBe(ACTOR.id);
     expect(lookup.lookupAssignee).not.toHaveBeenCalled();
   });
 

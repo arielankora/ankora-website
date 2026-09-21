@@ -911,8 +911,36 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-09-20"
+    },
+    "mcp:create_task": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
+    },
+    "mcp:list_assignable_people": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
+    },
+    "mcp:list_tasks": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
+    },
+    "mcp:update_task": {
+      "kind": "mcp-tool",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-20"
+  "lastScan": "2026-09-21"
 }
