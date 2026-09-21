@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
+import { afterResponse } from "@/lib/after-response";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
@@ -383,9 +384,7 @@ export async function stopTimer(
       // consumed minutes, so it's a natural trigger point for
       // threshold evaluation. Best-effort/non-fatal - a failure here
       // must never undo the timer stop that already committed above.
-      await evaluateAlertsForClient(updated.clientId).catch((err) =>
-        console.error("evaluateAlertsForClient failed (non-fatal)", err)
-      );
+      await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(updated.clientId));
 
       return updated;
     }
@@ -433,9 +432,7 @@ export async function reopenTimer(actor: User, timeEntryId: string) {
 
   // Reopening reduces this cycle's consumed minutes back down - same
   // best-effort re-evaluation trigger as every other mutation here.
-  await evaluateAlertsForClient(updated.clientId).catch((err) =>
-    console.error("evaluateAlertsForClient failed (non-fatal)", err)
-  );
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(updated.clientId));
 
   return updated;
 }
@@ -542,9 +539,7 @@ export async function createManualEntry(
 
   // Phase 4 (spec 9.2): a manual entry changes consumed minutes just
   // like a stopped timer does - same best-effort, non-fatal trigger.
-  await evaluateAlertsForClient(entry.clientId).catch((err) =>
-    console.error("evaluateAlertsForClient failed (non-fatal)", err)
-  );
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(entry.clientId));
 
   return entry;
 }
@@ -699,9 +694,7 @@ export async function updateTimeEntry(
   // range, client, or category) - re-evaluate thresholds for the
   // resulting client. Best-effort/non-fatal, same as the recalculation
   // flag above.
-  await evaluateAlertsForClient(result.updated.clientId).catch((err) =>
-    console.error("evaluateAlertsForClient failed (non-fatal)", err)
-  );
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(result.updated.clientId));
 
   return result.updated;
 }
@@ -737,9 +730,7 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
   // Phase 4 (spec 9.2): deleting an entry reduces consumed minutes,
   // which can also RESOLVE a previously-fired alert - same
   // best-effort, non-fatal trigger as every other mutation here.
-  await evaluateAlertsForClient(entry.clientId).catch((err) =>
-    console.error("evaluateAlertsForClient failed (non-fatal)", err)
-  );
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(entry.clientId));
 
   return updated;
 }
@@ -775,9 +766,7 @@ export async function restoreTimeEntry(actor: User, timeEntryId: string) {
   await flagAffectedCyclesRecalculated(entry.clientId, [entry.startAt]).catch((err) =>
     console.error("flagAffectedCyclesRecalculated failed (non-fatal)", err)
   );
-  await evaluateAlertsForClient(entry.clientId).catch((err) =>
-    console.error("evaluateAlertsForClient failed (non-fatal)", err)
-  );
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(entry.clientId));
 
   return updated;
 }

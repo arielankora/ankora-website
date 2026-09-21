@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { afterResponse } from "@/lib/after-response";
 import {
   computeConsumedMinutesForRange,
   consumedMinutesFromEntries,
@@ -119,9 +120,9 @@ export async function listHourBanksForClient(clientId: string) {
 /// spec doesn't define this edge case, so falling back to "last known
 /// cycle" rather than throwing keeps the snapshot screen from erroring
 /// out for a client between cycles).
-/// No `adjustments` include, deliberately.
 ///
-/// Both queries used to pull every adjustment row for the cycle, and
+/// No `adjustments` include, deliberately: both queries used to pull
+/// every adjustment row for the cycle, and
 /// getHourBankSnapshot then ignored them and asked the database for the
 /// sum separately. Nothing that calls this function reads `.adjustments`
 /// off the result - listHourBanksForClient, which does need them, keeps
@@ -460,9 +461,12 @@ export async function recordHourBankAdjustment(
   // Dynamic import avoids a circular dependency (alerts.ts imports
   // getCurrentHourBank from this file). Best-effort/non-fatal, same
   // pattern as every other alert-evaluation call site.
-  await import("@/lib/app-domain/alerts")
-    .then((mod) => mod.evaluateAlertsForClient(clientId))
-    .catch((err) => console.error("evaluateAlertsForClient failed (non-fatal)", err));
+  // Deferred, like every other alert trigger: the result is not used and
+  // a failure is swallowed, so awaiting it only makes the admin wait.
+  await afterResponse("evaluateAlertsForClient", async () => {
+    const mod = await import("@/lib/app-domain/alerts");
+    await mod.evaluateAlertsForClient(clientId);
+  });
 
   return adjustment;
 }
