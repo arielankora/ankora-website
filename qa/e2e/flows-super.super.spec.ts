@@ -56,7 +56,18 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
         }),
       )
       .catch(() => []);
-    const pending = await dialog.locator("button[disabled]").count().catch(() => 0);
+    // WHICH button is disabled, not how many.
+    //
+    // "1 disabled button(s)" was read as "the submit button is still
+    // pending" for four runs. It might have been any button in the
+    // drawer, and the difference decides whether the server is slow or
+    // the form is refusing to let go. A count that supports two opposite
+    // conclusions is not evidence.
+    const disabled = await dialog
+      .locator("button[disabled]")
+      .evaluateAll((els) => els.map((e) => `"${(e.textContent ?? "").trim().slice(0, 40)}"`))
+      .catch(() => []);
+    const pending = disabled.length;
 
     // What the form is SAYING, which is the thing this helper was
     // missing and the most likely reason of the three.
@@ -76,7 +87,8 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
       .slice(0, 400);
 
     throw new Error(
-      `${what}: the drawer never closed. ${pending} disabled button(s). ` +
+      `${what}: the drawer never closed after ${Math.round(timeout / 1000)}s. ` +
+        `${pending} disabled button(s)${pending ? `: ${disabled.join(", ")}` : ""}. ` +
         `invalid: ${invalid.join(" | ") || "none"}. drawer says: ${text || "(nothing)"}`,
     );
   }
