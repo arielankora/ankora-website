@@ -27,6 +27,7 @@ const PATHS = [
   "", "/about", "/contact", "/coverage", "/how-it-works", "/pricing", "/roi",
   "/solutions", "/technology", "/privacy", "/terms", "/blog",
   "/personal-operations-management", "/ankora-vs-personal-assistant",
+  "/ankora-vs-ai-assistants",
   "/personal-assistant-for-executives",
   // The evidence section. The hub is a new layout (portrait + row) rather than a
   // variant of an existing one, and the story page is the only long-form page on

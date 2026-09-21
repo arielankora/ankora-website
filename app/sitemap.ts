@@ -8,6 +8,7 @@ const routes: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "", priority: 1, changeFrequency: "weekly" },
   { path: "/personal-operations-management", priority: 0.9, changeFrequency: "monthly" },
   { path: "/ankora-vs-personal-assistant", priority: 0.9, changeFrequency: "monthly" },
+  { path: "/ankora-vs-ai-assistants", priority: 0.9, changeFrequency: "monthly" },
   { path: "/personal-assistant-for-executives", priority: 0.85, changeFrequency: "monthly" },
   { path: "/how-it-works", priority: 0.8, changeFrequency: "monthly" },
   // The evidence hub: it answers "does this work for people like me", which is the

@@ -47,6 +47,7 @@ export interface Dictionary {
     personalOperationsManagement: string;
     personalAssistantForExecutives: string;
     ankoraVsPersonalAssistant: string;
+    ankoraVsAiAssistants: string;
     relatedReading: string;
     blog: string;
     solutionsMenu: { label: string; blurb: string; href: string }[];
@@ -559,6 +560,42 @@ export interface PagesContent {
     choosePA: { title: string; items: string[] };
     chooseAnkora: { title: string; items: string[] };
     whereAnkoraFits: { title: string; body: string };
+    faq: { q: string; a: string }[];
+    ctaTitle: string;
+    ctaBody: string;
+    cta: string;
+  };
+  ankoraVsAiAssistants: {
+    eyebrow: string;
+    title: string;
+    sub: string;
+    directAnswer: string;
+    /** Section 01 concedes the category's strengths before the page argues anything.
+     *  It is first because a visitor who has used one of these tools abandons a page
+     *  that opens by telling them the thing they liked does not work. */
+    whatAiDoesWell: { title: string; body: string[] };
+    /** Named products, sorted into the three categories a visitor conflates. The names
+     *  live here and in the FAQ, never in the table headers: a column titled after a
+     *  company ages the moment that company ships something. */
+    landscape: { title: string; intro: string; items: { title: string; body: string }[] };
+    tableTitle: string;
+    columnA: string;
+    columnB: string;
+    table: { dimension: string; a: string; b: string }[];
+    gaps: { title: string; items: { title: string; body: string }[] };
+    sameLayer: { title: string; body: string[] };
+    /** The only section that links out of the page, and it links to our own contract.
+     *  Split the way the hero definition is split, because the link sits mid-sentence
+     *  and `Prose` renders a single paragraph. */
+    accountability: {
+      title: string;
+      body: string[];
+      linkPre: string;
+      linkLabel: string;
+      linkPost: string;
+    };
+    chooseTool: { title: string; items: string[] };
+    chooseAnkora: { title: string; items: string[] };
     faq: { q: string; a: string }[];
     ctaTitle: string;
     ctaBody: string;
