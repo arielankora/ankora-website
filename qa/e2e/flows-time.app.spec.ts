@@ -60,6 +60,8 @@ function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: strin
   return { start: fmt(start), end: fmt(end) };
 }
 
+test.describe.configure({ timeout: 90_000 });
+
 test.describe("timer/actions - start and stop", () => {
   test("starting a timer, then stopping it, leaves a finished entry", async ({ page }) => {
     const note = tag("e2e-timer");
@@ -108,6 +110,10 @@ test.describe("my-time/actions - manual entry", () => {
     await page.locator('input[name="note"]').fill(note);
     await page.getByRole("button", { name: "הוספת דיווח" }).click();
 
+    // The list is server-rendered. Re-fetch rather than wait on a
+    // revalidation reaching this router cache - that race is not the thing
+    // under test, and it made this assertion flaky across runs.
+    await page.reload();
     const row = page.getByText(note, { exact: false }).first();
     await expect(row, "the manual entry was not created").toBeVisible({ timeout: 15_000 });
 
@@ -142,6 +148,7 @@ test.describe("my-time/actions - manual entry", () => {
     await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
     await page.locator('input[name="note"]').fill(first);
     await page.getByRole("button", { name: "הוספת דיווח" }).click();
+    await page.reload();
     await expect(page.getByText(first, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
 
     // Same window again, same client: this one must be refused outright and

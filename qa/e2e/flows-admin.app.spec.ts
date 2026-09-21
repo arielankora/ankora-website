@@ -141,6 +141,11 @@ test.describe("time-entries/actions - an admin reporting on behalf of an employe
 
     await page.goto("/app/time-entries");
 
+    // The form starts collapsed behind its own toggle, so there is nothing to
+    // fill until this is clicked - which is why an earlier run reported the
+    // form as simply absent.
+    await page.getByRole("button", { name: "+ דיווח עבור עובד" }).click();
+
     // Scoped to the create form on purpose: the filter bar above it renders
     // selects with the SAME names (clientId, userId), so an unscoped locator
     // is ambiguous and, worse, would sometimes drive the filter instead.

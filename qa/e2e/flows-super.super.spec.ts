@@ -48,7 +48,10 @@ test.describe("users/actions", () => {
     await dialog.locator('select[name="role"]').selectOption("ANKORA_EMPLOYEE");
     await dialog.getByRole("button", { name: "הזמנת משתמש" }).click();
 
-    await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+    // This drawer deliberately stays OPEN on success - it shows the one-time
+    // invite link for the admin to copy, and closes only when they dismiss
+    // it. So unlike every other drawer here, its disappearance is not the
+    // success signal; the user appearing in the list is.
     await page.reload();
     await expect(page.getByText(email, { exact: false }).first(), "the invited user is not listed").toBeVisible({
       timeout: 15_000,
@@ -120,8 +123,13 @@ test.describe("important-dates/actions", () => {
     await expect(dialog).toBeVisible();
     await dialog.locator('select[name="clientId"]').selectOption(CLIENT);
     await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('select[name="category"]').selectOption({ index: 1 });
     await dialog.locator('select[name="recurrence"]').selectOption("ONCE");
     await dialog.locator('input[name="onceDate"]').fill(isoDay(30));
+    // Required, and missed on the first run - the browser then blocked the
+    // submit and the drawer simply stayed open, which looked like a failed
+    // action rather than an unfilled field.
+    await dialog.locator('select[name="responsibleUserId"]').selectOption({ index: 1 });
     await dialog.locator("button[type=submit]").first().click();
 
     await expect(dialog).toHaveCount(0, { timeout: 15_000 });
