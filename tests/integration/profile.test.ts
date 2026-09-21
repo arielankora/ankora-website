@@ -137,8 +137,8 @@ describe("updateOwnName() / updateOwnTimezone()", () => {
     const event = await prisma.auditEvent.findFirst({
       where: { actorId: user.id, action: "profile.name_update" },
     });
-    expect(JSON.stringify(event?.before)).toContain(original);
-    expect(JSON.stringify(event?.after)).toContain("שם חדש");
+    expect(JSON.stringify(event?.beforeJson)).toContain(original);
+    expect(JSON.stringify(event?.afterJson)).toContain("שם חדש");
   });
 
   it("refuses an empty timezone", async () => {

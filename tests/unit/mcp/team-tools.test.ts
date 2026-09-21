@@ -28,7 +28,13 @@ const domain = vi.hoisted(() => ({
   updateActiveTimerNote: vi.fn(),
   createManualEntry: vi.fn(),
   listMyTimeEntries: vi.fn(async () => []),
-  listTimeEntriesForAdmin: vi.fn(async () => [] as unknown[]),
+  // Parameters are declared rather than omitted: `vi.fn(async () => [])`
+  // types its own mock.calls as `[]`, so reading the arguments back needs
+  // a cast through `unknown` - the kind that silently stops checking.
+  listTimeEntriesForAdmin: vi.fn(
+    async (_filters: { userId?: string; clientId?: string; from?: Date; to?: Date } = {}) =>
+      [] as unknown[],
+  ),
   combineWallClockTime: vi.fn(),
 }));
 
@@ -82,6 +88,16 @@ vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
 vi.mock("@/lib/app-auth/permissions", () => permissions);
+// Serialisation turns a full entry row into the tool's wire shape and
+// would throw on the skeleton objects below. What is under test here is
+// the gate and the query, not the field mapping - which has its own
+// tests - so it is stubbed to something inspectable.
+vi.mock("@/lib/mcp/serialize", () => ({
+  serializeTimeEntry: (e: { id: string }) => ({ id: e.id }),
+  serializeTeamTimeEntry: (e: { id: string }) => ({ id: e.id }),
+  serializeClient: (c: { id: string; name: string }) => c,
+  elapsedMinutes: () => 0,
+}));
 
 import { registerAnkoraTools } from "@/lib/mcp/tools";
 
@@ -208,9 +224,7 @@ describe("list_team_time_entries", () => {
   it("reads the date window in the actor's timezone, not the server's", async () => {
     await tools.get("list_team_time_entries")!.handler({ from: "2026-09-01", to: "2026-10-01" }, CTX);
 
-    const [args] = domain.listTimeEntriesForAdmin.mock.calls[0] as [
-      { from?: Date; to?: Date },
-    ];
+    const [args] = domain.listTimeEntriesForAdmin.mock.calls[0];
     // Israeli midnight on 1 September is 21:00 UTC on 31 August (IDT,
     // UTC+3). A UTC-midnight window would silently move three hours of
     // one month's work into the next one's answer.

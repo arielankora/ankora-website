@@ -52,30 +52,50 @@ async function createClient(page: import("@playwright/test").Page, name: string)
   });
 }
 
-/** Pick an option by its visible label, which is the client's name. */
-async function selectClientByName(
+/**
+ * Create a client, then land on its hour-bank screen.
+ *
+ * The screen is driven by a `clientId` search param, not by a select on
+ * the page - the first version of this file assumed a select and every
+ * test failed on a locator that never existed. So the id comes from the
+ * link the clients list renders for the row just created, which is the
+ * same place a person would get it.
+ */
+async function createClientAndOpenItsBank(
   page: import("@playwright/test").Page,
-  selectName: string,
-  clientName: string,
-) {
-  const select = page.locator(`select[name="${selectName}"]`).first();
-  await expect(select).toBeVisible();
-  await select.selectOption({ label: clientName });
+  name: string,
+): Promise<void> {
+  await createClient(page, name);
+
+  const row = page.getByText(name, { exact: false }).first();
+  await expect(row).toBeVisible({ timeout: 15_000 });
+  const href = await row.locator("xpath=ancestor-or-self::a[1]").getAttribute("href");
+  const clientId = href?.split("/app/clients/")[1];
+  expect(clientId, `could not find the id of the client just created (${name})`).toBeTruthy();
+
+  await page.goto(`/app/hour-banks?clientId=${clientId}`, { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(name, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
+}
+
+/** Open the "new cycle" drawer and return its form scope. */
+async function openCycleDrawer(page: import("@playwright/test").Page) {
+  await page.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  return dialog;
 }
 
 test.describe("opening a cycle", () => {
   test("a cycle opened from the form shows its purchased minutes back", async ({ page }) => {
     const clientName = tag("[E2E] בנק");
-    await createClient(page, clientName);
+    await createClientAndOpenItsBank(page, clientName);
 
-    await page.goto("/app/hour-banks");
-    await selectClientByName(page, "clientId", clientName);
+    const dialog = await openCycleDrawer(page);
+    await dialog.locator('input[name="cycleStart"]').fill(isoDay(-7));
+    await dialog.locator('input[name="cycleEnd"]').fill(isoDay(23));
+    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
 
-    await page.locator('input[name="cycleStart"]').first().fill(isoDay(-7));
-    await page.locator('input[name="cycleEnd"]').first().fill(isoDay(23));
-    await page.locator('input[name="purchasedMinutes"]').first().fill("600");
-
-    await page.getByRole("button", { name: /פתיחת מחזור|פתח מחזור|שמירה/ }).first().click();
     await page.waitForLoadState("networkidle");
     await page.reload();
 
@@ -91,39 +111,36 @@ test.describe("opening a cycle", () => {
 
   test("refuses a cycle that ends before it starts, and says so", async ({ page }) => {
     const clientName = tag("[E2E] בנק-הפוך");
-    await createClient(page, clientName);
+    await createClientAndOpenItsBank(page, clientName);
 
-    await page.goto("/app/hour-banks");
-    await selectClientByName(page, "clientId", clientName);
-
+    const dialog = await openCycleDrawer(page);
     // Deliberately inverted. The domain refuses this; what is under test
     // here is that the refusal reaches the person instead of surfacing as
     // a blank screen or a silent no-op.
-    await page.locator('input[name="cycleStart"]').first().fill(isoDay(23));
-    await page.locator('input[name="cycleEnd"]').first().fill(isoDay(-7));
-    await page.locator('input[name="purchasedMinutes"]').first().fill("600");
+    await dialog.locator('input[name="cycleStart"]').fill(isoDay(23));
+    await dialog.locator('input[name="cycleEnd"]').fill(isoDay(-7));
+    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
 
-    await page.getByRole("button", { name: /פתיחת מחזור|פתח מחזור|שמירה/ }).first().click();
     await page.waitForLoadState("networkidle");
-
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
-    // Still on the form, not redirected into a success state.
-    await expect(page.locator('input[name="purchasedMinutes"]').first()).toBeVisible();
+    // The drawer stays open on a refusal rather than closing as if it worked.
+    await expect(dialog.locator('input[name="purchasedMinutes"]')).toBeVisible();
   });
 });
 
 test.describe("recording an adjustment", () => {
   test("an adjustment requires a reason, and the form does not submit without one", async ({ page }) => {
     const clientName = tag("[E2E] תיאום");
-    await createClient(page, clientName);
+    await createClientAndOpenItsBank(page, clientName);
 
-    await page.goto("/app/hour-banks");
-    await selectClientByName(page, "clientId", clientName);
-    await page.locator('input[name="cycleStart"]').first().fill(isoDay(-7));
-    await page.locator('input[name="cycleEnd"]').first().fill(isoDay(23));
-    await page.locator('input[name="purchasedMinutes"]').first().fill("600");
-    await page.getByRole("button", { name: /פתיחת מחזור|פתח מחזור|שמירה/ }).first().click();
+    const dialog = await openCycleDrawer(page);
+    await dialog.locator('input[name="cycleStart"]').fill(isoDay(-7));
+    await dialog.locator('input[name="cycleEnd"]').fill(isoDay(23));
+    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
+
     await page.waitForLoadState("networkidle");
     await page.reload();
 

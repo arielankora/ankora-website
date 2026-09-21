@@ -57,7 +57,12 @@ test.describe("the portal itself", () => {
       const shutOut =
         page.url().includes("/app/login") ||
         page.url().includes("/app/portal") ||
-        /אין הרשאה|אין לך גישה|Forbidden|404|לא נמצא/.test(body);
+        // The exact string the shared 403 component renders. An
+        // approximation of it passed review and failed the run: the
+        // component says "אין לך הרשאה", and my paraphrase said
+        // "אין הרשאה" - which matched nothing and reported a correctly
+        // gated screen as a leak.
+        /אין לך הרשאה|Forbidden|404|לא נמצא/.test(body);
 
       expect(shutOut, `${route} rendered for a client user`).toBe(true);
       expect(body, `${route} leaked another client's name`).not.toContain("[DEMO] קבוצת מרידיאן");
