@@ -7,20 +7,31 @@ import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import {
   elapsedMinutes,
   serializeClient,
+  serializeTask,
   serializeTeamTimeEntry,
   serializeTimeEntry,
   type SerializedTimeEntry,
+  type TaskLike,
 } from "@/lib/mcp/serialize";
 import {
   canSeeOthersTime,
+  lookupAssignee,
   lookupCategory,
   lookupClient,
+  lookupTask,
   lookupTeamMember,
   teamMembers,
   usableCategories,
 } from "@/lib/mcp/lookup";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
+import {
+  OPEN_STATUSES,
+  assignableUsers,
+  createTask,
+  listTasks,
+  updateTask,
+} from "@/lib/app-domain/tasks";
 import {
   combineWallClockTime,
   createManualEntry,
@@ -288,10 +299,14 @@ export function registerAnkoraTools(server: McpServer): void {
         client: z.string().describe("Client name, exactly as list_my_clients returned it."),
         category: z.string().describe("Category name, exactly as list_categories returned it for this client."),
         note: z.string().optional().describe("What the user is working on. Free text, shown in Ankora."),
+        task: z
+          .string()
+          .optional()
+          .describe("Title of an existing Ankora task to log this time against. Use list_tasks to find it."),
       }),
       annotations: WRITES,
     },
-    async (args: { client: string; category: string; note?: string }, ctx: ServerContext) => {
+    async (args: { client: string; category: string; note?: string; task?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
@@ -299,16 +314,31 @@ export function registerAnkoraTools(server: McpServer): void {
         const category = await lookupCategory(actor, client.value.id, args.category);
         if (!category.ok) return toolText(category.message);
 
+        // Phase 16: TimeEntry.taskId and startTimer's input have accepted a
+        // task since Phase 2 - the MCP surface simply never passed one, so
+        // "start a timer on this task" was impossible through Claude while
+        // being a single field in the app.
+        let taskId: string | null = null;
+        let taskTitle: string | null = null;
+        if (args.task) {
+          const task = await lookupTask(actor, args.task, { clientId: client.value.id });
+          if (!task.ok) return toolText(task.message);
+          taskId = task.value.id;
+          taskTitle = task.value.name;
+        }
+
         const entry = await startTimer(actor, {
           clientId: client.value.id,
           categoryId: category.value.id,
           note: args.note ?? null,
+          taskId,
           createdVia: "MCP",
         });
         return toolJson({
           started: true,
           client: client.value.name,
           category: category.value.name,
+          task: taskTitle,
           startAt: entry.startAt.toISOString(),
           entryId: entry.id,
         });
@@ -394,6 +424,10 @@ export function registerAnkoraTools(server: McpServer): void {
         start: CLOCK.describe("Start time, 24-hour HH:MM."),
         end: CLOCK.describe("End time, 24-hour HH:MM. Must be after start."),
         note: z.string().optional().describe("What the work was."),
+        task: z
+          .string()
+          .optional()
+          .describe("Title of an existing Ankora task this time belongs to. Use list_tasks to find it."),
         backdateReason: z
           .string()
           .optional()
@@ -409,6 +443,7 @@ export function registerAnkoraTools(server: McpServer): void {
         start: string;
         end: string;
         note?: string;
+        task?: string;
         backdateReason?: string;
       },
       ctx: ServerContext
@@ -434,12 +469,22 @@ export function registerAnkoraTools(server: McpServer): void {
           );
         }
 
+        let taskId: string | null = null;
+        let taskTitle: string | null = null;
+        if (args.task) {
+          const task = await lookupTask(actor, args.task, { clientId: client.value.id });
+          if (!task.ok) return toolText(task.message);
+          taskId = task.value.id;
+          taskTitle = task.value.name;
+        }
+
         const entry = await createManualEntry(actor, actor.id, {
           clientId: client.value.id,
           categoryId: category.value.id,
           startAt,
           endAt,
           note: args.note ?? null,
+          taskId,
           backdateReason: args.backdateReason ?? null,
           createdVia: "MCP",
         });
@@ -448,6 +493,7 @@ export function registerAnkoraTools(server: McpServer): void {
           entryId: entry.id,
           client: client.value.name,
           category: category.value.name,
+          task: taskTitle,
           startAt: entry.startAt.toISOString(),
           endAt: entry.endAt ? entry.endAt.toISOString() : null,
           actualMinutes: entry.actualSeconds === null ? null : Math.round(entry.actualSeconds / 60),
@@ -455,6 +501,316 @@ export function registerAnkoraTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] create_time_entry failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // ---------------------------------------------------------------- tasks
+  //
+  // Phase 16. Tasks existed in Ankora since Phase 9, with assignee and due
+  // date added in Phase 10 and written by the important-dates job ever
+  // since - but no read or write path exposed either. The domain functions
+  // these tools call were completed in the same change; see the Phase 16
+  // note at the top of lib/app-domain/tasks.ts.
+  //
+  // Note what these tools do NOT assert: `time_entry.edit_others`. Task
+  // visibility has always followed client access, not the hours
+  // permission, and assignableUsers() keeps assignment inside the same
+  // boundary.
+
+  server.registerTool(
+    "list_tasks",
+    {
+      title: "List tasks",
+      description:
+        "Lists Ankora tasks on the clients the signed-in employee works with. Defaults to unfinished tasks (open and in progress) assigned to nobody in particular - pass `mine: true` for the user's own plate, or `overdue: true` for anything past its due date. Answers 'what do I need to do today', 'what's overdue', 'what's open on this client'.",
+      inputSchema: z.object({
+        client: z.string().optional().describe("Client name, exactly as list_my_clients returned it. Omit for all."),
+        mine: z.boolean().optional().describe("Only tasks assigned to the signed-in employee."),
+        person: z
+          .string()
+          .optional()
+          .describe("Only tasks assigned to this colleague, by name or email. Requires `client`. Ignored when `mine` is set."),
+        unassigned: z.boolean().optional().describe("Only tasks with nobody assigned."),
+        overdue: z.boolean().optional().describe("Only tasks whose due date has passed."),
+        dueBy: DATE.optional().describe("Only tasks due on or before this date, YYYY-MM-DD."),
+        includeDone: z.boolean().optional().describe("Include completed and archived tasks. Off by default."),
+        limit: z.number().int().min(1).max(MAX_ENTRIES).optional(),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (
+      args: {
+        client?: string;
+        mine?: boolean;
+        person?: string;
+        unassigned?: boolean;
+        overdue?: boolean;
+        dueBy?: string;
+        includeDone?: boolean;
+        limit?: number;
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+
+        let clientId: string | undefined;
+        let clientName: string | null = null;
+        if (args.client) {
+          const client = await lookupClient(actor, args.client);
+          if (!client.ok) return toolText(client.message);
+          clientId = client.value.id;
+          clientName = client.value.name;
+        }
+
+        let assignedToId: string | undefined;
+        if (args.mine) {
+          assignedToId = actor.id;
+        } else if (args.person) {
+          if (!clientId) {
+            return toolText(
+              "Filtering by colleague needs a client too, because who may be assigned work is decided per client. Pass `client` as well, or use `mine` for your own tasks."
+            );
+          }
+          const person = await lookupAssignee(actor, clientId, args.person);
+          if (!person.ok) return toolText(person.message);
+          assignedToId = person.value.id;
+        }
+
+        const now = new Date();
+        // `overdue` and `dueBy` are the same filter with a different
+        // cutoff; when both arrive, the tighter one wins rather than
+        // silently dropping one of the user's two conditions.
+        const dueBy = args.dueBy ? localDateTimeToUtc(args.dueBy, "23:59", actor.timezone) : undefined;
+        const dueBefore =
+          args.overdue && dueBy ? new Date(Math.min(now.getTime(), dueBy.getTime())) : args.overdue ? now : dueBy;
+
+        const tasks = await listTasks(actor, {
+          clientId,
+          assignedToId,
+          unassigned: args.unassigned || undefined,
+          dueBefore,
+          statusIn: args.includeDone ? undefined : OPEN_STATUSES,
+        });
+
+        const page = tasks.slice(0, args.limit ?? MAX_ENTRIES);
+        return toolJson({
+          client: clientName,
+          count: page.length,
+          truncated: tasks.length > page.length,
+          totalMatching: tasks.length,
+          userTimezone: actor.timezone,
+          tasks: page.map((t: TaskLike) => serializeTask(t, { timeZone: actor.timezone, now })),
+        });
+      } catch (err) {
+        console.error("[mcp] list_tasks failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_assignable_people",
+    {
+      title: "List who a task can be assigned to",
+      description:
+        "Lists the colleagues who can be given a task on one client. Only people with access to that client appear, because anyone else would never see the task. Call this before assigning work to someone, and use the names exactly as returned.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (args: { client: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const people = await assignableUsers(actor, client.value.id);
+        return toolJson({ client: client.value.name, count: people.length, people });
+      } catch (err) {
+        console.error("[mcp] list_assignable_people failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_task",
+    {
+      title: "Open a task",
+      description:
+        "Creates a new Ankora task on one client. The task is visible to everyone who works on that client. Assigning it to a colleague is allowed only if they have access to that client - call list_assignable_people first if unsure. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
+        category: z.string().optional().describe("Category name, as list_categories returned it for this client."),
+        assignTo: z
+          .string()
+          .optional()
+          .describe("Colleague's name or email. Omit to leave it unassigned; pass the user's own name for themselves."),
+        due: DATE.optional().describe("Due date, YYYY-MM-DD. Treated as the end of that day in the user's timezone."),
+      }),
+      annotations: WRITES,
+    },
+    async (
+      args: { client: string; title: string; category?: string; assignTo?: string; due?: string },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+
+        let categoryId: string | null = null;
+        let categoryName: string | null = null;
+        if (args.category) {
+          const category = await lookupCategory(actor, client.value.id, args.category);
+          if (!category.ok) return toolText(category.message);
+          categoryId = category.value.id;
+          categoryName = category.value.name;
+        }
+
+        let assignedToId: string | null = null;
+        let assigneeName: string | null = null;
+        if (args.assignTo) {
+          const person = await lookupAssignee(actor, client.value.id, args.assignTo);
+          if (!person.ok) return toolText(person.message);
+          assignedToId = person.value.id;
+          assigneeName = person.value.name;
+        }
+
+        const task = await createTask(actor, {
+          clientId: client.value.id,
+          categoryId,
+          title: args.title,
+          assignedToId,
+          // End of the due day, not its start: a task due today should not
+          // read as overdue at nine in the morning.
+          dueDate: args.due ? localDateTimeToUtc(args.due, "23:59", actor.timezone) : null,
+        });
+
+        return toolJson({
+          created: true,
+          taskId: task.id,
+          title: task.title,
+          client: client.value.name,
+          category: categoryName,
+          assignedTo: assigneeName,
+          dueDate: args.due ?? null,
+          status: task.status,
+        });
+      } catch (err) {
+        console.error("[mcp] create_task failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "update_task",
+    {
+      title: "Update a task",
+      description:
+        "Changes an existing Ankora task: its status, owner, due date, title or category. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string.",
+      inputSchema: z.object({
+        task: z.string().describe("The task's title, or enough of it to identify it."),
+        client: z.string().optional().describe("Client name, to disambiguate when several tasks share a title."),
+        includeDone: z
+          .boolean()
+          .optional()
+          .describe("Look among completed and archived tasks too - needed to reopen something already finished."),
+        status: z
+          .enum(["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"])
+          .optional()
+          .describe("New status. DONE means finished; ARCHIVED means dropped without being done."),
+        title: z.string().min(1).optional().describe("New title, replacing the old one."),
+        category: z.string().optional().describe("New category, as list_categories returned it for this client."),
+        assignTo: z.string().optional().describe("Colleague's name or email to hand it to."),
+        clearAssignee: z.boolean().optional().describe("Remove the current owner, leaving it unassigned."),
+        due: DATE.optional().describe("New due date, YYYY-MM-DD."),
+        clearDue: z.boolean().optional().describe("Remove the due date."),
+      }),
+      annotations: { ...WRITES, idempotentHint: true },
+    },
+    async (
+      args: {
+        task: string;
+        client?: string;
+        includeDone?: boolean;
+        status?: "OPEN" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
+        title?: string;
+        category?: string;
+        assignTo?: string;
+        clearAssignee?: boolean;
+        due?: string;
+        clearDue?: boolean;
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+
+        if (args.assignTo && args.clearAssignee) {
+          return toolText("Pass either assignTo or clearAssignee, not both - they contradict each other.");
+        }
+        if (args.due && args.clearDue) {
+          return toolText("Pass either due or clearDue, not both - they contradict each other.");
+        }
+
+        let clientId: string | undefined;
+        if (args.client) {
+          const client = await lookupClient(actor, args.client);
+          if (!client.ok) return toolText(client.message);
+          clientId = client.value.id;
+        }
+
+        const found = await lookupTask(actor, args.task, {
+          clientId,
+          includeClosed: args.includeDone,
+        });
+        if (!found.ok) return toolText(found.message);
+
+        // The task's OWN client, not the optional `client` argument: that
+        // one is only a disambiguation hint and may well be absent, while
+        // an assignee or a category must be validated against the client
+        // the task actually sits on.
+        const taskClientId = found.value.clientId;
+
+        const patch: Parameters<typeof updateTask>[2] = {};
+        if (args.status !== undefined) patch.status = args.status;
+        if (args.title !== undefined) patch.title = args.title;
+        if (args.clearAssignee) patch.assignedToId = null;
+        if (args.clearDue) patch.dueDate = null;
+        if (args.due !== undefined) patch.dueDate = localDateTimeToUtc(args.due, "23:59", actor.timezone);
+
+        if (args.category !== undefined) {
+          const category = await lookupCategory(actor, taskClientId, args.category);
+          if (!category.ok) return toolText(category.message);
+          patch.categoryId = category.value.id;
+        }
+        if (args.assignTo !== undefined) {
+          const person = await lookupAssignee(actor, taskClientId, args.assignTo);
+          if (!person.ok) return toolText(person.message);
+          patch.assignedToId = person.value.id;
+        }
+
+        if (Object.keys(patch).length === 0) {
+          return toolText("Nothing to change - pass at least one of status, title, category, assignTo or due.");
+        }
+
+        const updated = await updateTask(actor, found.value.id, patch);
+        return toolJson({
+          updated: true,
+          taskId: updated.id,
+          title: updated.title,
+          status: updated.status,
+          client: found.value.clientName,
+          changed: Object.keys(patch),
+        });
+      } catch (err) {
+        console.error("[mcp] update_task failed", err);
         return toolFailure(err);
       }
     }
