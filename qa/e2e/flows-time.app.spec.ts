@@ -195,6 +195,9 @@ test.describe("tasks/actions - create and complete", () => {
     await dialog.locator('input[name="title"]').fill(title);
     await dialog.getByRole("button", { name: "הוספת משימה" }).click();
 
+    // Same as the other drawers: read the row back off a fresh render rather
+    // than trusting the drawer to have closed.
+    await page.reload();
     await expect(page.getByText(title, { exact: true }), "the task was not created").toBeVisible({ timeout: 15_000 });
 
     // The row's toggle is a `role="checkbox"` button sitting as the immediate
