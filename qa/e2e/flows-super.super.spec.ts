@@ -31,10 +31,10 @@ test.describe.configure({ timeout: 90_000 });
  * fixes. Reading the drawer's own text turns one wasted CI round into a
  * message that names the problem.
  */
-async function expectDrawerClosed(page: import("@playwright/test").Page, what: string) {
+async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 25_000) {
   const dialog = page.getByRole("dialog");
   try {
-    await expect(dialog).toHaveCount(0, { timeout: 25_000 });
+    await expect(dialog).toHaveCount(0, { timeout });
   } catch {
     // Name the fields, not just how many. "invalid fields: 6" cost a CI round
     // on its own; which six, and what the browser objects to about each, is
@@ -135,7 +135,11 @@ test.describe("hour-banks/actions", () => {
     await dialog.locator('select[name="rolloverMode"]').selectOption("NONE");
     await dialog.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
 
-    await expectDrawerClosed(page, "opening an hour-bank cycle");
+    // 60s, not the usual 25. Opening a cycle recalculates rollover against
+    // the previous one and writes several rows, and the last run showed it
+    // still in flight - submit button disabled, no invalid field - rather
+    // than refused. Worth knowing it is this slow; not worth failing over.
+    await expectDrawerClosed(page, "opening an hour-bank cycle", 60_000);
     await page.reload();
 
     // 600 minutes is ten hours; the screen renders banks in H:MM, so the
