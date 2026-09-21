@@ -465,10 +465,21 @@ string that could not be filtered for.
 
 Fixed here, alongside the revoke labels. The lesson is the ordinary one:
 `classifyAction` and `ACTION_LABEL` are a second place that every new
-audited action has to be registered, and nothing enforces it. A test
-asserting that every `recordAudit` call site in `lib/` has a label would
-close that permanently, and is worth doing the next time a third action
-slips through.
+audited action has to be registered, and nothing enforced it.
+
+Followed up immediately rather than waiting for a third occurrence,
+because pulling the thread found fourteen more: the whole of Phase 10's
+important-dates and reminder-rule actions, `profile.name_update`,
+`profile.notification_preference_update`, `task.update`,
+`client.restore` and `backup.nightly_export.sent` were all rendering as
+raw English, and five entity types (`Task`, `ImportantDate`,
+`ReminderRule`, `HolidayCalendarSubscription`, `System`) could not be
+selected in the filter at all. The two registries now live in
+`audit-log/labels.ts`, and `tests/unit/audit-labels.test.ts` scans every
+`recordAudit` call site in `lib/` and `app/` and fails on an
+unregistered action or entity type — in both directions, so a label left
+behind by a deleted call site is caught too. Verified by removing a
+label and an entity type and watching it fail on exactly those.
 
 ---
 
