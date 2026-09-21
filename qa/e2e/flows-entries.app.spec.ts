@@ -113,7 +113,12 @@ test.describe("filing time for someone else", () => {
     await expect(
       page.getByText(note, { exact: false }).first(),
       `the entry was not created${refusal ? ` - the form said: ${refusal[0]}` : ""}`,
-    ).toBeVisible({ timeout: 15_000 });
+      // 30s, matching the client-creation helper, and for the same
+      // reason: the write revalidates the dashboard, and the dashboard
+      // issues one hour-bank query per active client. The form said
+      // nothing when this flaked, which rules out a refusal and leaves
+      // only "not finished yet".
+    ).toBeVisible({ timeout: 30_000 });
   });
 
   test("refuses an end time before the start, without creating anything", async ({ page }) => {
