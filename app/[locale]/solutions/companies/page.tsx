@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getDictionary, type Locale } from "@/content";
 import { SegmentPage } from "@/components/sections/SegmentPage";
+import { getStoriesForSolution } from "@/lib/customer-stories";
 
 const meta = {
   en: {
@@ -49,6 +50,7 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
       locale={locale}
       cta={dict.hero.ctaPrimary}
       currentHref="/solutions/companies"
+      stories={getStoriesForSolution(locale, "/solutions/companies", 2)}
     />
   );
 }

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { MARKETING_ROUTES, isRealConsoleError } from "./routes";
+import { MARKETING_ROUTES, CUSTOMER_STORY_ROUTES, isRealConsoleError } from "./routes";
 
 // The marketing sweep.
 //
@@ -108,5 +108,151 @@ test.describe("the product is not publicly indexable", () => {
     // The other half of the ADR-0002 incident: sitemap entries on the
     // non-www host, redirecting to a page whose canonical points back.
     expect(xml).not.toMatch(/<loc>https:\/\/ankora\.co\.il/);
+  });
+});
+
+test.describe("customer stories", () => {
+  // @covers page:/[locale]/customer-stories/[slug]
+  //
+  // Declared rather than inferred, and this is the case the escape hatch was
+  // written for. The tests below really do load every published story page, but
+  // they get the URLs from CUSTOMER_STORY_ROUTES, which builds them from the
+  // content at run time - so the literal `[slug]` path the scanner looks for
+  // appears nowhere, and cannot, without typing out an inventory that goes
+  // stale the day story #2 publishes. The alternative was a hand-written list,
+  // which is the thing routes.ts exists to avoid.
+
+  // The hub itself is already swept above - it is a marketing page and the
+  // manifest found it. Story pages are not: the sweep excludes dynamic routes
+  // because /customer-stories/[slug] needs a real slug. These are the checks
+  // that are specific to this section rather than true of every page.
+
+  for (const route of CUSTOMER_STORY_ROUTES) {
+    test(`${route} renders and is indexable`, async ({ page }) => {
+      const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+      expect(response?.status(), `${route} HTTP status`).toBe(200);
+      await expect(page.locator("h1").first()).toBeVisible();
+
+      const robots = await page.locator('meta[name="robots"]').first().getAttribute("content");
+      expect(robots ?? "", `${route} must not be noindex`).not.toContain("noindex");
+    });
+  }
+
+  for (const route of ["/he/customer-stories", "/en/customer-stories", ...CUSTOMER_STORY_ROUTES]) {
+    test(`${route} declares a self-referencing canonical and both hreflangs`, async ({ page }) => {
+      await page.goto(route);
+
+      const canonical = await page.locator('link[rel="canonical"]').first().getAttribute("href");
+      expect(canonical, `${route} has a canonical`).toBeTruthy();
+      expect(canonical, `${route} canonical uses the www host`).toContain("www.ankora.co.il");
+      expect(canonical!.endsWith(route) || canonical!.endsWith(`${route}/`), `${route} canonical is self-referencing`).toBe(true);
+
+      const langs = await page
+        .locator("link[rel=alternate][hreflang]")
+        .evaluateAll((nodes) => nodes.map((n) => n.getAttribute("hreflang")));
+      expect(langs, `${route} hreflang pair`).toEqual(expect.arrayContaining(["he", "en"]));
+    });
+  }
+
+  for (const route of ["/he/customer-stories", "/en/customer-stories", ...CUSTOMER_STORY_ROUTES]) {
+    test(`${route} emits parseable structured data with no rating claim`, async ({ page }) => {
+      await page.goto(route);
+
+      const blocks = await page
+        .locator('script[type="application/ld+json"]')
+        .evaluateAll((nodes) => nodes.map((n) => n.textContent ?? ""));
+      expect(blocks.length, `${route} has JSON-LD`).toBeGreaterThan(0);
+
+      const types = blocks.flatMap((raw) => {
+        // Parsing is itself the assertion: a JSON-LD block that does not parse
+        // is invisible to a crawler and silent in a build log.
+        const parsed = JSON.parse(raw);
+        return (Array.isArray(parsed) ? parsed : [parsed]).map((o) => o["@type"]);
+      });
+
+      // Never a rating or a review corpus - Ankora has neither, and claiming
+      // one in markup is the kind of thing that earns a manual action.
+      //
+      // Checked against the parsed @type values and key names, not against the
+      // raw text: a substring search would also fire on a customer whose title
+      // happens to contain the word, which would be a false accusation of the
+      // one thing this test exists to police.
+      const claims = blocks.flatMap((raw) => {
+        const found: string[] = [];
+        JSON.parse(raw, function (key, value) {
+          if (["ratingValue", "reviewCount", "ratingCount", "aggregateRating", "review"].includes(key)) {
+            found.push(`key ${key}`);
+          }
+          if (key === "@type" && ["Review", "AggregateRating", "Rating"].includes(value)) {
+            found.push(`@type ${value}`);
+          }
+          return value;
+        });
+        return found;
+      });
+      expect(claims, `${route} must claim no rating or review`).toEqual([]);
+      expect(types, `${route} emits a BreadcrumbList`).toContain("BreadcrumbList");
+    });
+  }
+
+  // A page no plain <a> reaches is a page a crawler does not reach either, and
+  // the brief names four entry points rather than one. Checked as real anchors
+  // in the rendered DOM, not as strings in the source, because a link behind a
+  // click handler satisfies neither a crawler nor a keyboard.
+  const ENTRY_POINTS = [
+    { from: "/he", where: "footer" },
+    { from: "/he/personal-operations-management", where: "body" },
+    { from: "/he/solutions/executives", where: "body" },
+  ];
+
+  for (const { from, where } of ENTRY_POINTS) {
+    test(`${from} links to the hub - no orphan`, async ({ page }) => {
+      await page.goto(from);
+      const link = page.locator(`${where} a[href="/he/customer-stories"]`);
+      await expect(link.first(), `${from} has no link to the hub`).toBeAttached();
+    });
+  }
+
+  test("the footer link is present on a story page too, so the section is navigable from inside it", async ({ page }) => {
+    const route = CUSTOMER_STORY_ROUTES.find((r) => r.startsWith("/he/"));
+    test.skip(!route, "no published Hebrew story");
+    await page.goto(route!);
+    await expect(page.locator('footer a[href="/he/customer-stories"]').first()).toBeAttached();
+  });
+
+  test("the sitemap lists the hub and every published story, in both locales", async ({ page }) => {
+    const xml = await (await page.request.get("/sitemap.xml")).text();
+    for (const route of ["/he/customer-stories", "/en/customer-stories", ...CUSTOMER_STORY_ROUTES]) {
+      const loc = `<loc>https://www.ankora.co.il${route}</loc>`;
+      expect(xml.split(loc).length - 1, `${route} appears exactly once in the sitemap`).toBe(1);
+    }
+    // A Hebrew-slugged URL would be percent-encoded into an unreadable <loc>
+    // and would not match the page the router actually serves.
+    expect(xml, "sitemap contains a non-ASCII slug").not.toMatch(/<loc>[^<]*[\u0590-\u05FF][^<]*<\/loc>/);
+  });
+
+  test("Hebrew on a story page is neither letter-spaced nor forced left-to-right", async ({ page }) => {
+    const route = CUSTOMER_STORY_ROUTES.find((r) => r.startsWith("/he/"));
+    test.skip(!route, "no published Hebrew story");
+    await page.goto(route!);
+
+    const faults = await page.evaluate(() => {
+      const hebrew = /[\u0590-\u05FF]/;
+      const out: string[] = [];
+      for (const el of Array.from(document.querySelectorAll("body *"))) {
+        const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && hebrew.test(n.textContent ?? ""));
+        if (!own) continue;
+        const cs = getComputedStyle(el);
+        const text = (el.textContent ?? "").trim().slice(0, 40);
+        // Positive tracking on Hebrew: the letters come apart. MonoLabel's
+        // rtl:tracking-normal is what is meant to prevent this.
+        if (parseFloat(cs.letterSpacing) > 0.01) out.push(`letter-spaced: ${text}`);
+        // A Hebrew run inside a forced LTR box comes out with its words mirrored.
+        if (el.closest('[dir="ltr"]')) out.push(`forced ltr: ${text}`);
+      }
+      return out;
+    });
+
+    expect(faults, "Hebrew typography faults").toEqual([]);
   });
 });

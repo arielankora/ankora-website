@@ -11,6 +11,8 @@ import { RelatedLinks } from "@/components/sections/RelatedLinks";
 import { SummaryPanel } from "@/components/sections/SummaryPanel";
 import { LongFormNav } from "@/components/sections/LongFormNav";
 import { LongFormSection, Prose, ItemGrid, SubSection } from "@/components/sections/LongForm";
+import { CustomerProof } from "@/components/sections/CustomerProof";
+import { getStoriesForSolution } from "@/lib/customer-stories";
 import { WideContainer } from "@/components/ui/WideContainer";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Button } from "@/components/ui/Button";
@@ -38,6 +40,7 @@ export function PersonalOperationsManagementPage({
   const seo = dict.pages.seo;
   const minutes = readingMinutes(p);
   const updated = contentUpdated(locale, seo);
+  const proof = getStoriesForSolution(locale, "/personal-operations-management", 2);
 
   const sections: { title: string; body: React.ReactNode }[] = [
     {
@@ -197,6 +200,8 @@ export function PersonalOperationsManagementPage({
           </article>
         </div>
       </WideContainer>
+
+      <CustomerProof locale={locale} stories={proof} />
 
       <section className="mt-[clamp(56px,7vw,100px)] border-t border-[rgba(243,234,219,0.12)] py-[clamp(48px,7vw,96px)] text-center">
         <WideContainer>

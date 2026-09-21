@@ -953,6 +953,20 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-09-21"
+    },
+    "page:/[locale]/customer-stories": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-21"
+    },
+    "page:/[locale]/customer-stories/[slug]": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-21"
     }
   },
   "waivers": {},

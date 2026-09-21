@@ -10,6 +10,8 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Button } from "@/components/ui/Button";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
+import { CustomerProof } from "@/components/sections/CustomerProof";
+import type { CustomerStory } from "@/content/customer-stories/types";
 import { withLocale } from "@/lib/nav";
 
 /**
@@ -28,12 +30,14 @@ export function SegmentPage({
   locale,
   cta,
   currentHref,
+  stories = [],
 }: {
   content: SegmentContent;
   dict: Dictionary;
   locale: Locale;
   cta: string;
   currentHref: string;
+  stories?: CustomerStory[];
 }) {
   const bridge = dict.pages.segmentBridge;
   const otherSolutions = dict.nav.solutionsMenu.filter((item) => item.href !== currentHref);
@@ -107,6 +111,8 @@ export function SegmentPage({
           </p>
         </Reveal>
       </SectionShell>
+
+      <CustomerProof locale={locale} stories={stories} />
 
       {otherSolutions.length > 0 && (
         <SectionShell>

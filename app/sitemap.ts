@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getAllPosts } from "@/lib/blog";
+import { getAllStories } from "@/lib/customer-stories";
 import { SITE_URL } from "@/lib/site";
 
 // Priority reflects position in the information architecture, not ranking intent.
@@ -9,6 +10,9 @@ const routes: { path: string; priority: number; changeFrequency: MetadataRoute.S
   { path: "/ankora-vs-personal-assistant", priority: 0.9, changeFrequency: "monthly" },
   { path: "/personal-assistant-for-executives", priority: 0.85, changeFrequency: "monthly" },
   { path: "/how-it-works", priority: 0.8, changeFrequency: "monthly" },
+  // The evidence hub: it answers "does this work for people like me", which is the
+  // question immediately after the category page, and it is where the corpus grows.
+  { path: "/customer-stories", priority: 0.8, changeFrequency: "monthly" },
   { path: "/technology", priority: 0.7, changeFrequency: "monthly" },
   { path: "/about", priority: 0.8, changeFrequency: "monthly" },
   { path: "/pricing", priority: 0.8, changeFrequency: "monthly" },
@@ -47,6 +51,16 @@ export default function sitemap(): MetadataRoute.Sitemap {
         lastModified: new Date(post.updatedAt || post.publishedAt),
         changeFrequency: "monthly",
         priority: 0.65,
+      });
+    }
+    // Draft stories are filtered out by getAllStories, so an unapproved story is never
+    // submitted for indexing.
+    for (const story of getAllStories(locale)) {
+      entries.push({
+        url: `${base}/${locale}/customer-stories/${story.slug}`,
+        lastModified: new Date(story.updatedDate || story.publishedDate),
+        changeFrequency: "yearly",
+        priority: 0.7,
       });
     }
   }

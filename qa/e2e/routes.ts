@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { getAllStories } from "@/lib/customer-stories";
 
 // The list of pages to sweep is derived from qa/manifest.json, not typed
 // out here.
@@ -38,6 +39,20 @@ export const APP_SCREENS: string[] = ids
   .map(([id]) => id.slice("screen:".length))
   .filter((route) => !["/app/login", "/app/forgot-password", "/app/reset-password"].includes(route))
   .sort();
+
+/**
+ * Story pages, which the manifest-derived sweep above cannot reach.
+ *
+ * MARKETING_ROUTES excludes any route with a dynamic segment, because
+ * /customer-stories/[slug] needs a real slug. The corpus is small and every
+ * published story is a page a stranger can land on from search, so they are
+ * listed from the same data the site renders from rather than typed out here -
+ * a story added next month is swept next month, and a story set to `draft`
+ * leaves the sweep on the same edit that removes it from the site.
+ */
+export const CUSTOMER_STORY_ROUTES: string[] = ["he", "en"].flatMap((locale) =>
+  getAllStories(locale as "he" | "en").map((story) => `/${locale}/customer-stories/${story.slug}`),
+);
 
 /** The unauthenticated entry points, which have their own spec. */
 export const AUTH_SCREENS = ["/app/login", "/app/forgot-password", "/app/reset-password"];

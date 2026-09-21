@@ -40,6 +40,16 @@ export default defineConfig({
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
+  // Resolve `@/...` through the app's tsconfig, explicitly.
+  //
+  // Playwright otherwise picks whichever tsconfig sits nearest the spec file,
+  // which today happens to be the right one and tomorrow might not. routes.ts
+  // reads the published customer stories from the same module the site renders
+  // from, so an unresolved alias there does not fail one assertion - it fails
+  // collection for every spec that imports routes.ts, which reads like the
+  // whole suite broke.
+  tsconfig: path.resolve(__dirname, "..", "tsconfig.json"),
+
   reporter: process.env.CI
     ? [["list"], ["json", { outputFile: "./reports/e2e.json" }]]
     : [["list"]],
