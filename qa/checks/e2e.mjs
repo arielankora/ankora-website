@@ -154,9 +154,15 @@ export async function e2e() {
     // This keeps the lines that name a fault and drops the frames, so
     // twelve lines of budget hold twelve distinct problems rather than
     // one problem's plumbing.
+    //
+    // Only [WebServer] lines. Playwright's own reporter writes to the
+    // same stream, so without this the "what the app logged" block fills
+    // up with the test failures printed directly above it - the one
+    // thing the reader already has.
     const seen = new Set();
     const errors = String(r.all ?? "")
       .split("\n")
+      .filter((l) => l.startsWith("[WebServer]"))
       .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
       .filter((l) => l && !/^\s+at\s/.test(l))
       .filter((l) => /error|invalid|timeout|ECONN|Prisma|denied|failed|unhandled/i.test(l))

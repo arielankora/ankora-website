@@ -58,20 +58,31 @@ test.describe("the portal itself", () => {
     // clients' names. A 200 here is the failure.
     for (const route of ["/app/users", "/app/clients", "/app/reports", "/app/audit-log"]) {
       await page.goto(route, { waitUntil: "domcontentloaded" });
-      const body = await page.locator("body").innerText();
 
-      const shutOut =
-        page.url().includes("/app/login") ||
-        page.url().includes("/app/portal") ||
-        // The exact string the shared 403 component renders. An
-        // approximation of it passed review and failed the run: the
-        // component says "אין לך הרשאה", and my paraphrase said
-        // "אין הרשאה" - which matched nothing and reported a correctly
-        // gated screen as a leak.
-        /אין לך הרשאה|Forbidden|404|לא נמצא/.test(body);
+      // Redirected away is shut out, and there is nothing left to read.
+      if (page.url().includes("/app/login") || page.url().includes("/app/portal")) continue;
 
-      expect(shutOut, `${route} rendered for a client user`).toBe(true);
-      expect(body, `${route} leaked another client's name`).not.toContain("[DEMO] קבוצת מרידיאן");
+      // A retrying assertion, not a one-shot innerText read.
+      //
+      // This test failed on the first attempt and passed on the retry,
+      // and reported "/app/users rendered for a client user" - which
+      // reads like an authorisation hole and is not one.
+      // `domcontentloaded` can return before the refusal is painted; the
+      // body is then empty, the regex matches nothing, and a correctly
+      // gated screen is reported as a leak. The scariest possible
+      // failure message, produced by a timing bug in the test.
+      //
+      // The string is the exact one the shared 403 component renders.
+      // An approximation of it passed review and failed a run: the
+      // component says "אין לך הרשאה", and my paraphrase said
+      // "אין הרשאה".
+      await expect(page.locator("body"), `${route} rendered for a client user`).toContainText(
+        /אין לך הרשאה|Forbidden|404|לא נמצא/,
+        { timeout: 10_000 },
+      );
+      await expect(page.locator("body"), `${route} leaked another client's name`).not.toContainText(
+        "[DEMO] קבוצת מרידיאן",
+      );
     }
   });
 });
