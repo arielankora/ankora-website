@@ -7,7 +7,8 @@ import { listClients } from "@/lib/app-domain/clients";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EditRoleStatusForm } from "./EditRoleStatusForm";
 import { ClientAccessForm } from "./ClientAccessForm";
-import { logoutAllSessionsAction } from "../actions";
+import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
+import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -31,6 +32,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     listClients(),
   ]);
   if (!targetUser) notFound();
+
+  const claudeGrantCount = await countClaudeGrantsForUser(user, targetUser.id);
 
   const isSelf = targetUser.id === user.id;
 
@@ -73,6 +76,37 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               ניתוק כל ההתחברויות
             </button>
           </form>
+
+          {/* Claude (MCP) access, kept as its own control rather than
+              folded into the button above. "Logout all sessions" already
+              revokes these grants as a side effect of bumping
+              tokenVersion, but it is the blunt instrument: it also throws
+              the person out of every browser tab. When someone simply no
+              longer needs the integration - the common case - that is the
+              wrong trade, so this cuts Claude and nothing else.
+
+              The count is shown because an admin pressing a button that
+              looks the same whether there are three grants or none is
+              guessing. With none, there is nothing to press. */}
+          <div className="mt-5 border-t border-lineDark pt-5">
+            <p className="text-sm font-medium text-appNavy">חיבור Claude (MCP)</p>
+            <p className="mt-1 text-sm text-appNavy/60">
+              {claudeGrantCount > 0
+                ? `למשתמש יש ${claudeGrantCount} חיבורים פעילים ל-Claude. ניתוק מבטל את כולם מיידית, בלי לנתק אותו משאר המערכת.`
+                : "למשתמש אין חיבורים פעילים ל-Claude."}
+            </p>
+            {claudeGrantCount > 0 && (
+              <form action={revokeClaudeGrantsAction} className="mt-3">
+                <input type="hidden" name="userId" value={targetUser.id} />
+                <button
+                  type="submit"
+                  className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-error hover:text-error"
+                >
+                  ניתוק Claude
+                </button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </>
