@@ -56,7 +56,7 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts$/ },
     {
       name: "public",
-      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/, /\.super\.spec\.ts$/],
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -64,6 +64,14 @@ export default defineConfig({
       testMatch: /\.app\.spec\.ts$/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/employee.json" },
+    },
+    // The Super-Admin-only surfaces get their own session rather than their
+    // own login per spec, for the same reason the one above exists.
+    {
+      name: "app-super",
+      testMatch: /\.super\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/superadmin.json" },
     },
   ],
 

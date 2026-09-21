@@ -10,8 +10,10 @@ import path from "node:path";
 // surfaced somewhere it should not, it would be unmistakable.
 
 const STATE = path.join("qa", "reports", ".auth", "employee.json");
+const SUPER_STATE = path.join("qa", "reports", ".auth", "superadmin.json");
 
 export const DEMO = {
+  superAdmin: { identifier: "demo.superadmin@ankora.co.il", password: "DemoPass!2026" },
   admin: { identifier: "demo.admin@ankora.co.il", password: "DemoPass!2026" },
   employee: { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026" },
   suspended: { identifier: "demo.suspended@ankora.co.il", password: "DemoPass!2026" },
@@ -34,4 +36,23 @@ setup("sign in and store the session", async ({ page }) => {
   await expect(page.locator('input[name="password"]')).toHaveCount(0);
 
   await page.context().storageState({ path: STATE });
+});
+
+// A second session, for the four capabilities the role matrix reserves for
+// SUPER_ADMIN - users, hour banks, alerts and the important-dates catalog.
+// Driving those as the Ankora Admin above would assert a ForbiddenError and
+// call it coverage, which is worse than leaving the gap open and saying so.
+setup("sign in as super admin and store that session too", async ({ page }) => {
+  await page.goto("/app/login");
+
+  await page.fill('input[name="identifier"]', DEMO.superAdmin.identifier);
+  await page.fill('input[name="password"]', DEMO.superAdmin.password);
+  await page.click('button[type="submit"]');
+
+  await page.waitForURL((url) => url.pathname.startsWith("/app") && !url.pathname.includes("/login"), {
+    timeout: 20_000,
+  });
+  await expect(page.locator('input[name="password"]')).toHaveCount(0);
+
+  await page.context().storageState({ path: SUPER_STATE });
 });

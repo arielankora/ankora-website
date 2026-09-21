@@ -21,6 +21,13 @@ import { test, expect } from "@playwright/test";
 // @covers action:(product)/app/(authenticated)/categories/actions
 // @covers action:(product)/app/(authenticated)/profile/actions
 // @covers action:(product)/app/(authenticated)/time-entries/actions
+// @covers action:(product)/app/(authenticated)/report-schedules/actions
+
+// These are write flows against a shared build: a navigation, several
+// round-trips and a revalidation each. The 30s default is enough when one
+// runs alone and not when four do, and a timeout there reads as a product
+// failure rather than as a busy runner.
+test.describe.configure({ timeout: 90_000 });
 
 function tag(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -62,6 +69,13 @@ test.describe("clients/actions", () => {
     // The drawer closes itself on success, so its disappearance is the first
     // signal, and the row is the one that matters.
     await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+
+    // The drawer closing already proves the action returned ok. The list is
+    // server-rendered, so it is re-fetched rather than waited on - a
+    // revalidation that has not reached this router cache yet is not a bug
+    // in the action, and asserting through it would make this test flaky
+    // about the wrong thing.
+    await page.reload();
     await expect(page.getByText(name, { exact: false }).first(), "the client was not created").toBeVisible({
       timeout: 15_000,
     });
@@ -81,6 +95,7 @@ test.describe("categories/actions", () => {
     await dialog.getByRole("button", { name: "הוספת קטגוריה" }).click();
 
     await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+    await page.reload();
     await expect(page.getByText(name, { exact: false }).first(), "the category was not created").toBeVisible({
       timeout: 15_000,
     });
@@ -126,25 +141,54 @@ test.describe("time-entries/actions - an admin reporting on behalf of an employe
 
     await page.goto("/app/time-entries");
 
-    // userId is the field that makes this different from the employee's own
-    // screen: an admin is filing time against somebody else's name, which is
-    // the audited case spec 6.3 singles out.
-    await page.locator('select[name="userId"]').selectOption({ index: 1 });
-    await page.locator('input[name="date"]').fill(todayKey());
-    await page.locator('input[name="startTime"]').fill(start);
-    await page.locator('input[name="endTime"]').fill(end);
-    await page.locator('select[name="clientId"]').selectOption({ index: 1 });
-    await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
-    await page.locator('input[name="note"]').fill(note);
-    // Overlaps are plausible on a shared seeded database with other specs
-    // writing at the same time; this test is about the on-behalf-of path, so
-    // it does not also assert the overlap rule (flows-time covers that).
-    const override = page.locator('input[name="allowOverlapOverride"]');
+    // Scoped to the create form on purpose: the filter bar above it renders
+    // selects with the SAME names (clientId, userId), so an unscoped locator
+    // is ambiguous and, worse, would sometimes drive the filter instead.
+    const form = page.locator("form").filter({ has: page.getByRole("button", { name: "הוספת דיווח לעובד" }) });
+    await expect(form).toBeVisible();
+
+    // userId is what makes this different from the employee's own screen: an
+    // admin filing time against somebody else's name, the audited case.
+    await form.locator('select[name="userId"]').selectOption({ index: 1 });
+    await form.locator('input[name="date"]').fill(todayKey());
+    await form.locator('input[name="startTime"]').fill(start);
+    await form.locator('input[name="endTime"]').fill(end);
+    await form.locator('select[name="clientId"]').selectOption({ index: 1 });
+    // Enabled only once a client is chosen.
+    await form.locator('select[name="categoryId"]').selectOption({ index: 1 });
+    await form.locator('input[name="note"]').fill(note);
+    // Overlaps are plausible on a shared database with other specs writing at
+    // the same moment. This test is about the on-behalf-of path; the overlap
+    // rule has its own test in flows-time.
+    const override = form.locator('input[name="allowOverlapOverride"]');
     if (await override.count()) await override.check();
 
-    await page.getByRole("button", { name: "הוספת דיווח לעובד" }).click();
+    await form.getByRole("button", { name: "הוספת דיווח לעובד" }).click();
+    await page.reload();
 
     await expect(page.getByText(note, { exact: false }).first(), "the admin entry was not created").toBeVisible({
+      timeout: 15_000,
+    });
+  });
+});
+
+test.describe("report-schedules/actions", () => {
+  test("a weekly schedule created for a client is listed with its recipient", async ({ page }) => {
+    const recipient = `e2e.report.${Date.now().toString(36)}@example.invalid`;
+
+    // Scheduled reports are report.internal.view, which an Ankora Admin holds
+    // - so this belongs in this file rather than with the Super-Admin ones.
+    await page.goto("/app/report-schedules?clientId=demo-client-a");
+
+    const form = page.locator("form").filter({ has: page.getByRole("button", { name: "יצירת דוח מתוזמן" }) });
+    await expect(form, "the schedule form did not render for this client").toBeVisible();
+
+    await form.locator('select[name="frequency"]').selectOption("WEEKLY");
+    await form.locator('textarea[name="recipients"], input[name="recipients"]').first().fill(recipient);
+    await form.getByRole("button", { name: "יצירת דוח מתוזמן" }).click();
+
+    await page.reload();
+    await expect(page.getByText(recipient, { exact: false }).first(), "the schedule was not created").toBeVisible({
       timeout: 15_000,
     });
   });
