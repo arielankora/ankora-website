@@ -30,7 +30,13 @@ export default defineConfig({
   // hiccup; not enough to hide a test that fails half the time - the
   // report still marks it flaky, which is the signal worth keeping.
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
+  // One worker in CI. Every spec that writes shares ONE database and ONE
+  // build, and two of them at once made three different tests flake on
+  // different runs - each time looking like a fault in the screen under test
+  // rather than contention. Same lesson the integration suite learned in #76,
+  // arriving through a different door. The suite costs a couple of minutes
+  // more and stops lying.
+  workers: process.env.CI ? 1 : undefined,
   timeout: 30_000,
   expect: { timeout: 10_000 },
 
@@ -56,7 +62,7 @@ export default defineConfig({
     { name: "setup", testMatch: /auth\.setup\.ts$/ },
     {
       name: "public",
-      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/],
+      testIgnore: [/auth\.setup\.ts$/, /\.app\.spec\.ts$/, /\.super\.spec\.ts$/],
       use: { ...devices["Desktop Chrome"] },
     },
     {
@@ -64,6 +70,14 @@ export default defineConfig({
       testMatch: /\.app\.spec\.ts$/,
       dependencies: ["setup"],
       use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/employee.json" },
+    },
+    // The Super-Admin-only surfaces get their own session rather than their
+    // own login per spec, for the same reason the one above exists.
+    {
+      name: "app-super",
+      testMatch: /\.super\.spec\.ts$/,
+      dependencies: ["setup"],
+      use: { ...devices["Desktop Chrome"], storageState: "qa/reports/.auth/superadmin.json" },
     },
   ],
 
