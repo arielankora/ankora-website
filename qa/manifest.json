@@ -967,6 +967,13 @@
       "risk": "medium",
       "riskAssigned": true,
       "firstSeen": "2026-09-21"
+    },
+    "page:/[locale]/ankora-vs-ai-assistants": {
+      "kind": "page",
+      "area": "marketing",
+      "risk": "medium",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
     }
   },
   "waivers": {},

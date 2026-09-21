@@ -193,6 +193,7 @@ export function PersonalOperationsManagementPage({
               label={dict.nav.relatedReading}
               items={[
                 { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
+                { label: dict.nav.ankoraVsAiAssistants, href: "/ankora-vs-ai-assistants" },
                 { label: dict.nav.personalAssistantForExecutives, href: "/personal-assistant-for-executives" },
                 { label: dict.nav.coverage, href: "/coverage" },
               ]}

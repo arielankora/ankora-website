@@ -135,6 +135,7 @@ export function PersonalAssistantForExecutivesPage({
               items={[
                 { label: dict.nav.personalOperationsManagement, href: "/personal-operations-management" },
                 { label: dict.nav.ankoraVsPersonalAssistant, href: "/ankora-vs-personal-assistant" },
+                { label: dict.nav.ankoraVsAiAssistants, href: "/ankora-vs-ai-assistants" },
                 { label: dict.nav.roi, href: "/roi" },
               ]}
             />
