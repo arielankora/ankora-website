@@ -99,7 +99,12 @@ test.describe("timer/actions - start and stop", () => {
 
 test.describe("my-time/actions - manual entry", () => {
   test("a manual entry is created, edited and deleted from the employee's own screen", async ({ page }) => {
-    const window = windowEarlierToday();
+    // Shifted by the attempt number. A retry runs against the same database,
+    // so a fixed window collides with the entry the previous attempt already
+    // wrote - for the SAME client, which is the one collision this product
+    // refuses outright. A test that cannot survive its own retry reports as a
+    // product bug on the second run.
+    const window = windowEarlierToday(30, 20 + 60 * test.info().retry);
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
     const note = tag("e2e-manual");
@@ -142,7 +147,7 @@ test.describe("my-time/actions - manual entry", () => {
     // cross-client one is a warning with "שמירה בכל זאת". Proving the warning
     // path reaches the browser at all is what the unit and integration tests
     // cannot do.
-    const window = windowEarlierToday(40, 90);
+    const window = windowEarlierToday(40, 200 + 60 * test.info().retry);
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
     const first = tag("e2e-overlap-a");

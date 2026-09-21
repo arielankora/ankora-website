@@ -142,15 +142,28 @@ test.describe("important-dates/actions", () => {
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await dialog.locator('select[name="clientId"]').selectOption(CLIENT);
-    await dialog.locator('input[name="title"]').fill(title);
-    await dialog.locator('select[name="category"]').selectOption({ index: 1 });
-    await dialog.locator('select[name="recurrence"]').selectOption("ONCE");
-    await dialog.locator('input[name="onceDate"]').fill(isoDay(30));
-    // Required, and missed on the first run - the browser then blocked the
-    // submit and the drawer simply stayed open, which looked like a failed
-    // action rather than an unfilled field.
-    await dialog.locator('select[name="responsibleUserId"]').selectOption({ index: 1 });
+
+    // Each field is read back after it is set. This form has six required
+    // controls and a previous run reported all six still invalid AFTER they
+    // had apparently been filled - which is a very different problem from a
+    // rejected write, and worth a few extra assertions to tell apart.
+    const set = async (selector: string, value: string) => {
+      const field = dialog.locator(selector);
+      await expect(field, `${selector} is not on the form`).toBeVisible();
+      if (selector.startsWith("select")) await field.selectOption(value);
+      else await field.fill(value);
+      await expect(field, `${selector} did not keep the value it was given`).toHaveValue(value);
+    };
+
+    await set('select[name="clientId"]', CLIENT);
+    await set('input[name="title"]', title);
+    // Read the real option values off the page rather than assuming an order.
+    const category = await dialog.locator('select[name="category"] option').nth(1).getAttribute("value");
+    await set('select[name="category"]', category ?? "");
+    await set('select[name="recurrence"]', "ONCE");
+    await set('input[name="onceDate"]', isoDay(30));
+    const responsible = await dialog.locator('select[name="responsibleUserId"] option').nth(1).getAttribute("value");
+    await set('select[name="responsibleUserId"]', responsible ?? "");
     await dialog.locator("button[type=submit]").first().click();
 
     await expectDrawerClosed(page, "creating an important date");
