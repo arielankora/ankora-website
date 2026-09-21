@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestUser, createTestClient, createTestCategory, createTestTimeEntry } from "./factories";
 import { runReport } from "@/lib/app-domain/reports";
+import { openHourBankCycle } from "@/lib/app-domain/hour-banks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
 // Phase 5 - spec 14 (reports), 21.2 ("Report aggregates equal raw time
@@ -96,14 +97,27 @@ describe("hours_by_employee - spec 14.2", () => {
 
 describe("hours_by_client - spec 14.2 client isolation via filter", () => {
   it("clientId filter narrows Hours by Client to only that client", async () => {
-    const { superAdmin, employee, clientA, clientB, category } = await setup();
-    // Both clients get time logged, so the assertion below is about the
-    // FILTER and nothing else. The original logged none at all and still
-    // expected one row back, which quietly depended on hours_by_client
-    // listing a client with zero hours - a separate question about the
-    // report's shape, and not the one this test is named for.
-    await createTestTimeEntry({ userId: employee.id, clientId: clientA.id, categoryId: category.id });
-    await createTestTimeEntry({ userId: employee.id, clientId: clientB.id, categoryId: category.id });
+    const { superAdmin, clientA, clientB } = await setup();
+
+    // hours_by_client is an HOUR BANK report, not a time report - its
+    // columns are used / remaining / utilization %, and it deliberately
+    // skips any client that has no bank, because those three numbers do
+    // not exist for one. So both clients need a cycle open before the
+    // filter has anything to narrow.
+    //
+    // Worth recording why this took two tries: the original test created
+    // nothing at all and still expected a row, and the first fix added
+    // time entries - the natural guess for a report with "hours" in its
+    // name, and still the wrong one. Neither failure was a product bug,
+    // though the second looked convincingly like one.
+    const cycle = {
+      cycleStart: new Date(Date.now() - 7 * 86_400_000),
+      cycleEnd: new Date(Date.now() + 23 * 86_400_000),
+      purchasedMinutes: 600,
+      rolloverMode: "NONE" as const,
+    };
+    await openHourBankCycle(superAdmin, clientA.id, cycle);
+    await openHourBankCycle(superAdmin, clientB.id, cycle);
 
     const result = await runReport(superAdmin, "hours_by_client", { clientId: clientA.id });
     expect(result.rows).toHaveLength(1);
