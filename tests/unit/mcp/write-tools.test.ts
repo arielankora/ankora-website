@@ -482,3 +482,51 @@ describe("list_tasks", () => {
     expect(out.text).toMatch(/client/i);
   });
 });
+
+// ------------------------------------------- Phase 17: the cost of a preamble
+//
+// In Claude, every tool call is a permission prompt the person has to
+// click. A description that says "call list_my_clients first" therefore
+// does not just cost a round trip - it spends the user's attention
+// before anything they asked for happens. Logging one entry took four
+// clicks, and the first three told the model nothing it could not have
+// learned by trying the name.
+//
+// It bought no safety either: every tool resolves names through
+// lib/mcp/lookup.ts, which answers a miss with "did you mean X or Y"
+// built from what this actor may see. The listing tools are for when
+// that fails, or when the user actually asks what exists.
+//
+// This guards the property, because a helpful-sounding "call X first" is
+// exactly the sentence that gets added back.
+
+describe("no tool tells the model to call another one first", () => {
+  const PREAMBLE = /\bcall\s+(get_active_timer|list_\w+)\s+first\b|\bcall this before\b|\balways call\b/i;
+
+  it("has no description instructing a routine preamble call", () => {
+    for (const [name, { config }] of tools) {
+      const description = String(config.description ?? "");
+      expect(PREAMBLE.test(description), `${name}: ${description}`).toBe(false);
+    }
+  });
+
+  it("has no argument description telling the model to go and list first", () => {
+    // The same instruction hides well in a per-field `.describe()`.
+    for (const [name, { config }] of tools) {
+      const schema = config.inputSchema as { shape?: Record<string, { description?: string }> };
+      for (const [field, def] of Object.entries(schema.shape ?? {})) {
+        const d = String(def?.description ?? "");
+        expect(PREAMBLE.test(d), `${name}.${field}: ${d}`).toBe(false);
+        // "exactly as <tool> returned it" is the softer form of the same
+        // instruction: it implies the model must have called that tool.
+        expect(/exactly as list_\w+ returned/i.test(d), `${name}.${field}: ${d}`).toBe(false);
+      }
+    }
+  });
+
+  it("still keeps the listing tools available for when a name does not match", () => {
+    for (const name of ["list_my_clients", "list_categories", "list_assignable_people"]) {
+      expect(tools.has(name), name).toBe(true);
+    }
+  });
+});

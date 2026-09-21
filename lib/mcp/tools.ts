@@ -83,7 +83,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List my clients",
       description:
-        "Lists the Ankora clients the signed-in employee is allowed to log time against. Call this before any tool that takes a client name, and use the names exactly as returned. Admins see every active client; other employees see only the clients assigned to them.",
+        "Lists the Ankora clients the signed-in employee is allowed to log time against. Use it when the user asks which clients they have, or when another tool reports a client name it could not match - not as a routine preamble, since every tool matches client names itself. Admins see every active client; other employees see only the clients assigned to them.",
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
@@ -104,9 +104,9 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List categories for a client",
       description:
-        "Lists the activity categories that can be used when logging time against one client. Every time entry needs one. Some categories are global and some belong to a single client, so always pass the client you are about to log against rather than assuming a category exists everywhere.",
+        "Lists the activity categories usable when logging time against one client. Every time entry needs one. Use this when the user asks what the options are, or when a category name could not be matched - the write tools match category names themselves. Some categories are global and some belong to a single client, so pass the client you are logging against.",
       inputSchema: z.object({
-        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
       }),
       annotations: READ_ONLY,
     },
@@ -129,7 +129,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Get the running timer",
       description:
-        "Returns the employee's currently running Ankora timer, or reports that none is running. Ankora allows exactly one running timer per user. Call this before starting a timer, and whenever the user asks what they are working on.",
+        "Returns the employee's currently running Ankora timer, or reports that none is running. Ankora allows exactly one running timer per user. Use it when the user asks what they are working on, or after start_timer reports that a timer is already running - not as a routine check before starting one, since start_timer refuses on its own and says what to do.",
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
@@ -227,7 +227,7 @@ export function registerAnkoraTools(server: McpServer): void {
         person: z
           .string()
           .optional()
-          .describe("Teammate's name or email, as list_team_members returned it. Omit for the whole team."),
+          .describe("Teammate's name or email. Omit for the whole team."),
         client: z.string().optional().describe("Client name. Omit for all clients."),
         from: DATE.optional(),
         to: DATE.optional(),
@@ -294,15 +294,15 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Start a timer",
       description:
-        "Starts a running Ankora timer for the signed-in employee, against one client and category. Ankora allows exactly one running timer per user, so call get_active_timer first - if one is already running this will refuse. The entry is recorded as created through Claude.",
+        "Starts a running Ankora timer for the signed-in employee, against one client and category. Ankora allows exactly one running timer per user: if one is already running this refuses and tells you what is running, so there is no need to check first. The entry is recorded as created through Claude.",
       inputSchema: z.object({
-        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
-        category: z.string().describe("Category name, exactly as list_categories returned it for this client."),
+        client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
+        category: z.string().describe("Category name. Ankora matches it against the categories usable for this client and lists them if it cannot."),
         note: z.string().optional().describe("What the user is working on. Free text, shown in Ankora."),
         task: z
           .string()
           .optional()
-          .describe("Title of an existing Ankora task to log this time against. Use list_tasks to find it."),
+          .describe("Title of an existing Ankora task to log this time against, as the user referred to it."),
       }),
       annotations: WRITES,
     },
@@ -418,8 +418,8 @@ export function registerAnkoraTools(server: McpServer): void {
       description:
         "Creates a completed Ankora time entry for the signed-in employee - time they already spent, rather than a running timer. Times are the wall clock in Ankora's own timezone (Asia/Jerusalem), matching what the app's manual-entry form does. Calling this twice creates two entries, so confirm with the user before retrying. Entries more than a couple of days old need `backdateReason`.",
       inputSchema: z.object({
-        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
-        category: z.string().describe("Category name, exactly as list_categories returned it for this client."),
+        client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
+        category: z.string().describe("Category name. Ankora matches it against the categories usable for this client and lists them if it cannot."),
         date: DATE.describe("The day the work happened, YYYY-MM-DD."),
         start: CLOCK.describe("Start time, 24-hour HH:MM."),
         end: CLOCK.describe("End time, 24-hour HH:MM. Must be after start."),
@@ -427,7 +427,7 @@ export function registerAnkoraTools(server: McpServer): void {
         task: z
           .string()
           .optional()
-          .describe("Title of an existing Ankora task this time belongs to. Use list_tasks to find it."),
+          .describe("Title of an existing Ankora task this time belongs to, as the user referred to it."),
         backdateReason: z
           .string()
           .optional()
@@ -526,7 +526,7 @@ export function registerAnkoraTools(server: McpServer): void {
       description:
         "Lists Ankora tasks on the clients the signed-in employee works with. Defaults to unfinished tasks (open and in progress) assigned to nobody in particular - pass `mine: true` for the user's own plate, or `overdue: true` for anything past its due date. Answers 'what do I need to do today', 'what's overdue', 'what's open on this client'.",
       inputSchema: z.object({
-        client: z.string().optional().describe("Client name, exactly as list_my_clients returned it. Omit for all."),
+        client: z.string().optional().describe("Client name, as the user said it. Omit for all clients."),
         mine: z.boolean().optional().describe("Only tasks assigned to the signed-in employee."),
         person: z
           .string()
@@ -616,9 +616,9 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List who a task can be assigned to",
       description:
-        "Lists the colleagues who can be given a task on one client. Only people with access to that client appear, because anyone else would never see the task. Call this before assigning work to someone, and use the names exactly as returned.",
+        "Lists the colleagues who can be given a task on one client. Only people with access to that client appear, because anyone else would never see the task. Use this when the user asks who could take something on, or when create_task/update_task reports a person it could not match - those tools match names themselves.",
       inputSchema: z.object({
-        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
       }),
       annotations: READ_ONLY,
     },
@@ -641,11 +641,11 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Open a task",
       description:
-        "Creates a new Ankora task on one client. The task is visible to everyone who works on that client. Assigning it to a colleague is allowed only if they have access to that client - call list_assignable_people first if unsure. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
+        "Creates a new Ankora task on one client. The task is visible to everyone who works on that client. Assigning it to a colleague is allowed only if they have access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
       inputSchema: z.object({
-        client: z.string().describe("Client name, exactly as list_my_clients returned it."),
+        client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
-        category: z.string().optional().describe("Category name, as list_categories returned it for this client."),
+        category: z.string().optional().describe("Category name. Omit unless the user named one."),
         assignTo: z
           .string()
           .optional()
@@ -726,7 +726,7 @@ export function registerAnkoraTools(server: McpServer): void {
           .optional()
           .describe("New status. DONE means finished; ARCHIVED means dropped without being done."),
         title: z.string().min(1).optional().describe("New title, replacing the old one."),
-        category: z.string().optional().describe("New category, as list_categories returned it for this client."),
+        category: z.string().optional().describe("New category for the task."),
         assignTo: z.string().optional().describe("Colleague's name or email to hand it to."),
         clearAssignee: z.boolean().optional().describe("Remove the current owner, leaving it unassigned."),
         due: DATE.optional().describe("New due date, YYYY-MM-DD."),
