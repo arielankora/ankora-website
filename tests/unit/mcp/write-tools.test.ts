@@ -41,14 +41,41 @@ const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
   lookupTeamMember: vi.fn(),
+  // Phase 16 (tasks). These two are separate from lookupTeamMember on
+  // purpose - see lib/mcp/lookup.ts on why assigning work is gated more
+  // narrowly than reading a colleague's hours.
+  lookupAssignee: vi.fn(),
+  lookupTask: vi.fn(),
   usableCategories: vi.fn(),
   teamMembers: vi.fn(),
   canSeeOthersTime: vi.fn(() => false),
 }));
 
+// listTasks and assignableUsers declare their parameters rather than
+// taking none: `vi.fn(async () => [])` types its own `mock.calls` as
+// `[]`, so every assertion about what the tool passed would need a cast
+// through `unknown` - which is exactly the kind of cast that silently
+// stops checking anything.
+type TaskFilterArg = {
+  clientId?: string;
+  assignedToId?: string;
+  unassigned?: boolean;
+  dueBefore?: Date;
+  statusIn?: string[];
+};
+
+const tasks = vi.hoisted(() => ({
+  listTasks: vi.fn(async (_actor: unknown, _filters: TaskFilterArg = {}) => [] as unknown[]),
+  createTask: vi.fn(),
+  updateTask: vi.fn(),
+  assignableUsers: vi.fn(async (_actor: unknown, _clientId: string) => [] as unknown[]),
+  OPEN_STATUSES: ["OPEN", "IN_PROGRESS"],
+}));
+
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
 vi.mock("@/lib/app-domain/time-entries", () => domain);
+vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
@@ -125,6 +152,10 @@ describe("start_timer", () => {
       clientId: "c1",
       categoryId: "cat1",
       note: "x",
+      // Phase 16: an explicit null, not an absent key. A timer started
+      // without naming a task must clear the link rather than leave it
+      // to whatever the domain layer defaults to.
+      taskId: null,
       createdVia: "MCP",
     });
   });
@@ -266,5 +297,236 @@ describe("failures do not leak internals to the model", () => {
     const text = JSON.stringify(out);
     expect(text).not.toContain("10.0.0.5");
     expect(domain.startTimer).not.toHaveBeenCalled();
+  });
+});
+
+// ------------------------------------------------------- Phase 16: tasks
+//
+// The same three properties as above, asked of the task surface. The one
+// that is new here is assignment: a task filed against a colleague who
+// cannot see the client is a silent dead letter, so "refuse rather than
+// guess" has to hold for the assignee as well as for the client.
+
+describe("create_task", () => {
+  beforeEach(() => {
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c1", name: "Globex" } });
+    tasks.createTask.mockResolvedValue({ id: "t1", title: "Send the report", status: "OPEN" });
+  });
+
+  it("opens the task on the resolved client, unassigned and undated by default", async () => {
+    const out = payload(
+      await tools.get("create_task")!.handler({ client: "Globex", title: "Send the report" }, CTX),
+    );
+
+    expect(out.created).toBe(true);
+    expect(tasks.createTask).toHaveBeenCalledWith(ACTOR, {
+      clientId: "c1",
+      categoryId: null,
+      title: "Send the report",
+      assignedToId: null,
+      dueDate: null,
+    });
+  });
+
+  it("writes nothing when the client does not resolve", async () => {
+    lookup.lookupClient.mockResolvedValue({ ok: false, message: "Did you mean Globex Industries?" });
+    await tools.get("create_task")!.handler({ client: "Glob", title: "x" }, CTX);
+    expect(tasks.createTask).not.toHaveBeenCalled();
+  });
+
+  it("writes nothing when the assignee does not resolve, even though the client did", async () => {
+    // The near-miss that matters: creating the task anyway and dropping
+    // the assignee would look like success and lose the instruction.
+    lookup.lookupAssignee.mockResolvedValue({ ok: false, message: "Two people match Dana." });
+
+    const out = payload(
+      await tools.get("create_task")!.handler(
+        { client: "Globex", title: "x", assignTo: "Dana" },
+        CTX,
+      ),
+    );
+
+    expect(tasks.createTask).not.toHaveBeenCalled();
+    expect(out.text).toContain("Dana");
+  });
+
+  it("resolves the assignee against the task's own client, not globally", async () => {
+    lookup.lookupAssignee.mockResolvedValue({ ok: true, value: { id: "u2", name: "Dana" } });
+    await tools.get("create_task")!.handler({ client: "Globex", title: "x", assignTo: "Dana" }, CTX);
+    expect(lookup.lookupAssignee).toHaveBeenCalledWith(ACTOR, "c1", "Dana");
+    // Never the admin-only roster lookup - that one asserts a permission
+    // most employees do not hold, which would make assignment admin-only.
+    expect(lookup.lookupTeamMember).not.toHaveBeenCalled();
+  });
+
+  it("stores a due date at the end of that day, not its start", async () => {
+    await tools.get("create_task")!.handler({ client: "Globex", title: "x", due: "2026-09-24" }, CTX);
+
+    const { dueDate } = tasks.createTask.mock.calls[0][1] as { dueDate: Date };
+    // 23:59 Asia/Jerusalem on the 24th, i.e. still the 24th locally. If
+    // this were the START of the day, every task due today would read as
+    // overdue from one minute past midnight.
+    expect(dueDate.toISOString()).toBe("2026-09-24T20:59:00.000Z");
+  });
+
+  it("rejects a due date the model made up a format for", () => {
+    const schema = tools.get("create_task")!.config.inputSchema as {
+      safeParse: (v: unknown) => { success: boolean };
+    };
+    expect(schema.safeParse({ client: "Globex", title: "x", due: "24/09/2026" }).success).toBe(false);
+    expect(schema.safeParse({ client: "Globex", title: "x", due: "2026-09-24" }).success).toBe(true);
+  });
+
+  it("takes the acting user from the token, not from anything the model sent", async () => {
+    await tools.get("create_task")!.handler(
+      { client: "Globex", title: "x", userId: "u-someone-else", createdBy: "Dana" },
+      CTX,
+    );
+    expect(tasks.createTask).toHaveBeenCalledWith(ACTOR, expect.anything());
+  });
+});
+
+describe("update_task", () => {
+  beforeEach(() => {
+    lookup.lookupTask.mockResolvedValue({
+      ok: true,
+      value: { id: "t1", name: "Send the report", clientId: "c1", clientName: "Globex" },
+    });
+    tasks.updateTask.mockResolvedValue({ id: "t1", title: "Send the report", status: "DONE" });
+  });
+
+  it("changes only the fields that were passed", async () => {
+    await tools.get("update_task")!.handler({ task: "Send the report", status: "DONE" }, CTX);
+    expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { status: "DONE" });
+  });
+
+  it("writes nothing when the title matches more than one task", async () => {
+    // Guessing here would close the wrong piece of work.
+    lookup.lookupTask.mockResolvedValue({ ok: false, message: "Two tasks are called that." });
+
+    const out = payload(await tools.get("update_task")!.handler({ task: "report", status: "DONE" }, CTX));
+
+    expect(tasks.updateTask).not.toHaveBeenCalled();
+    expect(out.text).toContain("Two tasks");
+  });
+
+  it("refuses a patch that says two contradictory things at once", async () => {
+    for (const args of [
+      { task: "x", assignTo: "Dana", clearAssignee: true },
+      { task: "x", due: "2026-09-24", clearDue: true },
+    ]) {
+      await tools.get("update_task")!.handler(args, CTX);
+    }
+    expect(tasks.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("refuses an empty patch instead of pretending something changed", async () => {
+    const out = payload(await tools.get("update_task")!.handler({ task: "Send the report" }, CTX));
+    expect(tasks.updateTask).not.toHaveBeenCalled();
+    expect(out.text).toMatch(/nothing to change/i);
+  });
+
+  it("clears a field with an explicit null, not by omitting it", async () => {
+    await tools.get("update_task")!.handler({ task: "x", clearAssignee: true, clearDue: true }, CTX);
+    expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { assignedToId: null, dueDate: null });
+  });
+
+  it("validates a new assignee against the client the task actually sits on", async () => {
+    // Not against the optional `client` argument, which is only a
+    // disambiguation hint and is absent here.
+    lookup.lookupAssignee.mockResolvedValue({ ok: true, value: { id: "u2", name: "Dana" } });
+    await tools.get("update_task")!.handler({ task: "Send the report", assignTo: "Dana" }, CTX);
+    expect(lookup.lookupAssignee).toHaveBeenCalledWith(ACTOR, "c1", "Dana");
+  });
+
+  it("only looks among unfinished tasks unless asked otherwise", async () => {
+    await tools.get("update_task")!.handler({ task: "Send the report", status: "DONE" }, CTX);
+    expect(lookup.lookupTask).toHaveBeenCalledWith(ACTOR, "Send the report", {
+      clientId: undefined,
+      includeClosed: undefined,
+    });
+
+    await tools.get("update_task")!.handler(
+      { task: "Send the report", status: "OPEN", includeDone: true },
+      CTX,
+    );
+    expect(lookup.lookupTask).toHaveBeenLastCalledWith(ACTOR, "Send the report", {
+      clientId: undefined,
+      includeClosed: true,
+    });
+  });
+});
+
+describe("list_tasks", () => {
+  it("is read-only, so a client may call it without asking first", () => {
+    const ann = tools.get("list_tasks")!.config.annotations as { readOnlyHint?: boolean };
+    expect(ann.readOnlyHint).toBe(true);
+  });
+
+  it("defaults to unfinished tasks", async () => {
+    await tools.get("list_tasks")!.handler({}, CTX);
+    const [, filters] = tasks.listTasks.mock.calls[0]!;
+    expect(filters!.statusIn).toEqual(["OPEN", "IN_PROGRESS"]);
+  });
+
+  it("scopes `mine` to the token's user, never to a name the model supplied", async () => {
+    await tools.get("list_tasks")!.handler({ mine: true, person: "Dana" }, CTX);
+    const [, filters] = tasks.listTasks.mock.calls[0]!;
+    expect(filters!.assignedToId).toBe(ACTOR.id);
+    expect(lookup.lookupAssignee).not.toHaveBeenCalled();
+  });
+
+  it("asks for a client before filtering by colleague, rather than guessing", async () => {
+    const out = payload(await tools.get("list_tasks")!.handler({ person: "Dana" }, CTX));
+    expect(tasks.listTasks).not.toHaveBeenCalled();
+    expect(out.text).toMatch(/client/i);
+  });
+});
+
+// ------------------------------------------- Phase 17: the cost of a preamble
+//
+// In Claude, every tool call is a permission prompt the person has to
+// click. A description that says "call list_my_clients first" therefore
+// does not just cost a round trip - it spends the user's attention
+// before anything they asked for happens. Logging one entry took four
+// clicks, and the first three told the model nothing it could not have
+// learned by trying the name.
+//
+// It bought no safety either: every tool resolves names through
+// lib/mcp/lookup.ts, which answers a miss with "did you mean X or Y"
+// built from what this actor may see. The listing tools are for when
+// that fails, or when the user actually asks what exists.
+//
+// This guards the property, because a helpful-sounding "call X first" is
+// exactly the sentence that gets added back.
+
+describe("no tool tells the model to call another one first", () => {
+  const PREAMBLE = /\bcall\s+(get_active_timer|list_\w+)\s+first\b|\bcall this before\b|\balways call\b/i;
+
+  it("has no description instructing a routine preamble call", () => {
+    for (const [name, { config }] of tools) {
+      const description = String(config.description ?? "");
+      expect(PREAMBLE.test(description), `${name}: ${description}`).toBe(false);
+    }
+  });
+
+  it("has no argument description telling the model to go and list first", () => {
+    // The same instruction hides well in a per-field `.describe()`.
+    for (const [name, { config }] of tools) {
+      const schema = config.inputSchema as { shape?: Record<string, { description?: string }> };
+      for (const [field, def] of Object.entries(schema.shape ?? {})) {
+        const d = String(def?.description ?? "");
+        expect(PREAMBLE.test(d), `${name}.${field}: ${d}`).toBe(false);
+        // "exactly as <tool> returned it" is the softer form of the same
+        // instruction: it implies the model must have called that tool.
+        expect(/exactly as list_\w+ returned/i.test(d), `${name}.${field}: ${d}`).toBe(false);
+      }
+    }
+  });
+
+  it("still keeps the listing tools available for when a name does not match", () => {
+    for (const name of ["list_my_clients", "list_categories", "list_assignable_people"]) {
+      expect(tools.has(name), name).toBe(true);
+    }
   });
 });

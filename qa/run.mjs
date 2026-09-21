@@ -18,6 +18,7 @@ import { Run } from "./lib/report.mjs";
 import { sh } from "./lib/sh.mjs";
 import * as staticChecks from "./checks/static.mjs";
 import * as vitest from "./checks/vitest.mjs";
+import { accessibility, buildPresent } from "./checks/a11y.mjs";
 import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
@@ -102,17 +103,33 @@ async function main() {
     e2e,
   );
 
-  // deps / a11y / perf land in the next stage; the runner already
-  // reserves their slots so adding them is a one-line change here.
+  // deps / rbac / boundary / perf land in a later stage; the runner
+  // reserves their slots so adding one is a one-line change here. e2e and
+  // a11y are no longer among them - both are implemented.
   for (const [id, label, lvl] of [
     ["deps", "Dependency advisories", 2],
     ["rbac", "Permission matrix", 3],
     ["boundary", "Boundary & data integrity", 3],
-    ["a11y", "Accessibility & RTL", 3],
     ["perf", "Performance budgets", 3],
   ]) {
     await run.check(id, { label, level: lvl, blocking: false, skipIf: async () => "not implemented yet (stage 2)" }, async () => []);
   }
+
+  // The reserved a11y slot, filled. It needs a browser AND a server: the check reads
+  // computed styles from a rendered page, which is the only place a composited ground
+  // exists at all. It serves the level-2 build itself rather than asking for
+  // QA_BASE_URL, so it runs by default at level 3 - see checks/a11y.mjs.
+  await run.check(
+    "a11y",
+    {
+      label: "Accessibility & RTL",
+      level: 3,
+      skipIf: async () =>
+        (await needs.browser()) ||
+        (process.env.QA_BASE_URL || buildPresent() ? null : "no build to serve — run `next build` first, or set QA_BASE_URL"),
+    },
+    accessibility
+  );
 
   run.print();
   const file = run.persist();

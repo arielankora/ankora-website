@@ -39,12 +39,11 @@ async function databaseUp() {
   const url = process.env.QA_DATABASE_URL ?? process.env.DATABASE_URL;
   if (!url) return false;
   try {
-    // `hostname`, not `host`. `host` carries the port ("127.0.0.1:5432"),
-    // which then gets passed as a hostname, fails DNS, and reports a
-    // perfectly healthy database as unreachable. That happened in CI: the
-    // integration suite and the whole browser suite skipped themselves on
-    // a green run, one step after `prisma migrate deploy` had succeeded
-    // against that exact database.
+    // `hostname`, not `host`: WHATWG URL's `host` INCLUDES the port
+    // ("127.0.0.1:5432"), and net.createConnection then tries to resolve that
+    // whole string as a name, fails, and reports the database as unreachable.
+    // CI has had a healthy postgres service container this whole time and
+    // every integration test was being skipped for "no database reachable".
     const { hostname, port } = new URL(url.replace(/^postgres(ql)?:/, "http:"));
     const net = await import("node:net");
     return await new Promise((resolve) => {
@@ -63,18 +62,36 @@ async function databaseUp() {
   }
 }
 
-function browserAvailable() {
-  // Playwright's bundled Chromium, or the one this sandbox preinstalls.
-  return (
-    fs.existsSync("/opt/pw-browsers/chromium") ||
-    fs.existsSync(path.join(ROOT, "node_modules", "@playwright", "test"))
-  );
+async function browserAvailable() {
+  // Probe the driver AND the executable, because either one alone is a lie.
+  //
+  // An earlier revision answered `true` on the presence of
+  // `node_modules/@playwright/test`, which says nothing about whether
+  // `playwright install` was ever run, or on the presence of this sandbox's
+  // /opt/pw-browsers/chromium, which says nothing about whether any playwright
+  // package is installed to launch it. Both gave a green capability to an
+  // environment that cannot start a browser, and a check that then fails to launch
+  // one reports as a product defect - precisely the confusion this file exists to
+  // prevent. So: import the driver, ask it where chromium is, and look.
+  let chromium;
+  try {
+    ({ chromium } = await import("playwright"));
+  } catch {
+    return false;
+  }
+  if (process.env.PLAYWRIGHT_CHROMIUM) return fs.existsSync(process.env.PLAYWRIGHT_CHROMIUM);
+  try {
+    const exe = chromium.executablePath();
+    return Boolean(exe) && fs.existsSync(exe);
+  } catch {
+    return false;
+  }
 }
 
 export async function preflight() {
   capabilities.prismaClient = prismaClientGenerated();
   capabilities.database = await databaseUp();
-  capabilities.browser = browserAvailable();
+  capabilities.browser = await browserAvailable();
   capabilities.production =
     !(await egressBlocked()) && (await reachable(process.env.QA_PROD_URL ?? "https://ankora.co.il"));
 

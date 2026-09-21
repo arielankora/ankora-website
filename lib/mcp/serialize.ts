@@ -103,6 +103,70 @@ export function elapsedMinutes(startAt: Date, now: Date = new Date()): number {
   return Math.max(0, Math.round((now.getTime() - startAt.getTime()) / 60000));
 }
 
+// ------------------------------------------------------- Phase 16: tasks
+
+export type TaskLike = {
+  id: string;
+  title: string;
+  status: string;
+  dueDate: Date | null;
+  createdAt: Date;
+  client?: { name: string } | null;
+  category?: { name: string } | null;
+  assignedTo?: { name: string } | null;
+};
+
+export type SerializedTask = {
+  id: string;
+  title: string;
+  status: string;
+  client: string | null;
+  category: string | null;
+  assignedTo: string | null;
+  dueDate: string | null;
+  overdue: boolean;
+  createdAt: string;
+};
+
+/// The same one-liner as localDateKey() in lib/timezone.ts, which this
+/// module cannot import: that file is `server-only`, and this one is kept
+/// importable by tests (see the header). Duplicating one Intl call is the
+/// lesser evil against making the serializer untestable.
+function dateKey(date: Date, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(date);
+}
+
+/// A task as a model should see it.
+///
+/// `dueDate` is emitted as a plain YYYY-MM-DD in the USER's timezone, not
+/// as an instant. A deadline is a day, not a moment, and an ISO timestamp
+/// invites a model to reason about the hour - which is exactly how "due
+/// Thursday" becomes "due Wednesday 23:00" for a reader in another zone.
+///
+/// `overdue` is computed here rather than left to the model, because the
+/// comparison needs `now` and the stored instant, and a model working
+/// from a bare date string gets the boundary day wrong about half the
+/// time.
+export function serializeTask(
+  task: TaskLike,
+  opts: { timeZone: string; now?: Date }
+): SerializedTask {
+  const now = opts.now ?? new Date();
+  const isClosed = task.status === "DONE" || task.status === "ARCHIVED";
+  return {
+    id: task.id,
+    title: task.title,
+    status: task.status,
+    client: task.client?.name ?? null,
+    category: task.category?.name ?? null,
+    assignedTo: task.assignedTo?.name ?? null,
+    dueDate: task.dueDate ? dateKey(task.dueDate, opts.timeZone) : null,
+    // A finished task is never overdue, however far past its date it sits.
+    overdue: !isClosed && task.dueDate !== null && task.dueDate.getTime() < now.getTime(),
+    createdAt: task.createdAt.toISOString(),
+  };
+}
+
 export type ClientLike = { id: string; name: string; status: string };
 
 /// Clients are emitted WITH their id even though no tool requires one as

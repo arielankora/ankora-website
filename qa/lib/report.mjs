@@ -114,7 +114,23 @@ export class Run {
     fs.mkdirSync(dir, { recursive: true });
     const payload = { summary: this.summary(), checks: this.checks };
     fs.writeFileSync(path.join(dir, "last.json"), JSON.stringify(payload, null, 2) + "\n");
-    fs.writeFileSync(path.join(dir, "last.md"), this.markdown());
+    const md = this.markdown();
+    fs.writeFileSync(path.join(dir, "last.md"), md);
+
+    // On a CI runner, put the same report on the run's own summary page.
+    // Without this the only copy is inside a zipped artifact, and the
+    // artifact host is unreachable from the networks this project is
+    // actually operated from - so the report existed and nobody could read
+    // it. A dispatched run (no pull request to comment on) had no readable
+    // output at all.
+    const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+    if (summaryFile) {
+      try {
+        fs.appendFileSync(summaryFile, md + "\n");
+      } catch (err) {
+        process.stdout.write(`  (could not write the job summary: ${err?.message ?? err})\n`);
+      }
+    }
     return path.join("qa", "reports", "last.json");
   }
 

@@ -1,0 +1,22 @@
+-- Phase 17: "אישור דיווח שעות חופף בין לקוחות שונים" (cross-client overlap
+-- confirmation).
+--
+-- Renamed on rebase. It was authored as 20260918090000_phase12_*, which by then
+-- sorted BEHIND four migrations already applied in production (phase12 profile
+-- preferences, phase13/15 MCP, phase14 entry origin) and collided with the
+-- phase12 name one of them already holds. Prisma would still have applied it -
+-- it applies whatever is unapplied - but a fresh database (CI, a preview, a
+-- migrate reset) would then build the schema in a different order from the one
+-- production actually went through, and that difference is exactly what a
+-- migration history exists to rule out.
+--
+-- Hand-authored for the same reason as every prior phase's migration (see
+-- their own header comments and docs/adr/0001's "Known limitations"): this
+-- sandbox has no network route to Prisma's engine CDN, so `prisma migrate
+-- dev` cannot run here. Written to match prisma/schema.prisma exactly and
+-- verified by inspection against every prior hand-authored migration's own
+-- generated style. Additive only, single boolean column with a default -
+-- no existing column/table/constraint is dropped or altered destructively.
+
+-- AlterTable
+ALTER TABLE "time_entries" ADD COLUMN "isOverlapConfirmed" BOOLEAN NOT NULL DEFAULT false;

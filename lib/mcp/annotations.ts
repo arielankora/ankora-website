@@ -52,6 +52,14 @@ export const TOOL_ANNOTATIONS = {
   // unlike the other writes this one is genuinely idempotent.
   update_timer_note: { ...WRITES, idempotentHint: true },
   create_time_entry: WRITES,
+  // Phase 16 (MCP tasks).
+  list_tasks: READ_ONLY,
+  list_assignable_people: READ_ONLY,
+  create_task: WRITES,
+  // A patch that sets the same fields twice leaves the same state - unlike
+  // create_task, which makes a second task. Same reasoning as
+  // update_timer_note.
+  update_task: { ...WRITES, idempotentHint: true },
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -67,4 +75,15 @@ export const WRITE_TOOLS = [
   "stop_timer",
   "update_timer_note",
   "create_time_entry",
+  "create_task",
+  "update_task",
 ] as const;
+
+/// Phase 16: task tools are NOT in TEAM_TOOLS.
+///
+/// Reading a colleague's hours needs `time_entry.edit_others`; seeing and
+/// assigning a task on a client you share does not - see assignableUsers()
+/// in lib/app-domain/tasks.ts for why the two questions get different
+/// gates. list_tasks does surface an assignee's name, but only for tasks
+/// on clients the caller already works on, which is the same scope the
+/// Tasks screen has always had.

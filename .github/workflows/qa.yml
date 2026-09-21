@@ -125,18 +125,21 @@ jobs:
             echo "value=1" >> "$GITHUB_OUTPUT"
           fi
 
-      # Only from level 2. A pull request gate that downloads a browser
-      # it will not open has turned a four-minute check into a six-minute
-      # one for nothing.
-      - name: Install browser
+      # From level 2, not just level 3. Two checks need a browser now -
+      # the accessibility audit at level 3, and the end-to-end suite at
+      # level 2 - so installing only at level 3 would leave the browser
+      # suite with nothing to launch. Still not paid on the PR gate,
+      # which is the point of the condition.
+      - name: Install Chromium
         if: steps.level.outputs.value != '1'
         run: npx playwright install --with-deps chromium
 
-      # The demo fixtures from prisma/seed.ts, which the browser suite
-      # signs in as. Safe here and nowhere else: this database is created
-      # empty by the service container above and destroyed with the job,
-      # and every fixture is prefixed "[DEMO]" so it is unmistakable if it
-      # ever turns up somewhere it should not.
+      # The demo fixtures the browser suite signs in as. Safe here and
+      # nowhere else: this database is created empty by the service
+      # container above and destroyed with the job, and every fixture is
+      # prefixed "[DEMO]" so it is unmistakable if it ever turns up
+      # somewhere it should not. The e2e check re-seeds immediately before
+      # it runs as well, because the integration suite truncates.
       - name: Seed demo fixtures
         if: steps.level.outputs.value != '1'
         run: npm run db:seed

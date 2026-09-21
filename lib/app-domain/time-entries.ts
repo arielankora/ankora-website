@@ -6,6 +6,7 @@ import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
+import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -29,8 +30,23 @@ const SELF_EDIT_WINDOW_HOURS = 48;
 /// day-boundary helper - this file had its own private copy of it before
 /// Phase 8 extracted the shared version.
 
+/// The conflicting row, with just enough of its relations to build a
+/// human-readable warning at the action layer (spec "אישור דיווח שעות חופף
+/// בין לקוחות שונים": the cross-client warning names the conflicting
+/// client/category/time range).
+type OverlapConflict = TimeEntry & { client: { name: string }; category: { name: string } };
+
 export class OverlapError extends Error {
-  constructor(public readonly conflicting: TimeEntry) {
+  constructor(
+    public readonly conflicting: OverlapConflict,
+    /// True when the conflict is against an entry for the EXACT SAME
+    /// client - a hard, unconfirmable block for anyone without
+    /// time_entry.edit_others. False means a cross-client conflict, which
+    /// the action layer surfaces as a confirmable warning instead of a
+    /// terminal error (see resolveOverlapDecision in
+    /// time-entry-overlap.ts).
+    public readonly sameClient: boolean
+  ) {
     super("This time range overlaps an existing entry.");
     this.name = "OverlapError";
   }
@@ -134,6 +150,25 @@ async function assertActiveTargets(actor: User, clientId: string, categoryId: st
   }
 }
 
+/// Phase 16 (MCP tasks, docs/adr/0005): a TimeEntry's task must belong to
+/// the same client as the entry.
+///
+/// TimeEntry.taskId has been writable since Phase 2, and nothing ever
+/// checked this - the timer screen's task picker is scoped to the chosen
+/// client, so the invariant held only because the UI happened to enforce
+/// it. permissions.ts's own rule ("אין להסתמך על הסתרת כפתור ב-UI") says
+/// that is not enough, and a second caller (the MCP server) made it real:
+/// a mismatched pair would file a client's hours under another client's
+/// task and quietly corrupt both clients' reports.
+async function assertTaskMatchesClient(clientId: string, taskId: string | null | undefined) {
+  if (!taskId) return;
+  const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null } });
+  if (!task) throw new Error("Task not found.");
+  if (task.clientId !== clientId) {
+    throw new Error("That task belongs to a different client than this time entry.");
+  }
+}
+
 /// Spec 5.1: "TimeEntry חייב start_at < end_at." When endAt is null (an
 /// active timer) there is nothing to compare yet.
 function assertValidRange(startAt: Date, endAt: Date | null) {
@@ -160,40 +195,68 @@ function assertNotFuture(startAt: Date, endAt: Date | null) {
 /// Spec 6.3: "Validation למניעת overlap: להתריע על חפיפה עם Entry קיים;
 /// אפשר override רק למי שיש permission." Half-open interval overlap
 /// check: [startAt, endAt) vs [existing.startAt, existing.endAt or now).
+/// Phase 12 extended this to compare clientId too (see time-entry-overlap.ts)
+/// - the DB query itself is unchanged; it still finds ANY time-overlapping
+/// entry for this user regardless of client, and the client comparison
+/// happens in assertNoOverlap below.
 async function findOverlap(
   userId: string,
   startAt: Date,
   endAt: Date | null,
-  excludeEntryId?: string
-): Promise<TimeEntry | null> {
+  excludeEntryId?: string,
+  onlyClientId?: string
+): Promise<OverlapConflict | null> {
   const effectiveEnd = endAt ?? new Date("9999-01-01"); // an active timer blocks everything after it starts
   return prisma.timeEntry.findFirst({
     where: {
       userId,
       deletedAt: null,
       id: excludeEntryId ? { not: excludeEntryId } : undefined,
+      clientId: onlyClientId,
       startAt: { lt: effectiveEnd },
       OR: [{ endAt: null }, { endAt: { gt: startAt } }],
     },
+    include: { client: { select: { name: true } }, category: { select: { name: true } } },
   });
 }
 
+/// Phase 12 ("אישור דיווח שעות חופף בין לקוחות שונים"): returns whether the
+/// write that's about to happen should be flagged isOverlapConfirmed.
+/// Throws OverlapError when the conflict isn't (yet) resolved - callers
+/// distinguish a same-client hard block from a confirmable cross-client
+/// warning via err.sameClient. See resolveOverlapDecision for the actual
+/// rule.
 async function assertNoOverlap(
   actor: User,
   userId: string,
+  clientId: string,
   startAt: Date,
   endAt: Date | null,
   allowOverride: boolean,
   excludeEntryId?: string
-) {
-  const conflict = await findOverlap(userId, startAt, endAt, excludeEntryId);
-  if (!conflict) return;
-  // Spec 6.3: "אפשר override רק למי שיש permission" - the actor performing
-  // the write needs edit_others to push through a flagged overlap,
-  // regardless of whose entry it is.
-  const hasOverridePermission = can(actor.role, "time_entry.edit_others");
-  if (allowOverride && hasOverridePermission) return;
-  throw new OverlapError(conflict);
+): Promise<{ confirmed: boolean }> {
+  // A same-client conflict is looked for FIRST, deliberately. One findFirst()
+  // across all clients returns an arbitrary row, and a range can overlap two
+  // entries at once - one for this client, one for another. If the cross-client
+  // row happened to come back, the caller would be offered "save anyway", and
+  // confirming it would push through the same-client double-booking that the
+  // rule says can never be confirmed. Asking for a same-client conflict first
+  // makes the strictest applicable rule the one that decides, whatever order
+  // the database would otherwise have returned.
+  const conflict =
+    (await findOverlap(userId, startAt, endAt, excludeEntryId, clientId)) ??
+    (await findOverlap(userId, startAt, endAt, excludeEntryId));
+  if (!conflict) return { confirmed: false };
+
+  const decision = resolveOverlapDecision({
+    conflictClientId: conflict.clientId,
+    newEntryClientId: clientId,
+    allowOverride,
+    hasEditOthersPermission: can(actor.role, "time_entry.edit_others"),
+  });
+
+  if (decision.allowed) return { confirmed: decision.confirmed };
+  throw new OverlapError(conflict, decision.sameClient);
 }
 
 // ---------------------------------------------------------------------
@@ -223,6 +286,7 @@ export async function startTimer(
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   await assertActiveTargets(actor, input.clientId, input.categoryId);
+  await assertTaskMatchesClient(input.clientId, input.taskId);
 
   // Friendly pre-check (spec 5.1: "טיימר פעיל אחד לכל משתמש כברירת מחדל.
   // ניסיון להפעיל שני מציג החלטה: עצור קודם / בטל."). The database's
@@ -431,12 +495,20 @@ export async function createManualEntry(
   // isn't individually assigned to.
   await assertClientAccess({ ...actor, id: targetUserId } as User, input.clientId);
   await assertActiveTargets(actor, input.clientId, input.categoryId);
+  await assertTaskMatchesClient(input.clientId, input.taskId);
 
   if (isBackdated(input.startAt) && !input.backdateReason?.trim()) {
     throw new BackdateReasonRequiredError();
   }
 
-  await assertNoOverlap(actor, targetUserId, input.startAt, input.endAt, !!input.allowOverlapOverride);
+  const overlap = await assertNoOverlap(
+    actor,
+    targetUserId,
+    input.clientId,
+    input.startAt,
+    input.endAt,
+    !!input.allowOverlapOverride
+  );
 
   const actualSeconds = Math.round((input.endAt.getTime() - input.startAt.getTime()) / 1000);
   const billableSeconds = await computeEntryBillableSeconds(input.clientId, actualSeconds);
@@ -455,6 +527,7 @@ export async function createManualEntry(
       source: "MANUAL",
       isManual: true,
       createdVia: input.createdVia ?? "APP",
+      isOverlapConfirmed: overlap.confirmed,
     },
   });
 
@@ -536,15 +609,24 @@ export async function updateTimeEntry(
     await assertActiveTargets(actor, nextClientId, nextCategoryId);
   }
 
-  if (input.startAt || input.endAt) {
-    await assertNoOverlap(
+  // Re-checked whenever the time range OR the client changes - either can
+  // flip the conflict from same-client (hard block) to cross-client
+  // (confirmable) or introduce/remove a conflict entirely. Left
+  // untouched (isOverlapConfirmed stays whatever it already was) when
+  // neither changes, matching every other field here that's only
+  // re-validated when it's actually part of the edit.
+  let overlapConfirmed: boolean | undefined;
+  if (input.startAt || input.endAt || input.clientId) {
+    const overlap = await assertNoOverlap(
       actor,
       entry.userId,
+      nextClientId,
       nextStartAt,
       nextEndAt,
       !!input.allowOverlapOverride,
       entry.id
     );
+    overlapConfirmed = overlap.confirmed;
   }
 
   const nextActualSeconds = nextEndAt
@@ -569,6 +651,7 @@ export async function updateTimeEntry(
         actualSeconds: nextActualSeconds,
         billableSeconds: nextBillableSeconds,
         isEdited: true,
+        isOverlapConfirmed: overlapConfirmed,
       },
     });
 

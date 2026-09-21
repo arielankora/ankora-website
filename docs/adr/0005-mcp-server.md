@@ -394,3 +394,247 @@ it.
 **`CLIENT_USER` never sees the card.** None of the ten tools are
 reachable with that role, so offering the connection would be an
 invitation to a dead end.
+
+---
+
+## Phase 4 — revoking a grant from inside the product (2026-09-21)
+
+Phase 3 made the connection visible and said plainly what it did not
+build: a way to end one. Revocation meant removing the connector inside
+Claude, or an act that bumps `tokenVersion` — a password change, or an
+admin's "logout all sessions". All three work. None of them is what an
+admin reaches for when somebody leaves, and "change your password" is
+not an answer to "how do you cut a third party's access to client data",
+which is the form the question takes in a SOC 2 review.
+
+**Two controls, because there are two situations.**
+
+`revokeMyClaudeGrant` is self-service, per grant, on the card. Ownership
+lives in the `WHERE` clause (`{ id, userId: actor.id }`) rather than in a
+read-then-compare: a guessed or replayed id matches nothing, and a zero
+count is the same answer for a wrong id as for someone else's, so a
+caller learns nothing about grants that are not theirs.
+
+`revokeClaudeGrantsForUser` is the admin path, gated on `user.manage`,
+all-or-nothing, on the user detail screen next to "logout all sessions".
+It deliberately does **not** bump `tokenVersion`. The two answer
+different questions: "this account may be compromised" wants every
+session gone, and already takes the Claude grants with it; "this person
+no longer needs the integration" wants only the integration gone and
+should not log them out of the app they are working in. The screen shows
+the live grant count beside the button, because a control that looks
+identical whether there are three grants or none gets pressed on a hunch.
+
+### Decisions worth not re-litigating
+
+**Soft revoke, never delete.** `revokedAt` is set; the row stays.
+`lib/mcp/auth.ts` already treats a revoked row as a 401, so deleting
+would buy nothing and lose the evidence that the grant existed and when
+it ended. Consistent with the schema's own soft-delete-only convention.
+
+**An OAuth disconnect revokes by client, not by row.** Rotation writes a
+new row per renewal and revokes the one it supersedes, but a row that
+rotated away and was not yet revoked would keep a valid access token
+alive for up to an hour after the click. "Disconnect" has to mean
+disconnected, so every live row for that `(userId, clientId)` goes.
+
+**Confirm before, rather than undo after.** This is a deliberate
+exception to the toast provider's rule that destructive actions offer a
+real Undo. Un-revoking would resurrect a credential the person just
+decided to kill. The recovery path is honest and takes seconds —
+authorize again in Claude — so the safety sits in an explicit second
+press, inline in the card, not in a reversal. No `window.confirm`: a
+native modal blocks the page and looks nothing like the rest of this UI.
+
+**`mcp_grant.revoke` classifies as הרשאות, not עריכה.** The audit
+screen's `classifyAction` derives its tag from the action string.
+Revoking a credential is an access change; left to fall through it would
+have been tagged as a routine edit on the one screen an admin scans for
+exactly this kind of event.
+
+### Found by running it
+
+Exercising the flow end to end on the preview — register a client,
+approve consent, call `/api/mcp` with the token, press disconnect, call
+again — turned up something the code review had not. The consent
+endpoint has been writing an `mcp.oauth.granted` audit row since Phase
+15, correctly, but the audit screen had no Hebrew label for that action
+and no `OAuthClient` entry in its entity filter. So every grant since
+Phase 15 has been landing in the log as a raw `mcp.oauth.granted`
+string that could not be filtered for.
+
+Fixed here, alongside the revoke labels. The lesson is the ordinary one:
+`classifyAction` and `ACTION_LABEL` are a second place that every new
+audited action has to be registered, and nothing enforced it.
+
+Followed up immediately rather than waiting for a third occurrence,
+because pulling the thread found fourteen more: the whole of Phase 10's
+important-dates and reminder-rule actions, `profile.name_update`,
+`profile.notification_preference_update`, `task.update`,
+`client.restore` and `backup.nightly_export.sent` were all rendering as
+raw English, and five entity types (`Task`, `ImportantDate`,
+`ReminderRule`, `HolidayCalendarSubscription`, `System`) could not be
+selected in the filter at all. The two registries now live in
+`audit-log/labels.ts`, and `tests/unit/audit-labels.test.ts` scans every
+`recordAudit` call site in `lib/` and `app/` and fails on an
+unregistered action or entity type — in both directions, so a label left
+behind by a deleted call site is caught too. Verified by removing a
+label and an entity type and watching it fail on exactly those.
+
+---
+
+## Phase 5 — tasks (2026-09-21)
+
+(Numbered 5 in this document's own sequence. The code comments call it
+Phase 16, which is the repo-wide phase number the MCP work has used
+since Phase 13 — the two schemes have coexisted throughout this ADR.)
+
+The ten tools could answer "where did my week go" and record time, but
+not "what do I need to do". That asymmetry made the connector a
+reporting surface rather than an operational one, and it is the gap this
+phase closes: `list_tasks`, `list_assignable_people`, `create_task`,
+`update_task`, plus a `task` argument on `start_timer` and
+`create_time_entry`.
+
+### What this phase actually found
+
+The intended work was to expose existing domain functions. It turned out
+the domain functions were not there to expose.
+
+Phase 10 added `Task.assignedToId` and `Task.dueDate` and wired
+`important-dates-job.ts` to write both when it auto-creates a task from
+an important date. Nothing was ever added to read or change them.
+`createTask` took a title and a client; `updateTaskStatus` was the only
+mutation; `listTasks` could filter by client, category and status and
+nothing else. So production has carried tasks with an owner and a
+deadline that no screen, no server action and no export could show —
+data written by a cron job into columns with no readers.
+
+That is why most of this change is in `lib/app-domain/tasks.ts` rather
+than in the MCP layer. The MCP tools are one caller of the completed
+domain; the Tasks screen is the other, and it gets the same fix for
+free (including a `dueDate` leg in the sort order, so the list finally
+reads soonest-first instead of ignoring deadlines it was already
+storing).
+
+### Decisions worth not re-litigating
+
+**Assignment is gated on `time_entry.create_self`, not
+`time_entry.edit_others`.** The obvious move was to reuse
+`lookupTeamMember`, which already resolves a colleague by name. It
+asserts the hours permission, because listing who works here in order to
+read their timesheet is a real disclosure. Assigning work is a much
+smaller thing to be allowed to do, and reusing that gate would have made
+task assignment admin-only — which is not how a five-person operations
+team works. `assignableUsers()` carries the narrower rule instead:
+anyone who logs time may assign, and the people they can see are the
+ones who share the client.
+
+**An assignee must have access to the task's client.** Task visibility
+has always been derived from client access, so assigning a task to
+someone without access to that client files it where its owner can never
+find it — a silent dead letter that looks exactly like success. The
+domain layer refuses, with a message that says what to do about it.
+
+**A due date is stored at the end of its day, in the user's timezone.**
+Storing the start of the day would make every task due today read as
+overdue from one minute past midnight. `overdue` is computed on the
+server for the same reason `dueDate` is emitted as `YYYY-MM-DD` rather
+than an instant: a model handed a bare date and left to compare it
+against "now" gets the boundary day wrong about half the time.
+
+**A finished task is never overdue.** Otherwise the archive reads as a
+list of fires.
+
+**`update_task` takes a patch, and clearing is explicit.** Omitting a
+field leaves it alone; `clearAssignee` / `clearDue` empty it. A whole-
+object update would let "change the due date" silently unassign the
+task, and passing an empty string for "no owner" is exactly the kind of
+ambiguity a model resolves confidently and wrongly.
+
+### A pre-existing bug this surfaced
+
+`TimeEntry.taskId` has been writable since Phase 2 and nothing ever
+checked that the task belonged to the same client as the entry. The
+invariant held only because the timer screen's picker is scoped to the
+chosen client — precisely the "don't rely on the UI having hidden a
+button" failure `permissions.ts` warns about. A second caller made it
+reachable, so `assertTaskMatchesClient()` now runs in both `startTimer`
+and `createManualEntry`. A mismatched pair would have filed one client's
+hours under another client's task and corrupted both clients' reports,
+quietly.
+
+### Verification
+
+- 400 unit assertions pass, up from 370; 20 of the new ones are on the
+  task tools and 13 on the serializer
+- `tests/unit/mcp/write-tools.test.ts` was extended rather than
+  replaced: its exact-match assertion on `startTimer`'s arguments now
+  names `taskId: null` deliberately, because an absent key and an
+  explicit null are different instructions to the domain layer
+- The contradiction guard and the end-of-day due date were each
+  mutation-tested — removing the check fails exactly the test that
+  should catch it
+
+**Not verified: no task tool has run against a database.** The preview
+build confirms the code typechecks against the real Prisma client and
+that the existing suites still pass; it does not confirm that
+`create_task` writes a row Ankora's own screen then shows. That is the
+first thing to do after this merges.
+
+---
+
+## Phase 6 — the cost of a preamble (2026-09-21)
+
+(Phase 17 in the code's repo-wide numbering.)
+
+First real use of the task tools surfaced a complaint that had nothing
+to do with tasks: "it keeps asking for permission, and that is not how
+other connectors feel."
+
+### What was actually happening
+
+In Claude, each tool call is a permission prompt somebody has to click.
+This server's instructions opened with **"Call list_my_clients and
+list_categories first and use the names they return exactly as
+written"**, and most tool descriptions repeated it per argument
+("exactly as list_my_clients returned it"). `start_timer` told the model
+to call `get_active_timer` first. `create_task` told it to call
+`list_assignable_people` first.
+
+So "open a task on RIMED for next week" was four tool calls and four
+clicks, three of them preamble. Logging time was three. The connector
+felt like it was asking permission constantly because it was — and the
+prompts were for calls the user never asked for.
+
+### Why the preamble was never needed
+
+It was belt and braces, and the braces were always enough. Every tool
+resolves names through `lib/mcp/lookup.ts`, which answers a miss with
+"did you mean X or Y", built from what *this actor* may see. The
+listing tools never told the model anything it could not learn by
+simply trying the name and reading the refusal.
+
+The same is true of the timer check: `start_timer` refuses when one is
+already running, and `errors.ts` maps `ActiveTimerExistsError` to a
+message that names the recovery. Checking first bought a click and
+nothing else.
+
+Listing is now what happens when a name does not resolve, or when the
+user actually asks what exists.
+
+### What this does not fix
+
+The permission prompt itself is Claude's, not ours. `readOnlyHint` is a
+hint a client may act on or ignore, and the annotations were already
+correct — the read tools have carried `readOnlyHint: true` since Phase
+13. Reducing the call count is the only lever this codebase has; whether
+a given Claude surface offers "Allow always" is a client-side question.
+
+### Guarded
+
+`tests/unit/mcp/write-tools.test.ts` now fails on any tool description
+or argument description that reinstates a "call X first" instruction, in
+either its imperative form or the softer "exactly as list_X returned it".
+It caught one on its first run — `create_task` still carried a
+`list_assignable_people` preamble that the manual pass had missed.

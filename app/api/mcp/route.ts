@@ -42,13 +42,25 @@ const handler = createMcpHandler(registerAnkoraTools, {
     version: "0.1.0",
   },
   // Read by the model before it picks a tool. Worth as much care as the
-  // tool descriptions themselves: the two rules below are the ones that
-  // stop the most common failure modes - inventing an id, and assuming a
-  // write succeeded.
+  // tool descriptions themselves: the rules below are the ones that stop
+  // the most common failure modes - inventing an id, and assuming a write
+  // succeeded.
+  //
+  // Phase 17: these instructions used to open with "Call list_my_clients
+  // and list_categories first." That was belt and braces, and the braces
+  // were enough: every tool resolves names through lib/mcp/lookup.ts,
+  // which already answers a miss with "did you mean X or Y" built from
+  // what this actor may see. The preamble bought no safety and cost two
+  // extra tool calls before every real action - and in Claude each tool
+  // call is a permission prompt the person has to click, so the rule was
+  // spending the user's attention on round trips that told the model
+  // nothing it could not have learned by simply trying the name.
+  //
+  // Listing is now what you do when a name does not resolve, not before.
   instructions: [
     "This server exposes Ankora's Time Tracking app for the signed-in employee.",
     "Identity comes from the connection, not from arguments: you never pass a user id, and you cannot act as anyone else.",
-    "Never invent an Ankora id. Call list_my_clients and list_categories first and use the names they return exactly as written; if a name does not resolve, ask the user rather than guessing.",
+    "Never invent an Ankora id. Pass client, category, task and person names as the user said them - the tools match them for you. Only call a list tool when a name comes back as unrecognised or ambiguous, or when the user actually asks what exists; do not list first as a matter of course.",
     "Reading another person's time needs a manager or admin role. If a team tool is refused, say so plainly instead of retrying.",
     "Writes create real records that colleagues and clients see. Confirm the client, category and times with the user before calling a write tool, and never call create_time_entry twice for the same work - it makes two entries.",
   ].join(" "),

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestUser, createTestClient, createTestCategory, createTestTimeEntry } from "./factories";
 import { runReport } from "@/lib/app-domain/reports";
-import { openHourBankCycle } from "@/lib/app-domain/hour-banks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { openHourBankCycle } from "@/lib/app-domain/hour-banks";
 
 // Phase 5 - spec 14 (reports), 21.2 ("Report aggregates equal raw time
 // entry sums"), and 4.1 ("כל Endpoint בשרת בודק Authorization"). Needs a
@@ -96,28 +96,30 @@ describe("hours_by_employee - spec 14.2", () => {
 });
 
 describe("hours_by_client - spec 14.2 client isolation via filter", () => {
+  // hoursByClient() reads each client's CURRENT hour bank and drops any client
+  // that has none (getCurrentHourBank returns null). This test used to assert a
+  // row without opening one, so an empty result was the correct answer and the
+  // expectation was simply wrong - it had not run since the whole integration
+  // suite was being skipped in CI. Both clients get a cycle here, which is also
+  // what makes "narrows to only that client" a real assertion: without clientB
+  // in the unfiltered result there is nothing for the filter to exclude.
   it("clientId filter narrows Hours by Client to only that client", async () => {
     const { superAdmin, clientA, clientB } = await setup();
+    const cycleStart = new Date(Date.now() - 7 * 86_400_000);
+    const cycleEnd = new Date(Date.now() + 7 * 86_400_000);
+    for (const c of [clientA, clientB]) {
+      await openHourBankCycle(superAdmin, c.id, {
+        cycleStart,
+        cycleEnd,
+        purchasedMinutes: 600,
+        rolloverMode: "NONE",
+      });
+    }
 
-    // hours_by_client is an HOUR BANK report, not a time report - its
-    // columns are used / remaining / utilization %, and it deliberately
-    // skips any client that has no bank, because those three numbers do
-    // not exist for one. So both clients need a cycle open before the
-    // filter has anything to narrow.
-    //
-    // Worth recording why this took two tries: the original test created
-    // nothing at all and still expected a row, and the first fix added
-    // time entries - the natural guess for a report with "hours" in its
-    // name, and still the wrong one. Neither failure was a product bug,
-    // though the second looked convincingly like one.
-    const cycle = {
-      cycleStart: new Date(Date.now() - 7 * 86_400_000),
-      cycleEnd: new Date(Date.now() + 23 * 86_400_000),
-      purchasedMinutes: 600,
-      rolloverMode: "NONE" as const,
-    };
-    await openHourBankCycle(superAdmin, clientA.id, cycle);
-    await openHourBankCycle(superAdmin, clientB.id, cycle);
+    const unfiltered = await runReport(superAdmin, "hours_by_client", {});
+    expect(unfiltered.rows.map((r) => r.client)).toEqual(
+      expect.arrayContaining([clientA.name, clientB.name])
+    );
 
     const result = await runReport(superAdmin, "hours_by_client", { clientId: clientA.id });
     expect(result.rows).toHaveLength(1);
