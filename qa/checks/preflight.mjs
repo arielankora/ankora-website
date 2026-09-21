@@ -39,10 +39,15 @@ async function databaseUp() {
   const url = process.env.QA_DATABASE_URL ?? process.env.DATABASE_URL;
   if (!url) return false;
   try {
-    const { host, port } = new URL(url.replace(/^postgres(ql)?:/, "http:"));
+    // `hostname`, not `host`: WHATWG URL's `host` INCLUDES the port
+    // ("127.0.0.1:5432"), and net.createConnection then tries to resolve that
+    // whole string as a name, fails, and reports the database as unreachable.
+    // CI has had a healthy postgres service container this whole time and
+    // every integration test was being skipped for "no database reachable".
+    const { hostname, port } = new URL(url.replace(/^postgres(ql)?:/, "http:"));
     const net = await import("node:net");
     return await new Promise((resolve) => {
-      const s = net.createConnection({ host, port: Number(port || 5432) }, () => {
+      const s = net.createConnection({ host: hostname, port: Number(port || 5432) }, () => {
         s.end();
         resolve(true);
       });
