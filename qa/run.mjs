@@ -20,6 +20,7 @@ import * as staticChecks from "./checks/static.mjs";
 import * as vitest from "./checks/vitest.mjs";
 import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
+import { e2e } from "./checks/e2e.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -91,10 +92,19 @@ async function main() {
     return [finding("blocker", "next build failed", r.all.split("\n").slice(-30).join("\n"))];
   });
 
-  // e2e / deps / a11y / perf land in the next stage; the runner already
+  await run.check(
+    "e2e",
+    {
+      label: "Browser end-to-end",
+      level: 2,
+      skipIf: async () => (await needs.browser()) ?? (await needs.database()),
+    },
+    e2e,
+  );
+
+  // deps / a11y / perf land in the next stage; the runner already
   // reserves their slots so adding them is a one-line change here.
   for (const [id, label, lvl] of [
-    ["e2e", "Browser end-to-end", 2],
     ["deps", "Dependency advisories", 2],
     ["rbac", "Permission matrix", 3],
     ["boundary", "Boundary & data integrity", 3],

@@ -904,8 +904,15 @@
       "risk": "medium",
       "riskAssigned": false,
       "firstSeen": "2026-09-20"
+    },
+    "domain:mcp-connections": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-21"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-20"
+  "lastScan": "2026-09-21"
 }

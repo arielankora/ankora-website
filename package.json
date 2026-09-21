@@ -21,7 +21,9 @@
     "qa:2": "node qa/run.mjs 2",
     "qa:3": "node qa/run.mjs 3",
     "qa:scan": "node qa/scan.mjs",
-    "qa:sync": "node qa/scan.mjs --sync"
+    "qa:sync": "node qa/scan.mjs --sync",
+    "qa:e2e": "playwright test -c qa/playwright.config.ts",
+    "qa:e2e:ui": "playwright test -c qa/playwright.config.ts --ui"
   },
   "dependencies": {
     "@fontsource/assistant": "^5.3.0",
@@ -54,6 +56,7 @@
     "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "20.14.15",
     "@types/pdfkit": "^0.17.6",

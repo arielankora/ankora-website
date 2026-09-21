@@ -21,14 +21,52 @@ const args = process.argv.slice(2);
 const SYNC = args.includes("--sync");
 const JSON_OUT = args.includes("--json");
 
-/** Risk tiers decide *how much* proof a capability needs, not whether it is tested. */
-const REQUIRED_BY_RISK = {
-  critical: ["unit|integration", "e2e"], // money, auth, data integrity
-  high: ["unit|integration"],
-  medium: ["unit|integration|e2e"],
-  low: [],
-  unassigned: [], // never blocks; always reported so it gets triaged
+/**
+ * What a capability owes, by risk AND by kind.
+ *
+ * Risk alone is not enough, and an earlier version of this file proved
+ * it: treating every critical capability as owing both a logic test and
+ * a browser test demanded an end-to-end test of `mcp:start_timer`, which
+ * has no browser surface at all, and a unit test of `/app/login`, which
+ * is a React page with no logic module behind it. Impossible demands are
+ * worse than no demand - they fill the report with work nobody can do,
+ * and a report full of noise is one nobody reads.
+ *
+ * So the rule is: a capability owes only the kind of proof it can
+ * actually have.
+ */
+const PROOF = {
+  // Pages and screens exist to be looked at. A browser is the only thing
+  // that can say whether they work; there is no unit to test.
+  page: { critical: ["e2e"], high: ["e2e"], medium: ["e2e"], low: [] },
+  screen: { critical: ["e2e"], high: ["e2e"], medium: ["e2e"], low: [] },
+
+  // Logic. Reachable from a browser only through some screen, so the
+  // proof that matters is a test of the logic itself.
+  domain: { critical: ["unit|integration"], high: ["unit|integration"], medium: ["unit|integration"], low: [] },
+  api: { critical: ["unit|integration"], high: ["unit|integration"], medium: ["unit|integration"], low: [] },
+  cron: { critical: ["unit|integration"], high: ["unit|integration"], medium: ["unit|integration"], low: [] },
+
+  // No browser surface by definition: an MCP client is not a browser.
+  "mcp-tool": { critical: ["unit|integration"], high: ["unit|integration"], medium: ["unit|integration"], low: [] },
+
+  // The one kind that genuinely owes both. A Server Action is the hinge
+  // between a form somebody clicks and a write to the database, and each
+  // half can be right while the pair is broken. The browser half is only
+  // satisfied by a spec that actually submits - rendering the screen
+  // does not count (see qa/lib/discover.mjs).
+  "server-action": {
+    critical: ["unit|integration", "e2e"],
+    high: ["unit|integration"],
+    medium: ["unit|integration"],
+    low: [],
+  },
 };
+
+function requirementsFor(cap, risk) {
+  if (risk === "unassigned") return []; // never blocks; always reported so it gets triaged
+  return PROOF[cap.kind]?.[risk] ?? [];
+}
 
 function loadManifest() {
   if (!fs.existsSync(MANIFEST)) {
@@ -77,7 +115,7 @@ function main() {
     const entry = manifest.capabilities[cap.id];
     const risk = entry?.risk ?? guessRisk(cap);
     if (manifest.waivers?.[cap.id]) continue;
-    const missing = (REQUIRED_BY_RISK[risk] ?? []).filter((r) => !satisfied(r, cap.coverage));
+    const missing = requirementsFor(cap, risk).filter((r) => !satisfied(r, cap.coverage));
     if (missing.length) gaps.push({ id: cap.id, kind: cap.kind, area: cap.area, risk, missing, coverage: cap.coverage });
   }
 

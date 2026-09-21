@@ -103,6 +103,22 @@ jobs:
             echo "value=2" >> "$GITHUB_OUTPUT"
           fi
 
+      # Only from level 2. A pull request gate that downloads a browser
+      # it will not open has turned a four-minute check into a six-minute
+      # one for nothing.
+      - name: Install browser
+        if: steps.level.outputs.value != '1'
+        run: npx playwright install --with-deps chromium
+
+      # The demo fixtures from prisma/seed.ts, which the browser suite
+      # signs in as. Safe here and nowhere else: this database is created
+      # empty by the service container above and destroyed with the job,
+      # and every fixture is prefixed "[DEMO]" so it is unmistakable if it
+      # ever turns up somewhere it should not.
+      - name: Seed demo fixtures
+        if: steps.level.outputs.value != '1'
+        run: npm run db:seed
+
       - name: Run QA
         id: qa
         run: node qa/run.mjs ${{ steps.level.outputs.value }}
