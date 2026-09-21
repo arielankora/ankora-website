@@ -76,7 +76,11 @@ jobs:
       ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
 
     steps:
+      # Full history: the level-selection step below diffs against the
+      # base branch, which a shallow clone cannot see.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -90,17 +94,27 @@ jobs:
         run: npx prisma migrate deploy
 
       # The level: an explicit dispatch input wins; a pull request is
-      # always level 1 so the gate stays fast; anything else is the
-      # default deep regression.
+      # level 1 so the gate stays fast; anything else is the default deep
+      # regression.
+      #
+      # The one exception: a pull request that changes the browser suite
+      # itself runs at level 2, because level 1 does not open a browser -
+      # so without this, a change to the e2e specs would merge having
+      # never once been executed. The suite has to be able to test the
+      # thing it is made of.
       - name: Choose level
         id: level
         run: |
           if [ -n "${{ inputs.level }}" ]; then
             echo "value=${{ inputs.level }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "pull_request" ]; then
-            echo "value=1" >> "$GITHUB_OUTPUT"
-          else
+          elif [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "value=2" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+               | grep -qE '^qa/(e2e/|playwright\.config\.ts)'; then
+            echo "touches the browser suite - running level 2"
+            echo "value=2" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=1" >> "$GITHUB_OUTPUT"
           fi
 
       # Only from level 2. A pull request gate that downloads a browser
