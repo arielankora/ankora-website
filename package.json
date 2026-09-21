@@ -69,7 +69,7 @@
     "eslint": "8.57.0",
     "eslint-config-next": "15.5.25",
     "pdfjs-dist": "6.3.289",
-    "playwright": "^1.48.0",
+    "playwright": "1.56.1",
     "postcss": "^8.5.28",
     "tailwindcss": "3.4.7",
     "tsx": "^4.23.13",
