@@ -39,10 +39,16 @@ async function databaseUp() {
   const url = process.env.QA_DATABASE_URL ?? process.env.DATABASE_URL;
   if (!url) return false;
   try {
-    const { host, port } = new URL(url.replace(/^postgres(ql)?:/, "http:"));
+    // `hostname`, not `host`. `host` carries the port ("127.0.0.1:5432"),
+    // which then gets passed as a hostname, fails DNS, and reports a
+    // perfectly healthy database as unreachable. That happened in CI: the
+    // integration suite and the whole browser suite skipped themselves on
+    // a green run, one step after `prisma migrate deploy` had succeeded
+    // against that exact database.
+    const { hostname, port } = new URL(url.replace(/^postgres(ql)?:/, "http:"));
     const net = await import("node:net");
     return await new Promise((resolve) => {
-      const s = net.createConnection({ host, port: Number(port || 5432) }, () => {
+      const s = net.createConnection({ host: hostname, port: Number(port || 5432) }, () => {
         s.end();
         resolve(true);
       });

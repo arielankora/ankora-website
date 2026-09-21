@@ -28,7 +28,10 @@ export class Run {
     const started = Date.now();
     const skip = skipIf ? await skipIf() : null;
     if (skip) {
-      this.checks.push({ id, label, status: "skipped", reason: skip, ms: 0, findings: [] });
+      // `blocking` is recorded on a skip too, so `incomplete` below can
+      // tell "the browser suite did not run" from "a not-yet-implemented
+      // placeholder did not run".
+      this.checks.push({ id, label, status: "skipped", blocking, reason: skip, ms: 0, findings: [] });
       process.stdout.write(`  ○ ${label} — ${skip}\n`);
       return;
     }
@@ -55,6 +58,36 @@ export class Run {
 
   get failed() {
     return this.checks.some((c) => c.blocking && c.status === "fail");
+  }
+
+  /**
+   * A skipped check is not a passed check.
+   *
+   * Learned the hard way: a CI run reported PASS while the integration
+   * suite and the entire browser suite had quietly skipped themselves on
+   * a preflight bug. Nothing was red, nothing was wrong, and nothing had
+   * actually been tested. "PASS" on a run that did not open a browser at
+   * a level defined by opening a browser is a lie of omission, and the
+   * one thing this suite cannot afford is to be believed when it should
+   * not be.
+   *
+   * So the verdict says INCOMPLETE whenever a blocking check at this
+   * level did not run. It still exits zero - a missing database is not a
+   * product regression and should not block a merge - but nobody reads
+   * the word PASS and assumes more than happened.
+   */
+  get incomplete() {
+    return this.checks.some((c) => c.blocking && c.status === "skipped");
+  }
+
+  get verdict() {
+    if (this.failed) return "FAIL";
+    if (this.incomplete) return "INCOMPLETE — some checks did not run";
+    return this.warned ? "PASS WITH FINDINGS" : "PASS";
+  }
+
+  get warned() {
+    return this.checks.some((c) => c.status === "warn");
   }
 
   get allFindings() {
@@ -87,7 +120,7 @@ export class Run {
 
   markdown() {
     const s = this.summary();
-    const verdict = s.fail ? "FAIL" : s.warn ? "PASS WITH FINDINGS" : "PASS";
+    const verdict = this.verdict;
     const rows = this.checks
       .map((c) => `| ${{ pass: "✓", warn: "▲", fail: "✗", skipped: "○" }[c.status]} | ${c.label} | ${(c.ms / 1000).toFixed(1)}s | ${c.findings.length || (c.reason ?? "")} |`)
       .join("\n");
@@ -111,7 +144,7 @@ export class Run {
 
   print() {
     const s = this.summary();
-    const verdict = s.fail ? "FAIL" : s.warn ? "PASS WITH FINDINGS" : "PASS";
+    const verdict = this.verdict;
     process.stdout.write(`\n  ${verdict} — level ${this.level} · ${(s.durationMs / 1000 / 60).toFixed(1)} min\n`);
     process.stdout.write(`  ${s.pass} passed · ${s.warn} findings · ${s.fail} failed · ${s.skipped} skipped\n\n`);
     for (const f of this.allFindings.filter((x) => x.severity === "blocker" || x.severity === "major")) {
