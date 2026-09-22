@@ -121,6 +121,10 @@ export default defineConfig({
     ? undefined
     : {
         command: `npx next start -p ${PORT}`,
+        // Turns on lib/slow-log.ts's trace(), which is otherwise silent
+        // everywhere. Set here rather than in the workflow so the flag
+        // travels with the suite that reads it.
+        env: { QA_TRACE: "1" },
         // Playwright defaults a webServer's cwd to the directory holding
         // this config file - so `next start` ran inside qa/, found no
         // .next there, and died before a single spec was collected. The

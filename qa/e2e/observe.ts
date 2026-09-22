@@ -42,6 +42,7 @@ type Observed = {
   done: Call[];
   open: Map<string, { method: string; path: string; startedAt: number }>;
   logs: string[];
+  navigations: string[];
 };
 
 const observed = new WeakMap<Page, Observed>();
@@ -81,7 +82,7 @@ const DRIFT_PROBE = `(() => {
 })();`;
 
 export function observe(page: Page): void {
-  const state: Observed = { done: [], open: new Map(), logs: [] };
+  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [] };
   observed.set(page, state);
 
   // Fire and forget: a probe that failed to install must never be the
@@ -133,6 +134,15 @@ export function observe(page: Page): void {
     });
   });
 
+  // A navigation is the ordinary reason a browser aborts everything it
+  // had in flight, and the round that found five aborts in a row - four
+  // prefetches and the Server Action itself - cannot tell that apart from
+  // a cancellation with no navigation at all.
+  page.on("framenavigated", (frame) => {
+    if (frame !== page.mainFrame()) return;
+    state.navigations.push(shortPath(frame.url()));
+  });
+
   // An uncaught exception on the client is the one failure mode that
   // leaves the screen looking merely slow.
   page.on("pageerror", (err) => state.logs.push(`threw: ${err.message.slice(0, 200)}`));
@@ -181,6 +191,7 @@ export function trafficSummary(page: Page): string {
       : "no call was ever sent",
     stillOpen.length ? `in flight: ${stillOpen.join(" | ")}` : "nothing in flight",
     logs.length ? `page said: ${logs.join(" | ")}` : "page said nothing",
+    `main frame went: ${state.navigations.slice(-4).join(" -> ") || "nowhere"}`,
     machineLoad(),
   ].join(". ");
 }

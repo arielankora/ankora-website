@@ -207,6 +207,24 @@ export async function e2e() {
     if (errors.length) {
       out.push(finding("minor", "what the app logged while the browser ran", errors.join("\n")));
     }
+
+    // The action trace, when the suite asked for one.
+    //
+    // A Server Action's POST reported as aborted by the browser, with no
+    // row written, has two readings that need opposite fixes: the request
+    // never arrived, or it arrived and the server never finished. The
+    // error filter above cannot carry these lines - they name no fault,
+    // which is the point of them - so they get their own block.
+    const traced = String(r.all ?? "")
+      .split("\n")
+      .filter((l) => l.startsWith("[WebServer]"))
+      .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+      .filter((l) => l.includes("[trace]"))
+      .slice(-20);
+
+    if (traced.length) {
+      out.push(finding("minor", "what the server traced while the browser ran", traced.join("\n")));
+    }
   }
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));

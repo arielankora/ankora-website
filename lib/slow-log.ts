@@ -43,3 +43,22 @@ export async function timed<T>(label: string, work: () => Promise<T>): Promise<T
     if (elapsed >= SLOW_MS) console.warn(`${TAG} ${label} ${elapsed}ms${threw ? " (threw)" : ""}`);
   }
 }
+
+/// Off unless the browser suite turns it on.
+///
+/// The suite's own diagnostic can say that a Server Action's POST was
+/// aborted after fifty milliseconds and that the row never appeared. It
+/// cannot say which side let go: a request that never reached the server
+/// and one the server began and never finished look identical from the
+/// browser, and they have nothing in common as problems.
+///
+/// So the action says, in the server log, that it started and that it
+/// returned. Two lines, only while qa/playwright.config.ts sets the flag,
+/// which means never in production and never in a dev session.
+const TRACING = process.env.QA_TRACE === "1";
+
+export function trace(label: string): void {
+  // console.warn, not log: the browser suite pipes the app's stderr and
+  // discards its stdout, so a line on stdout is a line nobody reads.
+  if (TRACING) console.warn(`[trace] ${label}`);
+}
