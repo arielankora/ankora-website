@@ -97,17 +97,43 @@ test.describe("filing time for someone else", () => {
     await reason.fill("דיווח מאוחר - בדיקה אוטומטית");
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
-    await page.waitForLoadState("networkidle");
+
+    // Wait for the form to say it is done, not for the network to go
+    // quiet.
+    //
+    // `networkidle` can resolve in the gap between the click and the
+    // request the click causes - React schedules the submit, and five
+    // hundred milliseconds of quiet can pass the test before the write
+    // has left the browser. The reload below then cancels it, the row is
+    // never written, and the failure reads as a slow screen.
+    //
+    // The form closes when the action reports success, so that is the
+    // signal.
+    let closed = true;
+    try {
+      await expect(page.locator('select[name="userId"]')).toHaveCount(0, { timeout: 30_000 });
+    } catch {
+      closed = false;
+    }
 
     // Say what the form said, if it said no.
     //
     // "the entry was not created" is true and useless: a refused write
     // and a slow one look identical from the row that is missing. The
     // form renders its reason, so a failure here should carry it rather
-    // than send the next person to read the server log.
-    const refusal = (await page.locator("body").innerText()).match(
-      /יש (?:לציין|לבחור|להזין)[^\n]{0,80}|חופף[^\n]{0,80}|לא ניתן[^\n]{0,80}/,
-    );
+    // than send the next person to read the server log. Read while the
+    // form is still open, because a form that closed has nothing to say.
+    const refusal = closed
+      ? null
+      : (await page.locator("body").innerText()).match(
+          /יש (?:לציין|לבחור|להזין)[^\n]{0,80}|חופף[^\n]{0,80}|לא ניתן[^\n]{0,80}/,
+        );
+
+    if (!closed) {
+      throw new Error(
+        `the create form never closed after saving${refusal ? ` - the form said: ${refusal[0]}` : ", and said nothing"}`,
+      );
+    }
 
     await page.reload();
     await expect(
@@ -138,7 +164,22 @@ test.describe("filing time for someone else", () => {
     await page.locator('[name="note"]').fill(note);
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
-    await page.waitForLoadState("networkidle");
+
+    // Wait for the form to say it is done, not for the network to go
+    // quiet.
+    //
+    // `networkidle` can resolve in the gap between the click and the
+    // request the click causes - React schedules the submit, and five
+    // hundred milliseconds of quiet can pass the test before the write
+    // has left the browser. The reload below then cancels it, the row is
+    // never written, and the failure reads as a slow screen.
+    //
+    // The form closes when the action reports success, so that is the
+    // signal. If it never closes, the message below still says what the
+    // form is showing.
+    await expect(page.locator('select[name="userId"]'), "the create form never closed after saving").toHaveCount(0, {
+      timeout: 30_000,
+    });
 
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
@@ -165,7 +206,22 @@ test.describe("filing time for someone else", () => {
     await page.locator('[name="note"]').fill(note);
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
-    await page.waitForLoadState("networkidle");
+
+    // Wait for the form to say it is done, not for the network to go
+    // quiet.
+    //
+    // `networkidle` can resolve in the gap between the click and the
+    // request the click causes - React schedules the submit, and five
+    // hundred milliseconds of quiet can pass the test before the write
+    // has left the browser. The reload below then cancels it, the row is
+    // never written, and the failure reads as a slow screen.
+    //
+    // The form closes when the action reports success, so that is the
+    // signal. If it never closes, the message below still says what the
+    // form is showing.
+    await expect(page.locator('select[name="userId"]'), "the create form never closed after saving").toHaveCount(0, {
+      timeout: 30_000,
+    });
     await page.reload();
 
     // Three integration tests assert the guard itself. This asserts the

@@ -36,10 +36,14 @@ export function AdminCreateEntryForm({
   clients: Option[];
   categories: Category[];
 }) {
-  const { onSubmit, pending, error, ok } = useActionForm(adminCreateEntryAction);
   const [clientId, setClientId] = useState("");
   const [date, setDate] = useState(todayKey());
   const [open, setOpen] = useState(false);
+  // Closes on success, like every other create form in the app. It used
+  // to stay open and rely on the person noticing the new row appear in
+  // the table below - which says nothing when the row is slow to arrive,
+  // and nothing at all about whether the write was accepted.
+  const { onSubmit, pending, error } = useActionForm(adminCreateEntryAction, () => setOpen(false));
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
