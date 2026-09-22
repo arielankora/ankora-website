@@ -40,6 +40,21 @@ export const MARKETING_ROUTES: string[] = ids
   .sort();
 
 /**
+ * The unauthenticated entry points, which have their own spec
+ * (qa/e2e/auth-screens.spec.ts, qa/e2e/login-link.spec.ts). Anything
+ * listed here is deliberately reachable without a session, so the
+ * signed-in sweep below skips it.
+ */
+export const AUTH_SCREENS = [
+  "/app/login",
+  "/app/forgot-password",
+  "/app/reset-password",
+  // Portal phase 0.
+  "/app/login-link",
+  "/app/login-link/request",
+];
+
+/**
  * Product screens behind the session. Dynamic segments are excluded: a
  * route like /app/clients/[clientId] needs a real id, so it belongs in a
  * flow test that creates one rather than in a blind sweep.
@@ -47,7 +62,12 @@ export const MARKETING_ROUTES: string[] = ids
 export const APP_SCREENS: string[] = ids
   .filter(([id, c]) => c.kind === "screen" && !id.includes("["))
   .map(([id]) => id.slice("screen:".length))
-  .filter((route) => !["/app/login", "/app/forgot-password", "/app/reset-password"].includes(route))
+  // Derived from AUTH_SCREENS rather than repeating the list: the two
+  // portal sign-in-link screens were added to the manifest and not here,
+  // so the signed-in sweep tried to open them and failed on a screen that
+  // is public by design. The next public screen added should not be able
+  // to repeat that.
+  .filter((route) => !AUTH_SCREENS.includes(route))
   .sort();
 
 /**
@@ -64,8 +84,7 @@ export const CUSTOMER_STORY_ROUTES: string[] = ["he", "en"].flatMap((locale) =>
   getAllStories(locale as "he" | "en").map((story) => `/${locale}/customer-stories/${story.slug}`),
 );
 
-/** The unauthenticated entry points, which have their own spec. */
-export const AUTH_SCREENS = ["/app/login", "/app/forgot-password", "/app/reset-password"];
+
 
 /**
  * Console noise that is not a product fault.
