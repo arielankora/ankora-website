@@ -1,4 +1,5 @@
 import "server-only";
+import { timed } from "@/lib/slow-log";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -197,6 +198,12 @@ export async function getImportantDate(actor: User, id: string) {
 }
 
 export async function createImportantDate(actor: User, input: ImportantDateInput) {
+  // Measured: this is the write the browser suite has caught sitting at
+  // "נוצר..." for over thirty seconds, more than once. See lib/slow-log.ts.
+  return timed("createImportantDate", () => createImportantDateInner(actor, input));
+}
+
+async function createImportantDateInner(actor: User, input: ImportantDateInput) {
   await assertClientAccess(actor, input.clientId);
   assertNotesDoNotContainForbiddenData(input.notes);
 

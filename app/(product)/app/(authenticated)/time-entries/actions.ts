@@ -15,6 +15,7 @@ import {
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
+import { timed } from "@/lib/slow-log";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -46,7 +47,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
   }
 
   try {
-    await createManualEntry(admin, targetUserId, {
+    await timed("action.adminCreateEntry", () => createManualEntry(admin, targetUserId, {
       clientId,
       categoryId,
       taskId: null,
@@ -55,7 +56,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
       allowOverlapOverride: formData.get("allowOverlapOverride") === "on",
-    });
+    }));
   } catch (err) {
     return { error: friendlyError(err) };
   }

@@ -145,6 +145,34 @@ export async function e2e() {
   // "minor", not "info": the PR comment filters info findings out
   // entirely, and evidence nobody reads is evidence nobody has. Twelve
   // lines because that is what the comment renders.
+  // Timing first, and regardless of the verdict.
+  //
+  // The app logs one line per write that took longer than a person would
+  // wait (lib/slow-log.ts). Those lines are the difference between "the
+  // button stayed disabled" and "the overlap check took twenty-one
+  // seconds", and they are worth reading on a green run too: a write
+  // creeping towards the timeout is the run before the one that fails.
+  const slow = String(r.all ?? "")
+    .split("\n")
+    .filter((l) => l.startsWith("[WebServer]"))
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[slow]"))
+    .slice(0, 12);
+
+  if (slow.length) {
+    // The number decides the severity, not the fact: five hundred
+    // milliseconds over the line is a note, five seconds is a fault
+    // someone has to own.
+    const worst = Math.max(...slow.map((l) => Number(/(\d+)ms/.exec(l)?.[1] ?? 0)));
+    out.push(
+      finding(
+        worst >= 5000 ? "major" : "minor",
+        `slow server work while the browser ran (worst ${worst}ms)`,
+        slow.join("\n")
+      )
+    );
+  }
+
   if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
     // The error lines, not the last twelve lines.
     //

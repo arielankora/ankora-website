@@ -6,6 +6,7 @@ import { computeEntryBillableSeconds } from "@/lib/app-domain/billing";
 import { flagAffectedCyclesRecalculated } from "@/lib/app-domain/hour-banks";
 import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
 import { afterResponse } from "@/lib/after-response";
+import { timed } from "@/lib/slow-log";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
@@ -498,19 +499,20 @@ export async function createManualEntry(
     throw new BackdateReasonRequiredError();
   }
 
-  const overlap = await assertNoOverlap(
-    actor,
-    targetUserId,
-    input.clientId,
-    input.startAt,
-    input.endAt,
-    !!input.allowOverlapOverride
+  // Measurement, not a change in behaviour: each of these three is a
+  // plausible suspect for the twenty-second saves the browser suite keeps
+  // catching, and naming them separately is what turns the next failing
+  // run into an answer instead of another guess. See lib/slow-log.ts.
+  const overlap = await timed("createManualEntry.overlap", () =>
+    assertNoOverlap(actor, targetUserId, input.clientId, input.startAt, input.endAt, !!input.allowOverlapOverride)
   );
 
   const actualSeconds = Math.round((input.endAt.getTime() - input.startAt.getTime()) / 1000);
-  const billableSeconds = await computeEntryBillableSeconds(input.clientId, actualSeconds);
+  const billableSeconds = await timed("createManualEntry.billable", () =>
+    computeEntryBillableSeconds(input.clientId, actualSeconds)
+  );
 
-  const entry = await prisma.timeEntry.create({
+  const entry = await timed("createManualEntry.insert", () => prisma.timeEntry.create({
     data: {
       userId: targetUserId,
       clientId: input.clientId,
@@ -526,16 +528,16 @@ export async function createManualEntry(
       createdVia: input.createdVia ?? "APP",
       isOverlapConfirmed: overlap.confirmed,
     },
-  });
+  }));
 
-  await recordAudit({
+  await timed("createManualEntry.audit", () => recordAudit({
     actorId: actor.id,
     action: "time_entry.create",
     entityType: "TimeEntry",
     entityId: entry.id,
     clientId: entry.clientId,
     after: { ...entry, backdateReason: input.backdateReason ?? null },
-  });
+  }));
 
   // Phase 4 (spec 9.2): a manual entry changes consumed minutes just
   // like a stopped timer does - same best-effort, non-fatal trigger.
