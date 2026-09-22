@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
-import { Check } from "lucide-react";
-import { toggleTaskDoneAction } from "./actions";
+import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
+import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { TaskStatus } from "@prisma/client";
 
@@ -35,12 +35,94 @@ const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"]
 export function TaskRow({
   task,
 }: {
-  task: { id: string; title: string; clientName: string; categoryName: string | null; dueDate: string | null; status: TaskStatus };
+  task: {
+    id: string;
+    title: string;
+    clientName: string;
+    categoryName: string | null;
+    dueDate: string | null;
+    status: TaskStatus;
+    // Portal phase 1.
+    clientVisible: boolean;
+    clientTitle: string | null;
+    waitingOnClient: boolean;
+  };
 }) {
   const { showToast } = useToast();
   const [status, setStatus] = useState(task.status);
   const [pending, setPending] = useState(false);
   const isDone = status === "DONE";
+
+  // Portal phase 1: the three fields that decide whether this task is a
+  // promise the client can see, and what it says to them. Kept in the
+  // row rather than behind a detail screen because the moment a person
+  // knows a task is client-facing is the moment they are looking at it
+  // in this list.
+  const [clientVisible, setClientVisible] = useState(task.clientVisible);
+  const [waitingOnClient, setWaitingOnClient] = useState(task.waitingOnClient);
+  const [clientTitle, setClientTitle] = useState(task.clientTitle ?? "");
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [portalPending, setPortalPending] = useState(false);
+
+  async function writePortal(
+    patch: { clientVisible?: boolean; clientTitle?: string | null; waitingOnClient?: boolean },
+    toast: { title: string; description?: string; undo?: () => void }
+  ) {
+    setPortalPending(true);
+    const result = await updateTaskPortalAction({ taskId: task.id, ...patch });
+    setPortalPending(false);
+    if (!result.ok) {
+      // Roll the optimistic state back to what the server still holds.
+      setClientVisible(task.clientVisible);
+      setWaitingOnClient(task.waitingOnClient);
+      setClientTitle(task.clientTitle ?? "");
+      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      return;
+    }
+    setClientVisible(result.clientVisible);
+    setWaitingOnClient(result.waitingOnClient);
+    setClientTitle(result.clientTitle ?? "");
+    showToast({ tone: "success", ...toast });
+  }
+
+  async function toggleVisible() {
+    const next = !clientVisible;
+    setClientVisible(next);
+    // Hiding a task also stops it waiting: a client cannot answer
+    // something they can no longer see, and leaving the flag set would
+    // make it reappear as "מחכה לך" the moment it is shown again.
+    if (!next) setWaitingOnClient(false);
+    await writePortal(
+      { clientVisible: next, ...(next ? {} : { waitingOnClient: false }) },
+      {
+        title: next ? "המשימה מוצגת ללקוח" : "המשימה הוסרה מהפורטל",
+        description: clientTitle || task.title,
+        undo: () => toggleVisible(),
+      }
+    );
+  }
+
+  async function toggleWaiting() {
+    const next = !waitingOnClient;
+    setWaitingOnClient(next);
+    await writePortal(
+      { waitingOnClient: next },
+      {
+        title: next ? "סומן כמחכה ללקוח" : "המשימה חזרה לטיפול",
+        description: clientTitle || task.title,
+        undo: () => toggleWaiting(),
+      }
+    );
+  }
+
+  async function saveTitle() {
+    setEditingTitle(false);
+    if ((task.clientTitle ?? "") === clientTitle.trim()) return;
+    await writePortal(
+      { clientTitle: clientTitle.trim() || null },
+      { title: clientTitle.trim() ? "הכותרת ללקוח עודכנה" : "הכותרת ללקוח הוסרה", description: task.title }
+    );
+  }
 
   async function changeStatus(nextStatus: TaskStatus, isUndo = false) {
     const previousStatus = status;
@@ -97,7 +179,71 @@ export function TaskRow({
           {task.clientName}
           {task.categoryName ? ` · ${task.categoryName}` : ""}
         </p>
+
+        {clientVisible &&
+          (editingTitle ? (
+            <input
+              autoFocus
+              value={clientTitle}
+              disabled={portalPending}
+              onChange={(e) => setClientTitle(e.target.value)}
+              onBlur={saveTitle}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                if (e.key === "Escape") {
+                  setClientTitle(task.clientTitle ?? "");
+                  setEditingTitle(false);
+                }
+              }}
+              placeholder="איך זה ייקרא אצל הלקוח"
+              className="mt-1.5 w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setEditingTitle(true)}
+              className="mt-1 truncate text-[11.5px] text-gold-dim hover:underline"
+            >
+              {clientTitle || "הוספת כותרת ללקוח"}
+            </button>
+          ))}
       </div>
+
+      {/* Portal phase 1. Two icons, not a panel: the row already carries
+          five controls, and these are both binary. The hourglass only
+          appears once the task is visible, because "waiting on the
+          client" is meaningless for something the client cannot see. */}
+      <button
+        type="button"
+        aria-pressed={clientVisible}
+        aria-label={clientVisible ? "הסרה מהפורטל" : "הצגה ללקוח בפורטל"}
+        title={clientVisible ? "מוצג ללקוח" : "לא מוצג ללקוח"}
+        disabled={portalPending}
+        onClick={toggleVisible}
+        className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
+          clientVisible ? "border-gold/50 bg-gold/12 text-appNavy" : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+        }`}
+      >
+        {clientVisible ? <Eye size={15} strokeWidth={1.6} /> : <EyeOff size={15} strokeWidth={1.6} />}
+      </button>
+
+      {clientVisible && (
+        <button
+          type="button"
+          aria-pressed={waitingOnClient}
+          aria-label={waitingOnClient ? "הלקוח כבר לא מעכב" : "סימון כמחכה ללקוח"}
+          title={waitingOnClient ? "מחכה ללקוח" : "לא מחכה ללקוח"}
+          disabled={portalPending}
+          onClick={toggleWaiting}
+          className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
+            waitingOnClient
+              ? "border-warning/50 bg-warning-soft text-warning"
+              : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+          }`}
+        >
+          <Hourglass size={15} strokeWidth={1.6} />
+        </button>
+      )}
 
       <select
         value={status}

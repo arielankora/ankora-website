@@ -12,7 +12,6 @@ import {
   CalendarClock,
   ScrollText,
   BookOpen,
-  LayoutDashboard,
   CalendarDays,
   FileText,
   Plug,
@@ -43,7 +42,11 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/guide": BookOpen,
   "/app/notifications": Bell,
   "/app/profile": User,
-  "/app/portal": LayoutDashboard,
+  // Portal phase 1: the client's home is the promises screen, and the
+  // hour bank moved to its own entry.
+  "/app/portal": Home,
+  "/app/portal/activity": ListChecks,
+  "/app/portal/hours": Wallet,
   "/app/portal/weekly": CalendarDays,
   "/app/portal/monthly": FileText,
   "/app/portal/history": History,

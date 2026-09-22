@@ -481,3 +481,161 @@ export async function updatePortalScheduleRecipients(actor: User, scheduleId: st
   const cleaned = normalizeEmails(recipients);
   return prisma.reportSchedule.update({ where: { id: scheduleId }, data: { recipients: cleaned } });
 }
+
+// ---------------------------------------------------------------------------
+// Portal phase 1: promises.
+//
+// The portal's unit of content stops being a time entry and becomes a
+// commitment. Spec 13's screens answered "how many hours were used"; this
+// answers "what is being handled, what is done, and what is waiting on
+// me" - the three questions a client actually opens a portal with.
+//
+// Everything here reads Task, which already carries client, status, due
+// date and category. Phase 1 adds only three columns (see schema.prisma's
+// comment on clientVisible): what the client may see, what it is called
+// in their words, and since when it is waiting on them.
+// ---------------------------------------------------------------------------
+
+export type PortalStage = "RECEIVED" | "IN_PROGRESS" | "WAITING_ON_CLIENT" | "DONE";
+
+export const PORTAL_STAGE_LABELS: Record<PortalStage, string> = {
+  RECEIVED: "התקבל",
+  IN_PROGRESS: "בטיפול",
+  WAITING_ON_CLIENT: "מחכה לך",
+  DONE: "הושלם",
+};
+
+export interface PortalPromise {
+  id: string;
+  /// What the client reads: clientTitle when Ankora wrote one, the
+  /// internal title otherwise. Never blank.
+  title: string;
+  stage: PortalStage;
+  /// Only set while the stage is WAITING_ON_CLIENT.
+  waitingSince: Date | null;
+  dueDate: Date | null;
+  /// Last movement. Task has no completedAt column, so for a finished
+  /// promise this is when it was last written - which is the moment it
+  /// was marked done in every path that exists today. Called "movement"
+  /// rather than "completed" so no screen claims more precision than the
+  /// data has.
+  movedAt: Date;
+}
+
+/// Waiting on the client wins over the internal status: a task can be
+/// IN_PROGRESS internally and still be blocked on an answer, and the
+/// blocked state is the one the client needs to see.
+function stageOf(task: { status: string; waitingOnClientSince: Date | null }): PortalStage {
+  if (task.waitingOnClientSince) return "WAITING_ON_CLIENT";
+  if (task.status === "DONE") return "DONE";
+  if (task.status === "IN_PROGRESS") return "IN_PROGRESS";
+  return "RECEIVED";
+}
+
+function toPromise(task: {
+  id: string;
+  title: string;
+  clientTitle: string | null;
+  status: string;
+  waitingOnClientSince: Date | null;
+  dueDate: Date | null;
+  updatedAt: Date;
+}): PortalPromise {
+  return {
+    id: task.id,
+    title: task.clientTitle?.trim() || task.title,
+    stage: stageOf(task),
+    waitingSince: task.waitingOnClientSince,
+    dueDate: task.dueDate,
+    movedAt: task.updatedAt,
+  };
+}
+
+/// The one query behind every phase 1 screen. Client-isolated through
+/// resolvePortalClient exactly like every other function in this file,
+/// and additionally filtered to clientVisible: a task nobody opted in is
+/// invisible here even to its own client.
+///
+/// ARCHIVED is excluded deliberately. It is Ankora's internal
+/// housekeeping state ("this stopped being relevant"), and a client
+/// reading "בארכיון" about their own request would reasonably hear "we
+/// dropped it".
+async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) {
+  return prisma.task.findMany({
+    where: {
+      clientId,
+      deletedAt: null,
+      clientVisible: true,
+      status: { not: "ARCHIVED" },
+    },
+    select: {
+      id: true,
+      title: true,
+      clientTitle: true,
+      status: true,
+      waitingOnClientSince: true,
+      dueDate: true,
+      updatedAt: true,
+    },
+    orderBy: { updatedAt: "desc" },
+    take: opts.take,
+  });
+}
+
+export interface PortalHome {
+  client: Client;
+  isStaffPreview: boolean;
+  waitingOnClient: PortalPromise[];
+  inProgress: PortalPromise[];
+  recentlyDone: PortalPromise[];
+  /// The quiet line at the bottom of the screen, and the only number on
+  /// it. Null when no cycle has been set up yet.
+  cycle: { usedMinutes: number; totalMinutes: number; pct: number; daysLeft: number | null } | null;
+}
+
+const RECENTLY_DONE_TAKE = 5;
+
+/// The home screen. Answers "is everything handled, or is something
+/// waiting for me" before it answers anything else.
+export async function getPortalHome(actor: User): Promise<PortalHome> {
+  const { client, isStaffPreview } = await resolvePortalClient(actor);
+  const [tasks, snapshot] = await Promise.all([listVisibleTasks(client.id), getCurrentHourBank(client.id)]);
+
+  const promises = tasks.map(toPromise);
+  const done = promises.filter((p) => p.stage === "DONE");
+
+  const daysUntilCycleEnd = snapshot
+    ? Math.max(0, Math.ceil((snapshot.bank.cycleEnd.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
+
+  return {
+    client,
+    isStaffPreview,
+    waitingOnClient: promises.filter((p) => p.stage === "WAITING_ON_CLIENT"),
+    // "In progress" for a client means "you are not holding it": both
+    // RECEIVED and IN_PROGRESS are us, and splitting them on the home
+    // screen would ask the client to care about our internal handover.
+    inProgress: promises.filter((p) => p.stage === "RECEIVED" || p.stage === "IN_PROGRESS"),
+    recentlyDone: done.slice(0, RECENTLY_DONE_TAKE),
+    cycle: snapshot
+      ? {
+          usedMinutes: snapshot.utilization.consumedMinutes,
+          totalMinutes: snapshot.utilization.totalMinutes,
+          pct: snapshot.utilization.utilizationPct,
+          daysLeft: daysUntilCycleEnd,
+        }
+      : null,
+  };
+}
+
+const TIMELINE_TAKE = 60;
+
+/// The activity screen: the same promises as a single stream, newest
+/// movement first. Replaces the row-per-time-entry table as the client's
+/// view of what happened - the hours are still one tab away, and that is
+/// the right distance for them.
+export async function getPortalTimeline(actor: User): Promise<{ client: Client; promises: PortalPromise[] }> {
+  const { client } = await resolvePortalClient(actor);
+  const tasks = await listVisibleTasks(client.id, { take: TIMELINE_TAKE });
+  return { client, promises: tasks.map(toPromise) };
+}

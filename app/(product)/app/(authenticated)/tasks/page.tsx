@@ -117,6 +117,9 @@ export default async function TasksPage(
                   categoryName: task.category?.name ?? null,
                   dueDate: task.dueDate?.toISOString() ?? null,
                   status: task.status,
+                  clientVisible: task.clientVisible,
+                  clientTitle: task.clientTitle,
+                  waitingOnClient: task.waitingOnClientSince !== null,
                 }}
               />
             ))}

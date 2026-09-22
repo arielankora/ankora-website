@@ -546,6 +546,35 @@ model Task {
   importantDateId            String?
   importantDateOccurrenceKey String?
 
+  // Portal phase 1 ("הבטחות"). Three fields, and deliberately not a
+  // second status column.
+  //
+  // `clientVisible` is opt-in per task: not every internal task is a
+  // promise to the client (chasing an invoice we owe, a note to self,
+  // a task opened to park a thought), and a portal that shows all of
+  // them teaches the client to read our workflow instead of their own
+  // outcomes.
+  //
+  // `clientTitle` is the sentence the client reads. It falls back to
+  // `title` when empty, so nothing is ever blank - but the two exist
+  // separately because an internal title like "לבדוק מול הסוכן שוב"
+  // is not what a client should see, and rewriting it in place would
+  // cost the team the shorthand they work with.
+  //
+  // `waitingOnClientSince` is the ONE thing the client-facing stage
+  // cannot derive from `status`. The four stages the portal shows are
+  // התקבל / בטיפול / מחכה לך / הושלם: three of them are exactly
+  // OPEN / IN_PROGRESS / DONE, and only "waiting on the client" has no
+  // internal equivalent. A parallel client-stage enum would have to be
+  // kept in sync with `status` by hand on every change, which is the
+  // kind of dual write that silently drifts and then shows a client a
+  // task marked "בטיפול" that closed last week. A timestamp rather
+  // than a boolean so the portal can say how long it has been waiting,
+  // which is the number that actually moves a person to answer.
+  clientVisible        Boolean   @default(false)
+  clientTitle          String?
+  waitingOnClientSince DateTime?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -559,6 +588,8 @@ model Task {
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
   @@index([assignedToId])
+  // Portal phase 1: every portal screen reads this client's visible tasks.
+  @@index([clientId, clientVisible])
   @@map("tasks")
 }
 
