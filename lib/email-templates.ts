@@ -9,16 +9,39 @@ import { SITE_URL } from "@/lib/site";
 // purpose: they go to people who asked for a machine's output, not to a
 // client meeting Ankora for the first time.
 
-/// Absolute origin for links that leave the app. NEXTAUTH_URL is what
-/// Auth.js already trusts for callbacks and is set per environment in
-/// Vercel; VERCEL_URL covers preview deployments that have no explicit
-/// value; SITE_URL is the production fallback, and is deliberately last
-/// so a preview never emails a link into production.
+/// Absolute origin for links that leave the app and land in someone's
+/// inbox. The one rule that matters: a production email must never carry
+/// a *.vercel.app address. Vercel's SSO protection on this project is set
+/// to "all except custom domains", so every deployment URL - including
+/// production's own immutable one - sits behind a Vercel login wall. A
+/// recipient clicking such a link does not meet Ankora, they meet Vercel.
+///
+/// So in production the canonical domain wins outright and nothing can
+/// override it into a protected host. Outside production VERCEL_URL is
+/// still used, so a preview emails a preview link rather than reaching
+/// into production data.
+const VERCEL_HOST = /(^|\.)vercel\.app$/i;
+
+function isProtectedHost(origin: string): boolean {
+  try {
+    return VERCEL_HOST.test(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+}
+
 export function appBaseUrl(): string {
-  const configured = process.env.NEXTAUTH_URL?.trim();
-  if (configured) return configured.replace(/\/+$/, "");
-  const vercel = process.env.VERCEL_URL?.trim();
-  if (vercel) return `https://${vercel.replace(/\/+$/, "")}`;
+  const isProduction = process.env.VERCEL_ENV === "production";
+  const configured = process.env.NEXTAUTH_URL?.trim().replace(/\/+$/, "");
+
+  // An explicit value is honoured everywhere except when it would put a
+  // protected host into a production email - the exact failure this
+  // function exists to prevent, and one an env edit could reintroduce.
+  if (configured && !(isProduction && isProtectedHost(configured))) return configured;
+  if (isProduction) return SITE_URL;
+
+  const vercel = process.env.VERCEL_URL?.trim().replace(/\/+$/, "");
+  if (vercel) return `https://${vercel}`;
   return SITE_URL;
 }
 
