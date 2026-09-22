@@ -33,8 +33,12 @@ function navItemsFor(role: User["role"]): NavItem[] {
   // below.
   if (role === "CLIENT_USER") {
     return [
-      { href: "/app/portal", label: "לוח בקרה", group: "פורטל" },
-      { href: "/app/portal/weekly", label: "פעילות שבועית", group: "פורטל" },
+      // Portal phase 1: the nav mirrors the tab bar, in the order of the
+      // client's questions. "פעילות שבועית" is reachable from the שעות
+      // screen rather than listed here - see PortalTabs's comment.
+      { href: "/app/portal", label: "בית", group: "פורטל" },
+      { href: "/app/portal/activity", label: "פעילות", group: "פורטל" },
+      { href: "/app/portal/hours", label: "שעות", group: "פורטל" },
       { href: "/app/portal/monthly", label: "דוח חודשי", group: "פורטל" },
       { href: "/app/portal/history", label: "היסטוריה", group: "פורטל" },
       { href: "/app/notifications", label: "התראות שלי", group: "חשבון" },

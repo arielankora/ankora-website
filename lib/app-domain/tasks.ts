@@ -184,6 +184,10 @@ export async function createTask(
     title: string;
     assignedToId?: string | null;
     dueDate?: Date | null;
+    /// Portal phase 1. Opt-in per task: see schema.prisma's comment on
+    /// Task.clientVisible for why not every task is a promise.
+    clientVisible?: boolean;
+    clientTitle?: string | null;
   }
 ) {
   // permissions.ts requires every server-side entry point to assert, and
@@ -208,6 +212,8 @@ export async function createTask(
       title,
       assignedToId: input.assignedToId || null,
       dueDate: input.dueDate ?? null,
+      clientVisible: input.clientVisible ?? false,
+      clientTitle: input.clientTitle?.trim() || null,
     },
   });
 
@@ -228,6 +234,10 @@ export type TaskPatch = {
   categoryId?: string | null;
   assignedToId?: string | null;
   dueDate?: Date | null;
+  // Portal phase 1.
+  clientVisible?: boolean;
+  clientTitle?: string | null;
+  waitingOnClientSince?: Date | null;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -264,6 +274,9 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     data.assignedToId = patch.assignedToId || null;
   }
   if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
+  if (patch.clientVisible !== undefined) data.clientVisible = patch.clientVisible;
+  if (patch.clientTitle !== undefined) data.clientTitle = patch.clientTitle?.trim() || null;
+  if (patch.waitingOnClientSince !== undefined) data.waitingOnClientSince = patch.waitingOnClientSince;
 
   if (Object.keys(data).length === 0) return task;
 

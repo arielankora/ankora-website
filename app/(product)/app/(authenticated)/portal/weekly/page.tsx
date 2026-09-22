@@ -49,7 +49,7 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="week" />
+      <PortalTabs active="hours" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

@@ -179,26 +179,57 @@ async function main() {
   // /app/tasks and /app/notifications screens have something to show
   // right after a fresh seed - matching spec 21.5's test-data spirit
   // (every screen should be non-empty for a demo login).
+  // Portal phase 1: the demo client's tasks are what the portal home
+  // screen is made of, so the ones belonging to the client with a portal
+  // user are opted in and given the sentence a client would actually
+  // read. `update` carries them too (unlike the rest of this file's
+  // `update: {}`), so an existing demo database picks the fields up on
+  // the next seed instead of showing an empty portal.
+  const KICKOFF_PORTAL = { clientVisible: true, clientTitle: "[DEMO] פגישת הפתיחה שלך" };
   await prisma.task.upsert({
     where: { id: "demo-task-onboarding-kickoff" },
-    update: {},
+    update: KICKOFF_PORTAL,
     create: {
       id: "demo-task-onboarding-kickoff",
       clientId: clientA.id,
       categoryId: "demo-category-client-a-onboarding",
       title: "[DEMO] פגישת פתיחה עם אורביט",
       status: "DONE",
+      ...KICKOFF_PORTAL,
     },
   });
+  const RESEARCH_PORTAL = { clientVisible: true, clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה" };
   await prisma.task.upsert({
     where: { id: "demo-task-research-competitors" },
-    update: {},
+    update: RESEARCH_PORTAL,
     create: {
       id: "demo-task-research-competitors",
       clientId: clientA.id,
       categoryId: "demo-category-research",
       title: "[DEMO] מיפוי מתחרים",
       status: "IN_PROGRESS",
+      ...RESEARCH_PORTAL,
+    },
+  });
+
+  // One promise in each of the two states the home screen is built
+  // around: something waiting on the client (the only block that may use
+  // gold), and something still with us.
+  const WAITING_PORTAL = {
+    clientVisible: true,
+    clientTitle: "[DEMO] אישור מועד לביקור הטכנאי",
+    waitingOnClientSince: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+  };
+  await prisma.task.upsert({
+    where: { id: "demo-task-waiting-on-client" },
+    update: WAITING_PORTAL,
+    create: {
+      id: "demo-task-waiting-on-client",
+      clientId: clientA.id,
+      categoryId: "demo-category-client-a-onboarding",
+      title: "[DEMO] ממתין לאישור תאריך מהלקוח",
+      status: "IN_PROGRESS",
+      ...WAITING_PORTAL,
     },
   });
   await prisma.task.upsert({

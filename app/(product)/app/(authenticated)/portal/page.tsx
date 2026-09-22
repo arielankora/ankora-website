@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
+import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "./PortalTabs";
+import { PromiseList } from "./PromiseList";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -14,162 +15,104 @@ function formatMinutes(minutes: number) {
   return `${sign}${h}:${String(m).padStart(2, "0")}`;
 }
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
+/// The one sentence at the top of the portal. It is the whole product in
+/// a line: either something needs the client, or nothing does.
+function headline(waiting: number, inProgress: number): string {
+  if (waiting === 1) return "דבר אחד מחכה להחלטה שלך.";
+  if (waiting > 1) return `${waiting} דברים מחכים להחלטה שלך.`;
+  if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
+  if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
+  return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
 }
 
-const CATEGORY_BAR_COLORS = ["bg-gold", "bg-gold-light", "bg-gold/50"];
-
-// Spec 13's Client Portal Dashboard + Category Summary, combined on one
-// screen (both are compact "at a glance" views). App redesign (handoff
-// README, screen 16): the hero card gets the design's one explicitly
-// distinct treatment for the portal - `#FBF7F0` background + a gold
-// border (`Design Tokens` table has no named token for this exact tint,
-// so it's the one arbitrary hex value in this phase - everything else
-// uses the shared gold/navy/cream tokens). The prototype's own amber
-// "כך הלקוח רואה את הפורטל" banner is NOT reproduced here: that note is
-// third-person ("this is how the client sees it"), written for an Ankora
-// staff member toggling the SAME demo between an internal view and a
-// client-view preview - this app has no "view portal as this client"
-// staff impersonation feature (resolvePortalClient only ever resolves the
-// caller's OWN ClientUser membership), so a real client landing on this
-// page would find a banner describing them in the third person
-// nonsensical. Isolation is still structural exactly as the README
-// requires, just silent rather than announced.
-export default async function PortalDashboardPage() {
+// Portal phase 1, the home screen.
+//
+// The screen answers three questions in the order a person asks them:
+// is something waiting for me, what is being handled, and what was
+// finished. The hour bank, which used to be the first thing on this
+// screen, is now one quiet line at the bottom with a link - it is the
+// answer to a question the client asks monthly, not on every visit.
+//
+// The design's screen 16 had a fourth block here, a card for the account
+// manager with a WhatsApp button. It is not built yet on purpose: the
+// Client model has no owner field, so every version of that card would
+// have had to invent a name. It arrives with phase 2, which needs the
+// same relationship for decisions.
+export default async function PortalHomePage() {
   const user = await requireUser();
 
-  let dashboard;
-  let categorySummary;
-  let weekly;
+  let home;
   try {
-    [dashboard, categorySummary, weekly] = await Promise.all([
-      getPortalDashboard(user),
-      getCategorySummary(user),
-      getWeeklyActivity(user),
-    ]);
+    home = await getPortalHome(user);
   } catch (err) {
-    if (err instanceof ForbiddenError) {
-      return (
-        <>
-          <Forbidden />
-        </>
-      );
-    }
+    if (err instanceof ForbiddenError) return <Forbidden />;
     throw err;
   }
 
-  const { client, snapshot, daysUntilCycleEnd } = dashboard;
-  const totalCategoryMinutes = categorySummary.rows.reduce((s, r) => s + r.minutes, 0);
+  const { client, waitingOnClient, inProgress, recentlyDone, cycle } = home;
+  const nothingYet = waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="dash" />
+      <PortalTabs active="home" />
 
       <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
         <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
-        {snapshot ? (
-          <p className="mt-1.5 text-[13.5px] text-appNavy/60">
-            מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} – {formatDate(snapshot.bank.cycleEnd)}
-            {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
+        <p className="mt-1.5 text-[13.5px] text-appNavy/60">{headline(waitingOnClient.length, inProgress.length)}</p>
+      </div>
+
+      {nothingYet ? (
+        // The empty state of a brand-new client, and the one place the
+        // portal explains itself. Written as a promise with a date on it
+        // rather than as a tour: "here is what will appear, and when".
+        <div className="rounded-2xl border border-lineDark bg-white p-6">
+          <p className="text-[13.5px] font-medium text-appNavy">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
+          <ul className="mt-3 space-y-2 text-sm text-appNavy/65">
+            <li>כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.</li>
+            <li>כשמשהו מחכה להחלטה שלך, הוא יעלה לראש המסך.</li>
+            <li>מה שהושלם נשאר כאן, עם התאריך.</li>
+          </ul>
+          <p className="mt-4 text-[12.5px] text-appNavy/50">
+            הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק.
           </p>
-        ) : (
-          <p className="mt-1.5 text-[13.5px] text-appNavy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
-        )}
-
-        {snapshot && (
-          <>
-            <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">סה&quot;כ בבנק</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
-              </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">נוצל</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
-              </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">נותר</span>
-                <p
-                  dir="ltr"
-                  className={`mt-2 text-end font-jbmono text-2xl ${
-                    snapshot.utilization.remainingMinutes < 0 ? "text-error" : "text-appNavy"
-                  }`}
-                >
-                  {formatMinutes(snapshot.utilization.remainingMinutes)}
-                </p>
-              </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">ניצול</span>
-                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-error" : "text-appNavy"}`}>
-                  {snapshot.utilization.utilizationPct}%
-                </p>
-                <p className="mt-1 text-[11.5px] text-appNavy/50">
-                  {formatMinutes(snapshot.utilization.consumedMinutes)} שעות מתוך {formatMinutes(snapshot.utilization.totalMinutes)}
-                </p>
-              </div>
-            </div>
-            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-appNavy/8">
-              <span
-                className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"}`}
-                style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
-              />
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-lineDark bg-white p-5">
-          <p className="mb-4 text-[13.5px] font-medium text-appNavy">פילוח לפי תחום · החודש</p>
-          {categorySummary.rows.length === 0 ? (
-            <p className="text-sm text-appNavy/50">אין עדיין נתונים לחודש הנוכחי.</p>
-          ) : (
-            <div className="flex flex-col gap-3.5">
-              {categorySummary.rows.map((row, i) => (
-                <div key={row.category}>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-appNavy">{row.category}</span>
-                    <span className="font-jbmono text-appNavy/60">
-                      {formatMinutes(row.minutes)} · {row.pctOfTotal}%
-                    </span>
-                  </div>
-                  <span className="mt-1.5 block h-1.5 rounded-full bg-appNavy/7">
-                    <span
-                      className={`block h-full rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
-                      style={{ width: `${totalCategoryMinutes > 0 ? row.pctOfTotal : 0}%` }}
-                    />
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
-
-        <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-          <div className="flex items-center justify-between border-b border-lineDark px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-appNavy">פעילות השבוע</span>
-            <Link href="/app/portal/monthly" className="text-xs text-gold-dim hover:underline">
-              הורדת דוח חודשי
-            </Link>
-          </div>
-          {weekly.topActivities.length === 0 ? (
-            <p className="px-[18px] py-8 text-center text-sm text-appNavy/50">אין עדיין פעילות השבוע.</p>
-          ) : (
-            weekly.topActivities.map((a, i) => (
-              <div
-                key={a.activity}
-                className={`flex justify-between gap-2.5 px-[18px] py-3 text-sm ${
-                  i < weekly.topActivities.length - 1 ? "border-b border-lineDark/60" : ""
-                }`}
-              >
-                <span className="text-appNavy">{a.activity}</span>
-                <span className="font-jbmono text-appNavy/60">{formatMinutes(a.minutes)}</span>
-              </div>
-            ))
+      ) : (
+        <>
+          {waitingOnClient.length > 0 && (
+            <PromiseList title="מחכה להחלטה שלך" promises={waitingOnClient} tone="attention" showStage={false} />
           )}
+
+          <PromiseList
+            title="בטיפול עכשיו"
+            promises={inProgress}
+            emptyText="אין כרגע הבטחות פתוחות."
+            showStage={false}
+          />
+
+          <PromiseList
+            title="נסגר לאחרונה"
+            promises={recentlyDone}
+            action={
+              <Link href="/app/portal/activity" className="text-xs text-gold-dim hover:underline">
+                כל הפעילות
+              </Link>
+            }
+            showStage={false}
+          />
+        </>
+      )}
+
+      {cycle && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-lineDark bg-white px-[18px] py-3.5">
+          <span className="text-[12.5px] text-appNavy/60">
+            מחזור השעות הנוכחי: {formatMinutes(cycle.usedMinutes)} מתוך {formatMinutes(cycle.totalMinutes)}
+            {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
+          </span>
+          <Link href="/app/portal/hours" className="text-xs text-gold-dim hover:underline">
+            פירוט השעות
+          </Link>
         </div>
-      </div>
+      )}
     </div>
   );
 }

@@ -85,6 +85,30 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
         />
       </div>
 
+      {/* Portal phase 1. Off by default: an internal task stays internal
+          unless someone says otherwise, which is the safe direction for a
+          field that decides what a client sees. The client-facing title
+          is optional - left empty, the portal falls back to the task's
+          own title rather than showing a blank row. */}
+      <div className="rounded-lg border border-lineDark bg-cream-dim/40 p-3">
+        <label className="flex items-center gap-2.5 text-xs text-appNavy">
+          <input
+            type="checkbox"
+            name="clientVisible"
+            className="h-4 w-4 rounded border-lineDark accent-gold"
+          />
+          הצגה ללקוח בפורטל
+        </label>
+        <label className="mt-2.5 block">
+          <span className="block text-xs font-medium text-appNavy/60">כותרת ללקוח</span>
+          <input
+            name="clientTitle"
+            placeholder="איך זה ייקרא אצל הלקוח. ברירת מחדל: שם המשימה"
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          />
+        </label>
+      </div>
+
       {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
       <SubmitButton />
     </form>
