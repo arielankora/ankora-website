@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useMemo, useState } from "react";
 import { createImportantDateAction, updateImportantDateAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useActionForm } from "@/components/app/useActionForm";
 import { IMPORTANT_DATE_CATEGORY_LABELS, IMPORTANT_DATE_TYPE_EXAMPLES, type ImportantDateCategoryLike } from "@/lib/app-domain/important-dates-reminders";
 
 type Client = { id: string; name: string };
@@ -35,8 +35,7 @@ export interface ExistingImportantDate {
   updatedAt: Date;
 }
 
-function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
-  const { pending } = useFormStatus();
+function SubmitButton({ label, pendingLabel, pending }: { label: string; pendingLabel: string; pending: boolean }) {
   return (
     <button
       type="submit"
@@ -75,17 +74,13 @@ export function ImportantDateForm({
 }) {
   const isEdit = Boolean(existing);
   const action = isEdit ? updateImportantDateAction : createImportantDateAction;
-  const [state, formAction] = useFormState(action, {});
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(action, close);
   const [clientId, setClientId] = useState(existing?.clientId ?? "");
   const [category, setCategory] = useState<ImportantDateCategoryLike | "">(existing?.category ?? "");
   const [calendarType, setCalendarType] = useState(existing?.calendarType ?? "GREGORIAN");
   const [recurrence, setRecurrence] = useState(existing?.recurrence ?? "ANNUAL");
   const [createAutoTask, setCreateAutoTask] = useState(existing?.createAutoTask ?? false);
-  const close = useDrawerClose();
-
-  useEffect(() => {
-    if (state?.ok) close();
-  }, [state, close]);
 
   const typeExamples = useMemo(() => (category ? IMPORTANT_DATE_TYPE_EXAMPLES[category] : []), [category]);
   const availableAutoTaskCategories = useMemo(
@@ -94,7 +89,7 @@ export function ImportantDateForm({
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       {isEdit && existing && (
         <>
           <input type="hidden" name="id" value={existing.id} />
@@ -357,8 +352,12 @@ export function ImportantDateForm({
         </div>
       )}
 
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-      <SubmitButton label={isEdit ? "שמירת שינויים" : "הוספת מועד"} pendingLabel={isEdit ? "שומר..." : "נוצר..."} />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <SubmitButton
+        label={isEdit ? "שמירת שינויים" : "הוספת מועד"}
+        pendingLabel={isEdit ? "שומר..." : "נוצר..."}
+        pending={pending}
+      />
     </form>
   );
 }

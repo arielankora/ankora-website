@@ -1,14 +1,13 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useMemo, useState } from "react";
 import { createTaskAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useActionForm } from "@/components/app/useActionForm";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -29,13 +28,9 @@ function SubmitButton() {
 // see docs/adr/0001 addendum. `useDrawerClose()` closes the drawer once
 // the action reports `ok: true`, same pattern as CreateClientForm.
 export function CreateTaskForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
-  const [state, formAction] = useFormState(createTaskAction, {});
   const [clientId, setClientId] = useState("");
   const close = useDrawerClose();
-
-  useEffect(() => {
-    if (state?.ok) close();
-  }, [state, close]);
+  const { onSubmit, pending, error } = useActionForm(createTaskAction, close);
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
@@ -43,7 +38,7 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
         <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
         <select
@@ -109,8 +104,8 @@ export function CreateTaskForm({ clients, categories }: { clients: Client[]; cat
         </label>
       </div>
 
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-      <SubmitButton />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <SubmitButton pending={pending} />
     </form>
   );
 }

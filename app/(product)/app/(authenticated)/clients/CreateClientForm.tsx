@@ -1,11 +1,9 @@
 "use client";
-import { useEffect } from "react";
-import { useFormState, useFormStatus } from "react-dom";
 import { createClientAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -23,15 +21,11 @@ function SubmitButton() {
 // action reports `ok: true` - this form previously just stayed open
 // and relied on the fresh row appearing in the (now-adjacent) table.
 export function CreateClientForm() {
-  const [state, formAction] = useFormState(createClientAction, {});
   const close = useDrawerClose();
-
-  useEffect(() => {
-    if (state?.ok) close();
-  }, [state, close]);
+  const { onSubmit, pending, error } = useActionForm(createClientAction, close);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
         <label className="block text-xs font-medium text-appNavy/60">שם הלקוח *</label>
         <input
@@ -63,8 +57,8 @@ export function CreateClientForm() {
         />
       </div>
 
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-      <SubmitButton />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <SubmitButton pending={pending} />
     </form>
   );
 }
