@@ -13,15 +13,13 @@ import { formatMinor } from "@/lib/money";
 
 type Option = { id: string; label: string; detail: string | null; amountMinor: number | null; recommended: boolean };
 
-function OptionButton({ option, canAnswer }: { option: Option; canAnswer: boolean }) {
+function SubmitOption({ option, canAnswer }: { option: Option; canAnswer: boolean }) {
   const { pending } = useFormStatus();
   const price = formatMinor(option.amountMinor);
 
   return (
     <button
       type="submit"
-      name="optionId"
-      value={option.id}
       disabled={pending || !canAnswer}
       className={`w-full rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
         option.recommended ? "border-gold/50 bg-gold/10 hover:border-gold" : "border-lineDark bg-white hover:border-gold"
@@ -29,8 +27,8 @@ function OptionButton({ option, canAnswer }: { option: Option; canAnswer: boolea
     >
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <span className="text-sm text-appNavy">
-          {option.label}
-          {option.recommended && <span className="mr-2 text-[11px] text-gold-dim">ההמלצה שלנו</span>}
+          {pending ? "נשלח..." : option.label}
+          {option.recommended && !pending && <span className="mr-2 text-[11px] text-gold-dim">ההמלצה שלנו</span>}
         </span>
         {price && (
           <span dir="ltr" className="font-jbmono text-[12.5px] text-appNavy/60">
@@ -40,6 +38,33 @@ function OptionButton({ option, canAnswer }: { option: Option; canAnswer: boolea
       </span>
       {option.detail && <span className="mt-1 block text-[12px] text-appNavy/55">{option.detail}</span>}
     </button>
+  );
+}
+
+/// One option, one form.
+///
+/// The obvious build - a single form and a submit button per option
+/// carrying `name="optionId"` - loses the answer: React's form-state
+/// binding does not carry the submitter's own name/value into the action,
+/// so every click arrived with no option and the decision stayed open.
+/// Caught by the browser test for this screen, which is exactly the class
+/// of bug a rendering assertion would have missed. A form per option
+/// keeps the one-click gesture and puts the choice in a hidden field,
+/// where nothing has to infer it.
+function OptionForm({ decisionId, option, canAnswer }: { decisionId: string; option: Option; canAnswer: boolean }) {
+  const [state, formAction] = useFormState(respondToDecisionAction, {});
+
+  return (
+    <form action={formAction}>
+      <input type="hidden" name="decisionId" value={decisionId} />
+      <input type="hidden" name="optionId" value={option.id} />
+      <SubmitOption option={option} canAnswer={canAnswer} />
+      {state?.error && (
+        <p className="mt-2 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2 text-xs text-error">
+          {state.error}
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -66,12 +91,8 @@ export function DecisionCard({
   canAnswer: boolean;
   whatsappHref: string | null;
 }) {
-  const [state, formAction] = useFormState(respondToDecisionAction, {});
-
   return (
-    <form action={formAction} className="rounded-2xl border border-gold/40 bg-[#FBF7F0] p-5">
-      <input type="hidden" name="decisionId" value={decision.id} />
-
+    <div className="rounded-2xl border border-gold/40 bg-[#FBF7F0] p-5">
       {decision.taskTitle && <p className="text-[11.5px] text-appNavy/50">{decision.taskTitle}</p>}
       <p className="mt-1 text-[15px] font-medium text-appNavy">{decision.question}</p>
       {decision.background && <p className="mt-1.5 text-[13px] leading-relaxed text-appNavy/65">{decision.background}</p>}
@@ -87,15 +108,9 @@ export function DecisionCard({
 
       <div className="mt-4 space-y-2.5">
         {decision.options.map((o) => (
-          <OptionButton key={o.id} option={o} canAnswer={canAnswer} />
+          <OptionForm key={o.id} decisionId={decision.id} option={o} canAnswer={canAnswer} />
         ))}
       </div>
-
-      {state?.error && (
-        <p className="mt-3 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2 text-xs text-error">
-          {state.error}
-        </p>
-      )}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-appNavy/50">
         <span>
@@ -119,6 +134,6 @@ export function DecisionCard({
           רק מנהל הלקוח יכול לאשר. אפשר להעביר את זה אליו, או לדבר איתנו.
         </p>
       )}
-    </form>
+    </div>
   );
 }
