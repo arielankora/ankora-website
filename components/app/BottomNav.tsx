@@ -46,6 +46,10 @@ export function BottomNav({
             <Link
               key={item.href}
               href={item.href}
+              // Same reason as Sidebar.tsx: nothing behind these links is
+              // prefetchable, and a phone is the last place to spend a
+              // dozen requests on pages nobody has asked for yet.
+              prefetch={false}
               className={`flex min-h-[56px] flex-col items-center justify-center gap-1 px-1 py-2 text-[11px] ${
                 active ? "text-appNavy" : "text-appNavy/50"
               }`}
@@ -86,6 +90,7 @@ export function BottomNav({
                   <Link
                     key={item.href}
                     href={item.href}
+                    prefetch={false}
                     onClick={() => setMoreOpen(false)}
                     className="flex items-center gap-3 text-sm text-appNavy/80"
                   >
