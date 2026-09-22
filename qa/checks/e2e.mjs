@@ -88,7 +88,15 @@ export async function e2e() {
       // reproduce it from nothing.
       const where = (spec.file ?? "").split("/").pop();
       const why = results.find((x) => x.error)?.error?.message ?? "";
-      const oneLine = why.replace(/\s+/g, " ").trim().slice(0, 160);
+      // 160 characters was fine while a first-attempt message was one
+      // sentence. It is not fine now: the drawer helper's message opens
+      // with the timeout and carries the whole diagnosis after it -
+      // whether the row reached the database, what the page was doing,
+      // which requests died - and every one of those was being cut off
+      // mid-word. A flaky test IS the failing one here; truncating its
+      // only report cost a full run.
+      const flat = why.replace(/\s+/g, " ").trim();
+      const oneLine = flat.length > 420 ? `${flat.slice(0, 200)} … ${flat.slice(-220)}` : flat;
       flakyNames.push(
         `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    first attempt: ${oneLine}` : ""}`,
       );
@@ -181,21 +189,29 @@ export async function e2e() {
   // of this investigation were spent waiting to catch the fault in the
   // act. An abandoned request is worth knowing about whether or not it
   // happened to fail a test this time.
-  const aborted = String(r.all ?? "")
+  const allAborts = String(r.all ?? "")
     .split("\n")
     .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
-    .filter((l) => l.includes("[abort]"))
-    .slice(0, 12);
+    .filter((l) => l.includes("[abort]"));
+
+  // Writes first, and only then whatever room is left for the rest.
+  //
+  // Taking the first twelve lines in order dropped the one abandoned
+  // write that a test actually failed on, because eleven cancelled
+  // prefetches happened to come earlier in the run. The prefetches are
+  // the background; a write nobody got is the finding.
+  const abortedWrites = allAborts.filter((l) => /\[abort\] POST/.test(l));
+  const aborted = [...abortedWrites.slice(0, 10), ...allAborts.filter((l) => !/\[abort\] POST/.test(l))].slice(0, 14);
 
   if (aborted.length) {
     // A POST is a write the user asked for and did not get. A GET is
     // usually a prefetch the router cancelled on purpose, which is
     // ordinary Next behaviour and not worth waking anyone for.
-    const writes = aborted.filter((l) => /\[abort\] POST/.test(l)).length;
+    const writes = abortedWrites.length;
     out.push(
       finding(
         writes ? "major" : "info",
-        `${aborted.length} request(s) the browser abandoned${writes ? `, ${writes} of them a write` : ""}`,
+        `${allAborts.length} request(s) the browser abandoned${writes ? `, ${writes} of them a write` : ""}`,
         aborted.join("\n")
       )
     );

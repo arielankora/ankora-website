@@ -101,12 +101,23 @@ const DRIFT_PROBE = `(() => {
 
     var origFetch = window.fetch;
     var rejectionsLeft = 12;
-    window.fetch = function (input) {
+    window.fetch = function (input, init) {
       var url = typeof input === "string" ? input : (input && input.url) || "";
+      // The method, because a rejected GET is the router retrying and a
+      // rejected POST is somebody's write. Reading it off either shape of
+      // argument, since Next passes both.
+      var method = (init && init.method) || (typeof input !== "string" && input && input.method) || "GET";
       return origFetch.apply(this, arguments).catch(function (err) {
         if (rejectionsLeft-- > 0) {
           console.warn(
-            "[fetch-rejected] " + String(url).slice(0, 90) + " :: " + (err && err.name) + " :: " + (err && err.message)
+            "[fetch-rejected] " +
+              method +
+              " " +
+              String(url).slice(0, 90) +
+              " :: " +
+              (err && err.name) +
+              " :: " +
+              (err && err.message)
           );
         }
         throw err;
