@@ -14,6 +14,13 @@ import { test, expect } from "@playwright/test";
 // changes their mind gets a new decision), and a parallel run would have
 // two tests racing for the same single answer.
 //
+// Every assertion below goes through a retrying locator rather than a
+// one-shot innerText read. `domcontentloaded` returns before the server
+// component's content is painted, and the first version of this file read
+// the body at that moment: it saw the app shell, reported that the seeded
+// decision was missing, and looked exactly like a product bug. Same
+// lesson the detail-screens specs already carry.
+//
 // Prose warning, same as the other flow files: coverage is inferred from
 // the TEXT of these files, and a Server Action inherits the module paths
 // it imports. Refer to modules in words, never as paths.
@@ -25,10 +32,10 @@ test.describe.configure({ mode: "serial", timeout: 90_000 });
 const DECISIONS = "/app/portal/decisions";
 const HOME = "/app/portal";
 
-// The seeded decision, its recommended option, and the ceiling it sits
-// above - all three from the demo fixture.
+// The seeded decision and its recommended option, from the demo fixture.
 const QUESTION = "באיזה מועד לקבוע את ביקור הטכנאי";
 const RECOMMENDED = "יום שלישי בבוקר";
+const WAITING_BANNER = /החלטה אחת מחכה לך|החלטות מחכות לך/;
 
 test("the decision screen shows the question, the options and our recommendation", async ({ page }) => {
   const response = await page.goto(DECISIONS, { waitUntil: "domcontentloaded" });
@@ -38,19 +45,17 @@ test("the decision screen shows the question, the options and our recommendation
   // "/app/login" is not a bounce.
   expect(new URL(page.url()).pathname, "bounced to login - the client session was not accepted").not.toBe("/app/login");
 
-  const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  expect(body).toContain(QUESTION);
-  expect(body).toContain(RECOMMENDED);
-  expect(body).toContain("ההמלצה שלנו");
+  await expect(page.getByText(QUESTION)).toBeVisible();
+  await expect(page.getByText(RECOMMENDED)).toBeVisible();
+  await expect(page.getByText("ההמלצה שלנו")).toBeVisible();
   // The ceiling sentence is the reason this screen is an approval rather
   // than a poll, so its absence is a real regression.
-  expect(body).toContain("גבוה מהתקרה שסוכמה איתך");
+  await expect(page.getByText("גבוה מהתקרה שסוכמה איתך")).toBeVisible();
 });
 
 test("the home screen points at it", async ({ page }) => {
   await page.goto(HOME, { waitUntil: "domcontentloaded" });
-  const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  expect(body).toMatch(/החלטה אחת מחכה לך|החלטות מחכות לך/);
+  await expect(page.getByText(WAITING_BANNER).first()).toBeVisible();
 });
 
 test("answering records the choice and closes the decision", async ({ page }) => {
@@ -64,15 +69,15 @@ test("answering records the choice and closes the decision", async ({ page }) =>
   // below them, so the assertion is on the record - not on the button
   // disappearing, which would also be true if the page simply errored.
   await expect(page.getByText("החלטות קודמות")).toBeVisible({ timeout: 30_000 });
-
-  const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  expect(body).toContain(`נבחר: `);
-  expect(body).toContain(RECOMMENDED);
-  expect(body).toContain("אושר על ידי");
+  await expect(page.getByText("אושר על ידי")).toBeVisible();
+  await expect(page.getByText(RECOMMENDED)).toBeVisible();
 });
 
 test("the home screen stops asking once it is answered", async ({ page }) => {
   await page.goto(HOME, { waitUntil: "domcontentloaded" });
-  const body = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-  expect(body).not.toMatch(/החלטה אחת מחכה לך|החלטות מחכות לך/);
+
+  // Wait for the screen to actually be there before asserting something
+  // is absent from it: on an unpainted page every absence is true.
+  await expect(page.getByText("שלום,").first()).toBeVisible();
+  await expect(page.getByText(WAITING_BANNER)).toHaveCount(0);
 });
