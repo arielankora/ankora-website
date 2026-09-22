@@ -23,6 +23,76 @@ import { test, expect } from "@playwright/test";
 // "test timeout exceeded".
 test.describe.configure({ timeout: 90_000 });
 
+// ---------------------------------------------------------------------------
+// Which side is slow.
+//
+// Two rounds of server-side measurement came back silent: the write, the
+// revalidation and the dashboard's own load all stayed under 750ms
+// (lib/slow-log.ts), and this drawer still sat at "נוצר..." for thirty
+// seconds in the same run. Server work being fast and the button staying
+// pending cannot both be explained by a slow server, so the next fact
+// worth having is the one the browser holds: how long the Server Action's
+// POST actually took, and whether it ever came back.
+//
+// If a POST is still in flight at thirty seconds, the problem is the
+// request or the response. If every POST finished in milliseconds and the
+// button is still disabled, the problem is on this side of the wire, and
+// no amount of database tuning would ever have touched it.
+type ActionCall = { ms: number; status?: number; failed?: string };
+
+const finished = new WeakMap<import("@playwright/test").Page, ActionCall[]>();
+const inFlight = new WeakMap<import("@playwright/test").Page, Map<string, number>>();
+
+test.beforeEach(async ({ page }) => {
+  const done: ActionCall[] = [];
+  const open = new Map<string, number>();
+  finished.set(page, done);
+  inFlight.set(page, open);
+
+  // Server Actions are POSTs back to the page's own URL. Every POST this
+  // page makes is one, which is why the filter is this coarse: naming
+  // them more precisely would mean encoding Next's transport in a test.
+  page.on("request", (r) => {
+    if (r.method() === "POST") open.set(r.url() + r.postDataBuffer()?.byteLength, Date.now());
+  });
+  page.on("requestfinished", async (r) => {
+    if (r.method() !== "POST") return;
+    const key = r.url() + r.postDataBuffer()?.byteLength;
+    const startedAt = open.get(key);
+    if (startedAt === undefined) return;
+    open.delete(key);
+    let status: number | undefined;
+    try {
+      status = (await r.response())?.status();
+    } catch {
+      // A response that cannot be read is still a finished request; the
+      // duration is the part that matters here.
+    }
+    done.push({ ms: Date.now() - startedAt, status });
+  });
+  page.on("requestfailed", (r) => {
+    if (r.method() !== "POST") return;
+    const key = r.url() + r.postDataBuffer()?.byteLength;
+    const startedAt = open.get(key);
+    open.delete(key);
+    done.push({ ms: startedAt === undefined ? -1 : Date.now() - startedAt, failed: r.failure()?.errorText });
+  });
+});
+
+function postSummary(page: import("@playwright/test").Page): string {
+  const done = (finished.get(page) ?? []).slice(-3);
+  const open = inFlight.get(page) ?? new Map<string, number>();
+  const stillOpen = [...open.values()].map((t) => `${Date.now() - t}ms and counting`);
+
+  const parts = [
+    done.length
+      ? `last POSTs: ${done.map((c) => `${c.ms}ms${c.status ? ` (${c.status})` : ""}${c.failed ? ` (${c.failed})` : ""}`).join(", ")}`
+      : "no POST was ever sent",
+    stillOpen.length ? `in flight: ${stillOpen.join(", ")}` : "nothing in flight",
+  ];
+  return parts.join(". ");
+}
+
 /**
  * Wait for a drawer to close, and if it does not, fail with the reason the
  * screen is showing.
@@ -105,7 +175,9 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
     throw new Error(
       `${what}: the drawer never closed after ${Math.round(timeout / 1000)}s. ` +
         `${pending} disabled button(s)${pending ? `: ${disabled.join(", ")}` : ""}. ` +
-        `invalid: ${invalid.join(" | ") || "none"}. drawer says: ${text || "(nothing)"}`,
+        `invalid: ${invalid.join(" | ") || "none"}. ` +
+        // The half of the picture the server log cannot hold.
+        `${postSummary(page)}. drawer says: ${text || "(nothing)"}`,
     );
   }
 }

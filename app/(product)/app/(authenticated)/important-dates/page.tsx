@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/app-auth/session";
+import { timed } from "@/lib/slow-log";
 import { can } from "@/lib/app-auth/permissions";
 import { listImportantDates } from "@/lib/app-domain/important-dates";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -75,12 +76,13 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
 
   const tab: Tab = searchParams.tab === "all" ? "all" : searchParams.tab === "done" ? "done" : "upcoming";
 
-  const [dates, clients, users, allCategories] = await Promise.all([
-    listImportantDates(user),
-    listAccessibleClients(user),
-    listUsers(),
-    listCategories(),
-  ]);
+  // The last unmeasured segment of the chain. Every write on this screen
+  // revalidates it, and Next ships that re-render back inside the action's
+  // own response - so if the wait is here, the button that triggered it is
+  // what looks slow. See lib/slow-log.ts.
+  const [dates, clients, users, allCategories] = await timed("screen.important-dates.load", () =>
+    Promise.all([listImportantDates(user), listAccessibleClients(user), listUsers(), listCategories()])
+  );
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categoriesForAutoTask = allCategories.filter(
