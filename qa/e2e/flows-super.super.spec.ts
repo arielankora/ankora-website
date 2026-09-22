@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { observe, trafficSummary } from "./observe";
 
 // The four write surfaces the role matrix reserves for SUPER_ADMIN. They run
 // under their own stored session (see the second setup in auth.setup.ts);
@@ -30,68 +31,23 @@ test.describe.configure({ timeout: 90_000 });
 // revalidation and the dashboard's own load all stayed under 750ms
 // (lib/slow-log.ts), and this drawer still sat at "נוצר..." for thirty
 // seconds in the same run. Server work being fast and the button staying
-// pending cannot both be explained by a slow server, so the next fact
-// worth having is the one the browser holds: how long the Server Action's
-// POST actually took, and whether it ever came back.
+// pending cannot both be explained by a slow server.
 //
-// If a POST is still in flight at thirty seconds, the problem is the
-// request or the response. If every POST finished in milliseconds and the
-// button is still disabled, the problem is on this side of the wire, and
-// no amount of database tuning would ever have touched it.
-type ActionCall = { ms: number; status?: number; failed?: string };
-
-const finished = new WeakMap<import("@playwright/test").Page, ActionCall[]>();
-const inFlight = new WeakMap<import("@playwright/test").Page, Map<string, number>>();
+// Round three asked the browser, and narrowed it further: the Server
+// Action's POST came back 200 in 39ms with nothing else in flight, while
+// the submit button stayed at its own pending label. So the request and
+// the response are both fine, and whatever is stuck is stuck after the
+// answer arrived - on this side of the wire.
+//
+// That leaves two candidates the round-three recorder could not see,
+// because it watched POSTs and only POSTs: a follow-up fetch that never
+// returns, and an exception thrown while React applies the result. Both
+// end with a transition that never settles, which is exactly a button
+// that stays disabled forever. qa/e2e/observe.ts records both.
 
 test.beforeEach(async ({ page }) => {
-  const done: ActionCall[] = [];
-  const open = new Map<string, number>();
-  finished.set(page, done);
-  inFlight.set(page, open);
-
-  // Server Actions are POSTs back to the page's own URL. Every POST this
-  // page makes is one, which is why the filter is this coarse: naming
-  // them more precisely would mean encoding Next's transport in a test.
-  page.on("request", (r) => {
-    if (r.method() === "POST") open.set(r.url() + r.postDataBuffer()?.byteLength, Date.now());
-  });
-  page.on("requestfinished", async (r) => {
-    if (r.method() !== "POST") return;
-    const key = r.url() + r.postDataBuffer()?.byteLength;
-    const startedAt = open.get(key);
-    if (startedAt === undefined) return;
-    open.delete(key);
-    let status: number | undefined;
-    try {
-      status = (await r.response())?.status();
-    } catch {
-      // A response that cannot be read is still a finished request; the
-      // duration is the part that matters here.
-    }
-    done.push({ ms: Date.now() - startedAt, status });
-  });
-  page.on("requestfailed", (r) => {
-    if (r.method() !== "POST") return;
-    const key = r.url() + r.postDataBuffer()?.byteLength;
-    const startedAt = open.get(key);
-    open.delete(key);
-    done.push({ ms: startedAt === undefined ? -1 : Date.now() - startedAt, failed: r.failure()?.errorText });
-  });
+  observe(page);
 });
-
-function postSummary(page: import("@playwright/test").Page): string {
-  const done = (finished.get(page) ?? []).slice(-3);
-  const open = inFlight.get(page) ?? new Map<string, number>();
-  const stillOpen = [...open.values()].map((t) => `${Date.now() - t}ms and counting`);
-
-  const parts = [
-    done.length
-      ? `last POSTs: ${done.map((c) => `${c.ms}ms${c.status ? ` (${c.status})` : ""}${c.failed ? ` (${c.failed})` : ""}`).join(", ")}`
-      : "no POST was ever sent",
-    stillOpen.length ? `in flight: ${stillOpen.join(", ")}` : "nothing in flight",
-  ];
-  return parts.join(". ");
-}
 
 /**
  * Wait for a drawer to close, and if it does not, fail with the reason the
@@ -123,7 +79,14 @@ function postSummary(page: import("@playwright/test").Page): string {
 // to fall when that reason does, or it stops being a measurement and
 // becomes a blindfold - 90 seconds would now absorb a regression three
 // times worse than the one that prompted it, in silence.
-async function expectDrawerClosed(page: import("@playwright/test").Page, what: string, timeout = 30_000) {
+async function expectDrawerClosed(
+  page: import("@playwright/test").Page,
+  what: string,
+  timeout = 30_000,
+  /// Optional: where to look for the thing that was just submitted, from a
+  /// second tab. See the comment in the catch block.
+  written?: { path: string; text: string },
+) {
   const dialog = page.getByRole("dialog");
   try {
     await expect(dialog).toHaveCount(0, { timeout });
@@ -165,19 +128,52 @@ async function expectDrawerClosed(page: import("@playwright/test").Page, what: s
     // none" and inferring a slow server, on the strength of a disabled
     // button that may never have been the submit one: this counts every
     // disabled button in the dialog, not the one that matters.
-    const text = (await dialog.innerText().catch(() => ""))
+    const full = (await dialog.innerText().catch(() => ""))
       .split("\n")
       .map((l) => l.trim())
       .filter(Boolean)
-      .join(" / ")
-      .slice(0, 400);
+      .join(" / ");
+    // Both ends, not the first 400 characters. This form renders its
+    // refusal in a paragraph directly above the submit button, which is
+    // the BOTTOM of a long drawer - so a head-only excerpt cut off the
+    // one line worth reading and left "drawer says: לקוח * / כותרת * /"
+    // looking like the form had nothing to say.
+    const text = full.length > 400 ? `${full.slice(0, 250)} … ${full.slice(-150)}` : full;
+
+    // Did the write land?
+    //
+    // Everything above describes the screen that is stuck, and none of it
+    // separates the two explanations that remain: the server refused the
+    // write and said so in a way this drawer never rendered, or the
+    // server wrote the row and the browser never noticed. Those need
+    // opposite fixes, and the question is settled by asking a second tab
+    // - a fresh request, the same session, none of the stuck page's
+    // state.
+    let landed = "not checked";
+    if (written) {
+      const second = await page.context().newPage();
+      try {
+        await second.goto(written.path, { timeout: 15_000 });
+        const found = await second
+          .getByText(written.text, { exact: false })
+          .first()
+          .isVisible({ timeout: 10_000 })
+          .catch(() => false);
+        landed = found ? "YES - the row exists, so only the browser is stuck" : "no - the row is absent";
+      } catch (err) {
+        landed = `could not check (${err instanceof Error ? err.message.split("\n")[0] : String(err)})`;
+      } finally {
+        await second.close().catch(() => {});
+      }
+    }
 
     throw new Error(
       `${what}: the drawer never closed after ${Math.round(timeout / 1000)}s. ` +
+        `written to the database: ${landed}. ` +
         `${pending} disabled button(s)${pending ? `: ${disabled.join(", ")}` : ""}. ` +
         `invalid: ${invalid.join(" | ") || "none"}. ` +
         // The half of the picture the server log cannot hold.
-        `${postSummary(page)}. drawer says: ${text || "(nothing)"}`,
+        `${trafficSummary(page)}. drawer says: ${text || "(nothing)"}`,
     );
   }
 }
@@ -323,7 +319,10 @@ test.describe("important-dates/actions", () => {
     await set('select[name="responsibleUserId"]', responsible ?? "");
     await dialog.locator("button[type=submit]").first().click();
 
-    await expectDrawerClosed(page, "creating an important date");
+    await expectDrawerClosed(page, "creating an important date", 30_000, {
+      path: "/app/important-dates",
+      text: title,
+    });
     await page.reload();
     await expect(page.getByText(title, { exact: false }).first(), "the important date was not created").toBeVisible({
       timeout: 15_000,
