@@ -43,6 +43,11 @@ type Observed = {
   open: Map<string, { method: string; path: string; startedAt: number }>;
   logs: string[];
   navigations: string[];
+  /// Navigation requests started and not yet finished. A navigation
+  /// cancels everything the old document had in flight, and it commits
+  /// AFTER that - so the navigation count alone always reads as "nothing
+  /// was navigating", which is exactly backwards.
+  navsInFlight: number;
   /// Set the moment the test body returns. Everything after that point is
   /// teardown, and teardown aborts every request still in flight - which
   /// is not a fault, just a page being closed.
@@ -86,7 +91,7 @@ const DRIFT_PROBE = `(() => {
 })();`;
 
 export function observe(page: Page): void {
-  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [], sealed: false };
+  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [], navsInFlight: 0, sealed: false };
   observed.set(page, state);
 
   // Fire and forget: a probe that failed to install must never be the
@@ -110,10 +115,12 @@ export function observe(page: Page): void {
   };
 
   page.on("request", (r) => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) state.navsInFlight++;
     if (!WATCHED.has(r.resourceType())) return;
     state.open.set(keyOf(r), { method: r.method(), path: shortPath(r.url()), startedAt: Date.now() });
   });
   page.on("requestfinished", async (r) => {
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) state.navsInFlight--;
     const started = state.open.get(keyOf(r));
     if (!started) return;
     state.open.delete(keyOf(r));
@@ -127,6 +134,8 @@ export function observe(page: Page): void {
     state.done.push({ method: started.method, path: started.path, ms: Date.now() - started.startedAt, status });
   });
   page.on("requestfailed", (r) => {
+    const navigating = state.navsInFlight > 0;
+    if (r.isNavigationRequest() && r.frame() === page.mainFrame()) state.navsInFlight--;
     const started = state.open.get(keyOf(r));
     if (!started) return;
     state.open.delete(keyOf(r));
@@ -151,7 +160,8 @@ export function observe(page: Page): void {
     if (state.sealed) return;
     console.warn(
       `[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}` +
-        ` (at ${state.navigations.length} navigation(s), last ${state.navigations.at(-1) ?? "none"})`
+        ` (${navigating ? "WHILE NAVIGATING" : "page still"},` +
+        ` at ${state.navigations.length} navigation(s), last ${state.navigations.at(-1) ?? "none"})`
     );
   });
 
