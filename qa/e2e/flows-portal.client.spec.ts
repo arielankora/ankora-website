@@ -46,7 +46,9 @@ test.describe("the portal itself", () => {
     const response = await page.goto(HISTORY, { waitUntil: "domcontentloaded" });
 
     expect(response?.status()).toBe(200);
-    expect(page.url(), "bounced to login - the client session was not accepted").not.toContain("/app/login");
+    // Path, not substring: a route whose name merely starts with
+    // "/app/login" (such as the portal sign-in link) is not a bounce.
+    expect(new URL(page.url()).pathname, "bounced to login - the client session was not accepted").not.toBe("/app/login");
 
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);

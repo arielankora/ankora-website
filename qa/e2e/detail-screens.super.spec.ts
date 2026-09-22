@@ -51,7 +51,9 @@ async function assertDetailRenders(
   if (result.skipped) return;
 
   expect(result.response?.status(), `${result.href} HTTP status`).toBe(200);
-  expect(page.url(), "bounced to login - the stored session was not accepted").not.toContain("/app/login");
+  // Path, not substring: a route whose name merely starts with
+  // "/app/login" (such as the portal sign-in link) is not a bounce.
+  expect(new URL(page.url()).pathname, "bounced to login - the stored session was not accepted").not.toBe("/app/login");
 
   const body = await page.locator("body").innerText();
   expect(body, `${result.href} error boundary`).not.toMatch(/Application error|Internal Server Error/);

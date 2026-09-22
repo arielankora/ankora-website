@@ -28,7 +28,10 @@ test.describe("authenticated screens", () => {
       // Being bounced to the login screen means the stored session was
       // not accepted - a silent failure that would otherwise make every
       // assertion below pass against a login form.
-      expect(page.url(), `${route} did not bounce to login`).not.toContain("/app/login");
+      // Compared as a path, not as a substring: "/app/login-link" contains
+      // "/app/login", so the old substring check would report a screen as
+      // bounced to login purely because of its name.
+      expect(new URL(page.url()).pathname, `${route} did not bounce to login`).not.toBe("/app/login");
 
       // Next.js renders a thrown server error as a generic error page.
       // Catching it by its text is crude but it is what a user sees.

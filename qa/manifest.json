@@ -974,8 +974,29 @@
       "risk": "medium",
       "riskAssigned": false,
       "firstSeen": "2026-09-21"
+    },
+    "action:(product)/app/login-link/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
+    },
+    "screen:/app/login-link": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
+    },
+    "screen:/app/login-link/request": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-21"
+  "lastScan": "2026-09-22"
 }

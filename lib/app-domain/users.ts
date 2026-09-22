@@ -4,13 +4,16 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { hashPassword } from "@/lib/app-auth/password";
+import { sendEmail } from "@/lib/email";
+import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
 import type { User, UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
-// Phase 4 (Alerts/email delivery) hasn't been built yet, so there is no
-// email provider to send invite/reset links through. Documented
-// limitation (see docs/adr/0001, section "known limitations"): Phase 1
-// surfaces the one-time link directly to the inviting admin to relay
-// manually, instead of silently pretending email delivery exists.
+// Portal phase 0: the invite is now actually sent. Resend has been wired
+// up since Phase 4 (lib/email.ts) and already carries alerts, scheduled
+// reports and the nightly backup, but the invite itself was still handed
+// to the inviting admin to relay by hand - which is the single reason no
+// client had ever reached the portal. The one-time link is still returned
+// to the admin as a fallback for the case the mail does not arrive.
 const RESET_TOKEN_TTL_MS = 48 * 60 * 60 * 1000; // 48h for an initial invite/reset link
 
 function generateResetToken() {
@@ -95,7 +98,34 @@ export async function inviteUser(
     after: { name: user.name, email: user.email, role: user.role },
   });
 
-  return { user, setPasswordToken: raw };
+  // Never throws (lib/email.ts returns a result object), so a mail
+  // provider outage cannot roll back an invite that already exists in the
+  // database - the admin still gets the link and can relay it.
+  const isClient = user.role === "CLIENT_USER";
+  const { html, text } = renderActionEmail({
+    title: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
+    body: isClient
+      ? [
+          `שלום ${user.name},`,
+          "פתחנו עבורך גישה לפורטל, שבו רואים מה בטיפול, מה הושלם ומה ממתין להחלטה שלך.",
+          "הקישור תקף ל-48 שעות. בכניסה הראשונה בוחרים סיסמה, ואפשר גם להיכנס בהמשך בקישור למייל בלי סיסמה.",
+        ]
+      : [
+          `שלום ${user.name},`,
+          "נוצר עבורך חשבון במערכת התפעול של Ankora. הקישור תקף ל-48 שעות, ובכניסה הראשונה בוחרים סיסמה.",
+        ],
+    buttonLabel: isClient ? "כניסה לפורטל" : "בחירת סיסמה",
+    url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
+    footnote: "אם ההזמנה הגיעה אליך בטעות, אפשר להתעלם מההודעה.",
+  });
+  const mail = await sendEmail({
+    to: [user.email],
+    subject: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
+    text,
+    html,
+  });
+
+  return { user, setPasswordToken: raw, emailSent: mail.ok, emailError: mail.ok ? undefined : mail.error };
 }
 
 export async function updateUserRoleStatus(

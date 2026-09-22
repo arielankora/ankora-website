@@ -152,8 +152,9 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
       {state?.inviteLink && (
         <div className="mt-4 rounded-lg border border-lineDark bg-cream-dim p-4 text-sm">
           <p className="text-appNavy">
-            {state.invitedName} הוזמן בהצלחה. אין עדיין ספק אימייל מחובר (Phase 4) - יש להעביר את הקישור החד-פעמי
-            הבא ידנית:
+            {state.emailSent
+              ? `${state.invitedName} הוזמן בהצלחה, והמייל נשלח. הקישור החד-פעמי הבא הוא גיבוי אם המייל לא הגיע:`
+              : `${state.invitedName} הוזמן בהצלחה, אך שליחת המייל נכשלה. יש להעביר את הקישור החד-פעמי הבא ידנית:`}
           </p>
           <p className="mt-2 break-all text-gold-dim">
             <a href={state.inviteLink}>{state.inviteLink}</a>

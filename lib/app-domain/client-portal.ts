@@ -1,6 +1,7 @@
 import "server-only";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
+import { assertCan, can, ForbiddenError } from "@/lib/app-auth/permissions";
 import { getCurrentHourBank, listHourBanksForClient } from "@/lib/app-domain/hour-banks";
 import { getClient } from "@/lib/app-domain/clients";
 import { normalizeEmails } from "@/lib/app-domain/report-schedules";
@@ -31,10 +32,65 @@ import type { User, Client, ClientUserRole } from "@prisma/client";
 // משימות שבוצעו" / "Monthly detailed report: date, task, category..."
 // literally asks for.
 
+export interface PortalMembership {
+  clientId: string;
+  clientName: string;
+}
+
 export interface PortalClientContext {
   client: Client;
-  clientUserId: string;
+  /// Null in a staff preview: nobody's membership is being used, so there
+  /// is no ClientUser row to attribute a write to. Every write path in
+  /// this file refuses when this is null (see assertPortalWritable).
+  clientUserId: string | null;
   clientUserRole: ClientUserRole;
+  /// Portal phase 0: an Ankora manager looking at what a client sees.
+  /// Read-only by construction, never a client's own session.
+  isStaffPreview: boolean;
+  /// Every client this portal user belongs to, for the switcher. One entry
+  /// for the common case, empty in a staff preview.
+  memberships: PortalMembership[];
+}
+
+/// Portal phase 0. Which client the portal should resolve to is a
+/// per-request choice that lives in a cookie rather than in the URL: the
+/// portal is four screens plus an export route, and threading a query
+/// parameter through all of them (and through every internal link) would
+/// give five more places to forget it - and one forgotten place is a
+/// client looking at the wrong client's hours.
+///
+/// The cookie is a REQUEST, never an authorisation: both values below are
+/// re-checked against the caller's own memberships (or their staff
+/// permission) on every single call, so a hand-edited cookie can only
+/// ever fail closed.
+export const PORTAL_CLIENT_COOKIE = "ank_portal_client";
+export const PORTAL_PREVIEW_COOKIE = "ank_portal_preview";
+
+/// Reading cookies needs a request scope. The integration tests call the
+/// domain functions directly, with no request around them, and they
+/// should keep passing without a fake one - so a missing scope simply
+/// means "no selection", which is the pre-phase-0 behaviour.
+async function portalSelection(): Promise<{ selected?: string; preview?: string }> {
+  try {
+    const jar = await cookies();
+    return {
+      selected: jar.get(PORTAL_CLIENT_COOKIE)?.value || undefined,
+      preview: jar.get(PORTAL_PREVIEW_COOKIE)?.value || undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/// The one guard every portal write must pass. A staff preview may read
+/// everything the client reads and change nothing, which is the whole
+/// point of it: a manager checking what a client sees must never be able
+/// to act as that client, and the audit trail must never show a write
+/// that no client actually made.
+export function assertPortalWritable(ctx: PortalClientContext) {
+  if (ctx.isStaffPreview || !ctx.clientUserId) {
+    throw new ForbiddenError("Portal preview is read-only");
+  }
 }
 
 /// The one and only way any Phase 6 function learns which client a
@@ -46,19 +102,57 @@ export interface PortalClientContext {
 /// needs a single login spanning multiple clients, that is a deliberate
 /// future change, not an oversight.
 export async function resolvePortalClient(actor: User): Promise<PortalClientContext> {
+  const { selected, preview } = await portalSelection();
+
+  // Staff preview first: an Ankora manager has no ClientUser row at all,
+  // so without this branch they would always be rejected below. Gated on
+  // report.internal.view, the permission that already lets Super Admin and
+  // Ankora Admin read any client's hours on the internal reports screens -
+  // so the preview never widens what anyone can see, it only changes how
+  // it is presented. An ANKORA_EMPLOYEE has neither that permission nor a
+  // membership, and is refused exactly as before.
+  if (preview && can(actor.role, "report.internal.view")) {
+    const client = await prisma.client.findFirst({ where: { id: preview, deletedAt: null } });
+    if (!client) throw new ForbiddenError("Unknown client for portal preview");
+    return {
+      client,
+      clientUserId: null,
+      // VIEWER on purpose: Client-Admin-only surfaces (the scheduled-report
+      // recipients panel) stay hidden in a preview rather than rendering a
+      // form that would refuse on submit.
+      clientUserRole: "VIEWER",
+      isStaffPreview: true,
+      memberships: [],
+    };
+  }
+
   assertCan(actor.role, "report.client.view");
 
-  const membership = await prisma.clientUser.findFirst({
+  const memberships = await prisma.clientUser.findMany({
     where: { userId: actor.id },
     include: { client: true },
     orderBy: { createdAt: "asc" },
   });
+  const usable = memberships.filter((m) => !m.client.deletedAt);
 
-  if (!membership || membership.client.deletedAt) {
+  if (usable.length === 0) {
     throw new ForbiddenError("No active client membership for this portal user");
   }
 
-  return { client: membership.client, clientUserId: membership.id, clientUserRole: membership.role };
+  // Portal phase 0: a portal user may hold several memberships (a founder
+  // who is also a private client, a family with two entities). Before
+  // this, the first membership won permanently and the others were
+  // unreachable. The cookie only ever picks FROM this list, so it cannot
+  // reach a client the user does not belong to.
+  const chosen = usable.find((m) => m.clientId === selected) ?? usable[0];
+
+  return {
+    client: chosen.client,
+    clientUserId: chosen.id,
+    clientUserRole: chosen.role,
+    isStaffPreview: false,
+    memberships: usable.map((m) => ({ clientId: m.clientId, clientName: m.client.name })),
+  };
 }
 
 // Phase 8 fix (docs/adr/0001, Phase 8 addendum section 15.3): these four
@@ -360,7 +454,14 @@ export async function getPortalHistory(actor: User) {
 /// belonging to their OWN client (never report type/frequency/enabled -
 /// those stay an Ankora-only decision via report.internal.view).
 export async function updatePortalScheduleRecipients(actor: User, scheduleId: string, recipients: string[]) {
-  const { client, clientUserRole } = await resolvePortalClient(actor);
+  const ctx = await resolvePortalClient(actor);
+  const { client, clientUserRole } = ctx;
+  // Portal phase 0: a staff preview reaches this function with a resolved
+  // client and no membership. It must never write - see
+  // assertPortalWritable. The role check below would already refuse
+  // today (a preview resolves as VIEWER), but relying on that would make
+  // the read-only guarantee an accident of one constant.
+  assertPortalWritable(ctx);
   if (clientUserRole !== "ADMIN") {
     throw new ForbiddenError("Only a Client Admin may edit report recipients");
   }

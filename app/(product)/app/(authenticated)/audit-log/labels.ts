@@ -48,6 +48,10 @@ export const ACTION_LABEL: Record<string, string> = {
   "login.failure": "ניסיון התחברות כושל",
   "password_reset.requested": "בקשת איפוס סיסמה",
   "password_reset.completed": "איפוס סיסמה הושלם",
+  // Portal phase 0.
+  "login_link.requested": "בקשת קישור כניסה לפורטל",
+  "login_link.success": "כניסה לפורטל בקישור",
+  "portal.preview.start": "כניסה לתצוגת לקוח",
   "user.invite": "הזמנת משתמש",
   "user.role_status_change": "שינוי תפקיד/סטטוס",
   "user.client_access_change": "שינוי גישה ללקוחות",

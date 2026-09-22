@@ -21,7 +21,10 @@ export const authConfig = {
       // the self-service password-reset flow (a locked-out or brand-new
       // user has no session yet, so gating these behind auth would make
       // the flow unreachable).
-      const PUBLIC_APP_PATHS = ["/app/login", "/app/forgot-password", "/app/reset-password"];
+      // "/app/login-link" is public for the same reason as the reset flow: a
+      // client arriving from the emailed link has no session yet, and the
+      // token in the URL is what authorises them.
+      const PUBLIC_APP_PATHS = ["/app/login", "/app/login-link", "/app/forgot-password", "/app/reset-password"];
       const isPublic = PUBLIC_APP_PATHS.some((p) => path === p || path.startsWith(`${p}/`));
       const isProtected = path.startsWith("/app") && !isPublic;
       if (!isProtected) return true;

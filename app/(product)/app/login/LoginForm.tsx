@@ -82,6 +82,13 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
         <Link href="/app/forgot-password" className="text-xs text-gold-dim hover:underline">
           שכחתי סיסמה
         </Link>
+        {/* Portal phase 0: clients open the portal a few times a month and
+            will not remember a password. The link flow is offered here
+            rather than replacing the form, because Ankora staff sign in on
+            this same screen and keep password-only sign-in. */}
+        <Link href="/app/login-link/request" className="text-xs text-gold-dim hover:underline">
+          כניסה בקישור למייל
+        </Link>
       </div>
     </form>
   );

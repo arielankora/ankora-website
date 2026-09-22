@@ -127,6 +127,7 @@ model User {
   clientAccess        UserClientAccess[]
   auditEvents         AuditEvent[]         @relation("AuditActor")
   passwordResetTokens PasswordResetToken[]
+  portalLoginTokens   PortalLoginToken[]
   timeEntries         TimeEntry[]
   timeEntryRevisions  TimeEntryRevision[]  @relation("TimeEntryRevisionActor")
   hourBankAdjustments HourBankAdjustment[] @relation("HourBankAdjustmentCreator")
@@ -164,6 +165,28 @@ model PasswordResetToken {
 
   @@index([userId])
   @@map("password_reset_tokens")
+}
+
+/// Portal phase 0: a one-time sign-in link for a CLIENT_USER. Same
+/// hash-only storage as PasswordResetToken above, and deliberately a
+/// separate table rather than a reused reset token: a reset token grants
+/// the right to CHANGE A PASSWORD, this one grants a SESSION, and the two
+/// must never be interchangeable (a leaked reset link would otherwise log
+/// the finder straight in, and a leaked login link would let them take the
+/// account over). Short TTL, single use, and only ever issued to a
+/// CLIENT_USER - Ankora staff keep password sign-in.
+model PortalLoginToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("portal_login_tokens")
 }
 
 /// Phase 13 (docs/adr/0005): a personal access token that lets ONE Ankora
