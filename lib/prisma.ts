@@ -1,5 +1,6 @@
 import "server-only";
 import { PrismaClient } from "@prisma/client";
+import { isDevelopment, isProductionBuild } from "@/lib/env";
 
 // Standard Next.js/Prisma singleton pattern: avoids exhausting DB
 // connections from hot-reloading in dev, where modules re-evaluate but the
@@ -9,9 +10,9 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
+    log: isDevelopment() ? ["warn", "error"] : ["error"],
   });
 
-if (process.env.NODE_ENV !== "production") {
+if (!isProductionBuild()) {
   globalForPrisma.prisma = prisma;
 }

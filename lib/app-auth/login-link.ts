@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
+import { devOnly } from "@/lib/env";
 import type { AuthenticatedUser } from "@/lib/app-auth/authenticate";
 
 // Portal phase 0, "כניסה בקישור חד פעמי". A client opens the portal a few
@@ -69,7 +70,7 @@ export async function requestLoginLink(identifier: string): Promise<{ devToken?:
     entityId: user.id,
   });
 
-  return { devToken: process.env.NODE_ENV !== "production" ? raw : undefined };
+  return { devToken: devOnly(raw) };
 }
 
 /// Verifies a link and, on success, burns it. Mirrors

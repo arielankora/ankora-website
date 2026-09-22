@@ -1,4 +1,6 @@
 import "server-only";
+import { unreachableLinksIn } from "@/lib/site";
+import { isProductionDeployment } from "@/lib/env";
 
 // Generic Resend adapter, reusing the exact provider/domain the marketing
 // site's contact form already sends through successfully (see
@@ -49,6 +51,32 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
   if (input.to.length === 0) {
     return { ok: false, error: "No recipients" };
+  }
+
+  // 22.9.2026. An invite went out carrying the production deployment's
+  // own *.vercel.app address, which Vercel's deployment protection
+  // answers with a sign-in wall. The recipient had a valid token and
+  // still could not reach Ankora.
+  //
+  // The origin is chosen correctly upstream now (lib/email-templates.ts),
+  // and this is the same rule stated once more at the door, because that
+  // is the only place every outgoing message passes through. A future
+  // caller that builds its own link cannot get past here.
+  //
+  // Production refuses to send rather than quietly rewriting: a message
+  // with an unopenable link is worthless to its recipient anyway, and the
+  // invite screen already surfaces a failed send together with a link the
+  // admin can relay by hand. A loud failure in front of one admin beats a
+  // dead link in front of a new client. Previews are exempt on purpose -
+  // there, a *.vercel.app link is the correct link.
+  if (isProductionDeployment()) {
+    const unreachable = unreachableLinksIn(`${input.text}\n${input.html ?? ""}`);
+    if (unreachable.length > 0) {
+      return {
+        ok: false,
+        error: `Refusing to send: ${unreachable[0]} is behind deployment protection and the recipient cannot open it`,
+      };
+    }
   }
 
   try {
