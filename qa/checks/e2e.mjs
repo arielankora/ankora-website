@@ -173,6 +173,48 @@ export async function e2e() {
     );
   }
 
+  // Requests the browser abandoned, on every run.
+  //
+  // Reported outside the failure branch on purpose. Playwright retries a
+  // failed test once, so a Server Action whose POST was aborted and which
+  // then succeeded leaves a green run and no evidence - and three rounds
+  // of this investigation were spent waiting to catch the fault in the
+  // act. An abandoned request is worth knowing about whether or not it
+  // happened to fail a test this time.
+  const aborted = String(r.all ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[abort]"))
+    .slice(0, 12);
+
+  if (aborted.length) {
+    // A POST is a write the user asked for and did not get. A GET is
+    // usually a prefetch the router cancelled on purpose, which is
+    // ordinary Next behaviour and not worth waking anyone for.
+    const writes = aborted.filter((l) => /\[abort\] POST/.test(l)).length;
+    out.push(
+      finding(
+        writes ? "major" : "info",
+        `${aborted.length} request(s) the browser abandoned${writes ? `, ${writes} of them a write` : ""}`,
+        aborted.join("\n")
+      )
+    );
+  }
+
+  // The server's side of the same story, on every run, for the same
+  // reason. These lines appear only while qa/playwright.config.ts sets
+  // QA_TRACE, so they cost nothing anywhere else.
+  const traced = String(r.all ?? "")
+    .split("\n")
+    .filter((l) => l.startsWith("[WebServer]"))
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[trace]"))
+    .slice(-20);
+
+  if (traced.length) {
+    out.push(finding("minor", "what the server traced while the browser ran", traced.join("\n")));
+  }
+
   if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
     // The error lines, not the last twelve lines.
     //
@@ -208,23 +250,6 @@ export async function e2e() {
       out.push(finding("minor", "what the app logged while the browser ran", errors.join("\n")));
     }
 
-    // The action trace, when the suite asked for one.
-    //
-    // A Server Action's POST reported as aborted by the browser, with no
-    // row written, has two readings that need opposite fixes: the request
-    // never arrived, or it arrived and the server never finished. The
-    // error filter above cannot carry these lines - they name no fault,
-    // which is the point of them - so they get their own block.
-    const traced = String(r.all ?? "")
-      .split("\n")
-      .filter((l) => l.startsWith("[WebServer]"))
-      .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
-      .filter((l) => l.includes("[trace]"))
-      .slice(-20);
-
-    if (traced.length) {
-      out.push(finding("minor", "what the server traced while the browser ran", traced.join("\n")));
-    }
   }
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));

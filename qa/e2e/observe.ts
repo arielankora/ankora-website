@@ -126,12 +126,17 @@ export function observe(page: Page): void {
     const started = state.open.get(keyOf(r));
     if (!started) return;
     state.open.delete(keyOf(r));
-    state.done.push({
-      method: started.method,
-      path: started.path,
-      ms: Date.now() - started.startedAt,
-      failed: r.failure()?.errorText,
-    });
+    const ms = Date.now() - started.startedAt;
+    const failed = r.failure()?.errorText;
+    state.done.push({ method: started.method, path: started.path, ms, failed });
+
+    // Printed, not only stored, because this fault does not always fail a
+    // test. Playwright retries once, and a Server Action that was aborted
+    // and succeeded on the retry leaves a green run with no trace of the
+    // thing worth knowing. The e2e check collects these lines whether the
+    // run passed or not, so an intermittent fault stops depending on
+    // catching it in the act.
+    console.warn(`[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}`);
   });
 
   // A navigation is the ordinary reason a browser aborts everything it
