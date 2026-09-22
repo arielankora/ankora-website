@@ -2,6 +2,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./auth.config";
 import { authenticateWithPassword } from "@/lib/app-auth/authenticate";
+import { consumeLoginLink } from "@/lib/app-auth/login-link";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -20,6 +21,19 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           String(credentials?.identifier || ""),
           String(credentials?.password || "")
         );
+      },
+    }),
+    // Portal phase 0: the one-time sign-in link. A second provider rather
+    // than a magic `password` value inside the first one, so the two
+    // paths can never be confused for each other and the link flow gets
+    // its own audit action. All the rules (TTL, single use, CLIENT_USER
+    // only, re-checking status at consume time) live in
+    // lib/app-auth/login-link.ts, which is testable without NextAuth.
+    Credentials({
+      id: "login-link",
+      credentials: { token: { label: "One-time token" } },
+      async authorize(credentials) {
+        return consumeLoginLink(String(credentials?.token || ""));
       },
     }),
   ],

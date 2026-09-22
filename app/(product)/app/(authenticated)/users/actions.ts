@@ -7,7 +7,7 @@ import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
-type InviteState = { error?: string; inviteLink?: string; invitedName?: string };
+type InviteState = { error?: string; inviteLink?: string; invitedName?: string; emailSent?: boolean };
 type FormState = { error?: string; ok?: boolean };
 
 function friendlyError(err: unknown): string {
@@ -28,15 +28,14 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
   const clientUserRole = (String(formData.get("clientUserRole") || "") as ClientUserRole) || undefined;
 
   try {
-    const { user, setPasswordToken } = await inviteUser(actor, { name, email, role, clientIds, clientUserRole });
+    const { user, setPasswordToken, emailSent } = await inviteUser(actor, { name, email, role, clientIds, clientUserRole });
     revalidatePath("/app/users");
 
-    // Spec's documented Phase 1 limitation (no email provider until
-    // Phase 4): the one-time link is surfaced to the inviting admin to
-    // relay manually, rather than silently claiming an email was sent.
-    // Built as an absolute URL (not a relative path) since the admin will
-    // typically copy/paste this into Slack or a separate email to the
-    // invited user, outside the app itself.
+    // Portal phase 0: the invite email is sent by inviteUser itself. The
+    // absolute link is still returned so the admin has a fallback when the
+    // mail does not arrive (spam folder, wrong address, provider outage) -
+    // the screen now says which of the two happened instead of claiming
+    // there is no email provider.
     const hdrs = await headers();
     const host = hdrs.get("host");
     const protocol = host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https";
@@ -45,6 +44,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
     return {
       invitedName: user.name,
       inviteLink: `${origin}/app/reset-password?token=${setPasswordToken}`,
+      emailSent,
     };
   } catch (err) {
     return { error: friendlyError(err) };

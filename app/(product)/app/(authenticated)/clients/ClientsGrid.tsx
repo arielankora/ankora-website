@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { archiveClientAction, restoreClientAction } from "./actions";
+import { startPortalPreviewAction } from "../portal/actions";
 import type { ClientStatus } from "@prisma/client";
 
 export type ClientCard = {
@@ -135,6 +136,20 @@ export function ClientsGrid({
                       דוח פעילות
                     </Link>
                   )}
+                  {/* Portal phase 0: an Ankora manager can open this
+                      client's portal exactly as the client sees it. The
+                      action sets a short-lived cookie and redirects; the
+                      preview is read-only by construction
+                      (assertPortalWritable) and audited on entry. */}
+                  <form action={startPortalPreviewAction}>
+                    <input type="hidden" name="clientId" value={client.id} />
+                    <button
+                      type="submit"
+                      className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold"
+                    >
+                      תצוגת לקוח
+                    </button>
+                  </form>
                   {client.status !== "ARCHIVED" && (
                     <button
                       type="button"

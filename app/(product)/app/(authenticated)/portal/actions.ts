@@ -1,8 +1,16 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/app-auth/session";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { updatePortalScheduleRecipients } from "@/lib/app-domain/client-portal";
+import { recordAudit } from "@/lib/app-auth/audit";
+import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
+import {
+  updatePortalScheduleRecipients,
+  PORTAL_CLIENT_COOKIE,
+  PORTAL_PREVIEW_COOKIE,
+} from "@/lib/app-domain/client-portal";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -41,4 +49,78 @@ export async function updatePortalRecipientsAction(_prev: FormState | undefined,
 
   revalidatePath("/app/portal/history");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Portal phase 0: which client the portal is showing.
+//
+// Both actions below only ever WRITE A REQUEST into a cookie.
+// resolvePortalClient re-checks that request against the caller's own
+// memberships (or their client.view permission) on every call, so nothing
+// here is an authorisation decision - see client-portal.ts's comment on
+// PORTAL_CLIENT_COOKIE.
+// ---------------------------------------------------------------------------
+
+const PREVIEW_COOKIE_MAX_AGE_S = 60 * 60; // one hour: a preview is a look, not a mode to live in
+
+/// An Ankora manager opens a client's portal exactly as that client sees
+/// it. Read-only by construction (assertPortalWritable), one hour, and
+/// audited on entry - a manager stepping into a client's view is a thing
+/// the audit log should be able to answer questions about later.
+export async function startPortalPreviewAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  assertCan(user.role, "report.internal.view");
+
+  const clientId = String(formData.get("clientId") || "");
+  const client = await prisma.client.findFirst({ where: { id: clientId, deletedAt: null } });
+  if (!client) return;
+
+  const jar = await cookies();
+  jar.set(PORTAL_PREVIEW_COOKIE, client.id, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/app",
+    maxAge: PREVIEW_COOKIE_MAX_AGE_S,
+  });
+
+  await recordAudit({
+    actorId: user.id,
+    action: "portal.preview.start",
+    entityType: "Client",
+    entityId: client.id,
+    after: { clientName: client.name },
+  });
+
+  redirect("/app/portal");
+}
+
+export async function exitPortalPreviewAction(): Promise<void> {
+  await requireUser();
+  const jar = await cookies();
+  jar.delete(PORTAL_PREVIEW_COOKIE);
+  redirect("/app/clients");
+}
+
+/// The switcher a portal user sees only when they belong to more than one
+/// client. The membership check here is a fast fail for a wrong id; the
+/// authoritative one is in resolvePortalClient, which picks only from the
+/// caller's own list.
+export async function switchPortalClientAction(formData: FormData): Promise<void> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") || "");
+
+  const membership = await prisma.clientUser.findFirst({ where: { userId: user.id, clientId } });
+  if (!membership) return;
+
+  const jar = await cookies();
+  jar.set(PORTAL_CLIENT_COOKIE, clientId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/app",
+    maxAge: 60 * 60 * 24 * 180,
+  });
+
+  redirect("/app/portal");
 }
