@@ -165,21 +165,16 @@ test.describe("filing time for someone else", () => {
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
 
-    // Wait for the form to say it is done, not for the network to go
-    // quiet.
-    //
-    // `networkidle` can resolve in the gap between the click and the
-    // request the click causes - React schedules the submit, and five
-    // hundred milliseconds of quiet can pass the test before the write
-    // has left the browser. The reload below then cancels it, the row is
-    // never written, and the failure reads as a slow screen.
-    //
-    // The form closes when the action reports success, so that is the
-    // signal. If it never closes, the message below still says what the
-    // form is showing.
-    await expect(page.locator('select[name="userId"]'), "the create form never closed after saving").toHaveCount(0, {
-      timeout: 30_000,
-    });
+    // These two tests expect the write to be REFUSED, so the signal is
+    // the opposite one: the form stays open and renders its reason.
+    // Waiting for it to close would wait for the thing that must not
+    // happen, and waiting on `networkidle` would not wait for anything at
+    // all - it can resolve in the gap between the click and the request
+    // the click causes.
+    await expect(
+      page.locator("form p.text-red-600"),
+      "the form neither refused the write nor said why",
+    ).toBeVisible({ timeout: 30_000 });
 
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
@@ -207,21 +202,16 @@ test.describe("filing time for someone else", () => {
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
 
-    // Wait for the form to say it is done, not for the network to go
-    // quiet.
-    //
-    // `networkidle` can resolve in the gap between the click and the
-    // request the click causes - React schedules the submit, and five
-    // hundred milliseconds of quiet can pass the test before the write
-    // has left the browser. The reload below then cancels it, the row is
-    // never written, and the failure reads as a slow screen.
-    //
-    // The form closes when the action reports success, so that is the
-    // signal. If it never closes, the message below still says what the
-    // form is showing.
-    await expect(page.locator('select[name="userId"]'), "the create form never closed after saving").toHaveCount(0, {
-      timeout: 30_000,
-    });
+    // These two tests expect the write to be REFUSED, so the signal is
+    // the opposite one: the form stays open and renders its reason.
+    // Waiting for it to close would wait for the thing that must not
+    // happen, and waiting on `networkidle` would not wait for anything at
+    // all - it can resolve in the gap between the click and the request
+    // the click causes.
+    await expect(
+      page.locator("form p.text-red-600"),
+      "the form neither refused the write nor said why",
+    ).toBeVisible({ timeout: 30_000 });
     await page.reload();
 
     // Three integration tests assert the guard itself. This asserts the
