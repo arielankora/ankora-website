@@ -7,6 +7,7 @@ import { listClients } from "@/lib/app-domain/clients";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EditRoleStatusForm } from "./EditRoleStatusForm";
 import { ClientAccessForm } from "./ClientAccessForm";
+import { ResendInviteForm } from "./ResendInviteForm";
 import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 
@@ -88,6 +89,21 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             assignedClientIds={targetUser.clientAccess.map((a) => a.clientId)}
           />
         </div>
+
+        {/* Only while the invite is still unused. 22.9.2026: before this
+            existed, an expired invite could be resolved exactly one way -
+            delete the person and create them again, discarding their
+            client access with them. */}
+        {targetUser.status === "INVITED" && (
+          <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <h2 className="text-sm font-medium text-appNavy">הזמנה ממתינה</h2>
+            <p className="mt-1 text-sm text-appNavy/60">
+              המשתמש טרם בחר סיסמה. שליחה מחדש מנפיקה קישור חדש לארבעים ושמונה שעות ומבטלת את
+              הקישור הקודם.
+            </p>
+            <ResendInviteForm userId={targetUser.id} />
+          </div>
+        )}
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="text-sm font-medium text-appNavy">אבטחה</h2>

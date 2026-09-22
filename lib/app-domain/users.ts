@@ -85,10 +85,7 @@ export async function inviteUser(
     },
   });
 
-  const { raw, tokenHash } = generateResetToken();
-  await prisma.passwordResetToken.create({
-    data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
-  });
+  const { raw, emailSent, emailError } = await issueInvite(user);
 
   await recordAudit({
     actorId: actor.id,
@@ -98,9 +95,24 @@ export async function inviteUser(
     after: { name: user.name, email: user.email, role: user.role },
   });
 
-  // Never throws (lib/email.ts returns a result object), so a mail
-  // provider outage cannot roll back an invite that already exists in the
-  // database - the admin still gets the link and can relay it.
+  return { user, setPasswordToken: raw, emailSent, emailError };
+}
+
+/// Mints a fresh set-password link for a user and mails it.
+///
+/// Extracted from inviteUser on 22.9.2026 so that resendInvite below can
+/// send the identical message. The two paths differing even slightly is
+/// how a recipient ends up comparing two emails from us that disagree.
+///
+/// Never throws: lib/email.ts returns a result object, so a mail-provider
+/// outage cannot roll back an invite that already exists in the database.
+/// The caller gets the raw link and the admin can relay it by hand.
+async function issueInvite(user: User) {
+  const { raw, tokenHash } = generateResetToken();
+  await prisma.passwordResetToken.create({
+    data: { userId: user.id, tokenHash, expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS) },
+  });
+
   const isClient = user.role === "CLIENT_USER";
   const { html, text } = renderActionEmail({
     title: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
@@ -118,6 +130,7 @@ export async function inviteUser(
     url: `${appBaseUrl()}/app/reset-password?token=${raw}`,
     footnote: "אם ההזמנה הגיעה אליך בטעות, אפשר להתעלם מההודעה.",
   });
+
   const mail = await sendEmail({
     to: [user.email],
     subject: isClient ? "הגישה שלך לפורטל Ankora" : "הזמנה למערכת Ankora",
@@ -125,7 +138,50 @@ export async function inviteUser(
     html,
   });
 
-  return { user, setPasswordToken: raw, emailSent: mail.ok, emailError: mail.ok ? undefined : mail.error };
+  return { raw, emailSent: mail.ok, emailError: mail.ok ? undefined : mail.error };
+}
+
+/// Sends the invite again, to someone who never used the first one.
+///
+/// 22.9.2026. Until now there was no such thing. inviteUser refuses an
+/// email that already exists, and the self-service reset only serves
+/// ACTIVE accounts, so an invite that expired left exactly one way
+/// forward: delete the person and create them again. Deleting a human
+/// being from the system is not a reasonable answer to "the link timed
+/// out", and it silently discards their client access alongside it.
+///
+/// Only for someone still INVITED. Once they have chosen a password there
+/// is nothing to resend, and "forgot password" is the right door.
+///
+/// Every earlier unused link is burned first. An invite that was
+/// forwarded, or sat in a mailbox for two days, should stop working the
+/// moment a new one is issued - otherwise "resend" quietly widens the
+/// number of live credentials for one account instead of replacing them.
+export async function resendInvite(actor: User, userId: string) {
+  assertCan(actor.role, "user.manage");
+
+  const user = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+  if (!user) throw new Error("משתמש לא נמצא.");
+  if (user.status !== "INVITED") {
+    throw new Error("אפשר לשלוח הזמנה מחדש רק למשתמש שטרם בחר סיסמה.");
+  }
+
+  const burned = await prisma.passwordResetToken.updateMany({
+    where: { userId: user.id, usedAt: null },
+    data: { usedAt: new Date() },
+  });
+
+  const { raw, emailSent, emailError } = await issueInvite(user);
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "user.invite.resent",
+    entityType: "User",
+    entityId: user.id,
+    after: { email: user.email, revokedLinks: burned.count, emailSent },
+  });
+
+  return { user, setPasswordToken: raw, emailSent, emailError };
 }
 
 export async function updateUserRoleStatus(

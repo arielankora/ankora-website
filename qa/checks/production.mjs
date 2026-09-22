@@ -22,6 +22,22 @@ import { fetchOnce, unreachableBecause } from "../lib/sh.mjs";
 const BASE = process.env.QA_PROD_URL ?? "https://www.ankora.co.il";
 const APEX = "https://ankora.co.il";
 
+// The host the invite incident collided with.
+//
+// Vercel's deployment protection on this project runs in
+// `all_except_custom_domains` mode: every *.vercel.app address answers
+// with a Vercel sign-in wall, and only the custom domains are public.
+// The whole reason a valid invite was unopenable is that it named one of
+// these. That protection is now load-bearing in two directions at once -
+// it is part of the security posture, AND it is the condition that makes
+// a stray vercel.app link fail loudly instead of quietly working.
+//
+// So it is worth an assertion. If someone switches it off, the guards in
+// lib/email.ts and lib/email-templates.ts keep doing their job, but the
+// evidence that they matter disappears, and a stray link would look fine
+// to everyone who tried it.
+const PROTECTED_ALIAS = process.env.QA_PROTECTED_ALIAS ?? "https://ankora-website.vercel.app";
+
 /** Headers every response must carry, and what each one is actually for. */
 const REQUIRED_HEADERS = {
   "strict-transport-security": "HTTPS downgrade protection",
@@ -160,6 +176,44 @@ export async function probe() {
       out.push(finding("major", `apex returned ${apex.res.status}, expected a 308 to www`, "ADR-0002"));
     } else if (!to.startsWith(`${BASE}/he/pricing`)) {
       out.push(finding("major", "apex redirect dropped the path", `Location: ${to}`));
+    }
+  }
+
+  // Deployment protection, per the note on PROTECTED_ALIAS above.
+  //
+  // The tell is the same one egressBlocked() uses: Ankora stamps HSTS and
+  // CSP onto every response it serves. A wall put up by Vercel in front of
+  // the deployment carries neither, because the request never reached us.
+  // So "200 wearing our headers" is the one answer that means the door is
+  // open, and anything else - a 401, a redirect to Vercel, a bare 403 from
+  // some proxy in between - means it is not.
+  const guarded = await fetchOnce(`${PROTECTED_ALIAS}/app/login`);
+  if (!guarded.res) {
+    out.push(
+      finding(
+        "minor",
+        "deployment protection could not be checked from this runner",
+        `${guarded.error} — ${PROTECTED_ALIAS} did not answer. That says nothing about whether the protection is on, only that this machine could not ask.`,
+      ),
+    );
+  } else {
+    const wearingOurHeaders = ["strict-transport-security", "content-security-policy"].every((h) =>
+      guarded.res.headers.get(h),
+    );
+    if (guarded.res.status === 200 && wearingOurHeaders) {
+      out.push(
+        finding(
+          "major",
+          `${PROTECTED_ALIAS} serves the product with no sign-in wall`,
+          [
+            "Vercel deployment protection appears to be off for *.vercel.app hosts.",
+            "Two consequences: the product answers on a second, non-canonical origin, and a",
+            "stray vercel.app link in an outgoing email would silently work for whoever tried",
+            "it while still being the wrong address. See the 22.9.2026 invite incident.",
+            "Expected: Vercel's own sign-in wall, i.e. a response not wearing Ankora's headers.",
+          ].join("\n"),
+        ),
+      );
     }
   }
 

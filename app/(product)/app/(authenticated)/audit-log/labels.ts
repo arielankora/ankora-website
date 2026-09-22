@@ -53,6 +53,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "login_link.success": "כניסה לפורטל בקישור",
   "portal.preview.start": "כניסה לתצוגת לקוח",
   "user.invite": "הזמנת משתמש",
+  "user.invite.resent": "שליחת הזמנה מחדש",
   "user.role_status_change": "שינוי תפקיד/סטטוס",
   "user.client_access_change": "שינוי גישה ללקוחות",
   "user.logout_all_sessions": "ניתוק כל ההתחברויות",

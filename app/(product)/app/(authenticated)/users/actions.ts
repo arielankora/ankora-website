@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
-import { inviteUser, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
+import { inviteUser, resendInvite, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
@@ -46,6 +46,36 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
       inviteLink: `${origin}/app/reset-password?token=${setPasswordToken}`,
       emailSent,
     };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+}
+
+type ResendState = { error?: string; sent?: boolean; inviteLink?: string };
+
+/// Resends an invite that was never used. Mirrors inviteUserAction's
+/// contract: the absolute link comes back either way, so an admin whose
+/// mail failed to send still has something to relay by hand rather than
+/// a dead end.
+export async function resendInviteAction(
+  _prev: ResendState | undefined,
+  formData: FormData
+): Promise<ResendState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "משתמש לא נמצא." };
+
+  try {
+    const { setPasswordToken, emailSent } = await resendInvite(actor, userId);
+    revalidatePath(`/app/users/${userId}`);
+    revalidatePath("/app/users");
+
+    const hdrs = await headers();
+    const host = hdrs.get("host");
+    const protocol = host?.startsWith("localhost") || host?.startsWith("127.0.0.1") ? "http" : "https";
+    const origin = host ? `${protocol}://${host}` : "";
+
+    return { sent: emailSent, inviteLink: `${origin}/app/reset-password?token=${setPasswordToken}` };
   } catch (err) {
     return { error: friendlyError(err) };
   }
