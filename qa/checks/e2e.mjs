@@ -201,6 +201,20 @@ export async function e2e() {
     );
   }
 
+  // The page's own answer to "who cancelled it". Printed by the probe in
+  // qa/e2e/observe.ts, which wraps AbortController.abort() and window.fetch
+  // inside the browser, because from the network side a fetch cancelled by
+  // its own code and one killed on the wire are the same event.
+  const fromPage = String(r.all ?? "")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.includes("[abort-called]") || l.includes("[fetch-rejected]"))
+    .slice(0, 14);
+
+  if (fromPage.length) {
+    out.push(finding("minor", "what the page said about its own cancellations", fromPage.join("\n")));
+  }
+
   // The server's side of the same story, on every run, for the same
   // reason. These lines appear only while qa/playwright.config.ts sets
   // QA_TRACE, so they cost nothing anywhere else.

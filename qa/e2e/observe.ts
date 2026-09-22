@@ -77,16 +77,55 @@ const WATCHED = new Set(["document", "fetch", "xhr"]);
 /// during that time it cannot finish a transition, clear a pending form
 /// or render a row that already exists in the database.
 const DRIFT_PROBE = `(() => {
-  const period = 100;
-  const w = window;
-  w.__qaDrift = { max: 0, ticks: 0 };
-  let last = performance.now();
-  setInterval(() => {
-    const now = performance.now();
-    const late = now - last - period;
+  // Who cancels the writes.
+  //
+  // Two runs have now shown a Server Action's POST abandoned with the page
+  // standing still, and the network alone cannot say why: from outside, a
+  // fetch cancelled by its own AbortController and one killed on the wire
+  // look identical. From inside the page they do not. So this asks the two
+  // questions that are left - who called abort(), and what did the fetch
+  // reject with - and prints the answers to the console, where the
+  // recorder below is already listening.
+  //
+  // Capped, because ordinary prefetch cancellation goes through the same
+  // door and a hundred copies of it would bury the one that matters.
+  try {
+    var left = 12;
+    var origAbort = AbortController.prototype.abort;
+    AbortController.prototype.abort = function (reason) {
+      if (left-- > 0) {
+        console.warn("[abort-called] " + (new Error().stack || "").split("\\n").slice(1, 5).join(" <- "));
+      }
+      return origAbort.call(this, reason);
+    };
+
+    var origFetch = window.fetch;
+    var rejectionsLeft = 12;
+    window.fetch = function (input) {
+      var url = typeof input === "string" ? input : (input && input.url) || "";
+      return origFetch.apply(this, arguments).catch(function (err) {
+        if (rejectionsLeft-- > 0) {
+          console.warn(
+            "[fetch-rejected] " + String(url).slice(0, 90) + " :: " + (err && err.name) + " :: " + (err && err.message)
+          );
+        }
+        throw err;
+      });
+    };
+  } catch (e) {
+    // A probe that cannot install must never be the reason a test fails.
+  }
+
+  // And how starved the page is, which is what this script was first for.
+  var period = 100;
+  window.__qaDrift = { max: 0, ticks: 0 };
+  var last = performance.now();
+  setInterval(function () {
+    var now = performance.now();
+    var late = now - last - period;
     last = now;
-    w.__qaDrift.ticks++;
-    if (late > w.__qaDrift.max) w.__qaDrift.max = Math.round(late);
+    window.__qaDrift.ticks++;
+    if (late > window.__qaDrift.max) window.__qaDrift.max = Math.round(late);
   }, period);
 })();`;
 
@@ -179,7 +218,14 @@ export function observe(page: Page): void {
   page.on("pageerror", (err) => state.logs.push(`threw: ${err.message.slice(0, 200)}`));
   page.on("console", (msg) => {
     if (msg.type() !== "error" && msg.type() !== "warning") return;
-    state.logs.push(`${msg.type()}: ${msg.text().slice(0, 200)}`);
+    const text = msg.text();
+    state.logs.push(`${msg.type()}: ${text.slice(0, 200)}`);
+    // The two probe channels are evidence about an intermittent fault, so
+    // they follow [abort] out to the runner's own output rather than
+    // waiting for a failure that may not come.
+    if (!state.sealed && (text.startsWith("[abort-called]") || text.startsWith("[fetch-rejected]"))) {
+      console.warn(text.slice(0, 400));
+    }
   });
 }
 
