@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
+import { isProductionBuild } from "@/lib/env";
 import {
   updatePortalScheduleRecipients,
   PORTAL_CLIENT_COOKIE,
@@ -79,7 +80,7 @@ export async function startPortalPreviewAction(formData: FormData): Promise<void
   jar.set(PORTAL_PREVIEW_COOKIE, client.id, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isProductionBuild(),
     path: "/app",
     maxAge: PREVIEW_COOKIE_MAX_AGE_S,
   });
@@ -117,7 +118,7 @@ export async function switchPortalClientAction(formData: FormData): Promise<void
   jar.set(PORTAL_CLIENT_COOKIE, clientId, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: isProductionBuild(),
     path: "/app",
     maxAge: 60 * 60 * 24 * 180,
   });

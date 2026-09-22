@@ -76,6 +76,13 @@ async function main() {
 
   await run.check("types", { label: "TypeScript", level: 1, skipIf: needs.prisma }, staticChecks.types);
   await run.check("lint", { label: "Lint", level: 1, blocking: false }, staticChecks.lint);
+  // Blocks. A branch that only runs in production is a branch no test
+  // environment can reach - see the note in checks/static.mjs.
+  await run.check(
+    "production-branches",
+    { label: "Production-only branches", level: 1 },
+    staticChecks.productionBranches,
+  );
   await run.check("unit", { label: "Unit tests", level: 1, skipIf: needs.prisma }, vitest.unit);
   await run.check(
     "production",

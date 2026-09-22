@@ -3,6 +3,7 @@ import { registerAnkoraTools } from "@/lib/mcp/tools";
 import { verifyMcpBearerToken } from "@/lib/mcp/auth";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
+import { isProductionBuild } from "@/lib/env";
 
 // Phase 13 (MCP server, docs/adr/0005). The Model Context Protocol
 // endpoint that lets an Ankora employee reach the Time Tracking app from
@@ -87,7 +88,7 @@ const handler = createMcpHandler(registerAnkoraTools, {
     "Reading another person's time needs a manager or admin role. If a team tool is refused, say so plainly instead of retrying.",
     "Writes create real records that colleagues and clients see. Confirm the client, category and times with the user before calling a write tool, and never call create_time_entry twice for the same work - it makes two entries.",
   ].join(" "),
-  verboseLogs: process.env.NODE_ENV !== "production",
+  verboseLogs: !isProductionBuild(),
 });
 
 // `required: true` means an unauthenticated request is refused outright

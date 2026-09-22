@@ -2,6 +2,7 @@
 import { headers } from "next/headers";
 import { requestPasswordReset } from "@/lib/app-auth/password-reset";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
+import { devOnly } from "@/lib/env";
 
 // Security review (OWASP API4:2023 - Unrestricted Resource Consumption).
 // Unauthenticated, and every call that matches a real account writes a
@@ -44,8 +45,7 @@ export async function forgotPasswordAction(
   // no email provider yet (Phase 4), the raw link is surfaced here ONLY
   // when running outside production, so the flow is testable end-to-end
   // today without pretending an email was actually sent to a real user.
-  const devLink =
-    raw && process.env.NODE_ENV !== "production" ? `/app/reset-password?token=${raw}` : undefined;
+  const devLink = raw ? devOnly(`/app/reset-password?token=${raw}`) : undefined;
 
   return { submitted: true, devLink };
 }

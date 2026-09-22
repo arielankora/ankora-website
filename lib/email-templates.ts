@@ -1,5 +1,6 @@
 import "server-only";
-import { SITE_URL } from "@/lib/site";
+import { SITE_URL, isUnreachableFromOutside } from "@/lib/site";
+import { isProductionDeployment } from "@/lib/env";
 
 // Portal phase 0. Every transactional email the app sends to a PERSON
 // (invite, sign-in link) is built here, so there is one Hebrew RTL
@@ -20,18 +21,16 @@ import { SITE_URL } from "@/lib/site";
 /// override it into a protected host. Outside production VERCEL_URL is
 /// still used, so a preview emails a preview link rather than reaching
 /// into production data.
-const VERCEL_HOST = /(^|\.)vercel\.app$/i;
-
 function isProtectedHost(origin: string): boolean {
   try {
-    return VERCEL_HOST.test(new URL(origin).hostname);
+    return isUnreachableFromOutside(new URL(origin).hostname);
   } catch {
     return false;
   }
 }
 
 export function appBaseUrl(): string {
-  const isProduction = process.env.VERCEL_ENV === "production";
+  const isProduction = isProductionDeployment();
   const configured = process.env.NEXTAUTH_URL?.trim().replace(/\/+$/, "");
 
   // An explicit value is honoured everywhere except when it would put a
