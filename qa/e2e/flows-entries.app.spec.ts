@@ -202,16 +202,25 @@ test.describe("filing time for someone else", () => {
 
     await page.getByRole("button", { name: /שמירה|הוספה|דיווח/ }).last().click();
 
-    // These two tests expect the write to be REFUSED, so the signal is
-    // the opposite one: the form stays open and renders its reason.
-    // Waiting for it to close would wait for the thing that must not
-    // happen, and waiting on `networkidle` would not wait for anything at
-    // all - it can resolve in the gap between the click and the request
-    // the click causes.
+    // This one is refused before it is ever sent: the date field carries
+    // max="today", so the browser blocks the submit and the form never
+    // reaches the server.
+    //
+    // Which is worth asserting rather than stepping around, and was not
+    // asserted before. The old wait here was `networkidle`, which
+    // resolves immediately when nothing was ever sent - so the test then
+    // reloaded, found no row, and passed. It would have passed just as
+    // happily if the form had cheerfully submitted and the server had
+    // accepted a future-dated entry, as long as the row took a moment to
+    // appear. A test that cannot fail is not covering the rule it names.
     await expect(
-      page.locator("form p.text-red-600"),
-      "the form neither refused the write nor said why",
-    ).toBeVisible({ timeout: 30_000 });
+      page.locator('input[name="date"]:invalid'),
+      "the browser did not refuse the future date",
+    ).toHaveCount(1, { timeout: 10_000 });
+    await expect(page.locator('select[name="userId"]'), "the form closed on a write it should have refused").toHaveCount(
+      1,
+    );
+
     await page.reload();
 
     // Three integration tests assert the guard itself. This asserts the
