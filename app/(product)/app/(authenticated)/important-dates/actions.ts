@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
+import { timed } from "@/lib/slow-log";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
   createImportantDate,
@@ -95,8 +96,17 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
     return { error: friendlyError(err) };
   }
 
-  revalidatePath("/app/important-dates");
-  revalidatePath("/app");
+  // Measured around the revalidations, not only around the write: the
+  // last run proved the write itself is fast (no [slow] line from
+  // createImportantDate) while the button still sat at "נוצר..." for
+  // thirty seconds, so the time is somewhere after the row is committed.
+  // revalidatePath("/app") is the first suspect - it invalidates the
+  // dashboard, whose re-render Next ships back inside this action's own
+  // response. See lib/slow-log.ts.
+  await timed("action.createImportantDate.revalidate", async () => {
+    revalidatePath("/app/important-dates");
+    revalidatePath("/app");
+  });
   return { ok: true };
 }
 

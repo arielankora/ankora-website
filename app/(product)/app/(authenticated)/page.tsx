@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Users, Tag, UserCog, Timer, Clock, Wallet, Bell, BarChart3, ArrowLeft, LayoutGrid, type LucideIcon } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
+import { timed } from "@/lib/slow-log";
 import { KpiCard } from "@/components/app/KpiCard";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -143,7 +144,13 @@ export default async function AppHomePage() {
 
   const canSeeImportantDates = can(user.role, "time_entry.create_self");
 
-  const [counts, metrics, openAlerts, trend, upcomingDates, activeTimerRows] = await Promise.all([
+  // Measured. Every write that ends with revalidatePath("/app") ships this
+  // screen's re-render back inside its own response, so a slow dashboard
+  // is indistinguishable from a slow save at the button that triggered it
+  // - which is exactly what the browser suite keeps reporting. See
+  // lib/slow-log.ts.
+  const [counts, metrics, openAlerts, trend, upcomingDates, activeTimerRows] = await timed("screen.dashboard.load", () =>
+    Promise.all([
     loadCounts(canSeeClients, canSeeCategories, canSeeUsers),
     canSeeReports ? loadOperationalMetrics() : null,
     canSeeAlerts ? countOpenAlertEvents() : null,
@@ -154,7 +161,8 @@ export default async function AppHomePage() {
     // App redesign (handoff README, screen 1): live "טיימרים פעילים כרגע"
     // list - same visibility gate as the rest of the operational metrics.
     canSeeReports ? loadActiveTimerRows() : null,
-  ]);
+    ])
+  );
 
   const cards = [
     canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
