@@ -1,5 +1,5 @@
 import { test as base } from "@playwright/test";
-import { observe, pageDrift, trafficSummary } from "./observe";
+import { observe, pageDrift, seal, trafficSummary } from "./observe";
 
 // Every write flow, observed - because the failures move.
 //
@@ -26,6 +26,8 @@ export const test = base.extend({
   page: async ({ page }, runTest, testInfo) => {
     observe(page);
     await runTest(page);
+    // Past this line every abort is Playwright closing the page.
+    seal(page);
 
     if (testInfo.status === testInfo.expectedStatus) return;
 

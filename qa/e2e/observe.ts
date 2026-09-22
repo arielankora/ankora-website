@@ -43,6 +43,10 @@ type Observed = {
   open: Map<string, { method: string; path: string; startedAt: number }>;
   logs: string[];
   navigations: string[];
+  /// Set the moment the test body returns. Everything after that point is
+  /// teardown, and teardown aborts every request still in flight - which
+  /// is not a fault, just a page being closed.
+  sealed: boolean;
 };
 
 const observed = new WeakMap<Page, Observed>();
@@ -82,7 +86,7 @@ const DRIFT_PROBE = `(() => {
 })();`;
 
 export function observe(page: Page): void {
-  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [] };
+  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [], sealed: false };
   observed.set(page, state);
 
   // Fire and forget: a probe that failed to install must never be the
@@ -136,7 +140,19 @@ export function observe(page: Page): void {
     // thing worth knowing. The e2e check collects these lines whether the
     // run passed or not, so an intermittent fault stops depending on
     // catching it in the act.
-    console.warn(`[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}`);
+    //
+    // But only while the test is still running. The first run with this
+    // turned on reported twelve abandoned requests including a write, and
+    // no test failed on any of them: closing a page at the end of a test
+    // aborts everything still in flight, so an unsealed recorder reports
+    // ordinary teardown as if it were the fault under investigation. Once
+    // that noise is in the report it is worse than no report, because it
+    // is indistinguishable from the real thing.
+    if (state.sealed) return;
+    console.warn(
+      `[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}` +
+        ` (at ${state.navigations.length} navigation(s), last ${state.navigations.at(-1) ?? "none"})`
+    );
   });
 
   // A navigation is the ordinary reason a browser aborts everything it
@@ -159,6 +175,13 @@ export function observe(page: Page): void {
 
 /// One line for a failure message: what finished, what did not, and what
 /// the page said while it happened.
+/// Stop reporting aborts: the test body has returned and what follows is
+/// Playwright closing the page, which cancels whatever was in flight.
+export function seal(page: Page): void {
+  const state = observed.get(page);
+  if (state) state.sealed = true;
+}
+
 /// How busy the machine running all of this is. One line, read at the
 /// moment of failure, from the process that shares the machine with the
 /// app server, the database and the browser.
