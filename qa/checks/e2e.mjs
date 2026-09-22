@@ -201,20 +201,35 @@ export async function e2e() {
   // prefetches happened to come earlier in the run. The prefetches are
   // the background; a write nobody got is the finding.
   const abortedWrites = allAborts.filter((l) => /\[abort\] POST/.test(l));
-  const aborted = [...abortedWrites.slice(0, 10), ...allAborts.filter((l) => !/\[abort\] POST/.test(l))].slice(0, 14);
+  // A write dropped while the browser was navigating is the test moving on
+  // before the answer landed: the server still did the work, and the run
+  // still passes. A write dropped with the page standing still is the
+  // fault this whole investigation was about.
+  const droppedStanding = abortedWrites.filter((l) => l.includes("page still"));
+  const aborted = [
+    ...droppedStanding.slice(0, 8),
+    ...abortedWrites.filter((l) => !l.includes("page still")).slice(0, 6),
+    ...allAborts.filter((l) => !/\[abort\] POST/.test(l)),
+  ].slice(0, 14);
 
   if (aborted.length) {
     // A POST is a write the user asked for and did not get. A GET is
     // usually a prefetch the router cancelled on purpose, which is
     // ordinary Next behaviour and not worth waking anyone for.
-    const writes = abortedWrites.length;
-    out.push(
-      finding(
-        writes ? "major" : "info",
-        `${allAborts.length} request(s) the browser abandoned${writes ? `, ${writes} of them a write` : ""}`,
-        aborted.join("\n")
-      )
-    );
+    // Severity by what was actually lost, not by how many lines there are.
+    //
+    // This started at major for any abandoned write, which was right while
+    // writes were being dropped with nothing moving. It is wrong now: the
+    // GETs are Next cancelling its own prefetches on pagehide, ordinary
+    // router housekeeping, and a hundred of them every run under a major
+    // heading is a report that cries wolf until nobody reads it.
+    const severity = droppedStanding.length ? "major" : abortedWrites.length ? "minor" : "info";
+    const summary = droppedStanding.length
+      ? `${droppedStanding.length} write(s) dropped with the page standing still`
+      : abortedWrites.length
+        ? `${abortedWrites.length} write(s) dropped while the browser was navigating away`
+        : `${allAborts.length} request(s) the browser abandoned, none of them a write`;
+    out.push(finding(severity, summary, aborted.join("\n")));
   }
 
   // The page's own answer to "who cancelled it". Printed by the probe in
