@@ -1,13 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
 import { adminCreateEntryAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 
 type Option = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -37,7 +36,7 @@ export function AdminCreateEntryForm({
   clients: Option[];
   categories: Category[];
 }) {
-  const [state, formAction] = useFormState(adminCreateEntryAction, {});
+  const { onSubmit, pending, error, ok } = useActionForm(adminCreateEntryAction);
   const [clientId, setClientId] = useState("");
   const [date, setDate] = useState(todayKey());
   const [open, setOpen] = useState(false);
@@ -62,7 +61,7 @@ export function AdminCreateEntryForm({
 
   return (
     <form
-      action={formAction}
+      onSubmit={onSubmit}
       className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div>
@@ -168,12 +167,12 @@ export function AdminCreateEntryForm({
       </div>
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
         <div className="ms-auto flex gap-3">
           <button type="button" onClick={() => setOpen(false)} className="text-sm text-appNavy/60 hover:text-appNavy">
             ביטול
           </button>
-          <SubmitButton />
+          <SubmitButton pending={pending} />
         </div>
       </div>
     </form>

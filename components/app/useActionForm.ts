@@ -44,6 +44,9 @@ export function useActionForm(
 ) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /// Whether the last completed submit succeeded. Forms that stay open
+  /// after saving show their own "saved" line off this.
+  const [ok, setOk] = useState(false);
   // The action still updates the screen behind the form, and that update is
   // still a transition - it is just no longer one this form waits inside.
   const [, startTransition] = useTransition();
@@ -57,13 +60,18 @@ export function useActionForm(
 
     const data = new FormData(event.currentTarget);
     setError(null);
+    setOk(false);
     setPending(true);
 
     startTransition(async () => {
       try {
         const result = await action(undefined, data);
-        if (result?.ok) onSuccess?.();
-        else setError(result?.error ?? "אירעה שגיאה. נסו שוב.");
+        if (result?.ok) {
+          setOk(true);
+          onSuccess?.();
+        } else {
+          setError(result?.error ?? "אירעה שגיאה. נסו שוב.");
+        }
       } catch {
         // A Server Action that throws has already been logged on the
         // server; what this side owes the person is a form that works
@@ -75,5 +83,5 @@ export function useActionForm(
     });
   }
 
-  return { onSubmit, pending, error };
+  return { onSubmit, pending, error, ok };
 }
