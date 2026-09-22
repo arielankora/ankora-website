@@ -1,3 +1,4 @@
+import os from "node:os";
 import type { Page } from "@playwright/test";
 
 // What the browser saw, for a failure the server log cannot explain.
@@ -18,6 +19,22 @@ import type { Page } from "@playwright/test";
 // So it now records every document/fetch/xhr call in both directions and
 // everything the page logged or threw. A diagnostic that can only see
 // one half of the wire will keep confirming whichever half it can see.
+//
+// And one more thing, added after the round that PASSED.
+//
+// The next run of the very same commit went green: the drawer closed, and
+// six unrelated specs failed their first attempt instead, every one of
+// them on "the write is not on the screen yet". The failing run took
+// twelve minutes, the passing one seven. That is not the shape of a bug
+// in one screen. It is the shape of a machine that is sometimes too busy
+// to finish anything - and a browser that cannot get the CPU to complete
+// a React transition looks exactly like a button that stays pending,
+// while the server it is waiting on reports itself fast, because it was.
+//
+// So this also measures how starved the two sides are: the page reports
+// how far its own timer drifted, and the test process reports the load
+// average of the machine both of them share. Neither belongs in a
+// product fix. Both decide whether a product fix is what is needed.
 
 type Call = { method: string; path: string; ms: number; status?: number; failed?: string };
 
@@ -44,9 +61,33 @@ function shortPath(url: string): string {
 /// so documents, RSC fetches and XHRs, and nothing else.
 const WATCHED = new Set(["document", "fetch", "xhr"]);
 
+/// Runs before anything on the page: a 100ms heartbeat that records how
+/// late it actually fired. A tab with the CPU to itself drifts by a few
+/// milliseconds. A tab that cannot get scheduled drifts by seconds, and
+/// during that time it cannot finish a transition, clear a pending form
+/// or render a row that already exists in the database.
+const DRIFT_PROBE = `(() => {
+  const period = 100;
+  const w = window;
+  w.__qaDrift = { max: 0, ticks: 0 };
+  let last = performance.now();
+  setInterval(() => {
+    const now = performance.now();
+    const late = now - last - period;
+    last = now;
+    w.__qaDrift.ticks++;
+    if (late > w.__qaDrift.max) w.__qaDrift.max = Math.round(late);
+  }, period);
+})();`;
+
 export function observe(page: Page): void {
   const state: Observed = { done: [], open: new Map(), logs: [] };
   observed.set(page, state);
+
+  // Fire and forget: a probe that failed to install must never be the
+  // reason a test fails, so its own errors are swallowed and its absence
+  // is reported as "not measured" rather than thrown.
+  void page.addInitScript(DRIFT_PROBE).catch(() => {});
 
   // The key has to be unique per request object, not per URL: Next sends
   // several fetches to the same path within one transition, and a key
@@ -103,9 +144,30 @@ export function observe(page: Page): void {
 
 /// One line for a failure message: what finished, what did not, and what
 /// the page said while it happened.
+/// How busy the machine running all of this is. One line, read at the
+/// moment of failure, from the process that shares the machine with the
+/// app server, the database and the browser.
+function machineLoad(): string {
+  const cpus = os.cpus().length || 1;
+  const [oneMinute] = os.loadavg();
+  // Load per core is the comparable number: 4 on a two-core runner and 4
+  // on an eight-core one are different situations.
+  return `machine: ${cpus} cpu(s), load ${oneMinute.toFixed(2)} (${(oneMinute / cpus).toFixed(2)} per cpu)`;
+}
+
+/// How late the page's own heartbeat ran. Asynchronous on purpose: it has
+/// to read state out of the browser, which the synchronous summary cannot.
+export async function pageDrift(page: Page): Promise<string> {
+  const drift = await page
+    .evaluate(() => (window as unknown as { __qaDrift?: { max: number; ticks: number } }).__qaDrift)
+    .catch(() => undefined);
+  if (!drift) return "page timer drift: not measured";
+  return `page timer drift: worst ${drift.max}ms over ${drift.ticks} ticks`;
+}
+
 export function trafficSummary(page: Page): string {
   const state = observed.get(page);
-  if (!state) return "traffic was not recorded";
+  if (!state) return `traffic was not recorded. ${machineLoad()}`;
 
   const done = state.done.slice(-5);
   const stillOpen = [...state.open.values()].map((o) => `${o.method} ${o.path} ${Date.now() - o.startedAt}ms and counting`);
@@ -119,5 +181,6 @@ export function trafficSummary(page: Page): string {
       : "no call was ever sent",
     stillOpen.length ? `in flight: ${stillOpen.join(" | ")}` : "nothing in flight",
     logs.length ? `page said: ${logs.join(" | ")}` : "page said nothing",
+    machineLoad(),
   ].join(". ");
 }

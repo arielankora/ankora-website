@@ -1,5 +1,5 @@
-import { test, expect } from "@playwright/test";
-import { observe, trafficSummary } from "./observe";
+import { test, expect } from "./fixtures";
+import { pageDrift, trafficSummary } from "./observe";
 
 // The four write surfaces the role matrix reserves for SUPER_ADMIN. They run
 // under their own stored session (see the second setup in auth.setup.ts);
@@ -43,11 +43,8 @@ test.describe.configure({ timeout: 90_000 });
 // because it watched POSTs and only POSTs: a follow-up fetch that never
 // returns, and an exception thrown while React applies the result. Both
 // end with a transition that never settles, which is exactly a button
-// that stays disabled forever. qa/e2e/observe.ts records both.
-
-test.beforeEach(async ({ page }) => {
-  observe(page);
-});
+// that stays disabled forever. qa/e2e/observe.ts records both, and
+// qa/e2e/fixtures.ts turns it on for every spec that writes.
 
 /**
  * Wait for a drawer to close, and if it does not, fail with the reason the
@@ -167,9 +164,12 @@ async function expectDrawerClosed(
       }
     }
 
+    const drift = await pageDrift(page);
+
     throw new Error(
       `${what}: the drawer never closed after ${Math.round(timeout / 1000)}s. ` +
         `written to the database: ${landed}. ` +
+        `${drift}. ` +
         `${pending} disabled button(s)${pending ? `: ${disabled.join(", ")}` : ""}. ` +
         `invalid: ${invalid.join(" | ") || "none"}. ` +
         // The half of the picture the server log cannot hold.

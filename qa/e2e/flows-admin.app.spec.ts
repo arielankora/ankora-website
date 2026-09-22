@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 // The write paths behind the admin screens, signed in as the seeded
 // ANKORA_ADMIN. Same reasoning as flows-time.app.spec.ts: rendering a screen

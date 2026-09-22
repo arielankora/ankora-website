@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 // Flows that WRITE, for the four Server Actions behind the time-tracking
 // screens. Everything else in qa/e2e renders a page and checks it did not

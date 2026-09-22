@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures";
 
 // The one write path that belongs to a client rather than to Ankora.
 //
