@@ -38,15 +38,18 @@ export type ActionResult = { ok?: boolean; error?: string };
  * uses this sits inside a drawer that only JavaScript can open, so there
  * was never a no-JS path through it to lose.
  */
-export function useActionForm(
-  action: (prev: ActionResult | undefined, data: FormData) => Promise<ActionResult>,
-  onSuccess?: () => void
+export function useActionForm<R extends ActionResult>(
+  action: (prev: R | undefined, data: FormData) => Promise<R>,
+  onSuccess?: (result: R) => void
 ) {
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  /// Whether the last completed submit succeeded. Forms that stay open
-  /// after saving show their own "saved" line off this.
-  const [ok, setOk] = useState(false);
+  /// The action's whole answer, kept because several of these actions say
+  /// more than ok-or-error: an overlap the person may confirm, a one-time
+  /// invite link to show. `error` and `ok` below are the common two read
+  /// off it, so a form that needs nothing else never touches this.
+  const [result, setResult] = useState<R | null>(null);
+  /// Set only when the action itself threw, which `result` cannot carry.
+  const [thrown, setThrown] = useState<string | null>(null);
   // The action still updates the screen behind the form, and that update is
   // still a transition - it is just no longer one this form waits inside.
   const [, startTransition] = useTransition();
@@ -59,29 +62,31 @@ export function useActionForm(
     if (pending) return;
 
     const data = new FormData(event.currentTarget);
-    setError(null);
-    setOk(false);
+    setResult(null);
+    setThrown(null);
     setPending(true);
 
     startTransition(async () => {
       try {
-        const result = await action(undefined, data);
-        if (result?.ok) {
-          setOk(true);
-          onSuccess?.();
-        } else {
-          setError(result?.error ?? "אירעה שגיאה. נסו שוב.");
-        }
+        const answer = await action(undefined, data);
+        setResult(answer);
+        if (answer?.ok) onSuccess?.(answer);
       } catch {
         // A Server Action that throws has already been logged on the
         // server; what this side owes the person is a form that works
         // again rather than one frozen mid-save.
-        setError("אירעה שגיאה. נסו שוב.");
+        setThrown("אירעה שגיאה. נסו שוב.");
       } finally {
         setPending(false);
       }
     });
   }
 
-  return { onSubmit, pending, error, ok };
+  return {
+    onSubmit,
+    pending,
+    result,
+    error: thrown ?? result?.error ?? null,
+    ok: result?.ok === true,
+  };
 }
