@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { getClient } from "@/lib/app-domain/clients";
+import { getClient, listStaffForAssignment } from "@/lib/app-domain/clients";
+import { listDecisionsForClient } from "@/lib/app-domain/decisions";
 import {
   listImportantDates,
   IMPORTANT_DATE_STATUS_LABELS,
@@ -12,6 +13,7 @@ import {
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { EditClientForm } from "./EditClientForm";
+import { DecisionsPanel } from "./DecisionsPanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import type { ImportantDateStatus } from "@prisma/client";
 
@@ -47,6 +49,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // listImportantDates, so the call always succeeds here).
   const clientDates = await listImportantDates(user, { clientId: client.id });
 
+  // Portal phase 2: the decisions panel and the account-manager picker.
+  const [decisions, staff] = await Promise.all([
+    listDecisionsForClient(user, client.id),
+    listStaffForAssignment(),
+  ]);
+
   // Phase 10 follow-up ("לוחות חגים" UI gap - ADR 21.6): gate matches
   // setHolidayCalendarSubscription()'s own important_date.manage_catalog
   // check, so the section (and its data fetch) simply doesn't render for
@@ -68,8 +76,27 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <EditClientForm client={client} />
+          <EditClientForm client={client} staff={staff} />
         </div>
+
+        <DecisionsPanel
+          clientId={client.id}
+          ceilingMinor={client.approvalCeilingMinor}
+          decisions={decisions.map((d) => ({
+            id: d.id,
+            question: d.question,
+            status: d.status,
+            amountMinor: d.amountMinor,
+            createdAt: d.createdAt.toISOString(),
+            answer: d.answer
+              ? {
+                  optionLabel: d.answer.optionLabel,
+                  respondedByName: d.answer.respondedByName,
+                  respondedAt: d.answer.respondedAt.toISOString(),
+                }
+              : null,
+          }))}
+        />
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="text-sm font-medium text-appNavy">קטגוריות ({client.categories.length})</h2>

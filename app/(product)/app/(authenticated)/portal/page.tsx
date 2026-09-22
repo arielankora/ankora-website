@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
+import { whatsappHref } from "@/lib/whatsapp";
 import { PortalTabs } from "./PortalTabs";
 import { PromiseList } from "./PromiseList";
 
@@ -17,9 +18,17 @@ function formatMinutes(minutes: number) {
 
 /// The one sentence at the top of the portal. It is the whole product in
 /// a line: either something needs the client, or nothing does.
-function headline(waiting: number, inProgress: number): string {
-  if (waiting === 1) return "דבר אחד מחכה להחלטה שלך.";
-  if (waiting > 1) return `${waiting} דברים מחכים להחלטה שלך.`;
+///
+/// Phase 2 put decisions ahead of waiting promises in it. Both are "you
+/// are holding this", but a decision has options and a price and a real
+/// cost to leaving it - a promise waiting on an answer is usually
+/// downstream of one.
+function headline(decisions: number, waiting: number, inProgress: number): string {
+  const needsYou = decisions + waiting;
+  if (decisions === 1 && waiting === 0) return "החלטה אחת מחכה לך.";
+  if (decisions > 1 && waiting === 0) return `${decisions} החלטות מחכות לך.`;
+  if (needsYou === 1) return "דבר אחד מחכה להחלטה שלך.";
+  if (needsYou > 1) return `${needsYou} דברים מחכים להחלטה שלך.`;
   if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
   if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
   return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
@@ -49,8 +58,10 @@ export default async function PortalHomePage() {
     throw err;
   }
 
-  const { client, waitingOnClient, inProgress, recentlyDone, cycle } = home;
-  const nothingYet = waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
+  const { client, waitingOnClient, inProgress, recentlyDone, cycle, openDecisions, contact } = home;
+  const nothingYet =
+    openDecisions === 0 && waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
+  const waHref = whatsappHref(contact.whatsappNumber);
 
   return (
     <div className="space-y-4">
@@ -58,7 +69,9 @@ export default async function PortalHomePage() {
 
       <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
         <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
-        <p className="mt-1.5 text-[13.5px] text-appNavy/60">{headline(waitingOnClient.length, inProgress.length)}</p>
+        <p className="mt-1.5 text-[13.5px] text-appNavy/60">
+          {headline(openDecisions, waitingOnClient.length, inProgress.length)}
+        </p>
       </div>
 
       {nothingYet ? (
@@ -78,6 +91,22 @@ export default async function PortalHomePage() {
         </div>
       ) : (
         <>
+          {/* Portal phase 2. A link, not the cards themselves: a decision
+              needs its options and its price to be answered properly, and
+              a home screen that tries to hold them stops being a summary.
+              The count is the whole message. */}
+          {openDecisions > 0 && (
+            <Link
+              href="/app/portal/decisions"
+              className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-gold/45 bg-[#FBF7F0] px-[18px] py-4 transition-colors hover:border-gold"
+            >
+              <span className="text-[13.5px] font-medium text-appNavy">
+                {openDecisions === 1 ? "החלטה אחת מחכה לך" : `${openDecisions} החלטות מחכות לך`}
+              </span>
+              <span className="text-xs text-gold-dim">לצפייה והחלטה</span>
+            </Link>
+          )}
+
           {waitingOnClient.length > 0 && (
             <PromiseList title="מחכה להחלטה שלך" promises={waitingOnClient} tone="attention" showStage={false} />
           )}
@@ -100,6 +129,30 @@ export default async function PortalHomePage() {
             showStage={false}
           />
         </>
+      )}
+
+      {/* Portal phase 2: who to talk to. Last on the screen because it is
+          the answer to "and if I want a person", not the first thing a
+          client needs - but always present, because a portal without a
+          name on it is a system, and Ankora is not selling a system. */}
+      {(contact.managerName || waHref) && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-lineDark bg-white px-[18px] py-3.5">
+          <span className="text-[12.5px] text-appNavy/60">
+            {contact.managerName ? `מנהל התיק שלך: ${contact.managerName}` : "מנהל התיק שלך ב-Ankora"}
+          </span>
+          {waHref ? (
+            <a
+              href={waHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-full border border-lineDark px-3.5 py-1.5 text-xs text-appNavy hover:border-gold"
+            >
+              וואטסאפ
+            </a>
+          ) : (
+            <span className="text-xs text-appNavy/35">וואטסאפ: זמין בקרוב</span>
+          )}
+        </div>
       )}
 
       {cycle && (

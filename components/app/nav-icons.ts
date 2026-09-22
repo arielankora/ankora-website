@@ -13,6 +13,7 @@ import {
   ScrollText,
   BookOpen,
   CalendarDays,
+  CheckSquare,
   FileText,
   Plug,
   User,
@@ -45,6 +46,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   // Portal phase 1: the client's home is the promises screen, and the
   // hour bank moved to its own entry.
   "/app/portal": Home,
+  "/app/portal/decisions": CheckSquare,
   "/app/portal/activity": ListChecks,
   "/app/portal/hours": Wallet,
   "/app/portal/weekly": CalendarDays,

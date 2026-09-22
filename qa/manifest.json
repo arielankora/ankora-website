@@ -1009,6 +1009,27 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-09-22"
+    },
+    "action:(product)/app/(authenticated)/portal/decisions/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
+    },
+    "domain:decisions": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
+    },
+    "screen:/app/portal/decisions": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-22"
     }
   },
   "waivers": {},

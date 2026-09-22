@@ -41,6 +41,8 @@ export const ENTITY_TYPES = [
   // how we noticed.
   "OAuthClient",
   "McpGrant",
+  // Portal phase 2.
+  "Decision",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -52,6 +54,10 @@ export const ACTION_LABEL: Record<string, string> = {
   "login_link.requested": "בקשת קישור כניסה לפורטל",
   "login_link.success": "כניסה לפורטל בקישור",
   "portal.preview.start": "כניסה לתצוגת לקוח",
+  // Portal phase 2.
+  "decision.create": "פתיחת החלטה ללקוח",
+  "decision.cancel": "ביטול החלטה",
+  "decision.respond": "אישור החלטה על ידי הלקוח",
   "user.invite": "הזמנת משתמש",
   "user.invite.resent": "שליחת הזמנה מחדש",
   "user.role_status_change": "שינוי תפקיד/סטטוס",
