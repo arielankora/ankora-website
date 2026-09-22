@@ -19,7 +19,14 @@ function hashToken(raw: string) {
 export async function requestPasswordReset(identifier: string): Promise<string | null> {
   const email = identifier.trim().toLowerCase();
   const user = await prisma.user.findFirst({
-    where: { deletedAt: null, status: "ACTIVE", OR: [{ email }, { username: email }] },
+    // INVITED belongs here as much as ACTIVE. Someone who never used
+    // their invite has no password to forget, but this is the door they
+    // will try, and refusing them quietly - the same "check your inbox"
+    // message with no mail behind it - was a dead end that ended in an
+    // admin deleting and recreating the account (22.9.2026).
+    // consumePasswordResetToken already promotes INVITED to ACTIVE on use,
+    // so the flow completes correctly from here.
+    where: { deletedAt: null, status: { in: ["ACTIVE", "INVITED"] }, OR: [{ email }, { username: email }] },
   });
   if (!user) return null;
 
