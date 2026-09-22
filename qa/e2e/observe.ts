@@ -101,13 +101,39 @@ const DRIFT_PROBE = `(() => {
 
     var origFetch = window.fetch;
     var rejectionsLeft = 12;
+    var bodiesLeft = 8;
     window.fetch = function (input, init) {
       var url = typeof input === "string" ? input : (input && input.url) || "";
       // The method, because a rejected GET is the router retrying and a
       // rejected POST is somebody's write. Reading it off either shape of
       // argument, since Next passes both.
       var method = (init && init.method) || (typeof input !== "string" && input && input.method) || "GET";
-      return origFetch.apply(this, arguments).catch(function (err) {
+      var call = origFetch.apply(this, arguments);
+
+      // What came back on a write, byte for byte at the end.
+      //
+      // The clearest failure yet was a Server Action that answered 200 in
+      // fifty milliseconds, wrote its row, and left the form pending with
+      // nothing in flight and nothing thrown. A truncated response body
+      // does exactly that: the fetch completes, the status is 200, and
+      // React waits forever for the rest of a payload that stopped
+      // arriving. The only way to tell that from a complete answer is to
+      // read the answer.
+      if (String(method).toUpperCase() === "POST" && bodiesLeft > 0) {
+        bodiesLeft--;
+        call
+          .then(function (res) {
+            return res.clone().text();
+          })
+          .then(function (text) {
+            console.warn("[action-body] " + text.length + " bytes, ends: " + JSON.stringify(text.slice(-70)));
+          })
+          .catch(function () {
+            console.warn("[action-body] could not be read");
+          });
+      }
+
+      return call.catch(function (err) {
         if (rejectionsLeft-- > 0) {
           console.warn(
             "[fetch-rejected] " +
@@ -234,7 +260,7 @@ export function observe(page: Page): void {
     // The two probe channels are evidence about an intermittent fault, so
     // they follow [abort] out to the runner's own output rather than
     // waiting for a failure that may not come.
-    if (!state.sealed && (text.startsWith("[abort-called]") || text.startsWith("[fetch-rejected]"))) {
+    if (!state.sealed && (text.startsWith("[abort-called]") || text.startsWith("[fetch-rejected]") || text.startsWith("[action-body]"))) {
       console.warn(text.slice(0, 400));
     }
   });

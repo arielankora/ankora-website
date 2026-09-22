@@ -224,7 +224,7 @@ export async function e2e() {
   const fromPage = String(r.all ?? "")
     .split("\n")
     .map((l) => l.trimEnd())
-    .filter((l) => l.includes("[abort-called]") || l.includes("[fetch-rejected]"))
+    .filter((l) => l.includes("[abort-called]") || l.includes("[fetch-rejected]") || l.includes("[action-body]"))
     .slice(0, 14);
 
   if (fromPage.length) {
