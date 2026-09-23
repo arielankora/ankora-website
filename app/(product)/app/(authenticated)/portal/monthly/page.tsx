@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
+import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ExportMenu } from "@/components/app/ExportMenu";
 import { PortalTabs } from "../PortalTabs";
@@ -25,9 +26,14 @@ function formatMonthTitle(date: Date) {
 // App redesign (handoff README, screen 16 "דוח חודשי"): title + auto-send
 // note + KPI tiles, same as before but restyled - see
 // lib/app-domain/client-portal.ts's getMonthlyDetailed comment for why
-// the prototype's "ספקים שתואמו" tile and "סיכום מנהל התיק" prose aren't
-// reproduced (no backing schema field for either - would be fabricated,
-// not real).
+// the prototype's "ספקים שתואמו" tile was not reproduced.
+//
+// Portal phase 3 brings back the other half of that note. "סיכום מנהל
+// התיק" was left out because there was no field behind it and the prose
+// would have been fabricated; it is here now because it is assembled from
+// the month's own rows and signed by a person before the client can read
+// it. Above the numbers, because a sentence about what happened is what
+// someone opens this screen for - the table is the evidence under it.
 export default async function PortalMonthlyPage(props: { searchParams: Promise<{ monthOffset?: string }> }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
@@ -37,8 +43,9 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
   referenceDate.setUTCMonth(referenceDate.getUTCMonth() + monthOffset);
 
   let report;
+  let summaries: Awaited<ReturnType<typeof getApprovedSummaries>> = [];
   try {
-    report = await getMonthlyDetailed(user, referenceDate);
+    [report, summaries] = await Promise.all([getMonthlyDetailed(user, referenceDate), getApprovedSummaries(user)]);
   } catch (err) {
     if (err instanceof ForbiddenError) {
       return (
@@ -50,9 +57,34 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
     throw err;
   }
 
+  // The summary belongs to a calendar month, and this screen moves by
+  // offset - so it is matched on the month rather than taken as "the
+  // latest", which would show September's words above August's numbers.
+  const shownMonth = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+  }).format(referenceDate);
+  const summary = summaries.find(
+    (s) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(
+        s.periodStart
+      ) === shownMonth
+  );
+
   return (
     <div className="space-y-4">
       <PortalTabs active="month" />
+
+      {summary && (
+        // Only for the month on screen, and only when a person approved
+        // it. An unapproved draft does not exist as far as this page is
+        // concerned - which is the whole of the spec's first rule about
+        // generated text, expressed as a query rather than as a promise.
+        <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
+          <p className="text-[13.5px] leading-relaxed text-appNavy">{summary.draft}</p>
+        </div>
+      )}
 
       <div className="rounded-2xl border border-lineDark bg-white p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">

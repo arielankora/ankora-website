@@ -151,6 +151,11 @@ model User {
   decisionsOpened   Decision[]         @relation("DecisionAuthor")
   decisionResponses DecisionResponse[] @relation("DecisionResponder")
 
+  // Portal phase 3.
+  preferencesTouched  Client[]         @relation("ClientPreferencesEditor")
+  documentsUploaded   ClientDocument[] @relation("ClientDocumentUploader")
+  summariesApproved   PortalSummary[]  @relation("PortalSummaryApprover")
+
   @@index([role, status])
   @@map("users")
 }
@@ -385,6 +390,26 @@ model Client {
   /// number someone will eventually dispute.
   approvalCeilingMinor Int?
 
+  /// Portal phase 3, screen 5 ("התיק שלי"). The three questions the
+  /// intake call already asks, kept in the client's own words: how they
+  /// want to be spoken to, what matters to them, and what must never
+  /// happen. Free text rather than a set of toggles because the half of
+  /// each answer worth having is the half no enum has a box for - "אל
+  /// תתקשרו לפני תשע" and "בלי הפתעות בחשבון" are the whole point.
+  ///
+  /// Both sides edit them. When the client edits, their account manager
+  /// is told, which is why the last editor is recorded rather than only
+  /// the time.
+  preferenceContact String?
+  preferenceMatters String?
+  preferenceNever   String?
+  preferencesUpdatedAt   DateTime?
+  preferencesUpdatedById String?
+
+  /// How often this client wants the portal to reach out. Theirs to set,
+  /// from their own screen - the spec's second notification rule.
+  portalDigest PortalDigest @default(EVERY_DECISION)
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -408,6 +433,11 @@ model Client {
   // Portal phase 2.
   accountManager User?      @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
   decisions      Decision[]
+
+  // Portal phase 3.
+  preferencesUpdatedBy User?            @relation("ClientPreferencesEditor", fields: [preferencesUpdatedById], references: [id], onDelete: SetNull)
+  documents            ClientDocument[]
+  portalSummaries      PortalSummary[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -612,6 +642,28 @@ model Task {
   clientTitle          String?
   waitingOnClientSince DateTime?
 
+  // Portal phase 3 ("ספקים וגורמים"), and deliberately not a Supplier
+  // table.
+  //
+  // The 22.9.2026 decision on the spec: a supplier is recorded as one
+  // field on the task at the moment it closes, and the client's supplier
+  // list is derived from their tasks rather than maintained beside them.
+  // A separate entity would be a second place to type the same name, and
+  // a second place to type something is the first thing abandoned under
+  // load - which would leave the client's file confidently empty.
+  //
+  // `supplierExperience` is the "ואיך היה" of the spec's own phrasing. It
+  // is three values rather than five stars because the person filling it
+  // in is closing a task, not writing a review, and because the only
+  // question the client ever asks of it is whether to use them again.
+  //
+  // `supplierRecordedAt` is the "when": set when the line is filled,
+  // which is at closing. The task's own updatedAt would move again on
+  // every later edit and stop meaning anything.
+  supplierName       String?
+  supplierExperience SupplierExperience?
+  supplierRecordedAt DateTime?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -622,12 +674,15 @@ model Task {
   importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
   timeEntries   TimeEntry[]
   decisions     Decision[]
+  documents     ClientDocument[]
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
   @@index([assignedToId])
   // Portal phase 1: every portal screen reads this client's visible tasks.
   @@index([clientId, clientVisible])
+  // Portal phase 3: the client's file lists suppliers newest first.
+  @@index([clientId, supplierRecordedAt])
   @@map("tasks")
 }
 
@@ -1339,6 +1394,15 @@ model ImportantDate {
   sensitivity ImportantDateSensitivity  @default(NORMAL)
   notes       String?
 
+  /// Portal phase 3. Opt-in per row, exactly like a task: a date Ankora
+  /// tracks in order to act on it is not by itself something the client
+  /// asked to have shown back to them.
+  ///
+  /// It is not the only gate. A SENSITIVE date is never shown in the
+  /// portal whatever this says - that is enforced in the query rather
+  /// than left to whoever ticks the box.
+  clientVisible Boolean @default(false)
+
   createAutoTask     Boolean @default(false)
   autoTaskLeadDays   Int?
   autoTaskCategoryId String?
@@ -1383,6 +1447,8 @@ model ImportantDate {
   @@index([clientId, status, deletedAt])
   @@index([nextOccurrenceAt])
   @@index([responsibleUserId])
+  // Portal phase 3: the client's file lists the dates opted in for them.
+  @@index([clientId, clientVisible])
   @@map("important_dates")
 }
 
@@ -1602,4 +1668,129 @@ model DecisionResponse {
 
   @@index([respondedById])
   @@map("decision_responses")
+}
+
+
+// ---------------------------------------------------------------------------
+// Portal phase 3: the client's file, and the monthly summary.
+// ---------------------------------------------------------------------------
+
+/// How a supplier worked out, recorded on the task that used them.
+///
+/// Three values, not five stars. Whoever fills this in is closing a task,
+/// not writing a review, and the only question the client ever asks of it
+/// is whether we would use them again.
+enum SupplierExperience {
+  GOOD
+  OK
+  AVOID
+}
+
+/// How often a client wants the portal to reach them. Set by the client,
+/// on their own screen.
+enum PortalDigest {
+  EVERY_DECISION
+  WEEKLY
+  MONTHLY
+}
+
+enum ClientDocumentKind {
+  POLICY
+  CERTIFICATE
+  CONTRACT
+  INVOICE
+  OTHER
+}
+
+/// A document that belongs to the client, produced while working for
+/// them: a policy, a confirmation, a signed contract.
+///
+/// The row holds a Drive file id and never a URL. Section 14's third rule
+/// is that documents are reachable through this server only - a link that
+/// works on its own outlives whatever permission granted it, and the
+/// portal's whole isolation story is that access is decided per request
+/// from the signed-in user, never from what someone happens to hold.
+model ClientDocument {
+  id       String  @id @default(cuid())
+  clientId String
+  /// The task this came out of, when it came out of one. Optional
+  /// because a policy can arrive before anyone opened a task for it.
+  taskId   String?
+
+  title String
+  kind  ClientDocumentKind @default(OTHER)
+
+  driveFileId String
+  mimeType    String
+  sizeBytes   Int?
+
+  /// Default true, unlike a task's. This table exists to hold the
+  /// client's own documents - an internal draft has no business being
+  /// filed here in the first place - so the honest default is that
+  /// filing something means the client can have it. The toggle exists for
+  /// the case where a document is prepared before it is ready to be seen.
+  clientVisible Boolean @default(true)
+
+  uploadedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  client     Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  task       Task?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy User?  @relation("ClientDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@index([clientId, clientVisible])
+  @@map("client_documents")
+}
+
+/// The monthly summary, as a record with a signature on it.
+///
+/// Two rules from the spec live in these columns rather than in a comment
+/// somewhere:
+///
+/// Nothing generated reaches the client without a person approving it -
+/// so the portal reads a summary only when `approvedById` is set, and an
+/// unapproved one simply does not exist as far as the client is
+/// concerned. If nobody approves it before the report goes out, the
+/// report goes out without it.
+///
+/// And every sentence must trace back to a record. The ids the draft was
+/// built from are captured with it, so the person approving it checks the
+/// draft against the rows rather than against their memory of the month.
+model PortalSummary {
+  id       String @id @default(cuid())
+  clientId String
+
+  periodStart DateTime
+  periodEnd   DateTime
+
+  draft  String
+  status PortalSummaryStatus @default(DRAFT)
+
+  sourceTaskIds     String[]
+  sourceDecisionIds String[]
+
+  generatedAt  DateTime  @default(now())
+  approvedById String?
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client     Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  approvedBy User?  @relation("PortalSummaryApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  /// One per client per period. Regenerating replaces the draft in place
+  /// rather than leaving two summaries of the same month for someone to
+  /// approve the wrong one of.
+  @@unique([clientId, periodStart])
+  @@index([clientId, status])
+  @@map("portal_summaries")
+}
+
+enum PortalSummaryStatus {
+  DRAFT
+  APPROVED
+  DISCARDED
 }

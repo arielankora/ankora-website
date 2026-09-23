@@ -1,11 +1,10 @@
 "use client";
-import { useFormState, useFormStatus } from "react-dom";
 import { updateClientAction } from "../actions";
+import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
 import type { Client } from "@prisma/client";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -27,10 +26,10 @@ export function EditClientForm({
   /// person to talk to on their own portal.
   staff: { id: string; name: string }[];
 }) {
-  const [state, formAction] = useFormState(updateClientAction, {});
+  const { onSubmit, pending, error, ok } = useActionForm(updateClientAction);
 
   return (
-    <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="clientId" value={client.id} />
       <div>
         <label className="block text-xs font-medium text-appNavy/60">שם הלקוח</label>
@@ -134,11 +133,53 @@ export function EditClientForm({
         </div>
       </div>
 
+      {/* Portal phase 3. The same three answers the client sees on their
+          own screen, editable here because half of what is worth
+          recording is said on a call and never typed by the person who
+          said it. Changing one here does not send the client a
+          notification - the notice goes the other way, to the account
+          manager, when the CLIENT edits. */}
+      <div className="sm:col-span-2">
+        <p className="text-xs font-medium text-appNavy/60">העדפות שירות</p>
+        <p className="mt-1 text-[11px] text-appNavy/45">
+          מופיע ללקוח במסך &quot;התיק שלי&quot;, והוא יכול לערוך שם בעצמו.
+        </p>
+        <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <label className="block">
+            <span className="block text-[11px] text-appNavy/55">איך לדבר איתו</span>
+            <textarea
+              name="preferenceContact"
+              rows={2}
+              defaultValue={client.preferenceContact ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-appNavy/55">מה חשוב לו</span>
+            <textarea
+              name="preferenceMatters"
+              rows={2}
+              defaultValue={client.preferenceMatters ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-[11px] text-appNavy/55">מה אסור שיקרה</span>
+            <textarea
+              name="preferenceNever"
+              rows={2}
+              defaultValue={client.preferenceNever ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="flex items-center gap-4 sm:col-span-2">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">נשמר בהצלחה.</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {ok && <p className="text-sm text-emerald-700">נשמר בהצלחה.</p>}
         <div className="ms-auto">
-          <SubmitButton />
+          <SubmitButton pending={pending} />
         </div>
       </div>
     </form>

@@ -77,10 +77,22 @@ export async function updateClient(
     accountManagerId?: string | null;
     whatsappNumber?: string | null;
     approvalCeilingMinor?: number | null;
+    // Portal phase 3. The same three preferences the client edits on
+    // their own screen. Both sides write them, because half of what is
+    // worth recording here is said on a call and never typed by the
+    // person who said it.
+    preferenceContact?: string | null;
+    preferenceMatters?: string | null;
+    preferenceNever?: string | null;
   }
 ) {
   assertCan(actor.role, "client.manage");
   const before = await prisma.client.findUniqueOrThrow({ where: { id: clientId } });
+
+  const touchedPreferences =
+    (input.preferenceContact !== undefined && (input.preferenceContact?.trim() || null) !== before.preferenceContact) ||
+    (input.preferenceMatters !== undefined && (input.preferenceMatters?.trim() || null) !== before.preferenceMatters) ||
+    (input.preferenceNever !== undefined && (input.preferenceNever?.trim() || null) !== before.preferenceNever);
 
   if (input.accountManagerId) {
     // A client user must never be set as an account manager: they would
@@ -103,6 +115,15 @@ export async function updateClient(
       accountManagerId: input.accountManagerId,
       whatsappNumber: input.whatsappNumber === null ? null : input.whatsappNumber?.trim() || undefined,
       approvalCeilingMinor: input.approvalCeilingMinor,
+      preferenceContact: input.preferenceContact === null ? null : input.preferenceContact?.trim() || undefined,
+      preferenceMatters: input.preferenceMatters === null ? null : input.preferenceMatters?.trim() || undefined,
+      preferenceNever: input.preferenceNever === null ? null : input.preferenceNever?.trim() || undefined,
+      // Only stamp the editor when a preference actually moved, so the
+      // client's screen does not report "עודכן לאחרונה" because somebody
+      // changed the timezone.
+      ...(touchedPreferences
+        ? { preferencesUpdatedAt: new Date(), preferencesUpdatedById: actor.id }
+        : {}),
     },
   });
   await recordAudit({

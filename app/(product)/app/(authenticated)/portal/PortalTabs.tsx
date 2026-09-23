@@ -10,6 +10,10 @@ const TABS = [
   { href: "/app/portal/hours", key: "hours", label: "שעות" },
   { href: "/app/portal/monthly", key: "month", label: "דוח חודשי" },
   { href: "/app/portal/history", key: "history", label: "היסטוריה" },
+  // Portal phase 3. Last on purpose: it is the one screen nobody opens to
+  // find out what is happening. People come here when they are asked for
+  // a policy, or want to remember who fixed the boiler.
+  { href: "/app/portal/file", key: "file", label: "התיק שלי" },
 ] as const;
 
 export type PortalTabKey = (typeof TABS)[number]["key"];

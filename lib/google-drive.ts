@@ -78,6 +78,19 @@ const CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 export const DRIVE_FOLDER_EXCEL_REPORTS = "1rco2ZnbDDZF_QxI79MdfwUrHfvH_0HBC"; // "דוחות יומיים - Excel"
 export const DRIVE_FOLDER_DB_DUMPS = "1H4kXfsCuzF_vutlLdjhfjUG1xhmvHZ4p"; // "דאטהבייס - dumps"
 
+/// Portal phase 3: where a client's documents are filed.
+///
+/// Read from the environment rather than written above, because unlike
+/// the two folders this module was built for, this one does not exist
+/// yet: it has to be created in the Shared drive and shared with the
+/// service account before a single document can be filed. Until it is,
+/// clientDocumentsFolder() returns null and the product says so in words
+/// rather than failing on upload - the same rule the portal spec sets for
+/// every capability that waits on something outside the code.
+export function clientDocumentsFolder(): string | null {
+  return process.env.GCP_DRIVE_FOLDER_CLIENT_DOCS || null;
+}
+
 export interface DriveUploadFileResult {
   ok: boolean;
   fileId?: string;
@@ -282,5 +295,39 @@ export async function uploadFileToDriveFolder(params: {
     return { ok: true, fileId: uploaded.id };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Unknown error uploading to Drive" };
+  }
+}
+
+
+const DOWNLOAD_URL = "https://www.googleapis.com/drive/v3/files";
+
+export interface DriveDownloadResult {
+  ok: boolean;
+  body?: ArrayBuffer;
+  error?: string;
+}
+
+/// Fetch a file's bytes, for this server to hand on.
+///
+/// This is the other half of section 14's third rule. The portal never
+/// gives a browser a Drive link: it asks this server for a document, the
+/// server decides whether that person may have it, and only then are the
+/// bytes fetched with the service account's own credentials. A link that
+/// works on its own would outlive the permission that granted it, and a
+/// client who left last year would still be able to open their file.
+export async function downloadFileFromDrive(fileId: string): Promise<DriveDownloadResult> {
+  const tokenResult = await getAccessToken();
+  if (!tokenResult.ok) return { ok: false, error: tokenResult.error };
+
+  try {
+    const res = await fetch(`${DOWNLOAD_URL}/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`, {
+      headers: { Authorization: `Bearer ${tokenResult.token}` },
+    });
+    if (!res.ok) {
+      return { ok: false, error: `Drive download failed ${res.status}` };
+    }
+    return { ok: true, body: await res.arrayBuffer() };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error downloading from Drive" };
   }
 }

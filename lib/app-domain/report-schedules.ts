@@ -310,7 +310,18 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
   }
 }
 
-function renderEmailBody(reportType: ClientReportType, clientName: string, from: Date, to: Date, snapshot: any): { subject: string; text: string } {
+function renderEmailBody(
+  reportType: ClientReportType,
+  clientName: string,
+  from: Date,
+  to: Date,
+  snapshot: any,
+  /// Portal phase 3: the approved summary for this period, when there is
+  /// one. Null covers both "nobody wrote it" and "nobody approved it in
+  /// time", which the spec treats the same way on purpose - the report
+  /// goes out either way, and a summary nobody signed does not travel.
+  summary?: string | null
+): { subject: string; text: string } {
   const label = REPORT_TYPE_LABELS[reportType];
   // Phase 8 fix: from/to are UTC instants representing LOCAL midnight
   // boundaries (see computeReportingPeriod) - formatting them with
@@ -327,6 +338,9 @@ function renderEmailBody(reportType: ClientReportType, clientName: string, from:
   const subject = `Ankora - ${label} - ${clientName} (${period})`;
 
   const lines = [`${label} עבור ${clientName}`, `תקופה: ${period}`, ""];
+  // First, above the numbers: it is the part a person reads, and the rows
+  // below it are what it rests on.
+  if (summary) lines.push(summary, "");
   if (reportType === "HOUR_BANK_STATUS") {
     const cycle = snapshot.cycle;
     if (cycle) {
@@ -373,7 +387,29 @@ export async function sendReportSchedule(
   if (!client) return { sent: false, reason: "Client not found" };
 
   const snapshot = await buildSnapshot(schedule.clientId, schedule.reportType, period.from, period.to);
-  const { subject, text } = renderEmailBody(schedule.reportType, client.name, period.from, period.to, snapshot);
+
+  // The approved summary for exactly this period, if a person signed one.
+  // Matched on periodStart rather than taken as the latest, so a report
+  // re-sent for an earlier month cannot carry this month's words.
+  const approved = await prisma.portalSummary.findFirst({
+    where: {
+      clientId: schedule.clientId,
+      status: "APPROVED",
+      approvedById: { not: null },
+      periodStart: { lte: period.from },
+      periodEnd: { gte: period.from },
+    },
+    select: { draft: true },
+  });
+
+  const { subject, text } = renderEmailBody(
+    schedule.reportType,
+    client.name,
+    period.from,
+    period.to,
+    snapshot,
+    approved?.draft ?? null
+  );
 
   const result = await sendEmail({ to: schedule.recipients, subject, text });
 

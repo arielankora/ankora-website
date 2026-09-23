@@ -43,6 +43,8 @@ export const ENTITY_TYPES = [
   "McpGrant",
   // Portal phase 2.
   "Decision",
+  "ClientDocument",
+  "PortalSummary",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -58,6 +60,15 @@ export const ACTION_LABEL: Record<string, string> = {
   "decision.create": "פתיחת החלטה ללקוח",
   "decision.cancel": "ביטול החלטה",
   "decision.respond": "אישור החלטה על ידי הלקוח",
+  // Portal phase 3.
+  "portal.preferences.update": "עדכון העדפות שירות בפורטל",
+  "portal.digest.update": "שינוי תדירות עדכונים בפורטל",
+  "client_document.add": "צירוף מסמך לתיק הלקוח",
+  "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
+  "client_document.remove": "הסרת מסמך מתיק הלקוח",
+  "portal_summary.generate": "הפקת טיוטת סיכום חודשי",
+  "portal_summary.approve": "אישור סיכום חודשי ללקוח",
+  "portal_summary.discard": "ביטול טיוטת סיכום חודשי",
   "user.invite": "הזמנת משתמש",
   "user.invite.resent": "שליחת הזמנה מחדש",
   "user.role_status_change": "שינוי תפקיד/סטטוס",

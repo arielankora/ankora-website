@@ -9,6 +9,19 @@ const PREVIEW_ORIGINS =
 const nextConfig = {
   reactStrictMode: true,
 
+  experimental: {
+    // Portal phase 3 files a client's documents through a Server Action,
+    // and an action's body is capped at 1MB by default - which a scanned
+    // insurance policy passes without trying.
+    //
+    // 5MB and not more, deliberately. Vercel's own limit on a function
+    // request body is 4.5MB, so anything larger would be refused a layer
+    // below this no matter what is written here; a bigger number would
+    // only move the failure somewhere harder to explain. The upload path
+    // refuses at 4MB with a sentence a person can act on.
+    serverActions: { bodySizeLimit: '5mb' },
+  },
+
   // Security review (information disclosure). Next.js sends
   // `X-Powered-By: Next.js` on every response by default, handing a
   // scanner the framework to look up advisories for before it has probed
