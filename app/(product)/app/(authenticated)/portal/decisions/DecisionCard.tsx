@@ -1,6 +1,7 @@
 "use client";
-import { useFormState, useFormStatus } from "react-dom";
+import { useState } from "react";
 import { respondToDecisionAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
 
 // Portal phase 2. One decision, as a card.
@@ -13,14 +14,27 @@ import { formatMinor } from "@/lib/money";
 
 type Option = { id: string; label: string; detail: string | null; amountMinor: number | null; recommended: boolean };
 
-function SubmitOption({ option, canAnswer }: { option: Option; canAnswer: boolean }) {
-  const { pending } = useFormStatus();
+function SubmitOption({
+  option,
+  canAnswer,
+  pending,
+  locked,
+}: {
+  option: Option;
+  canAnswer: boolean;
+  pending: boolean;
+  /// Another option on this card has already been answered. The card is
+  /// still on screen because the screen behind it has not finished
+  /// refreshing, and a second answer in that window would be a person
+  /// changing a decision they did not mean to reopen.
+  locked: boolean;
+}) {
   const price = formatMinor(option.amountMinor);
 
   return (
     <button
       type="submit"
-      disabled={pending || !canAnswer}
+      disabled={pending || locked || !canAnswer}
       className={`w-full rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
         option.recommended ? "border-gold/50 bg-gold/10 hover:border-gold" : "border-lineDark bg-white hover:border-gold"
       }`}
@@ -51,17 +65,35 @@ function SubmitOption({ option, canAnswer }: { option: Option; canAnswer: boolea
 /// of bug a rendering assertion would have missed. A form per option
 /// keeps the one-click gesture and puts the choice in a hidden field,
 /// where nothing has to infer it.
-function OptionForm({ decisionId, option, canAnswer }: { decisionId: string; option: Option; canAnswer: boolean }) {
-  const [state, formAction] = useFormState(respondToDecisionAction, {});
+///
+/// Submitted through useActionForm rather than `<form action>`: the
+/// button reports what the server said about this answer, and not how
+/// long the two revalidated screens take to redraw. This is the client's
+/// only write in the whole product, and "נשלח..." that never ends is the
+/// worst place in Ankora to leave someone standing.
+function OptionForm({
+  decisionId,
+  option,
+  canAnswer,
+  locked,
+  onAnswered,
+}: {
+  decisionId: string;
+  option: Option;
+  canAnswer: boolean;
+  locked: boolean;
+  onAnswered: () => void;
+}) {
+  const { onSubmit, pending, error } = useActionForm(respondToDecisionAction, onAnswered);
 
   return (
-    <form action={formAction}>
+    <form onSubmit={onSubmit}>
       <input type="hidden" name="decisionId" value={decisionId} />
       <input type="hidden" name="optionId" value={option.id} />
-      <SubmitOption option={option} canAnswer={canAnswer} />
-      {state?.error && (
+      <SubmitOption option={option} canAnswer={canAnswer} pending={pending} locked={locked} />
+      {error && (
         <p className="mt-2 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2 text-xs text-error">
-          {state.error}
+          {error}
         </p>
       )}
     </form>
@@ -91,6 +123,11 @@ export function DecisionCard({
   canAnswer: boolean;
   whatsappHref: string | null;
 }) {
+  /// Answered, and the card is still here because the screens behind it
+  /// are still refreshing. Held on the card rather than inside one option
+  /// so that answering any option closes all of them.
+  const [answered, setAnswered] = useState(false);
+
   return (
     <div className="rounded-2xl border border-gold/40 bg-[#FBF7F0] p-5">
       {decision.taskTitle && <p className="text-[11.5px] text-appNavy/50">{decision.taskTitle}</p>}
@@ -108,9 +145,18 @@ export function DecisionCard({
 
       <div className="mt-4 space-y-2.5">
         {decision.options.map((o) => (
-          <OptionForm key={o.id} decisionId={decision.id} option={o} canAnswer={canAnswer} />
+          <OptionForm
+            key={o.id}
+            decisionId={decision.id}
+            option={o}
+            canAnswer={canAnswer}
+            locked={answered}
+            onAnswered={() => setAnswered(true)}
+          />
         ))}
       </div>
+
+      {answered && <p className="mt-2.5 text-[12px] text-appNavy/60">התשובה נקלטה. תודה.</p>}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-appNavy/50">
         <span>
