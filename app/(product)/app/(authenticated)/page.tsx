@@ -1,6 +1,20 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Users, Tag, UserCog, Timer, Clock, Wallet, Bell, BarChart3, ArrowLeft, LayoutGrid, type LucideIcon } from "lucide-react";
+import {
+  Users,
+  Tag,
+  UserCog,
+  Timer,
+  Clock,
+  Wallet,
+  Bell,
+  BarChart3,
+  ArrowLeft,
+  LayoutGrid,
+  ListChecks,
+  TriangleAlert,
+  type LucideIcon,
+} from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
 import { KpiCard } from "@/components/app/KpiCard";
@@ -16,6 +30,8 @@ import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { ProgressBar } from "@/components/app/ProgressBar";
 import { ActiveTimersList, type ActiveTimerRow } from "@/components/app/ActiveTimersList";
 import { EmptyState } from "@/components/app/states/EmptyState";
+import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@/lib/app-domain/tasks";
+import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -149,7 +165,14 @@ export default async function AppHomePage() {
   // is indistinguishable from a slow save at the button that triggered it
   // - which is exactly what the browser suite keeps reporting. See
   // lib/slow-log.ts.
-  const [counts, metrics, openAlerts, trend, upcomingDates, activeTimerRows] = await timed("screen.dashboard.load", () =>
+  // Team adoption: "today" is the local day boundary, so a manager
+  // reading the stalled-promises number at four in the afternoon is
+  // asking what has been untouched since this morning.
+  const startOfToday = localDateTimeToUtc(localDateKey(new Date()), "00:00", TIMEZONE);
+
+  const [counts, metrics, openAlerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
+    "screen.dashboard.load",
+    () =>
     Promise.all([
     loadCounts(canSeeClients, canSeeCategories, canSeeUsers),
     canSeeReports ? loadOperationalMetrics() : null,
@@ -161,8 +184,17 @@ export default async function AppHomePage() {
     // App redesign (handoff README, screen 1): live "טיימרים פעילים כרגע"
     // list - same visibility gate as the rest of the operational metrics.
     canSeeReports ? loadActiveTimerRows() : null,
+    // Team adoption, mechanism two: the work this person is holding. Not
+    // gated on a reporting permission - it is their own list, and anyone
+    // who can log time can hold a task.
+    canSeeImportantDates ? listMyOpenTasks(user, 8) : null,
+    // Mechanism four: a manager's number, so the same gate as the rest of
+    // the operational metrics.
+    canSeeReports ? stalledPromisesByClient(user, startOfToday) : null,
     ])
   );
+
+  const stalledTotal = stalled?.reduce((sum, row) => sum + row.count, 0) ?? 0;
 
   const cards = [
     canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
@@ -189,6 +221,68 @@ export default async function AppHomePage() {
           <h1 className="text-xl font-medium text-appNavy">שלום, {user.name.split(" ")[0]}</h1>
           <p className="mt-1 text-sm text-appNavy/60">סקירה כללית של המערכת.</p>
         </div>
+
+        {/* Team adoption, mechanism two: the work this person is holding.
+
+            Above the metrics on purpose. Everything below this is a
+            number about the business; this is the only block on the
+            screen that answers "what is on me", and a person who opens
+            their home screen is asking that first. The spec's whole
+            premise is that the portal goes stale unless the update sits
+            where someone already is, and this is where they already are.
+
+            The eight rows are a cap, not a list: anyone holding more
+            than that needs the Tasks screen, and the link is there. */}
+        {myTasks && myTasks.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
+            <div className="flex items-center justify-between gap-2.5 border-b border-lineDark px-[18px] py-3.5">
+              <span className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
+                <ListChecks size={15} strokeWidth={2} className="text-appNavy/45" />
+                המשימות שלי
+              </span>
+              <Link href="/app/tasks?mine=1" className="text-[11.5px] text-gold-dim hover:underline">
+                לכל המשימות שלי
+              </Link>
+            </div>
+            <div className="divide-y divide-lineDark/60">
+              {myTasks.map((t) => (
+                <Link
+                  key={t.id}
+                  href="/app/tasks?mine=1"
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-appNavy/[0.02]"
+                >
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    {/* The mark the spec asks for: a promise the client
+                        can see that has not moved in a day. It is on the
+                        row rather than in a separate list, because the
+                        person who can fix it is looking at the row. */}
+                    {t.stale && (
+                      <span
+                        title={`לא זזה מעל ${STALE_PROMISE_HOURS} שעות, והלקוח רואה אותה`}
+                        className="shrink-0 text-warning"
+                      >
+                        <TriangleAlert size={13} strokeWidth={2.25} />
+                      </span>
+                    )}
+                    <span className="truncate text-[13.5px] text-appNavy">{t.title}</span>
+                  </span>
+                  <span className="flex items-center gap-2.5 text-[11.5px] text-appNavy/50">
+                    <span className="truncate">{t.clientName}</span>
+                    {t.dueDate && (
+                      <span dir="ltr" className="font-jbmono">
+                        {new Intl.DateTimeFormat("he-IL", {
+                          day: "numeric",
+                          month: "short",
+                          timeZone: TIMEZONE,
+                        }).format(t.dueDate)}
+                      </span>
+                    )}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* App redesign (handoff README, screen 1): primary 4-card KPI row -
             active timers (with overage row), hours today, avg bank
@@ -237,6 +331,54 @@ export default async function AppHomePage() {
                 label="לכל הדוחות הפנימיים"
                 value={<ArrowLeft size={20} strokeWidth={1.75} />}
               />
+            )}
+          </div>
+        )}
+
+        {/* Team adoption, mechanism four: the manager's number.
+
+            Deliberately a manager's metric and not an employee's
+            reminder. A person nudged about their own row learns to
+            dismiss the nudge; a team measured on a number talks about
+            the number, and this is the number that decides whether the
+            client portal shows the truth or a week-old picture of it.
+
+            Named by client, because "eleven promises have not moved" is
+            a fact nobody can act on and "four of them are Orbit's" is a
+            conversation. Zero is worth rendering too: a manager who only
+            ever sees this card when it is bad cannot tell a good day
+            from a card that stopped working. */}
+        {stalled && (
+          <div className="rounded-2xl border border-lineDark bg-white p-5">
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <h2 className="text-sm font-medium text-appNavy/70">הבטחות שלא זזו היום</h2>
+              <span
+                className={`font-jbmono text-[22px] font-medium ${stalledTotal > 0 ? "text-warning" : "text-success"}`}
+              >
+                {stalledTotal}
+              </span>
+            </div>
+            {stalledTotal === 0 ? (
+              <p className="mt-1.5 text-[12.5px] text-appNavy/55">
+                כל ההבטחות שהלקוחות רואים זזו היום. זה מה שהפורטל אמור להראות.
+              </p>
+            ) : (
+              <>
+                <p className="mt-1.5 text-[12.5px] text-appNavy/55">
+                  הלקוחות האלה רואים אצלם משימה פתוחה שלא נגענו בה היום.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {stalled.slice(0, 8).map((row) => (
+                    <Link
+                      key={row.clientId}
+                      href={`/app/tasks?clientId=${row.clientId}`}
+                      className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11.5px] text-appNavy/70 transition-colors hover:border-gold"
+                    >
+                      {row.clientName} · {row.count}
+                    </Link>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         )}

@@ -539,12 +539,18 @@ export interface PortalPromise {
   /// Only set while the stage is WAITING_ON_CLIENT.
   waitingSince: Date | null;
   dueDate: Date | null;
-  /// Last movement. Task has no completedAt column, so for a finished
-  /// promise this is when it was last written - which is the moment it
-  /// was marked done in every path that exists today. Called "movement"
-  /// rather than "completed" so no screen claims more precision than the
-  /// data has.
+  /// Last movement. `completedAt` once a promise is finished, and the
+  /// row's last write before that.
+  ///
+  /// It used to be `updatedAt` in every case, which moves again whenever
+  /// anyone touches the row: a client could see work finished three
+  /// weeks ago dated today because someone fixed a typo in its title.
+  /// Team adoption added the column; the fallback stays for rows closed
+  /// before it existed.
   movedAt: Date;
+  /// What came of it, in the client's language. Only ever set on a
+  /// finished promise - closing a visible one without it is refused.
+  outcome: string | null;
 }
 
 /// Waiting on the client wins over the internal status: a task can be
@@ -565,6 +571,8 @@ function toPromise(task: {
   waitingOnClientSince: Date | null;
   dueDate: Date | null;
   updatedAt: Date;
+  completedAt: Date | null;
+  clientOutcome: string | null;
 }): PortalPromise {
   return {
     id: task.id,
@@ -572,7 +580,8 @@ function toPromise(task: {
     stage: stageOf(task),
     waitingSince: task.waitingOnClientSince,
     dueDate: task.dueDate,
-    movedAt: task.updatedAt,
+    movedAt: task.completedAt ?? task.updatedAt,
+    outcome: task.clientOutcome?.trim() || null,
   };
 }
 
@@ -601,6 +610,8 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       waitingOnClientSince: true,
       dueDate: true,
       updatedAt: true,
+      completedAt: true,
+      clientOutcome: true,
     },
     orderBy: { updatedAt: "desc" },
     take: opts.take,

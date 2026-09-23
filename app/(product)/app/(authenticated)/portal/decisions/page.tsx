@@ -21,7 +21,10 @@ function formatDate(date: Date) {
 // screen, and the record of what was already decided sits below them -
 // quiet, but present, because "what did I approve, and when" is a
 // question people ask months later.
-export default async function PortalDecisionsPage() {
+export default async function PortalDecisionsPage(props: {
+  searchParams: Promise<{ answered?: string }>;
+}) {
+  const { answered } = await props.searchParams;
   const user = await requireUser();
 
   let decisions;
@@ -36,9 +39,24 @@ export default async function PortalDecisionsPage() {
   const canAnswer = ctx.clientUserRole === "ADMIN" && !ctx.isStaffPreview;
   const waHref = whatsappHref(ctx.client.whatsappNumber);
 
+  // The confirmation, rendered from the server rather than held in the
+  // card's own state - so it is still on the screen after the redraw that
+  // replaces the card with the record. Matched against the closed list so
+  // a hand-edited id says nothing.
+  const justAnswered = answered ? decisions.closed.find((d) => d.id === answered) : undefined;
+
   return (
     <div className="space-y-4">
       <PortalTabs active="decisions" />
+
+      {justAnswered && (
+        <div className="rounded-2xl border border-success/25 bg-success-soft px-[18px] py-3.5">
+          <p className="text-[13.5px] text-success">התשובה שלך נקלטה. תודה.</p>
+          {justAnswered.answer && (
+            <p className="mt-1 text-[12.5px] text-appNavy/60">נבחר: {justAnswered.answer.optionLabel}</p>
+          )}
+        </div>
+      )}
 
       {decisions.open.length === 0 ? (
         <div className="rounded-2xl border border-lineDark bg-white p-6">

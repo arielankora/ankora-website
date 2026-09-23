@@ -185,7 +185,16 @@ async function main() {
   // read. `update` carries them too (unlike the rest of this file's
   // `update: {}`), so an existing demo database picks the fields up on
   // the next seed instead of showing an empty portal.
-  const KICKOFF_PORTAL = { clientVisible: true, clientTitle: "[DEMO] פגישת הפתיחה שלך" };
+  // Team adoption: a finished promise now carries what came of it, and
+  // the date it closed. Without both, the portal's activity screen and
+  // the monthly summary have only a title to show for completed work -
+  // which is the gap the definition of done exists to close.
+  const KICKOFF_PORTAL = {
+    clientVisible: true,
+    clientTitle: "[DEMO] פגישת הפתיחה שלך",
+    clientOutcome: "[DEMO] נפגשנו, מיפינו את כל מה שרץ אצלך, ויצאנו עם תוכנית לשלושת החודשים הראשונים.",
+    completedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
+  };
   await prisma.task.upsert({
     where: { id: "demo-task-onboarding-kickoff" },
     update: KICKOFF_PORTAL,
@@ -198,7 +207,15 @@ async function main() {
       ...KICKOFF_PORTAL,
     },
   });
-  const RESEARCH_PORTAL = { clientVisible: true, clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה" };
+  // Assigned to the account manager on this client, who is also the
+  // account the browser suite signs in as - so "המשימות שלי" on the home
+  // screen and the "שלי" filter both have a row, and the timer screen has
+  // a promise to offer when a timer stops.
+  const RESEARCH_PORTAL = {
+    clientVisible: true,
+    clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה",
+    assignedToId: ankoraAdmin.id,
+  };
   await prisma.task.upsert({
     where: { id: "demo-task-research-competitors" },
     update: RESEARCH_PORTAL,

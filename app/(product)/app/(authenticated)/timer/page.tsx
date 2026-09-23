@@ -3,6 +3,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimer, listRecentCombinations, listMyTimeEntries } from "@/lib/app-domain/time-entries";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
+import { listOpenPromises } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { Forbidden } from "@/components/app/Forbidden";
 import { TimerWidget, type TodayEntry } from "./TimerWidget";
@@ -43,13 +44,17 @@ export default async function TimerPage() {
     );
   }
 
-  const [activeTimer, clients, allCategories, recent, todayEntries] = await Promise.all([
+  const [activeTimer, clients, allCategories, recent, todayEntries, openPromises] = await Promise.all([
     getActiveTimer(user.id),
     listAccessibleClients(user),
     listCategories(),
     // Spec 6.2 quick-start bullet: exactly three one-click combos.
     listRecentCombinations(user.id, 3),
     loadTodayEntries(user.id),
+    // Team adoption: what the stop can ask about. Loaded here rather
+    // than fetched when the toast appears, because a question that
+    // arrives a moment after the toast does is a question nobody sees.
+    listOpenPromises(user),
   ]);
 
   const clientIds = new Set(clients.map((c) => c.id));
@@ -76,6 +81,7 @@ export default async function TimerPage() {
                   clientId: activeTimer.clientId,
                   categoryId: activeTimer.categoryId,
                   note: activeTimer.note,
+                  taskId: activeTimer.taskId,
                 }
               : null
           }
@@ -93,6 +99,15 @@ export default async function TimerPage() {
             lastUsedAt: r.startAt.toISOString(),
           }))}
           todayEntries={todayEntries}
+          openPromises={openPromises.map((t) => ({
+            id: t.id,
+            clientId: t.clientId,
+            // What the client calls it, when Ankora wrote them a title.
+            // The person stopping the timer is about to tell that client
+            // something, so the words in front of them should be the
+            // ones the client already sees.
+            label: t.clientTitle?.trim() || t.title,
+          }))}
         />
       </div>
     </>

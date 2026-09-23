@@ -664,6 +664,25 @@ model Task {
   supplierExperience SupplierExperience?
   supplierRecordedAt DateTime?
 
+  // Team adoption ("אימוץ בצוות"), and the answer to a gap the portal has
+  // carried since phase 1: a promise could be marked done without anyone
+  // ever saying what happened.
+  //
+  // `clientOutcome` is the definition of done. `clientTitle` is what the
+  // thing was called; this is what came of it, in the client's language,
+  // and a client-visible task cannot reach DONE without it - see
+  // updateTask. It is the field that feeds the activity screen and the
+  // monthly summary, both of which were assembling themselves out of
+  // titles alone.
+  //
+  // `completedAt` is the moment it closed, written by the server on the
+  // transition into DONE and cleared if a task is reopened. The portal
+  // used `updatedAt` for this, which moves again whenever anyone touches
+  // the row - so a client could see work finished three weeks ago dated
+  // today, because someone fixed a typo in its title.
+  clientOutcome String?
+  completedAt   DateTime?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -683,6 +702,9 @@ model Task {
   @@index([clientId, clientVisible])
   // Portal phase 3: the client's file lists suppliers newest first.
   @@index([clientId, supplierRecordedAt])
+  // Team adoption: promises that have not moved, for the manager's metric
+  // and for one person's own rows on the home screen.
+  @@index([clientVisible, status, updatedAt])
   @@map("tasks")
 }
 
