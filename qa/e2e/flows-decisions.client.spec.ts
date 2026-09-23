@@ -119,7 +119,7 @@ test("answering records the choice and closes the decision", async ({ page }) =>
   // exactly as it was is a client pressing approve and being shown
   // nothing at all.
   await expect(
-    page.getByText("התשובה נקלטה").or(page.getByText("החלטות קודמות")).first(),
+    page.getByText("נקלטה").or(page.getByText("החלטות קודמות")).first(),
     "the click produced nothing - no confirmation on the card, no record below it"
   ).toBeVisible({ timeout: 20_000 });
 

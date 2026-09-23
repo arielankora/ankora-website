@@ -207,13 +207,14 @@ async function main() {
       ...KICKOFF_PORTAL,
     },
   });
-  // Assigned to the employee the browser suite signs in as, so "המשימות
-  // שלי" on the home screen and the "שלי" filter both have a row, and so
-  // the timer screen has a promise to offer at the stop.
+  // Assigned to the account manager on this client, who is also the
+  // account the browser suite signs in as - so "המשימות שלי" on the home
+  // screen and the "שלי" filter both have a row, and the timer screen has
+  // a promise to offer when a timer stops.
   const RESEARCH_PORTAL = {
     clientVisible: true,
     clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה",
-    assignedToId: employeeOne.id,
+    assignedToId: ankoraAdmin.id,
   };
   await prisma.task.upsert({
     where: { id: "demo-task-research-competitors" },

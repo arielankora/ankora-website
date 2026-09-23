@@ -395,10 +395,20 @@ export type TaskPatch = {
 /// assembling itself out of task titles, which say what the thing was
 /// called and never what happened to it.
 ///
-/// Evaluated on the RESULTING state, not on the patch. Closing a visible
-/// task and making a closed task visible arrive here as different patches
-/// and produce the same thing: a promise on a client's screen marked done
-/// with nothing to show for it.
+/// Evaluated on the RESULTING state, but only for a patch that MOVES
+/// something into it. Closing a visible task and making a closed task
+/// visible arrive here as different patches and produce the same thing:
+/// a promise on a client's screen marked done with nothing to show for
+/// it. Both are refused.
+///
+/// A patch that touches none of the three is left alone even when the row
+/// is already in that state, and that is not a loophole - it is the
+/// difference between a rule and a trap. Every promise closed before this
+/// existed is a row with no outcome on it, and a rule evaluated on state
+/// alone would mean nobody can ever correct a supplier, a title or a
+/// category on any of them again. Found by a test written for the
+/// supplier line, which is exactly the sort of edit that would have
+/// started failing in production for no reason a person could see.
 ///
 /// The message is what the person sees, so it says what to do.
 export const NO_OUTCOME_MESSAGE =
@@ -408,6 +418,10 @@ function assertClosable(
   current: { status: TaskStatus; clientVisible: boolean; clientOutcome: string | null },
   data: TaskPatch
 ) {
+  const touches =
+    data.status !== undefined || data.clientVisible !== undefined || data.clientOutcome !== undefined;
+  if (!touches) return;
+
   const status = data.status ?? current.status;
   const visible = data.clientVisible ?? current.clientVisible;
   const outcome = data.clientOutcome !== undefined ? data.clientOutcome : current.clientOutcome;

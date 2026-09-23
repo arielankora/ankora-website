@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useState, useTransition, type FormEvent } from "react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 
 /// What a Server Action in this app answers with.
 export type ActionResult = { ok?: boolean; error?: string };
@@ -39,25 +39,31 @@ export type ActionResult = { ok?: boolean; error?: string };
  * uses this sits inside a drawer that only JavaScript can open, so there
  * was never a no-JS path through it to lose.
  *
- * And one thing that had to be added back. The refresh that `revalidatePath`
- * asks for still rides home inside the action's response, and it is applied
- * without this form waiting for it - that part works. What is not reliable
- * is WHETHER it arrives. The same click, on two consecutive CI runs of the
- * same screen, produced opposite results: once the screen refreshed so
- * promptly that the form unmounted before it could say the answer was
- * accepted, and once the answer was accepted and the screen had still not
- * refreshed forty-five seconds later. Both from a write that committed.
+ * And one thing that had to be added back, twice.
  *
- * A client approving spending above their agreed ceiling and then not
- * seeing their own approval on the screen is the worst version of that
- * coin landing wrong, so the refresh is no longer left to chance: a
- * successful action asks for one explicitly. It costs one extra render of
- * the screen when the implicit refresh did arrive, which is a price worth
- * paying to stop a write from being invisible half the time.
+ * The refresh that `revalidatePath` asks for rides home inside the action's
+ * response, and whether it ARRIVES turned out to be a coin. The same click,
+ * on consecutive CI runs of the same screen, produced opposite results:
+ * once the screen refreshed before the form could even say the write had
+ * been accepted, once the write committed and the screen had still not
+ * changed forty-five seconds later.
  *
- * Why no test caught this until now: every other write test in the browser
- * suite reloads the page before asserting the result, so this is the only
- * place in the product where a screen is expected to refresh itself.
+ * The first attempt at a fix asked for a refresh explicitly, inside the
+ * transition, right after the action returned. It did not hold. A run
+ * caught the server's own answer and said so outright: the action's
+ * response carried a rendered screen with the new record missing from it,
+ * and the explicit refresh that followed changed nothing on the page.
+ *
+ * So the refresh is now asked for from an effect, after the transition
+ * that carried the action has committed and this component is settled.
+ * Nothing about it competes with the action's own response any more: the
+ * screen is re-fetched once, from a normal render, the way it would be if
+ * a person had asked for it.
+ *
+ * Why no test caught any of this for three releases: every other write
+ * test in the browser suite reloads the page before asserting the result.
+ * A test that reloads before it looks is not testing a refresh. Two specs
+ * now assert the screen updating itself, and they reload nothing.
  */
 export function useActionForm<R extends ActionResult>(
   action: (prev: R | undefined, data: FormData) => Promise<R>,
@@ -75,6 +81,16 @@ export function useActionForm<R extends ActionResult>(
   // still a transition - it is just no longer one this form waits inside.
   const [, startTransition] = useTransition();
   const router = useRouter();
+  /// Bumped on every successful write, and watched by the effect below.
+  /// A counter rather than a boolean because two saves in a row are two
+  /// refreshes, and a boolean that is already true is a refresh that
+  /// never happens.
+  const [landed, setLanded] = useState(0);
+
+  useEffect(() => {
+    if (landed === 0) return;
+    router.refresh();
+  }, [landed, router]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -93,12 +109,13 @@ export function useActionForm<R extends ActionResult>(
         const answer = await action(undefined, data);
         setResult(answer);
         if (answer?.ok) {
-          // onSuccess first, and the refresh after it. The refresh may
-          // unmount this form - that is what closing a decision does -
-          // and a callback that never ran because its component was
-          // already gone is a drawer that stays open on a saved row.
+          // onSuccess first, then the signal that asks for the refresh.
+          // The refresh may unmount this form - that is what closing a
+          // decision does - and a callback that never ran because its
+          // component was already gone is a drawer that stays open on a
+          // saved row.
           onSuccess?.(answer);
-          router.refresh();
+          setLanded((n) => n + 1);
         }
       } catch {
         // A Server Action that throws has already been logged on the

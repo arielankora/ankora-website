@@ -1,4 +1,5 @@
 "use client";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { respondToDecisionAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -127,6 +128,27 @@ export function DecisionCard({
   /// are still refreshing. Held on the card rather than inside one option
   /// so that answering any option closes all of them.
   const [answered, setAnswered] = useState(false);
+  const router = useRouter();
+
+  /// The answer changes the URL, and that is the point.
+  ///
+  /// This screen is the one write in the product made by somebody who is
+  /// not us: a client approving spending above the ceiling they agreed.
+  /// Twice now it has been caught leaving them looking at the same
+  /// question after their approval was already recorded, because the
+  /// refresh that was supposed to redraw the screen did not arrive. A
+  /// refresh is a request; a navigation is not. Changing the query string
+  /// means the router cannot reuse what it already has, so the server
+  /// renders this screen again and the record is there.
+  ///
+  /// It also moves the confirmation somewhere it survives. "התשובה
+  /// נקלטה" lived in this component's own state, which the redraw
+  /// destroys - so the reassurance flickered out at the exact moment the
+  /// page finally caught up.
+  function onAnswered() {
+    setAnswered(true);
+    router.replace(`/app/portal/decisions?answered=${decision.id}`, { scroll: false });
+  }
 
   return (
     <div className="rounded-2xl border border-gold/40 bg-[#FBF7F0] p-5">
@@ -151,7 +173,7 @@ export function DecisionCard({
             option={o}
             canAnswer={canAnswer}
             locked={answered}
-            onAnswered={() => setAnswered(true)}
+            onAnswered={onAnswered}
           />
         ))}
       </div>
