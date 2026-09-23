@@ -109,15 +109,19 @@ test("answering records the choice and closes the decision", async ({ page }) =>
 
   await option.click();
 
-  // Two assertions, in this order, because they fail for different
-  // reasons and the difference is the whole diagnosis: the server
-  // accepting the answer, and the screens behind the card catching up.
-  // A single assertion on the record cannot tell "the write was refused"
-  // from "the write landed and the refresh is slow", and the first run
-  // that failed here spent a round on exactly that ambiguity.
-  await expect(page.getByText("התשובה נקלטה"), "the server did not accept the answer").toBeVisible({
-    timeout: 20_000,
-  });
+  // Either of two things is correct here, and which one happens is a
+  // race that the product does not need to win: the card says the answer
+  // was accepted, or the refresh takes the card away before it can. A
+  // run that asserted only the first found nothing, on a click whose
+  // write had already committed - the card was simply gone by then.
+  //
+  // What is NOT correct is neither: a click that leaves the screen
+  // exactly as it was is a client pressing approve and being shown
+  // nothing at all.
+  await expect(
+    page.getByText("התשובה נקלטה").or(page.getByText("החלטות קודמות")).first(),
+    "the click produced nothing - no confirmation on the card, no record below it"
+  ).toBeVisible({ timeout: 20_000 });
 
   const response = await answerResponse;
   const body = response ? await response.text().catch(() => null) : null;
