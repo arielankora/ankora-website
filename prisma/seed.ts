@@ -391,6 +391,50 @@ async function main() {
     });
   }
 
+  // Portal phase 3: enough in the demo client's file that the screen
+  // shows what it is for rather than four empty states. A supplier line
+  // on a promise that already exists (derived, never a row of its own), a
+  // recurring date opted in, and the three preferences.
+  await prisma.task.update({
+    where: { id: "demo-task-onboarding-kickoff" },
+    data: {
+      supplierName: "[DEMO] חשמלאי כהן",
+      supplierExperience: "GOOD",
+      supplierRecordedAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000),
+    },
+  });
+
+  await prisma.client.update({
+    where: { id: clientA.id },
+    data: {
+      preferenceContact: "[DEMO] וואטסאפ עדיף. שיחות רק אחרי תשע.",
+      preferenceMatters: "[DEMO] שהכול יהיה סגור לפני שאני שומע עליו.",
+      preferenceNever: "[DEMO] שמישהו יגיע למשרד בלי תיאום מראש.",
+      preferencesUpdatedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+      preferencesUpdatedById: ankoraAdmin.id,
+    },
+  });
+
+  const existingPortalDate = await prisma.importantDate.findFirst({ where: { id: "demo-date-portal-renewal" } });
+  if (!existingPortalDate) {
+    await prisma.importantDate.create({
+      data: {
+        id: "demo-date-portal-renewal",
+        clientId: clientA.id,
+        title: "[DEMO] חידוש ביטוח המשרד",
+        type: "renewal",
+        category: "DOCUMENTS_AUTHORITIES",
+        month: 3,
+        day: 14,
+        responsibleUserId: ankoraAdmin.id,
+        additionalUserIds: [],
+        extraEmailRecipients: [],
+        clientVisible: true,
+        nextOccurrenceAt: new Date(Date.now() + 40 * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);

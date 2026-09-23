@@ -1030,8 +1030,57 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-09-22"
+    },
+    "action:(product)/app/(authenticated)/portal/file/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "api:/api/portal/documents/[documentId]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "domain:client-documents": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "domain:client-file": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "domain:portal-labels": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "domain:portal-summary": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
+    },
+    "screen:/app/portal/file": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-09-23"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-22"
+  "lastScan": "2026-09-23"
 }
