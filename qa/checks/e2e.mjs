@@ -88,7 +88,15 @@ export async function e2e() {
       // reproduce it from nothing.
       const where = (spec.file ?? "").split("/").pop();
       const why = results.find((x) => x.error)?.error?.message ?? "";
-      const oneLine = why.replace(/\s+/g, " ").trim().slice(0, 160);
+      // 160 characters was fine while a first-attempt message was one
+      // sentence. It is not fine now: the drawer helper's message opens
+      // with the timeout and carries the whole diagnosis after it -
+      // whether the row reached the database, what the page was doing,
+      // which requests died - and every one of those was being cut off
+      // mid-word. A flaky test IS the failing one here; truncating its
+      // only report cost a full run.
+      const flat = why.replace(/\s+/g, " ").trim();
+      const oneLine = flat.length > 420 ? `${flat.slice(0, 200)} … ${flat.slice(-220)}` : flat;
       flakyNames.push(
         `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    first attempt: ${oneLine}` : ""}`,
       );
@@ -145,6 +153,113 @@ export async function e2e() {
   // "minor", not "info": the PR comment filters info findings out
   // entirely, and evidence nobody reads is evidence nobody has. Twelve
   // lines because that is what the comment renders.
+  // Timing first, and regardless of the verdict.
+  //
+  // The app logs one line per write that took longer than a person would
+  // wait (lib/slow-log.ts). Those lines are the difference between "the
+  // button stayed disabled" and "the overlap check took twenty-one
+  // seconds", and they are worth reading on a green run too: a write
+  // creeping towards the timeout is the run before the one that fails.
+  const slow = String(r.all ?? "")
+    .split("\n")
+    .filter((l) => l.startsWith("[WebServer]"))
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[slow]"))
+    .slice(0, 12);
+
+  if (slow.length) {
+    // The number decides the severity, not the fact: five hundred
+    // milliseconds over the line is a note, five seconds is a fault
+    // someone has to own.
+    const worst = Math.max(...slow.map((l) => Number(/(\d+)ms/.exec(l)?.[1] ?? 0)));
+    out.push(
+      finding(
+        worst >= 5000 ? "major" : "minor",
+        `slow server work while the browser ran (worst ${worst}ms)`,
+        slow.join("\n")
+      )
+    );
+  }
+
+  // Requests the browser abandoned, on every run.
+  //
+  // Reported outside the failure branch on purpose. Playwright retries a
+  // failed test once, so a Server Action whose POST was aborted and which
+  // then succeeded leaves a green run and no evidence - and three rounds
+  // of this investigation were spent waiting to catch the fault in the
+  // act. An abandoned request is worth knowing about whether or not it
+  // happened to fail a test this time.
+  const allAborts = String(r.all ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[abort]"));
+
+  // Writes first, and only then whatever room is left for the rest.
+  //
+  // Taking the first twelve lines in order dropped the one abandoned
+  // write that a test actually failed on, because eleven cancelled
+  // prefetches happened to come earlier in the run. The prefetches are
+  // the background; a write nobody got is the finding.
+  const abortedWrites = allAborts.filter((l) => /\[abort\] POST/.test(l));
+  // A write dropped while the browser was navigating is the test moving on
+  // before the answer landed: the server still did the work, and the run
+  // still passes. A write dropped with the page standing still is the
+  // fault this whole investigation was about.
+  const droppedStanding = abortedWrites.filter((l) => l.includes("page still"));
+  const aborted = [
+    ...droppedStanding.slice(0, 8),
+    ...abortedWrites.filter((l) => !l.includes("page still")).slice(0, 6),
+    ...allAborts.filter((l) => !/\[abort\] POST/.test(l)),
+  ].slice(0, 14);
+
+  if (aborted.length) {
+    // A POST is a write the user asked for and did not get. A GET is
+    // usually a prefetch the router cancelled on purpose, which is
+    // ordinary Next behaviour and not worth waking anyone for.
+    // Severity by what was actually lost, not by how many lines there are.
+    //
+    // This started at major for any abandoned write, which was right while
+    // writes were being dropped with nothing moving. It is wrong now: the
+    // GETs are Next cancelling its own prefetches on pagehide, ordinary
+    // router housekeeping, and a hundred of them every run under a major
+    // heading is a report that cries wolf until nobody reads it.
+    const severity = droppedStanding.length ? "major" : abortedWrites.length ? "minor" : "info";
+    const summary = droppedStanding.length
+      ? `${droppedStanding.length} write(s) dropped with the page standing still`
+      : abortedWrites.length
+        ? `${abortedWrites.length} write(s) dropped while the browser was navigating away`
+        : `${allAborts.length} request(s) the browser abandoned, none of them a write`;
+    out.push(finding(severity, summary, aborted.join("\n")));
+  }
+
+  // The page's own answer to "who cancelled it". Printed by the probe in
+  // qa/e2e/observe.ts, which wraps AbortController.abort() and window.fetch
+  // inside the browser, because from the network side a fetch cancelled by
+  // its own code and one killed on the wire are the same event.
+  const fromPage = String(r.all ?? "")
+    .split("\n")
+    .map((l) => l.trimEnd())
+    .filter((l) => l.includes("[abort-called]") || l.includes("[fetch-rejected]") || l.includes("[action-body]"))
+    .slice(0, 14);
+
+  if (fromPage.length) {
+    out.push(finding("minor", "what the page said about its own cancellations", fromPage.join("\n")));
+  }
+
+  // The server's side of the same story, on every run, for the same
+  // reason. These lines appear only while qa/playwright.config.ts sets
+  // QA_TRACE, so they cost nothing anywhere else.
+  const traced = String(r.all ?? "")
+    .split("\n")
+    .filter((l) => l.startsWith("[WebServer]"))
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[trace]"))
+    .slice(-20);
+
+  if (traced.length) {
+    out.push(finding("minor", "what the server traced while the browser ran", traced.join("\n")));
+  }
+
   if (out.some((f) => f.severity === "blocker" || f.severity === "major")) {
     // The error lines, not the last twelve lines.
     //
@@ -179,6 +294,7 @@ export async function e2e() {
     if (errors.length) {
       out.push(finding("minor", "what the app logged while the browser ran", errors.join("\n")));
     }
+
   }
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));

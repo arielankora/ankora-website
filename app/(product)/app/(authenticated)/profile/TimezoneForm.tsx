@@ -1,9 +1,8 @@
 "use client";
-import { useFormState, useFormStatus } from "react-dom";
 import { updateTimezoneAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -32,13 +31,13 @@ const CURATED_TIMEZONES = [
 ];
 
 export function TimezoneForm({ timezone }: { timezone: string }) {
-  const [state, formAction] = useFormState(updateTimezoneAction, {});
+  const { onSubmit, pending, error, ok } = useActionForm(updateTimezoneAction);
   const options = CURATED_TIMEZONES.some((tz) => tz.value === timezone)
     ? CURATED_TIMEZONES
     : [{ value: timezone, label: timezone }, ...CURATED_TIMEZONES];
 
   return (
-    <form action={formAction}>
+    <form onSubmit={onSubmit}>
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-appNavy/60">אזור זמן</span>
         <select
@@ -54,10 +53,10 @@ export function TimezoneForm({ timezone }: { timezone: string }) {
         </select>
       </label>
 
-      {state?.error && <p className="mt-2 text-xs text-error">{state.error}</p>}
-      {state?.ok && <p className="mt-2 text-xs text-success">אזור הזמן עודכן.</p>}
+      {error && <p className="mt-2 text-xs text-error">{error}</p>}
+      {ok && <p className="mt-2 text-xs text-success">אזור הזמן עודכן.</p>}
 
-      <SubmitButton />
+      <SubmitButton pending={pending} />
     </form>
   );
 }

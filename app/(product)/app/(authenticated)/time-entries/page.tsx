@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/app-auth/session";
+import { timed } from "@/lib/slow-log";
 import { can } from "@/lib/app-auth/permissions";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { listClients } from "@/lib/app-domain/clients";
@@ -49,17 +50,23 @@ export default async function AdminTimeEntriesPage(
   const from = parseDate(searchParams.from);
   const to = parseDateEndOfDay(searchParams.to);
 
-  const [entries, clients, allCategories, users] = await Promise.all([
-    listTimeEntriesForAdmin({
-      clientId: searchParams.clientId || undefined,
-      userId: searchParams.userId || undefined,
-      from,
-      to,
-    }),
-    listClients(),
-    listCategories(),
-    listUsers(),
-  ]);
+  // Measured, because a Server Action's response carries the re-render of
+  // every path it revalidates - so a screen that is slow to load makes the
+  // save that revalidated it look slow, and the two are indistinguishable
+  // from the browser. See lib/slow-log.ts.
+  const [entries, clients, allCategories, users] = await timed("screen.time-entries.load", () =>
+    Promise.all([
+      listTimeEntriesForAdmin({
+        clientId: searchParams.clientId || undefined,
+        userId: searchParams.userId || undefined,
+        from,
+        to,
+      }),
+      listClients(),
+      listCategories(),
+      listUsers(),
+    ])
+  );
 
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
   const employees = users.filter((u) => u.role !== "CLIENT_USER" && u.status === "ACTIVE");

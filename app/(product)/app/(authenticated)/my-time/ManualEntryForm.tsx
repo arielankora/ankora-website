@@ -1,14 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
 import { createManualEntryAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -45,7 +44,7 @@ function todayKey(): string {
 // re-entered. A same-client overlap still comes back as the existing hard `error`
 // and is never offered this choice.
 export function ManualEntryForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
-  const [state, formAction] = useFormState(createManualEntryAction, {});
+  const { onSubmit, pending, result } = useActionForm(createManualEntryAction);
   const { showToast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const [clientId, setClientId] = useState("");
@@ -60,18 +59,18 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
   const isBackdated = date !== todayKey();
 
   useEffect(() => {
-    if (state?.overlapWarning) setWarningDismissed(false);
+    if (result?.overlapWarning) setWarningDismissed(false);
     // The hidden flag is sticky across submits (it is a ref, not form state), so
     // it has to be cleared once a save succeeds - otherwise the NEXT entry would
     // silently confirm an overlap nobody was shown.
-    if (confirmOverlapRef.current && (state?.ok || state?.error)) confirmOverlapRef.current.value = "false";
-    if (!state?.ok) return;
+    if (confirmOverlapRef.current && (result?.ok || result?.error)) confirmOverlapRef.current.value = "false";
+    if (!result?.ok) return;
     formRef.current?.reset();
     setClientId("");
     setDate(todayKey());
     showToast({ tone: "success", title: "הדיווח נשמר" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [result]);
 
   function saveAnyway() {
     if (confirmOverlapRef.current) confirmOverlapRef.current.value = "true";
@@ -81,7 +80,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
   return (
     <form
       ref={formRef}
-      action={formAction}
+      onSubmit={onSubmit}
       className="rounded-2xl border border-lineDark bg-white p-5"
     >
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
@@ -158,7 +157,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>
-        <SubmitButton />
+        <SubmitButton pending={pending} />
       </div>
 
       {isBackdated && (
@@ -172,11 +171,11 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           />
         </div>
       )}
-      {state?.overlapWarning && !warningDismissed && (
+      {result?.overlapWarning && !warningDismissed && (
         <div className="mt-3 rounded-[10px] border border-warning/35 bg-warning-soft px-3 py-2.5 text-[12.5px] text-warning">
           <p>
-            קיים כבר דיווח בשעה זו עבור {state.overlapWarning.clientName} (
-            {formatTimeRange(state.overlapWarning.startAt, state.overlapWarning.endAt)}). דיווח מקביל אפשרי
+            קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
+            {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
             רק כשמדובר בלקוחות שונים - אם אכן כך, אפשר לשמור בכל זאת.
           </p>
           <div className="mt-2 flex items-center gap-3">
@@ -197,9 +196,9 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </div>
         </div>
       )}
-      {state?.error && (
+      {result?.error && (
         <p className="mt-3 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-[12.5px] text-error">
-          {state.error}
+          {result.error}
         </p>
       )}
     </form>

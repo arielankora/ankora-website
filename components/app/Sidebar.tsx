@@ -117,6 +117,20 @@ export function Sidebar({
               )}
               <Link
                 href={item.href}
+                // Every screen behind this nav is dynamic, signed-in and
+                // database-backed, so Next cannot prefetch anything of a
+                // page here: it fetches the loading shell, once per link,
+                // on every view of every screen. Fourteen requests, each
+                // one a session check and a render, to save nothing.
+                //
+                // They are also implicated in the write fault the browser
+                // suite has been chasing: every abort burst it has
+                // recorded is this whole nav re-prefetching at the moment
+                // a form is submitted, and the submitted write cancelled
+                // along with it. Whether that is cause or company, a
+                // dozen concurrent requests nobody asked for is not what
+                // should be happening while somebody saves a form.
+                prefetch={false}
                 className={`flex items-center gap-2.5 rounded-[10px] border-s-2 px-2.5 py-[9px] text-[13px] transition-colors ${
                   active
                     ? "border-gold bg-gold/[0.18] font-medium text-[#F8F4EC]"

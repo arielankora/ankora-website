@@ -1,11 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useState } from "react";
 import { openHourBankCycleAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -18,16 +17,12 @@ function SubmitButton() {
 }
 
 export function OpenCycleForm({ clientId }: { clientId: string }) {
-  const [state, formAction] = useFormState(openHourBankCycleAction, {});
   const [rolloverMode, setRolloverMode] = useState("NONE");
   const close = useDrawerClose();
-
-  useEffect(() => {
-    if (state?.ok) close();
-  }, [state, close]);
+  const { onSubmit, pending, error } = useActionForm(openHourBankCycleAction, close);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <input type="hidden" name="clientId" value={clientId} />
 
       <div>
@@ -97,8 +92,8 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
         <p className="mt-1 text-[11px] text-appNavy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
       </div>
 
-      {state?.error && <p className="text-sm text-error">{state.error}</p>}
-      <SubmitButton />
+      {error && <p className="text-sm text-error">{error}</p>}
+      <SubmitButton pending={pending} />
     </form>
   );
 }

@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
+import { timed, trace } from "@/lib/slow-log";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
   createImportantDate,
@@ -62,6 +63,10 @@ function parseImportantDateFormData(formData: FormData) {
 }
 
 export async function createImportantDateAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  // Silent unless the browser suite is running. See lib/slow-log.ts: the
+  // browser saw this POST aborted at 50ms with no row written, and only
+  // the server can say whether it ever arrived.
+  trace("createImportantDateAction: in");
   const user = await requireUser();
   const input = parseImportantDateFormData(formData);
 
@@ -89,14 +94,27 @@ export async function createImportantDateAction(_prev: FormState | undefined, fo
     if (!input.day || input.day < 1 || input.day > 31) return { error: "יום לא תקין." };
   }
 
+  trace("createImportantDateAction: writing");
   try {
     await createImportantDate(user, input);
   } catch (err) {
+    trace("createImportantDateAction: out (refused)");
     return { error: friendlyError(err) };
   }
+  trace("createImportantDateAction: written");
 
-  revalidatePath("/app/important-dates");
-  revalidatePath("/app");
+  // Measured around the revalidations, not only around the write: the
+  // last run proved the write itself is fast (no [slow] line from
+  // createImportantDate) while the button still sat at "נוצר..." for
+  // thirty seconds, so the time is somewhere after the row is committed.
+  // revalidatePath("/app") is the first suspect - it invalidates the
+  // dashboard, whose re-render Next ships back inside this action's own
+  // response. See lib/slow-log.ts.
+  await timed("action.createImportantDate.revalidate", async () => {
+    revalidatePath("/app/important-dates");
+    revalidatePath("/app");
+  });
+  trace("createImportantDateAction: out (ok)");
   return { ok: true };
 }
 

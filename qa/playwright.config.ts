@@ -120,7 +120,38 @@ export default defineConfig({
   webServer: process.env.QA_BASE_URL
     ? undefined
     : {
-        command: `npx next start -p ${PORT}`,
+        // --keepAliveTimeout, and it is the point of this round rather
+        // than a detail.
+        //
+        // The page's own probe finally said what kills the writes. The
+        // cancelled prefetches really are cancelled: AbortController.abort()
+        // called from Next's router, every one of them from the same line
+        // of the same chunk. The write is not. Its fetch rejects with
+        // "TypeError: Failed to fetch", which no AbortController produces -
+        // that is a connection dying underneath a request.
+        //
+        // Node closes an idle keep-alive connection after five seconds.
+        // Chrome holds its sockets far longer and reuses them, so a socket
+        // the server has already closed gets a request written to it and
+        // the request dies. Chrome silently retries that for a GET, which
+        // is why prefetches only ever look cancelled. It does not retry a
+        // POST, because a POST is not safe to repeat - which is exactly
+        // why every casualty of this has been a write.
+        //
+        // These specs idle for tens of seconds filling forms, so they hit
+        // the window constantly. Seventy seconds is comfortably past any
+        // gap they leave.
+        //
+        // Worth being clear about what this does NOT say: production runs
+        // on Vercel, not on `next start`, so this is the browser suite's
+        // own plumbing rather than a fault the product ever had. If the
+        // aborts stop, then three investigations into "slow writes" were
+        // three investigations into a connection timeout in the test rig.
+        command: `npx next start -p ${PORT} --keepAliveTimeout 70000`,
+        // Turns on lib/slow-log.ts's trace(), which is otherwise silent
+        // everywhere. Set here rather than in the workflow so the flag
+        // travels with the suite that reads it.
+        env: { QA_TRACE: "1" },
         // Playwright defaults a webServer's cwd to the directory holding
         // this config file - so `next start` ran inside qa/, found no
         // .next there, and died before a single spec was collected. The

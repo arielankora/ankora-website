@@ -1,9 +1,8 @@
 "use client";
-import { useFormState, useFormStatus } from "react-dom";
 import { updateNameAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -20,10 +19,10 @@ function SubmitButton() {
 // real capability this now calls (didn't exist before this pass; every
 // prior phase's Profile screen only touched timezone/password).
 export function NameForm({ name }: { name: string }) {
-  const [state, formAction] = useFormState(updateNameAction, {});
+  const { onSubmit, pending, error, ok } = useActionForm(updateNameAction);
 
   return (
-    <form action={formAction}>
+    <form onSubmit={onSubmit}>
       <label className="block">
         <span className="mb-1.5 block text-xs font-medium text-appNavy/60">שם לתצוגה</span>
         <input
@@ -35,10 +34,10 @@ export function NameForm({ name }: { name: string }) {
         />
       </label>
 
-      {state?.error && <p className="mt-2 text-xs text-error">{state.error}</p>}
-      {state?.ok && <p className="mt-2 text-xs text-success">השם עודכן.</p>}
+      {error && <p className="mt-2 text-xs text-error">{error}</p>}
+      {ok && <p className="mt-2 text-xs text-success">השם עודכן.</p>}
 
-      <SubmitButton />
+      <SubmitButton pending={pending} />
     </form>
   );
 }

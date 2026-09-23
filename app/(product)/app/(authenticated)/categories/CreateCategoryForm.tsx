@@ -1,11 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useState } from "react";
 import { createCategoryAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -21,16 +20,12 @@ function SubmitButton() {
 // see docs/adr/0001 addendum and CreateClientForm's comment for the same
 // change applied consistently across every list screen.
 export function CreateCategoryForm({ clients }: { clients: { id: string; name: string }[] }) {
-  const [state, formAction] = useFormState(createCategoryAction, {});
   const [visibility, setVisibility] = useState<"GLOBAL" | "CLIENT">("GLOBAL");
   const close = useDrawerClose();
-
-  useEffect(() => {
-    if (state?.ok) close();
-  }, [state, close]);
+  const { onSubmit, pending, error } = useActionForm(createCategoryAction, close);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
         <label className="block text-xs font-medium text-appNavy/60">שם הקטגוריה *</label>
         <input
@@ -74,8 +69,8 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
         </select>
       </div>
 
-      {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-      <SubmitButton />
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <SubmitButton pending={pending} />
     </form>
   );
 }

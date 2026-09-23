@@ -1,10 +1,9 @@
 "use client";
 import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
 import { createReportScheduleAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -28,12 +27,12 @@ const REPORT_TYPES: { value: string; label: string }[] = [
 const WEEKDAYS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
 export function ScheduleForm({ clientId }: { clientId: string }) {
-  const [state, formAction] = useFormState(createReportScheduleAction, {});
+  const { onSubmit, pending, error, ok } = useActionForm(createReportScheduleAction);
   const [frequency, setFrequency] = useState<"WEEKLY" | "MONTHLY">("MONTHLY");
 
   return (
     <form
-      action={formAction}
+      onSubmit={onSubmit}
       className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <input type="hidden" name="clientId" value={clientId} />
@@ -119,10 +118,10 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
       </div>
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">הדוח המתוזמן נוצר.</p>}
+        {error && <p className="text-sm text-red-600">{error}</p>}
+        {ok && <p className="text-sm text-emerald-700">הדוח המתוזמן נוצר.</p>}
         <div className="ms-auto">
-          <SubmitButton />
+          <SubmitButton pending={pending} />
         </div>
       </div>
     </form>
