@@ -94,6 +94,19 @@ test("answering records the choice and closes the decision", async ({ page }) =>
   await page.goto(DECISIONS, { waitUntil: "domcontentloaded" });
 
   const option = await openCard(page);
+
+  // The answer's own response, captured before the click so nothing is
+  // missed. Reading it is the whole point: when the record does not
+  // appear, this says which half of the machine failed - the server
+  // rendering a refreshed screen into its answer, or the browser
+  // applying one it was given. Two rounds were spent guessing between
+  // those two, which is one more than the question deserved.
+  const answerResponse = page
+    .waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/portal/decisions"), {
+      timeout: 30_000,
+    })
+    .catch(() => null);
+
   await option.click();
 
   // Two assertions, in this order, because they fail for different
@@ -106,12 +119,21 @@ test("answering records the choice and closes the decision", async ({ page }) =>
     timeout: 20_000,
   });
 
+  const response = await answerResponse;
+  const body = response ? await response.text().catch(() => null) : null;
+  const carried =
+    body === null
+      ? "the answer's response body could not be read"
+      : body.includes("החלטות קודמות")
+        ? `the server DID send the refreshed screen (${body.length} bytes, the record is in it) - the browser did not apply it`
+        : `the server did NOT send a refreshed screen (${body.length} bytes, no record in it) - revalidation never reached the answer's response`;
+
   // The answer moves the decision from the open cards to the record
   // below them, so the assertion is on the record - not on the button
   // disappearing, which would also be true if the page simply errored.
   await expect(
     page.getByText("החלטות קודמות"),
-    "the answer was accepted but the screen never refreshed to show the record"
+    `the answer was accepted but the screen never refreshed to show the record. ${carried}`
     // Thirty seconds was not enough on a loaded runner. The refresh is
     // two revalidated portal trees rendered server-side before the
     // router applies them, and it was measured at twenty seconds on a

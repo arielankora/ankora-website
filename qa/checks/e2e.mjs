@@ -87,7 +87,17 @@ export async function e2e() {
       // passing retry throws that error away and the next run has to
       // reproduce it from nothing.
       const where = (spec.file ?? "").split("/").pop();
-      const why = results.find((x) => x.error)?.error?.message ?? "";
+      // Which attempt this error came from, not "the first one".
+      //
+      // This line used to be labelled "first attempt" while the code
+      // below picks the first attempt that ERRORED - and in a serial
+      // file a test can pass on attempt one and fail on the retry, when
+      // an earlier test consumed the fixture it needed. Reading that
+      // error as the first attempt's describes a sequence that cannot
+      // happen, and a whole round was spent trying to explain it.
+      const failedAt = results.findIndex((x) => x.error);
+      const why = failedAt === -1 ? "" : (results[failedAt].error?.message ?? "");
+      const attemptLabel = failedAt <= 0 ? "attempt 1" : `attempt ${failedAt + 1} of ${results.length}`;
       // 160 characters was fine while a first-attempt message was one
       // sentence. It is not fine now: the drawer helper's message opens
       // with the timeout and carries the whole diagnosis after it -
@@ -96,9 +106,9 @@ export async function e2e() {
       // mid-word. A flaky test IS the failing one here; truncating its
       // only report cost a full run.
       const flat = why.replace(/\s+/g, " ").trim();
-      const oneLine = flat.length > 420 ? `${flat.slice(0, 200)} … ${flat.slice(-220)}` : flat;
+      const oneLine = flat.length > 900 ? `${flat.slice(0, 520)} … ${flat.slice(-360)}` : flat;
       flakyNames.push(
-        `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    first attempt: ${oneLine}` : ""}`,
+        `${where ? `${where} — ` : ""}${spec.title}${oneLine ? `\n    ${attemptLabel}: ${oneLine}` : ""}`,
       );
     }
     if (spec.ok) {
