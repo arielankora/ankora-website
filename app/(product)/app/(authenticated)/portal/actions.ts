@@ -10,6 +10,7 @@ import { isProductionBuild } from "@/lib/env";
 import {
   updatePortalScheduleRecipients,
   PORTAL_CLIENT_COOKIE,
+  PORTAL_COOKIE_OPTIONS,
   PORTAL_PREVIEW_COOKIE,
 } from "@/lib/app-domain/client-portal";
 
@@ -64,6 +65,20 @@ export async function updatePortalRecipientsAction(_prev: FormState | undefined,
 
 const PREVIEW_COOKIE_MAX_AGE_S = 60 * 60; // one hour: a preview is a look, not a mode to live in
 
+/// Both cookies used to be written with path "/app". Widening the path
+/// does not replace those: a browser holding one at "/app" and one at "/"
+/// sends both, more specific first, and the stale one wins on exactly the
+/// screens that matter. The client-selection cookie lives for a hundred
+/// and eighty days, so "it expires eventually" is not an answer.
+///
+/// So every write and every clear removes the old pair explicitly first.
+/// Harmless once nobody has one left; a month of quiet wrong answers if
+/// it is skipped.
+function clearLegacyPortalCookies(jar: Awaited<ReturnType<typeof cookies>>) {
+  jar.delete({ name: PORTAL_PREVIEW_COOKIE, path: "/app" });
+  jar.delete({ name: PORTAL_CLIENT_COOKIE, path: "/app" });
+}
+
 /// An Ankora manager opens a client's portal exactly as that client sees
 /// it. Read-only by construction (assertPortalWritable), one hour, and
 /// audited on entry - a manager stepping into a client's view is a thing
@@ -77,11 +92,10 @@ export async function startPortalPreviewAction(formData: FormData): Promise<void
   if (!client) return;
 
   const jar = await cookies();
+  clearLegacyPortalCookies(jar);
   jar.set(PORTAL_PREVIEW_COOKIE, client.id, {
-    httpOnly: true,
-    sameSite: "lax",
+    ...PORTAL_COOKIE_OPTIONS,
     secure: isProductionBuild(),
-    path: "/app",
     maxAge: PREVIEW_COOKIE_MAX_AGE_S,
   });
 
@@ -99,6 +113,7 @@ export async function startPortalPreviewAction(formData: FormData): Promise<void
 export async function exitPortalPreviewAction(): Promise<void> {
   await requireUser();
   const jar = await cookies();
+  clearLegacyPortalCookies(jar);
   jar.delete(PORTAL_PREVIEW_COOKIE);
   redirect("/app/clients");
 }
@@ -115,11 +130,10 @@ export async function switchPortalClientAction(formData: FormData): Promise<void
   if (!membership) return;
 
   const jar = await cookies();
+  clearLegacyPortalCookies(jar);
   jar.set(PORTAL_CLIENT_COOKIE, clientId, {
-    httpOnly: true,
-    sameSite: "lax",
+    ...PORTAL_COOKIE_OPTIONS,
     secure: isProductionBuild(),
-    path: "/app",
     maxAge: 60 * 60 * 24 * 180,
   });
 

@@ -37,6 +37,33 @@ const QUESTION = "באיזה מועד לקבוע את ביקור הטכנאי";
 const RECOMMENDED = "יום שלישי בבוקר";
 const WAITING_BANNER = /החלטה אחת מחכה לך|החלטות מחכות לך/;
 
+/// Wait for the open card itself, and say what the screen shows instead
+/// when it is not there.
+///
+/// Written after a CI failure that could not be read: the run reported a
+/// missing ceiling sentence, which sounds like a rendering regression,
+/// while the three assertions before it had passed against text that is
+/// not on the card at all - the question and the chosen option also
+/// appear in the record of past decisions, and "ההמלצה שלנו" is a
+/// substring of the empty state's own sentence. An empty screen was
+/// therefore reported as a screen with three quarters of a card on it.
+/// A failure that names the wrong thing costs more than no test.
+async function openCard(page: import("@playwright/test").Page) {
+  const answer = page.getByRole("button", { name: new RegExp(RECOMMENDED) });
+  try {
+    await answer.waitFor({ state: "visible", timeout: 25_000 });
+  } catch {
+    const shown = await page
+      .locator("main")
+      .innerText()
+      .catch(() => "(the page has no main element)");
+    throw new Error(
+      `the open decision is not on the screen. this is what the screen says instead:\n---\n${shown.slice(0, 900)}\n---`
+    );
+  }
+  return answer;
+}
+
 test("the decision screen shows the question, the options and our recommendation", async ({ page }) => {
   const response = await page.goto(DECISIONS, { waitUntil: "domcontentloaded" });
 
@@ -45,9 +72,14 @@ test("the decision screen shows the question, the options and our recommendation
   // "/app/login" is not a bounce.
   expect(new URL(page.url()).pathname, "bounced to login - the client session was not accepted").not.toBe("/app/login");
 
-  await expect(page.getByText(QUESTION)).toBeVisible();
-  await expect(page.getByText(RECOMMENDED)).toBeVisible();
-  await expect(page.getByText("ההמלצה שלנו")).toBeVisible();
+  await openCard(page);
+
+  await expect(page.getByText(QUESTION).first()).toBeVisible();
+  await expect(page.getByText(RECOMMENDED).first()).toBeVisible();
+  // `exact`, because the empty state's own sentence ends with the same
+  // three words. Without it this assertion passes on a screen that has
+  // no decision on it.
+  await expect(page.getByText("ההמלצה שלנו", { exact: true })).toBeVisible();
   // The ceiling sentence is the reason this screen is an approval rather
   // than a poll, so its absence is a real regression.
   await expect(page.getByText("גבוה מהתקרה שסוכמה איתך")).toBeVisible();
@@ -61,16 +93,61 @@ test("the home screen points at it", async ({ page }) => {
 test("answering records the choice and closes the decision", async ({ page }) => {
   await page.goto(DECISIONS, { waitUntil: "domcontentloaded" });
 
-  const option = page.getByRole("button", { name: new RegExp(RECOMMENDED) });
-  await expect(option, "the recommended option is not on the screen").toBeVisible();
+  const option = await openCard(page);
+
+  // The answer's own response, captured before the click so nothing is
+  // missed. Reading it is the whole point: when the record does not
+  // appear, this says which half of the machine failed - the server
+  // rendering a refreshed screen into its answer, or the browser
+  // applying one it was given. Two rounds were spent guessing between
+  // those two, which is one more than the question deserved.
+  const answerResponse = page
+    .waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/portal/decisions"), {
+      timeout: 30_000,
+    })
+    .catch(() => null);
+
   await option.click();
+
+  // Either of two things is correct here, and which one happens is a
+  // race that the product does not need to win: the card says the answer
+  // was accepted, or the refresh takes the card away before it can. A
+  // run that asserted only the first found nothing, on a click whose
+  // write had already committed - the card was simply gone by then.
+  //
+  // What is NOT correct is neither: a click that leaves the screen
+  // exactly as it was is a client pressing approve and being shown
+  // nothing at all.
+  await expect(
+    page.getByText("התשובה נקלטה").or(page.getByText("החלטות קודמות")).first(),
+    "the click produced nothing - no confirmation on the card, no record below it"
+  ).toBeVisible({ timeout: 20_000 });
+
+  const response = await answerResponse;
+  const body = response ? await response.text().catch(() => null) : null;
+  const carried =
+    body === null
+      ? "the answer's response body could not be read"
+      : body.includes("החלטות קודמות")
+        ? `the server DID send the refreshed screen (${body.length} bytes, the record is in it) - the browser did not apply it`
+        : `the server did NOT send a refreshed screen (${body.length} bytes, no record in it) - revalidation never reached the answer's response`;
 
   // The answer moves the decision from the open cards to the record
   // below them, so the assertion is on the record - not on the button
   // disappearing, which would also be true if the page simply errored.
-  await expect(page.getByText("החלטות קודמות")).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText("החלטות קודמות"),
+    `the answer was accepted but the screen never refreshed to show the record. ${carried}`
+    // Thirty seconds was not enough on a loaded runner. The refresh is
+    // two revalidated portal trees rendered server-side before the
+    // router applies them, and it was measured at twenty seconds on a
+    // quiet machine while the slow-writes work was going on. The budget
+    // here is generous on purpose so that this test fails for product
+    // reasons and not for arithmetic; the twenty seconds themselves are
+    // a real cost and belong in their own piece of work.
+  ).toBeVisible({ timeout: 45_000 });
   await expect(page.getByText("אושר על ידי")).toBeVisible();
-  await expect(page.getByText(RECOMMENDED)).toBeVisible();
+  await expect(page.getByText(RECOMMENDED).first()).toBeVisible();
 });
 
 test("the home screen stops asking once it is answered", async ({ page }) => {

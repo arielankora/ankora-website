@@ -198,7 +198,12 @@ export async function addClientDocumentAction(
       fileName: file.name,
       mimeType: file.type || "application/octet-stream",
       content: Buffer.from(await file.arrayBuffer()),
-      clientVisible: formData.get("clientVisible") !== "off",
+      // `=== "on"`, not `!== "off"`. An unchecked checkbox is not sent at
+      // all, so the value is null and the negative test reads it as
+      // checked - which made the "הלקוח רואה את זה" toggle decorative:
+      // every document was filed visible to the client whatever the
+      // person ticking it intended. Found on the first real upload.
+      clientVisible: formData.get("clientVisible") === "on",
     });
   } catch (err) {
     // The one error worth its own sentence: the Drive folder has not been
