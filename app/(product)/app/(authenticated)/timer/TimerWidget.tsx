@@ -7,12 +7,18 @@ import {
   reopenTimerAction,
   discardActiveTimerAction,
   updateActiveTimerNoteAction,
+  recordPromiseStageAction,
 } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
 type Recent = { clientId: string; clientName: string; categoryId: string; categoryName: string; lastUsedAt: string };
+/// An open promise on one of this person's clients. Team adoption's
+/// mechanism one needs exactly this much: which client it belongs to, so
+/// the picker can narrow to the one being worked on, and what to call it
+/// in the toast.
+export type OpenPromise = { id: string; clientId: string; label: string };
 export type TodayEntry = { id: string; clientName: string; categoryName: string; actualSeconds: number };
 type ActiveTimer = {
   id: string;
@@ -20,6 +26,7 @@ type ActiveTimer = {
   clientId: string;
   categoryId: string;
   note: string | null;
+  taskId: string | null;
 } | null;
 
 // Spec 6.1: "אם הטיימר רץ זמן חריג (למשל 8/12 שעות configurable) המערכת
@@ -65,12 +72,14 @@ export function TimerWidget({
   categories,
   recent,
   todayEntries,
+  openPromises,
 }: {
   activeTimer: ActiveTimer;
   clients: Client[];
   categories: Category[];
   recent: Recent[];
   todayEntries: TodayEntry[];
+  openPromises: OpenPromise[];
 }) {
   const { showToast } = useToast();
   const [active, setActive] = useState(activeTimer);
@@ -80,6 +89,11 @@ export function TimerWidget({
   // "autosaves while running" note once one does - exactly one of those
   // two contexts is ever visible at a time.
   const [note, setNote] = useState(activeTimer?.note ?? "");
+  // Team adoption: which promise this time is against, chosen before the
+  // start or at the stop. Optional at both ends - most work is not a
+  // promise, and the mechanism is worthless the moment it becomes a
+  // field somebody has to clear.
+  const [taskId, setTaskId] = useState(activeTimer?.taskId ?? "");
   const [elapsed, setElapsed] = useState(0);
   const [pending, setPending] = useState(false);
   const [discarding, setDiscarding] = useState(false);
@@ -114,10 +128,24 @@ export function TimerWidget({
     [categories, clientId]
   );
 
+  const availablePromises = useMemo(
+    () => openPromises.filter((t) => t.clientId === clientId),
+    [openPromises, clientId]
+  );
+
   async function beginTimer(targetClientId: string, targetCategoryId: string, startedFromQuickStart: boolean) {
     setPending(true);
     setError(null);
-    const result = await startTimerAction({ clientId: targetClientId, categoryId: targetCategoryId, note });
+    const result = await startTimerAction({
+      clientId: targetClientId,
+      categoryId: targetCategoryId,
+      note,
+      // Quick start is one click by definition, and it carries no
+      // promise: the picker belongs to the deliberate start. A quick
+      // start still gets asked at the stop, which is where the question
+      // costs nothing.
+      taskId: startedFromQuickStart ? null : taskId || null,
+    });
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -132,6 +160,7 @@ export function TimerWidget({
       clientId: result.entry.clientId,
       categoryId: result.entry.categoryId,
       note: result.entry.note,
+      taskId: result.entry.taskId,
     });
 
     // App redesign (handoff README, screen 2, "חשוב"): starting without a
@@ -176,9 +205,16 @@ export function TimerWidget({
     const category = categories.find((c) => c.id === active.categoryId);
     const durationText = formatElapsed(elapsed);
 
+    // The promise this time was against: whatever was chosen at the
+    // start, or - when the timer was started in one click and nothing
+    // was chosen - the client's single open promise, if they have
+    // exactly one. Guessing between two would be worse than asking.
+    const clientPromises = openPromises.filter((p) => p.clientId === active.clientId);
+    const attached = taskId || active.taskId || (clientPromises.length === 1 ? clientPromises[0].id : "");
+
     setPending(true);
     setError(null);
-    const result = await stopTimerAction({ timeEntryId: stoppedId, note });
+    const result = await stopTimerAction({ timeEntryId: stoppedId, note, taskId: attached || null });
     setPending(false);
     if (!result.ok) {
       setError(result.error);
@@ -189,10 +225,61 @@ export function TimerWidget({
     setElapsed(0);
     setClientId("");
     setCategoryId("");
+    setTaskId("");
 
     // Interactions & Behavior rule 2: "עצירת טיימר" is one of the actions
     // that must carry a *real* undo, not just a client-side rewind -
     // reopenTimerAction actually re-opens the stored entry server-side.
+    // Team adoption, mechanism one.
+    //
+    // The toast that already confirms the stop asks one question, and
+    // only when there is something to ask about: a promise this time
+    // was against. No promise, no question - a person logging internal
+    // work is interrupted by nothing.
+    //
+    // The three choices are the three stages a client reads, and the
+    // undo is dropped while the question is up: a toast cannot sensibly
+    // offer "undo the stop" and "what stage is it" at the same time,
+    // and the question is the more valuable of the two. Reopening a
+    // timer stays available from the day's entries.
+    const promise = attached ? openPromises.find((p) => p.id === attached) : undefined;
+    if (promise) {
+      showToast({
+        tone: "success",
+        title: `הדיווח נשמר · ${durationText}`,
+        description: promise.label,
+        ask: {
+          question: "ומה השלב עכשיו?",
+          choices: [
+            { value: "IN_PROGRESS", label: "בטיפול" },
+            { value: "WAITING_ON_CLIENT", label: "מחכה ללקוח" },
+            {
+              value: "DONE",
+              label: "הושלם",
+              prompt: { label: "מה נגיד ללקוח שקרה?", placeholder: "משפט אחד, בשפה שלו" },
+            },
+          ],
+          onAnswer: async (stage, written) => {
+            const recorded = await recordPromiseStageAction({
+              taskId: promise.id,
+              stage: stage as "IN_PROGRESS" | "WAITING_ON_CLIENT" | "DONE",
+              clientOutcome: written,
+            });
+            if (!recorded.ok) {
+              showToast({ tone: "error", title: "העדכון נכשל", description: recorded.error });
+              return;
+            }
+            showToast({
+              tone: "success",
+              title: "הלקוח מעודכן",
+              description: written || promise.label,
+            });
+          },
+        },
+      });
+      return;
+    }
+
     showToast({
       tone: "success",
       title: `הדיווח נשמר · ${durationText}`,
@@ -212,6 +299,7 @@ export function TimerWidget({
           clientId: reopened.entry.clientId,
           categoryId: reopened.entry.categoryId,
           note: reopened.entry.note,
+          taskId: reopened.entry.taskId,
         });
         showToast({ tone: "info", title: "הטיימר שוחזר", description: `ממשיך מ־${durationText}` });
       },
@@ -337,6 +425,29 @@ export function TimerWidget({
                     ))}
                   </select>
                 </label>
+                {/* Team adoption: the promise, when this client has any
+                    open. Third and optional, and absent entirely for a
+                    client with nothing open - an empty select is a
+                    question the screen asks and cannot answer. */}
+                {clientId && availablePromises.length > 0 && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">הבטחה ללקוח</span>
+                    <select
+                      value={taskId}
+                      onChange={(e) => setTaskId(e.target.value)}
+                      className="w-full rounded-[10px] border border-cream/18 bg-hairline px-3 py-2.5 text-sm text-cream outline-none focus:border-gold-light"
+                    >
+                      <option value="" className="text-appNavy">
+                        לא משויך
+                      </option>
+                      {availablePromises.map((t) => (
+                        <option key={t.id} value={t.id} className="text-appNavy">
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
               </div>
               <label className="mt-3 block">
                 <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">משימה / הערה</span>

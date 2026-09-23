@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { createTask, updateTask, updateTaskStatus } from "@/lib/app-domain/tasks";
+import { createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { SupplierExperience, TaskStatus } from "@prisma/client";
 
@@ -47,12 +47,25 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
 // status tag (any of the four TaskStatus values), replacing the old
 // standalone TaskStatusSelect - one status-change path for the whole row
 // instead of two independently-wired controls.
-export async function toggleTaskDoneAction(input: { taskId: string; nextStatus: TaskStatus }) {
+//
+// Team adoption: `clientOutcome` rides along on the close. A client-visible
+// task is refused DONE without one (updateTask's assertClosable), so the
+// row asks for the sentence and sends it in the same call - rather than
+// closing the task and then hoping somebody comes back to explain it.
+export async function toggleTaskDoneAction(input: {
+  taskId: string;
+  nextStatus: TaskStatus;
+  clientOutcome?: string | null;
+}) {
   const user = await requireUser();
   try {
-    const updated = await updateTaskStatus(user, input.taskId, input.nextStatus);
+    const updated = await updateTask(user, input.taskId, {
+      status: input.nextStatus,
+      clientOutcome: input.clientOutcome,
+    });
     revalidatePath("/app/tasks");
-    return { ok: true as const, status: updated.status };
+    revalidatePath("/app/portal");
+    return { ok: true as const, status: updated.status, clientOutcome: updated.clientOutcome };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }
@@ -79,10 +92,15 @@ export async function updateTaskPortalAction(input: {
   // on the task and not in a directory of its own.
   supplierName?: string | null;
   supplierExperience?: SupplierExperience | null;
+  // Team adoption: the sentence the client reads when this is done. Kept
+  // here alongside the other portal fields because it is one of them: it
+  // is written in the client's language and it is what they see.
+  clientOutcome?: string | null;
 }) {
   const user = await requireUser();
   try {
     const updated = await updateTask(user, input.taskId, {
+      clientOutcome: input.clientOutcome,
       clientVisible: input.clientVisible,
       clientTitle: input.clientTitle,
       // The row speaks in "is it waiting", the column stores "since
@@ -103,6 +121,7 @@ export async function updateTaskPortalAction(input: {
       waitingOnClient: updated.waitingOnClientSince !== null,
       supplierName: updated.supplierName,
       supplierExperience: updated.supplierExperience,
+      clientOutcome: updated.clientOutcome,
     };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

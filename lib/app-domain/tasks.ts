@@ -110,6 +110,136 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
   });
 }
 
+/// The open promises a person could be working on right now, for the
+/// timer.
+///
+/// Team adoption, mechanism one: a stopped timer is the moment a person
+/// already knows what happened, so it is the moment to ask - but only if
+/// the timer knows which promise it was against. The field existed on
+/// TimeEntry from the start and the timer screen never wrote it, so the
+/// strongest update point in the product had nothing to update.
+///
+/// Client-visible tasks only. An internal task has no stage a client
+/// reads and no question worth interrupting anyone for, and a picker
+/// listing everything open would bury the few rows that matter.
+export async function listOpenPromises(actor: User) {
+  assertCan(actor.role, "time_entry.create_self");
+  const accessible = await listAccessibleClients(actor);
+  const ids = accessible.map((c) => c.id);
+  if (ids.length === 0) return [];
+
+  return prisma.task.findMany({
+    where: {
+      deletedAt: null,
+      clientId: { in: ids },
+      clientVisible: true,
+      status: { in: OPEN_STATUSES },
+    },
+    // Soonest deadline first, undated last: the same order the Tasks
+    // screen uses, so a person sees the list they already know.
+    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    // A cap rather than pagination: this feeds a picker inside a toast.
+    // A person with more than this many open promises on their clients
+    // has a problem no dropdown solves.
+    take: 100,
+    select: { id: true, clientId: true, title: true, clientTitle: true, status: true, clientOutcome: true },
+  });
+}
+
+/// How long a visible promise may sit without a word before the home
+/// screen says so. The spec's own number.
+export const STALE_PROMISE_HOURS = 24;
+
+/// The work one person is holding, for their own home screen.
+///
+/// Team adoption, mechanism two. The home screen shows timers, hours and
+/// alerts, and has never shown tasks - so the answer to "what is on me
+/// today" lived on a screen nobody opens first. Assigned to this person,
+/// still open, soonest deadline first.
+///
+/// `stale` is the mark the spec asks for: a promise the client can see
+/// that has not moved in a day. Computed here rather than in the screen
+/// so the threshold is one number in one place.
+export async function listMyOpenTasks(actor: User, take = 8) {
+  assertCan(actor.role, "time_entry.create_self");
+  const cutoff = new Date(Date.now() - STALE_PROMISE_HOURS * 3600_000);
+
+  // Scoped to the clients this person can still reach, like every other
+  // query in this module. An assignment is checked when it is made
+  // (assertAssignable), but access can be taken away afterwards - and a
+  // row on a client somebody no longer works on is a task they cannot
+  // open, sitting at the top of their home screen telling them to.
+  const accessible = await listAccessibleClients(actor);
+  const ids = accessible.map((c) => c.id);
+  if (ids.length === 0) return [];
+
+  const rows = await prisma.task.findMany({
+    where: {
+      deletedAt: null,
+      clientId: { in: ids },
+      assignedToId: actor.id,
+      status: { in: OPEN_STATUSES },
+    },
+    orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { updatedAt: "asc" }],
+    take,
+    select: {
+      id: true,
+      title: true,
+      clientTitle: true,
+      clientVisible: true,
+      dueDate: true,
+      updatedAt: true,
+      client: { select: { name: true } },
+    },
+  });
+
+  return rows.map((t) => ({
+    id: t.id,
+    title: t.clientTitle?.trim() || t.title,
+    clientName: t.client.name,
+    dueDate: t.dueDate,
+    clientVisible: t.clientVisible,
+    stale: t.clientVisible && t.updatedAt < cutoff,
+  }));
+}
+
+/// Promises the client can see that have not moved today, by client.
+///
+/// Team adoption, mechanism four, and the reason it is a manager's
+/// number rather than an employee's reminder: a person nudged about
+/// their own row learns to dismiss the nudge, and a team measured on a
+/// number talks about the number. The spec is explicit that this is
+/// measured at the team level.
+///
+/// "Today" is the local day boundary, not a rolling window: a manager
+/// reading this at four in the afternoon is asking what has been
+/// untouched since the morning, and a rolling twenty-four hours would
+/// answer a different question every hour.
+export async function stalledPromisesByClient(actor: User, since: Date) {
+  const accessible = await listAccessibleClients(actor);
+  const ids = accessible.map((c) => c.id);
+  if (ids.length === 0) return [];
+
+  const rows = await prisma.task.findMany({
+    where: {
+      deletedAt: null,
+      clientId: { in: ids },
+      clientVisible: true,
+      status: { in: OPEN_STATUSES },
+      updatedAt: { lt: since },
+    },
+    select: { clientId: true, client: { select: { name: true } } },
+  });
+
+  const byClient = new Map<string, { clientId: string; clientName: string; count: number }>();
+  for (const r of rows) {
+    const found = byClient.get(r.clientId);
+    if (found) found.count += 1;
+    else byClient.set(r.clientId, { clientId: r.clientId, clientName: r.client.name, count: 1 });
+  }
+  return [...byClient.values()].sort((a, b) => b.count - a.count);
+}
+
 /// Who may be given a task on this client.
 ///
 /// Deliberately NOT gated on `time_entry.edit_others` the way
@@ -243,6 +373,10 @@ export type TaskPatch = {
   // Task.supplierName for why that is a decision and not a shortcut.
   supplierName?: string | null;
   supplierExperience?: SupplierExperience | null;
+  // Team adoption: what came of it, in the client's language. A
+  // client-visible task cannot be closed without this - see
+  // assertClosable below.
+  clientOutcome?: string | null;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -250,6 +384,36 @@ export type TaskPatch = {
 /// due date" cannot accidentally blank the assignee by omitting it -
 /// which is why this takes a patch rather than a whole task.
 ///
+/// The definition of done, and the one rule in this module that refuses a
+/// write rather than recording it.
+///
+/// A promise the client can see does not close without a sentence saying
+/// what came of it. Not a nudge, not a badge on a list somebody reviews
+/// later: the close itself does not happen. Everything downstream depends
+/// on it - the activity screen, the monthly summary, and the client's own
+/// answer to "what did I get this month" - and every one of those was
+/// assembling itself out of task titles, which say what the thing was
+/// called and never what happened to it.
+///
+/// Evaluated on the RESULTING state, not on the patch. Closing a visible
+/// task and making a closed task visible arrive here as different patches
+/// and produce the same thing: a promise on a client's screen marked done
+/// with nothing to show for it.
+///
+/// The message is what the person sees, so it says what to do.
+export const NO_OUTCOME_MESSAGE =
+  "משימה שהלקוח רואה לא נסגרת בלי שורת תוצאה. כתבו במשפט אחד, בשפה של הלקוח, מה קרה בפועל.";
+
+function assertClosable(
+  current: { status: TaskStatus; clientVisible: boolean; clientOutcome: string | null },
+  data: TaskPatch
+) {
+  const status = data.status ?? current.status;
+  const visible = data.clientVisible ?? current.clientVisible;
+  const outcome = data.clientOutcome !== undefined ? data.clientOutcome : current.clientOutcome;
+  if (status === "DONE" && visible && !outcome?.trim()) throw new Error(NO_OUTCOME_MESSAGE);
+}
+
 /// `null` is meaningful and distinct from absent: it clears the field.
 export async function updateTask(actor: User, taskId: string, patch: TaskPatch) {
   assertCan(actor.role, "time_entry.create_self");
@@ -262,9 +426,11 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     throw new ForbiddenError("You are not assigned to this client.");
   }
 
-  // Not TaskPatch: this carries one field the patch contract deliberately
-  // does not expose (supplierRecordedAt, which the server owns).
-  const data: TaskPatch & { supplierRecordedAt?: Date | null } = {};
+  // Not TaskPatch: this carries two fields the patch contract deliberately
+  // does not expose (supplierRecordedAt and completedAt, which the server
+  // owns).
+  const data: TaskPatch & { supplierRecordedAt?: Date | null; completedAt?: Date | null } = {};
+  const withCompletion = data;
 
   if (patch.title !== undefined) {
     const title = patch.title.trim();
@@ -301,8 +467,24 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   if (patch.supplierExperience !== undefined) {
     data.supplierExperience = patch.supplierExperience ?? null;
   }
+  if (patch.clientOutcome !== undefined) data.clientOutcome = patch.clientOutcome?.trim() || null;
 
   if (Object.keys(data).length === 0) return task;
+
+  assertClosable(task, data);
+
+  // `completedAt` is the server's, not the caller's.
+  //
+  // Set on the way into DONE and cleared on the way back out to open
+  // work, so a task that is reopened stops claiming a completion date it
+  // no longer has. ARCHIVED keeps whatever it had: archiving finished
+  // work does not unfinish it.
+  const nextStatus = data.status ?? task.status;
+  if (nextStatus === "DONE" && task.status !== "DONE") {
+    withCompletion.completedAt = new Date();
+  } else if (nextStatus !== "DONE" && nextStatus !== "ARCHIVED" && task.completedAt) {
+    withCompletion.completedAt = null;
+  }
 
   const updated = await prisma.task.update({ where: { id: taskId }, data });
   await recordAudit({
@@ -317,13 +499,6 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     after: updated,
   });
   return updated;
-}
-
-/// Kept as the narrow entry point the Tasks screen's server action already
-/// uses. A thin wrapper now, so there is exactly one place where a task is
-/// written.
-export async function updateTaskStatus(actor: User, taskId: string, status: TaskStatus) {
-  return updateTask(actor, taskId, { status });
 }
 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {

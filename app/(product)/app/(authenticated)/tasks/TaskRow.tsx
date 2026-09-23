@@ -50,6 +50,8 @@ export function TaskRow({
     // Portal phase 3.
     supplierName: string | null;
     supplierExperience: SupplierExperience | null;
+    // Team adoption: what came of it, in the client's language.
+    clientOutcome: string | null;
   };
 }) {
   const { showToast } = useToast();
@@ -76,6 +78,18 @@ export function TaskRow({
   const [supplierExperience, setSupplierExperience] = useState<SupplierExperience | null>(task.supplierExperience);
   const [editingSupplier, setEditingSupplier] = useState(false);
 
+  // Team adoption: the definition of done.
+  //
+  // `closing` is the row asking the one question that closing a visible
+  // promise now requires. The server refuses the close without an answer
+  // (updateTask's assertClosable), so the alternative would be to send
+  // the close, get it rejected, and show the person an error for
+  // something they were never asked. The question comes first instead,
+  // at the moment they already decided the thing is finished.
+  const [clientOutcome, setClientOutcome] = useState(task.clientOutcome ?? "");
+  const [closing, setClosing] = useState(false);
+  const [editingOutcome, setEditingOutcome] = useState(false);
+
   async function writePortal(
     patch: {
       clientVisible?: boolean;
@@ -83,6 +97,7 @@ export function TaskRow({
       waitingOnClient?: boolean;
       supplierName?: string | null;
       supplierExperience?: SupplierExperience | null;
+      clientOutcome?: string | null;
     },
     toast: { title: string; description?: string; undo?: () => void }
   ) {
@@ -96,6 +111,7 @@ export function TaskRow({
       setClientTitle(task.clientTitle ?? "");
       setSupplierName(task.supplierName ?? "");
       setSupplierExperience(task.supplierExperience);
+      setClientOutcome(task.clientOutcome ?? "");
       showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
       return;
     }
@@ -104,6 +120,7 @@ export function TaskRow({
     setClientTitle(result.clientTitle ?? "");
     setSupplierName(result.supplierName ?? "");
     setSupplierExperience(result.supplierExperience);
+    setClientOutcome(result.clientOutcome ?? "");
     showToast({ tone: "success", ...toast });
   }
 
@@ -164,12 +181,55 @@ export function TaskRow({
     await writePortal({ supplierName: null }, { title: "הספק הוסר מהתיק", description: task.title });
   }
 
-  async function changeStatus(nextStatus: TaskStatus, isUndo = false) {
+  /// Save the outcome sentence and close in the same call.
+  ///
+  /// One call rather than "write the sentence, then close": two writes
+  /// mean a window where the promise carries a result and is still open,
+  /// and a person who closes the tab in that window leaves it there.
+  async function confirmClose() {
+    const outcome = clientOutcome.trim();
+    if (!outcome) return;
+    setClosing(false);
+    await changeStatus("DONE", false, outcome);
+  }
+
+  function cancelClose() {
+    setClosing(false);
+    setClientOutcome(task.clientOutcome ?? "");
+  }
+
+  async function saveOutcome() {
+    setEditingOutcome(false);
+    if ((task.clientOutcome ?? "") === clientOutcome.trim()) return;
+    // Emptying it is refused on a closed visible promise, the same rule
+    // as closing without one - so the row asks nothing and simply does
+    // not offer that: an empty value here is a no-op rather than a write
+    // the server would reject.
+    if (!clientOutcome.trim() && isDone) {
+      setClientOutcome(task.clientOutcome ?? "");
+      return;
+    }
+    await writePortal(
+      { clientOutcome: clientOutcome.trim() || null },
+      { title: "שורת התוצאה עודכנה", description: clientOutcome.trim() || task.title }
+    );
+  }
+
+  async function changeStatus(nextStatus: TaskStatus, isUndo = false, outcome?: string) {
     const previousStatus = status;
     if (nextStatus === previousStatus) return;
+
+    // The one interception: finishing something the client can see, with
+    // nothing yet written about what came of it. Ask here rather than
+    // let the server refuse a gesture the person had no way to complete.
+    if (nextStatus === "DONE" && clientVisible && outcome === undefined && !clientOutcome.trim()) {
+      setClosing(true);
+      return;
+    }
+
     setStatus(nextStatus);
     setPending(true);
-    const result = await toggleTaskDoneAction({ taskId: task.id, nextStatus });
+    const result = await toggleTaskDoneAction({ taskId: task.id, nextStatus, clientOutcome: outcome });
     setPending(false);
     if (!result.ok) {
       setStatus(previousStatus);
@@ -180,11 +240,15 @@ export function TaskRow({
       showToast({ tone: "info", title: "הסימון בוטל", description: task.title });
       return;
     }
+    if (outcome !== undefined) setClientOutcome(result.clientOutcome ?? outcome);
     if (nextStatus === "DONE") {
       showToast({
         tone: "success",
         title: "המשימה סומנה כהושלמה",
-        description: task.title,
+        // The sentence the client will read, shown back at the moment it
+        // is saved. This is the only place it is confirmed, and a person
+        // who sees their own wording here catches a bad one immediately.
+        description: outcome || task.title,
         undo: () => changeStatus(previousStatus, true),
       });
     } else {
@@ -198,7 +262,11 @@ export function TaskRow({
   }
 
   return (
-    <div className="flex items-center gap-3.5 px-[18px] py-3.5">
+    // `data-task` is the row's own handle, for the browser suite. The
+    // alternative is a locator built out of layout classes, which
+    // silently stops matching the day someone changes the padding - and
+    // a test that quietly matches nothing is worse than no test.
+    <div data-task={task.id} className="flex items-center gap-3.5 px-[18px] py-3.5">
       <button
         type="button"
         role="checkbox"
@@ -247,6 +315,72 @@ export function TaskRow({
               {clientTitle || "הוספת כותרת ללקוח"}
             </button>
           ))}
+
+        {/* Team adoption: the definition of done.
+
+            Opened by the checkbox when a visible promise is being closed
+            with nothing written about it, and shown from then on so the
+            sentence stays editable - a result the client reads should be
+            fixable without reopening the work. */}
+        {clientVisible && (closing || isDone || clientOutcome) && (
+          <div className="mt-1.5">
+            {closing ? (
+              <div className="rounded-[10px] border border-gold/40 bg-[#FBF7F0] p-2.5">
+                <p className="text-[11.5px] text-appNavy/70">מה נגיד ללקוח שקרה?</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={clientOutcome}
+                    disabled={pending}
+                    onChange={(e) => setClientOutcome(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void confirmClose();
+                      if (e.key === "Escape") cancelClose();
+                    }}
+                    placeholder="משפט אחד, בשפה שלו"
+                    className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                  />
+                  <button
+                    type="button"
+                    disabled={pending || !clientOutcome.trim()}
+                    onClick={() => void confirmClose()}
+                    className="rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
+                  >
+                    סיום
+                  </button>
+                  <button type="button" onClick={cancelClose} className="text-[11px] text-appNavy/40 hover:text-appNavy">
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            ) : editingOutcome ? (
+              <input
+                autoFocus
+                value={clientOutcome}
+                disabled={portalPending}
+                onChange={(e) => setClientOutcome(e.target.value)}
+                onBlur={saveOutcome}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                  if (e.key === "Escape") {
+                    setClientOutcome(task.clientOutcome ?? "");
+                    setEditingOutcome(false);
+                  }
+                }}
+                placeholder="מה קרה בפועל, בשפה של הלקוח"
+                className="w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingOutcome(true)}
+                className="truncate text-[11.5px] text-appNavy/60 hover:underline"
+              >
+                {clientOutcome || "הוספת שורת תוצאה"}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Portal phase 3. Only once the task is both shown to the client
             and closed: before that the answer is not known, and for a

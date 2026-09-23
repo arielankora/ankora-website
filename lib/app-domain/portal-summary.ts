@@ -73,10 +73,18 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
         deletedAt: null,
         clientVisible: true,
         status: "DONE",
-        updatedAt: { gte: periodStart, lt: periodEnd },
+        // Which month a promise belongs to is the month it CLOSED.
+        // `updatedAt` answered that only by accident: it moves again on
+        // every later edit, so a task finished in August and retitled in
+        // September counted as September's work. The fallback covers
+        // rows closed before completedAt existed.
+        OR: [
+          { completedAt: { gte: periodStart, lt: periodEnd } },
+          { completedAt: null, updatedAt: { gte: periodStart, lt: periodEnd } },
+        ],
       },
       orderBy: { updatedAt: "desc" },
-      select: { id: true, title: true, clientTitle: true },
+      select: { id: true, title: true, clientTitle: true, clientOutcome: true },
     }),
     prisma.decision.findMany({
       where: { clientId, status: "ANSWERED", updatedAt: { gte: periodStart, lt: periodEnd } },
@@ -108,7 +116,12 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
     sentences.push(`ב${period} לא נסגרה אף הבטחה ולא התקבלה אף החלטה.`);
   } else {
     if (closed.length > 0) {
-      const titles = closed.map((t) => t.clientTitle?.trim() || t.title);
+      // The outcome, when there is one, and the title only as a fallback
+      // for rows closed before the definition of done existed. A summary
+      // built from titles lists what the client asked for; one built
+      // from outcomes tells them what they got, which is the entire
+      // reason the summary is sent.
+      const titles = closed.map((t) => t.clientOutcome?.trim() || t.clientTitle?.trim() || t.title);
       sentences.push(
         closed.length === 1
           ? `ב${period} סגרנו עבורך דבר אחד: ${titles[0]}.`

@@ -36,7 +36,19 @@ function waitingLabel(since: Date): string {
 export function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5">
-      <span className="text-sm text-appNavy">{promise.title}</span>
+      <span className="min-w-0 flex-1 text-sm text-appNavy">
+        {promise.title}
+        {/* Team adoption: what came of it.
+
+            A finished promise used to be its own title with a green pill
+            beside it - the client read back the thing they had asked
+            for, dated, and learned nothing about what happened. This
+            line is the answer, and it is why closing a visible promise
+            without one is refused upstream rather than nudged. */}
+        {promise.outcome && (
+          <span className="mt-1 block text-[12.5px] leading-relaxed text-appNavy/60">{promise.outcome}</span>
+        )}
+      </span>
       <span className="flex items-center gap-2.5">
         {promise.stage === "WAITING_ON_CLIENT" && promise.waitingSince && (
           <span className="text-[11.5px] text-appNavy/55">{waitingLabel(promise.waitingSince)}</span>

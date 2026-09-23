@@ -27,12 +27,41 @@ import { Check, AlertCircle, TriangleAlert, Info, X } from "lucide-react";
 
 export type ToastTone = "success" | "error" | "warning" | "info";
 
+/// A question the toast asks, for team adoption's mechanism one.
+///
+/// The rule the whole mechanism rests on is that the update must not be
+/// a step of its own, so it is grafted onto a gesture that already
+/// happens: stopping a timer. The toast that already confirms the stop
+/// carries the question, and answering it is one tap inside the same
+/// surface - no screen, no navigation, nothing to come back to later.
+///
+/// A choice may ask for one line before it takes effect (`prompt`).
+/// That is the definition of done: finishing a promise the client can
+/// see needs a sentence saying what came of it, and the moment the clock
+/// stops is the moment a person can write it in one line.
+///
+/// A toast carrying a question does NOT auto-dismiss. A question that
+/// disappears while someone is thinking about it is worse than no
+/// question: it teaches people the product does not really want an
+/// answer.
+export type ToastAsk = {
+  question: string;
+  choices: {
+    value: string;
+    label: string;
+    prompt?: { label: string; placeholder: string };
+  }[];
+  onAnswer: (value: string, text?: string) => void | Promise<void>;
+};
+
 export type ShowToastInput = {
   tone: ToastTone;
   title: string;
   description?: string;
   /** Real undo action. Presence alone extends the auto-dismiss delay to 8s. */
   undo?: () => void | Promise<void>;
+  /** A question asked inside the toast. Suppresses auto-dismiss. */
+  ask?: ToastAsk;
 };
 
 type ToastItem = ShowToastInput & { id: string };
@@ -83,6 +112,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (input: ShowToastInput) => {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setToasts((prev) => [...prev, { ...input, id }]);
+      if (input.ask) return;
       const duration = input.undo ? UNDO_DURATION_MS : NORMAL_DURATION_MS;
       const timer = setTimeout(() => dismiss(id), duration);
       timers.current.set(id, timer);
@@ -143,7 +173,8 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         <div className="min-w-0 flex-1 pt-0.5">
           <p className="text-[13.5px] font-medium text-appNavy">{toast.title}</p>
           {toast.description && <p className="mt-0.5 text-xs text-appNavy/60">{toast.description}</p>}
-          {toast.undo && (
+          {toast.ask && <ToastQuestion ask={toast.ask} onDone={onDismiss} />}
+          {toast.undo && !toast.ask && (
             <button
               type="button"
               onClick={handleUndo}
@@ -162,6 +193,87 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
         >
           <X size={14} strokeWidth={2} />
         </button>
+      </div>
+    </div>
+  );
+}
+
+/// The question, and the one field a choice may ask for before it counts.
+///
+/// Two states and no more. Picking a choice with no prompt answers
+/// immediately; picking one with a prompt swaps the buttons for a single
+/// field, which is still the same toast in the same place rather than a
+/// dialog that takes the screen. Going back is always available, because
+/// a person who mis-taps on their phone should not have to finish a
+/// promise to escape.
+function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
+  const [choice, setChoice] = useState<ToastAsk["choices"][number] | null>(null);
+  const [text, setText] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function answer(value: string, written?: string) {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await ask.onAnswer(value, written);
+    } finally {
+      onDone();
+    }
+  }
+
+  if (choice?.prompt) {
+    return (
+      <div className="mt-2">
+        <p className="text-xs text-appNavy/60">{choice.prompt.label}</p>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <input
+            autoFocus
+            value={text}
+            disabled={saving}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && text.trim()) void answer(choice.value, text.trim());
+              if (e.key === "Escape") setChoice(null);
+            }}
+            placeholder={choice.prompt.placeholder}
+            className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-xs text-appNavy outline-none focus:border-gold"
+          />
+          <button
+            type="button"
+            disabled={saving || !text.trim()}
+            onClick={() => void answer(choice.value, text.trim())}
+            className="shrink-0 rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
+          >
+            שמירה
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setChoice(null)}
+            className="shrink-0 text-[11px] text-appNavy/40 hover:text-appNavy"
+          >
+            חזרה
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <p className="text-xs text-appNavy/60">{ask.question}</p>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {ask.choices.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            disabled={saving}
+            onClick={() => (c.prompt ? setChoice(c) : void answer(c.value))}
+            className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/75 hover:border-gold disabled:opacity-40"
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
     </div>
   );

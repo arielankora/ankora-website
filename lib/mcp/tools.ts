@@ -713,7 +713,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update a task",
       description:
-        "Changes an existing Ankora task: its status, owner, due date, title or category. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string.",
+        "Changes an existing Ankora task: its status, owner, due date, title or category. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal.",
       inputSchema: z.object({
         task: z.string().describe("The task's title, or enough of it to identify it."),
         client: z.string().optional().describe("Client name, to disambiguate when several tasks share a title."),
@@ -731,6 +731,13 @@ export function registerAnkoraTools(server: McpServer): void {
         clearAssignee: z.boolean().optional().describe("Remove the current owner, leaving it unassigned."),
         due: DATE.optional().describe("New due date, YYYY-MM-DD."),
         clearDue: z.boolean().optional().describe("Remove the due date."),
+        outcome: z
+          .string()
+          .min(1)
+          .optional()
+          .describe(
+            "One sentence, in the client's own language, saying what actually came of this. Required to finish a task the client can see - Ankora refuses DONE without it. Write what happened, not what it was called: the client reads this on their portal and it goes into their monthly summary."
+          ),
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
@@ -746,6 +753,7 @@ export function registerAnkoraTools(server: McpServer): void {
         clearAssignee?: boolean;
         due?: string;
         clearDue?: boolean;
+        outcome?: string;
       },
       ctx: ServerContext
     ) => {
@@ -784,6 +792,7 @@ export function registerAnkoraTools(server: McpServer): void {
         if (args.clearAssignee) patch.assignedToId = null;
         if (args.clearDue) patch.dueDate = null;
         if (args.due !== undefined) patch.dueDate = localDateTimeToUtc(args.due, "23:59", actor.timezone);
+        if (args.outcome !== undefined) patch.clientOutcome = args.outcome;
 
         if (args.category !== undefined) {
           const category = await lookupCategory(actor, taskClientId, args.category);
@@ -797,7 +806,7 @@ export function registerAnkoraTools(server: McpServer): void {
         }
 
         if (Object.keys(patch).length === 0) {
-          return toolText("Nothing to change - pass at least one of status, title, category, assignTo or due.");
+          return toolText("Nothing to change - pass at least one of status, title, category, assignTo, due or outcome.");
         }
 
         const updated = await updateTask(actor, found.value.id, patch);
