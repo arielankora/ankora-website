@@ -7,6 +7,11 @@ import { sendEmail } from "@/lib/email";
 import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
 import type { Client, ClientDocumentKind, PortalDigest, SupplierExperience, User } from "@prisma/client";
 
+// The Hebrew for these enums lives in portal-labels.ts, which a client
+// component can import. Re-exported here so a server caller has one
+// place to look.
+export { DIGEST_LABELS, DOCUMENT_KIND_LABELS, SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
+
 // Portal phase 3, screen 5: "התיק שלי".
 //
 // The spec calls this the screen that is hardest to copy, and the reason
@@ -70,26 +75,6 @@ export interface PortalFile {
 const SUPPLIER_TAKE = 30;
 const DOCUMENT_TAKE = 60;
 const DATE_TAKE = 30;
-
-export const DIGEST_LABELS: Record<PortalDigest, string> = {
-  EVERY_DECISION: "כל החלטה, ברגע שהיא נפתחת",
-  WEEKLY: "סיכום שבועי",
-  MONTHLY: "רק הסיכום החודשי",
-};
-
-export const DOCUMENT_KIND_LABELS: Record<ClientDocumentKind, string> = {
-  POLICY: "פוליסה",
-  CERTIFICATE: "אישור",
-  CONTRACT: "חוזה",
-  INVOICE: "חשבונית",
-  OTHER: "מסמך",
-};
-
-export const SUPPLIER_EXPERIENCE_LABELS: Record<SupplierExperience, string> = {
-  GOOD: "מומלץ",
-  OK: "בסדר",
-  AVOID: "לא נשתמש שוב",
-};
 
 /// The whole screen in one call.
 ///
