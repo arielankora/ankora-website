@@ -66,6 +66,31 @@ export interface PortalClientContext {
 export const PORTAL_CLIENT_COOKIE = "ank_portal_client";
 export const PORTAL_PREVIEW_COOKIE = "ank_portal_preview";
 
+/// Shared options for both portal cookies, and the path is the point.
+///
+/// They were scoped to "/app", which reads as tidy and is wrong: the
+/// portal's exports and document downloads are served from /api/portal/*,
+/// and a cookie scoped to /app is never sent there. So every one of those
+/// routes ran without knowing which client the person was looking at.
+///
+/// What that cost: a staff preview could not download a document or an
+/// export at all - resolvePortalClient found no membership for an Ankora
+/// user and refused - and a portal user who belongs to more than one
+/// client got their FIRST client's data rather than the one they had
+/// selected, silently. The screens were right and the files were not.
+///
+/// "/" because these cookies answer one question, "which client is this
+/// person looking at", and every part of the product that serves that
+/// person needs the answer. Both stay httpOnly and sameSite lax, and
+/// neither is an authorisation: resolvePortalClient re-checks the value
+/// against the caller's own memberships on every call, so the widest a
+/// hand-edited cookie can get you is your own data.
+export const PORTAL_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: "lax",
+  path: "/",
+} as const;
+
 /// Reading cookies needs a request scope. The integration tests call the
 /// domain functions directly, with no request around them, and they
 /// should keep passing without a fake one - so a missing scope simply

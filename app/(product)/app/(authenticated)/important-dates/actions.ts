@@ -58,7 +58,11 @@ function parseImportantDateFormData(formData: FormData) {
     createAutoTask: formData.get("createAutoTask") === "on",
     autoTaskLeadDays: autoTaskLeadDaysRaw ? Number(autoTaskLeadDaysRaw) : null,
     autoTaskCategoryId: String(formData.get("autoTaskCategoryId") || "") || null,
-    useDefaultReminders: formData.get("useDefaultReminders") !== "off",
+    // Same fix as the document visibility toggle, and the same bug: an
+    // unchecked box is absent from the form data, so `!== "off"` read
+    // every unticked "add the default reminders" as a yes. Older than
+    // the portal; found while fixing its twin.
+    useDefaultReminders: formData.get("useDefaultReminders") === "on",
   };
 }
 
