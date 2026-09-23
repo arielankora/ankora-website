@@ -2,6 +2,10 @@ import Link from "next/link";
 
 const TABS = [
   { href: "/app/portal", key: "home", label: "בית" },
+  // Portal phase 2. Second, not last: it is the only tab where the client
+  // does something, and a tab people act on does not belong at the end of
+  // a row they stop reading.
+  { href: "/app/portal/decisions", key: "decisions", label: "החלטות" },
   { href: "/app/portal/activity", key: "activity", label: "פעילות" },
   { href: "/app/portal/hours", key: "hours", label: "שעות" },
   { href: "/app/portal/monthly", key: "month", label: "דוח חודשי" },

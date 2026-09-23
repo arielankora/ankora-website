@@ -146,6 +146,11 @@ model User {
   oauthCodes  OAuthAuthorizationCode[]
   oauthTokens OAuthToken[]
 
+  // Portal phase 2.
+  managedClients    Client[]           @relation("ClientAccountManager")
+  decisionsOpened   Decision[]         @relation("DecisionAuthor")
+  decisionResponses DecisionResponse[] @relation("DecisionResponder")
+
   @@index([role, status])
   @@map("users")
 }
@@ -353,6 +358,33 @@ model Client {
   /// requires anonymity. Documented in docs/adr/0001's Phase 6 addendum.
   portalShowEmployeeNames Boolean @default(true)
 
+  /// Portal phase 2. Who at Ankora owns this client operationally. Shown
+  /// on the portal's home screen and named on every decision, because a
+  /// decision arrives from a person, not from a system - and because a
+  /// client who does not know whose desk their request sits on has not
+  /// had their mental load removed, only moved.
+  accountManagerId String?
+
+  /// The dedicated WhatsApp line this client already talks to Ankora on.
+  /// Stored per client (not per employee) because that is how it works
+  /// today: the thread exists before the portal does, and the portal's
+  /// job is to shorten the way to it, never to open a second channel.
+  /// Null means no line is recorded yet, and the portal says so rather
+  /// than rendering a button that goes nowhere.
+  whatsappNumber String?
+
+  /// The spending ceiling agreed with this client, in agorot. Above it,
+  /// the service agreement requires the client's approval in writing
+  /// before Ankora commits money on their behalf - which is exactly what
+  /// a decision recorded in the portal is. Null means no ceiling was
+  /// agreed, and every priced decision then needs an approval.
+  ///
+  /// Agorot rather than shekels for the same reason money is stored in
+  /// minor units everywhere: 149.90 is not representable as a float, and
+  /// a rounding error in a number that appears on an approval is a
+  /// number someone will eventually dispute.
+  approvalCeilingMinor Int?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
@@ -373,7 +405,12 @@ model Client {
   importantDates       ImportantDate[]
   holidaySubscriptions HolidayCalendarSubscription[]
 
+  // Portal phase 2.
+  accountManager User?      @relation("ClientAccountManager", fields: [accountManagerId], references: [id], onDelete: SetNull)
+  decisions      Decision[]
+
   @@index([status])
+  @@index([accountManagerId])
   @@map("clients")
 }
 
@@ -584,6 +621,7 @@ model Task {
   assignedTo    User?          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
   timeEntries   TimeEntry[]
+  decisions     Decision[]
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
@@ -1461,4 +1499,107 @@ model HolidayCalendarSubscription {
 
   @@unique([clientId, calendarKey])
   @@map("holiday_calendar_subscriptions")
+}
+
+/// Portal phase 2: the one thing a client does in the portal.
+///
+/// Today these are decided in WhatsApp, between other messages: the
+/// options scroll away, the answer is a thumbs-up on a message three
+/// screens up, and nobody can say later who approved what. A decision is
+/// that same conversation with a shape - a question, the options with
+/// their prices, our recommendation, and a recorded answer.
+///
+/// It is also the service agreement's "approval in writing" for spending
+/// above the client's ceiling, which is why the response below stores a
+/// snapshot rather than a pointer: what the client agreed to must stay
+/// readable even if the option text is later edited.
+model Decision {
+  id         String  @id @default(cuid())
+  clientId   String
+  /// The promise this decision blocks, when there is one. Optional: some
+  /// decisions arrive before any task exists ("which of these three?").
+  taskId     String?
+  question   String
+  background String?
+  /// Agorot. The amount at stake, when the decision is about money. Null
+  /// for decisions that are not (a date, a supplier, a preference).
+  amountMinor Int?
+  /// Copied from the client at creation, so a later change to the agreed
+  /// ceiling never rewrites what an old approval said it was.
+  ceilingMinorAtCreation Int?
+  dueAt      DateTime?
+  status     DecisionStatus @default(OPEN)
+  createdById String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  cancelledAt DateTime?
+
+  client    Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  task      Task?             @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  createdBy User              @relation("DecisionAuthor", fields: [createdById], references: [id], onDelete: Restrict)
+  options   DecisionOption[]
+  response  DecisionResponse?
+
+  @@index([clientId, status])
+  @@map("decisions")
+}
+
+enum DecisionStatus {
+  OPEN
+  ANSWERED
+  /// Withdrawn by Ankora - the question stopped being relevant before the
+  /// client answered it. Kept rather than deleted: a client who saw a
+  /// decision appear and then vanish deserves the record that it did.
+  CANCELLED
+}
+
+/// One of the two or three ways a decision can go. Rows rather than a
+/// JSON column so an answer can point at one with a foreign key, and so
+/// "which option did clients pick most" stays a query rather than a
+/// migration.
+model DecisionOption {
+  id          String  @id @default(cuid())
+  decisionId  String
+  label       String
+  detail      String?
+  /// Agorot, when this particular option has its own price.
+  amountMinor Int?
+  /// Ankora's recommendation. At most one per decision - enforced in the
+  /// domain layer (lib/app-domain/decisions.ts), not by a constraint,
+  /// because "at most one true per group" has no clean expression here.
+  recommended Boolean @default(false)
+  position    Int     @default(0)
+
+  decision  Decision           @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  responses DecisionResponse[]
+
+  @@index([decisionId])
+  @@map("decision_options")
+}
+
+/// The answer, and the evidence.
+///
+/// One per decision (the unique on decisionId), written once and never
+/// updated: a client who changes their mind gets a new decision, so the
+/// record of what they approved and when stays a record.
+model DecisionResponse {
+  id            String   @id @default(cuid())
+  decisionId    String   @unique
+  optionId      String
+  respondedById String
+  respondedAt   DateTime @default(now())
+
+  /// The snapshot. The question and the chosen option as they read at the
+  /// moment of approval, plus the amount agreed - so the proof does not
+  /// depend on rows that can still change.
+  questionSnapshot    String
+  optionLabelSnapshot String
+  amountMinorSnapshot Int?
+
+  decision    Decision       @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+  option      DecisionOption @relation(fields: [optionId], references: [id], onDelete: Restrict)
+  respondedBy User           @relation("DecisionResponder", fields: [respondedById], references: [id], onDelete: Restrict)
+
+  @@index([respondedById])
+  @@map("decision_responses")
 }

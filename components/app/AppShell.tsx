@@ -37,6 +37,7 @@ function navItemsFor(role: User["role"]): NavItem[] {
       // client's questions. "פעילות שבועית" is reachable from the שעות
       // screen rather than listed here - see PortalTabs's comment.
       { href: "/app/portal", label: "בית", group: "פורטל" },
+      { href: "/app/portal/decisions", label: "החלטות", group: "פורטל" },
       { href: "/app/portal/activity", label: "פעילות", group: "פורטל" },
       { href: "/app/portal/hours", label: "שעות", group: "פורטל" },
       { href: "/app/portal/monthly", label: "דוח חודשי", group: "פורטל" },

@@ -356,6 +356,41 @@ async function main() {
     },
   });
 
+  // Portal phase 2. The demo client gets the three fields the portal
+  // reads (an account manager, the dedicated WhatsApp line, an agreed
+  // ceiling) and one open decision above that ceiling - which is the
+  // state the decisions screen exists for, and the fixture its browser
+  // test signs in to answer.
+  await prisma.client.update({
+    where: { id: clientA.id },
+    data: {
+      accountManagerId: ankoraAdmin.id,
+      whatsappNumber: "052-000-0000",
+      approvalCeilingMinor: 50000,
+    },
+  });
+
+  const existingDecision = await prisma.decision.findFirst({ where: { id: "demo-decision-technician" } });
+  if (!existingDecision) {
+    await prisma.decision.create({
+      data: {
+        id: "demo-decision-technician",
+        clientId: clientA.id,
+        question: "[DEMO] באיזה מועד לקבוע את ביקור הטכנאי?",
+        background: "שני מועדים פנויים השבוע. המוקדם יותר גם זול יותר.",
+        amountMinor: 90000,
+        ceilingMinorAtCreation: 50000,
+        createdById: ankoraAdmin.id,
+        options: {
+          create: [
+            { label: "[DEMO] יום שלישי בבוקר", amountMinor: 90000, recommended: true, position: 0 },
+            { label: "[DEMO] יום חמישי אחר הצהריים", amountMinor: 105000, position: 1 },
+          ],
+        },
+      },
+    });
+  }
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);

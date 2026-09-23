@@ -585,6 +585,14 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
 export interface PortalHome {
   client: Client;
   isStaffPreview: boolean;
+  /// Portal phase 2. Counted rather than loaded: the home screen says how
+  /// many decisions wait and links to them, and the decisions screen is
+  /// the one place their options are read.
+  openDecisions: number;
+  /// Who at Ankora owns this account, and the line the client already
+  /// talks to us on. Either may be null - the screen then says so rather
+  /// than rendering a name or a button that goes nowhere.
+  contact: { managerName: string | null; whatsappNumber: string | null };
   waitingOnClient: PortalPromise[];
   inProgress: PortalPromise[];
   recentlyDone: PortalPromise[];
@@ -599,7 +607,17 @@ const RECENTLY_DONE_TAKE = 5;
 /// waiting for me" before it answers anything else.
 export async function getPortalHome(actor: User): Promise<PortalHome> {
   const { client, isStaffPreview } = await resolvePortalClient(actor);
-  const [tasks, snapshot] = await Promise.all([listVisibleTasks(client.id), getCurrentHourBank(client.id)]);
+  const [tasks, snapshot, openDecisions, manager] = await Promise.all([
+    listVisibleTasks(client.id),
+    getCurrentHourBank(client.id),
+    // Queried here rather than through lib/app-domain/decisions.ts on
+    // purpose: that module already imports this one (for
+    // resolvePortalClient), and importing it back would close a cycle.
+    prisma.decision.count({ where: { clientId: client.id, status: "OPEN" } }),
+    client.accountManagerId
+      ? prisma.user.findFirst({ where: { id: client.accountManagerId, deletedAt: null }, select: { name: true } })
+      : null,
+  ]);
 
   const promises = tasks.map(toPromise);
   const done = promises.filter((p) => p.stage === "DONE");
@@ -611,6 +629,8 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
   return {
     client,
     isStaffPreview,
+    openDecisions,
+    contact: { managerName: manager?.name ?? null, whatsappNumber: client.whatsappNumber },
     waitingOnClient: promises.filter((p) => p.stage === "WAITING_ON_CLIENT"),
     // "In progress" for a client means "you are not holding it": both
     // RECEIVED and IN_PROGRESS are us, and splitting them on the home

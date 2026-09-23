@@ -65,10 +65,33 @@ export async function createClient(
 export async function updateClient(
   actor: User,
   clientId: string,
-  input: { name?: string; legalName?: string; status?: ClientStatus; timezone?: string; primaryContact?: string }
+  input: {
+    name?: string;
+    legalName?: string;
+    status?: ClientStatus;
+    timezone?: string;
+    primaryContact?: string;
+    // Portal phase 2. All three are nullable and `null` clears them,
+    // which is why they are typed separately from the strings above -
+    // "no account manager" and "unchanged" must not be the same value.
+    accountManagerId?: string | null;
+    whatsappNumber?: string | null;
+    approvalCeilingMinor?: number | null;
+  }
 ) {
   assertCan(actor.role, "client.manage");
   const before = await prisma.client.findUniqueOrThrow({ where: { id: clientId } });
+
+  if (input.accountManagerId) {
+    // A client user must never be set as an account manager: they would
+    // then appear on their own portal as the person to talk to, and the
+    // name on that card is a promise about who is accountable.
+    const manager = await prisma.user.findFirst({
+      where: { id: input.accountManagerId, deletedAt: null, role: { not: "CLIENT_USER" } },
+    });
+    if (!manager) throw new Error("מנהל התיק שנבחר אינו משתמש פעיל של Ankora.");
+  }
+
   const client = await prisma.client.update({
     where: { id: clientId },
     data: {
@@ -77,6 +100,9 @@ export async function updateClient(
       status: input.status,
       timezone: input.timezone,
       primaryContact: input.primaryContact?.trim(),
+      accountManagerId: input.accountManagerId,
+      whatsappNumber: input.whatsappNumber === null ? null : input.whatsappNumber?.trim() || undefined,
+      approvalCeilingMinor: input.approvalCeilingMinor,
     },
   });
   await recordAudit({
@@ -133,4 +159,18 @@ export async function restoreClient(actor: User, clientId: string) {
     clientId,
   });
   return client;
+}
+
+/// Portal phase 2: who may be named as a client's account manager.
+///
+/// Every Ankora user who is not a client user, ordered by name. No
+/// permission check of its own: the only caller is the client screen,
+/// which is already gated on client.manage, and what this returns
+/// (colleagues' names) is not a disclosure to anyone who can reach it.
+export async function listStaffForAssignment(): Promise<{ id: string; name: string }[]> {
+  return prisma.user.findMany({
+    where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" } },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 }
