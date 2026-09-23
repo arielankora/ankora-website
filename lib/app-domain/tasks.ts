@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import type { User, TaskStatus, UserRole } from "@prisma/client";
+import type { SupplierExperience, User, TaskStatus, UserRole } from "@prisma/client";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -238,6 +238,11 @@ export type TaskPatch = {
   clientVisible?: boolean;
   clientTitle?: string | null;
   waitingOnClientSince?: Date | null;
+  // Portal phase 3: who did the work, and how they were. Recorded on the
+  // task rather than in a supplier directory - see the schema comment on
+  // Task.supplierName for why that is a decision and not a shortcut.
+  supplierName?: string | null;
+  supplierExperience?: SupplierExperience | null;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -257,7 +262,9 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     throw new ForbiddenError("You are not assigned to this client.");
   }
 
-  const data: TaskPatch = {};
+  // Not TaskPatch: this carries one field the patch contract deliberately
+  // does not expose (supplierRecordedAt, which the server owns).
+  const data: TaskPatch & { supplierRecordedAt?: Date | null } = {};
 
   if (patch.title !== undefined) {
     const title = patch.title.trim();
@@ -277,6 +284,23 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   if (patch.clientVisible !== undefined) data.clientVisible = patch.clientVisible;
   if (patch.clientTitle !== undefined) data.clientTitle = patch.clientTitle?.trim() || null;
   if (patch.waitingOnClientSince !== undefined) data.waitingOnClientSince = patch.waitingOnClientSince;
+
+  // The supplier line, and the timestamp that goes with it.
+  //
+  // `supplierRecordedAt` is set here rather than accepted from the caller
+  // because it is the client's "when" on their own file, and a date the
+  // caller can choose is a date that will eventually be wrong. Clearing
+  // the name clears the timestamp with it, so a half-erased row cannot
+  // survive as a date with nobody attached to it.
+  if (patch.supplierName !== undefined) {
+    const name = patch.supplierName?.trim() || null;
+    data.supplierName = name;
+    data.supplierRecordedAt = name ? (task.supplierRecordedAt ?? new Date()) : null;
+    if (!name) data.supplierExperience = null;
+  }
+  if (patch.supplierExperience !== undefined) {
+    data.supplierExperience = patch.supplierExperience ?? null;
+  }
 
   if (Object.keys(data).length === 0) return task;
 
