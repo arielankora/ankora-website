@@ -3,7 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { createTask, updateTask, updateTaskStatus } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import type { TaskStatus } from "@prisma/client";
+import type { SupplierExperience, TaskStatus } from "@prisma/client";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -74,6 +74,11 @@ export async function updateTaskPortalAction(input: {
   clientVisible?: boolean;
   clientTitle?: string | null;
   waitingOnClient?: boolean;
+  // Portal phase 3: the supplier line, recorded at the moment the task
+  // closes. See the schema comment on Task.supplierName for why it lives
+  // on the task and not in a directory of its own.
+  supplierName?: string | null;
+  supplierExperience?: SupplierExperience | null;
 }) {
   const user = await requireUser();
   try {
@@ -86,6 +91,8 @@ export async function updateTaskPortalAction(input: {
       // caller.
       waitingOnClientSince:
         input.waitingOnClient === undefined ? undefined : input.waitingOnClient ? new Date() : null,
+      supplierName: input.supplierName,
+      supplierExperience: input.supplierExperience,
     });
     revalidatePath("/app/tasks");
     revalidatePath("/app/portal");
@@ -94,6 +101,8 @@ export async function updateTaskPortalAction(input: {
       clientVisible: updated.clientVisible,
       clientTitle: updated.clientTitle,
       waitingOnClient: updated.waitingOnClientSince !== null,
+      supplierName: updated.supplierName,
+      supplierExperience: updated.supplierExperience,
     };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

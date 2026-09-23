@@ -5,6 +5,18 @@ import { createClient, updateClient, archiveClient, restoreClient } from "@/lib/
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { shekelsToMinor } from "@/lib/money";
 import { createDecision, cancelDecision } from "@/lib/app-domain/decisions";
+import {
+  addClientDocument,
+  removeClientDocument,
+  setClientDocumentVisibility,
+  DriveNotConfiguredError,
+} from "@/lib/app-domain/client-documents";
+import {
+  approvePortalSummary,
+  discardPortalSummary,
+  generatePortalSummary,
+} from "@/lib/app-domain/portal-summary";
+import type { ClientDocumentKind } from "@prisma/client";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -53,6 +65,11 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       accountManagerId: String(formData.get("accountManagerId") || "") || null,
       whatsappNumber: String(formData.get("whatsappNumber") || "") || null,
       approvalCeilingMinor: shekelsToMinor(String(formData.get("approvalCeiling") || "")),
+      // Portal phase 3. Same rule as the three above: always on the form,
+      // so an empty box is a deliberate blank.
+      preferenceContact: String(formData.get("preferenceContact") || "") || null,
+      preferenceMatters: String(formData.get("preferenceMatters") || "") || null,
+      preferenceNever: String(formData.get("preferenceNever") || "") || null,
     });
   } catch (err) {
     return { error: friendlyError(err) };
@@ -143,6 +160,118 @@ export async function cancelDecisionAction(input: { decisionId: string }) {
     const decision = await cancelDecision(user, input.decisionId);
     revalidatePath(`/app/clients/${decision.clientId}`);
     revalidatePath("/app/portal/decisions");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// Portal phase 3: the client's file, from Ankora's side.
+// ---------------------------------------------------------------------------
+
+/// Filing a document.
+///
+/// The file rides the action's own body rather than going to storage
+/// directly, which is why next.config.mjs raises the action body limit to
+/// 5MB - and why the domain refuses at 4MB, below Vercel's own 4.5MB cap
+/// on a function request. A limit that fails where the person can see it
+/// is worth more than a larger one that fails where they cannot.
+export async function addClientDocumentAction(
+  _prev: FormState | undefined,
+  formData: FormData
+): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") || "");
+  if (!clientId) return { error: "לקוח לא נמצא." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return { error: "יש לבחור קובץ." };
+
+  try {
+    await addClientDocument(user, {
+      clientId,
+      title: String(formData.get("title") || ""),
+      kind: (String(formData.get("kind") || "OTHER") || "OTHER") as ClientDocumentKind,
+      taskId: String(formData.get("taskId") || "") || null,
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      content: Buffer.from(await file.arrayBuffer()),
+      clientVisible: formData.get("clientVisible") !== "off",
+    });
+  } catch (err) {
+    // The one error worth its own sentence: the Drive folder has not been
+    // created yet, which is a setup step and not a fault of whoever just
+    // pressed the button.
+    if (err instanceof DriveNotConfiguredError) return { error: err.message };
+    return { error: friendlyError(err) };
+  }
+
+  revalidatePath(`/app/clients/${clientId}`);
+  return { ok: true };
+}
+
+export async function setClientDocumentVisibilityAction(documentId: string, clientVisible: boolean) {
+  const user = await requireUser();
+  try {
+    const doc = await setClientDocumentVisibility(user, documentId, clientVisible);
+    revalidatePath(`/app/clients/${doc.clientId}`);
+    return { ok: true as const, clientVisible: doc.clientVisible };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function removeClientDocumentAction(documentId: string) {
+  const user = await requireUser();
+  try {
+    const doc = await removeClientDocument(user, documentId);
+    revalidatePath(`/app/clients/${doc.clientId}`);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function generateSummaryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") || "");
+  if (!clientId) return { error: "לקוח לא נמצא." };
+
+  try {
+    await generatePortalSummary(user, clientId);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+
+  revalidatePath(`/app/clients/${clientId}`);
+  return { ok: true };
+}
+
+/// Approving is the moment a person puts their name to what the client
+/// will read, so the text that gets approved is the text in the box -
+/// edits and all - and not the draft as it was generated.
+export async function approveSummaryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const summaryId = String(formData.get("summaryId") || "");
+  if (!summaryId) return { error: "הסיכום לא נמצא." };
+
+  try {
+    const summary = await approvePortalSummary(user, summaryId, String(formData.get("draft") || ""));
+    revalidatePath(`/app/clients/${summary.clientId}`);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+
+  return { ok: true };
+}
+
+export async function discardSummaryAction(summaryId: string) {
+  const user = await requireUser();
+  try {
+    const summary = await discardPortalSummary(user, summaryId);
+    revalidatePath(`/app/clients/${summary.clientId}`);
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

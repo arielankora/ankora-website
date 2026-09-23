@@ -118,6 +118,8 @@ export default async function TasksPage(
                   dueDate: task.dueDate?.toISOString() ?? null,
                   status: task.status,
                   clientVisible: task.clientVisible,
+                  supplierName: task.supplierName,
+                  supplierExperience: task.supplierExperience,
                   clientTitle: task.clientTitle,
                   waitingOnClient: task.waitingOnClientSince !== null,
                 }}

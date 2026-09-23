@@ -15,11 +15,15 @@ import type { ClientDocumentKind, User } from "@prisma/client";
 // user (lib/app-domain/client-file.ts, resolvePortalDocument), and the
 // Drive file id never leaves the server.
 
-/// 20 MB. A policy, a confirmation or a signed contract is a few hundred
-/// kilobytes; anything an order of magnitude past that is a video someone
-/// filed by accident, and the honest answer is to say so rather than to
-/// spend a minute uploading it.
-export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+/// 4 MB, and the number is not ours to choose freely.
+///
+/// A function request body on Vercel is capped at 4.5MB, so a larger file
+/// is refused a layer below this whatever the product says - and a limit
+/// that fails somewhere the person cannot see is worse than a smaller one
+/// that answers in words. A policy, a confirmation or a signed contract
+/// is a few hundred kilobytes; what does not fit is a scan nobody
+/// compressed, and the honest response is to say so.
+export const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 
 export class DriveNotConfiguredError extends Error {
   constructor() {
@@ -76,7 +80,7 @@ export async function addClientDocument(actor: User, input: AddClientDocumentInp
   if (!title) throw new Error("יש להזין שם למסמך.");
   if (input.content.byteLength === 0) throw new Error("הקובץ ריק.");
   if (input.content.byteLength > MAX_DOCUMENT_BYTES) {
-    throw new Error("הקובץ גדול מ-20MB. אפשר לשלוח אותו במייל ולקשר אליו במקום.");
+    throw new Error("הקובץ גדול מ-4MB. אפשר לדחוס אותו או לסרוק שוב באיכות נמוכה יותר.");
   }
 
   const folderId = clientDocumentsFolder();

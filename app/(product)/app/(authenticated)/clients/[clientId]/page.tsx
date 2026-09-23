@@ -4,6 +4,9 @@ import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getClient, listStaffForAssignment } from "@/lib/app-domain/clients";
 import { listDecisionsForClient } from "@/lib/app-domain/decisions";
+import { listClientDocuments } from "@/lib/app-domain/client-documents";
+import { listPortalSummaries } from "@/lib/app-domain/portal-summary";
+import { clientDocumentsFolder } from "@/lib/google-drive";
 import {
   listImportantDates,
   IMPORTANT_DATE_STATUS_LABELS,
@@ -14,6 +17,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { EditClientForm } from "./EditClientForm";
 import { DecisionsPanel } from "./DecisionsPanel";
+import { DocumentsPanel, SummaryPanel } from "./FilePanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import type { ImportantDateStatus } from "@prisma/client";
 
@@ -50,10 +54,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const clientDates = await listImportantDates(user, { clientId: client.id });
 
   // Portal phase 2: the decisions panel and the account-manager picker.
-  const [decisions, staff] = await Promise.all([
+  // Portal phase 3: the documents and the monthly summary.
+  const [decisions, staff, documents, summaries] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
+    listClientDocuments(user, client.id),
+    listPortalSummaries(user, client.id),
   ]);
+
+  const monthLabel = (date: Date) =>
+    new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
 
   // Phase 10 follow-up ("לוחות חגים" UI gap - ADR 21.6): gate matches
   // setHolidayCalendarSubscription()'s own important_date.manage_catalog
@@ -78,6 +88,34 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <EditClientForm client={client} staff={staff} />
         </div>
+
+        <DocumentsPanel
+          clientId={client.id}
+          storageReady={clientDocumentsFolder() !== null}
+          documents={documents.map((d) => ({
+            id: d.id,
+            title: d.title,
+            kind: d.kind,
+            clientVisible: d.clientVisible,
+            sizeBytes: d.sizeBytes,
+            createdAt: d.createdAt.toISOString(),
+            uploadedByName: d.uploadedBy?.name ?? null,
+            taskTitle: d.task ? d.task.clientTitle?.trim() || d.task.title : null,
+          }))}
+        />
+
+        <SummaryPanel
+          clientId={client.id}
+          summaries={summaries.map((s) => ({
+            id: s.id,
+            periodLabel: monthLabel(s.periodStart),
+            draft: s.draft,
+            status: s.status,
+            approvedByName: s.approvedBy?.name ?? null,
+            approvedAt: s.approvedAt ? s.approvedAt.toISOString() : null,
+            sourceCount: s.sourceTaskIds.length + s.sourceDecisionIds.length,
+          }))}
+        />
 
         <DecisionsPanel
           clientId={client.id}

@@ -3,7 +3,8 @@ import { useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import type { TaskStatus } from "@prisma/client";
+import { SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
+import type { SupplierExperience, TaskStatus } from "@prisma/client";
 
 // Mirrors lib/app-domain/tasks.ts's TASK_STATUS_LABELS - duplicated
 // (rather than imported) because that module starts with `import
@@ -46,6 +47,9 @@ export function TaskRow({
     clientVisible: boolean;
     clientTitle: string | null;
     waitingOnClient: boolean;
+    // Portal phase 3.
+    supplierName: string | null;
+    supplierExperience: SupplierExperience | null;
   };
 }) {
   const { showToast } = useToast();
@@ -64,8 +68,22 @@ export function TaskRow({
   const [editingTitle, setEditingTitle] = useState(false);
   const [portalPending, setPortalPending] = useState(false);
 
+  // Portal phase 3: who actually did it. Offered at the moment the task
+  // closes, which is the only moment the answer is both known and cheap -
+  // the 22.9 decision was one field here rather than a supplier screen,
+  // precisely so that nobody has to go somewhere else to record it.
+  const [supplierName, setSupplierName] = useState(task.supplierName ?? "");
+  const [supplierExperience, setSupplierExperience] = useState<SupplierExperience | null>(task.supplierExperience);
+  const [editingSupplier, setEditingSupplier] = useState(false);
+
   async function writePortal(
-    patch: { clientVisible?: boolean; clientTitle?: string | null; waitingOnClient?: boolean },
+    patch: {
+      clientVisible?: boolean;
+      clientTitle?: string | null;
+      waitingOnClient?: boolean;
+      supplierName?: string | null;
+      supplierExperience?: SupplierExperience | null;
+    },
     toast: { title: string; description?: string; undo?: () => void }
   ) {
     setPortalPending(true);
@@ -76,12 +94,16 @@ export function TaskRow({
       setClientVisible(task.clientVisible);
       setWaitingOnClient(task.waitingOnClient);
       setClientTitle(task.clientTitle ?? "");
+      setSupplierName(task.supplierName ?? "");
+      setSupplierExperience(task.supplierExperience);
       showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
       return;
     }
     setClientVisible(result.clientVisible);
     setWaitingOnClient(result.waitingOnClient);
     setClientTitle(result.clientTitle ?? "");
+    setSupplierName(result.supplierName ?? "");
+    setSupplierExperience(result.supplierExperience);
     showToast({ tone: "success", ...toast });
   }
 
@@ -122,6 +144,24 @@ export function TaskRow({
       { clientTitle: clientTitle.trim() || null },
       { title: clientTitle.trim() ? "הכותרת ללקוח עודכנה" : "הכותרת ללקוח הוסרה", description: task.title }
     );
+  }
+
+  async function saveSupplier(experience: SupplierExperience) {
+    const name = supplierName.trim();
+    setEditingSupplier(false);
+    if (!name) return;
+    setSupplierExperience(experience);
+    await writePortal(
+      { supplierName: name, supplierExperience: experience },
+      { title: "נרשם בתיק הלקוח", description: `${name} · ${SUPPLIER_EXPERIENCE_LABELS[experience]}` }
+    );
+  }
+
+  async function clearSupplier() {
+    setEditingSupplier(false);
+    setSupplierName("");
+    setSupplierExperience(null);
+    await writePortal({ supplierName: null }, { title: "הספק הוסר מהתיק", description: task.title });
   }
 
   async function changeStatus(nextStatus: TaskStatus, isUndo = false) {
@@ -207,6 +247,63 @@ export function TaskRow({
               {clientTitle || "הוספת כותרת ללקוח"}
             </button>
           ))}
+
+        {/* Portal phase 3. Only once the task is both shown to the client
+            and closed: before that the answer is not known, and for a
+            task the client never sees there is nobody to show it to. */}
+        {clientVisible && (isDone || supplierName) && (
+          <div className="mt-1.5">
+            {editingSupplier ? (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <input
+                  autoFocus
+                  value={supplierName}
+                  disabled={portalPending}
+                  onChange={(e) => setSupplierName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape") {
+                      setSupplierName(task.supplierName ?? "");
+                      setEditingSupplier(false);
+                    }
+                  }}
+                  placeholder="מי ביצע בפועל"
+                  className="w-40 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                />
+                {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={portalPending || !supplierName.trim()}
+                    onClick={() => saveSupplier(key)}
+                    className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/70 hover:border-gold disabled:opacity-40"
+                  >
+                    {SUPPLIER_EXPERIENCE_LABELS[key]}
+                  </button>
+                ))}
+                {task.supplierName && (
+                  <button
+                    type="button"
+                    disabled={portalPending}
+                    onClick={clearSupplier}
+                    className="text-[11px] text-appNavy/40 hover:text-error"
+                  >
+                    הסרה
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingSupplier(true)}
+                className="truncate text-[11.5px] text-gold-dim hover:underline"
+              >
+                {supplierName
+                  ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
+                  : "מי ביצע בפועל?"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Portal phase 1. Two icons, not a panel: the row already carries
