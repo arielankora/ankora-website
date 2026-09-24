@@ -92,7 +92,10 @@ test.describe.serial("one task, from opening it to closing it", () => {
     // has already run, and an assertion that depends on running order is
     // one that will eventually fail for no reason anyone can act on.
     await expect(page.getByText("שעות על המשימה")).toBeVisible();
-    await expect(page.getByText("היסטוריה")).toBeVisible();
+    // Phase 3 replaced the read-only history panel with the thread: one
+    // list carrying the changes, the words and the files, so a status
+    // change and the sentence explaining it sit next to each other.
+    await expect(page.getByRole("heading", { name: "שרשור" })).toBeVisible();
   });
 
   test("priority and description are written from the screen and survive a reload", async ({ page }) => {
@@ -171,4 +174,40 @@ test.describe.serial("one task, from opening it to closing it", () => {
     // And the sentence is where the client will read it, still editable.
     await expect(page.getByText(outcome)).toBeVisible();
   });
+});
+
+// Tasks phase 3. Appended to this file rather than given its own,
+// because it is the same screen and the same seeded task, and a second
+// file would mean a second fixture and a second serial group competing
+// for it.
+//
+// What is asserted here is the round trip a browser is the only thing
+// that can check: typing into the composer, the server taking it, and
+// the words coming back on the screen without a reload. The rules
+// underneath (who may delete, what the merge orders by, what an empty
+// body does) are checked where they can be checked in milliseconds, in
+// the integration suite.
+test("a comment is written on the task and comes back on the screen", async ({ page }) => {
+  await page.goto("/app/tasks/demo-task-screen-fixture", { waitUntil: "domcontentloaded" });
+
+  const composer = page.getByLabel("הערה חדשה");
+  await expect(composer).toBeVisible({ timeout: 30_000 });
+
+  // Unique per run: this task is written to by the tests above it, and a
+  // fixed string would match an entry left by the previous run.
+  const said = `דיברתי עם ועד הבית ${Date.now()}`;
+  await composer.fill(said);
+  await page.getByRole("button", { name: "הוספת הערה" }).click();
+
+  await expect(page.getByText("ההערה נוספה")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(said)).toBeVisible({ timeout: 30_000 });
+
+  // And the composer is empty again, which it must not be until the
+  // server has the words: a textarea cleared optimistically is a
+  // paragraph somebody has to write twice.
+  await expect(composer).toHaveValue("");
+
+  // Written, not just rendered.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByText(said)).toBeVisible({ timeout: 30_000 });
 });

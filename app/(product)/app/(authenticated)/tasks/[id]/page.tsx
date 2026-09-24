@@ -3,12 +3,14 @@ import { ChevronRight } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
+import { clientDocumentsFolder } from "@/lib/google-drive";
+import { MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { listCategories } from "@/lib/app-domain/categories";
 import { getActiveTimer } from "@/lib/app-domain/time-entries";
 import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
-import { TaskHistory } from "./TaskHistory";
+import { TaskThread } from "./TaskThread";
 import { TaskTimeSummary } from "./TaskTimeSummary";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -49,7 +51,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
     );
   }
 
-  const { task, time, history } = detail;
+  const { task, time, thread, commentCount } = detail;
 
   const [people, allCategories, activeTimer] = await Promise.all([
     assignableUsers(user, task.clientId),
@@ -126,14 +128,14 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TaskTimeSummary time={time} />
-        <TaskHistory
-          entries={history.map((h) => ({
-            id: h.id,
-            at: h.at.toISOString(),
-            actorName: h.actorName,
-            label: h.label,
-            changed: h.changed,
-          }))}
+        <TaskThread
+          taskId={task.id}
+          commentCount={commentCount}
+          // Same signal the client file screen uses: the composer works
+          // either way, and only the paperclip has to explain itself.
+          storageReady={clientDocumentsFolder() !== null}
+          maxBytes={MAX_DOCUMENT_BYTES}
+          entries={thread.map((e) => ({ ...e, at: e.at.toISOString() }))}
         />
       </div>
     </div>

@@ -846,18 +846,67 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.update": "המשימה עודכנה",
   "task.status_change": "הסטטוס שונה",
   "task.approve": "המשימה אושרה",
+  // Phase 3. These two appear in the log but NOT as lines in the thread:
+  // the comment itself is already a line there, and a second entry
+  // saying a comment was written would be the same fact twice.
+  "task.comment": "נוספה הערה",
+  "task.comment_delete": "הערה נמחקה",
 };
 
-/// One line of a task's history, already in the words a person reads.
-export type TaskHistoryEntry = {
-  id: string;
-  at: Date;
-  actorName: string | null;
-  label: string;
-  /// The fields that actually changed, in Hebrew, for the lines where
-  /// knowing "what" is the whole point. Empty on creation.
-  changed: string[];
-};
+/// Audit actions the thread deliberately drops, because the thing they
+/// record already appears in it as itself.
+const THREAD_SUPPRESSED_ACTIONS = new Set(["task.comment", "task.comment_delete"]);
+
+/// One line of a task's thread, already in the words a person reads.
+///
+/// Tasks phase 3. Three kinds in one list, and the list is composed at
+/// READ time rather than maintained as a table of its own. That is the
+/// spec's first decision and it is worth restating here, because the
+/// tempting alternative is a single `TaskEvent` table that every writer
+/// appends to: it would put a second write beside every existing one,
+/// and a second write is a write that can be forgotten, fail on its own,
+/// or disagree with the first. The audit log has recorded task changes
+/// since phase 1 and is already the authority on them. Comments and
+/// files are their own rows because they are their own things. Merging
+/// them costs one sort.
+export type TaskThreadEntry =
+  | {
+      kind: "event";
+      id: string;
+      at: Date;
+      actorName: string | null;
+      label: string;
+      /// The fields that actually changed, in Hebrew, for the lines
+      /// where knowing "what" is the whole point. Empty on creation.
+      changed: string[];
+    }
+  | {
+      kind: "comment";
+      id: string;
+      at: Date;
+      actorName: string | null;
+      /// Markdown as plain text. The screen renders it with
+      /// lib/markdown-lite.ts; nothing here produces HTML.
+      body: string;
+      /// Whether THIS actor may remove it. Decided here rather than on
+      /// the screen, because the same rule has to hold for the action
+      /// behind the button.
+      canDelete: boolean;
+    }
+  | {
+      kind: "file";
+      id: string;
+      at: Date;
+      actorName: string | null;
+      title: string;
+      mimeType: string;
+      sizeBytes: number | null;
+      /// Whether the client can see this file in their portal. Shown on
+      /// the line because a file filed against a promise is something
+      /// somebody chose to share or not, and that choice should not be
+      /// invisible to the next person.
+      clientVisible: boolean;
+    };
 
 /// Field names as a person would say them. Only the fields worth naming
 /// in a history line appear here; anything else is summarised as a count
@@ -917,6 +966,99 @@ function changedFields(before: unknown, after: unknown): string[] {
 /// actor cannot reach its client: a page renders a not-found for both,
 /// and telling the two apart would confirm that a task exists on a client
 /// somebody has no access to.
+/// A comment is a person writing something down, so the only limit on it
+/// is the one that stops a paste of an entire email thread from becoming
+/// the task. Generous on purpose: the field exists precisely because
+/// people were writing these paragraphs in WhatsApp instead.
+export const MAX_COMMENT_LENGTH = 4000;
+
+/// Whether this person may remove that comment.
+///
+/// Their own, or anyone's if they already edit other people's work. Not
+/// a new permission: phase 9's note says access to a task reduces to
+/// access to its client, and the only extra question a comment raises is
+/// whose words these are.
+function mayRemoveComment(actor: { id: string; role: UserRole }, authorId: string | null): boolean {
+  return authorId === actor.id || can(actor.role, "time_entry.edit_others");
+}
+
+/// Say something on a task.
+export async function addTaskComment(actor: User, taskId: string, body: string) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, deletedAt: null },
+    select: { id: true, clientId: true },
+  });
+  if (!task) throw new Error("Task not found.");
+
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === task.clientId)) {
+    throw new ForbiddenError("You are not assigned to this client.");
+  }
+
+  const text = body.trim();
+  if (!text) throw new Error("אין מה לשמור: ההערה ריקה.");
+  if (text.length > MAX_COMMENT_LENGTH) {
+    throw new Error(`ההערה ארוכה מ-${MAX_COMMENT_LENGTH} תווים. אפשר לפצל אותה לשתיים.`);
+  }
+
+  const comment = await prisma.taskComment.create({
+    data: { taskId: task.id, authorId: actor.id, body: text },
+  });
+
+  // Audited like everything else that changes a task, and for the same
+  // reason: the thread is read from two tables, and an entry that exists
+  // in one of them without a trace in the log would be the one entry
+  // nobody could account for later.
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.comment",
+    entityType: "Task",
+    entityId: task.id,
+    clientId: task.clientId,
+    after: { commentId: comment.id },
+  });
+  return comment;
+}
+
+/// Take it back.
+///
+/// Soft, like every other delete here. A thread that can lose entries
+/// without a trace is a thread nobody can rely on when it matters.
+export async function deleteTaskComment(actor: User, commentId: string) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const comment = await prisma.taskComment.findFirst({
+    where: { id: commentId, deletedAt: null },
+    select: { id: true, authorId: true, task: { select: { id: true, clientId: true } } },
+  });
+  if (!comment) throw new Error("ההערה לא נמצאה.");
+
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === comment.task.clientId)) {
+    throw new ForbiddenError("You are not assigned to this client.");
+  }
+  if (!mayRemoveComment(actor, comment.authorId)) {
+    throw new ForbiddenError("אפשר למחוק רק הערות שכתבתם.");
+  }
+
+  const removed = await prisma.taskComment.update({
+    where: { id: commentId },
+    data: { deletedAt: new Date() },
+  });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.comment_delete",
+    entityType: "Task",
+    entityId: comment.task.id,
+    clientId: comment.task.clientId,
+    after: { commentId },
+  });
+  return removed;
+}
+
 export async function getTaskDetail(actor: User, taskId: string) {
   assertCan(actor.role, "time_entry.create_self");
 
@@ -937,7 +1079,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === task.clientId)) return null;
 
-  const [entries, audit] = await Promise.all([
+  const [entries, audit, comments, files] = await Promise.all([
     // Every reported minute on this task, by whom. Running timers
     // (endAt null, so actualSeconds null) are counted separately rather
     // than as zero - a task with a timer running on it right now is not
@@ -967,6 +1109,37 @@ export async function getTaskDetail(actor: User, taskId: string) {
         actor: { select: { name: true } },
       },
     }),
+    // Phase 3. Capped like the audit list above and for the same reason:
+    // a thread that grows without bound on a task somebody keeps open
+    // makes that task slower every week it stays open.
+    prisma.taskComment.findMany({
+      where: { taskId: task.id, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: {
+        id: true,
+        body: true,
+        createdAt: true,
+        authorId: true,
+        author: { select: { name: true } },
+      },
+    }),
+    // Files filed against this task. Not a new table: ClientDocument has
+    // carried `taskId` since the portal's own phase 3, and a file that
+    // came out of a task is a document of that client's either way.
+    prisma.clientDocument.findMany({
+      where: { taskId: task.id, deletedAt: null },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        mimeType: true,
+        sizeBytes: true,
+        clientVisible: true,
+        createdAt: true,
+        uploadedBy: { select: { name: true } },
+      },
+    }),
   ]);
 
   const byUser = new Map<string, { userId: string; userName: string; seconds: number }>();
@@ -979,13 +1152,40 @@ export async function getTaskDetail(actor: User, taskId: string) {
     else byUser.set(e.user.id, { userId: e.user.id, userName: e.user.name, seconds });
   }
 
-  const history: TaskHistoryEntry[] = audit.map((row) => ({
-    id: row.id,
-    at: row.createdAt,
-    actorName: row.actor?.name ?? null,
-    label: TASK_AUDIT_LABELS[row.action] ?? "שינוי במשימה",
-    changed: row.action === "task.create" ? [] : changedFields(row.beforeJson, row.afterJson),
-  }));
+  // Three sources, one list, sorted once. Newest first, like the history
+  // panel this replaces: the composer sits above it, and the question
+  // somebody opens a task with is "where is this now", not "how did it
+  // start".
+  const thread: TaskThreadEntry[] = [
+    ...audit
+      .filter((row) => !THREAD_SUPPRESSED_ACTIONS.has(row.action))
+      .map((row) => ({
+        kind: "event" as const,
+        id: row.id,
+        at: row.createdAt,
+        actorName: row.actor?.name ?? null,
+        label: TASK_AUDIT_LABELS[row.action] ?? "שינוי במשימה",
+        changed: row.action === "task.create" ? [] : changedFields(row.beforeJson, row.afterJson),
+      })),
+    ...comments.map((c) => ({
+      kind: "comment" as const,
+      id: c.id,
+      at: c.createdAt,
+      actorName: c.author?.name ?? null,
+      body: c.body,
+      canDelete: mayRemoveComment(actor, c.authorId),
+    })),
+    ...files.map((f) => ({
+      kind: "file" as const,
+      id: f.id,
+      at: f.createdAt,
+      actorName: f.uploadedBy?.name ?? null,
+      title: f.title,
+      mimeType: f.mimeType,
+      sizeBytes: f.sizeBytes,
+      clientVisible: f.clientVisible,
+    })),
+  ].sort((a, b) => b.at.getTime() - a.at.getTime());
 
   return {
     task,
@@ -995,6 +1195,10 @@ export async function getTaskDetail(actor: User, taskId: string) {
       runningCount: entries.filter((e) => e.endAt === null).length,
       entryCount: entries.length,
     },
-    history,
+    thread,
+    /// How many of the thread's entries are somebody's words rather than
+    /// the system's. The screen says "no comments yet" only when this is
+    /// zero, which is a different sentence from "nothing happened".
+    commentCount: comments.length,
   };
 }

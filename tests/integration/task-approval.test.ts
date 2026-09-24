@@ -151,13 +151,14 @@ describe("the audit log tells an approval apart from a status change", () => {
     expect(events.map((e) => e.action)).toEqual(["task.create", "task.status_change", "task.approve"]);
   });
 
-  it("shows the approval as its own line in the task's history", async () => {
+  it("shows the approval as its own line in the task's thread", async () => {
     const { doer, boss, task } = await supervised();
     await updateTask(doer, task.id, { status: "PENDING_APPROVAL" });
     await updateTask(boss, task.id, { status: "DONE" });
 
     const detail = await getTaskDetail(boss, task.id);
-    expect(detail?.history.map((h) => h.label)).toContain("המשימה אושרה");
+    const events = detail!.thread.filter((e) => e.kind === "event");
+    expect(events.map((e) => e.label)).toContain("המשימה אושרה");
   });
 });
 
