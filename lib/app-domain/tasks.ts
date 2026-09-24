@@ -45,10 +45,20 @@ import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } fro
 // access to that client would file it where its owner can never find it -
 // a silent dead letter. assertAssignable() below refuses that.
 
-/// The status pair that means "not finished". Used for the default MCP
-/// task list and for `onlyOpen` - DONE and ARCHIVED are history, and a
-/// model asked "what is open" should not have to know the enum.
-export const OPEN_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS"];
+/// The statuses that mean "not finished". Used for the default MCP task
+/// list and for `onlyOpen` - DONE and ARCHIVED are history, and a model
+/// asked "what is open" should not have to know the enum.
+///
+/// PENDING_APPROVAL is open work. The person who did it is finished with
+/// it; the task is not, because nobody has signed it off yet. Leaving it
+/// out would have made a task disappear from its owner's own list the
+/// moment they sent it for approval, which is the exact moment they most
+/// need to be able to find it again.
+///
+/// This constant is the single definition of that set. Anything asking
+/// "which tasks are still live" reads it rather than writing the list
+/// out, so a status added to the enum is a change in one place.
+export const OPEN_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
 
 /// The roles that reach every active client without a UserClientAccess
 /// row - derived from the permission rather than written out, so it
@@ -75,6 +85,9 @@ export type TaskFilters = {
   /// rather than a set, because the question a person asks of a list is
   /// "show me what matters", never "show me exactly the high ones".
   minPriority?: TaskPriority;
+  /// Tasks phase 2: only tasks this person is the supervisor of. Pass
+  /// the actor's own id for the supervision screen.
+  supervisorId?: string;
 };
 
 /// Most urgent first. Postgres orders an enum by its declaration order,
@@ -114,8 +127,9 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // intent readable and survives someone adding an `OR` here later.
       dueDate: filters.dueBefore ? { not: null, lte: filters.dueBefore } : undefined,
       priority: filters.minPriority ? { in: priorityAtLeast(filters.minPriority) } : undefined,
+      supervisorId: filters.supervisorId || undefined,
     },
-    include: { client: true, category: true, assignedTo: true },
+    include: { client: true, category: true, assignedTo: true, supervisor: true },
     // Open/In-progress first (spec §11: "open/recent tasks"), then by
     // deadline, then newest first. The dueDate leg is Phase 16: with due
     // dates finally readable, "soonest deadline first" is the order a
@@ -239,6 +253,50 @@ export async function listMyOpenTasks(actor: User, take = 8) {
 /// reading this at four in the afternoon is asking what has been
 /// untouched since the morning, and a rolling twenty-four hours would
 /// answer a different question every hour.
+/// Tasks phase 2: how much is on this person as a supervisor, and how
+/// much of it is waiting on them right now.
+///
+/// Two numbers from one query, because both are read on every page: the
+/// nav shows the supervision screen only to people who actually
+/// supervise something, and shows a count beside it only when something
+/// is waiting. A person who supervises nothing pays for one grouped
+/// count and sees no extra nav row at all.
+///
+/// Scoped to the clients this person can still reach, like every other
+/// query in this module and for the same reason as listMyOpenTasks: a
+/// supervisor can lose access to a client after being named on its
+/// tasks, and a count that includes rows they cannot open is a badge
+/// that never goes away.
+export async function supervisionCounts(actor: User): Promise<{ total: number; pending: number }> {
+  if (!can(actor.role, "time_entry.create_self")) return { total: 0, pending: 0 };
+
+  const accessible = await listAccessibleClients(actor);
+  const ids = accessible.map((c) => c.id);
+  if (ids.length === 0) return { total: 0, pending: 0 };
+
+  const rows = await prisma.task.groupBy({
+    by: ["status"],
+    where: {
+      deletedAt: null,
+      clientId: { in: ids },
+      supervisorId: actor.id,
+      // Finished work is not supervision any more. Counting it would
+      // make the nav row permanent for anybody who ever supervised
+      // anything once.
+      status: { in: OPEN_STATUSES },
+    },
+    _count: { _all: true },
+  });
+
+  let total = 0;
+  let pending = 0;
+  for (const row of rows) {
+    total += row._count._all;
+    if (row.status === "PENDING_APPROVAL") pending += row._count._all;
+  }
+  return { total, pending };
+}
+
 export async function stalledPromisesByClient(actor: User, since: Date) {
   const accessible = await listAccessibleClients(actor);
   const ids = accessible.map((c) => c.id);
@@ -313,6 +371,21 @@ async function assertAssignable(actor: User, clientId: string, assignedToId: str
   }
 }
 
+/// The same rule for the supervisor, and for a stronger reason.
+///
+/// An assignee without access to the client would never find the task.
+/// A supervisor without access could not open the thing they are being
+/// asked to sign for, which makes the approval either a rubber stamp or
+/// a dead end. Both are worse than refusing here.
+async function assertSupervisable(actor: User, clientId: string, supervisorId: string) {
+  const candidates = await assignableUsers(actor, clientId);
+  if (!candidates.some((u) => u.id === supervisorId)) {
+    throw new ForbiddenError(
+      "That person does not have access to this client, so they could not open the task they are being asked to approve. Give them access to the client first, or choose a supervisor who has it."
+    );
+  }
+}
+
 /// Mirrors the CLIENT-visibility half of assertActiveTargets() in
 /// lib/app-domain/time-entries.ts. Not shared with it on purpose: that
 /// function also enforces client/category ACTIVE-ness for billing
@@ -341,6 +414,12 @@ export async function createTask(
     description?: string | null;
     priority?: TaskPriority;
     assignedToId?: string | null;
+    /// Tasks phase 2. A task can be born supervised - the important-dates
+    /// job and the MCP server both create tasks nobody is standing over,
+    /// and the one place a supervisor is genuinely known at creation time
+    /// is a person opening the drawer and choosing one.
+    supervisorId?: string | null;
+    requiresApproval?: boolean;
     dueDate?: Date | null;
     /// Portal phase 1. Opt-in per task: see schema.prisma's comment on
     /// Task.clientVisible for why not every task is a promise.
@@ -362,6 +441,10 @@ export async function createTask(
 
   if (input.categoryId) await assertCategoryUsable(actor, input.clientId, input.categoryId);
   if (input.assignedToId) await assertAssignable(actor, input.clientId, input.assignedToId);
+  if (input.supervisorId) await assertSupervisable(actor, input.clientId, input.supervisorId);
+  // The same refusal updateTask makes, at the other end. A task created
+  // needing an approval nobody can give is a task born unclosable.
+  if (input.requiresApproval && !input.supervisorId) throw new Error(APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
 
   const task = await prisma.task.create({
     data: {
@@ -371,6 +454,8 @@ export async function createTask(
       description: input.description?.trim() || null,
       priority: input.priority ?? "NORMAL",
       assignedToId: input.assignedToId || null,
+      supervisorId: input.supervisorId || null,
+      requiresApproval: input.requiresApproval ?? false,
       dueDate: input.dueDate ?? null,
       clientVisible: input.clientVisible ?? false,
       clientTitle: input.clientTitle?.trim() || null,
@@ -415,6 +500,12 @@ export type TaskPatch = {
   // client-visible task cannot be closed without this - see
   // assertClosable below.
   clientOutcome?: string | null;
+  // Tasks phase 2. `approvedById` and `approvedAt` are deliberately NOT
+  // here: they are the server's record of who signed, written on the
+  // transition and never accepted from a caller, exactly like
+  // `completedAt`. A signature a caller can supply is not a signature.
+  supervisorId?: string | null;
+  requiresApproval?: boolean;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -463,7 +554,90 @@ function assertClosable(
   const status = data.status ?? current.status;
   const visible = data.clientVisible ?? current.clientVisible;
   const outcome = data.clientOutcome !== undefined ? data.clientOutcome : current.clientOutcome;
-  if (status === "DONE" && visible && !outcome?.trim()) throw new Error(NO_OUTCOME_MESSAGE);
+  // PENDING_APPROVAL counts, and phase 2 added it here rather than
+  // leaving the rule on DONE alone. Sending a promise for approval is a
+  // person saying they are finished with it, and the supervisor is about
+  // to be asked whether it can close. Without the sentence, the
+  // supervisor is asked to sign for something with nothing to show, and
+  // then blocked by this very rule at the moment they try - the refusal
+  // would land on the one person who could not have prevented it.
+  const claimsFinished = status === "DONE" || status === "PENDING_APPROVAL";
+  if (claimsFinished && visible && !outcome?.trim()) throw new Error(NO_OUTCOME_MESSAGE);
+}
+
+/// Tasks phase 2. Three refusals, and every one of them is stated on the
+/// CHANGE rather than on the resulting state.
+///
+/// That distinction is not stylistic, and the team-adoption phase paid
+/// for it once already. A rule written as "a task in this shape may not
+/// exist" silently applies to every row that already exists, so the day
+/// it ships, edits that have nothing to do with it start failing on old
+/// data for reasons nobody can see. A rule written as "this move is not
+/// allowed" applies only to people making that move, from today. The
+/// `touches` guard below is what makes it the second kind: a patch that
+/// says nothing about status, supervision or the flag is never refused
+/// here, however the row looks.
+export const APPROVAL_WITHOUT_SUPERVISOR_MESSAGE =
+  "כדי לדרוש אישור צריך לבחור מפקח. בלי מפקח אין מי שיאשר, והמשימה לא תיסגר לעולם.";
+export const NEEDS_APPROVAL_MESSAGE =
+  "המשימה הזו דורשת אישור. שלחו אותה לאישור, והמפקח יסגור אותה.";
+export const NOT_THE_SUPERVISOR_MESSAGE =
+  "רק המפקח של המשימה יכול לאשר אותה או לוותר על האישור.";
+
+/// Exported, and narrowed to the two fields of the actor it actually
+/// reads, so it can be called directly from a test.
+///
+/// Deliberate. This is the highest-stakes logic phase 2 adds and it is a
+/// pure function of three arguments, so the whole transition matrix can
+/// be checked in milliseconds. The alternative was to reach it only
+/// through `updateTask`, which needs a database, which means CI, which
+/// means one answer every twelve minutes. The repo learned that lesson
+/// twice over on the refresh-after-write investigation.
+export function assertApprovable(
+  actor: { id: string; role: UserRole },
+  current: { status: TaskStatus; supervisorId: string | null; requiresApproval: boolean },
+  data: TaskPatch
+) {
+  const touches =
+    data.status !== undefined || data.requiresApproval !== undefined || data.supervisorId !== undefined;
+  if (!touches) return;
+
+  const nextStatus = data.status ?? current.status;
+  const nextRequires = data.requiresApproval ?? current.requiresApproval;
+  const nextSupervisor = data.supervisorId !== undefined ? data.supervisorId : current.supervisorId;
+
+  /// Whoever the task defers to, plus the people who can already edit
+  /// anyone's work. The second half is not a loophole: without it, a
+  /// supervisor on holiday is a task nobody in the company can close,
+  /// and the answer to that would be people turning the flag off, which
+  /// leaves no record at all. An admin closing it leaves one.
+  const maySign = actor.id === nextSupervisor || can(actor.role, "time_entry.edit_others");
+
+  // 1. Demanding a signature from nobody. This is the trap the whole
+  //    feature could have shipped with: approval required, supervisor
+  //    empty, and a task that can never reach DONE by any route on any
+  //    screen. Refused at the moment it is created rather than
+  //    discovered later by whoever tried to close it.
+  if (nextRequires && !nextSupervisor) throw new Error(APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
+
+  // 2. The gate itself. A task that needs approval reaches DONE through
+  //    PENDING_APPROVAL and no other way.
+  if (nextRequires && nextStatus === "DONE" && current.status !== "PENDING_APPROVAL") {
+    throw new Error(NEEDS_APPROVAL_MESSAGE);
+  }
+
+  // 3. Who may sign, and who may waive. Both are the same decision seen
+  //    from two sides: closing work that is waiting for a signature, and
+  //    removing the requirement while it waits. A gate that the person
+  //    being gated can switch off is not a gate, so the waiver is the
+  //    supervisor's too - but only from PENDING_APPROVAL. Up to that
+  //    moment the flag is an ordinary setting anyone on the client can
+  //    change, because nothing is riding on it yet.
+  if (current.status === "PENDING_APPROVAL" && current.requiresApproval && !maySign) {
+    const closing = nextStatus === "DONE";
+    const waiving = data.requiresApproval === false;
+    if (closing || waiving) throw new ForbiddenError(NOT_THE_SUPERVISOR_MESSAGE);
+  }
 }
 
 /// `null` is meaningful and distinct from absent: it clears the field.
@@ -485,6 +659,8 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     supplierRecordedAt?: Date | null;
     completedAt?: Date | null;
     startedAt?: Date | null;
+    approvedById?: string | null;
+    approvedAt?: Date | null;
   } = {};
   const withCompletion = data;
 
@@ -504,6 +680,11 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     if (patch.assignedToId) await assertAssignable(actor, task.clientId, patch.assignedToId);
     data.assignedToId = patch.assignedToId || null;
   }
+  if (patch.supervisorId !== undefined) {
+    if (patch.supervisorId) await assertSupervisable(actor, task.clientId, patch.supervisorId);
+    data.supervisorId = patch.supervisorId || null;
+  }
+  if (patch.requiresApproval !== undefined) data.requiresApproval = patch.requiresApproval;
   if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
   if (patch.clientVisible !== undefined) data.clientVisible = patch.clientVisible;
   if (patch.clientTitle !== undefined) data.clientTitle = patch.clientTitle?.trim() || null;
@@ -539,6 +720,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   const callerChanged = Object.keys(data);
 
   assertClosable(task, data);
+  assertApprovable(actor, task, data);
 
   // `completedAt` is the server's, not the caller's.
   //
@@ -570,6 +752,24 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     withCompletion.startedAt = new Date();
   }
 
+  // The signature, and the server's like the two above it.
+  //
+  // Written on the one transition that is an approval: out of
+  // PENDING_APPROVAL and into DONE. Cleared on the way back to open work
+  // for the same reason `completedAt` is, and it matters more here - an
+  // approval that survived a reopen would be a person's name on work
+  // that changed after they signed for it.
+  //
+  // ARCHIVED keeps it, exactly as it keeps `completedAt`: filing
+  // finished work away does not unsign it.
+  if (nextStatus === "DONE" && task.status === "PENDING_APPROVAL") {
+    withCompletion.approvedById = actor.id;
+    withCompletion.approvedAt = new Date();
+  } else if (nextStatus !== "DONE" && nextStatus !== "ARCHIVED" && task.approvedAt) {
+    withCompletion.approvedById = null;
+    withCompletion.approvedAt = null;
+  }
+
   const updated = await prisma.task.update({ where: { id: taskId }, data });
 
   // Kept as the existing action name when status is the only change, so
@@ -583,10 +783,21 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // phantom action called `status`. Nothing here is worth making that
   // check less strict.
   const statusOnly = callerChanged.length === 1 && callerChanged[0] === STATUS_KEY;
+  /// An approval is a status change, and naming it one would bury it.
+  /// "מי אישר את זה" is a question somebody asks about a specific task
+  /// months later, and it should be answerable by reading the log rather
+  /// than by inferring it from a pair of timestamps.
+  ///
+  /// The literals stay inside the `action:` expression below rather than
+  /// being lifted into a variable: tests/unit/audit-labels.test.ts reads
+  /// this file as text and collects the quoted strings it finds there, so
+  /// an action hidden behind an identifier is an action that silently
+  /// stops being checked for a Hebrew label.
+  const approving = updated.approvedAt !== null && task.approvedAt === null;
 
   await recordAudit({
     actorId: actor.id,
-    action: statusOnly ? "task.status_change" : "task.update",
+    action: approving ? "task.approve" : statusOnly ? "task.status_change" : "task.update",
     entityType: "Task",
     entityId: taskId,
     clientId: task.clientId,
@@ -599,6 +810,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
 export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   OPEN: "פתוחה",
   IN_PROGRESS: "בביצוע",
+  PENDING_APPROVAL: "ממתינה לאישור",
   DONE: "הושלמה",
   ARCHIVED: "בארכיון",
 };
@@ -633,6 +845,7 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.create": "המשימה נפתחה",
   "task.update": "המשימה עודכנה",
   "task.status_change": "הסטטוס שונה",
+  "task.approve": "המשימה אושרה",
 };
 
 /// One line of a task's history, already in the words a person reads.
@@ -656,6 +869,8 @@ const FIELD_LABELS: Record<string, string> = {
   status: "סטטוס",
   categoryId: "קטגוריה",
   assignedToId: "אחראי",
+  supervisorId: "מפקח",
+  requiresApproval: "דורשת אישור",
   dueDate: "תאריך יעד",
   clientVisible: "הצגה ללקוח",
   clientTitle: "כותרת ללקוח",
@@ -668,7 +883,17 @@ const FIELD_LABELS: Record<string, string> = {
 /// Server-owned columns. They move on their own as a consequence of
 /// somebody else's change, so listing them in a history line would tell a
 /// person about bookkeeping rather than about a decision.
-const DERIVED_FIELDS = new Set(["updatedAt", "startedAt", "completedAt", "supplierRecordedAt"]);
+const DERIVED_FIELDS = new Set([
+  "updatedAt",
+  "startedAt",
+  "completedAt",
+  "supplierRecordedAt",
+  // Tasks phase 2. Who signed and when is a line of its own in the
+  // history ("המשימה אושרה"), so naming the columns again beside it
+  // would say the same thing twice in the same entry.
+  "approvedById",
+  "approvedAt",
+]);
 
 function changedFields(before: unknown, after: unknown): string[] {
   if (!before || !after || typeof before !== "object" || typeof after !== "object") return [];
@@ -701,6 +926,10 @@ export async function getTaskDetail(actor: User, taskId: string) {
       client: { select: { id: true, name: true } },
       category: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
+      // Tasks phase 2. Two names the screen shows and never writes: who
+      // this goes back to, and who signed it off.
+      supervisor: { select: { id: true, name: true } },
+      approvedBy: { select: { id: true, name: true } },
     },
   });
   if (!task) return null;

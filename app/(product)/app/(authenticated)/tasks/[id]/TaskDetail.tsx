@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, Hourglass, Pause, Play } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import {
@@ -17,6 +17,7 @@ import type { TaskPriority, TaskStatus } from "@prisma/client";
 const STATUS_LABELS: Record<TaskStatus, string> = {
   OPEN: "פתוחה",
   IN_PROGRESS: "בביצוע",
+  PENDING_APPROVAL: "ממתינה לאישור",
   DONE: "הושלמה",
   ARCHIVED: "בארכיון",
 };
@@ -35,7 +36,7 @@ const PRIORITY_CLASSES: Record<TaskPriority, string> = {
   URGENT: "bg-error-soft text-error",
 };
 
-const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"];
+const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE", "ARCHIVED"];
 const PRIORITY_OPTIONS: TaskPriority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
 
 export type TaskDetailData = {
@@ -48,6 +49,11 @@ export type TaskDetailData = {
   categoryId: string | null;
   assignedToId: string | null;
   assignedToName: string | null;
+  supervisorId: string | null;
+  supervisorName: string | null;
+  requiresApproval: boolean;
+  approvedByName: string | null;
+  approvedAt: string | null;
   dueDate: string | null;
   clientVisible: boolean;
   clientTitle: string | null;
@@ -62,11 +68,15 @@ export function TaskDetail({
   people,
   categories,
   activeTimer,
+  canApprove,
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
   categories: { id: string; name: string }[];
   activeTimer: { id: string; startAt: string; onThisTask: boolean } | null;
+  /// Whether this person may sign this task off. Decided on the server,
+  /// where the rule lives.
+  canApprove: boolean;
 }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
@@ -79,7 +89,16 @@ export function TaskDetail({
   const [priority, setPriority] = useState(task.priority);
   const [clientVisible, setClientVisible] = useState(task.clientVisible);
   const [clientOutcome, setClientOutcome] = useState(task.clientOutcome ?? "");
-  const [closing, setClosing] = useState(false);
+  const [supervisorId, setSupervisorId] = useState(task.supervisorId ?? "");
+  const [requiresApproval, setRequiresApproval] = useState(task.requiresApproval);
+  /// The status the person is trying to reach, held while they are being
+  /// asked for the outcome sentence first. Null when nothing is pending.
+  ///
+  /// A status rather than a boolean, because phase 2 gave the sentence a
+  /// second moment: submitting a client-visible promise for approval is
+  /// also a person saying they are finished with it, and the supervisor
+  /// about to be asked to sign needs to see what they are signing for.
+  const [closingTo, setClosingTo] = useState<TaskStatus | null>(null);
 
   /// The one write path on this screen.
   ///
@@ -102,12 +121,16 @@ export function TaskDetail({
       setPriority(task.priority);
       setClientVisible(task.clientVisible);
       setClientOutcome(task.clientOutcome ?? "");
+      setSupervisorId(task.supervisorId ?? "");
+      setRequiresApproval(task.requiresApproval);
       showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
       return false;
     }
     setStatus(result.status);
     setClientVisible(result.clientVisible);
     setClientOutcome(result.clientOutcome ?? "");
+    setSupervisorId(result.supervisorId ?? "");
+    setRequiresApproval(result.requiresApproval);
     showToast({ tone: "success", ...toast });
     return true;
   }
@@ -119,8 +142,9 @@ export function TaskDetail({
     // no sentence about what came of it, so asking here is the difference
     // between a question and an error about a gesture that had no way to
     // succeed.
-    if (next === "DONE" && clientVisible && !clientOutcome.trim()) {
-      setClosing(true);
+    const claimsFinished = next === "DONE" || next === "PENDING_APPROVAL";
+    if (claimsFinished && clientVisible && !clientOutcome.trim()) {
+      setClosingTo(next);
       return;
     }
     const previous = status;
@@ -131,13 +155,20 @@ export function TaskDetail({
 
   async function confirmClose() {
     const outcome = clientOutcome.trim();
-    if (!outcome) return;
-    setClosing(false);
-    setStatus("DONE");
+    const next = closingTo;
+    if (!outcome || !next) return;
+    setClosingTo(null);
+    setStatus(next);
     // One call, not two. Two writes leave a window where the promise
     // carries a result and is still open, and a person who closes the tab
     // inside that window leaves it there.
-    await write({ status: "DONE", clientOutcome: outcome }, { title: "המשימה הושלמה", description: outcome });
+    await write(
+      { status: next, clientOutcome: outcome },
+      {
+        title: next === "DONE" ? "המשימה הושלמה" : "נשלחה לאישור",
+        description: outcome,
+      }
+    );
   }
 
   return (
@@ -251,6 +282,18 @@ export function TaskDetail({
         <Timestamps task={task} />
       </section>
 
+      <Supervision
+        task={task}
+        people={people}
+        pending={pending}
+        status={status}
+        supervisorId={supervisorId}
+        requiresApproval={requiresApproval}
+        canApprove={canApprove}
+        write={write}
+        onChangeStatus={changeStatus}
+      />
+
       <section className="rounded-2xl border border-lineDark bg-white p-5">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-medium text-appNavy/70">תיאור</h2>
@@ -330,9 +373,9 @@ export function TaskDetail({
         clientVisible={clientVisible}
         clientOutcome={clientOutcome}
         setClientOutcome={setClientOutcome}
-        closing={closing}
+        closingTo={closingTo}
         onCancelClose={() => {
-          setClosing(false);
+          setClosingTo(null);
           setClientOutcome(task.clientOutcome ?? "");
         }}
         onConfirmClose={confirmClose}
@@ -340,6 +383,177 @@ export function TaskDetail({
         isDone={status === "DONE"}
       />
     </div>
+  );
+}
+
+/// Tasks phase 2: the second person on a task, and the signature.
+///
+/// A section of its own rather than two more controls in the pill row
+/// above, because this is a small state machine and the row is a set of
+/// independent fields. The one thing this screen owes a person here is
+/// an answer to "what happens next, and is it me": whether anybody is
+/// watching, whether they have to agree, and which single button moves
+/// the task forward from where it is right now. Everything below is in
+/// service of showing exactly one of those buttons at a time.
+///
+/// The rules it mirrors live in lib/app-domain/tasks.ts (assertApprovable)
+/// and are enforced there. Nothing here is a permission check: this
+/// decides what to show, and the server decides what is allowed. A screen
+/// that guessed wrong would be confusing, not unsafe.
+function Supervision({
+  task,
+  people,
+  pending,
+  status,
+  supervisorId,
+  requiresApproval,
+  canApprove,
+  write,
+  onChangeStatus,
+}: {
+  task: TaskDetailData;
+  people: { id: string; name: string; email: string }[];
+  pending: boolean;
+  status: TaskStatus;
+  supervisorId: string;
+  requiresApproval: boolean;
+  canApprove: boolean;
+  write: (
+    patch: Omit<Parameters<typeof updateTaskDetailAction>[0], "taskId">,
+    toast: { title: string; description?: string }
+  ) => Promise<boolean>;
+  onChangeStatus: (next: TaskStatus) => Promise<void>;
+}) {
+  const waiting = status === "PENDING_APPROVAL";
+  const finished = status === "DONE" || status === "ARCHIVED";
+  const supervisorName = people.find((p) => p.id === supervisorId)?.name ?? task.supervisorName;
+
+  return (
+    <section className="rounded-2xl border border-lineDark bg-white p-5">
+      <h2 className="flex items-center gap-2 text-sm font-medium text-appNavy/70">
+        <ShieldCheck size={15} strokeWidth={1.75} className="text-appNavy/40" />
+        פיקוח ואישור
+      </h2>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Select
+          label="מפקח"
+          value={supervisorId}
+          disabled={pending}
+          options={[{ value: "", label: "ללא מפקח" }, ...people.map((p) => ({ value: p.id, label: p.name }))]}
+          onChange={async (v) => {
+            const name = people.find((p) => p.id === v)?.name;
+            await write(
+              // Removing the supervisor of a task that requires approval
+              // would leave nobody able to close it, and the server
+              // refuses exactly that. Sent as one patch so the person
+              // making the sensible version of that gesture is not
+              // stopped: clearing the supervisor clears the requirement
+              // with it.
+              { supervisorId: v || null, ...(v ? {} : { requiresApproval: false }) },
+              { title: name ? `${name} מפקח על המשימה` : "הפיקוח הוסר", description: task.title }
+            );
+          }}
+        />
+
+        <label className="flex items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/60">
+          <input
+            type="checkbox"
+            checked={requiresApproval}
+            disabled={pending || (!supervisorId && !requiresApproval)}
+            onChange={async (e) =>
+              write(
+                { requiresApproval: e.target.checked },
+                {
+                  title: e.target.checked ? "המשימה תדרוש אישור" : "המשימה לא דורשת אישור",
+                  description: task.title,
+                }
+              )
+            }
+            className="h-3.5 w-3.5 accent-appNavy"
+          />
+          דורשת אישור לפני סגירה
+        </label>
+      </div>
+
+      {/* Why the checkbox is disabled, said where somebody is trying to
+          click it. A control that does nothing and explains nothing is
+          the thing people file a bug about. */}
+      {!supervisorId && !requiresApproval && (
+        <p className="mt-2 text-[12px] text-appNavy/45">בחרו מפקח כדי לדרוש אישור.</p>
+      )}
+
+      {waiting && (
+        <div className="mt-4 rounded-xl border border-lineDark bg-appNavy/[0.04] p-4">
+          {canApprove ? (
+            <>
+              <p className="text-[13.5px] font-medium text-appNavy">המשימה מחכה לאישור שלך.</p>
+              {task.clientOutcome && (
+                <p className="mt-1 text-[12.5px] text-appNavy/60">{task.clientOutcome}</p>
+              )}
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onChangeStatus("DONE")}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+                >
+                  <CheckCircle2 size={14} />
+                  אישור וסגירה
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onChangeStatus("IN_PROGRESS")}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-40"
+                >
+                  <Undo2 size={14} />
+                  החזרה לביצוע
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-[13.5px] text-appNavy">
+                {supervisorName ? `ממתינה לאישור של ${supervisorName}.` : "ממתינה לאישור."}
+              </p>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onChangeStatus("IN_PROGRESS")}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-40"
+              >
+                <Undo2 size={14} />
+                ביטול השליחה
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* The forward move, and the only one offered while the task is
+          still being worked on. Shown instead of leaving the person to
+          find PENDING_APPROVAL in the status dropdown, which is the sort
+          of step that turns a rule into something people route around. */}
+      {!waiting && !finished && requiresApproval && (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onChangeStatus("PENDING_APPROVAL")}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+        >
+          <ShieldCheck size={14} />
+          שליחה לאישור
+        </button>
+      )}
+
+      {task.approvedAt && status === "DONE" && (
+        <p className="mt-4 flex items-center gap-1.5 text-[12.5px] text-success">
+          <CheckCircle2 size={14} />
+          אושרה על ידי {task.approvedByName ?? "המערכת"} ב{formatDate(task.approvedAt)}
+        </p>
+      )}
+    </section>
   );
 }
 
@@ -426,7 +640,7 @@ function ClientSection({
   clientVisible,
   clientOutcome,
   setClientOutcome,
-  closing,
+  closingTo,
   onCancelClose,
   onConfirmClose,
   write,
@@ -437,7 +651,7 @@ function ClientSection({
   clientVisible: boolean;
   clientOutcome: string;
   setClientOutcome: (v: string) => void;
-  closing: boolean;
+  closingTo: TaskStatus | null;
   onCancelClose: () => void;
   onConfirmClose: () => void;
   write: (
@@ -523,11 +737,11 @@ function ClientSection({
         </div>
       )}
 
-      {closing && (
+      {closingTo && (
         <div className="mt-4 rounded-xl border border-warning/30 bg-warning-soft p-4">
           <p className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
             <Hourglass size={15} className="text-warning" />
-            לפני הסגירה: מה קרה בפועל?
+            {closingTo === "DONE" ? "לפני הסגירה: מה קרה בפועל?" : "לפני השליחה לאישור: מה קרה בפועל?"}
           </p>
           <p className="mt-1 text-[12.5px] text-appNavy/60">
             המשפט הזה הוא מה שהלקוח קורא בפורטל ומה שנכנס לסיכום החודשי.
@@ -556,7 +770,7 @@ function ClientSection({
                   exactly when this button is used, since the write before
                   it raised one. A screen reader hears two identical
                   buttons that do very different things. */}
-              סגירת המשימה
+              {closingTo === "DONE" ? "סגירת המשימה" : "שליחה לאישור"}
             </button>
             <button
               type="button"

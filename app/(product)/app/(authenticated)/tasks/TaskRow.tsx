@@ -13,6 +13,7 @@ import type { SupplierExperience, TaskPriority, TaskStatus } from "@prisma/clien
 const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   OPEN: "פתוחה",
   IN_PROGRESS: "בביצוע",
+  PENDING_APPROVAL: "ממתינה לאישור",
   DONE: "הושלמה",
   ARCHIVED: "בארכיון",
 };
@@ -20,11 +21,16 @@ const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
   OPEN: "bg-neutral-soft text-neutral",
   IN_PROGRESS: "bg-warning-soft text-warning",
+  // Tasks phase 2. Neither in flight nor finished: the work is done and
+  // the task is not. A navy tint rather than a fifth colour token - the
+  // portal already uses this exact pair for a held state, and inventing
+  // a colour for one status is how a palette stops meaning anything.
+  PENDING_APPROVAL: "bg-appNavy/5 text-appNavy/70",
   DONE: "bg-success-soft text-success",
   ARCHIVED: "bg-neutral-soft text-neutral",
 };
 
-const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"];
+const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE", "ARCHIVED"];
 
 // Tasks phase 1. A dot and not a pill: NORMAL is most rows and shows
 // nothing at all, so the mark only appears where it means something. A

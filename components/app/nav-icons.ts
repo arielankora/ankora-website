@@ -17,6 +17,7 @@ import {
   FileText,
   Plug,
   User,
+  ShieldCheck,
   type LucideIcon,
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/timer": Timer,
   "/app/my-time": History,
   "/app/tasks": ListChecks,
+  "/app/supervising": ShieldCheck,
   "/app/clients": Users,
   "/app/categories": Tag,
   "/app/time-entries": ListChecks,

@@ -22,8 +22,17 @@ const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "הכל" },
   { value: "OPEN", label: "פתוחות" },
   { value: "IN_PROGRESS", label: "בטיפול" },
+  { value: "PENDING_APPROVAL", label: "ממתינות לאישור" },
   { value: "DONE", label: "הושלמו" },
 ];
+
+/// The pill values that are real statuses, derived from the list above so
+/// a pill added there is selectable without a second edit. The guard
+/// below used to be three `===` comparisons, which is exactly the shape
+/// that silently ignores a new one.
+const FILTER_STATUSES = new Set(
+  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ALL")
+);
 
 // The pre-redesign client/category <select> filter bar is intentionally
 // dropped here - neither the handoff README's screen-4 bullet nor its
@@ -54,10 +63,9 @@ export default async function TasksPage(
     );
   }
 
-  const status =
-    searchParams.status === "OPEN" || searchParams.status === "IN_PROGRESS" || searchParams.status === "DONE"
-      ? (searchParams.status as TaskStatus)
-      : undefined;
+  const status = FILTER_STATUSES.has(searchParams.status as TaskStatus)
+    ? (searchParams.status as TaskStatus)
+    : undefined;
   const activePill = status ?? "ALL";
 
   // Team adoption, mechanism three: "mine".

@@ -90,6 +90,11 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           categoryId: task.categoryId,
           assignedToId: task.assignedToId,
           assignedToName: task.assignedTo?.name ?? null,
+          supervisorId: task.supervisorId,
+          supervisorName: task.supervisor?.name ?? null,
+          requiresApproval: task.requiresApproval,
+          approvedByName: task.approvedBy?.name ?? null,
+          approvedAt: task.approvedAt?.toISOString() ?? null,
           dueDate: task.dueDate?.toISOString() ?? null,
           clientVisible: task.clientVisible,
           clientTitle: task.clientTitle,
@@ -100,6 +105,12 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
         }}
         people={people}
         categories={categories}
+        // Whether THIS person may sign. Computed on the server beside the
+        // rule it mirrors (assertApprovable), not guessed in the browser:
+        // the screen uses it to decide which button to show, and the
+        // domain refuses the write regardless, so a wrong answer here is
+        // a confusing screen rather than a hole.
+        canApprove={user.id === task.supervisorId || can(user.role, "time_entry.edit_others")}
         // Only this person's own timer, and only enough of it to answer
         // two questions: is one running, and is it on this task.
         activeTimer={

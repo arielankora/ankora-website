@@ -9,6 +9,15 @@ import path from "node:path";
 // fixtures are all prefixed "[DEMO]" precisely so that, if one ever
 // surfaced somewhere it should not, it would be unmistakable.
 
+// Named `employee.json` and signed in as the Ankora Admin below. The
+// name is the older one and the account is the one every `.app.spec.ts`
+// actually runs as, which has misled at least one spec into seeding a
+// fixture for `demo.employee1` and then asserting an empty screen. Left
+// as it is rather than renamed, because the path is written into
+// qa/playwright.config.ts and into the CI job's cache, and a rename that
+// misses one of them fails every authenticated spec at once. The comment
+// is the cheap half of the fix; anything that seeds a per-user fixture
+// should read `DEMO.admin` below and not this constant's name.
 const STATE = path.join("qa", "reports", ".auth", "employee.json");
 const SUPER_STATE = path.join("qa", "reports", ".auth", "superadmin.json");
 const CLIENT_STATE = path.join("qa", "reports", ".auth", "clientadmin.json");

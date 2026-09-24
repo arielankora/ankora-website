@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<User["role"], string> = {
   CLIENT_USER: "לקוח",
 };
 
-function navItemsFor(role: User["role"]): NavItem[] {
+function navItemsFor(role: User["role"], supervises: boolean): NavItem[] {
   // Phase 6 (spec 13 "Client Portal"): a CLIENT_USER gets an entirely
   // separate, deliberately short nav - the portal is meant to "feel part
   // of Ankora, not an internal tool exposed outward" (spec 13's own
@@ -58,6 +58,13 @@ function navItemsFor(role: User["role"]): NavItem[] {
   // Tasks screen - same gate as Timer/My Time (see lib/app-domain/tasks.ts
   // for why no dedicated permission exists).
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/tasks", label: "משימות", group: "העבודה שלי" });
+  // Tasks phase 2. Shown only to people who actually supervise something
+  // open, rather than to every member of staff: a permanently empty
+  // screen in the nav is a row everybody learns to ignore, and this one
+  // has to be noticed on the day it stops being empty. It appears when
+  // somebody names you supervisor and goes when the last of that work
+  // closes.
+  if (supervises) items.push({ href: "/app/supervising", label: "בפיקוח שלי", group: "העבודה שלי" });
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "ניהול" });
   if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "ניהול" });
   if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "ניהול" });
@@ -127,6 +134,7 @@ export function AppShell({
   unreadCount,
   importantDatesCount,
   alertsCount,
+  supervising,
   clients,
   children,
 }: {
@@ -136,10 +144,13 @@ export function AppShell({
   unreadCount: number;
   importantDatesCount: number;
   alertsCount: number;
+  /// Tasks phase 2. `total` decides whether the nav row exists at all,
+  /// `pending` is the number printed beside it.
+  supervising: { total: number; pending: number };
   clients: { id: string; name: string }[];
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role);
+  const items = navItemsFor(user.role, supervising.total > 0);
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
@@ -148,7 +159,12 @@ export function AppShell({
         items={items}
         userName={user.name}
         roleLabel={ROLE_LABELS[user.role]}
-        counters={{ activeTimerStartAt: activeTimer?.startAt ?? null, importantDatesCount, alertsCount }}
+        counters={{
+          activeTimerStartAt: activeTimer?.startAt ?? null,
+          importantDatesCount,
+          alertsCount,
+          supervisingCount: supervising.pending,
+        }}
       />
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
 

@@ -77,6 +77,11 @@ enum CategoryVisibility {
 enum TaskStatus {
   OPEN
   IN_PROGRESS
+  // Tasks phase 2. Placed between IN_PROGRESS and DONE because Postgres
+  // orders an enum by declaration and the tasks list sorts on status:
+  // work waiting for a signature belongs beside work in progress, not
+  // after everything that is finished.
+  PENDING_APPROVAL
   DONE
   ARCHIVED
 }
@@ -150,6 +155,8 @@ model User {
 
   // Phase 10: Important Dates (מועדים חשובים).
   assignedTasks              Task[]                        @relation("TaskAssignee")
+  supervisedTasks            Task[]                        @relation("TaskSupervisor")
+  approvedTasks              Task[]                        @relation("TaskApprover")
   importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
   importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
   holidaySubscriptionsOwned  HolidayCalendarSubscription[]  @relation("HolidaySubscriptionResponsible")
@@ -728,6 +735,32 @@ model Task {
   priority    TaskPriority @default(NORMAL)
   startedAt   DateTime?
 
+  // Tasks phase 2 ("מפקח ואישור"), and the difference between a task
+  // somebody is responsible for and a task somebody signs off.
+  //
+  // `supervisorId` is the second person on a task. Not a second
+  // assignee: the assignee does the work, the supervisor is who it goes
+  // back to. Nullable, because most work needs no second pair of eyes,
+  // and a required field here would be filled in with whoever happens to
+  // be at the top of the list.
+  //
+  // `requiresApproval` is a separate switch from `supervisorId` on
+  // purpose. Hadas asked for both modes: somebody who wants to know, and
+  // somebody who has to agree. Watching is the supervisor alone; signing
+  // off is the supervisor plus this flag. One column meaning both would
+  // turn every watcher into a gate and teach the team to leave the field
+  // empty rather than slow themselves down.
+  //
+  // `approvedById` and `approvedAt` record the signature. Written by the
+  // server on the move out of PENDING_APPROVAL into DONE and cleared if
+  // the task is reopened, exactly like `completedAt` - an approval that
+  // survived a reopen would be a signature on work that changed after it
+  // was given.
+  supervisorId     String?
+  requiresApproval Boolean   @default(false)
+  approvedById     String?
+  approvedAt       DateTime?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -735,6 +768,8 @@ model Task {
   client        Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category      Category?      @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   assignedTo    User?          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  supervisor    User?          @relation("TaskSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
+  approvedBy    User?          @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
   timeEntries   TimeEntry[]
   decisions     Decision[]
@@ -749,6 +784,9 @@ model Task {
   @@index([clientId, supplierRecordedAt])
   // Tasks phase 1: the list sorts urgent work to the top within a status.
   @@index([status, priority, dueDate])
+  // Tasks phase 2: the supervision screen reads one person's tasks, the
+  // ones waiting on their signature first.
+  @@index([supervisorId, status])
   // Team adoption: promises that have not moved, for the manager's metric
   // and for one person's own rows on the home screen.
   @@index([clientVisible, status, updatedAt])

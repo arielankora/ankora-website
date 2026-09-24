@@ -8,6 +8,7 @@ import { listNotificationsForUser, unreadNotificationCount } from "@/lib/app-dom
 import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
+import { supervisionCounts } from "@/lib/app-domain/tasks";
 
 /// Redesign direction A, layout-flash fix: AppShell (Sidebar + BottomNav)
 /// used to be rendered inside every single page.tsx under app/(product)/app,
@@ -51,8 +52,15 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
   const canSeeAlerts = can(user.role, "alert.manage");
   const isClientUser = user.role === "CLIENT_USER";
 
-  const [activeTimerRow, notificationRows, unreadCount, importantDates, alertsCount, accessibleClients] =
-    await Promise.all([
+  const [
+    activeTimerRow,
+    notificationRows,
+    unreadCount,
+    importantDates,
+    alertsCount,
+    accessibleClients,
+    supervising,
+  ] = await Promise.all([
       canTrackTime ? getActiveTimer(user.id) : Promise.resolve(null),
       listNotificationsForUser(user.id),
       unreadNotificationCount(user.id),
@@ -67,6 +75,12 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       // own-access branch isn't meant to resolve "which client is this
       // portal user" (that's resolvePortalClient, a different lookup).
       isClientUser ? Promise.resolve([]) : listAccessibleClients(user),
+      // Tasks phase 2. One grouped count, and it decides two things: the
+      // nav row exists only for people who supervise open work, and the
+      // number beside it is what is waiting on them right now. Cheap
+      // enough to run on every page because a person who supervises
+      // nothing still only pays for one count.
+      canTrackTime ? supervisionCounts(user) : Promise.resolve({ total: 0, pending: 0 }),
     ]);
 
   return (
@@ -83,6 +97,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       unreadCount={unreadCount}
       importantDatesCount={importantDates.length}
       alertsCount={alertsCount}
+      supervising={supervising}
       clients={accessibleClients.map((c: Client) => ({ id: c.id, name: c.name }))}
     >
       {children}
