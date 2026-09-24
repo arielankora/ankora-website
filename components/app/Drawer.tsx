@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
 
 // Redesign direction A: replaces the old pattern of an inline "add" form
@@ -83,7 +83,13 @@ export function Drawer({
 
   useEffect(() => {
     if (writes === 0) return;
-    router.refresh();
+    // Inside a transition, which is how Next documents this call and is
+    // not decoration. A refresh requested outside one is an update React
+    // may discard when another render supersedes it, and the request
+    // behind it is then aborted with nothing to retry it. CI has caught
+    // exactly that twice, at 41ms and at 37ms, on writes that had
+    // already committed.
+    startTransition(() => router.refresh());
   }, [writes, router]);
 
   return (

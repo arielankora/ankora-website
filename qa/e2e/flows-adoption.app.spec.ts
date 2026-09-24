@@ -115,7 +115,16 @@ test("a promise the client can see cannot be closed without a sentence for them"
         ? `the write answered ${response.status()} and its body could not be read`
         : body.includes(title)
           ? `the server DID send back a screen carrying this task (${body.length} bytes) - the browser did not apply it`
-          : `the write answered ${response.status()} (${body.length} bytes) and the task is NOT in what came back - revalidation never reached the response, so the row can only arrive by the explicit refresh`;
+          : // How many task rows came back matters more than that this one
+            // did not. A response with no rows at all is a response with no
+            // re-rendered list in it, and the row can only arrive by the
+            // explicit refresh. A response carrying the rows that existed
+            // BEFORE this write is something else entirely: a list that was
+            // re-rendered and did not see the row, which is not a refresh
+            // problem and would send the next person to the wrong place.
+            `the write answered ${response.status()} (${body.length} bytes) and the task is NOT in what came back, though ${
+              (body.match(/data-task/g) ?? []).length
+            } task row(s) are - so the list WAS re-rendered and did not include this row`;
 
   // Two stages, because "the row is not there" has two very different
   // causes and this test has been unable to tell them apart for weeks.

@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { startTransition, useEffect, useState, useTransition, type FormEvent } from "react";
 
 /// What a Server Action in this app answers with.
 export type ActionResult = { ok?: boolean; error?: string };
@@ -120,7 +120,10 @@ export function useActionForm<R extends ActionResult>(
   /// be two requests for the same screen racing each other.
   useEffect(() => {
     if (writes === 0) return;
-    router.refresh();
+    // In a transition, for the same reason the drawer's copy is: an
+    // update outside one can be discarded by a later render, and the RSC
+    // request behind it aborted with nothing left to retry it.
+    startTransition(() => router.refresh());
   }, [writes, router]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
