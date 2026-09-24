@@ -356,6 +356,47 @@ async function main() {
     },
   });
 
+  // The board spec's own fixture.
+  //
+  // Its own, for the reason three earlier specs learned the hard way: a
+  // card this spec drags between columns is a card whose status it has
+  // to be able to predict, and every other seeded task is read or moved
+  // by somebody else. No supervisor and internal, so the drag tests the
+  // board rather than re-testing the approval rule or the outcome gate,
+  // both of which have tests of their own.
+  await prisma.task.upsert({
+    where: { id: "demo-task-board-fixture" },
+    update: {},
+    create: {
+      id: "demo-task-board-fixture",
+      clientId: clientB.id,
+      title: "[DEMO] חידוש ביטוח המשרד",
+      status: "OPEN",
+      priority: "NORMAL",
+    },
+  });
+
+  // And a supervised one, also the board spec's own.
+  //
+  // Reusing the supervision spec's fixture would have been cheaper and
+  // wrong: Playwright runs spec FILES in parallel, that spec closes its
+  // task, and a card whose status another worker is changing underneath
+  // is a test that fails by timing. The board needs a task it can try to
+  // close and be refused, which means a task nobody else moves.
+  await prisma.task.upsert({
+    where: { id: "demo-task-board-supervised" },
+    update: {},
+    create: {
+      id: "demo-task-board-supervised",
+      clientId: clientB.id,
+      title: "[DEMO] אישור תקציב רבעוני",
+      status: "OPEN",
+      priority: "NORMAL",
+      supervisorId: ankoraAdmin.id,
+      requiresApproval: true,
+    },
+  });
+
   await prisma.task.upsert({
     where: { id: "demo-task-old-proposal" },
     update: {},
