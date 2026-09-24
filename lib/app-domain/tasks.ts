@@ -88,7 +88,48 @@ export type TaskFilters = {
   /// Tasks phase 2: only tasks this person is the supervisor of. Pass
   /// the actor's own id for the supervision screen.
   supervisorId?: string;
+  /// Tasks phase 4: free text, matched against everything a person
+  /// would remember about a task. See `searchWhere` below for what that
+  /// covers and why. Ignored under two characters.
+  q?: string;
 };
+
+/// The shortest search worth running.
+///
+/// One character matches nearly every task, which is not a search
+/// result, it is the list with extra steps and a slower query behind it.
+const MIN_SEARCH_LENGTH = 2;
+
+/// What "find the task about the plumber" has to look in.
+///
+/// A person does not remember which field they typed something into.
+/// They remember a word. So the box looks in every place a task keeps
+/// words about itself: the internal title, the one the client reads, the
+/// details, the outcome sentence, and the thread. It also looks at the
+/// client's NAME, because "מרידיאן" is a thing people type into a search
+/// box and being sent to a separate dropdown for it is the kind of small
+/// refusal that teaches people the box does not work.
+///
+/// Deleted comments are excluded. Words somebody took back should not
+/// surface the task they took them back on.
+///
+/// `contains` with insensitive mode is an ILIKE with a leading wildcard,
+/// which no btree index can serve. At Ankora's volume, hundreds of tasks
+/// scoped to one person's clients before this predicate is even reached,
+/// that is the right trade: a trigram index costs an extension, a
+/// migration and a CI dependency to save milliseconds nobody can feel.
+/// Worth revisiting at tens of thousands of rows, not before.
+function searchWhere(q: string) {
+  const contains = { contains: q, mode: "insensitive" as const };
+  return [
+    { title: contains },
+    { clientTitle: contains },
+    { description: contains },
+    { clientOutcome: contains },
+    { client: { name: contains } },
+    { comments: { some: { deletedAt: null, body: contains } } },
+  ];
+}
 
 /// Most urgent first. Postgres orders an enum by its declaration order,
 /// which runs LOW to URGENT, so the column sorts descending and the floor
@@ -106,6 +147,12 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
   if (accessibleIds.length === 0) return [];
 
   const clientId = filters.clientId && accessibleIds.includes(filters.clientId) ? filters.clientId : undefined;
+
+  // Trimmed and length-checked here rather than at each caller, so the
+  // screen, the MCP server and anything after them share one answer to
+  // "is this worth searching for".
+  const raw = filters.q?.trim() ?? "";
+  const search = raw.length >= MIN_SEARCH_LENGTH ? raw : undefined;
 
   // `status` wins over `statusIn` so the existing screen's single-status
   // pills keep behaving exactly as before.
@@ -128,6 +175,11 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       dueDate: filters.dueBefore ? { not: null, lte: filters.dueBefore } : undefined,
       priority: filters.minPriority ? { in: priorityAtLeast(filters.minPriority) } : undefined,
       supervisorId: filters.supervisorId || undefined,
+      // Sits beside the other keys rather than wrapping them, which
+      // makes it an AND with all of them: a search inside a status pill
+      // stays inside that pill. The alternative reads the same and
+      // quietly widens every other filter the person set.
+      OR: search ? searchWhere(search) : undefined,
     },
     include: { client: true, category: true, assignedTo: true, supervisor: true },
     // Open/In-progress first (spec §11: "open/recent tasks"), then by

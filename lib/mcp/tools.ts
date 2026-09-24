@@ -533,6 +533,12 @@ export function registerAnkoraTools(server: McpServer): void {
           .optional()
           .describe("Only tasks assigned to this colleague, by name or email. Requires `client`. Ignored when `mine` is set."),
         unassigned: z.boolean().optional().describe("Only tasks with nobody assigned."),
+        search: z
+          .string()
+          .optional()
+          .describe(
+            "Free text. Matches the task's title, the client-facing title, its details, its outcome sentence, its thread and the client's name - anything a person would remember about it. Two characters minimum; shorter is ignored."
+          ),
         supervising: z
           .boolean()
           .optional()
@@ -556,6 +562,7 @@ export function registerAnkoraTools(server: McpServer): void {
         mine?: boolean;
         person?: string;
         unassigned?: boolean;
+        search?: string;
         supervising?: boolean;
         awaitingApproval?: boolean;
         overdue?: boolean;
@@ -603,6 +610,7 @@ export function registerAnkoraTools(server: McpServer): void {
           clientId,
           assignedToId,
           unassigned: args.unassigned || undefined,
+          q: args.search,
           supervisorId: args.supervising ? actor.id : undefined,
           dueBefore,
           // `awaitingApproval` is a status, so it wins over the default

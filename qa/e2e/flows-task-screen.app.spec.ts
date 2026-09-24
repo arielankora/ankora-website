@@ -211,3 +211,43 @@ test("a comment is written on the task and comes back on the screen", async ({ p
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByText(said)).toBeVisible({ timeout: 30_000 });
 });
+
+// Tasks phase 4. On the LIST screen rather than the task's own, but kept
+// in this file because it reads the same seeded fixture and a second
+// file would mean a second fixture competing for it.
+//
+// The word searched for is in the fixture's TITLE, which nothing in this
+// suite rewrites. Its description is edited by a test above, and its
+// thread is written by the one below, so either would make this pass or
+// fail by running order - the failure the phase-1 notes in this file
+// were written about.
+//
+// Searching the thread and the details is checked where it can be
+// checked against a database in milliseconds, in the integration suite.
+// What only a browser can say is that typing into the box and pressing
+// Enter narrows the list a person is looking at.
+test("the list finds a task by a word, and hides the rest", async ({ page }) => {
+  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+
+  const box = page.getByLabel("חיפוש במשימות");
+  await expect(box).toBeVisible({ timeout: 30_000 });
+
+  // Present before the search, so its absence afterwards means the
+  // filter worked rather than that it was never there.
+  const other = page.getByRole("link", { name: /החלפת ספק ניקיון/ });
+  await expect(other.first()).toBeVisible({ timeout: 30_000 });
+
+  await box.fill("ועד הבית");
+  await box.press("Enter");
+
+  await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(other).toHaveCount(0);
+
+  // The box follows the URL, which is what makes a filtered list
+  // something a person can send to a colleague.
+  await expect(page).toHaveURL(/[?&]q=/);
+
+  // And clearing it gives the list back.
+  await page.getByRole("button", { name: "ניקוי החיפוש" }).click();
+  await expect(other.first()).toBeVisible({ timeout: 30_000 });
+});
