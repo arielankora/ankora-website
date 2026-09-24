@@ -40,17 +40,36 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
     // The forward move is a button, not a value buried in the status
     // dropdown. A rule people have to go looking for is a rule people
     // route around.
-    await page.getByRole("button", { name: "שליחה לאישור" }).click();
-    await expect(page.getByText("הסטטוס: ממתינה לאישור")).toBeVisible({ timeout: 30_000 });
+    //
+    // Guarded rather than clicked outright, because this button exists
+    // only while the task has not been sent yet. On a retry of this
+    // group the send has already happened, and an unguarded click would
+    // wait for an element that is correctly gone until the test timeout
+    // fires ninety seconds later - a fixture problem reported as a
+    // broken screen. The assertion below is the same either way.
+    const send = page.getByRole("button", { name: "שליחה לאישור" });
+    if (await send.isVisible().catch(() => false)) {
+      await send.click();
+      await expect(page.getByText("הסטטוס: ממתינה לאישור")).toBeVisible({ timeout: 30_000 });
+    }
+
+    await expect(page.getByLabel("סטטוס")).toHaveValue("PENDING_APPROVAL", { timeout: 30_000 });
   });
 
   test("the nav says something is waiting, and the screen says what", async ({ page }) => {
     await page.goto(SUPERVISING, { waitUntil: "domcontentloaded" });
 
+    // Asserted in this order on purpose, so a failure says which half
+    // broke. If the task is not here at all, the screen is showing the
+    // wrong person's work or none - which is what happens when the
+    // fixture names somebody other than the account this project signs
+    // in as. If it is here but not under the waiting heading, the send
+    // in the previous test did not land.
+    await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: 30_000 });
+
     // The heading carries its own count, which is the number a person
     // reads before deciding whether to open anything.
     await expect(page.getByText(/ממתינות לאישור שלכם \(\d+\)/)).toBeVisible();
-    await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible();
 
     // And the row is reachable from here, because a list of things
     // waiting for you that you cannot act on from is a list of chores.

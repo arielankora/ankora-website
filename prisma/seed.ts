@@ -323,11 +323,18 @@ async function main() {
   // Tasks phase 2's own fixture, read by the supervision spec and by
   // nothing else.
   //
-  // Supervised by employee1 because that is who the browser suite signs
-  // in as: the nav row, the count beside it and the approval buttons all
-  // exist only for the person a task defers to, so a fixture supervised
-  // by anybody else would leave every one of them invisible and the spec
-  // asserting an empty screen.
+  // Supervised by the Ankora Admin, because that is who the browser suite
+  // signs in as. Worth stating plainly, because the file it signs in
+  // with is called `employee.json` and the account inside it is
+  // `demo.admin@ankora.co.il` - see qa/e2e/auth.setup.ts. The first
+  // version of this fixture named employee1 on the strength of that file
+  // name and cost a full CI round: the nav row, the count beside it and
+  // the approval buttons all exist only for the person a task defers to,
+  // so the spec loaded a supervision screen that was correctly empty.
+  //
+  // Which also means this fixture must sit on a client that person can
+  // reach. The admin reaches every active client by role; employee1
+  // holds client A only, and this task is on client B.
   //
   // Internal rather than client-visible on purpose. A promise cannot be
   // sent for approval without its outcome sentence, and that rule has
@@ -343,7 +350,7 @@ async function main() {
       title: "[DEMO] החלפת ספק ניקיון",
       status: "OPEN",
       priority: "NORMAL",
-      supervisorId: employeeOne.id,
+      supervisorId: ankoraAdmin.id,
       requiresApproval: true,
       description: "מחיר מול שניים אחרים, ואז אישור לפני החתימה.",
     },

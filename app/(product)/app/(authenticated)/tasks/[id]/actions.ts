@@ -84,6 +84,10 @@ export async function updateTaskDetailAction(input: {
     });
     revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath("/app/tasks");
+    // Tasks phase 2. Approving, submitting or naming a supervisor all
+    // change what is on somebody's supervision screen, and that screen
+    // is one click away from this one.
+    revalidatePath("/app/supervising");
     // A status or visibility change on a promise is something a client
     // may be looking at right now, and something the home screen counts.
     revalidatePath("/app/portal");
