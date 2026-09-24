@@ -235,13 +235,17 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   // Present before the search, so its absence afterwards means the
   // filter worked rather than that it was never there.
   //
-  // Sixty seconds, and only on the two assertions that need the WHOLE
-  // list. This is the slowest render in the product and this test is the
-  // only one that waits for an unfiltered version of it; on a loaded CI
-  // machine thirty seconds was not enough, and the failure read as a
-  // missing row rather than as a page that had not finished. Everything
-  // after the search runs against a list of one or two rows and keeps
-  // the usual timeout.
+  // Sixty seconds, on every assertion in this test that waits for a
+  // render of the task list. This is the slowest render in the product;
+  // on a loaded CI machine thirty seconds was not enough, and the
+  // failure read as a missing row rather than as a page that had not
+  // finished.
+  //
+  // It applies to the filtered renders too, which is the correction. The
+  // first version of this reasoned that "everything after the search
+  // runs against a list of one or two rows" and left those on
+  // Playwright's ten-second default. The number of ROWS was never what
+  // took the time.
   const WHOLE_LIST = 60_000;
   const other = page.getByRole("link", { name: /החלפת ספק ניקיון/ });
   await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
@@ -249,12 +253,39 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   await box.fill("ועד הבית");
   await box.press("Enter");
 
-  await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: 30_000 });
-  await expect(other).toHaveCount(0);
+  // The URL first, and not as an afterthought.
+  //
+  // This assertion used to sit below the two about rows, and that order
+  // is what made this test fail on a loaded runner. Searching is a
+  // navigation, and until it lands the browser is still showing the
+  // UNFILTERED list. The fixture row is visible on both pages, so
+  // waiting for it proves nothing about which one is on screen - and
+  // then `toHaveCount(0)` was being asked about the old page, and
+  // correctly answered 1 for ten seconds.
+  //
+  // The URL is the one signal that separates the two states. Asserting
+  // it first means everything below runs against the filtered list.
+  //
+  // And on the same sixty seconds as everything else here, which is the
+  // correction to the first version of this fix. In the App Router a
+  // navigation does not change the address bar when it is asked for, it
+  // changes it when the RSC payload arrives - so "the URL still has no
+  // q after ten seconds" and "this screen takes more than ten seconds to
+  // render" are the same sentence. Giving it Playwright's default while
+  // the two assertions below it get sixty was the mistake, not the
+  // ordering.
+  //
+  // If this still fails at sixty seconds then Enter is not navigating at
+  // all, and that is a fault in the screen rather than in the waiting.
+  // The two readings are what this timeout is for.
+  await expect(page).toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
 
-  // The box follows the URL, which is what makes a filtered list
-  // something a person can send to a colleague.
-  await expect(page).toHaveURL(/[?&]q=/);
+  await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: WHOLE_LIST });
+  // A filtered list is small, but it is still this screen, and this
+  // screen is the slowest render in the product. The number here was
+  // Playwright's 10s default, which is shorter than the time the same
+  // file already documents as necessary above.
+  await expect(other).toHaveCount(0, { timeout: WHOLE_LIST });
 
   // And clearing it gives the list back.
   await page.getByRole("button", { name: "ניקוי החיפוש" }).click();
