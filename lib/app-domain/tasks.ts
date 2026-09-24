@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import type { SupplierExperience, User, TaskStatus, UserRole } from "@prisma/client";
+import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -71,7 +71,21 @@ export type TaskFilters = {
   dueBefore?: Date;
   /// Only tasks with no assignee. Cannot be combined with assignedToId.
   unassigned?: boolean;
+  /// Tasks phase 1: only work at this priority or above. A single floor
+  /// rather than a set, because the question a person asks of a list is
+  /// "show me what matters", never "show me exactly the high ones".
+  minPriority?: TaskPriority;
 };
+
+/// Most urgent first. Postgres orders an enum by its declaration order,
+/// which runs LOW to URGENT, so the column sorts descending and the floor
+/// in `minPriority` is expressed as "in these values" rather than a
+/// comparison - an enum has no > operator Prisma will write for us.
+const PRIORITY_ORDER: TaskPriority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
+
+function priorityAtLeast(floor: TaskPriority): TaskPriority[] {
+  return PRIORITY_ORDER.slice(PRIORITY_ORDER.indexOf(floor));
+}
 
 export async function listTasks(actor: User, filters: TaskFilters = {}) {
   const accessible = await listAccessibleClients(actor);
@@ -99,6 +113,7 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // no due date would be excluded anyway, but stating it keeps the
       // intent readable and survives someone adding an `OR` here later.
       dueDate: filters.dueBefore ? { not: null, lte: filters.dueBefore } : undefined,
+      priority: filters.minPriority ? { in: priorityAtLeast(filters.minPriority) } : undefined,
     },
     include: { client: true, category: true, assignedTo: true },
     // Open/In-progress first (spec §11: "open/recent tasks"), then by
@@ -106,7 +121,16 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
     // dates finally readable, "soonest deadline first" is the order a
     // person scanning this list actually wants, and undated tasks sort
     // last rather than jumping the queue as NULLs otherwise would.
-    orderBy: [{ status: "asc" }, { dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+    // Open/In-progress first, then most urgent, then by deadline, then
+    // newest. Priority sits ABOVE the deadline on purpose: a due date
+    // says when someone wrote a date down, and a priority says what a
+    // person decided. When the two disagree, the decision wins.
+    orderBy: [
+      { status: "asc" },
+      { priority: "desc" },
+      { dueDate: { sort: "asc", nulls: "last" } },
+      { createdAt: "desc" },
+    ],
   });
 }
 
@@ -312,6 +336,10 @@ export async function createTask(
     clientId: string;
     categoryId?: string | null;
     title: string;
+    /// Tasks phase 1. Markdown as plain text; nothing renders it as HTML
+    /// on the way in.
+    description?: string | null;
+    priority?: TaskPriority;
     assignedToId?: string | null;
     dueDate?: Date | null;
     /// Portal phase 1. Opt-in per task: see schema.prisma's comment on
@@ -340,6 +368,8 @@ export async function createTask(
       clientId: input.clientId,
       categoryId: input.categoryId || null,
       title,
+      description: input.description?.trim() || null,
+      priority: input.priority ?? "NORMAL",
       assignedToId: input.assignedToId || null,
       dueDate: input.dueDate ?? null,
       clientVisible: input.clientVisible ?? false,
@@ -358,8 +388,16 @@ export async function createTask(
   return task;
 }
 
+/// The one TaskPatch key the audit action is named after. A named
+/// constant so the comparison below carries no string literal of its own
+/// - see the note at the recordAudit call in updateTask.
+const STATUS_KEY = "status";
+
 export type TaskPatch = {
   title?: string;
+  // Tasks phase 1.
+  description?: string | null;
+  priority?: TaskPriority;
   status?: TaskStatus;
   categoryId?: string | null;
   assignedToId?: string | null;
@@ -440,10 +478,14 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     throw new ForbiddenError("You are not assigned to this client.");
   }
 
-  // Not TaskPatch: this carries two fields the patch contract deliberately
-  // does not expose (supplierRecordedAt and completedAt, which the server
-  // owns).
-  const data: TaskPatch & { supplierRecordedAt?: Date | null; completedAt?: Date | null } = {};
+  // Not TaskPatch: this carries three fields the patch contract
+  // deliberately does not expose (supplierRecordedAt, completedAt and
+  // startedAt, all of which the server owns).
+  const data: TaskPatch & {
+    supplierRecordedAt?: Date | null;
+    completedAt?: Date | null;
+    startedAt?: Date | null;
+  } = {};
   const withCompletion = data;
 
   if (patch.title !== undefined) {
@@ -451,6 +493,8 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     if (!title) throw new Error("Task title cannot be empty.");
     data.title = title;
   }
+  if (patch.description !== undefined) data.description = patch.description?.trim() || null;
+  if (patch.priority !== undefined) data.priority = patch.priority;
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.categoryId !== undefined) {
     if (patch.categoryId) await assertCategoryUsable(actor, task.clientId, patch.categoryId);
@@ -485,6 +529,15 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
 
   if (Object.keys(data).length === 0) return task;
 
+  // What the CALLER asked to change, captured before the server adds its
+  // own columns below. The audit action is named off this rather than off
+  // the final `data`, because `completedAt` and `startedAt` are written
+  // by this function and would otherwise turn every plain status change
+  // into a "task.update" - which is exactly the query the audit log was
+  // promised to keep answering, and which the history panel on the task
+  // screen now reads.
+  const callerChanged = Object.keys(data);
+
   assertClosable(task, data);
 
   // `completedAt` is the server's, not the caller's.
@@ -500,12 +553,40 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     withCompletion.completedAt = null;
   }
 
+  // `startedAt`, the other end of cycle time, and the server's too.
+  //
+  // Written the FIRST time a task leaves OPEN and never moved again,
+  // which is the difference between "when did work begin" and "when was
+  // this last touched". A task that goes to DONE and is reopened to
+  // IN_PROGRESS keeps its original start, because the work did begin
+  // then and a second start date would quietly shorten every cycle-time
+  // number that reads it.
+  //
+  // Cleared only on the way back to OPEN, which is the one transition
+  // where a person is saying the work has not in fact started.
+  if (nextStatus === "OPEN") {
+    if (task.startedAt) withCompletion.startedAt = null;
+  } else if (!task.startedAt) {
+    withCompletion.startedAt = new Date();
+  }
+
   const updated = await prisma.task.update({ where: { id: taskId }, data });
+
+  // Kept as the existing action name when status is the only change, so
+  // the audit log stays queryable the way it already was.
+  //
+  // Computed here rather than inline in the call below, and not only for
+  // readability: tests/unit/audit-labels.test.ts reads this file as text
+  // to check every audited action has a Hebrew label, and a quoted string
+  // inside the `action:` expression reads to that scanner as another
+  // action name. A ternary comparing against "status" made it report a
+  // phantom action called `status`. Nothing here is worth making that
+  // check less strict.
+  const statusOnly = callerChanged.length === 1 && callerChanged[0] === STATUS_KEY;
+
   await recordAudit({
     actorId: actor.id,
-    // Kept as the existing action name when status is the only change, so
-    // the audit log stays queryable the way it already was.
-    action: Object.keys(data).length === 1 && data.status !== undefined ? "task.status_change" : "task.update",
+    action: statusOnly ? "task.status_change" : "task.update",
     entityType: "Task",
     entityId: taskId,
     clientId: task.clientId,
@@ -521,3 +602,170 @@ export const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
   DONE: "הושלמה",
   ARCHIVED: "בארכיון",
 };
+
+export const TASK_PRIORITY_LABELS: Record<TaskPriority, string> = {
+  LOW: "נמוכה",
+  NORMAL: "רגילה",
+  HIGH: "גבוהה",
+  URGENT: "דחופה",
+};
+
+// ---------------------------------------------------------------------
+// Tasks phase 1: the task screen.
+//
+// Until now a task existed only as a row in a list. A row is a fine place
+// to tick a checkbox and a bad place to do anything else - read what the
+// work actually is, see how long it has taken, or find out who changed
+// what. Everything below feeds one screen, /app/tasks/[id].
+//
+// Three of these reads already existed as data nobody could see:
+// AuditEvent has recorded every task mutation since phase 1, TimeEntry
+// has pointed at a task since phase 2, and neither was ever displayed.
+// ---------------------------------------------------------------------
+
+/// The Hebrew for what the audit log records about a task.
+///
+/// A map rather than a switch so an action this module does not know
+/// about falls through to a generic line instead of crashing the screen:
+/// AuditEvent.action is a plain String by design, and a future phase will
+/// add verbs this build has never heard of.
+const TASK_AUDIT_LABELS: Record<string, string> = {
+  "task.create": "המשימה נפתחה",
+  "task.update": "המשימה עודכנה",
+  "task.status_change": "הסטטוס שונה",
+};
+
+/// One line of a task's history, already in the words a person reads.
+export type TaskHistoryEntry = {
+  id: string;
+  at: Date;
+  actorName: string | null;
+  label: string;
+  /// The fields that actually changed, in Hebrew, for the lines where
+  /// knowing "what" is the whole point. Empty on creation.
+  changed: string[];
+};
+
+/// Field names as a person would say them. Only the fields worth naming
+/// in a history line appear here; anything else is summarised as a count
+/// rather than exposed by its column name.
+const FIELD_LABELS: Record<string, string> = {
+  title: "כותרת",
+  description: "תיאור",
+  priority: "עדיפות",
+  status: "סטטוס",
+  categoryId: "קטגוריה",
+  assignedToId: "אחראי",
+  dueDate: "תאריך יעד",
+  clientVisible: "הצגה ללקוח",
+  clientTitle: "כותרת ללקוח",
+  waitingOnClientSince: "ממתין ללקוח",
+  clientOutcome: "משפט התוצאה",
+  supplierName: "ספק",
+  supplierExperience: "חוויה מהספק",
+};
+
+/// Server-owned columns. They move on their own as a consequence of
+/// somebody else's change, so listing them in a history line would tell a
+/// person about bookkeeping rather than about a decision.
+const DERIVED_FIELDS = new Set(["updatedAt", "startedAt", "completedAt", "supplierRecordedAt"]);
+
+function changedFields(before: unknown, after: unknown): string[] {
+  if (!before || !after || typeof before !== "object" || typeof after !== "object") return [];
+  const b = before as Record<string, unknown>;
+  const a = after as Record<string, unknown>;
+  const names: string[] = [];
+  for (const key of Object.keys(a)) {
+    if (DERIVED_FIELDS.has(key)) continue;
+    // JSON round-trips dates to strings on one side and not the other, so
+    // compare the serialised form rather than the values.
+    if (JSON.stringify(b[key]) === JSON.stringify(a[key])) continue;
+    const label = FIELD_LABELS[key];
+    if (label) names.push(label);
+  }
+  return names;
+}
+
+/// Everything one task screen shows, in one call.
+///
+/// Returns null rather than throwing when the task does not exist or the
+/// actor cannot reach its client: a page renders a not-found for both,
+/// and telling the two apart would confirm that a task exists on a client
+/// somebody has no access to.
+export async function getTaskDetail(actor: User, taskId: string) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const task = await prisma.task.findFirst({
+    where: { id: taskId, deletedAt: null },
+    include: {
+      client: { select: { id: true, name: true } },
+      category: { select: { id: true, name: true } },
+      assignedTo: { select: { id: true, name: true } },
+    },
+  });
+  if (!task) return null;
+
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === task.clientId)) return null;
+
+  const [entries, audit] = await Promise.all([
+    // Every reported minute on this task, by whom. Running timers
+    // (endAt null, so actualSeconds null) are counted separately rather
+    // than as zero - a task with a timer running on it right now is not
+    // a task with no time on it.
+    prisma.timeEntry.findMany({
+      where: { taskId: task.id, deletedAt: null },
+      orderBy: { startAt: "desc" },
+      select: {
+        id: true,
+        startAt: true,
+        endAt: true,
+        actualSeconds: true,
+        note: true,
+        user: { select: { id: true, name: true } },
+      },
+    }),
+    prisma.auditEvent.findMany({
+      where: { entityType: "Task", entityId: task.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      select: {
+        id: true,
+        action: true,
+        createdAt: true,
+        beforeJson: true,
+        afterJson: true,
+        actor: { select: { name: true } },
+      },
+    }),
+  ]);
+
+  const byUser = new Map<string, { userId: string; userName: string; seconds: number }>();
+  let totalSeconds = 0;
+  for (const e of entries) {
+    const seconds = e.actualSeconds ?? 0;
+    totalSeconds += seconds;
+    const found = byUser.get(e.user.id);
+    if (found) found.seconds += seconds;
+    else byUser.set(e.user.id, { userId: e.user.id, userName: e.user.name, seconds });
+  }
+
+  const history: TaskHistoryEntry[] = audit.map((row) => ({
+    id: row.id,
+    at: row.createdAt,
+    actorName: row.actor?.name ?? null,
+    label: TASK_AUDIT_LABELS[row.action] ?? "שינוי במשימה",
+    changed: row.action === "task.create" ? [] : changedFields(row.beforeJson, row.afterJson),
+  }));
+
+  return {
+    task,
+    time: {
+      totalSeconds,
+      byUser: [...byUser.values()].sort((a, b) => b.seconds - a.seconds),
+      runningCount: entries.filter((e) => e.endAt === null).length,
+      entryCount: entries.length,
+    },
+    history,
+  };
+}

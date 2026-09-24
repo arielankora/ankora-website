@@ -211,10 +211,31 @@ async function main() {
   // account the browser suite signs in as - so "המשימות שלי" on the home
   // screen and the "שלי" filter both have a row, and the timer screen has
   // a promise to offer when a timer stops.
+  //
+  // Tasks phase 1: this is the row the task screen is demonstrated on, so
+  // it carries the two fields that screen exists for. A description in
+  // the Markdown subset the field actually supports (lib/markdown-lite.ts
+  // - emphasis, a list, a link, and nothing else), because a demo that
+  // only ever shows one paragraph teaches people the field holds one
+  // paragraph. `startedAt` is left to the server: the status is already
+  // IN_PROGRESS here, and writing a start date beside it in a seed would
+  // be the one place in the product where that column is not the
+  // server's.
   const RESEARCH_PORTAL = {
     clientVisible: true,
     clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה",
     assignedToId: ankoraAdmin.id,
+    priority: "HIGH" as const,
+    description: [
+      "שלושה ספקים להשוואה, **עד יום חמישי**:",
+      "",
+      "- אלפא, הצעה קיימת מ-2024, אסמכתא `INV-2024-118`",
+      "- ביתא, פנינו ולא חזרו",
+      "- גמא, הגיע דרך המלצה של הלקוח",
+      "",
+      "מה שחשוב ללקוח הוא *זמן האספקה*, לא המחיר. פרטי ההתקשרות של אלפא נמצאים",
+      "ב[אתר שלהם](https://example.com/alpha).",
+    ].join("\n"),
   };
   await prisma.task.upsert({
     where: { id: "demo-task-research-competitors" },
@@ -260,6 +281,45 @@ async function main() {
       status: "OPEN",
     },
   });
+  // Tasks phase 1: the task screen's own fixture, and nothing else's.
+  //
+  // The browser spec for that screen needs a task it can rename,
+  // re-prioritise, run a clock on and close, and every other seeded task
+  // is read by some other spec - the research promise is what the home
+  // screen and the "שלי" filter assert against, and the waiting one is
+  // what the portal reads. A spec that closes a task another spec expects
+  // open is a suite that fails by running order, which is the hardest
+  // kind of failure to believe.
+  //
+  // It carries a category on purpose. A time entry cannot exist without
+  // one, so the timer refuses to start from a task that has none - and a
+  // fixture without a category would make that refusal look like a broken
+  // button rather than the rule it is.
+  //
+  // Internal, not a promise: the spec opts it in itself, because becoming
+  // client-visible and then needing a sentence to close is the sequence
+  // worth proving.
+  await prisma.task.upsert({
+    where: { id: "demo-task-screen-fixture" },
+    update: {},
+    create: {
+      id: "demo-task-screen-fixture",
+      clientId: clientB.id,
+      categoryId: "demo-category-meetings",
+      title: "[DEMO] תיאום מול ועד הבית",
+      status: "OPEN",
+      priority: "NORMAL",
+      description: [
+        "הפרטים שצריך כדי להרים את זה, **בלי לשאול אף אחד**:",
+        "",
+        "- ועד הבית, מיכל, אסמכתא `VA-2026-07`",
+        "- המפתח נמצא אצל השכן מקומה 2",
+        "",
+        "הטופס עצמו נמצא [באתר העירייה](https://example.com/vaad).",
+      ].join("\n"),
+    },
+  });
+
   await prisma.task.upsert({
     where: { id: "demo-task-old-proposal" },
     update: {},

@@ -1,10 +1,11 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
-import type { SupplierExperience, TaskStatus } from "@prisma/client";
+import type { SupplierExperience, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Mirrors lib/app-domain/tasks.ts's TASK_STATUS_LABELS - duplicated
 // (rather than imported) because that module starts with `import
@@ -25,6 +26,24 @@ const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
 
 const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"];
 
+// Tasks phase 1. A dot and not a pill: NORMAL is most rows and shows
+// nothing at all, so the mark only appears where it means something. A
+// pill on every row would cost the list its scannability to say "this one
+// is ordinary", which is not news.
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  LOW: "נמוכה",
+  NORMAL: "רגילה",
+  HIGH: "גבוהה",
+  URGENT: "דחופה",
+};
+
+const PRIORITY_DOTS: Record<TaskPriority, string> = {
+  LOW: "bg-appNavy/20",
+  NORMAL: "bg-transparent",
+  HIGH: "bg-warning",
+  URGENT: "bg-error",
+};
+
 // App redesign (handoff README, screen 4 "משימות"): "שורה: תיבת סימון
 // 20px (ירוקה כשהושלם), כותרת (קו חוצה + עמעום כשהושלם), לקוח · קטגוריה,
 // תג סטטוס, תאריך יעד. סימון כהושלם -> טוסט עם ביטול." The checkbox is a
@@ -43,6 +62,7 @@ export function TaskRow({
     categoryName: string | null;
     dueDate: string | null;
     status: TaskStatus;
+    priority: TaskPriority;
     // Portal phase 1.
     clientVisible: boolean;
     clientTitle: string | null;
@@ -282,7 +302,24 @@ export function TaskRow({
       </button>
 
       <div className="min-w-0 flex-1">
-        <p className={`truncate text-[13.5px] ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}>{task.title}</p>
+        {/* Tasks phase 1: the title is the way in to the task's own
+            screen. A row is where work is ticked off; everything else
+            about a task - its description, its hours, who changed what -
+            lives one click away and had nowhere to be until now. */}
+        <div className="flex items-center gap-1.5">
+          {task.priority !== "NORMAL" && (
+            <span
+              title={`עדיפות ${PRIORITY_LABELS[task.priority]}`}
+              className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOTS[task.priority]}`}
+            />
+          )}
+          <Link
+            href={`/app/tasks/${task.id}`}
+            className={`truncate text-[13.5px] hover:underline ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}
+          >
+            {task.title}
+          </Link>
+        </div>
         <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
           {task.clientName}
           {task.categoryName ? ` · ${task.categoryName}` : ""}

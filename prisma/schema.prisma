@@ -81,6 +81,21 @@ enum TaskStatus {
   ARCHIVED
 }
 
+/// Task.priority. Four values and not five, because a scale people
+/// actually use has a middle they can leave alone: NORMAL is the default
+/// and the majority, HIGH and URGENT are the two that earn a look, and
+/// LOW is the honest place for work that should exist without competing.
+/// A five-point scale turns into "everything is a 3" within a month.
+///
+/// Deliberately NOT an Int. The Tasks screen sorts and filters on this,
+/// and a number invites arithmetic on something that has no units.
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
 // --- Core models ---------------------------------------------------------
 
 /// Every human who can log in - internal Ankora staff AND client-portal
@@ -683,6 +698,31 @@ model Task {
   clientOutcome String?
   completedAt   DateTime?
 
+  // Tasks phase 1 ("מסך המשימה"), and the three things a task could not
+  // say about itself.
+  //
+  // `description` is the first place in this model where a task can hold
+  // more than a line. Until now the only text on a task was `title`, so
+  // every address, phone number, reference number and instruction lived
+  // in WhatsApp, and a colleague picking the task up had to go and ask.
+  // Markdown as plain text, sanitised on render - see the tasks-system
+  // spec's decision 4 for why this is not a rich-text editor.
+  //
+  // `priority` is what the list has never been able to say: these four
+  // are today and the rest are not. Defaulted so no existing row needs a
+  // backfill and no form needs a required field.
+  //
+  // `startedAt` is the counterpart to `completedAt`, which the team
+  // adoption phase added without it. Written by the server on the first
+  // transition into IN_PROGRESS and never moved again - a task that goes
+  // back and forth keeps the moment work actually began on it, because
+  // that is the number cycle time is measured from. Cleared only when a
+  // task returns all the way to OPEN, which is a person saying the work
+  // has not in fact started.
+  description String?
+  priority    TaskPriority @default(NORMAL)
+  startedAt   DateTime?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -702,6 +742,8 @@ model Task {
   @@index([clientId, clientVisible])
   // Portal phase 3: the client's file lists suppliers newest first.
   @@index([clientId, supplierRecordedAt])
+  // Tasks phase 1: the list sorts urgent work to the top within a status.
+  @@index([status, priority, dueDate])
   // Team adoption: promises that have not moved, for the manager's metric
   // and for one person's own rows on the home screen.
   @@index([clientVisible, status, updatedAt])

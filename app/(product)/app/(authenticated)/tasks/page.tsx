@@ -165,6 +165,7 @@ export default async function TasksPage(
                   categoryName: task.category?.name ?? null,
                   dueDate: task.dueDate?.toISOString() ?? null,
                   status: task.status,
+                  priority: task.priority,
                   clientVisible: task.clientVisible,
                   supplierName: task.supplierName,
                   supplierExperience: task.supplierExperience,

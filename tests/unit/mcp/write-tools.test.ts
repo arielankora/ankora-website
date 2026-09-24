@@ -323,6 +323,11 @@ describe("create_task", () => {
       clientId: "c1",
       categoryId: null,
       title: "Send the report",
+      // Tasks phase 1: both are passed on every call, so that omitting
+      // one in the tool cannot silently mean something different from
+      // clearing it. `priority` undefined lets createTask apply NORMAL.
+      description: null,
+      priority: undefined,
       assignedToId: null,
       dueDate: null,
     });
