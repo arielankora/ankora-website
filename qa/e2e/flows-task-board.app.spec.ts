@@ -75,8 +75,19 @@ test("dragging a card moves the task, and it stays moved", async ({ page }) => {
   const startedOpen = (await cardIn(page, "OPEN", CARD).count()) > 0;
   const to = startedOpen ? "IN_PROGRESS" : "OPEN";
 
+  // Waited on BEFORE the reload, and this is not belt and braces. The
+  // card moves optimistically, so the assertion below passes while the
+  // write is still in flight, and a reload at that moment cancels it -
+  // the test would then be asserting against its own aborted write. Four
+  // tests in this suite were doing exactly that until #102.
+  const wrote = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.status() < 400,
+    { timeout: 30_000 }
+  );
+
   await dragTo(page, CARD, to);
   await expect(cardIn(page, to, CARD)).toBeVisible({ timeout: 30_000 });
+  await wrote;
 
   // Written, not just moved on screen.
   await page.reload({ waitUntil: "domcontentloaded" });
