@@ -43,6 +43,12 @@ export async function updateTaskDetailAction(input: {
   assignedToId?: string | null;
   dueDate?: string | null;
   clientOutcome?: string | null;
+  // Tasks phase 2. Who this goes back to, and whether their agreement is
+  // required before it closes. `approvedById` and `approvedAt` are not
+  // here and never will be: the server writes the signature on the
+  // transition, and a signature a browser can post is not one.
+  supervisorId?: string | null;
+  requiresApproval?: boolean;
   // The three portal fields. They are editable from the Tasks row as
   // well, and they belong here too: this screen is the task's own home,
   // and sending somebody back to a list to change what their client
@@ -65,6 +71,8 @@ export async function updateTaskDetailAction(input: {
       // reaches the database does not depend on the reader's clock.
       dueDate: input.dueDate === undefined ? undefined : input.dueDate ? new Date(input.dueDate) : null,
       clientOutcome: input.clientOutcome,
+      supervisorId: input.supervisorId,
+      requiresApproval: input.requiresApproval,
       clientVisible: input.clientVisible,
       clientTitle: input.clientTitle,
       // The screen says "is it waiting", the column stores "since when".
@@ -83,6 +91,9 @@ export async function updateTaskDetailAction(input: {
     return {
       ok: true as const,
       status: updated.status,
+      supervisorId: updated.supervisorId,
+      requiresApproval: updated.requiresApproval,
+      approvedAt: updated.approvedAt?.toISOString() ?? null,
       startedAt: updated.startedAt?.toISOString() ?? null,
       completedAt: updated.completedAt?.toISOString() ?? null,
       clientVisible: updated.clientVisible,

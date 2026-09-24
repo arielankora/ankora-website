@@ -110,10 +110,36 @@ describe("the payload", () => {
         "id",
         "overdue",
         "priority",
+        "requiresApproval",
         "status",
+        "supervisor",
         "title",
       ].sort()
     );
+  });
+
+  it("says who supervises a task, and whether they have to agree", () => {
+    // Two fields rather than one, because watching and approving are
+    // different arrangements. A model that reported "Dana has to approve
+    // this" about a task Dana is only watching would be wrong in the
+    // direction that stops work.
+    const watched = serializeTask(task({ supervisor: { name: "דנה" } }), { timeZone: IL });
+    expect(watched.supervisor).toBe("דנה");
+    expect(watched.requiresApproval).toBe(false);
+
+    const gated = serializeTask(task({ supervisor: { name: "דנה" }, requiresApproval: true }), {
+      timeZone: IL,
+    });
+    expect(gated.requiresApproval).toBe(true);
+  });
+
+  it("emits both for an unsupervised task rather than leaving them out", () => {
+    // The same reasoning as `priority` above: a field that vanishes when
+    // it is ordinary reads as missing data, and a model that cannot see
+    // "nobody supervises this" will ask.
+    const out = serializeTask(task(), { timeZone: IL });
+    expect(out.supervisor).toBeNull();
+    expect(out.requiresApproval).toBe(false);
   });
 
   it("flattens relations to names, and tolerates missing ones", () => {

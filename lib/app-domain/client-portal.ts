@@ -559,7 +559,13 @@ export interface PortalPromise {
 function stageOf(task: { status: string; waitingOnClientSince: Date | null }): PortalStage {
   if (task.waitingOnClientSince) return "WAITING_ON_CLIENT";
   if (task.status === "DONE") return "DONE";
-  if (task.status === "IN_PROGRESS") return "IN_PROGRESS";
+  // Tasks phase 2: PENDING_APPROVAL is ours, not theirs. To the client
+  // it is still being handled, because from where they sit it is - the
+  // work is done and somebody here has to sign it. Showing them a stage
+  // called "waiting for approval" would raise a question about our
+  // internal process that has nothing to do with their outcome, and
+  // "הושלם" would be a lie until it is signed.
+  if (task.status === "IN_PROGRESS" || task.status === "PENDING_APPROVAL") return "IN_PROGRESS";
   return "RECEIVED";
 }
 

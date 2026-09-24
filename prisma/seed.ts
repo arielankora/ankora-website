@@ -320,6 +320,35 @@ async function main() {
     },
   });
 
+  // Tasks phase 2's own fixture, read by the supervision spec and by
+  // nothing else.
+  //
+  // Supervised by employee1 because that is who the browser suite signs
+  // in as: the nav row, the count beside it and the approval buttons all
+  // exist only for the person a task defers to, so a fixture supervised
+  // by anybody else would leave every one of them invisible and the spec
+  // asserting an empty screen.
+  //
+  // Internal rather than client-visible on purpose. A promise cannot be
+  // sent for approval without its outcome sentence, and that rule has
+  // its own tests; making this one a promise would mean every run of the
+  // approval flow also re-proving the outcome gate, which is the sort of
+  // coupling that makes one failure look like two.
+  await prisma.task.upsert({
+    where: { id: "demo-task-supervised-fixture" },
+    update: {},
+    create: {
+      id: "demo-task-supervised-fixture",
+      clientId: clientB.id,
+      title: "[DEMO] החלפת ספק ניקיון",
+      status: "OPEN",
+      priority: "NORMAL",
+      supervisorId: employeeOne.id,
+      requiresApproval: true,
+      description: "מחיר מול שניים אחרים, ואז אישור לפני החתימה.",
+    },
+  });
+
   await prisma.task.upsert({
     where: { id: "demo-task-old-proposal" },
     update: {},

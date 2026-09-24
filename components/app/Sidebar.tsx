@@ -14,6 +14,9 @@ export type NavCounters = {
   activeTimerStartAt?: string | null;
   importantDatesCount?: number;
   alertsCount?: number;
+  /// Tasks phase 2: how many tasks are waiting on this person's
+  /// approval. Zero prints nothing, like every other counter here.
+  supervisingCount?: number;
 };
 
 /** Ticks a "H:MM" counter from an ISO start time - mirrors LiveTimerPill's own tick, kept separate since this one renders a shorter format for the nav row. */
@@ -104,6 +107,8 @@ export function Sidebar({
               ? timerCounter
               : item.href === "/app/important-dates" && counters?.importantDatesCount
                 ? String(counters.importantDatesCount)
+                : item.href === "/app/supervising" && counters?.supervisingCount
+                ? String(counters.supervisingCount)
                 : item.href === "/app/alerts" && counters?.alertsCount
                   ? String(counters.alertsCount)
                   : null;

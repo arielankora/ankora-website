@@ -115,6 +115,8 @@ export type TaskLike = {
   client?: { name: string } | null;
   category?: { name: string } | null;
   assignedTo?: { name: string } | null;
+  supervisor?: { name: string } | null;
+  requiresApproval?: boolean;
 };
 
 export type SerializedTask = {
@@ -130,6 +132,14 @@ export type SerializedTask = {
   /// find the urgent work needs to see that the rest is not, and a field
   /// that disappears when it is ordinary reads as missing data.
   priority: string;
+  /// Tasks phase 2. Null when nobody supervises, which is most tasks.
+  supervisor: string | null;
+  /// Whether this task needs that person's sign-off before it can close.
+  /// Separate from `supervisor` because watching and approving are two
+  /// different arrangements, and a model telling somebody "Dana has to
+  /// approve this" when Dana is only watching would be wrong in the
+  /// direction that stops work.
+  requiresApproval: boolean;
   createdAt: string;
 };
 
@@ -169,6 +179,8 @@ export function serializeTask(
     // A finished task is never overdue, however far past its date it sits.
     overdue: !isClosed && task.dueDate !== null && task.dueDate.getTime() < now.getTime(),
     priority: task.priority,
+    supervisor: task.supervisor?.name ?? null,
+    requiresApproval: task.requiresApproval ?? false,
     createdAt: task.createdAt.toISOString(),
   };
 }

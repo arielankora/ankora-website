@@ -4,6 +4,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
+import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import type { User } from "@prisma/client";
 
 // Portal phase 3: the monthly summary.
@@ -102,7 +103,10 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
       select: { id: true, supplierName: true },
     }),
     prisma.task.count({
-      where: { clientId, deletedAt: null, clientVisible: true, status: { in: ["OPEN", "IN_PROGRESS"] } },
+      // OPEN_STATUSES rather than the list written out: phase 2 added
+      // PENDING_APPROVAL and a second copy of "what counts as open" is a
+      // copy that gets missed. It was missed here once already.
+      where: { clientId, deletedAt: null, clientVisible: true, status: { in: OPEN_STATUSES } },
     }),
   ]);
 

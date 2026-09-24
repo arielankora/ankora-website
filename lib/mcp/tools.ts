@@ -533,6 +533,16 @@ export function registerAnkoraTools(server: McpServer): void {
           .optional()
           .describe("Only tasks assigned to this colleague, by name or email. Requires `client`. Ignored when `mine` is set."),
         unassigned: z.boolean().optional().describe("Only tasks with nobody assigned."),
+        supervising: z
+          .boolean()
+          .optional()
+          .describe(
+            "Only tasks the signed-in employee supervises. Combine with `awaitingApproval` for the ones actually waiting on them."
+          ),
+        awaitingApproval: z
+          .boolean()
+          .optional()
+          .describe("Only tasks whose work is finished and waiting for a supervisor to sign them off."),
         overdue: z.boolean().optional().describe("Only tasks whose due date has passed."),
         dueBy: DATE.optional().describe("Only tasks due on or before this date, YYYY-MM-DD."),
         includeDone: z.boolean().optional().describe("Include completed and archived tasks. Off by default."),
@@ -546,6 +556,8 @@ export function registerAnkoraTools(server: McpServer): void {
         mine?: boolean;
         person?: string;
         unassigned?: boolean;
+        supervising?: boolean;
+        awaitingApproval?: boolean;
         overdue?: boolean;
         dueBy?: string;
         includeDone?: boolean;
@@ -591,7 +603,13 @@ export function registerAnkoraTools(server: McpServer): void {
           clientId,
           assignedToId,
           unassigned: args.unassigned || undefined,
+          supervisorId: args.supervising ? actor.id : undefined,
           dueBefore,
+          // `awaitingApproval` is a status, so it wins over the default
+          // open set rather than narrowing it: asking for work waiting on
+          // a signature and getting everything open back would be an
+          // answer to a different question.
+          status: args.awaitingApproval ? "PENDING_APPROVAL" : undefined,
           statusIn: args.includeDone ? undefined : OPEN_STATUSES,
         });
 
@@ -743,9 +761,11 @@ export function registerAnkoraTools(server: McpServer): void {
           .optional()
           .describe("Look among completed and archived tasks too - needed to reopen something already finished."),
         status: z
-          .enum(["OPEN", "IN_PROGRESS", "DONE", "ARCHIVED"])
+          .enum(["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE", "ARCHIVED"])
           .optional()
-          .describe("New status. DONE means finished; ARCHIVED means dropped without being done."),
+          .describe(
+            "New status. PENDING_APPROVAL means the work is finished and waiting for the supervisor to sign it off; DONE means finished; ARCHIVED means dropped without being done. A task that requires approval reaches DONE only from PENDING_APPROVAL, and only its supervisor may make that move."
+          ),
         title: z.string().min(1).optional().describe("New title, replacing the old one."),
         category: z.string().optional().describe("New category for the task."),
         assignTo: z.string().optional().describe("Colleague's name or email to hand it to."),
@@ -762,6 +782,22 @@ export function registerAnkoraTools(server: McpServer): void {
           .enum(["LOW", "NORMAL", "HIGH", "URGENT"])
           .optional()
           .describe("New priority."),
+        supervisor: z
+          .string()
+          .optional()
+          .describe(
+            "Colleague's name or email to watch over this task. A supervisor alone only watches; set `requireApproval` as well if they have to agree before it closes."
+          ),
+        clearSupervisor: z
+          .boolean()
+          .optional()
+          .describe("Remove the supervisor. Also switches off any approval requirement, since nobody would be left to give it."),
+        requireApproval: z
+          .boolean()
+          .optional()
+          .describe(
+            "Whether this task needs the supervisor's sign-off before it can be finished. Turning it on needs a supervisor. Once the task is waiting for approval, only the supervisor may switch it off."
+          ),
         outcome: z
           .string()
           .min(1)
@@ -777,7 +813,7 @@ export function registerAnkoraTools(server: McpServer): void {
         task: string;
         client?: string;
         includeDone?: boolean;
-        status?: "OPEN" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
+        status?: "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "DONE" | "ARCHIVED";
         title?: string;
         category?: string;
         assignTo?: string;
@@ -786,6 +822,9 @@ export function registerAnkoraTools(server: McpServer): void {
         clearDue?: boolean;
         details?: string;
         priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+        supervisor?: string;
+        clearSupervisor?: boolean;
+        requireApproval?: boolean;
         outcome?: string;
       },
       ctx: ServerContext
@@ -798,6 +837,9 @@ export function registerAnkoraTools(server: McpServer): void {
         }
         if (args.due && args.clearDue) {
           return toolText("Pass either due or clearDue, not both - they contradict each other.");
+        }
+        if (args.supervisor && args.clearSupervisor) {
+          return toolText("Pass either supervisor or clearSupervisor, not both - they contradict each other.");
         }
 
         let clientId: string | undefined;
@@ -831,6 +873,15 @@ export function registerAnkoraTools(server: McpServer): void {
         // reads a blank string as null.
         if (args.details !== undefined) patch.description = args.details;
         if (args.priority !== undefined) patch.priority = args.priority;
+        // Clearing the supervisor clears the requirement with it. The
+        // domain refuses a task that requires an approval nobody can
+        // give, and a model asked to "take Dana off this" means the whole
+        // arrangement, not half of it followed by an error.
+        if (args.clearSupervisor) {
+          patch.supervisorId = null;
+          patch.requiresApproval = false;
+        }
+        if (args.requireApproval !== undefined) patch.requiresApproval = args.requireApproval;
 
         if (args.category !== undefined) {
           const category = await lookupCategory(actor, taskClientId, args.category);
@@ -842,9 +893,21 @@ export function registerAnkoraTools(server: McpServer): void {
           if (!person.ok) return toolText(person.message);
           patch.assignedToId = person.value.id;
         }
+        if (args.supervisor !== undefined) {
+          // The same lookup as the assignee, because it is the same
+          // question: who, among the people with access to this client,
+          // is this. A supervisor without that access could not open the
+          // task they are being asked to sign for, and updateTask refuses
+          // it either way.
+          const person = await lookupAssignee(actor, taskClientId, args.supervisor);
+          if (!person.ok) return toolText(person.message);
+          patch.supervisorId = person.value.id;
+        }
 
         if (Object.keys(patch).length === 0) {
-          return toolText("Nothing to change - pass at least one of status, title, category, assignTo, due or outcome.");
+          return toolText(
+            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due or outcome."
+          );
         }
 
         const updated = await updateTask(actor, found.value.id, patch);
