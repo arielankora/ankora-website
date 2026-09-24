@@ -503,4 +503,38 @@ describe("deleteTimeEntry - spec 5.1 soft delete only", () => {
     expect(row).not.toBeNull();
     expect(row?.deletedAt).not.toBeNull();
   });
+
+  // 24.9.2026: discarding a running timer left endAt null, which the
+  // one-active-per-user index still counted as active while
+  // getActiveTimer (deletedAt: null) did not. Every later start failed
+  // on the index and surfaced as "כבר קיים טיימר פעיל" with no timer to
+  // stop - a permanent block for that user. Asserted at both levels: the
+  // discarded row is closed, and the next start actually succeeds.
+  it("lets the user start a new timer right after discarding a running one", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+
+    await deleteTimeEntry(employee, running.id);
+
+    const discarded = await prisma.timeEntry.findUnique({ where: { id: running.id } });
+    expect(discarded?.endAt).not.toBeNull();
+    expect(discarded?.actualSeconds).toBe(0);
+    expect(await getActiveTimer(employee.id)).toBeNull();
+
+    const next = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+    expect(next.endAt).toBeNull();
+  });
+
+  // The same row, left running as the old code left it: the index alone
+  // must not block the next start. Guards the migration's predicate
+  // directly, so a future schema regeneration that drops the deletedAt
+  // half of it fails here rather than in someone's timer screen.
+  it("does not let a soft-deleted running row block a new timer", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+    await prisma.timeEntry.update({ where: { id: running.id }, data: { deletedAt: new Date() } });
+
+    const next = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+    expect(next.endAt).toBeNull();
+  });
 });
