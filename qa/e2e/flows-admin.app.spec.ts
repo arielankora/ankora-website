@@ -21,6 +21,7 @@ import { test, expect } from "./fixtures";
 // @covers action:(product)/app/(authenticated)/categories/actions
 // @covers action:(product)/app/(authenticated)/profile/actions
 // @covers action:(product)/app/(authenticated)/report-schedules/actions
+// @covers action:(product)/app/(authenticated)/time-entries/actions
 
 // These are write flows against a shared build: a navigation, several
 // round-trips and a revalidation each. The 30s default is enough when one
@@ -140,22 +141,17 @@ test.describe("profile/actions", () => {
 });
 
 test.describe("time-entries/actions - an admin reporting on behalf of an employee", () => {
-  // Left failing, and its @covers claim removed with it, so the scanner keeps
-  // reporting this action as uncovered rather than crediting a test that does
-  // not pass.
+  // This was `fixme` for two rounds, and the note left with it named its own
+  // fix: give the form the same success toast the employee's own screen has,
+  // and assert on that. It has one now.
   //
-  // The flow itself works - the entry is filed. What could not be pinned down
-  // in a reasonable number of CI rounds is how this screen reports that it
-  // did: after the submit the form is sometimes collapsed back to its toggle,
-  // sometimes gone entirely, and the entry lands in a table that is filtered
-  // and paged so it is not reliably visible either. Every assertion tried so
-  // far has been about the screen's post-submit state rather than the write,
-  // and each one held for some runs and not others.
-  //
-  // Worth doing properly rather than guessing again: give this form the same
-  // success toast the employee's own screen has, and then assert on that. The
-  // absence of one is the actual reason this is hard to test.
-  test.fixme("an entry created for another user shows up under their name", async ({ page }) => {
+  // The point is not that a toast is easier to locate. It is that the screen
+  // had no success signal at all, so every assertion tried here was about
+  // some side effect of one - the form collapsing, a row appearing in a table
+  // that is filtered and paged - and each held for some runs and not others.
+  // A test that cannot be written stably against a screen is usually telling
+  // you something about the screen. This one was.
+  test("an entry created for another user shows up under their name", async ({ page }) => {
     const window = windowEarlierToday(25, 320 + 60 * test.info().retry);
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
@@ -192,12 +188,19 @@ test.describe("time-entries/actions - an admin reporting on behalf of an employe
 
     await form.getByRole("button", { name: "הוספת דיווח לעובד" }).click();
 
-    // This form reports success by collapsing back to its toggle, and reports
-    // failure by rendering an error paragraph in place. Either of those is a
-    // completed round trip; what must never happen is the error.
+    // The toast is the action reporting ok, and it is the assertion. Its
+    // description carries the employee's name, which is the whole point of
+    // this path - an admin filing time against somebody else - so the name is
+    // checked too rather than just the fact that something was saved.
+    await expect(page.getByText("הדיווח נשמר"), "the admin entry was refused").toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/נרשם על שם/), "the toast did not name the employee it filed for").toBeVisible();
+
+    // And the form is gone, not merely quiet: the toggle is back. A toast
+    // with the form still open would mean the entry was filed twice on the
+    // next click.
     await expect(
       page.getByRole("button", { name: "+ דיווח עבור עובד" }),
-      "the admin entry form never completed its submit",
+      "the admin entry form never collapsed after its save",
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/שגיאה|חופף|לא תקין|אין לך הרשאה/), "the admin entry was refused").toHaveCount(0);
   });

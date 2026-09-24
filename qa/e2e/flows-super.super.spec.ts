@@ -9,6 +9,7 @@ import { pageDrift, trafficSummary } from "./observe";
 // @covers action:(product)/app/(authenticated)/users/actions
 // @covers action:(product)/app/(authenticated)/alerts/actions
 // @covers action:(product)/app/(authenticated)/important-dates/actions
+// @covers action:(product)/app/(authenticated)/hour-banks/actions
 //
 // As in the other flow files: each test creates the row it acts on, under a
 // name unique to that run, so nothing here depends on another spec's timing
@@ -240,20 +241,17 @@ test.describe("alerts/actions", () => {
 });
 
 test.describe("hour-banks/actions", () => {
-  // Left failing on purpose, and its @covers claim removed with it, so the
-  // scanner keeps reporting hour-banks/actions as uncovered rather than
-  // crediting a test that does not pass.
+  // This was `fixme` with a note asking for one thing before it came back:
+  // understand why the submit button was still disabled sixty seconds after
+  // a form that validated. It was never this action being slow. The form was
+  // held pending until the revalidated re-render landed, not until the action
+  // answered - the same coupling that made every write screen in the app look
+  // slow, and that useActionForm removed. The measurement is in that file.
   //
-  // What three runs showed, consistently: the form validates (no invalid
-  // field), the submit button goes disabled, and it is STILL disabled 60
-  // seconds later - so the action was accepted and never came back. That is
-  // not the test being impatient, and raising the timeout again would only
-  // hide how long it is. Opening a cycle recalculates rollover against the
-  // previous one; under a single-worker run with nothing else writing, it
-  // should not take a minute.
-  //
-  // Flip this to `test` once that is understood - the flow itself is right.
-  test.fixme("opening a cycle for a client shows its purchased hours", async ({ page }) => {
+  // So the flow comes back unchanged. What changes is the wait: see the
+  // helper's own note on why a timeout raised for a reason has to fall when
+  // that reason does.
+  test("opening a cycle for a client shows its purchased hours", async ({ page }) => {
     await page.goto(`/app/hour-banks?clientId=${CLIENT}`);
 
     // The opener lives in a drawer, and only once a client is selected.
@@ -269,11 +267,11 @@ test.describe("hour-banks/actions", () => {
     await dialog.locator('select[name="rolloverMode"]').selectOption("NONE");
     await dialog.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
 
-    // 60s, not the usual 25. Opening a cycle recalculates rollover against
-    // the previous one and writes several rows, and the last run showed it
-    // still in flight - submit button disabled, no invalid field - rather
-    // than refused. Worth knowing it is this slow; not worth failing over.
-    await expectDrawerClosed(page, "opening an hour-bank cycle", 60_000);
+    // The default, like every other drawer here. The 60s this used to carry
+    // was measuring a form waiting for a screen refresh, not an action
+    // writing rows; with that gone, 60s would only absorb a real regression
+    // in silence.
+    await expectDrawerClosed(page, "opening an hour-bank cycle");
     await page.reload();
 
     // 600 minutes is ten hours; the screen renders banks in H:MM, so the

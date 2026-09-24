@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { adminCreateEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
+import { useToast } from "@/components/app/toast/ToastProvider";
 
 type Option = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -37,13 +38,35 @@ export function AdminCreateEntryForm({
   categories: Category[];
 }) {
   const [clientId, setClientId] = useState("");
+  const [userId, setUserId] = useState("");
   const [date, setDate] = useState(todayKey());
   const [open, setOpen] = useState(false);
+  const { showToast } = useToast();
   // Closes on success, like every other create form in the app. It used
   // to stay open and rely on the person noticing the new row appear in
   // the table below - which says nothing when the row is slow to arrive,
   // and nothing at all about whether the write was accepted.
-  const { onSubmit, pending, error } = useActionForm(adminCreateEntryAction, () => setOpen(false));
+  //
+  // And closing alone was not enough either. Collapsing back to a toggle
+  // is the same shape as never having opened: the only difference a
+  // person could read was a row appearing in a table that is filtered and
+  // paged, so on most screens there was nothing to see at all. This form
+  // now says so out loud, the way the employee's own screen does - and it
+  // names the employee, because filing time against somebody else's name
+  // is exactly the case where "saved" is not enough to know it went to
+  // the right person.
+  const { onSubmit, pending, error } = useActionForm(adminCreateEntryAction, () => {
+    setOpen(false);
+    const person = users.find((u) => u.id === userId);
+    showToast({
+      tone: "success",
+      title: "הדיווח נשמר",
+      description: person ? `נרשם על שם ${person.name}.` : undefined,
+    });
+    setUserId("");
+    setClientId("");
+    setDate(todayKey());
+  });
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
@@ -73,6 +96,8 @@ export function AdminCreateEntryForm({
         <select
           name="userId"
           required
+          value={userId}
+          onChange={(e) => setUserId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
           <option value="">בחירה</option>
