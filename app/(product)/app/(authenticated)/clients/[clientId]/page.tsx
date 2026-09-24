@@ -19,6 +19,9 @@ import { EditClientForm } from "./EditClientForm";
 import { DecisionsPanel } from "./DecisionsPanel";
 import { DocumentsPanel, SummaryPanel } from "./FilePanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
+import { TasksPanel } from "./TasksPanel";
+import { clientTaskOverview } from "@/lib/app-domain/tasks";
+import { listCategories } from "@/lib/app-domain/categories";
 import type { ImportantDateStatus } from "@prisma/client";
 
 const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red"> = {
@@ -55,12 +58,17 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
     listPortalSummaries(user, client.id),
+    clientTaskOverview(user, client.id),
+    listCategories(),
   ]);
+  const taskCategories = allCategories
+    .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
+    .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }));
 
   const monthLabel = (date: Date) =>
     new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
@@ -88,6 +96,23 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <EditClientForm client={client} staff={staff} />
         </div>
+
+        <TasksPanel
+          clientId={client.id}
+          clientName={client.name}
+          openCount={taskOverview.openCount}
+          closedRecently={taskOverview.closedRecently}
+          untaskedSecondsThisMonth={taskOverview.untaskedSecondsThisMonth}
+          categories={taskCategories}
+          tasks={taskOverview.open.map((t) => ({
+            id: t.id,
+            title: t.title,
+            status: t.status,
+            assigneeName: t.assignedTo?.name ?? null,
+            dueDate: t.dueDate ? t.dueDate.toISOString() : null,
+            seconds: taskOverview.hoursByTask.get(t.id) ?? 0,
+          }))}
+        />
 
         <DocumentsPanel
           clientId={client.id}

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
+import { localDateTimeToUtc } from "@/lib/timezone";
 import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
@@ -198,6 +199,67 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       { createdAt: "desc" },
     ],
   });
+}
+
+/// Hadas, 23.9.2026: "בשדה לקוח להוסיף תצוגת משימות". The client screen
+/// showed the client's files, decisions and dates, and not the work.
+///
+/// Three numbers beside the list, each answering a question the screen is
+/// opened to ask: what is open, what closed lately, and how much of this
+/// month's time was reported against no task at all. The last one is the
+/// honest caveat under the first two: hours on tasks are only as complete
+/// as the linking.
+///
+/// The access check is explicit here. listTasks drops a clientId the actor
+/// cannot reach and falls back to every client they can, which is right for
+/// a filter and wrong for a screen that is about one client.
+export const CLIENT_OVERVIEW_OPEN_LIMIT = 10;
+const RECENTLY_CLOSED_DAYS = 30;
+
+export async function clientTaskOverview(actor: User, clientId: string, now: Date = new Date()) {
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === clientId)) {
+    return { open: [], openCount: 0, closedRecently: 0, hoursByTask: new Map<string, number>(), untaskedSecondsThisMonth: 0 };
+  }
+
+  const monthKey = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" }).format(now);
+  const monthStart = localDateTimeToUtc(`${monthKey}-01`, "00:00");
+
+  const [open, closedRecently, untasked] = await Promise.all([
+    listTasks(actor, { clientId, statusIn: OPEN_STATUSES }),
+    prisma.task.count({
+      where: {
+        clientId,
+        deletedAt: null,
+        status: "DONE",
+        completedAt: { gte: new Date(now.getTime() - RECENTLY_CLOSED_DAYS * 86_400_000) },
+      },
+    }),
+    prisma.timeEntry.aggregate({
+      where: { clientId, deletedAt: null, taskId: null, startAt: { gte: monthStart, lt: now } },
+      _sum: { actualSeconds: true },
+    }),
+  ]);
+
+  const shown = open.slice(0, CLIENT_OVERVIEW_OPEN_LIMIT);
+  const sums =
+    shown.length === 0
+      ? []
+      : await prisma.timeEntry.groupBy({
+          by: ["taskId"],
+          where: { taskId: { in: shown.map((t) => t.id) }, deletedAt: null },
+          _sum: { actualSeconds: true },
+        });
+  const hoursByTask = new Map<string, number>();
+  for (const row of sums) if (row.taskId) hoursByTask.set(row.taskId, row._sum.actualSeconds ?? 0);
+
+  return {
+    open: shown,
+    openCount: open.length,
+    closedRecently,
+    hoursByTask,
+    untaskedSecondsThisMonth: untasked._sum.actualSeconds ?? 0,
+  };
 }
 
 /// The open promises a person could be working on right now, for the
