@@ -2,24 +2,30 @@ import { test, expect } from "./fixtures";
 
 // The task screen, from the side of somebody actually working on a task.
 //
-// The scanner flagged two new capabilities with no proof behind them: the
+// The scanner flagged two new capabilities with nothing behind them: the
 // screen itself, and the Server Actions that write from it. A screen owes
 // a browser test because a browser is the only thing that can say whether
 // it works; a Server Action owes one because it is the hinge between a
 // control somebody clicks and a row in the database, and each half can be
 // right while the pair is broken.
 //
-// What is asserted here is what a person would notice, not what the code
-// does. The description comes back RENDERED rather than as the characters
-// that produced it. The clock starts from the work and the minutes land
-// on that task. A promise the client can see refuses to close silently
-// and asks first. None of those are readable from the source.
+// Everything here runs against ONE seeded task that exists for this file
+// and is read by nothing else. Two earlier versions of this spec failed
+// for reasons that had nothing to do with the screen, and both are worth
+// stating because they are why it looks like this:
 //
-// Prose warning, same as the other flow files in this directory: coverage
-// is inferred from the TEXT of these files, so a module named in a comment
-// would hand itself credit it has not earned. Modules are referred to in
-// words. The two lines below are the declared exception, and they are
-// deliberately awkward to write so they stay rare.
+//   - It created its task through the list drawer, hanging four tests off
+//     the one step in this suite that has been failing and passing on
+//     retry for several releases. A stale list reported itself as a
+//     broken task screen.
+//   - It asserted the history panel's EMPTY state on a shared seeded
+//     task. That task is empty only until another spec touches it, so the
+//     assertion passed or failed by running order.
+//
+// Prose warning, same as the other flow files here: coverage is inferred
+// from the TEXT of these files, so a module named in a comment would hand
+// itself credit it has not earned. Modules are referred to in words. The
+// two lines below are the declared exception.
 //
 // @covers screen:/app/tasks/[id]
 // @covers action:(product)/app/(authenticated)/tasks/[id]/actions
@@ -29,11 +35,9 @@ test.describe.configure({ timeout: 90_000 });
 const TASKS = "/app/tasks";
 const TIMER = "/app/timer";
 
-// The seeded task the demo data gives a description and a priority to, so
-// that this screen has something to be demonstrated on. Matched loosely:
-// every seeded name carries a "[DEMO]" prefix, and an exact string would
-// bake that fixture detail into the test.
-const SEEDED = /מיפוי מתחרים/;
+// This file's own task. Matched loosely: every seeded name carries a
+// "[DEMO]" prefix, and an exact string would bake that into the test.
+const FIXTURE = /תיאום מול ועד הבית/;
 
 /// Leave no timer of an earlier spec running.
 ///
@@ -50,90 +54,46 @@ async function clearRunningTimer(page: import("@playwright/test").Page) {
   }
 }
 
-test("the list opens the task, and the task says what the row could not", async ({ page }) => {
+/// Open this file's task from the list, the way a person reaches it.
+async function openFixture(page: import("@playwright/test").Page) {
   await page.goto(TASKS, { waitUntil: "domcontentloaded" });
-
-  await page.getByRole("link", { name: SEEDED }).first().click();
+  await page.getByRole("link", { name: FIXTURE }).first().click();
   await expect(page).toHaveURL(/\/app\/tasks\/[^/]+$/);
+}
 
-  // Rendered, not raw. The asterisks that produced this are not on the
-  // screen, and the emphasis is a real element - which is the whole
-  // difference between a description field and a textarea nobody reads.
-  await expect(page.locator("strong", { hasText: "עד יום חמישי" })).toBeVisible();
-  await expect(page.locator("code", { hasText: "INV-2024-118" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "אתר שלהם" })).toHaveAttribute(
-    "href",
-    "https://example.com/alpha"
-  );
-  // A link in a description leaves the app, and says so to the browser.
-  await expect(page.getByRole("link", { name: "אתר שלהם" })).toHaveAttribute(
-    "rel",
-    /noopener/
-  );
-
-  // The two panels that read data nothing has ever displayed.
-  //
-  // Both show their empty state here, and that is the correct assertion
-  // rather than a weaker one. This task is written straight into the
-  // database by the seed, so it has never passed through the write path
-  // that records an audit event - it genuinely has no history, and a
-  // panel claiming otherwise would be the bug. The populated case is
-  // asserted below, on a task the suite creates through the product.
-  await expect(page.getByText("שעות על המשימה")).toBeVisible();
-  await expect(page.getByText("היסטוריה")).toBeVisible();
-  await expect(page.getByText("אין עדיין שינויים מתועדים")).toBeVisible();
-});
-
-// Serial, and sharing one task: these are stages of a single piece of
-// work, not independent checks. Creating a task per assertion would make
-// the file slower and would stop testing the thing that matters - that
-// the same task carries all of it at once.
+// Serial, and in this order: these are stages of one piece of work, and
+// the last of them closes the task the others need open.
 test.describe.serial("one task, from opening it to closing it", () => {
-  const title = `[E2E] משימה-${Date.now().toString(36)}`;
-  let taskUrl = "";
+  test("the list opens the task, and the task says what the row could not", async ({ page }) => {
+    await openFixture(page);
 
-  test("a task created from the list opens on its own screen", async ({ page }) => {
-    await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+    // Rendered, not raw. The asterisks that produced this are not on the
+    // screen and the emphasis is a real element, which is the whole
+    // difference between a description field and a textarea nobody reads.
+    await expect(page.locator("strong", { hasText: "בלי לשאול אף אחד" })).toBeVisible();
+    await expect(page.locator("code", { hasText: "VA-2026-07" })).toBeVisible();
 
-    await page.getByRole("button", { name: "+ משימה" }).click();
-    await page.locator('select[name="clientId"]').selectOption({ index: 1 });
-    await page.locator('input[name="title"]').fill(title);
-    await page.locator('input[name="clientVisible"]').check();
-    await page.getByRole("button", { name: "הוספת משימה" }).click();
+    const link = page.getByRole("link", { name: "באתר העירייה" });
+    await expect(link).toHaveAttribute("href", "https://example.com/vaad");
+    // A link inside a description leaves the app, and says so to the
+    // browser rather than handing it the referrer.
+    await expect(link).toHaveAttribute("rel", /noopener/);
 
-    // Reloaded until the row is there, rather than waited for.
-    //
-    // This is the one place this file differs from the adoption spec on
-    // purpose. That spec waits without reloading because the thing it is
-    // testing IS the screen refreshing itself, and it is the reason that
-    // property stopped being a coin flip. Here the creation is a fixture:
-    // this file is about what happens once a task exists, and hanging all
-    // of it on the slowest path in the suite would mean four tests
-    // reporting a stale list as a broken task screen.
-    const row = page.locator("[data-task]").filter({ hasText: title });
-    await expect
-      .poll(
-        async () => {
-          if (await row.isVisible().catch(() => false)) return true;
-          await page.reload({ waitUntil: "domcontentloaded" });
-          return row.isVisible().catch(() => false);
-        },
-        { message: "the created task never appeared in the list", timeout: 60_000 }
-      )
-      .toBe(true);
-
-    await row.getByRole("link", { name: title }).click();
-    await expect(page).toHaveURL(/\/app\/tasks\/[^/]+$/);
-    taskUrl = page.url();
+    // The two panels that read data nothing has ever displayed. Asserted
+    // as present, not as empty or full: what they hold depends on what
+    // has already run, and an assertion that depends on running order is
+    // one that will eventually fail for no reason anyone can act on.
+    await expect(page.getByText("שעות על המשימה")).toBeVisible();
+    await expect(page.getByText("היסטוריה")).toBeVisible();
   });
 
   test("priority and description are written from the screen and survive a reload", async ({ page }) => {
-    await page.goto(taskUrl, { waitUntil: "domcontentloaded" });
+    await openFixture(page);
 
     await page.getByLabel("עדיפות").selectOption("URGENT");
     await expect(page.getByText("העדיפות: דחופה")).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole("button", { name: "הוספת תיאור" }).click();
+    await page.getByRole("button", { name: "עריכה" }).first().click();
     await page
       .getByPlaceholder(/מה צריך לעשות/)
       .fill("כתובת: הרצל 5.\n\n- לאסוף את המסמך\n- **להחתים** לפני חמישי");
@@ -147,20 +107,20 @@ test.describe.serial("one task, from opening it to closing it", () => {
     await expect(page.locator("strong", { hasText: "להחתים" })).toBeVisible();
     await expect(page.getByText("כתובת: הרצל 5.")).toBeVisible();
 
-    // And the history panel, on a task that DID go through the product's
-    // own write path. The audit log has been recording this since phase
-    // 1 with nothing to display it; these two lines are the first time
-    // anything asserts that a person can see it.
-    await expect(page.getByText("המשימה נפתחה")).toBeVisible();
-    // The whole line, not the field name: "עדיפות" on its own also
-    // matches the select's own label a few centimetres above, which
-    // would be an assertion that passes without the history existing.
+    // And the history, now that this task has been through the product's
+    // own write path twice. The audit log has recorded task changes since
+    // phase 1 with nothing to display them; this is the first assertion
+    // that a person can actually see one.
+    //
+    // The whole line, not just the field name: "עדיפות" on its own also
+    // matches the select's label a few centimetres above, so it would
+    // pass with no history rendered at all.
     await expect(page.getByText("המשימה עודכנה: עדיפות")).toBeVisible();
   });
 
   test("the clock starts from the work, and the minutes land on this task", async ({ page }) => {
     await clearRunningTimer(page);
-    await page.goto(taskUrl, { waitUntil: "domcontentloaded" });
+    await openFixture(page);
 
     // Before: nothing has been reported against it.
     await expect(page.getByText("עדיין לא דווח זמן על המשימה הזו")).toBeVisible();
@@ -175,24 +135,27 @@ test.describe.serial("one task, from opening it to closing it", () => {
 
     await page.reload({ waitUntil: "domcontentloaded" });
     // The entry is on THIS task now, which is the point of starting from
-    // it: the empty state is gone and the roll-up names the person.
+    // it: the empty state is gone.
     await expect(page.getByText("עדיין לא דווח זמן על המשימה הזו")).toHaveCount(0);
-    await expect(page.getByText("שעות על המשימה")).toBeVisible();
   });
 
   test("a promise the client can see refuses to close without a sentence for them", async ({ page }) => {
-    await page.goto(taskUrl, { waitUntil: "domcontentloaded" });
+    await openFixture(page);
+
+    // Internal until this click. Becoming something a client reads is the
+    // step that puts the task under the close rule at all.
+    await page.getByRole("button", { name: "פנימית" }).click();
+    await expect(page.getByText("המשימה מוצגת ללקוח")).toBeVisible({ timeout: 30_000 });
 
     // The close asks BEFORE it happens. The server would refuse it
-    // anyway; being refused after the fact for something nobody was
-    // asked is the failure this interception exists to avoid.
+    // anyway; being refused after the fact for something nobody was asked
+    // is the failure this interception exists to avoid.
     await page.getByLabel("סטטוס").selectOption("DONE");
     await expect(page.getByText("לפני הסגירה: מה קרה בפועל?")).toBeVisible({ timeout: 30_000 });
 
-    const outcome = "אספנו את המסמך והחתמנו אותו, הכול סגור.";
+    const outcome = "תיאמנו מול הוועד, המפתח נאסף והטופס הוגש.";
     await page.getByLabel("משפט התוצאה לפני סגירה").fill(outcome);
     await page.getByRole("button", { name: "סגירה", exact: true }).click();
-
     await expect(page.getByText("המשימה הושלמה")).toBeVisible({ timeout: 30_000 });
 
     await page.reload({ waitUntil: "domcontentloaded" });
