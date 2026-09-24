@@ -265,7 +265,20 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   //
   // The URL is the one signal that separates the two states. Asserting
   // it first means everything below runs against the filtered list.
-  await expect(page).toHaveURL(/[?&]q=/);
+  //
+  // And on the same sixty seconds as everything else here, which is the
+  // correction to the first version of this fix. In the App Router a
+  // navigation does not change the address bar when it is asked for, it
+  // changes it when the RSC payload arrives - so "the URL still has no
+  // q after ten seconds" and "this screen takes more than ten seconds to
+  // render" are the same sentence. Giving it Playwright's default while
+  // the two assertions below it get sixty was the mistake, not the
+  // ordering.
+  //
+  // If this still fails at sixty seconds then Enter is not navigating at
+  // all, and that is a fault in the screen rather than in the waiting.
+  // The two readings are what this timeout is for.
+  await expect(page).toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
 
   await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: WHOLE_LIST });
   // A filtered list is small, but it is still this screen, and this
