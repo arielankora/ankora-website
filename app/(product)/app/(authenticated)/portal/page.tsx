@@ -6,6 +6,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { whatsappHref } from "@/lib/whatsapp";
 import { PortalTabs } from "./PortalTabs";
 import { PromiseList } from "./PromiseList";
+import { portalHeadline } from "@/lib/app-domain/portal-labels";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -14,24 +15,6 @@ function formatMinutes(minutes: number) {
   const m = Math.abs(minutes) % 60;
   const sign = minutes < 0 ? "-" : "";
   return `${sign}${h}:${String(m).padStart(2, "0")}`;
-}
-
-/// The one sentence at the top of the portal. It is the whole product in
-/// a line: either something needs the client, or nothing does.
-///
-/// Phase 2 put decisions ahead of waiting promises in it. Both are "you
-/// are holding this", but a decision has options and a price and a real
-/// cost to leaving it - a promise waiting on an answer is usually
-/// downstream of one.
-function headline(decisions: number, waiting: number, inProgress: number): string {
-  const needsYou = decisions + waiting;
-  if (decisions === 1 && waiting === 0) return "החלטה אחת מחכה לך.";
-  if (decisions > 1 && waiting === 0) return `${decisions} החלטות מחכות לך.`;
-  if (needsYou === 1) return "דבר אחד מחכה להחלטה שלך.";
-  if (needsYou > 1) return `${needsYou} דברים מחכים להחלטה שלך.`;
-  if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
-  if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
-  return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
 }
 
 // Portal phase 1, the home screen.
@@ -70,7 +53,7 @@ export default async function PortalHomePage() {
       <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
         <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
         <p className="mt-1.5 text-[13.5px] text-appNavy/60">
-          {headline(openDecisions, waitingOnClient.length, inProgress.length)}
+          {portalHeadline(openDecisions, waitingOnClient.length, inProgress.length)}
         </p>
       </div>
 
@@ -82,7 +65,7 @@ export default async function PortalHomePage() {
           <p className="text-[13.5px] font-medium text-appNavy">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
           <ul className="mt-3 space-y-2 text-sm text-appNavy/65">
             <li>כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.</li>
-            <li>כשמשהו מחכה להחלטה שלך, הוא יעלה לראש המסך.</li>
+            <li>כשמשהו מחכה לך, הוא יעלה לראש המסך.</li>
             <li>מה שהושלם נשאר כאן, עם התאריך.</li>
           </ul>
           <p className="mt-4 text-[12.5px] text-appNavy/50">
@@ -107,8 +90,16 @@ export default async function PortalHomePage() {
             </Link>
           )}
 
+          {/* "מחכה לך", not "מחכה להחלטה שלך".
+              These are promises in flight that need something from the
+              client - an answer, a document, a key. They are not
+              decisions, and the decisions tab does not list them. Calling
+              them decisions sent a client to that tab to be told nothing
+              was waiting, which is the fastest way to teach someone the
+              portal is not accurate. The wording here is the same stage
+              label they read on every other screen. */}
           {waitingOnClient.length > 0 && (
-            <PromiseList title="מחכה להחלטה שלך" promises={waitingOnClient} tone="attention" showStage={false} />
+            <PromiseList title="מחכה לך" promises={waitingOnClient} tone="attention" showStage={false} />
           )}
 
           <PromiseList
