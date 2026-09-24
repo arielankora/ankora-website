@@ -26,11 +26,27 @@ const SLOW_MS = 750;
 /// write is never mistaken for a failure - it is a fact about timing.
 const TAG = "[slow]";
 
-export async function timed<T>(label: string, work: () => Promise<T>): Promise<T> {
+/// `detail` is a function and not a string on purpose.
+///
+/// A slow line is worth much more when it says what it was working on -
+/// "312 tasks, 18 clients" turns "this screen took 1.4 seconds" from a
+/// complaint into a diagnosis, because it separates a slow query from a
+/// large result. But building that string on every call would cost
+/// something on the healthy path, which is the one thing this file
+/// promises not to do. So it is only called when the line is printed,
+/// which is to say almost never, and it is called from inside the same
+/// try/finally: a detail that throws must not replace the real error.
+export async function timed<T>(
+  label: string,
+  work: () => Promise<T>,
+  detail?: (result: T | undefined) => string
+): Promise<T> {
   const startedAt = Date.now();
   let threw = false;
+  let value: T | undefined;
   try {
-    return await work();
+    value = await work();
+    return value;
   } catch (err) {
     threw = true;
     throw err;
@@ -40,7 +56,17 @@ export async function timed<T>(label: string, work: () => Promise<T>): Promise<T
     // took twenty milliseconds are different problems, so the duration is
     // reported either way - and the error itself is rethrown untouched.
     const elapsed = Date.now() - startedAt;
-    if (elapsed >= SLOW_MS) console.warn(`${TAG} ${label} ${elapsed}ms${threw ? " (threw)" : ""}`);
+    if (elapsed >= SLOW_MS) {
+      let said = "";
+      if (detail) {
+        try {
+          said = ` ${detail(value)}`;
+        } catch {
+          said = " (detail threw)";
+        }
+      }
+      console.warn(`${TAG} ${label} ${elapsed}ms${threw ? " (threw)" : ""}${said}`);
+    }
   }
 }
 
