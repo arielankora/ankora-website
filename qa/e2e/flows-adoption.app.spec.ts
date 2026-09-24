@@ -89,14 +89,69 @@ test("a promise the client can see cannot be closed without a sentence for them"
   await page.locator('select[name="clientId"]').selectOption({ index: 1 });
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="clientVisible"]').check();
+
+  // This test is the only one in the suite that asserts a screen
+  // refreshing ITSELF after a write, which is why it never reloads and
+  // why it must not start doing so to go green.
+  //
+  // It has also been failing and passing on retry for weeks while saying
+  // only "the row is not there", which is the symptom and not the half
+  // that broke. There are exactly two halves - the write did not land, or
+  // it landed and the screen never showed it - and the answer is in the
+  // action's own response. So the test reads it, the way the decisions
+  // spec has done since the same race was chased through that screen.
+  const wrote = page
+    .waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/tasks"), { timeout: 30_000 })
+    .catch(() => null);
+
   await page.getByRole("button", { name: "הוספת משימה" }).click();
 
-  // Thirty seconds, and the number is a finding rather than a
-  // convenience: the row appears on its own now, and on one CI run it
-  // took longer than twenty. The screen refreshing itself is no longer
-  // a coin flip; how long it takes is still worth someone's attention.
+  const response = await wrote;
+  const body = response ? await response.text().catch(() => null) : null;
+  const carried =
+    response === null
+      ? "the write never even produced a response - the click did not submit, or it was aborted"
+      : body === null
+        ? `the write answered ${response.status()} and its body could not be read`
+        : body.includes(title)
+          ? `the server DID send back a screen carrying this task (${body.length} bytes) - the browser did not apply it`
+          : `the write answered ${response.status()} (${body.length} bytes) and the task is NOT in what came back - revalidation never reached the response, so the row can only arrive by the explicit refresh`;
+
+  // Two stages, because "the row is not there" has two very different
+  // causes and this test has been unable to tell them apart for weeks.
+  //
+  // Stage one is the property under test: the screen brings the row in by
+  // itself. Forty-five seconds, matching the decisions spec, and for its
+  // reason - a refresh on this app was measured at twenty seconds on a
+  // QUIET machine while the slow-writes work was going on. That cost is
+  // real and belongs in its own piece of work; it must not be mistaken
+  // here for a refresh that never happened.
+  //
+  // Stage two runs only when stage one has already failed, and it exists
+  // to name which half broke. If a reload shows the row, the write landed
+  // and the screen never told anyone - a product fault in the refresh. If
+  // a reload does not show it either, the row is not in this list at all,
+  // which is a different fault entirely and would send the next person
+  // somewhere else.
   const row = page.locator("[data-task]").filter({ hasText: title });
-  await expect(row, "the task the drawer just created is not in the list").toBeVisible({ timeout: 30_000 });
+  const appeared = await row
+    .waitFor({ state: "visible", timeout: 45_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (!appeared) {
+    await page.reload({ waitUntil: "domcontentloaded" });
+    const afterReload = await row
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    throw new Error(
+      afterReload
+        ? `the screen never refreshed itself: the task IS in the list after a reload, so the write landed and nothing told the page. ${carried}`
+        : `the task is not in the list even after a reload, so this is not a refresh problem at all. ${carried}`
+    );
+  }
 
   // The close asks before it happens, rather than being refused after.
   await row.getByRole("checkbox").click();

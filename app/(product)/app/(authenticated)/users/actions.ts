@@ -7,7 +7,18 @@ import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
-type InviteState = { error?: string; inviteLink?: string; invitedName?: string; emailSent?: boolean };
+// `ok` is what tells useActionForm the write landed, and it is the reason
+// this state carries a flag that looks redundant beside `inviteLink`.
+// The hook refreshes the screen behind the form on `ok === true`, and the
+// users table is exactly the screen that has to show the new row while
+// the drawer stays open on the one-time link.
+type InviteState = {
+  ok?: boolean;
+  error?: string;
+  inviteLink?: string;
+  invitedName?: string;
+  emailSent?: boolean;
+};
 type FormState = { error?: string; ok?: boolean };
 
 function friendlyError(err: unknown): string {
@@ -42,6 +53,7 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
     const origin = host ? `${protocol}://${host}` : "";
 
     return {
+      ok: true,
       invitedName: user.name,
       inviteLink: `${origin}/app/reset-password?token=${setPasswordToken}`,
       emailSent,

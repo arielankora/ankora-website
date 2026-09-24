@@ -102,6 +102,20 @@ test.describe("categories/actions", () => {
     await dialog.locator('input[name="name"]').fill(name);
     await dialog.getByRole("button", { name: "הוספת קטגוריה" }).click();
 
+    // Wait for the write to be ACKNOWLEDGED before navigating.
+    //
+    // A reload issued while the POST is still open aborts it, and the
+    // run's own traffic log has been reporting exactly that for weeks:
+    // `POST /app/categories net::ERR_ABORTED (WHILE NAVIGATING)`. The
+    // server usually committed anyway, which is why this passed most of
+    // the time and failed for no visible reason the rest of it.
+    //
+    // This drawer closes itself on success, so its disappearance is the
+    // signal that the action answered.
+    await expect(dialog, "the drawer never closed, so the write was not acknowledged").toBeHidden({
+      timeout: 30_000,
+    });
+
     await page.reload();
     await expect(page.getByText(name, { exact: false }).first(), "the category was not created").toBeVisible({
       timeout: 15_000,
@@ -216,11 +230,24 @@ test.describe("report-schedules/actions", () => {
 
     await form.locator('select[name="frequency"]').selectOption("WEEKLY");
     await form.locator('textarea[name="recipients"], input[name="recipients"]').first().fill(recipient);
+    // Wait for the SERVER to acknowledge the write, then navigate.
+    //
+    // The old version reloaded the moment it had clicked, which aborted
+    // the POST that click had just started - the run's traffic log has
+    // been reporting exactly that for weeks. Waiting on the response is
+    // the precise signal, and unlike a UI cue it cannot be confused with
+    // a form that simply has not started yet.
+    //
+    // The reload stays. Dropping it was tried on this branch and turns
+    // this test into an assertion about a screen refreshing itself, which
+    // is a separate open question and not what this test is for.
+    const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
     await form.getByRole("button", { name: "יצירת דוח מתוזמן" }).click();
+    await written;
 
     await page.reload();
     await expect(page.getByText(recipient, { exact: false }).first(), "the schedule was not created").toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
   });
 });

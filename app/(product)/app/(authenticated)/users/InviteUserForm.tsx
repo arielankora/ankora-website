@@ -1,10 +1,9 @@
 "use client";
 import { useRef, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
 import { inviteUserAction } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -24,8 +23,24 @@ function SubmitButton() {
 // one-time invite link below still needs to be visible so it can be
 // copied (no email provider connected yet - Phase 4 TODO). The admin
 // closes it manually via the drawer's own X once they've copied it.
+//
+// Moved off `useFormState` + `<form action>`. It was held back when the
+// other eleven forms moved, on the grounds that it shows what the action
+// returns and the replacement carried only ok-or-error. That was wrong:
+// the replacement carries the whole answer, which is what `result` below
+// reads.
+//
+// The pattern it leaves is the one measured at twenty seconds to
+// acknowledge a write that took a millisecond, because the form waits
+// inside the screen's re-render rather than on the action. Eleven more
+// forms are still on it - five under /app/users and /app/hour-banks, the
+// two inline row editors, and the login and password screens, which have
+// a real reason (they redirect, and a directly-called action cannot).
+// The rest do not, and they are worth a change of their own rather than
+// a detour inside this one.
 export function InviteUserForm({ clients }: { clients: { id: string; name: string }[] }) {
-  const [state, formAction] = useFormState(inviteUserAction, {});
+  const { onSubmit, pending, result } = useActionForm(inviteUserAction);
+  const state = result;
   const [role, setRole] = useState("");
   const isClientUser = role === "CLIENT_USER";
   const checkboxContainerRef = useRef<HTMLDivElement>(null);
@@ -44,7 +59,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
 
   return (
     <div>
-      <form action={formAction} className="flex flex-col gap-4">
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <div>
           <label className="block text-xs font-medium text-appNavy/60">שם מלא *</label>
           <input
@@ -146,7 +161,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
         )}
 
         {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        <SubmitButton />
+        <SubmitButton pending={pending} />
       </form>
 
       {state?.inviteLink && (

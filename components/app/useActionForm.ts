@@ -39,7 +39,7 @@ export type ActionResult = { ok?: boolean; error?: string };
  * uses this sits inside a drawer that only JavaScript can open, so there
  * was never a no-JS path through it to lose.
  *
- * And one thing that had to be added back, twice.
+ * And one thing that had to be added back, three times.
  *
  * The refresh that `revalidatePath` asks for rides home inside the action's
  * response, and whether it ARRIVES turned out to be a coin. The same click,
@@ -48,22 +48,45 @@ export type ActionResult = { ok?: boolean; error?: string };
  * been accepted, once the write committed and the screen had still not
  * changed forty-five seconds later.
  *
- * The first attempt at a fix asked for a refresh explicitly, inside the
- * transition, right after the action returned. It did not hold. A run
- * caught the server's own answer and said so outright: the action's
- * response carried a rendered screen with the new record missing from it,
- * and the explicit refresh that followed changed nothing on the page.
+ * Attempt one asked for a refresh explicitly, inside the transition, right
+ * after the action returned. A run caught the server's own answer and said
+ * so outright: the action's response carried a rendered screen with the new
+ * record missing from it, and the explicit refresh folded into that same
+ * update changed nothing.
  *
- * So the refresh is now asked for from an effect, after the transition
- * that carried the action has committed and this component is settled.
- * Nothing about it competes with the action's own response any more: the
- * screen is re-fetched once, from a normal render, the way it would be if
- * a person had asked for it.
+ * Attempt two asked for it from an effect, after the transition had
+ * committed. Right idea, wrong owner. Five forms here sit in a drawer and
+ * close it on success, and closing unmounts the form in the same batched
+ * update that scheduled the effect. React does not run the effects of a
+ * component it is removing, so Tasks, Clients, Categories, Hour banks and
+ * Important dates asked for no refresh at all.
  *
- * Why no test caught any of this for three releases: every other write
- * test in the browser suite reloads the page before asserting the result.
- * A test that reloads before it looks is not testing a refresh. Two specs
- * now assert the screen updating itself, and they reload nothing.
+ * Attempt three moved it off the component entirely, onto a macrotask that
+ * nothing could unmount. It ran, and it lost a race. A trace of a failing
+ * run, on a write that had already committed:
+ *
+ *     POST /app/tasks                55ms (200)
+ *     GET  /app/tasks?_rsc=...       41ms (net::ERR_ABORTED)
+ *
+ * A timer set on the way out fires while Next is still applying the
+ * action's response, and Next drops the newer request in favour of the one
+ * already in flight - which does not carry the new row. Both lose.
+ *
+ * So the rule is not "an effect" and not "a macrotask". It is: **the
+ * refresh is asked for by whichever component is still alive after the
+ * write, from an effect, so that it runs after the commit that applied the
+ * action's response.** For a form that stays on the screen that is this
+ * hook, below. For the five that close a drawer it is the drawer, which
+ * outlives them; see components/app/Drawer.tsx. Exactly one of the two
+ * fires per write.
+ *
+ * Why no test caught any of this for three releases, and then caught it
+ * in twenty milliseconds. Every other write test in the browser suite
+ * reloads the page before asserting, and a test that reloads before it
+ * looks is not testing a refresh. But the deeper reason is that a
+ * question about one hook's behaviour was only ever asked by sampling a
+ * twelve-minute browser suite. `tests/unit/use-action-form.test.tsx`
+ * renders the real drawer, submits a form and counts the refreshes.
  */
 export function useActionForm<R extends ActionResult>(
   action: (prev: R | undefined, data: FormData) => Promise<R>,
@@ -77,20 +100,28 @@ export function useActionForm<R extends ActionResult>(
   const [result, setResult] = useState<R | null>(null);
   /// Set only when the action itself threw, which `result` cannot carry.
   const [thrown, setThrown] = useState<string | null>(null);
+  /// Bumped on every accepted write, and watched by the effect below. A
+  /// counter rather than a flag, because two saves in a row are two
+  /// refreshes and a flag that is already set is a refresh that never
+  /// happens.
+  const [writes, setWrites] = useState(0);
   // The action still updates the screen behind the form, and that update is
   // still a transition - it is just no longer one this form waits inside.
   const [, startTransition] = useTransition();
   const router = useRouter();
-  /// Bumped on every successful write, and watched by the effect below.
-  /// A counter rather than a boolean because two saves in a row are two
-  /// refreshes, and a boolean that is already true is a refresh that
-  /// never happens.
-  const [landed, setLanded] = useState(0);
 
+  /// Ask the screen behind this form to re-read itself.
+  ///
+  /// Deliberately an effect, and deliberately one that does nothing when
+  /// this form is being removed from the screen. A form inside a drawer
+  /// closes that drawer on success and is unmounted in the same commit,
+  /// and this effect will not run for it. That is correct: the drawer asks
+  /// instead, from an effect of its own, and two components asking would
+  /// be two requests for the same screen racing each other.
   useEffect(() => {
-    if (landed === 0) return;
+    if (writes === 0) return;
     router.refresh();
-  }, [landed, router]);
+  }, [writes, router]);
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,13 +140,8 @@ export function useActionForm<R extends ActionResult>(
         const answer = await action(undefined, data);
         setResult(answer);
         if (answer?.ok) {
-          // onSuccess first, then the signal that asks for the refresh.
-          // The refresh may unmount this form - that is what closing a
-          // decision does - and a callback that never ran because its
-          // component was already gone is a drawer that stays open on a
-          // saved row.
           onSuccess?.(answer);
-          setLanded((n) => n + 1);
+          setWrites((n) => n + 1);
         }
       } catch {
         // A Server Action that throws has already been logged on the
