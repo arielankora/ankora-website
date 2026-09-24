@@ -553,7 +553,12 @@ model AuditEvent {
 // Postgres partial unique index created directly in
 // prisma/migrations/.../migration.sql:
 //   CREATE UNIQUE INDEX time_entries_one_active_per_user
-//     ON time_entries (user_id) WHERE end_at IS NULL;
+//     ON time_entries (user_id) WHERE end_at IS NULL AND deleted_at IS NULL;
+// The deletedAt half of that predicate is not decoration: without it the
+// index and getActiveTimer disagree about what "active" means, and a
+// soft-deleted running timer (discard on the timer screen) blocks every
+// future start for that user with an error they cannot clear - the
+// 24.9.2026 report. See the 20260924120000 migration.
 // Application code in lib/app-domain/time-entries.ts additionally
 // pre-checks for a friendlier error message, but the database constraint
 // is the actual race-safe guarantee - the pre-check alone is not enough

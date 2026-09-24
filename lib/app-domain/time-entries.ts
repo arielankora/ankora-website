@@ -708,9 +708,22 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
   const isSelf = entry.userId === actor.id;
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
 
+  // A delete that lands on a RUNNING timer (the timer screen's "מחיקה
+  // ללא שמירה") closes the row as well as marking it deleted. Leaving
+  // endAt null was the 24.9.2026 bug: the row stayed invisible to
+  // getActiveTimer and visible to the one-active-per-user index, which
+  // blocked every later start with an error the person could not clear.
+  // The index now ignores deleted rows, so this is belt and braces - but
+  // it is also what makes restoreTimeEntry safe, since restoring a row
+  // that is still running would otherwise resurrect a second active
+  // timer. Discarded time is zeroed rather than counted: the point of
+  // the action is that this work was never recorded.
+  const closeIfRunning =
+    entry.endAt === null ? { endAt: entry.startAt, actualSeconds: 0, billableSeconds: 0 } : {};
+
   const updated = await prisma.timeEntry.update({
     where: { id: timeEntryId },
-    data: { deletedAt: new Date() },
+    data: { deletedAt: new Date(), ...closeIfRunning },
   });
 
   await recordAudit({
