@@ -1,0 +1,74 @@
+# Does production serve what `main` says it should?
+#
+# On 24.9.2026 two production builds died on the same Prisma advisory
+# lock. Vercel did what it should and kept serving the last build that
+# worked, so nothing broke for anybody using the product. What it left
+# behind is the worse state: `main` and production pointing at two
+# different commits, with no screen anywhere saying so. A merged PR that
+# is not deployed looks exactly like a merged PR that is.
+#
+# prisma/schema.prisma now sends migrations down an unpooled connection,
+# which should stop that particular death. This workflow is the part that
+# does not depend on having guessed the cause right.
+#
+# It asks the product itself rather than the deployment platform: no API
+# token to store, no permission to grant, and it measures what a person
+# visiting the site actually gets.
+name: deploy drift
+
+on:
+  schedule:
+    # Every twenty minutes. A deployment takes about three, so a drift
+    # that lasts one interval is a deployment in progress and a drift
+    # that lasts two is a deployment that is not coming.
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The two most recent commits are enough to date the head one.
+          fetch-depth: 2
+
+      - name: Compare main with what production serves
+        env:
+          SITE: https://www.ankora.co.il
+        run: |
+          set -euo pipefail
+
+          HEAD_SHA=$(git rev-parse --short=7 HEAD)
+          HEAD_AT=$(git log -1 --format=%ct HEAD)
+          NOW=$(date +%s)
+          AGE=$(( NOW - HEAD_AT ))
+
+          BODY=$(curl -fsS --max-time 20 "$SITE/api/health")
+          LIVE=$(printf '%s' "$BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("commit") or "")')
+
+          echo "main:       $HEAD_SHA (${AGE}s old)"
+          echo "production: ${LIVE:-unknown}"
+
+          if [ -z "$LIVE" ]; then
+            echo "::warning::Production did not report a commit. Either it is serving a build from before this check existed, or the health endpoint changed shape."
+            exit 0
+          fi
+
+          if [ "$LIVE" = "$HEAD_SHA" ]; then
+            echo "In sync."
+            exit 0
+          fi
+
+          # Under ten minutes old, a difference is the deployment still
+          # building. Failing here would page somebody for every merge.
+          if [ "$AGE" -lt 600 ]; then
+            echo "::notice::main is $HEAD_SHA and production is $LIVE, but the commit is only ${AGE}s old. Treating this as a deployment in progress."
+            exit 0
+          fi
+
+          echo "::error::main is at $HEAD_SHA and production is serving $LIVE, ${AGE}s after the merge. The deployment failed or never started. Check the Vercel deployment for $HEAD_SHA, and redeploy that commit if its build died."
+          exit 1

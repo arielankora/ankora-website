@@ -22,9 +22,34 @@ generator client {
   provider = "prisma-client-js"
 }
 
+// Two connection strings, and the reason is a deploy that failed twice in
+// one day with a message that blamed the database.
+//
+//     Error: P1002
+//     The database server was reached but timed out.
+//     Context: Timed out trying to acquire a postgres advisory lock
+//     (SELECT pg_advisory_lock(72707369)). Timeout: 10000ms.
+//
+// `prisma migrate deploy` takes one session-level advisory lock before it
+// touches anything. `url` is Neon's POOLED endpoint, which is correct for
+// the app (serverless opens far more connections than Postgres will hold)
+// and wrong for that lock: the pooler hands a server connection back to
+// the pool between statements, so the session that took the lock is not
+// the session that tries to release it. The lock stays held by a
+// connection nobody owns, and the next deploy waits ten seconds and dies.
+//
+// Measured rather than assumed: the second failure had no other build
+// running. The queue explanation in claude/deploy-migration-lock covers
+// the first one and cannot cover that.
+//
+// `directUrl` is where Prisma Migrate goes instead. Neon's Vercel
+// integration already provides the unpooled string under this name, in
+// both production and preview, so this costs no new secret. The runtime
+// client keeps using `url` and keeps its pooling.
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 // --- Enums -------------------------------------------------------------
