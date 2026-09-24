@@ -90,13 +90,18 @@ test("a promise the client can see cannot be closed without a sentence for them"
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="clientVisible"]').check();
 
-  // This test is the only one in the suite that asserts a screen
-  // refreshing ITSELF after a write, which is why it never reloads and
-  // why it must not start doing so to go green.
+  // This test is the only one in the suite that asserts a screen showing
+  // a write by itself, which is why it never reloads and why it must not
+  // start doing so to go green.
   //
-  // It has also been failing and passing on retry for weeks while saying
-  // only "the row is not there", which is the symptom and not the half
-  // that broke. There are exactly two halves - the write did not land, or
+  // What it is asserting changed underneath it. It used to watch for a
+  // refresh the screen asked for; it now watches for the row the action
+  // returned. The assertion is the same sentence and the mechanism under
+  // it is the one that cannot be cancelled.
+  //
+  // It spent weeks failing and passing on retry while saying only "the
+  // row is not there", which is the symptom and not the half that
+  // broke. There are exactly two halves - the write did not land, or
   // it landed and the screen never showed it - and the answer is in the
   // action's own response. So the test reads it, the way the decisions
   // spec has done since the same race was chased through that screen.
@@ -126,25 +131,28 @@ test("a promise the client can see cannot be closed without a sentence for them"
               (body.match(/data-task/g) ?? []).length
             } task row(s) are - so the list WAS re-rendered and did not include this row`;
 
-  // Two stages, because "the row is not there" has two very different
-  // causes and this test has been unable to tell them apart for weeks.
+  // Fifteen seconds now, where it used to be forty-five.
   //
-  // Stage one is the property under test: the screen brings the row in by
-  // itself. Forty-five seconds, matching the decisions spec, and for its
-  // reason - a refresh on this app was measured at twenty seconds on a
-  // QUIET machine while the slow-writes work was going on. That cost is
-  // real and belongs in its own piece of work; it must not be mistaken
-  // here for a refresh that never happened.
+  // That number was not caution, it was a symptom. The row used to reach
+  // this screen only by the screen going back for it, and that request
+  // was cancelled on and off for three weeks across five investigations,
+  // so the wait had to cover a refresh that might arrive very late or
+  // never. The action returns the created row now and the list puts it
+  // straight on screen, so there is no round trip left to be slow: the
+  // row is there before the drawer has finished closing.
   //
-  // Stage two runs only when stage one has already failed, and it exists
-  // to name which half broke. If a reload shows the row, the write landed
-  // and the screen never told anyone - a product fault in the refresh. If
-  // a reload does not show it either, the row is not in this list at all,
-  // which is a different fault entirely and would send the next person
-  // somewhere else.
+  // Keeping forty-five would hide a regression for forty-five seconds.
+  // Fifteen is still generous for a render and short enough that a
+  // failure is news.
+  //
+  // The two stages stay, because "the row is not there" still has two
+  // very different causes and the message has to say which. If a reload
+  // shows the row, the write landed and the screen was not told. If it
+  // does not, the row is not in this list at all, which would send the
+  // next person somewhere else entirely.
   const row = page.locator("[data-task]").filter({ hasText: title });
   const appeared = await row
-    .waitFor({ state: "visible", timeout: 45_000 })
+    .waitFor({ state: "visible", timeout: 15_000 })
     .then(() => true)
     .catch(() => false);
 

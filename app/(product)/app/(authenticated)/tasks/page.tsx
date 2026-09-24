@@ -10,7 +10,8 @@ import { Drawer } from "@/components/app/Drawer";
 import { CreateTaskForm } from "./CreateTaskForm";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
-import { TaskBoard } from "./TaskBoard";
+import { TaskListProvider, type ListRow } from "./TaskListProvider";
+import { TaskListView } from "./TaskListView";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -33,7 +34,7 @@ const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
 /// below used to be three `===` comparisons, which is exactly the shape
 /// that silently ignores a new one.
 const FILTER_STATUSES = new Set(
-  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ALL")
+  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ALL"),
 );
 
 // The pre-redesign client/category filter bar was dropped by the
@@ -55,19 +56,17 @@ const FILTER_STATUSES = new Set(
 // role that tracks time may see and create tasks for clients they're
 // assigned to; CLIENT_USER never reaches this route (separate nav array
 // in AppShell, spec 13's portal-isolation rule).
-export default async function TasksPage(
-  props: {
-    searchParams: Promise<{
-      clientId?: string;
-      categoryId?: string;
-      status?: string;
-      mine?: string;
-      q?: string;
-      group?: string;
-      view?: string;
-    }>;
-  }
-) {
+export default async function TasksPage(props: {
+  searchParams: Promise<{
+    clientId?: string;
+    categoryId?: string;
+    status?: string;
+    mine?: string;
+    q?: string;
+    group?: string;
+    view?: string;
+  }>;
+}) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
 
@@ -125,15 +124,24 @@ export default async function TasksPage(
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categories = allCategories.filter(
-    (cat) => cat.active && (cat.visibility === "GLOBAL" || (cat.clientId && clientIds.has(cat.clientId)))
+    (cat) =>
+      cat.active &&
+      (cat.visibility === "GLOBAL" ||
+        (cat.clientId && clientIds.has(cat.clientId))),
   );
 
   // Both controls write the same query string, so picking a status keeps
   // "mine" on and turning "mine" off keeps the status.
-  function href(next: { status?: TaskStatus | "ALL"; mine?: boolean; group?: boolean; view?: "list" | "board" }) {
+  function href(next: {
+    status?: TaskStatus | "ALL";
+    mine?: boolean;
+    group?: boolean;
+    view?: "list" | "board";
+  }) {
     const params = new URLSearchParams();
     if (searchParams.clientId) params.set("clientId", searchParams.clientId);
-    if (searchParams.categoryId) params.set("categoryId", searchParams.categoryId);
+    if (searchParams.categoryId)
+      params.set("categoryId", searchParams.categoryId);
     const nextStatus = next.status ?? activePill;
     if (nextStatus !== "ALL") params.set("status", nextStatus);
     if (next.mine ?? mine) params.set("mine", "1");
@@ -157,149 +165,121 @@ export default async function TasksPage(
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-medium text-appNavy">משימות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
+          <p className="mt-1 text-sm text-appNavy/60">
+            משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          <TaskFilters clients={clients} categories={categories} />
-          <Drawer triggerLabel="+ משימה" title="משימה חדשה">
-            <CreateTaskForm clients={clients} categories={categories} />
-          </Drawer>
-        </div>
+        <TaskListProvider
+          rows={tasks.map(toRow)}
+          // What a newly created task has to survive to belong on the
+          // screen as it is filtered right now. The client's NAME and not
+          // only its id, because the row the action returns carries the
+          // name and comparing an id to a name is how a row that belongs
+          // gets dropped.
+          filters={{
+            status: listStatus,
+            clientId: searchParams.clientId,
+            clientName: clients.find((c) => c.id === searchParams.clientId)
+              ?.name,
+          }}
+        >
+          <div className="flex flex-wrap items-center gap-2.5">
+            <TaskFilters clients={clients} categories={categories} />
+            <Drawer triggerLabel="+ משימה" title="משימה חדשה">
+              <CreateTaskForm clients={clients} categories={categories} />
+            </Drawer>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* The view switch comes first because it changes what the
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* The view switch comes first because it changes what the
               controls beside it mean. On the board the status pills and
               the grouping toggle are not hidden to simplify the screen,
               they are hidden because the board already answers both
               questions: its columns ARE the statuses. */}
-          <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
-            {[
-              { href: listHref, label: "רשימה", active: !board },
-              { href: boardHref, label: "לוח", active: board },
-            ].map((view) => (
-              <Link
-                key={view.label}
-                href={view.href}
-                className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                  view.active ? "bg-appNavy text-cream" : "text-appNavy/60 hover:text-appNavy"
-                }`}
-              >
-                {view.label}
-              </Link>
-            ))}
-          </div>
+            <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+              {[
+                { href: listHref, label: "רשימה", active: !board },
+                { href: boardHref, label: "לוח", active: board },
+              ].map((view) => (
+                <Link
+                  key={view.label}
+                  href={view.href}
+                  className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                    view.active
+                      ? "bg-appNavy text-cream"
+                      : "text-appNavy/60 hover:text-appNavy"
+                  }`}
+                >
+                  {view.label}
+                </Link>
+              ))}
+            </div>
 
-          {!board && (
-          <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
-            {FILTER_PILLS.map((pill) => (
-              <Link
-                key={pill.value}
-                href={pillHref(pill.value)}
-                className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                  activePill === pill.value ? "bg-appNavy text-cream" : "text-appNavy/60 hover:text-appNavy"
-                }`}
-              >
-                {pill.label}
-              </Link>
-            ))}
-          </div>
-          )}
+            {!board && (
+              <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+                {FILTER_PILLS.map((pill) => (
+                  <Link
+                    key={pill.value}
+                    href={pillHref(pill.value)}
+                    className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                      activePill === pill.value
+                        ? "bg-appNavy text-cream"
+                        : "text-appNavy/60 hover:text-appNavy"
+                    }`}
+                  >
+                    {pill.label}
+                  </Link>
+                ))}
+              </div>
+            )}
 
-          {/* "Mine" is a separate toggle rather than a fifth status pill:
+            {/* "Mine" is a separate toggle rather than a fifth status pill:
               it answers a different question and combines with all four
               of them. */}
-          <Link
-            href={mineHref}
-            className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
-              mine ? "border-appNavy bg-appNavy text-cream" : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
-            }`}
-          >
-            שלי
-          </Link>
+            <Link
+              href={mineHref}
+              className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                mine
+                  ? "border-appNavy bg-appNavy text-cream"
+                  : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
+              }`}
+            >
+              שלי
+            </Link>
 
-          {/* Grouping is a way of reading the same list, not a filter on
+            {/* Grouping is a way of reading the same list, not a filter on
               it, so it sits with the toggles rather than in the filter
               bar above and says what it does rather than naming a
               setting. */}
-          {!board && (
-          <Link
-            href={groupHref}
-            className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
-              grouped
-                ? "border-appNavy bg-appNavy text-cream"
-                : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
-            }`}
-          >
-            לפי לקוח
-          </Link>
-          )}
-        </div>
+            {!board && (
+              <Link
+                href={groupHref}
+                className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                  grouped
+                    ? "border-appNavy bg-appNavy text-cream"
+                    : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
+                }`}
+              >
+                לפי לקוח
+              </Link>
+            )}
+          </div>
 
-        {tasks.length === 0 ? (
-          <EmptyState
-            icon={ListChecks}
-            // Three different nothings, and they mean three different
-            // things. A search that found nothing is not a product with
-            // no tasks in it, and telling somebody "אין עדיין משימות"
-            // when their colleagues have forty open is simply wrong.
-            title={q ? "לא נמצאו משימות" : mine ? "אין משימות פתוחות עליך" : "אין עדיין משימות"}
-            description={
-              q
-                ? `אין משימה שמכילה "${q}" בכותרת, בתיאור, בשרשור או בשם הלקוח. אפשר לנקות את החיפוש או לוותר על אחד המסננים.`
-                : mine
-                  ? "כשמשימה תשויך אליך היא תופיע כאן. אפשר לכבות את המסנן כדי לראות את כל המשימות."
-                  : "הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם."
-            }
-          />
-        ) : board ? (
-          <TaskBoard
-            cards={tasks.map((task) => ({
-              id: task.id,
-              title: task.title,
-              clientName: task.client.name,
-              status: task.status,
-              priority: task.priority,
-              dueDate: task.dueDate?.toISOString() ?? null,
-              assignedToName: task.assignedTo?.name ?? null,
-              clientVisible: task.clientVisible,
-              // The board needs to know WHETHER there is an outcome, not
-              // what it says: that is the difference between asking for
-              // the sentence before a card lands on "הושלמו" and being
-              // refused after it does.
-              hasOutcome: Boolean(task.clientOutcome?.trim()),
-            }))}
-          />
-        ) : grouped ? (
-          <div className="space-y-5">
-            {groupByClient(tasks).map(([clientName, rows]) => (
-              <section key={clientName}>
-                <h2 className="text-sm font-medium text-appNavy">
-                  {clientName}
-                  <span className="mr-2 font-normal text-appNavy/45">{rows.length}</span>
-                </h2>
-                <div className="mt-2 divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-                  {rows.map((task) => (
-                    <TaskRow key={task.id} task={toRow(task)} />
-                  ))}
-                </div>
-              </section>
-            ))}
-          </div>
-        ) : (
-          <div className="divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-            {tasks.map((task) => (
-              <TaskRow key={task.id} task={toRow(task)} />
-            ))}
-          </div>
-        )}
+          <TaskListView board={board} grouped={grouped} mine={mine} q={q} />
+        </TaskListProvider>
       </div>
     </>
   );
 }
 
-/// The row's own shape, lifted out because two branches render it now.
-function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
+/// The one shape every view on this screen renders from.
+///
+/// The list, the grouped list and the board all read it, and so does the
+/// row a create returns, which is why it is a named type rather than an
+/// inferred object: the action builds the same shape on the server, and
+/// the compiler is what keeps the two from drifting.
+function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
   return {
     id: task.id,
     title: task.title,
@@ -308,6 +288,7 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
     dueDate: task.dueDate?.toISOString() ?? null,
     status: task.status,
     priority: task.priority,
+    assignedToName: task.assignedTo?.name ?? null,
     clientVisible: task.clientVisible,
     supplierName: task.supplierName,
     supplierExperience: task.supplierExperience,
@@ -315,20 +296,4 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
     waitingOnClient: task.waitingOnClientSince !== null,
     clientOutcome: task.clientOutcome,
   };
-}
-
-/// Grouped in the order the query already produced, so within a client
-/// the urgent work is still on top. The groups themselves are ordered by
-/// the client whose most urgent task comes first, not alphabetically:
-/// the point of this view is to see which account needs attention, and
-/// sorting by name would bury that under the alphabet.
-function groupByClient(tasks: Awaited<ReturnType<typeof listTasks>>) {
-  const groups = new Map<string, typeof tasks>();
-  for (const task of tasks) {
-    const name = task.client.name;
-    const found = groups.get(name);
-    if (found) found.push(task);
-    else groups.set(name, [task]);
-  }
-  return [...groups.entries()];
 }

@@ -3,9 +3,43 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import type { SupplierExperience, TaskStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import type { SupplierExperience, TaskPriority, TaskStatus } from "@prisma/client";
 
-type FormState = { error?: string; ok?: boolean };
+type FormState = { error?: string; ok?: boolean; created?: CreatedTaskRow };
+
+/// The row the list needs, returned by the action that wrote it.
+///
+/// This is the whole point of the change it belongs to. Until now a
+/// created task reached the screen only by the screen going back to the
+/// server for it, and that round trip has been cancelled on and off for
+/// three weeks across five investigations. A row that comes back with
+/// the write cannot be cancelled, cannot be raced and cannot arrive
+/// late: it is already here.
+///
+/// Shaped for the row component rather than returned whole. A Server
+/// Action's return value crosses the wire, so it carries what the screen
+/// draws and nothing else - not the audit trail, not the supervisor, not
+/// fields the list has never shown.
+export type CreatedTaskRow = {
+  id: string;
+  title: string;
+  clientName: string;
+  categoryName: string | null;
+  dueDate: string | null;
+  status: TaskStatus;
+  priority: TaskPriority;
+  /// Always null on a create, because the create form has no assignee
+  /// picker. Carried anyway so this type is the ONE shape every view on
+  /// the tasks screen renders from, rather than a near-miss of it.
+  assignedToName: string | null;
+  clientVisible: boolean;
+  supplierName: string | null;
+  supplierExperience: SupplierExperience | null;
+  clientTitle: string | null;
+  waitingOnClient: boolean;
+  clientOutcome: string | null;
+};
 
 function friendlyError(err: unknown): string {
   if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
@@ -20,8 +54,9 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   if (!clientId) return { error: "יש לבחור לקוח." };
   if (!title) return { error: "יש להזין שם משימה." };
 
+  let created;
   try {
-    await createTask(user, {
+    created = await createTask(user, {
       clientId,
       categoryId: String(formData.get("categoryId") || "") || null,
       title,
@@ -35,8 +70,41 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
     return { error: friendlyError(err) };
   }
 
+  // The two names the row shows and the row itself does not carry. Read
+  // after the write rather than taken from the form, because the form
+  // holds ids and the screen shows names, and a name the browser sent is
+  // a name the browser could have been wrong about.
+  const [client, category] = await Promise.all([
+    prisma.client.findUnique({ where: { id: created.clientId }, select: { name: true } }),
+    created.categoryId
+      ? prisma.category.findUnique({ where: { id: created.categoryId }, select: { name: true } })
+      : Promise.resolve(null),
+  ]);
+
+  // Still revalidated. The returned row is what the person sees now; this
+  // is what every OTHER open tab, and this one on its next navigation,
+  // sees. Dropping it would trade one stale screen for another.
   revalidatePath("/app/tasks");
-  return { ok: true };
+
+  return {
+    ok: true,
+    created: {
+      id: created.id,
+      title: created.title,
+      clientName: client?.name ?? "",
+      categoryName: category?.name ?? null,
+      dueDate: created.dueDate?.toISOString() ?? null,
+      status: created.status,
+      priority: created.priority,
+      assignedToName: null,
+      clientVisible: created.clientVisible,
+      supplierName: created.supplierName,
+      supplierExperience: created.supplierExperience,
+      clientTitle: created.clientTitle,
+      waitingOnClient: created.waitingOnClientSince !== null,
+      clientOutcome: created.clientOutcome,
+    },
+  };
 }
 
 // App redesign (handoff README, screen 4 "משימות"): "תיבת סימון... סימון

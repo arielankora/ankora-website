@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import { createTaskAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
+import { useTaskList } from "./TaskListProvider";
 import { useActionForm } from "@/components/app/useActionForm";
 
 type Client = { id: string; name: string };
@@ -30,7 +31,15 @@ function SubmitButton({ pending }: { pending: boolean }) {
 export function CreateTaskForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
   const [clientId, setClientId] = useState("");
   const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(createTaskAction, close);
+  const { addCreated } = useTaskList();
+  // The row goes onto the list before the drawer closes, which is the
+  // whole change: the screen behind this form is already correct by the
+  // time the form is gone, so nothing has to go back to the server and
+  // nothing can be cancelled on the way.
+  const { onSubmit, pending, error } = useActionForm(createTaskAction, (result) => {
+    if (result.created) addCreated(result.created);
+    close();
+  });
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
