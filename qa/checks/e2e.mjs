@@ -264,7 +264,12 @@ export async function e2e() {
     .filter((l) => l.startsWith("[WebServer]"))
     .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
     .filter((l) => l.includes("[trace]"))
-    .slice(-20);
+    // Eighty rather than twenty. These lines exist only while an
+    // investigation has asked for them, so there is no steady-state cost
+    // to keeping more - and twenty was enough to show that a trace
+    // existed and not enough to read a sequence, which is the only thing
+    // a trace is for.
+    .slice(-80);
 
   if (traced.length) {
     out.push(finding("minor", "what the server traced while the browser ran", traced.join("\n")));

@@ -4,6 +4,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { listTasks } from "@/lib/app-domain/tasks";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
+import { trace } from "@/lib/slow-log";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { Drawer } from "@/components/app/Drawer";
@@ -78,6 +79,13 @@ export default async function TasksPage(
     listAccessibleClients(user),
     listCategories(),
   ]);
+
+  // Temporary, and the whole question this branch exists to answer: does
+  // this page render again inside the Server Action's own response, and
+  // if it does, how many rows does it see? The browser suite can say the
+  // task is missing from what came back; only the server can say whether
+  // it was ever asked.
+  trace(`tasks page rendered: ${tasks.length} task(s)`);
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categories = allCategories.filter(

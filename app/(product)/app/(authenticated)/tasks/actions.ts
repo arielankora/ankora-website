@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { trace } from "@/lib/slow-log";
 import type { SupplierExperience, TaskStatus } from "@prisma/client";
 
 type FormState = { error?: string; ok?: boolean };
@@ -20,6 +21,7 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   if (!clientId) return { error: "יש לבחור לקוח." };
   if (!title) return { error: "יש להזין שם משימה." };
 
+  trace("createTaskAction: in");
   try {
     await createTask(user, {
       clientId,
@@ -32,10 +34,13 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       clientTitle: String(formData.get("clientTitle") || "") || null,
     });
   } catch (err) {
+    trace("createTaskAction: out (refused)");
     return { error: friendlyError(err) };
   }
 
+  trace("createTaskAction: written, about to revalidate");
   revalidatePath("/app/tasks");
+  trace("createTaskAction: revalidated, returning");
   return { ok: true };
 }
 
