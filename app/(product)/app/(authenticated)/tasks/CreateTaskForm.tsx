@@ -28,8 +28,17 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // instead of an inline card above the (now-adjacent) filter bar + table -
 // see docs/adr/0001 addendum. `useDrawerClose()` closes the drawer once
 // the action reports `ok: true`, same pattern as CreateClientForm.
-export function CreateTaskForm({ clients, categories }: { clients: Client[]; categories: Category[] }) {
-  const [clientId, setClientId] = useState("");
+export function CreateTaskForm({
+  clients,
+  categories,
+  defaultClientId,
+}: {
+  clients: Client[];
+  categories: Category[];
+  /// The client screen opens this form already pointed at its client.
+  defaultClientId?: string;
+}) {
+  const [clientId, setClientId] = useState(defaultClientId ?? "");
   const close = useDrawerClose();
   const { addCreated } = useTaskList();
   // The row goes onto the list before the drawer closes, which is the

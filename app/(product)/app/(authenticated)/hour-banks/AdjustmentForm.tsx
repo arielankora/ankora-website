@@ -30,10 +30,11 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
 
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block w-[84px]">
-          <span className="mb-1 block text-[11px] text-appNavy/55">דקות</span>
+          <span className="mb-1 block text-[11px] text-appNavy/55">שעות</span>
           <input
-            type="number"
-            name="minutes"
+            name="hours"
+            inputMode="decimal"
+            placeholder="1:30"
             required
             dir="ltr"
             className="w-full rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-appNavy outline-none focus:border-gold"

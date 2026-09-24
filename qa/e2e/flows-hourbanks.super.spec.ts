@@ -103,20 +103,20 @@ async function openCycleDrawer(page: import("@playwright/test").Page) {
 }
 
 test.describe("opening a cycle", () => {
-  test("a cycle opened from the form shows its purchased minutes back", async ({ page }) => {
+  test("a cycle opened from the form shows its purchased hours back", async ({ page }) => {
     const clientName = tag("[E2E] בנק");
     await createClientAndOpenItsBank(page, clientName);
 
     const dialog = await openCycleDrawer(page);
     await dialog.locator('input[name="cycleStart"]').fill(isoDay(-7));
     await dialog.locator('input[name="cycleEnd"]').fill(isoDay(23));
-    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.locator('input[name="purchasedHours"]').fill("10");
     await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
 
     await page.waitForLoadState("networkidle");
     await page.reload();
 
-    // 600 minutes is ten hours. Asserting on the raw number and on a
+    // Ten hours (the form takes hours since the Grantor 1:51 mix-up). Asserting on the raw number and on a
     // formatted duration both fail for different reasons on a wording
     // change, so this asserts the client now HAS a cycle at all - the
     // adjustment form only renders once there is an open cycle to adjust,
@@ -125,7 +125,7 @@ test.describe("opening a cycle", () => {
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
     await expect(
-      page.locator('input[name="minutes"]').first(),
+      page.locator('input[name="hours"]').first(),
       "no open cycle on this client after the form was submitted",
     ).toBeVisible({ timeout: 15_000 });
   });
@@ -140,14 +140,14 @@ test.describe("opening a cycle", () => {
     // a blank screen or a silent no-op.
     await dialog.locator('input[name="cycleStart"]').fill(isoDay(23));
     await dialog.locator('input[name="cycleEnd"]').fill(isoDay(-7));
-    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.locator('input[name="purchasedHours"]').fill("10");
     await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
 
     await page.waitForLoadState("networkidle");
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
     // The drawer stays open on a refusal rather than closing as if it worked.
-    await expect(dialog.locator('input[name="purchasedMinutes"]')).toBeVisible();
+    await expect(dialog.locator('input[name="purchasedHours"]')).toBeVisible();
   });
 });
 
@@ -159,19 +159,19 @@ test.describe("recording an adjustment", () => {
     const dialog = await openCycleDrawer(page);
     await dialog.locator('input[name="cycleStart"]').fill(isoDay(-7));
     await dialog.locator('input[name="cycleEnd"]').fill(isoDay(23));
-    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.locator('input[name="purchasedHours"]').fill("10");
     await dialog.getByRole("button", { name: /פתיחת מחזור|שמירה|אישור/ }).last().click();
 
     await page.waitForLoadState("networkidle");
     await page.reload();
 
-    const minutes = page.locator('input[name="minutes"]').first();
+    const minutes = page.locator('input[name="hours"]').first();
     if ((await minutes.count()) === 0) {
       test.skip(true, "the adjustment form is not on this screen for a client without an open cycle");
       return;
     }
 
-    await minutes.fill("30");
+    await minutes.fill("0:30");
     // Reason left empty on purpose. A manual adjustment to a client's
     // balance with no recorded reason is an unexplained change to what
     // they are billed, which is why the domain demands one.
@@ -184,6 +184,6 @@ test.describe("recording an adjustment", () => {
 
     const body = await page.locator("body").innerText();
     expect(body).not.toMatch(/Application error|Internal Server Error/);
-    await expect(page.locator('input[name="minutes"]').first()).toBeVisible();
+    await expect(page.locator('input[name="hours"]').first()).toBeVisible();
   });
 });

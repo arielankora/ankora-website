@@ -384,6 +384,65 @@ describe("createManualEntry - spec 6.3", () => {
 });
 
 describe("updateTimeEntry - spec 5.1 revisions, 6.4 edit window", () => {
+  // Hadas, 23.9.2026: two back-to-back timers for the same client, the
+  // second started in the same minute the first stopped. The edit form
+  // submits HH:MM only, so saving the second one (even for a note) used to
+  // move its start to :00, before the first one's end, and hard-block.
+  it("does not invent a same-client overlap when the form echoes back a time without its seconds", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const minute = Math.floor((Date.now() - 2 * 3600_000) / 60_000) * 60_000;
+    const first = await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(minute - 10 * 60_000),
+      endAt: new Date(minute + 38_000),
+      source: "TIMER",
+    });
+    const second = await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(minute + 50_000),
+      endAt: new Date(minute + 11 * 60_000 + 52_000),
+      source: "TIMER",
+    });
+
+    const updated = await updateTimeEntry(employee, second.id, {
+      startAt: new Date(minute),
+      endAt: new Date(minute + 11 * 60_000),
+      note: "note only",
+    });
+
+    expect(updated.startAt.getTime()).toBe(second.startAt.getTime());
+    expect(updated.endAt?.getTime()).toBe(second.endAt?.getTime());
+    expect(updated.note).toBe("note only");
+    expect(first.id).not.toBe(second.id);
+  });
+
+  it("still blocks a real same-client overlap introduced by an edit", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const minute = Math.floor((Date.now() - 2 * 3600_000) / 60_000) * 60_000;
+    await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(minute - 10 * 60_000),
+      endAt: new Date(minute + 38_000),
+    });
+    const second = await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(minute + 50_000),
+      endAt: new Date(minute + 11 * 60_000),
+    });
+
+    await expect(
+      updateTimeEntry(employee, second.id, { startAt: new Date(minute - 5 * 60_000) })
+    ).rejects.toBeInstanceOf(OverlapError);
+  });
+
   it("creates a TimeEntryRevision and marks isEdited on every mutating edit", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
     const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id });

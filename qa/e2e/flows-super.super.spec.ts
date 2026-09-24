@@ -279,7 +279,7 @@ test.describe("hour-banks/actions", () => {
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="cycleStart"]').fill(isoDay(-1));
     await dialog.locator('input[name="cycleEnd"]').fill(isoDay(27));
-    await dialog.locator('input[name="purchasedMinutes"]').fill("600");
+    await dialog.locator('input[name="purchasedHours"]').fill("10");
     await dialog.locator('select[name="rolloverMode"]').selectOption("NONE");
     await dialog.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
 
@@ -290,7 +290,7 @@ test.describe("hour-banks/actions", () => {
     await expectDrawerClosed(page, "opening an hour-bank cycle");
     await page.reload();
 
-    // 600 minutes is ten hours; the screen renders banks in H:MM, so the
+    // Ten hours; the screen renders banks in H:MM, so the
     // assertion is on the cycle being open at all rather than on a format
     // this test should not be pinning.
     await expect(

@@ -44,11 +44,12 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">דקות שנרכשו *</label>
+        <label className="block text-xs font-medium text-appNavy/60">שעות שנרכשו *</label>
         <input
-          type="number"
-          name="purchasedMinutes"
-          min={0}
+          name="purchasedHours"
+          inputMode="decimal"
+          dir="ltr"
+          placeholder="111 או 98:30"
           required
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
@@ -71,11 +72,11 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
 
       {rolloverMode === "CAPPED" && (
         <div>
-          <label className="block text-xs font-medium text-appNavy/60">תקרת Rollover (דקות)</label>
+          <label className="block text-xs font-medium text-appNavy/60">תקרת Rollover (שעות)</label>
           <input
-            type="number"
-            name="rolloverCapMinutes"
-            min={0}
+            name="rolloverCapHours"
+            inputMode="decimal"
+            dir="ltr"
             className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
@@ -84,12 +85,12 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
       <div>
         <label className="block text-xs font-medium text-appNavy/60">Rollover ידני מהמחזור הקודם</label>
         <input
-          type="number"
-          name="manualRolloverInMinutes"
-          min={0}
+          name="manualRolloverInHours"
+          inputMode="decimal"
+          dir="ltr"
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
-        <p className="mt-1 text-[11px] text-appNavy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה דקות יעברו אליו.</p>
+        <p className="mt-1 text-[11px] text-appNavy/40">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה שעות יעברו אליו.</p>
       </div>
 
       {error && <p className="text-sm text-error">{error}</p>}

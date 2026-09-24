@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDuration, formatSource, SOURCE_LABEL } from "@/lib/time-entry-format";
+import { formatDuration, formatSource, SOURCE_LABEL, describeOverlapConflict } from "@/lib/time-entry-format";
 
 // Extracted (2026-09-11) from app/(product)/app/time-entries/AdminEntryRow.tsx
 // so the on-screen table and app/api/time-entries/export/route.ts render
@@ -45,5 +45,30 @@ describe("formatSource()", () => {
   it("SOURCE_LABEL exposes the same mapping formatSource reads from", () => {
     expect(SOURCE_LABEL.MANUAL).toBe("ידני");
     expect(SOURCE_LABEL.TIMER).toBe("טיימר");
+  });
+});
+
+describe("describeOverlapConflict()", () => {
+  it("names the client, category and Israel-time range", () => {
+    const text = describeOverlapConflict({
+      startAt: new Date("2026-09-14T08:48:44.062Z"),
+      endAt: new Date("2026-09-14T08:54:38.834Z"),
+      client: { name: "גלעד קומורוב" },
+      category: { name: "עזרה מקצועית" },
+    });
+    expect(text).toContain("גלעד קומורוב");
+    expect(text).toContain("עזרה מקצועית");
+    expect(text).toContain("11:48");
+    expect(text).toContain("11:54");
+  });
+
+  it("says when the conflict is a timer that is still running", () => {
+    const text = describeOverlapConflict({
+      startAt: new Date("2026-09-14T08:48:44.062Z"),
+      endAt: null,
+      client: { name: "A" },
+      category: { name: "B" },
+    });
+    expect(text).toContain("טיימר שעדיין רץ");
   });
 });

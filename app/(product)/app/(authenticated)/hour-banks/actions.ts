@@ -5,6 +5,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { upsertBillingPolicy } from "@/lib/app-domain/billing";
 import { openHourBankCycle, recordHourBankAdjustment } from "@/lib/app-domain/hour-banks";
 import type { RoundingMode, BillingAggregationScope, RolloverMode } from "@prisma/client";
+import { parseHoursInput } from "@/lib/hours-input";
 
 type FormState = { error?: string; ok?: boolean };
 
@@ -49,10 +50,16 @@ export async function openHourBankCycleAction(_prev: FormState | undefined, form
   const cycleEnd = parseDateInput(formData.get("cycleEnd"));
   if (!cycleStart || !cycleEnd) return { error: "יש להזין תאריך התחלה ותאריך סיום תקינים." };
 
-  const purchasedMinutes = Number(formData.get("purchasedMinutes") || 0);
+  // The form speaks hours; the domain keeps minutes. See lib/hours-input.ts.
+  const purchasedMinutes = parseHoursInput(formData.get("purchasedHours"));
+  if (purchasedMinutes === null) return { error: "יש להזין שעות שנרכשו, למשל 111 או 98:30." };
   const rolloverMode = String(formData.get("rolloverMode") || "NONE") as RolloverMode;
-  const rolloverCapMinutesRaw = formData.get("rolloverCapMinutes");
-  const manualRolloverRaw = formData.get("manualRolloverInMinutes");
+  const capRaw = String(formData.get("rolloverCapHours") || "").trim();
+  const rolloverCapMinutes = capRaw ? parseHoursInput(capRaw) : undefined;
+  if (rolloverCapMinutes === null) return { error: "תקרת ה-Rollover אינה מספר שעות תקין." };
+  const manualRaw = String(formData.get("manualRolloverInHours") || "").trim();
+  const manualRolloverInMinutes = manualRaw ? parseHoursInput(manualRaw) : undefined;
+  if (manualRolloverInMinutes === null) return { error: "ה-Rollover הידני אינו מספר שעות תקין." };
 
   try {
     await openHourBankCycle(user, clientId, {
@@ -60,8 +67,8 @@ export async function openHourBankCycleAction(_prev: FormState | undefined, form
       cycleEnd,
       purchasedMinutes,
       rolloverMode,
-      rolloverCapMinutes: rolloverCapMinutesRaw ? Number(rolloverCapMinutesRaw) : undefined,
-      manualRolloverInMinutes: manualRolloverRaw ? Number(manualRolloverRaw) : undefined,
+      rolloverCapMinutes,
+      manualRolloverInMinutes,
     });
   } catch (err) {
     return { error: friendlyError(err) };
@@ -75,10 +82,10 @@ export async function recordAdjustmentAction(_prev: FormState | undefined, formD
   const user = await requireUser();
   const clientId = String(formData.get("clientId") || "");
   const reason = String(formData.get("reason") || "").trim();
-  const minutes = Number(formData.get("minutes") || 0);
+  const minutes = parseHoursInput(formData.get("hours"), { allowNegative: true });
   if (!clientId) return { error: "יש לבחור לקוח." };
   if (!reason) return { error: "יש להזין סיבה להתאמה." };
-  if (!minutes) return { error: "יש להזין מספר דקות שונה מאפס." };
+  if (!minutes) return { error: "יש להזין שעות שונות מאפס, למשל 2, 1:30 או -0:45." };
 
   try {
     await recordHourBankAdjustment(user, clientId, {

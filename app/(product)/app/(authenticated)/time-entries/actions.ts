@@ -16,11 +16,13 @@ import {
 } from "@/lib/app-domain/time-entries";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { timed } from "@/lib/slow-log";
+import { describeOverlapConflict } from "@/lib/time-entry-format";
 
 type FormState = { error?: string; ok?: boolean };
 
 function friendlyError(err: unknown): string {
-  if (err instanceof OverlapError) return "טווח הזמן חופף לדיווח קיים.";
+  if (err instanceof OverlapError)
+    return `טווח הזמן חופף לדיווח קיים: ${describeOverlapConflict(err.conflicting)}.`;
   if (err instanceof ConflictError)
     return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
   if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";

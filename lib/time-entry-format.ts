@@ -18,3 +18,27 @@ export const SOURCE_LABEL: Record<string, string> = { MANUAL: "ידני", TIMER:
 export function formatSource(source: string): string {
   return SOURCE_LABEL[source] ?? source;
 }
+
+/// Hadas, 23.9.2026: the same-client overlap message said only "חופף לדיווח
+/// קיים", so a person looking at a list with no visible overlap had nothing
+/// to go on. Name the entry: its category and its time range, in Israel
+/// time. Used by both the "הזמן שלי" and the admin "דיווחי זמן" actions.
+export function describeOverlapConflict(conflict: {
+  startAt: Date;
+  endAt: Date | null;
+  category: { name: string };
+  client: { name: string };
+}): string {
+  const fmt = new Intl.DateTimeFormat("he-IL", {
+    day: "numeric",
+    month: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Jerusalem",
+  });
+  const time = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+  const range = conflict.endAt
+    ? `${fmt.format(conflict.startAt)} עד ${time.format(conflict.endAt)}`
+    : `${fmt.format(conflict.startAt)}, טיימר שעדיין רץ`;
+  return `${conflict.client.name} · ${conflict.category.name} · ${range}`;
+}
