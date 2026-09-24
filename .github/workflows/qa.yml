@@ -68,6 +68,11 @@ jobs:
       TZ: Asia/Jerusalem
       QA_DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
       DATABASE_URL: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
+      # Prisma Migrate reads this one (schema.prisma `directUrl`). There is
+      # no pooler in front of the CI Postgres, so it is the same string -
+      # but the variable has to exist or every prisma command here fails
+      # before it opens a connection.
+      DATABASE_URL_UNPOOLED: postgresql://ankora:ankora_ci_only@127.0.0.1:5432/ankora_ci
       # The canonical host (lib/site.ts, ADR-0002). Pointing this at the
       # apex overrides the code's own default and makes every route 308.
       QA_PROD_URL: https://www.ankora.co.il

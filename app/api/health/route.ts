@@ -2,6 +2,24 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+/// The commit this build was made from, seven characters of it.
+///
+/// Vercel injects the full SHA at build time. It is read here, at module
+/// scope, because that is the only moment it exists: the variable is a
+/// build-time value and reading it per request would return the same
+/// thing anyway.
+///
+/// Why an unauthenticated endpoint may say it. A private repository's
+/// commit hash is not a secret and cannot be turned into one: it names a
+/// commit nobody outside the repository can fetch. What it buys is the
+/// one question no other public surface can answer, which is whether the
+/// code serving this request is the code on `main`. See
+/// .github/workflows/deploy-drift.yml, and claude/deploy-migration-lock,
+/// for the failure that made the question worth asking: a merge whose
+/// deployment died, leaving production on the commit before it with
+/// nothing anywhere saying so.
+const COMMIT = (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7) || null;
+
 // Overnight bug-hunt (docs/adr/0001 section 19.1): without this, Next.js
 // statically optimizes this route at build time - nothing in the handler
 // (no cookies/headers/searchParams) signals dynamic rendering to its
@@ -24,12 +42,12 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    return NextResponse.json({ ok: true, db: "up", time: new Date().toISOString() });
+    return NextResponse.json({ ok: true, db: "up", commit: COMMIT, time: new Date().toISOString() });
   } catch {
     // No error detail in the body on purpose - just enough for an
     // external monitor to page someone, not enough to leak DB internals.
     return NextResponse.json(
-      { ok: false, db: "down", time: new Date().toISOString() },
+      { ok: false, db: "down", commit: COMMIT, time: new Date().toISOString() },
       { status: 503 }
     );
   }

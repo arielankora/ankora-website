@@ -1,0 +1,119 @@
+# Does production serve what `main` says it should?
+#
+# On 24.9.2026 a production build died on a Prisma advisory lock. Vercel
+# did what it should and kept serving the last build that worked, so
+# nothing broke for anybody using the product. What it left behind is the
+# worse state: `main` and production pointing at two different commits,
+# with no screen anywhere saying so. A merged PR that is not deployed
+# looks exactly like a merged PR that is.
+#
+# prisma/schema.prisma now sends migrations down an unpooled connection,
+# which should stop that particular death. This workflow is the part that
+# does not depend on having guessed the cause right.
+#
+# It asks the product itself rather than the deployment platform: no API
+# token to store, no permission to grant, and it measures what a person
+# visiting the site actually gets.
+#
+# The one thing it must not do is cry wolf. Production is SUPPOSED to lag
+# main whenever the commits in between changed nothing it serves - a
+# test-only merge, a docs commit, a workflow file. That rule already
+# exists, in scripts/vercel-ignore-build.sh, and Vercel runs it as the
+# project's Ignored Build Step. So this job runs the same script rather
+# than restating what it does: one source of truth, and a change to the
+# rule cannot leave this check behind believing the old one.
+name: deploy drift
+
+on:
+  schedule:
+    # Every twenty minutes. A deployment takes about three, so a drift
+    # that lasts one interval is a deployment in progress and a drift
+    # that lasts two is a deployment that is not coming.
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Enough history to walk back to whatever production is on, and
+          # to give each of those commits a parent to be diffed against.
+          fetch-depth: 100
+
+      - name: Compare main with what production serves
+        env:
+          SITE: https://www.ankora.co.il
+        run: |
+          set -uo pipefail
+
+          HEAD_SHA=$(git rev-parse HEAD)
+          BODY=$(curl -fsS --max-time 20 "$SITE/api/health") || {
+            echo "::warning::Could not reach $SITE/api/health. This job says nothing about drift; the uptime monitor is the thing that should be complaining."
+            exit 0
+          }
+          LIVE=$(printf '%s' "$BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("commit") or "")')
+
+          if [ -z "$LIVE" ]; then
+            echo "::warning::Production did not report a commit. Either it is serving a build from before this check existed, or the health endpoint changed shape."
+            exit 0
+          fi
+
+          echo "main:       ${HEAD_SHA:0:7}"
+          echo "production: $LIVE"
+
+          if [ "${HEAD_SHA:0:7}" = "$LIVE" ]; then
+            echo "In sync."
+            exit 0
+          fi
+
+          # The live commit has to be findable, and has to be an ancestor.
+          # If it is neither, something stranger than a failed build has
+          # happened and a human should look rather than be told a number.
+          FULL_LIVE=$(git rev-parse --verify --quiet "${LIVE}^{commit}") || {
+            echo "::warning::Production reports commit $LIVE, which is not in the last 100 commits of this branch. It may be very old, or from another branch."
+            exit 0
+          }
+          if ! git merge-base --is-ancestor "$FULL_LIVE" "$HEAD_SHA"; then
+            echo "::error::Production is serving $LIVE, which is not an ancestor of main. Production and main have diverged, which no failed build can cause."
+            exit 1
+          fi
+
+          # Which of the commits since then were ever going to be built.
+          #
+          # Newest first, so the first hit is the one production should be
+          # on. Each is tested by the project's own Ignored Build Step
+          # script, run against that commit exactly as Vercel runs it.
+          NEWEST_DEPLOYABLE=""
+          for SHA in $(git rev-list "${FULL_LIVE}..${HEAD_SHA}"); do
+            git checkout -q --detach "$SHA"
+            if VERCEL_GIT_COMMIT_REF=main bash scripts/vercel-ignore-build.sh >/dev/null 2>&1; then
+              : # exit 0 from that script means SKIP, so this commit changed nothing served
+            else
+              NEWEST_DEPLOYABLE="$SHA"
+              break
+            fi
+          done
+          git checkout -q --detach "$HEAD_SHA"
+
+          if [ -z "$NEWEST_DEPLOYABLE" ]; then
+            echo "Behind main by $(git rev-list --count ${FULL_LIVE}..${HEAD_SHA}) commit(s), all of which change nothing production serves. In sync."
+            exit 0
+          fi
+
+          AGE=$(( $(date +%s) - $(git log -1 --format=%ct "$NEWEST_DEPLOYABLE") ))
+          SHORT=${NEWEST_DEPLOYABLE:0:7}
+
+          # Under ten minutes old, a difference is the deployment still
+          # building. Failing here would page somebody for every merge.
+          if [ "$AGE" -lt 600 ]; then
+            echo "::notice::Production is on $LIVE and $SHORT is waiting, but that commit is only ${AGE}s old. Treating this as a deployment in progress."
+            exit 0
+          fi
+
+          echo "::error::Production is serving $LIVE, and $SHORT should have replaced it ${AGE}s ago. Its build failed or never started. Open that commit's deployment in Vercel; if the build died, redeploying the same commit is usually all it needs (claude/deploy-migration-lock-2026-09-24.md)."
+          exit 1
