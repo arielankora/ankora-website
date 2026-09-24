@@ -54,18 +54,26 @@ async function clearRunningTimer(page: import("@playwright/test").Page) {
   }
 }
 
-/// Open this file's task from the list, the way a person reaches it.
-async function openFixture(page: import("@playwright/test").Page) {
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
-  await page.getByRole("link", { name: FIXTURE }).first().click();
-  await expect(page).toHaveURL(/\/app\/tasks\/[^/]+$/);
-}
+// The seed gives this task a fixed id, so every test after the first can
+// go straight to it.
+//
+// That is not a shortcut, it is the difference between a suite that
+// finishes and one that does not. The tasks list is the slowest screen in
+// this product right now, and an earlier version of this file loaded it
+// four times to reach the same row - minutes of browser time spent
+// re-proving a link that the first test already asserts, on a run that
+// other specs are timing out inside.
+const FIXTURE_URL = "/app/tasks/demo-task-screen-fixture";
 
 // Serial, and in this order: these are stages of one piece of work, and
 // the last of them closes the task the others need open.
 test.describe.serial("one task, from opening it to closing it", () => {
   test("the list opens the task, and the task says what the row could not", async ({ page }) => {
-    await openFixture(page);
+    // The one test that goes through the list, because the link from a
+    // row to its task is the thing being asserted here.
+    await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+    await page.getByRole("link", { name: FIXTURE }).first().click();
+    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}$`));
 
     // Rendered, not raw. The asterisks that produced this are not on the
     // screen and the emphasis is a real element, which is the whole
@@ -88,7 +96,7 @@ test.describe.serial("one task, from opening it to closing it", () => {
   });
 
   test("priority and description are written from the screen and survive a reload", async ({ page }) => {
-    await openFixture(page);
+    await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
     await page.getByLabel("עדיפות").selectOption("URGENT");
     await expect(page.getByText("העדיפות: דחופה")).toBeVisible({ timeout: 30_000 });
@@ -120,7 +128,7 @@ test.describe.serial("one task, from opening it to closing it", () => {
 
   test("the clock starts from the work, and the minutes land on this task", async ({ page }) => {
     await clearRunningTimer(page);
-    await openFixture(page);
+    await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
     // Before: nothing has been reported against it.
     await expect(page.getByText("עדיין לא דווח זמן על המשימה הזו")).toBeVisible();
@@ -140,7 +148,7 @@ test.describe.serial("one task, from opening it to closing it", () => {
   });
 
   test("a promise the client can see refuses to close without a sentence for them", async ({ page }) => {
-    await openFixture(page);
+    await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
     // Internal until this click. Becoming something a client reads is the
     // step that puts the task under the close rule at all.
@@ -155,7 +163,7 @@ test.describe.serial("one task, from opening it to closing it", () => {
 
     const outcome = "תיאמנו מול הוועד, המפתח נאסף והטופס הוגש.";
     await page.getByLabel("משפט התוצאה לפני סגירה").fill(outcome);
-    await page.getByRole("button", { name: "סגירה", exact: true }).click();
+    await page.getByRole("button", { name: "סגירת המשימה" }).click();
     await expect(page.getByText("המשימה הושלמה")).toBeVisible({ timeout: 30_000 });
 
     await page.reload({ waitUntil: "domcontentloaded" });

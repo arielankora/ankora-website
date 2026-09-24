@@ -550,7 +550,13 @@ function ClientSection({
               onClick={onConfirmClose}
               className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
             >
-              סגירה
+              {/* "סגירת המשימה", not "סגירה". Every toast in this product
+                  carries a dismiss button labelled "סגירה", so the bare
+                  word is ambiguous the moment one is on screen - which is
+                  exactly when this button is used, since the write before
+                  it raised one. A screen reader hears two identical
+                  buttons that do very different things. */}
+              סגירת המשימה
             </button>
             <button
               type="button"
