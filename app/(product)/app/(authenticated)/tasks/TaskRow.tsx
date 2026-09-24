@@ -315,6 +315,23 @@ export function TaskRow({
           )}
           <Link
             href={`/app/tasks/${task.id}`}
+            // Same decision as the nav, for the same reason, and this
+            // time with the run that proves it.
+            //
+            // A task screen is dynamic, signed-in and database-backed, so
+            // there is nothing here for Next to prefetch but a loading
+            // shell - at the cost of one session check and one render per
+            // ROW, fired the moment the list paints.
+            //
+            // The browser suite caught the consequence on the run that
+            // added these links: a task created from the drawer took a
+            // reload to appear, and the traffic beside the failure was a
+            // burst of `/app/tasks/<id>?_rsc=` prefetches, all aborted,
+            // sharing a single-worker runner with the refresh that was
+            // supposed to bring the row in. The nav's own comment had
+            // already recorded this pattern; these links reintroduced it
+            // one per row.
+            prefetch={false}
             className={`truncate text-[13.5px] hover:underline ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}
           >
             {task.title}
