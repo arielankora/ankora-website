@@ -72,10 +72,16 @@ test("the list opens the task, and the task says what the row could not", async 
   );
 
   // The two panels that read data nothing has ever displayed.
+  //
+  // Both show their empty state here, and that is the correct assertion
+  // rather than a weaker one. This task is written straight into the
+  // database by the seed, so it has never passed through the write path
+  // that records an audit event - it genuinely has no history, and a
+  // panel claiming otherwise would be the bug. The populated case is
+  // asserted below, on a task the suite creates through the product.
   await expect(page.getByText("שעות על המשימה")).toBeVisible();
   await expect(page.getByText("היסטוריה")).toBeVisible();
-  // The audit log has recorded this since the task was seeded.
-  await expect(page.getByText("המשימה נפתחה")).toBeVisible();
+  await expect(page.getByText("אין עדיין שינויים מתועדים")).toBeVisible();
 });
 
 // Serial, and sharing one task: these are stages of a single piece of
@@ -95,13 +101,26 @@ test.describe.serial("one task, from opening it to closing it", () => {
     await page.locator('input[name="clientVisible"]').check();
     await page.getByRole("button", { name: "הוספת משימה" }).click();
 
-    // Thirty seconds, for the same reason the adoption spec spends them:
-    // the row arrives on its own, and on one CI run that took longer than
-    // twenty. How long it takes is a finding, not a convenience.
+    // Reloaded until the row is there, rather than waited for.
+    //
+    // This is the one place this file differs from the adoption spec on
+    // purpose. That spec waits without reloading because the thing it is
+    // testing IS the screen refreshing itself, and it is the reason that
+    // property stopped being a coin flip. Here the creation is a fixture:
+    // this file is about what happens once a task exists, and hanging all
+    // of it on the slowest path in the suite would mean four tests
+    // reporting a stale list as a broken task screen.
     const row = page.locator("[data-task]").filter({ hasText: title });
-    await expect(row, "the task the drawer just created is not in the list").toBeVisible({
-      timeout: 30_000,
-    });
+    await expect
+      .poll(
+        async () => {
+          if (await row.isVisible().catch(() => false)) return true;
+          await page.reload({ waitUntil: "domcontentloaded" });
+          return row.isVisible().catch(() => false);
+        },
+        { message: "the created task never appeared in the list", timeout: 60_000 }
+      )
+      .toBe(true);
 
     await row.getByRole("link", { name: title }).click();
     await expect(page).toHaveURL(/\/app\/tasks\/[^/]+$/);
@@ -127,6 +146,16 @@ test.describe.serial("one task, from opening it to closing it", () => {
     await expect(page.getByLabel("עדיפות")).toHaveValue("URGENT");
     await expect(page.locator("strong", { hasText: "להחתים" })).toBeVisible();
     await expect(page.getByText("כתובת: הרצל 5.")).toBeVisible();
+
+    // And the history panel, on a task that DID go through the product's
+    // own write path. The audit log has been recording this since phase
+    // 1 with nothing to display it; these two lines are the first time
+    // anything asserts that a person can see it.
+    await expect(page.getByText("המשימה נפתחה")).toBeVisible();
+    // The whole line, not the field name: "עדיפות" on its own also
+    // matches the select's own label a few centimetres above, which
+    // would be an assertion that passes without the history existing.
+    await expect(page.getByText("המשימה עודכנה: עדיפות")).toBeVisible();
   });
 
   test("the clock starts from the work, and the minutes land on this task", async ({ page }) => {
