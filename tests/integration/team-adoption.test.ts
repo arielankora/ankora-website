@@ -3,6 +3,8 @@ import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import {
   NO_OUTCOME_MESSAGE,
+  addTaskComment,
+  deleteTaskComment,
   listMyOpenTasks,
   listOpenPromises,
   stalledPromisesByClient,
@@ -278,6 +280,99 @@ describe("the three queries the screens rest on", () => {
     expect(rows.map((r) => [r.clientName, r.count])).toEqual([
       ["עסוק", 2],
       ["שקט", 1],
+    ]);
+  });
+
+  // What "moved" means, after phase 3.
+  //
+  // The metric was written when a task was a row and nothing else, so
+  // "moved" was `updatedAt`. A thread writes to task_comments and
+  // client_documents and touches neither the row nor its timestamp - so
+  // from the day the thread shipped, the most engaged work in the
+  // product read as stalled. These four cases are the definition.
+  it("does not call a promise stalled when somebody wrote on it today", async () => {
+    const client = await createTestClient({ name: "מדברים" });
+    const actor = await employeeOn(client.id);
+    const yesterday = new Date(Date.now() - 30 * 3600_000);
+    const since = new Date(Date.now() - 12 * 3600_000);
+
+    const chased = await seedTask(client.id, { clientVisible: true, updatedAt: yesterday });
+    await seedTask(client.id, { clientVisible: true, updatedAt: yesterday });
+
+    // Note what this does NOT do: writing a comment leaves the task row
+    // and its updatedAt untouched, so the task is still a candidate by
+    // the old definition. That is the whole point.
+    await addTaskComment(actor, chased.id, "דיברתי עם הספק, הוא חוזר אליי מחר בבוקר.");
+
+    const rows = await stalledPromisesByClient(actor, since);
+    expect(rows.map((r) => [r.clientName, r.count])).toEqual([["מדברים", 1]]);
+  });
+
+  it("does not call a promise stalled when a file was filed against it today", async () => {
+    const client = await createTestClient({ name: "מצרפים" });
+    const actor = await employeeOn(client.id);
+    const yesterday = new Date(Date.now() - 30 * 3600_000);
+    const since = new Date(Date.now() - 12 * 3600_000);
+
+    const documented = await seedTask(client.id, { clientVisible: true, updatedAt: yesterday });
+    await seedTask(client.id, { clientVisible: true, updatedAt: yesterday });
+
+    await prisma.clientDocument.create({
+      data: {
+        clientId: client.id,
+        taskId: documented.id,
+        title: "הצעת מחיר",
+        driveFileId: "drive-fake-1",
+        mimeType: "application/pdf",
+      },
+    });
+
+    const rows = await stalledPromisesByClient(actor, since);
+    expect(rows.map((r) => [r.clientName, r.count])).toEqual([["מצרפים", 1]]);
+  });
+
+  it("counts a promise again once the day's comment is taken back", async () => {
+    // Somebody writing an update and deleting it is the day's work
+    // undone, not work done. A soft-deleted row is still in the table,
+    // so this is the case that a naive `createdAt` filter gets wrong.
+    const client = await createTestClient({ name: "מוחקים" });
+    const actor = await employeeOn(client.id);
+    const yesterday = new Date(Date.now() - 30 * 3600_000);
+    const since = new Date(Date.now() - 12 * 3600_000);
+
+    const task = await seedTask(client.id, { clientVisible: true, updatedAt: yesterday });
+    const comment = await addTaskComment(actor, task.id, "טעות, זה על משימה אחרת.");
+
+    expect(await stalledPromisesByClient(actor, since)).toEqual([]);
+
+    await deleteTaskComment(actor, comment.id);
+
+    const rows = await stalledPromisesByClient(actor, since);
+    expect(rows.map((r) => [r.clientName, r.count])).toEqual([["מוחקים", 1]]);
+  });
+
+  it("counts the overdue ones separately and puts them first", async () => {
+    // Four quiet promises are a worse number than one, and one promise a
+    // week past the date it was promised for is a worse conversation.
+    const late = await createTestClient({ name: "באיחור" });
+    const many = await createTestClient({ name: "הרבה" });
+    const actor = await employeeOn(late.id);
+    await prisma.userClientAccess.create({ data: { userId: actor.id, clientId: many.id } });
+
+    const yesterday = new Date(Date.now() - 30 * 3600_000);
+    const since = new Date(Date.now() - 12 * 3600_000);
+    const lastWeek = new Date(Date.now() - 7 * 24 * 3600_000);
+    const nextWeek = new Date(Date.now() + 7 * 24 * 3600_000);
+
+    await seedTask(late.id, { clientVisible: true, updatedAt: yesterday, dueDate: lastWeek });
+    await seedTask(many.id, { clientVisible: true, updatedAt: yesterday, dueDate: nextWeek });
+    await seedTask(many.id, { clientVisible: true, updatedAt: yesterday, dueDate: null });
+    await seedTask(many.id, { clientVisible: true, updatedAt: yesterday, dueDate: nextWeek });
+
+    const rows = await stalledPromisesByClient(actor, since);
+    expect(rows.map((r) => [r.clientName, r.count, r.overdue])).toEqual([
+      ["באיחור", 1, 1],
+      ["הרבה", 3, 0],
     ]);
   });
 

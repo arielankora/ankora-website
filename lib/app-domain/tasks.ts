@@ -411,12 +411,53 @@ export async function supervisionCounts(actor: User): Promise<{ total: number; p
   return { total, pending };
 }
 
-export async function stalledPromisesByClient(actor: User, since: Date) {
+export type StalledClientRow = {
+  clientId: string;
+  clientName: string;
+  count: number;
+  /// How many of this client's stalled promises are also past the date
+  /// they were promised for. A subset of `count`, never a second total.
+  overdue: number;
+};
+
+/// The promises a client can see that nobody has moved today.
+///
+/// Team adoption, mechanism four. A manager's number, which is why it
+/// counts what the CLIENT can see (`clientVisible`) rather than every
+/// open row: the question behind it is whether the portal shows the
+/// truth or a week-old picture of it.
+///
+/// What "moved" means, and why it had to be rewritten.
+///
+/// This started as `updatedAt < since`, which was the whole definition
+/// when a task was a row and nothing else. Phase 3 gave tasks a thread,
+/// and a thread writes to `task_comments` and `client_documents` -
+/// neither of which touches `Task.updatedAt`. So from the day the thread
+/// shipped, the most engaged work in the product read as stalled: a task
+/// somebody chased all morning, wrote three updates on and filed the
+/// quote against still counted here, because the row itself had not been
+/// edited.
+///
+/// A metric that punishes the behaviour it is meant to encourage does
+/// not get argued with, it gets ignored. So "moved" now means what a
+/// person would say it means: the row changed, or somebody said
+/// something about it, or something was filed against it. That is the
+/// same three sources `getTaskDetail` merges into the thread, and the
+/// number and the screen now agree about what happened today.
+///
+/// Three queries, and none of them grow with the number of clients: the
+/// second and third are bounded by the candidate set, which is by
+/// definition the rows that already look stalled. On a good day it is
+/// empty and they do not run at all.
+export async function stalledPromisesByClient(
+  actor: User,
+  since: Date
+): Promise<StalledClientRow[]> {
   const accessible = await listAccessibleClients(actor);
   const ids = accessible.map((c) => c.id);
   if (ids.length === 0) return [];
 
-  const rows = await prisma.task.findMany({
+  const candidates = await prisma.task.findMany({
     where: {
       deletedAt: null,
       clientId: { in: ids },
@@ -424,16 +465,54 @@ export async function stalledPromisesByClient(actor: User, since: Date) {
       status: { in: OPEN_STATUSES },
       updatedAt: { lt: since },
     },
-    select: { clientId: true, client: { select: { name: true } } },
+    select: { id: true, clientId: true, dueDate: true, client: { select: { name: true } } },
   });
+  if (candidates.length === 0) return [];
 
-  const byClient = new Map<string, { clientId: string; clientName: string; count: number }>();
-  for (const r of rows) {
-    const found = byClient.get(r.clientId);
-    if (found) found.count += 1;
-    else byClient.set(r.clientId, { clientId: r.clientId, clientName: r.client.name, count: 1 });
+  const candidateIds = candidates.map((t) => t.id);
+  const [commented, filed] = await Promise.all([
+    prisma.taskComment.findMany({
+      where: { taskId: { in: candidateIds }, deletedAt: null, createdAt: { gte: since } },
+      select: { taskId: true },
+      distinct: ["taskId"],
+    }),
+    // A deleted file is not movement either. Somebody filing a document
+    // and taking it back is the same day's work undone.
+    prisma.clientDocument.findMany({
+      where: { taskId: { in: candidateIds }, deletedAt: null, createdAt: { gte: since } },
+      select: { taskId: true },
+      distinct: ["taskId"],
+    }),
+  ]);
+
+  const moved = new Set<string>();
+  for (const r of commented) moved.add(r.taskId);
+  for (const r of filed) if (r.taskId) moved.add(r.taskId);
+
+  const byClient = new Map<string, StalledClientRow>();
+  for (const t of candidates) {
+    if (moved.has(t.id)) continue;
+    // `since` is the start of the local day, so a task due yesterday is
+    // late and one due today is not late yet.
+    const late = t.dueDate !== null && t.dueDate < since;
+    const found = byClient.get(t.clientId);
+    if (found) {
+      found.count += 1;
+      if (late) found.overdue += 1;
+    } else {
+      byClient.set(t.clientId, {
+        clientId: t.clientId,
+        clientName: t.client.name,
+        count: 1,
+        overdue: late ? 1 : 0,
+      });
+    }
   }
-  return [...byClient.values()].sort((a, b) => b.count - a.count);
+
+  // Late first, then by how many. A client with one promise a week past
+  // its date needs the conversation before a client with four that are
+  // merely quiet.
+  return [...byClient.values()].sort((a, b) => b.overdue - a.overdue || b.count - a.count);
 }
 
 /// Who may be given a task on this client.

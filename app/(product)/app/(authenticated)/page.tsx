@@ -195,6 +195,7 @@ export default async function AppHomePage() {
   );
 
   const stalledTotal = stalled?.reduce((sum, row) => sum + row.count, 0) ?? 0;
+  const stalledOverdue = stalled?.reduce((sum, row) => sum + row.overdue, 0) ?? 0;
 
   const cards = [
     canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
@@ -347,7 +348,13 @@ export default async function AppHomePage() {
             a fact nobody can act on and "four of them are Orbit's" is a
             conversation. Zero is worth rendering too: a manager who only
             ever sees this card when it is bad cannot tell a good day
-            from a card that stopped working. */}
+            from a card that stopped working.
+
+            The overdue number is a subset of the big one, never a second
+            total, and it is shown as a sentence rather than as its own
+            figure. Two figures at the top of a card is two things to
+            read before knowing whether the day is fine, and the whole
+            value of this card is that it can be read in one glance. */}
         {stalled && (
           <div className="rounded-2xl border border-lineDark bg-white p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -366,6 +373,14 @@ export default async function AppHomePage() {
               <>
                 <p className="mt-1.5 text-[12.5px] text-appNavy/55">
                   הלקוחות האלה רואים אצלם משימה פתוחה שלא נגענו בה היום.
+                  {stalledOverdue > 0 && (
+                    <>
+                      {" "}
+                      <span className="text-warning">
+                        {stalledOverdue} מהן כבר עברו את תאריך היעד.
+                      </span>
+                    </>
+                  )}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {stalled.slice(0, 8).map((row) => (
@@ -375,6 +390,7 @@ export default async function AppHomePage() {
                       className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11.5px] text-appNavy/70 transition-colors hover:border-gold"
                     >
                       {row.clientName} · {row.count}
+                      {row.overdue > 0 && <span className="text-warning"> · {row.overdue} באיחור</span>}
                     </Link>
                   ))}
                 </div>
