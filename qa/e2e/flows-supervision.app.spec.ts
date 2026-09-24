@@ -37,23 +37,29 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
   test("the task offers the one move that is open to it", async ({ page }) => {
     await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
+    // Wait for the section before deciding anything about what is in it.
+    // The previous version asked `isVisible()` the instant the document
+    // fired, and that call does not wait: this page streams, so on a slow
+    // render it answered "no button" for a button that arrived a moment
+    // later, skipped the click, and then reported the untouched status as
+    // a broken screen. A whole CI round on a question about timing.
+    await expect(page.getByRole("heading", { name: "פיקוח ואישור" })).toBeVisible({ timeout: 30_000 });
+
     // The forward move is a button, not a value buried in the status
     // dropdown. A rule people have to go looking for is a rule people
     // route around.
     //
-    // Guarded rather than clicked outright, because this button exists
-    // only while the task has not been sent yet. On a retry of this
-    // group the send has already happened, and an unguarded click would
-    // wait for an element that is correctly gone until the test timeout
-    // fires ninety seconds later - a fixture problem reported as a
-    // broken screen. The assertion below is the same either way.
+    // Conditional because this group is serial and its fixture is
+    // mutated: on a retry the task has already been sent and the button
+    // is correctly gone. The assertion after it is the same either way,
+    // and it is the product's own sentence rather than a form value.
     const send = page.getByRole("button", { name: "שליחה לאישור" });
-    if (await send.isVisible().catch(() => false)) {
+    if (await send.count()) {
       await send.click();
       await expect(page.getByText("הסטטוס: ממתינה לאישור")).toBeVisible({ timeout: 30_000 });
     }
 
-    await expect(page.getByLabel("סטטוס")).toHaveValue("PENDING_APPROVAL", { timeout: 30_000 });
+    await expect(page.getByText("המשימה מחכה לאישור שלך.")).toBeVisible({ timeout: 30_000 });
   });
 
   test("the nav says something is waiting, and the screen says what", async ({ page }) => {
@@ -80,7 +86,6 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
   test("the supervisor signs it, and the screen says who and when", async ({ page }) => {
     await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText("המשימה מחכה לאישור שלך.")).toBeVisible();
     await page.getByRole("button", { name: "אישור וסגירה" }).click();
     await expect(page.getByText("הסטטוס: הושלמה")).toBeVisible({ timeout: 30_000 });
 
