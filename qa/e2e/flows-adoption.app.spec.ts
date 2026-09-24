@@ -89,14 +89,41 @@ test("a promise the client can see cannot be closed without a sentence for them"
   await page.locator('select[name="clientId"]').selectOption({ index: 1 });
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="clientVisible"]').check();
+
+  // This test is the only one in the suite that asserts a screen
+  // refreshing ITSELF after a write, which is why it never reloads and
+  // why it must not start doing so to go green.
+  //
+  // It has also been failing and passing on retry for weeks while saying
+  // only "the row is not there", which is the symptom and not the half
+  // that broke. There are exactly two halves - the write did not land, or
+  // it landed and the screen never showed it - and the answer is in the
+  // action's own response. So the test reads it, the way the decisions
+  // spec has done since the same race was chased through that screen.
+  const wrote = page
+    .waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/tasks"), { timeout: 30_000 })
+    .catch(() => null);
+
   await page.getByRole("button", { name: "הוספת משימה" }).click();
+
+  const response = await wrote;
+  const body = response ? await response.text().catch(() => null) : null;
+  const carried =
+    response === null
+      ? "the write never even produced a response - the click did not submit, or it was aborted"
+      : body === null
+        ? `the write answered ${response.status()} and its body could not be read`
+        : body.includes(title)
+          ? `the server DID send back a screen carrying this task (${body.length} bytes) - the browser did not apply it`
+          : `the write answered ${response.status()} (${body.length} bytes) and the task is NOT in what came back - revalidation never reached the response, so the row can only arrive by the explicit refresh`;
 
   // Thirty seconds, and the number is a finding rather than a
   // convenience: the row appears on its own now, and on one CI run it
-  // took longer than twenty. The screen refreshing itself is no longer
-  // a coin flip; how long it takes is still worth someone's attention.
+  // took longer than twenty.
   const row = page.locator("[data-task]").filter({ hasText: title });
-  await expect(row, "the task the drawer just created is not in the list").toBeVisible({ timeout: 30_000 });
+  await expect(row, `the task the drawer just created is not in the list. ${carried}`).toBeVisible({
+    timeout: 30_000,
+  });
 
   // The close asks before it happens, rather than being refused after.
   await row.getByRole("checkbox").click();

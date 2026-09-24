@@ -242,12 +242,13 @@ test.describe("alerts/actions", () => {
 
     await form.locator('input[name="thresholdValue"]').fill("80");
     await form.locator('input[name="recipientsAnkora"]').fill(recipient);
+    // Wait on the server's acknowledgement, then navigate. Reloading
+    // straight after the click aborted the POST the click had started.
+    const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
     await form.getByRole("button", { name: "יצירת כלל התראה" }).click();
+    await written;
 
-    // No reload: it aborted the POST it had just started, and it made
-    // this test unable to tell a screen that refreshed itself from one
-    // that did not. This form stays on the screen, so the rule has to
-    // appear on its own.
+    await page.reload();
     await expect(page.getByText(recipient, { exact: false }).first(), "the alert rule was not created").toBeVisible({
       timeout: 30_000,
     });

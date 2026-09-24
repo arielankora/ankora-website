@@ -230,15 +230,22 @@ test.describe("report-schedules/actions", () => {
 
     await form.locator('select[name="frequency"]').selectOption("WEEKLY");
     await form.locator('textarea[name="recipients"], input[name="recipients"]').first().fill(recipient);
-    await form.getByRole("button", { name: "יצירת דוח מתוזמן" }).click();
-
-    // No reload, deliberately.
+    // Wait for the SERVER to acknowledge the write, then navigate.
     //
-    // The old version reloaded immediately, which aborted the POST it had
-    // just started. And a test that reloads before it looks cannot tell a
-    // screen that refreshed itself from one that did not - which is how a
-    // refresh that only worked half the time survived three releases.
-    // This form stays on the screen, so the row has to arrive on its own.
+    // The old version reloaded the moment it had clicked, which aborted
+    // the POST that click had just started - the run's traffic log has
+    // been reporting exactly that for weeks. Waiting on the response is
+    // the precise signal, and unlike a UI cue it cannot be confused with
+    // a form that simply has not started yet.
+    //
+    // The reload stays. Dropping it was tried on this branch and turns
+    // this test into an assertion about a screen refreshing itself, which
+    // is a separate open question and not what this test is for.
+    const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await form.getByRole("button", { name: "יצירת דוח מתוזמן" }).click();
+    await written;
+
+    await page.reload();
     await expect(page.getByText(recipient, { exact: false }).first(), "the schedule was not created").toBeVisible({
       timeout: 30_000,
     });
