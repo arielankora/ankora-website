@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 
 /// What a Server Action in this app answers with.
 export type ActionResult = { ok?: boolean; error?: string };
@@ -54,16 +54,26 @@ export type ActionResult = { ok?: boolean; error?: string };
  * response carried a rendered screen with the new record missing from it,
  * and the explicit refresh that followed changed nothing on the page.
  *
- * So the refresh is now asked for from an effect, after the transition
- * that carried the action has committed and this component is settled.
- * Nothing about it competes with the action's own response any more: the
- * screen is re-fetched once, from a normal render, the way it would be if
- * a person had asked for it.
+ * The second attempt asked for it from an effect, after the transition had
+ * committed. Right idea, and it worked for every form that stays on the
+ * screen - which is not the ones that matter. Five forms here sit in a
+ * drawer and close it on success, and closing the drawer unmounts the
+ * form in the same batched update that scheduled the effect. React does
+ * not run the effects of a component it is removing. So Tasks, Clients,
+ * Categories, Hour banks and Important dates asked for no refresh at all,
+ * and whether the row appeared went back to being the coin this hook was
+ * rewritten to get rid of.
  *
- * Why no test caught any of this for three releases: every other write
- * test in the browser suite reloads the page before asserting the result.
- * A test that reloads before it looks is not testing a refresh. Two specs
- * now assert the screen updating itself, and they reload nothing.
+ * It is a macrotask now: after React has committed, and belonging to
+ * nothing that can be unmounted. See askForRefresh below.
+ *
+ * Why no test caught any of this for three releases, and then caught it
+ * in twenty milliseconds. Every other write test in the browser suite
+ * reloads the page before asserting, and a test that reloads before it
+ * looks is not testing a refresh. But the deeper reason is that a
+ * question about one hook's behaviour was only ever asked by sampling a
+ * twelve-minute browser suite. `tests/unit/use-action-form.test.tsx`
+ * renders a drawer, submits a form and counts the refreshes.
  */
 export function useActionForm<R extends ActionResult>(
   action: (prev: R | undefined, data: FormData) => Promise<R>,
@@ -82,15 +92,34 @@ export function useActionForm<R extends ActionResult>(
   const [, startTransition] = useTransition();
   const router = useRouter();
   /// Bumped on every successful write, and watched by the effect below.
-  /// A counter rather than a boolean because two saves in a row are two
-  /// refreshes, and a boolean that is already true is a refresh that
-  /// never happens.
-  const [landed, setLanded] = useState(0);
-
-  useEffect(() => {
-    if (landed === 0) return;
-    router.refresh();
-  }, [landed, router]);
+  /// Ask the screen behind this form to re-read itself.
+  ///
+  /// Two things this deliberately is NOT, and the product spent three
+  /// investigations learning each one.
+  ///
+  /// **Not an effect.** That is what it was, and it silently did nothing
+  /// for the five forms that matter most. `onSuccess` above is a drawer's
+  /// close for Tasks, Clients, Categories, Hour banks and Important
+  /// dates: it unmounts this form, in the same batched update that would
+  /// have scheduled the effect. React does not run the effects of a
+  /// component it is removing, so those five screens never asked for a
+  /// refresh at all, and whether the new row appeared came down to
+  /// whether the revalidation riding inside the action's own response
+  /// happened to arrive. That is the coin flip this hook was rewritten to
+  /// get rid of, still being flipped, for half the forms in the product.
+  ///
+  /// **Not a direct call either.** Called straight from here it lands
+  /// inside the transition carrying the action, folded into the same
+  /// update as that action's response. That version was tried and it did
+  /// not hold. A macrotask puts it after React has committed, which is
+  /// the one thing the effect had right.
+  ///
+  /// And nothing cancels it on unmount, which is the entire point: the
+  /// form is usually gone by the time it runs, and the list it is
+  /// refreshing is not.
+  function askForRefresh() {
+    setTimeout(() => router.refresh(), 0);
+  }
 
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,13 +138,8 @@ export function useActionForm<R extends ActionResult>(
         const answer = await action(undefined, data);
         setResult(answer);
         if (answer?.ok) {
-          // onSuccess first, then the signal that asks for the refresh.
-          // The refresh may unmount this form - that is what closing a
-          // decision does - and a callback that never ran because its
-          // component was already gone is a drawer that stays open on a
-          // saved row.
           onSuccess?.(answer);
-          setLanded((n) => n + 1);
+          askForRefresh();
         }
       } catch {
         // A Server Action that throws has already been logged on the

@@ -2,6 +2,15 @@ import { defineConfig } from "vitest/config";
 import path from "path";
 
 export default defineConfig({
+  // JSX through esbuild rather than @vitejs/plugin-react.
+  //
+  // The plugin is a dependency here and would do this too, but its type
+  // declarations use syntax newer than this repo's TypeScript, and
+  // importing it into this file puts those declarations in front of
+  // `tsc --noEmit` - which then fails on a file that has nothing to do
+  // with the product. Component tests need a JSX transform, not fast
+  // refresh, and the bundler's own transform already does that.
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "."),
@@ -10,7 +19,7 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.ts", "tests/**/*.test.tsx"],
     // Integration tests share ONE database and tests/integration/setup.ts
     // truncates every table in beforeEach. With vitest's default file-level
     // parallelism, several files run at once against that database and each

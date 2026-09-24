@@ -102,6 +102,20 @@ test.describe("categories/actions", () => {
     await dialog.locator('input[name="name"]').fill(name);
     await dialog.getByRole("button", { name: "הוספת קטגוריה" }).click();
 
+    // Wait for the write to be ACKNOWLEDGED before navigating.
+    //
+    // A reload issued while the POST is still open aborts it, and the
+    // run's own traffic log has been reporting exactly that for weeks:
+    // `POST /app/categories net::ERR_ABORTED (WHILE NAVIGATING)`. The
+    // server usually committed anyway, which is why this passed most of
+    // the time and failed for no visible reason the rest of it.
+    //
+    // This drawer closes itself on success, so its disappearance is the
+    // signal that the action answered.
+    await expect(dialog, "the drawer never closed, so the write was not acknowledged").toBeHidden({
+      timeout: 30_000,
+    });
+
     await page.reload();
     await expect(page.getByText(name, { exact: false }).first(), "the category was not created").toBeVisible({
       timeout: 15_000,
@@ -218,9 +232,15 @@ test.describe("report-schedules/actions", () => {
     await form.locator('textarea[name="recipients"], input[name="recipients"]').first().fill(recipient);
     await form.getByRole("button", { name: "יצירת דוח מתוזמן" }).click();
 
-    await page.reload();
+    // No reload, deliberately.
+    //
+    // The old version reloaded immediately, which aborted the POST it had
+    // just started. And a test that reloads before it looks cannot tell a
+    // screen that refreshed itself from one that did not - which is how a
+    // refresh that only worked half the time survived three releases.
+    // This form stays on the screen, so the row has to arrive on its own.
     await expect(page.getByText(recipient, { exact: false }).first(), "the schedule was not created").toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
   });
 });

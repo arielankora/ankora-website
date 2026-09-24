@@ -208,7 +208,19 @@ test.describe("users/actions", () => {
     // This drawer deliberately stays OPEN on success - it shows the one-time
     // invite link for the admin to copy, and closes only when they dismiss
     // it. So unlike every other drawer here, its disappearance is not the
-    // success signal; the user appearing in the list is.
+    // success signal: the link is.
+    //
+    // Waiting for it before navigating is the point. Reloading straight
+    // after the click aborted the POST that click had just started, which
+    // the run's traffic log has been reporting all along
+    // (`POST /app/users net::ERR_ABORTED (WHILE NAVIGATING)`), and which
+    // is why this test failed roughly one run in three while the row it
+    // was looking for had usually been written anyway.
+    await expect(
+      dialog.getByText("/app/reset-password"),
+      "the one-time invite link never appeared, so the invite was not acknowledged"
+    ).toBeVisible({ timeout: 30_000 });
+
     await page.reload();
     await expect(page.getByText(email, { exact: false }).first(), "the invited user is not listed").toBeVisible({
       timeout: 15_000,
@@ -232,9 +244,12 @@ test.describe("alerts/actions", () => {
     await form.locator('input[name="recipientsAnkora"]').fill(recipient);
     await form.getByRole("button", { name: "יצירת כלל התראה" }).click();
 
-    await page.reload();
+    // No reload: it aborted the POST it had just started, and it made
+    // this test unable to tell a screen that refreshed itself from one
+    // that did not. This form stays on the screen, so the rule has to
+    // appear on its own.
     await expect(page.getByText(recipient, { exact: false }).first(), "the alert rule was not created").toBeVisible({
-      timeout: 15_000,
+      timeout: 30_000,
     });
   });
 });

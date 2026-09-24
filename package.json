@@ -57,6 +57,8 @@
   },
   "devDependencies": {
     "@playwright/test": "1.56.1",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "20.14.15",
     "@types/pdfkit": "^0.17.6",
@@ -68,6 +70,7 @@
     "embedded-postgres": "^18.4.0-beta.17",
     "eslint": "8.57.0",
     "eslint-config-next": "15.5.25",
+    "jsdom": "^25.0.1",
     "pdfjs-dist": "6.3.289",
     "playwright": "1.56.1",
     "postcss": "^8.5.28",
