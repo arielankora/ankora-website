@@ -5,24 +5,33 @@
 // pay for one. (Vitest 5 removed `environmentMatchGlobs`; the docblock is
 // what replaced it.)
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
-import { useState, type ReactNode } from "react";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { useActionForm } from "@/components/app/useActionForm";
+import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 
 // Whether a screen refreshes itself after a write has now been the subject
-// of three investigations and roughly twenty-five CI rounds, and every one
-// of them had to sample a browser suite to ask the question. This file
-// asks it directly.
+// of four investigations and roughly thirty CI rounds, and every one of
+// them had to sample a twelve-minute browser suite to ask the question.
+// This file asks it directly, in twenty milliseconds.
 //
-// The property under test is one sentence: **a successful write asks the
-// router to refresh, and it does so even when the form that performed the
-// write is removed from the screen in the same breath.**
+// The property under test is one sentence: **an accepted write asks the
+// router to refresh exactly once, and something still mounted is the thing
+// that asks.**
 //
-// That second half is the whole thing. Five forms in this product sit
-// inside a drawer and close it on success, and closing the drawer unmounts
-// the form. A refresh that is requested from that form's own effect is a
-// refresh that never happens, because React does not run the effects of a
-// component it is removing.
+// Every clause there was bought with a failure.
+//
+// "Exactly once" - because two components asking is two requests for the
+// same screen racing each other, and the loser of that race is what a CI
+// trace caught being aborted at 41ms on a write that had already committed.
+//
+// "Something still mounted" - because five forms in this product close the
+// drawer they live in when the server accepts the write, and closing the
+// drawer unmounts the form. A refresh asked for by that form is a refresh
+// that never happens.
+//
+// So the real Drawer is used here rather than a stand-in. The thing being
+// tested is which of the two components owns the refresh, and a hand-rolled
+// drawer would let that ownership be wrong in the product and right here.
 
 const refresh = vi.fn();
 // ONE router object for every call, because that is what Next returns.
@@ -38,15 +47,18 @@ vi.mock("next/navigation", () => ({
 beforeEach(() => refresh.mockClear());
 afterEach(() => cleanup());
 
-/// A drawer, reduced to the one thing that matters here: it renders its
-/// child only while open, and the child can close it.
-function Drawer({ children }: { children: (close: () => void) => ReactNode }) {
-  const [open, setOpen] = useState(true);
-  return <div>{open ? children(() => setOpen(false)) : <p>closed</p>}</div>;
-}
-
-function Form({ action, onSuccess }: { action: () => Promise<{ ok?: boolean; error?: string }>; onSuccess?: () => void }) {
-  const { onSubmit, pending, error } = useActionForm(async () => action(), onSuccess);
+function Form({
+  action,
+  closesDrawer = false,
+}: {
+  action: () => Promise<{ ok?: boolean; error?: string }>;
+  closesDrawer?: boolean;
+}) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(
+    async () => action(),
+    closesDrawer ? close : undefined
+  );
   return (
     <form onSubmit={onSubmit}>
       <button type="submit">{pending ? "saving" : "save"}</button>
@@ -55,13 +67,24 @@ function Form({ action, onSuccess }: { action: () => Promise<{ ok?: boolean; err
   );
 }
 
+const ok = async () => ({ ok: true });
+
+function openDrawer() {
+  act(() => {
+    screen.getByRole("button", { name: "add" }).click();
+  });
+}
+
 async function submit() {
   await act(async () => {
     screen.getByRole("button", { name: /save|saving/ }).click();
     // Let the action's promise and the transition settle.
     await Promise.resolve();
   });
-  // A refresh scheduled outside React's commit lands on a later task.
+  // Nothing should need this any more: the refresh is asked for from an
+  // effect, and effects flush inside act. The turn of the task queue stays
+  // so that a regression to a timer would still be counted rather than
+  // silently missed, and reported as "asked twice".
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
@@ -69,26 +92,49 @@ async function submit() {
 
 describe("a successful write asks for a refresh", () => {
   it("does so for a form that stays on the screen", async () => {
-    render(<Form action={async () => ({ ok: true })} />);
+    render(<Form action={ok} />);
     await submit();
     expect(refresh).toHaveBeenCalledTimes(1);
   });
 
-  it("does so even when success closes the drawer the form lives in", async () => {
-    // The regression this file exists for. `onSuccess` here is the
-    // drawer's close, exactly as five forms in this product use it: the
-    // write succeeds, the drawer closes, the form is gone - and the list
-    // behind it has to be told to re-read itself by something that is
-    // still alive.
+  it("does so when success closes the drawer the form lives in", async () => {
+    // The regression this file exists for. `useDrawerClose()` here is what
+    // Tasks, Clients, Categories, Hour banks and Important dates all pass
+    // as their success callback: the write is accepted, the drawer closes,
+    // the form is gone, and the list behind it has to be told to re-read
+    // itself by something that is still alive.
     render(
-      <Drawer>
-        {(close) => <Form action={async () => ({ ok: true })} onSuccess={close} />}
+      <Drawer triggerLabel="add" title="drawer">
+        <Form action={ok} closesDrawer />
       </Drawer>
     );
+    openDrawer();
     await submit();
 
-    expect(screen.getByText("closed")).toBeDefined();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks once and not twice, with both the form and the drawer in play", async () => {
+    // Stated separately from the count above because it is a different
+    // failure: the hook asking as well as the drawer would pass a
+    // "did it refresh" test and still put two requests for the same screen
+    // on the wire, which is the shape of the race that started all this.
+    render(
+      <Drawer triggerLabel="add" title="drawer">
+        <Form action={ok} closesDrawer />
+      </Drawer>
+    );
+    openDrawer();
+    await submit();
+    expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks once per successful write, not once ever", async () => {
+    render(<Form action={ok} />);
+    await submit();
+    await submit();
+    expect(refresh).toHaveBeenCalledTimes(2);
   });
 
   it("does not ask for one when the action reports an error", async () => {
@@ -109,14 +155,25 @@ describe("a successful write asks for a refresh", () => {
     await submit();
     expect(refresh).not.toHaveBeenCalled();
   });
+});
 
-  it("asks once per successful write, not once ever", async () => {
-    // A counter rather than a boolean, for the same reason the hook uses
-    // one: two saves in a row are two refreshes, and a flag that is
-    // already set is a refresh that never happens.
-    render(<Form action={async () => ({ ok: true })} />);
-    await submit();
-    await submit();
-    expect(refresh).toHaveBeenCalledTimes(2);
+describe("dismissing a drawer is not a write", () => {
+  it("does not refresh when the drawer is closed without saving", async () => {
+    // The X and the backdrop go through a different close than the forms
+    // do, and this is the line that keeps them apart. Opening a form,
+    // changing nothing and closing it again should cost the screen behind
+    // it nothing.
+    render(
+      <Drawer triggerLabel="add" title="drawer">
+        <Form action={ok} closesDrawer />
+      </Drawer>
+    );
+    openDrawer();
+    act(() => {
+      screen.getAllByRole("button", { name: "סגירה" })[0].click();
+    });
+
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
