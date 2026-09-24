@@ -104,12 +104,21 @@ describe("the diagnostic never becomes the problem", () => {
     clockThatJumps(SLOW_MS + 1);
 
     await expect(
-      timed(
+      // The type argument is explicit because the work function only
+      // throws, so TypeScript infers `never` for it and the detail's
+      // parameter collapses to `undefined`. Naming the type the caller
+      // would really have is what makes this the careless-detail case
+      // rather than a compile error about it.
+      timed<string[]>(
         "failing.thing",
         async () => {
           throw new Error("the actual failure");
         },
-        (rows) => `${(rows as string[]).length} rows`
+        // `rows` is `string[] | undefined` here, and it is undefined on
+        // this path because the work threw. Reading `.length` off it is
+        // the whole point: this is the careless detail the guard exists
+        // to contain.
+        (rows) => `${rows!.length} rows`
       )
     ).rejects.toThrow("the actual failure");
 
