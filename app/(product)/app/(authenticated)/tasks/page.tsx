@@ -11,6 +11,7 @@ import { CreateTaskForm } from "./CreateTaskForm";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
 import { TaskBoard } from "./TaskBoard";
+import { TaskListProvider, type ListRow } from "./TaskListProvider";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -160,6 +161,21 @@ export default async function TasksPage(
           <p className="mt-1 text-sm text-appNavy/60">משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.</p>
         </div>
 
+        <TaskListProvider
+          rows={tasks.map(toRow)}
+          // What a newly created task has to survive to belong on the
+          // screen as it is filtered right now. The client's NAME and not
+          // only its id, because the row the action returns carries the
+          // name and comparing an id to a name is how a row that belongs
+          // gets dropped.
+          filters={{
+            status: listStatus,
+            clientId: searchParams.clientId,
+            clientName: clients.find((c) => c.id === searchParams.clientId)?.name,
+          }}
+        >
+          {(rows) => (
+            <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-2.5">
           <TaskFilters clients={clients} categories={categories} />
           <Drawer triggerLabel="+ משימה" title="משימה חדשה">
@@ -236,7 +252,7 @@ export default async function TasksPage(
           )}
         </div>
 
-        {tasks.length === 0 ? (
+        {rows.length === 0 ? (
           <EmptyState
             icon={ListChecks}
             // Three different nothings, and they mean three different
@@ -254,33 +270,36 @@ export default async function TasksPage(
           />
         ) : board ? (
           <TaskBoard
-            cards={tasks.map((task) => ({
-              id: task.id,
-              title: task.title,
-              clientName: task.client.name,
-              status: task.status,
-              priority: task.priority,
-              dueDate: task.dueDate?.toISOString() ?? null,
-              assignedToName: task.assignedTo?.name ?? null,
-              clientVisible: task.clientVisible,
+            // Fed from the same rows as the list, so a task created
+            // while the board is open appears on it too. The board is a
+            // different view of this list, not a different list.
+            cards={rows.map((row) => ({
+              id: row.id,
+              title: row.title,
+              clientName: row.clientName,
+              status: row.status,
+              priority: row.priority,
+              dueDate: row.dueDate,
+              assignedToName: row.assignedToName,
+              clientVisible: row.clientVisible,
               // The board needs to know WHETHER there is an outcome, not
               // what it says: that is the difference between asking for
               // the sentence before a card lands on "הושלמו" and being
               // refused after it does.
-              hasOutcome: Boolean(task.clientOutcome?.trim()),
+              hasOutcome: Boolean(row.clientOutcome?.trim()),
             }))}
           />
         ) : grouped ? (
           <div className="space-y-5">
-            {groupByClient(tasks).map(([clientName, rows]) => (
+            {groupByClient(rows).map(([clientName, inClient]) => (
               <section key={clientName}>
                 <h2 className="text-sm font-medium text-appNavy">
                   {clientName}
-                  <span className="mr-2 font-normal text-appNavy/45">{rows.length}</span>
+                  <span className="mr-2 font-normal text-appNavy/45">{inClient.length}</span>
                 </h2>
                 <div className="mt-2 divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-                  {rows.map((task) => (
-                    <TaskRow key={task.id} task={toRow(task)} />
+                  {inClient.map((row) => (
+                    <TaskRow key={row.id} task={row} />
                   ))}
                 </div>
               </section>
@@ -288,18 +307,26 @@ export default async function TasksPage(
           </div>
         ) : (
           <div className="divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-            {tasks.map((task) => (
-              <TaskRow key={task.id} task={toRow(task)} />
+            {rows.map((row) => (
+              <TaskRow key={row.id} task={row} />
             ))}
           </div>
         )}
+            </div>
+          )}
+        </TaskListProvider>
       </div>
     </>
   );
 }
 
-/// The row's own shape, lifted out because two branches render it now.
-function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
+/// The one shape every view on this screen renders from.
+///
+/// The list, the grouped list and the board all read it, and so does the
+/// row a create returns, which is why it is a named type rather than an
+/// inferred object: the action builds the same shape on the server, and
+/// the compiler is what keeps the two from drifting.
+function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
   return {
     id: task.id,
     title: task.title,
@@ -308,6 +335,7 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
     dueDate: task.dueDate?.toISOString() ?? null,
     status: task.status,
     priority: task.priority,
+    assignedToName: task.assignedTo?.name ?? null,
     clientVisible: task.clientVisible,
     supplierName: task.supplierName,
     supplierExperience: task.supplierExperience,
@@ -322,10 +350,10 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]) {
 /// the client whose most urgent task comes first, not alphabetically:
 /// the point of this view is to see which account needs attention, and
 /// sorting by name would bury that under the alphabet.
-function groupByClient(tasks: Awaited<ReturnType<typeof listTasks>>) {
-  const groups = new Map<string, typeof tasks>();
+function groupByClient(tasks: ListRow[]) {
+  const groups = new Map<string, ListRow[]>();
   for (const task of tasks) {
-    const name = task.client.name;
+    const name = task.clientName;
     const found = groups.get(name);
     if (found) found.push(task);
     else groups.set(name, [task]);
