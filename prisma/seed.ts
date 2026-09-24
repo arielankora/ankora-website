@@ -211,10 +211,31 @@ async function main() {
   // account the browser suite signs in as - so "המשימות שלי" on the home
   // screen and the "שלי" filter both have a row, and the timer screen has
   // a promise to offer when a timer stops.
+  //
+  // Tasks phase 1: this is the row the task screen is demonstrated on, so
+  // it carries the two fields that screen exists for. A description in
+  // the Markdown subset the field actually supports (lib/markdown-lite.ts
+  // - emphasis, a list, a link, and nothing else), because a demo that
+  // only ever shows one paragraph teaches people the field holds one
+  // paragraph. `startedAt` is left to the server: the status is already
+  // IN_PROGRESS here, and writing a start date beside it in a seed would
+  // be the one place in the product where that column is not the
+  // server's.
   const RESEARCH_PORTAL = {
     clientVisible: true,
     clientTitle: "[DEMO] בדיקת שלושה ספקים והשוואה",
     assignedToId: ankoraAdmin.id,
+    priority: "HIGH" as const,
+    description: [
+      "שלושה ספקים להשוואה, **עד יום חמישי**:",
+      "",
+      "- אלפא, הצעה קיימת מ-2024, אסמכתא `INV-2024-118`",
+      "- ביתא, פנינו ולא חזרו",
+      "- גמא, הגיע דרך המלצה של הלקוח",
+      "",
+      "מה שחשוב ללקוח הוא *זמן האספקה*, לא המחיר. פרטי ההתקשרות של אלפא נמצאים",
+      "ב[אתר שלהם](https://example.com/alpha).",
+    ].join("\n"),
   };
   await prisma.task.upsert({
     where: { id: "demo-task-research-competitors" },

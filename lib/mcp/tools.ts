@@ -651,11 +651,29 @@ export function registerAnkoraTools(server: McpServer): void {
           .optional()
           .describe("Colleague's name or email. Omit to leave it unassigned; pass the user's own name for themselves."),
         due: DATE.optional().describe("Due date, YYYY-MM-DD. Treated as the end of that day in the user's timezone."),
+        details: z
+          .string()
+          .optional()
+          .describe(
+            "Everything a colleague needs to pick this up without asking: an address, a reference number, what was already tried. Markdown for emphasis, lists and links; no headings or tables. Omit when the title says it all."
+          ),
+        priority: z
+          .enum(["LOW", "NORMAL", "HIGH", "URGENT"])
+          .optional()
+          .describe("How urgent. Omit unless the user said so - NORMAL is the default and most work is ordinary."),
       }),
       annotations: WRITES,
     },
     async (
-      args: { client: string; title: string; category?: string; assignTo?: string; due?: string },
+      args: {
+        client: string;
+        title: string;
+        category?: string;
+        assignTo?: string;
+        due?: string;
+        details?: string;
+        priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+      },
       ctx: ServerContext
     ) => {
       try {
@@ -685,6 +703,8 @@ export function registerAnkoraTools(server: McpServer): void {
           clientId: client.value.id,
           categoryId,
           title: args.title,
+          description: args.details ?? null,
+          priority: args.priority,
           assignedToId,
           // End of the due day, not its start: a task due today should not
           // read as overdue at nine in the morning.
@@ -700,6 +720,7 @@ export function registerAnkoraTools(server: McpServer): void {
           assignedTo: assigneeName,
           dueDate: args.due ?? null,
           status: task.status,
+          priority: task.priority,
         });
       } catch (err) {
         console.error("[mcp] create_task failed", err);
@@ -731,6 +752,16 @@ export function registerAnkoraTools(server: McpServer): void {
         clearAssignee: z.boolean().optional().describe("Remove the current owner, leaving it unassigned."),
         due: DATE.optional().describe("New due date, YYYY-MM-DD."),
         clearDue: z.boolean().optional().describe("Remove the due date."),
+        details: z
+          .string()
+          .optional()
+          .describe(
+            "Replace the task's details with this. Markdown for emphasis, lists and links. Pass an empty string to clear them."
+          ),
+        priority: z
+          .enum(["LOW", "NORMAL", "HIGH", "URGENT"])
+          .optional()
+          .describe("New priority."),
         outcome: z
           .string()
           .min(1)
@@ -753,6 +784,8 @@ export function registerAnkoraTools(server: McpServer): void {
         clearAssignee?: boolean;
         due?: string;
         clearDue?: boolean;
+        details?: string;
+        priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
         outcome?: string;
       },
       ctx: ServerContext
@@ -793,6 +826,11 @@ export function registerAnkoraTools(server: McpServer): void {
         if (args.clearDue) patch.dueDate = null;
         if (args.due !== undefined) patch.dueDate = localDateTimeToUtc(args.due, "23:59", actor.timezone);
         if (args.outcome !== undefined) patch.clientOutcome = args.outcome;
+        // An empty string is the model's only way to say "clear this",
+        // since the schema has no clearDetails flag - updateTask already
+        // reads a blank string as null.
+        if (args.details !== undefined) patch.description = args.details;
+        if (args.priority !== undefined) patch.priority = args.priority;
 
         if (args.category !== undefined) {
           const category = await lookupCategory(actor, taskClientId, args.category);

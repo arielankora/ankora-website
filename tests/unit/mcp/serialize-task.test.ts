@@ -17,6 +17,7 @@ function task(over: Partial<TaskLike> = {}): TaskLike {
     id: "t1",
     title: "Send the monthly report",
     status: "OPEN",
+    priority: "NORMAL",
     dueDate: null,
     createdAt: new Date("2026-09-01T08:00:00Z"),
     client: { name: "RIMED" },
@@ -108,6 +109,7 @@ describe("the payload", () => {
         "dueDate",
         "id",
         "overdue",
+        "priority",
         "status",
         "title",
       ].sort()
@@ -116,7 +118,7 @@ describe("the payload", () => {
 
   it("flattens relations to names, and tolerates missing ones", () => {
     const bare = serializeTask(
-      { id: "t2", title: "x", status: "OPEN", dueDate: null, createdAt: new Date(0) },
+      { id: "t2", title: "x", status: "OPEN", priority: "NORMAL", dueDate: null, createdAt: new Date(0) },
       { timeZone: IL }
     );
     expect(bare.client).toBeNull();

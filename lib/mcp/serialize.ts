@@ -109,6 +109,7 @@ export type TaskLike = {
   id: string;
   title: string;
   status: string;
+  priority: string;
   dueDate: Date | null;
   createdAt: Date;
   client?: { name: string } | null;
@@ -125,6 +126,10 @@ export type SerializedTask = {
   assignedTo: string | null;
   dueDate: string | null;
   overdue: boolean;
+  /// Tasks phase 1. Emitted always, including NORMAL: a model asked to
+  /// find the urgent work needs to see that the rest is not, and a field
+  /// that disappears when it is ordinary reads as missing data.
+  priority: string;
   createdAt: string;
 };
 
@@ -163,6 +168,7 @@ export function serializeTask(
     dueDate: task.dueDate ? dateKey(task.dueDate, opts.timeZone) : null,
     // A finished task is never overdue, however far past its date it sits.
     overdue: !isClosed && task.dueDate !== null && task.dueDate.getTime() < now.getTime(),
+    priority: task.priority,
     createdAt: task.createdAt.toISOString(),
   };
 }
