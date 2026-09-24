@@ -10,6 +10,7 @@ import { Drawer } from "@/components/app/Drawer";
 import { CreateTaskForm } from "./CreateTaskForm";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
+import { TaskBoard } from "./TaskBoard";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -63,6 +64,7 @@ export default async function TasksPage(
       mine?: string;
       q?: string;
       group?: string;
+      view?: string;
     }>;
   }
 ) {
@@ -95,12 +97,25 @@ export default async function TasksPage(
   /// default because the flat list is already ordered by what is urgent,
   /// and grouping trades that reading for a different one.
   const grouped = searchParams.group === "client";
+  /// The board. A way of looking at the same query, so it lives on this
+  /// route with the same filters rather than on a route of its own: a
+  /// board that could not be narrowed to one client would be a wall of
+  /// cards, and a second route would mean two places to keep the filter
+  /// bar working.
+  const board = searchParams.view === "board";
+
+  // A status filter on the board would empty three of its four columns,
+  // which is not a filtered board, it is a broken one. The pills are
+  // hidden in that view and the value is ignored rather than carried,
+  // so switching to the board never shows a column somebody cannot see
+  // the reason for.
+  const listStatus = board ? undefined : status;
 
   const [tasks, clients, allCategories] = await Promise.all([
     listTasks(user, {
       clientId: searchParams.clientId,
       categoryId: searchParams.categoryId,
-      status,
+      status: listStatus,
       assignedToId: mine ? user.id : undefined,
       q,
     }),
@@ -115,7 +130,7 @@ export default async function TasksPage(
 
   // Both controls write the same query string, so picking a status keeps
   // "mine" on and turning "mine" off keeps the status.
-  function href(next: { status?: TaskStatus | "ALL"; mine?: boolean; group?: boolean }) {
+  function href(next: { status?: TaskStatus | "ALL"; mine?: boolean; group?: boolean; view?: "list" | "board" }) {
     const params = new URLSearchParams();
     if (searchParams.clientId) params.set("clientId", searchParams.clientId);
     if (searchParams.categoryId) params.set("categoryId", searchParams.categoryId);
@@ -126,12 +141,16 @@ export default async function TasksPage(
     // not silently throw away what somebody searched for.
     if (q) params.set("q", q);
     if (next.group ?? grouped) params.set("group", "client");
+    const nextView = next.view ?? (board ? "board" : "list");
+    if (nextView === "board") params.set("view", "board");
     const query = params.toString();
     return query ? `/app/tasks?${query}` : "/app/tasks";
   }
   const pillHref = (value: TaskStatus | "ALL") => href({ status: value });
   const mineHref = href({ mine: !mine });
   const groupHref = href({ group: !grouped });
+  const listHref = href({ view: "list" });
+  const boardHref = href({ view: "board" });
 
   return (
     <>
@@ -149,6 +168,29 @@ export default async function TasksPage(
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* The view switch comes first because it changes what the
+              controls beside it mean. On the board the status pills and
+              the grouping toggle are not hidden to simplify the screen,
+              they are hidden because the board already answers both
+              questions: its columns ARE the statuses. */}
+          <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+            {[
+              { href: listHref, label: "רשימה", active: !board },
+              { href: boardHref, label: "לוח", active: board },
+            ].map((view) => (
+              <Link
+                key={view.label}
+                href={view.href}
+                className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                  view.active ? "bg-appNavy text-cream" : "text-appNavy/60 hover:text-appNavy"
+                }`}
+              >
+                {view.label}
+              </Link>
+            ))}
+          </div>
+
+          {!board && (
           <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
             {FILTER_PILLS.map((pill) => (
               <Link
@@ -162,6 +204,7 @@ export default async function TasksPage(
               </Link>
             ))}
           </div>
+          )}
 
           {/* "Mine" is a separate toggle rather than a fifth status pill:
               it answers a different question and combines with all four
@@ -179,6 +222,7 @@ export default async function TasksPage(
               it, so it sits with the toggles rather than in the filter
               bar above and says what it does rather than naming a
               setting. */}
+          {!board && (
           <Link
             href={groupHref}
             className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
@@ -189,6 +233,7 @@ export default async function TasksPage(
           >
             לפי לקוח
           </Link>
+          )}
         </div>
 
         {tasks.length === 0 ? (
@@ -206,6 +251,24 @@ export default async function TasksPage(
                   ? "כשמשימה תשויך אליך היא תופיע כאן. אפשר לכבות את המסנן כדי לראות את כל המשימות."
                   : "הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם."
             }
+          />
+        ) : board ? (
+          <TaskBoard
+            cards={tasks.map((task) => ({
+              id: task.id,
+              title: task.title,
+              clientName: task.client.name,
+              status: task.status,
+              priority: task.priority,
+              dueDate: task.dueDate?.toISOString() ?? null,
+              assignedToName: task.assignedTo?.name ?? null,
+              clientVisible: task.clientVisible,
+              // The board needs to know WHETHER there is an outcome, not
+              // what it says: that is the difference between asking for
+              // the sentence before a card lands on "הושלמו" and being
+              // refused after it does.
+              hasOutcome: Boolean(task.clientOutcome?.trim()),
+            }))}
           />
         ) : grouped ? (
           <div className="space-y-5">

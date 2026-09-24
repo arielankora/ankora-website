@@ -234,8 +234,17 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
 
   // Present before the search, so its absence afterwards means the
   // filter worked rather than that it was never there.
+  //
+  // Sixty seconds, and only on the two assertions that need the WHOLE
+  // list. This is the slowest render in the product and this test is the
+  // only one that waits for an unfiltered version of it; on a loaded CI
+  // machine thirty seconds was not enough, and the failure read as a
+  // missing row rather than as a page that had not finished. Everything
+  // after the search runs against a list of one or two rows and keeps
+  // the usual timeout.
+  const WHOLE_LIST = 60_000;
   const other = page.getByRole("link", { name: /החלפת ספק ניקיון/ });
-  await expect(other.first()).toBeVisible({ timeout: 30_000 });
+  await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
 
   await box.fill("ועד הבית");
   await box.press("Enter");
@@ -249,5 +258,5 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
 
   // And clearing it gives the list back.
   await page.getByRole("button", { name: "ניקוי החיפוש" }).click();
-  await expect(other.first()).toBeVisible({ timeout: 30_000 });
+  await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
 });
