@@ -28,3 +28,32 @@ export const SUPPLIER_EXPERIENCE_LABELS: Record<SupplierExperience, string> = {
   OK: "בסדר",
   AVOID: "לא נשתמש שוב",
 };
+
+/// The one sentence at the top of the portal's home screen.
+///
+/// Moved here from the screen so it can be tested, and rewritten because
+/// it was lying. The old version counted decisions and waiting promises
+/// into one number and then described that number as decisions: a client
+/// with no decisions and one waiting promise was told "דבר אחד מחכה
+/// להחלטה שלך", clicked through to the decisions tab, and was told there
+/// was nothing there. Found on a real client in production.
+///
+/// The two are genuinely different things and the client already reads
+/// them differently. A decision has options, a price and a recommendation,
+/// and it is answered on its own screen. A promise waiting on the client
+/// is work in flight that needs something from them, and it carries the
+/// stage label "מחכה לך" everywhere else in the portal.
+///
+/// So: the word "החלטה" appears only when there is a decision, and when
+/// both exist the sentence counts them together without naming either.
+export function portalHeadline(decisions: number, waiting: number, inProgress: number): string {
+  if (decisions > 0 && waiting === 0) {
+    return decisions === 1 ? "החלטה אחת מחכה לך." : `${decisions} החלטות מחכות לך.`;
+  }
+  const needsYou = decisions + waiting;
+  if (needsYou === 1) return "דבר אחד מחכה לך.";
+  if (needsYou > 1) return `${needsYou} דברים מחכים לך.`;
+  if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
+  if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
+  return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
+}
