@@ -44,11 +44,14 @@ import type { CreatedTaskRow } from "./actions";
 // on the same fields the query uses rather than guessed.
 
 type TaskListValue = {
+  /// Everything the server sent, plus anything it has not had a chance
+  /// to send yet. Read by the view; never by the page.
+  rows: ListRow[];
   /// Called by the create form with what the action returned.
   addCreated: (task: CreatedTaskRow) => void;
 };
 
-const TaskListContext = createContext<TaskListValue>({ addCreated: () => {} });
+const TaskListContext = createContext<TaskListValue>({ rows: [], addCreated: () => {} });
 
 export function useTaskList() {
   return useContext(TaskListContext);
@@ -74,6 +77,19 @@ function accepts(
   return true;
 }
 
+/// `children` is a plain ReactNode and NOT a render prop, which is not a
+/// style preference.
+///
+/// Every `page.tsx` on this screen is a Server Component, and a function
+/// cannot cross the server/client boundary as a prop: only serializable
+/// values and React elements can. The first version of this file took
+/// `(rows) => ReactNode` and type-checked, linted and built without a
+/// word of complaint, then failed at runtime on every render of the
+/// tasks screen. `Drawer.tsx` has carried a comment about this exact
+/// trap since the redesign; I wrote the trap anyway.
+///
+/// So the merged rows go out through the context instead, and the view
+/// below reads them from there.
 export function TaskListProvider({
   rows,
   filters,
@@ -81,7 +97,7 @@ export function TaskListProvider({
 }: {
   rows: ListRow[];
   filters: { status?: string; clientId?: string; clientName?: string };
-  children: (rows: ListRow[]) => ReactNode;
+  children: ReactNode;
 }) {
   const [extra, setExtra] = useState<ListRow[]>([]);
 
@@ -96,20 +112,21 @@ export function TaskListProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  const value = useMemo<TaskListValue>(
-    () => ({
-      addCreated: (task) => {
-        if (!accepts(task, filters)) return;
-        setExtra((prev) => (prev.some((r) => r.id === task.id) ? prev : [task, ...prev]));
-      },
-    }),
-    [filters]
-  );
-
   // Newest first, above everything the server sent. A task somebody just
   // created belongs at the top whatever the sort says: they are looking
   // for confirmation that it exists, not for where it ranks.
   const all = useMemo(() => [...extra, ...rows], [extra, rows]);
 
-  return <TaskListContext.Provider value={value}>{children(all)}</TaskListContext.Provider>;
+  const value = useMemo<TaskListValue>(
+    () => ({
+      rows: all,
+      addCreated: (task) => {
+        if (!accepts(task, filters)) return;
+        setExtra((prev) => (prev.some((r) => r.id === task.id) ? prev : [task, ...prev]));
+      },
+    }),
+    [all, filters]
+  );
+
+  return <TaskListContext.Provider value={value}>{children}</TaskListContext.Provider>;
 }

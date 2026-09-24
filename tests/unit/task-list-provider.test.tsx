@@ -50,6 +50,27 @@ function Creator({ task }: { task: ListRow }) {
   return null;
 }
 
+/// Reads the merged rows the way the real view does: out of the context,
+/// not out of a prop.
+///
+/// The first version of this file used a render prop, and every case
+/// below passed. It could not have failed: jsdom has no server/client
+/// boundary, so nothing here notices that a function cannot be passed
+/// from a Server Component to a Client one. The product noticed, on
+/// every render of the tasks screen. A unit test cannot check that
+/// boundary, and this comment is here so the next person does not
+/// believe it did.
+function Rows() {
+  const { rows } = useTaskList();
+  return (
+    <ul>
+      {rows.map((r) => (
+        <li key={r.id}>{r.title}</li>
+      ))}
+    </ul>
+  );
+}
+
 function renderList(
   rows: ListRow[],
   filters: { status?: string; clientId?: string; clientName?: string } = {},
@@ -57,16 +78,8 @@ function renderList(
 ) {
   return render(
     <TaskListProvider rows={rows} filters={filters}>
-      {(all) => (
-        <>
-          {created && <Creator task={created} />}
-          <ul>
-            {all.map((r) => (
-              <li key={r.id}>{r.title}</li>
-            ))}
-          </ul>
-        </>
-      )}
+      {created && <Creator task={created} />}
+      <Rows />
     </TaskListProvider>
   );
 }
@@ -99,13 +112,7 @@ describe("the server still wins", () => {
     act(() => {
       rerender(
         <TaskListProvider rows={[created, row({ id: "server", title: "ישנה" })]} filters={{}}>
-          {(all) => (
-            <ul>
-              {all.map((r) => (
-                <li key={r.id}>{r.title}</li>
-              ))}
-            </ul>
-          )}
+          <Rows />
         </TaskListProvider>
       );
     });
