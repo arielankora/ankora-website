@@ -188,8 +188,11 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
           categories={categories.map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }))}
         />
 
+        {/* Hadas, 23.9.2026: "יום עבודה נוכחי ראשון". Newest day on top,
+            which also matches the order inside each day (startAt desc). The
+            strip above stays Sunday to Saturday: it is a calendar. */}
         <div className="space-y-4">
-          {days.map((day) => {
+          {[...days].reverse().map((day) => {
             const key = dateKey(day);
             const dayEntries = byDay.get(key) ?? [];
             if (dayEntries.length === 0) return null;
