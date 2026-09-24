@@ -1,7 +1,8 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
+import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { getActiveTimer, startTimer, stopTimer, ActiveTimerExistsError } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -183,6 +184,95 @@ export async function stopTimerForTaskAction(input: { taskId: string; timeEntryI
     revalidatePath("/app/timer");
     revalidatePath("/app/my-time");
     revalidatePath("/app");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Tasks phase 3: say something on a task.
+///
+/// Revalidates this screen only. A comment changes nothing a list, the
+/// portal or the home screen reads, and revalidating four paths for a
+/// sentence is four re-renders nobody asked for.
+export async function addTaskCommentAction(input: { taskId: string; body: string }) {
+  const user = await requireUser();
+  try {
+    await addTaskComment(user, input.taskId, input.body);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function deleteTaskCommentAction(input: { commentId: string }) {
+  const user = await requireUser();
+  try {
+    const removed = await deleteTaskComment(user, input.commentId);
+    revalidatePath(`/app/tasks/${removed.taskId}`);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Attach a file to a task.
+///
+/// FormData rather than a JSON argument, because the bytes have to cross
+/// as bytes: a base64 string in a Server Action argument is a third
+/// larger and would push files under the 4.5MB request cap over it for
+/// no reason.
+///
+/// The file is filed as a document of the task's CLIENT, through the
+/// same path the client file screen uses, with `taskId` set. Not a new
+/// table and not a new Drive folder: a file that came out of a task is a
+/// document of that client's either way, and `ClientDocument.taskId` has
+/// existed since the portal's own phase 3 waiting for this.
+///
+/// **Visibility is inherited from the task, not taken from the table's
+/// default.** `ClientDocument.clientVisible` defaults to true, which is
+/// right for a folder called "the client's documents" and wrong for a
+/// screenshot somebody drops on an internal task. An internal task's
+/// files stay internal; a promise's files are the client's, like the
+/// promise.
+export async function attachFileToTaskAction(form: FormData) {
+  const user = await requireUser();
+  try {
+    const taskId = String(form.get("taskId") || "");
+    const file = form.get("file");
+    if (!taskId) return { ok: false as const, error: "חסר מזהה משימה." };
+    if (!(file instanceof File) || file.size === 0) {
+      return { ok: false as const, error: "לא נבחר קובץ." };
+    }
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      return { ok: false as const, error: "הקובץ גדול מ-4MB." };
+    }
+
+    const task = await prisma.task.findFirst({
+      where: { id: taskId, deletedAt: null },
+      select: { id: true, clientId: true, clientVisible: true },
+    });
+    if (!task) return { ok: false as const, error: "המשימה לא נמצאה." };
+
+    await addClientDocument(user, {
+      clientId: task.clientId,
+      // The file's own name is the title. Anything else would ask a
+      // person to name a thing they have already named on their disk.
+      title: file.name,
+      kind: "OTHER",
+      taskId: task.id,
+      fileName: file.name,
+      mimeType: file.type || "application/octet-stream",
+      content: Buffer.from(await file.arrayBuffer()),
+      clientVisible: task.clientVisible,
+    });
+
+    revalidatePath(`/app/tasks/${taskId}`);
+    // The client's own file screen lists every document they have, and
+    // this just added one to it.
+    revalidatePath(`/app/clients/${task.clientId}`);
+    if (task.clientVisible) revalidatePath("/app/portal");
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

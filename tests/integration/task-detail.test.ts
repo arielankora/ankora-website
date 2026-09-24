@@ -205,9 +205,11 @@ describe("getTaskDetail", () => {
     await updateTask(actor, task.id, { priority: "URGENT" });
 
     const detail = await getTaskDetail(actor, task.id);
-    // Newest first: the priority change, then the creation.
-    expect(detail!.history[0].changed).toContain("עדיפות");
-    expect(detail!.history[detail!.history.length - 1].label).toBe("המשימה נפתחה");
+    // Newest first: the priority change, then the creation. Read off the
+    // thread's event entries now that comments and files share the list.
+    const events = detail!.thread.filter((e) => e.kind === "event");
+    expect(events[0].changed).toContain("עדיפות");
+    expect(events[events.length - 1].label).toBe("המשימה נפתחה");
   });
 
   it("names the field that changed and not the columns the server moved", async () => {
@@ -220,7 +222,8 @@ describe("getTaskDetail", () => {
     await updateTask(actor, task.id, { status: "DONE" });
 
     const detail = await getTaskDetail(actor, task.id);
-    expect(detail!.history[0].changed).toEqual(["סטטוס"]);
+    const events = detail!.thread.filter((e) => e.kind === "event");
+    expect(events[0].changed).toEqual(["סטטוס"]);
   });
 });
 

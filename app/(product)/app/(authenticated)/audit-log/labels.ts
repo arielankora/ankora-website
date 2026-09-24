@@ -108,6 +108,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.create": "יצירת משימה",
   "task.status_change": "שינוי סטטוס משימה",
   "task.approve": "אישור משימה",
+  "task.comment": "הערה על משימה",
+  "task.comment_delete": "מחיקת הערה על משימה",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.

@@ -156,6 +156,7 @@ model User {
   // Phase 10: Important Dates (מועדים חשובים).
   assignedTasks              Task[]                        @relation("TaskAssignee")
   supervisedTasks            Task[]                        @relation("TaskSupervisor")
+  taskComments               TaskComment[]                 @relation("TaskCommentAuthor")
   approvedTasks              Task[]                        @relation("TaskApprover")
   importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
   importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
@@ -774,6 +775,7 @@ model Task {
   timeEntries   TimeEntry[]
   decisions     Decision[]
   documents     ClientDocument[]
+  comments      TaskComment[]
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
@@ -791,6 +793,54 @@ model Task {
   // and for one person's own rows on the home screen.
   @@index([clientVisible, status, updatedAt])
   @@map("tasks")
+}
+
+/// Tasks phase 3 ("שרשור"), and the third of Hadas's three requests.
+///
+/// What a task could not hold until now is the conversation around it.
+/// Everything a colleague needed to know that was not a field lived in
+/// WhatsApp: what was tried, who answered, what the supplier said. A task
+/// somebody picks up two weeks later carried the title and nothing else.
+///
+/// **Internal, and there is no `clientVisible` column here on purpose.**
+/// The client-facing sentence is `Task.clientOutcome`, which already
+/// exists, already reaches the portal and already gates closing a
+/// promise. A second client-facing channel would mean two places to write
+/// to a client and two places to check before saying something, which is
+/// how one of them quietly stops being read. Raising a single comment to
+/// an interim update for the client is a real idea and it is the next
+/// increment, not this one.
+///
+/// The thread on the screen is NOT this table. It is these rows merged at
+/// read time with the AuditEvent rows the product has recorded since
+/// phase 1, and with the files filed against the task, so "who changed
+/// the status", "what Dana said about it" and "the quote arrived" sit in
+/// one list in the order they happened. Nothing is written twice; see the
+/// tasks-system spec's decision 1.
+model TaskComment {
+  id       String  @id @default(cuid())
+  taskId   String
+  /// Nullable for the same reason an audit actor is: a comment written
+  /// by a job has no person behind it, and a person who leaves should
+  /// not take their words out of the thread with them.
+  authorId String?
+
+  /// Markdown as plain text, exactly as `Task.description` holds it.
+  /// Rendered by lib/markdown-lite.ts, which escapes first and applies
+  /// patterns second. Nothing stores HTML.
+  body String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  /// Soft, like every other delete in this product. A thread that can
+  /// lose entries without trace is a thread nobody can rely on.
+  deletedAt DateTime?
+
+  task   Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author User? @relation("TaskCommentAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([taskId, createdAt])
+  @@map("task_comments")
 }
 
 /// Spec section 5 + 6. A row with endAt = null is a currently-running
