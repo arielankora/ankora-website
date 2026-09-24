@@ -1898,6 +1898,11 @@ model ClientDocument {
   uploadedBy User?  @relation("ClientDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@index([clientId, clientVisible])
+  /// The manager's stalled-promises number asks this table "which of
+  /// these tasks had something filed against them today", which is a
+  /// lookup by taskId and nothing else. Without this it is a scan of
+  /// every document in the product, on every dashboard load.
+  @@index([taskId, createdAt])
   @@map("client_documents")
 }
 
