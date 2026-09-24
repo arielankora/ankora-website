@@ -234,6 +234,7 @@ export function TaskDetail({
             תאריך יעד
             <input
               type="date"
+              aria-label="תאריך יעד"
               disabled={pending}
               defaultValue={task.dueDate ? task.dueDate.slice(0, 10) : ""}
               onChange={async (e) =>
@@ -394,6 +395,11 @@ function Select({
     >
       <span className="text-appNavy/50">{label}</span>
       <select
+        // The visible <span> and the chosen option share this <label>, so
+        // without an explicit name the accessible label would be the
+        // field name plus its current value - and would change every
+        // time somebody picks something else.
+        aria-label={label}
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
@@ -529,6 +535,10 @@ function ClientSection({
           <textarea
             autoFocus
             rows={2}
+            // Named apart from the outcome field above it: both write the
+            // same column, and a test (or a screen reader) needs to know
+            // which one is being answered.
+            aria-label="משפט התוצאה לפני סגירה"
             value={clientOutcome}
             onChange={(e) => setClientOutcome(e.target.value)}
             className="mt-3 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
