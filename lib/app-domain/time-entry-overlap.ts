@@ -64,3 +64,19 @@ export function resolveOverlapDecision(input: OverlapDecisionInput): OverlapDeci
   }
   return { allowed: false, confirmed: false, sameClient };
 }
+
+/// Hadas, 23.9.2026: "לא נותן לשנות זמנים, מודיע על חפיפה למרות שאין חפיפה
+/// ללקוח עצמו." A timer stores seconds; every edit form shows and submits
+/// HH:MM only. Saving a form therefore rewrote 11:54:50 as 11:54:00, which
+/// lands before a neighbouring timer that ended at 11:54:38, and that is a
+/// same-client overlap nobody can confirm past. It fired on a note-only
+/// edit too, because the form always sends both times.
+///
+/// The rule: a submitted time that names the same wall-clock minute as the
+/// stored one is not a change. Keep the stored instant, seconds and all.
+/// Israel's UTC offset is whole minutes, so comparing UTC minutes is the
+/// same as comparing what the form showed.
+export function keepStoredIfSameMinute(submitted: Date | undefined, stored: Date | null): Date | undefined {
+  if (!submitted || !stored) return submitted;
+  return Math.floor(submitted.getTime() / 60_000) === Math.floor(stored.getTime() / 60_000) ? undefined : submitted;
+}

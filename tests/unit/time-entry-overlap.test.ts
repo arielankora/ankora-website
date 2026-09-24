@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
+import { resolveOverlapDecision, keepStoredIfSameMinute } from "@/lib/app-domain/time-entry-overlap";
 
 // Phase 12 ("אישור דיווח שעות חופף בין לקוחות שונים"). Pure rule only - see
 // lib/app-domain/time-entry-overlap.ts's header comment for why this is
@@ -75,5 +75,27 @@ describe("resolveOverlapDecision()", () => {
       hasEditOthersPermission: true,
     });
     expect(decision).toEqual({ allowed: true, confirmed: true, sameClient: false });
+  });
+});
+
+describe("keepStoredIfSameMinute()", () => {
+  const stored = new Date("2026-09-14T08:54:50.240Z");
+
+  it("treats a submitted time in the same minute as no change", () => {
+    expect(keepStoredIfSameMinute(new Date("2026-09-14T08:54:00.000Z"), stored)).toBeUndefined();
+  });
+
+  it("passes through a time in a different minute", () => {
+    const moved = new Date("2026-09-14T08:55:00.000Z");
+    expect(keepStoredIfSameMinute(moved, stored)).toBe(moved);
+  });
+
+  it("passes through when nothing is stored (a running timer has no end)", () => {
+    const end = new Date("2026-09-14T09:05:00.000Z");
+    expect(keepStoredIfSameMinute(end, null)).toBe(end);
+  });
+
+  it("returns undefined when nothing was submitted", () => {
+    expect(keepStoredIfSameMinute(undefined, stored)).toBeUndefined();
   });
 });

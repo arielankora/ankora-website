@@ -8,7 +8,7 @@ import { evaluateAlertsForClient } from "@/lib/app-domain/alerts";
 import { afterResponse } from "@/lib/after-response";
 import { timed } from "@/lib/slow-log";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
-import { resolveOverlapDecision } from "@/lib/app-domain/time-entry-overlap";
+import { resolveOverlapDecision, keepStoredIfSameMinute } from "@/lib/app-domain/time-entry-overlap";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -587,6 +587,14 @@ export async function updateTimeEntry(
       throw new EditWindowExpiredError();
     }
   }
+
+  // A time the form merely echoed back (same minute as stored) is not an
+  // edit. See keepStoredIfSameMinute for the bug this closes.
+  input = {
+    ...input,
+    startAt: keepStoredIfSameMinute(input.startAt, entry.startAt),
+    endAt: keepStoredIfSameMinute(input.endAt, entry.endAt),
+  };
 
   const nextStartAt = input.startAt ?? entry.startAt;
   const nextEndAt = input.endAt ?? entry.endAt;

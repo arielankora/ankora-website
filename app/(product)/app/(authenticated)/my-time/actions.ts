@@ -13,6 +13,7 @@ import {
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { describeOverlapConflict } from "@/lib/time-entry-format";
 
 /// Spec "אישור דיווח שעות חופף בין לקוחות שונים" (Phase 12): a cross-client
 /// overlap (OverlapError.sameClient === false) is surfaced as a non-fatal,
@@ -31,7 +32,8 @@ type OverlapWarning = {
 type FormState = { error?: string; ok?: boolean; overlapWarning?: OverlapWarning };
 
 function friendlyError(err: unknown): string {
-  if (err instanceof OverlapError) return "טווח הזמן חופף לדיווח קיים אצל אותו לקוח.";
+  if (err instanceof OverlapError)
+    return `טווח הזמן חופף לדיווח קיים אצל אותו לקוח: ${describeOverlapConflict(err.conflicting)}.`;
   if (err instanceof ConflictError)
     return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
   if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
