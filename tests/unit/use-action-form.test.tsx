@@ -34,17 +34,33 @@ import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 // drawer would let that ownership be wrong in the product and right here.
 
 const refresh = vi.fn();
+const replace = vi.fn();
 // ONE router object for every call, because that is what Next returns.
 // A mock that builds a fresh object per render changes the identity of a
 // dependency on every render, which would make an effect keyed on the
 // router look like it fires too often - a defect in the double, reported
 // as a defect in the product.
-const router = { refresh };
+const router = { refresh, replace };
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
 }));
 
-beforeEach(() => refresh.mockClear());
+/// What "the screen was asked to re-read itself" means, counted across
+/// both mechanisms.
+///
+/// The two are not interchangeable and the difference is the point: a
+/// form that stays on the screen asks for a refresh, and a drawer
+/// navigates, because three CI runs aborted the refresh it used to ask
+/// for. This helper exists so the shared cases below (an error, a throw,
+/// two writes in a row) read the same for both and do not have to care.
+function asks() {
+  return refresh.mock.calls.length + replace.mock.calls.length;
+}
+
+beforeEach(() => {
+  refresh.mockClear();
+  replace.mockClear();
+});
 afterEach(() => cleanup());
 
 function Form({
@@ -95,6 +111,7 @@ describe("a successful write asks for a refresh", () => {
     render(<Form action={ok} />);
     await submit();
     expect(refresh).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("does so when success closes the drawer the form lives in", async () => {
@@ -112,7 +129,22 @@ describe("a successful write asks for a refresh", () => {
     await submit();
 
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(refresh).toHaveBeenCalledTimes(1);
+
+    // A navigation, not a refresh, and the assertion says so rather than
+    // counting "something happened". The refresh is the call CI aborted
+    // three runs running on writes that had already committed; swapping
+    // it back would pass any test that only asked whether the screen was
+    // told anything at all.
+    expect(refresh).not.toHaveBeenCalled();
+    expect(replace).toHaveBeenCalledTimes(1);
+
+    // Same path, and a parameter that makes it a different URL. Both
+    // halves matter: the same URL is not a navigation, and a different
+    // path would take the person off the screen they just wrote on.
+    const [url, opts] = replace.mock.calls[0];
+    expect(url).toMatch(/^\/[^?]*\?/);
+    expect(new URL(url, "http://x").searchParams.get("w")).toBeTruthy();
+    expect(opts).toEqual({ scroll: false });
   });
 
   it("asks once and not twice, with both the form and the drawer in play", async () => {
@@ -127,20 +159,20 @@ describe("a successful write asks for a refresh", () => {
     );
     openDrawer();
     await submit();
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(asks()).toBe(1);
   });
 
   it("asks once per successful write, not once ever", async () => {
     render(<Form action={ok} />);
     await submit();
     await submit();
-    expect(refresh).toHaveBeenCalledTimes(2);
+    expect(asks()).toBe(2);
   });
 
   it("does not ask for one when the action reports an error", async () => {
     render(<Form action={async () => ({ error: "nope" })} />);
     await submit();
-    expect(refresh).not.toHaveBeenCalled();
+    expect(asks()).toBe(0);
     expect(screen.getByText("nope")).toBeDefined();
   });
 
@@ -153,7 +185,7 @@ describe("a successful write asks for a refresh", () => {
       />
     );
     await submit();
-    expect(refresh).not.toHaveBeenCalled();
+    expect(asks()).toBe(0);
   });
 });
 
@@ -174,6 +206,6 @@ describe("dismissing a drawer is not a write", () => {
     });
 
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(refresh).not.toHaveBeenCalled();
+    expect(asks()).toBe(0);
   });
 });

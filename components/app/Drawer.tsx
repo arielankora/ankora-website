@@ -81,15 +81,46 @@ export function Drawer({
     setWrites((n) => n + 1);
   };
 
+  // A navigation, not a refresh. This is the fifth attempt at the same
+  // sentence and the first one that stops asking nicely.
+  //
+  // `router.refresh()` from here was correct in every way that could be
+  // reasoned about: the drawer outlives the form, the effect runs after
+  // the commit that applied the action's response, and the call sits
+  // inside a transition. CI aborted the request anyway, three runs
+  // running, at 41ms, 37ms and 46ms, on writes that had already
+  // committed. And the action's own response carries no list to fall
+  // back on: the last run counted the task rows in it and found zero in
+  // twenty-three kilobytes.
+  //
+  // A local lab on the same Next version, built for production, under
+  // the same route groups, with the same hook, the same drawer, the same
+  // middleware, a loading.tsx above it and a page slow enough to hit the
+  // fallback, delivers the row in the action response every time. So the
+  // cause is something about this app that a lab cannot hold, and five
+  // rounds of narrowing has not found it.
+  //
+  // What is left is to stop depending on the mechanism that keeps
+  // failing. #98 did this on the decisions screen and wrote the reason
+  // down: a refresh is a request, a navigation is not. A changed query
+  // string is a different URL, so the router has to go and get it, and
+  // there is no pending-fetch bookkeeping for anything to cancel.
+  //
+  // The cost is one short parameter in the address bar. Every screen
+  // that builds its own links rebuilds them from the parameters it cares
+  // about, so it does not survive the next thing the person clicks.
   useEffect(() => {
     if (writes === 0) return;
-    // Inside a transition, which is how Next documents this call and is
-    // not decoration. A refresh requested outside one is an update React
-    // may discard when another render supersedes it, and the request
-    // behind it is then aborted with nothing to retry it. CI has caught
-    // exactly that twice, at 41ms and at 37ms, on writes that had
-    // already committed.
-    startTransition(() => router.refresh());
+    // Read from `window` rather than `useSearchParams`, which would make
+    // every page holding a drawer need a Suspense boundary it does not
+    // otherwise want. This runs in an effect, so there is no server pass
+    // to worry about.
+    const url = new URL(window.location.href);
+    // A timestamp and not the counter: the counter restarts at one
+    // whenever this drawer remounts, and replacing a URL with the one it
+    // already has is not a navigation at all.
+    url.searchParams.set("w", String(Date.now()));
+    startTransition(() => router.replace(`${url.pathname}${url.search}`, { scroll: false }));
   }, [writes, router]);
 
   return (
