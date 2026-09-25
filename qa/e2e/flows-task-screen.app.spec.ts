@@ -372,6 +372,27 @@ test("a task says what it is waiting on, and for how long", async ({ page }) => 
   const section = page.locator("section", { hasText: "ממתינים למשהו?" });
   await expect(section).toBeVisible({ timeout: 30_000 });
 
+  // The fixture arrives here closed: the test above this one takes it
+  // all the way to DONE, and every test in this file shares one seeded
+  // task on purpose (a second fixture is a second thing to keep in
+  // sync). A finished task is not waiting for anybody and the screen
+  // says so instead of offering the control, which is the rule and not
+  // a gap, so this reopens it the way a person would.
+  //
+  // Caught by CI on the first run of this test, which sat on a click
+  // that could never resolve. Playwright's default action timeout is
+  // infinite, so "the button is not there" arrives as a test timeout
+  // with nothing in flight.
+  const status = page.getByLabel("סטטוס");
+  if ((await status.inputValue()) !== "IN_PROGRESS") {
+    const reopened = page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+      { timeout: 30_000 }
+    );
+    await status.selectOption("IN_PROGRESS");
+    await reopened;
+  }
+
   // Left over from a previous run of this spec: the fixture is a real
   // row and this test blocks it. Clearing first keeps the run
   // repeatable without a second fixture.
