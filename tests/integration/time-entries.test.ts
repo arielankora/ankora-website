@@ -238,12 +238,27 @@ describe("createManualEntry - spec 6.3", () => {
     const overlapStart = new Date(startAt.getTime() + 1_800_000); // 30 min into the first entry
     const overlapEnd = new Date(overlapStart.getTime() + 3600_000);
 
+    // The reason is not decoration, and leaving it off made this test
+    // fail only between midnight and 03:00.
+    //
+    // `isBackdated` asks whether startAt falls on a different LOCAL DAY
+    // from now, and that check runs before the overlap check. This window
+    // starts three hours ago, so for most of the day it is still today
+    // and the entry reaches the overlap rule. Run the suite just after
+    // midnight in Asia/Jerusalem and the same three hours land on
+    // yesterday, the backdate rule fires first, and the test reports
+    // BackdateReasonRequiredError where it expected OverlapError.
+    //
+    // It reads as the overlap rule having broken. It is the clock. The
+    // first create in this test already carried the reason for exactly
+    // this purpose; these two were simply missed.
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
         categoryId: category.id,
         startAt: overlapStart,
         endAt: overlapEnd,
+        backdateReason: PAST_REASON,
       })
     ).rejects.toBeInstanceOf(OverlapError);
 
@@ -255,6 +270,7 @@ describe("createManualEntry - spec 6.3", () => {
         startAt: overlapStart,
         endAt: overlapEnd,
         allowOverlapOverride: true,
+        backdateReason: PAST_REASON,
       })
     ).rejects.toBeInstanceOf(OverlapError);
   });

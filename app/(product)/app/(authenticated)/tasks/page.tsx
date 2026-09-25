@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listTasks } from "@/lib/app-domain/tasks";
+import { timed } from "@/lib/slow-log";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -110,17 +111,43 @@ export default async function TasksPage(props: {
   // the reason for.
   const listStatus = board ? undefined : status;
 
-  const [tasks, clients, allCategories] = await Promise.all([
-    listTasks(user, {
-      clientId: searchParams.clientId,
-      categoryId: searchParams.categoryId,
-      status: listStatus,
-      assignedToId: mine ? user.id : undefined,
-      q,
-    }),
-    listAccessibleClients(user),
-    listCategories(),
-  ]);
+  // Measured, because this screen is the one everything else gets blamed
+  // on.
+  //
+  // Its own comments call it "the slowest render in the product". Its
+  // browser test carries a sixty-second wait with a paragraph explaining
+  // why thirty was not enough. Six CI runs in one day failed on timeouts
+  // around it, and the refresh investigation circled it for five rounds
+  // and ended by routing around it rather than measuring it.
+  //
+  // Nobody has a number. This is the number: one line, only when the load
+  // crosses what a person would wait for, saying how long and on how
+  // much. Without the counts the line cannot tell a slow query from a
+  // large answer, which are opposite problems.
+  //
+  // Note what is NOT measured here: the React render that follows. This
+  // times the data, the same as the dashboard does, so the two are
+  // comparable. If the data is fast and the screen still is not, that is
+  // itself the finding.
+  const [tasks, clients, allCategories] = await timed(
+    "screen.tasks.load",
+    () =>
+      Promise.all([
+        listTasks(user, {
+          clientId: searchParams.clientId,
+          categoryId: searchParams.categoryId,
+          status: listStatus,
+          assignedToId: mine ? user.id : undefined,
+          q,
+        }),
+        listAccessibleClients(user),
+        listCategories(),
+      ]),
+    (result) =>
+      result
+        ? `${result[0].length} tasks, ${result[1].length} clients, ${result[2].length} categories${q ? ", searching" : ""}${board ? ", board" : ""}`
+        : "(failed)"
+  );
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categories = allCategories.filter(

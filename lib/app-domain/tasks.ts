@@ -182,7 +182,30 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // quietly widens every other filter the person set.
       OR: search ? searchWhere(search) : undefined,
     },
-    include: { client: true, category: true, assignedTo: true, supervisor: true },
+    // Four names, not four rows.
+    //
+    // This used to be `client: true, category: true, assignedTo: true,
+    // supervisor: true`, which is every column of four tables on every
+    // task on the screen. Two of those tables are User, and a User row
+    // carries `passwordHash`, `tokenVersion`, `failedLoginAttempts` and
+    // `lockedUntil`.
+    //
+    // Nothing leaked: every caller maps to a narrow shape and throws the
+    // rest away (see `toRow` on the tasks screen, and serialize.ts, which
+    // types these as `{ name: string }`). That is the problem. The safety
+    // is a habit rather than a rule, and it holds only until somebody
+    // passes `task.assignedTo` straight to a client component - which is
+    // one plausible edit, on a screen that already has client components
+    // taking rows as props.
+    //
+    // `getTaskDetail` below has been written this way since phase 1. This
+    // is the older query catching up, not a new idea.
+    include: {
+      client: { select: { id: true, name: true } },
+      category: { select: { id: true, name: true } },
+      assignedTo: { select: { id: true, name: true } },
+      supervisor: { select: { id: true, name: true } },
+    },
     // Open/In-progress first (spec §11: "open/recent tasks"), then by
     // deadline, then newest first. The dueDate leg is Phase 16: with due
     // dates finally readable, "soonest deadline first" is the order a
