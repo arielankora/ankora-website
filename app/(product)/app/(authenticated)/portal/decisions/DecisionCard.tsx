@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { respondToDecisionAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -128,18 +127,40 @@ export function DecisionCard({
   /// are still refreshing. Held on the card rather than inside one option
   /// so that answering any option closes all of them.
   const [answered, setAnswered] = useState(false);
-  const router = useRouter();
 
-  /// The answer changes the URL, and that is the point.
+  /// The answer leaves this page, and it leaves it the way a browser
+  /// leaves a page.
   ///
   /// This screen is the one write in the product made by somebody who is
   /// not us: a client approving spending above the ceiling they agreed.
-  /// Twice now it has been caught leaving them looking at the same
-  /// question after their approval was already recorded, because the
-  /// refresh that was supposed to redraw the screen did not arrive. A
-  /// refresh is a request; a navigation is not. Changing the query string
-  /// means the router cannot reuse what it already has, so the server
-  /// renders this screen again and the record is there.
+  /// Three times now it has been caught leaving them looking at the same
+  /// question after their approval was already recorded.
+  ///
+  /// The previous version of this comment said "a refresh is a request; a
+  /// navigation is not", and used `router.replace` on that basis. **That
+  /// sentence is false**, and it is why this kept happening. In the App
+  /// Router a `router.replace` is not a page load either - it is a fetch
+  /// of an RSC payload, and the screen changes when that payload arrives.
+  /// It can be dropped exactly like a refresh can. CI caught both halves
+  /// of it on 25.9.2026: a search box whose URL never changed in sixty
+  /// seconds (#117), and this screen, twice on the same commit:
+  ///
+  ///     the answer was accepted but the screen never refreshed to show
+  ///     the record. the server did NOT send a refreshed screen
+  ///     (15259 bytes, no record in it)
+  ///
+  /// So this asks the browser instead of the router. `window.location`
+  /// is a document navigation: no RSC fetch, no router bookkeeping, and
+  /// nothing that can quietly decide not to finish. A client who has just
+  /// approved money is the last person in this product who should be left
+  /// wondering whether it went through.
+  ///
+  /// `replace` rather than `assign`, so Back does not return them to a
+  /// question they have already answered.
+  ///
+  /// The cost is a full page load. On a screen somebody reaches once, to
+  /// make one decision, that is not a cost worth optimising against
+  /// certainty.
   ///
   /// It also moves the confirmation somewhere it survives. "התשובה
   /// נקלטה" lived in this component's own state, which the redraw
@@ -147,7 +168,7 @@ export function DecisionCard({
   /// page finally caught up.
   function onAnswered() {
     setAnswered(true);
-    router.replace(`/app/portal/decisions?answered=${decision.id}`, { scroll: false });
+    window.location.replace(`/app/portal/decisions?answered=${decision.id}`);
   }
 
   return (
