@@ -123,7 +123,7 @@ jobs:
           elif [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "value=2" >> "$GITHUB_OUTPUT"
           elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-               | grep -qE '^(qa/(e2e/|playwright\.config\.ts)|tests/integration/|lib/app-domain/|prisma/)'; then
+               | grep -qE '^(qa/(e2e/|playwright\.config\.ts)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
             # Level 1 runs types, lint and the unit suite. It does not run
             # the integration suite, and it does not open a browser - so a
             # pull request that changes domain logic, or adds an
@@ -135,6 +135,22 @@ jobs:
             # matched the per-client one. Those tests are the entire
             # argument for the change, and level 1 would have skipped
             # every one of them.
+            #
+            # The product screens were added on 25.9.2026, and by the same
+            # reasoning. A pull request that changed only a .tsx under
+            # /app was gated by types, lint and the unit suite - none of
+            # which opens a browser, and the browser suite is the ONLY
+            # thing in this repo that tests a screen. So a fix to the one
+            # write a CLIENT makes in this product, on the screen where
+            # they approve spending, ran a gate that could not see it.
+            #
+            # That pull request was the fix for a failure the browser
+            # suite had caught twice. It could not be verified by the
+            # suite that found it.
+            #
+            # The cost is honest: a screen change now pays ten minutes on
+            # the gate instead of four. A screen nobody watched a browser
+            # open is a screen nobody tested.
             echo "touches domain logic, the schema or a suite level 1 cannot run - running level 2"
             echo "value=2" >> "$GITHUB_OUTPUT"
           else
