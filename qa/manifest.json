@@ -1101,6 +1101,20 @@
       "riskAssigned": true,
       "firstSeen": "2026-09-24"
     },
+    "action:(product)/app/(authenticated)/clients/message-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-25"
+    },
+    "domain:client-messages": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-25"
+    },
     "domain:sop-templates": {
       "kind": "domain",
       "area": "app",

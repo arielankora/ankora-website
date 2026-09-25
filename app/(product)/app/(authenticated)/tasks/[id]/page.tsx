@@ -149,14 +149,10 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
         }
       />
 
-      {/* Above the hours and the thread, and that placement is the
-          argument: the steps are what is left to do, and the two panels
-          below are the record of what has been done. A person opening
-          this screen mid-task is asking the first question. */}
-      {/* Beside the steps, because the two answer the same question from
-          opposite ends: what is left to do, and what the client has been
-          told about it. Nothing here sends by itself - the button opens
-          a draft and a person presses send. */}
+      {/* The button that writes to the client, above the steps and above
+          the record below them. Nothing here sends by itself: it opens a
+          draft, and a person presses send. See
+          claude/client-communication-rule-2026-09-25.md. */}
       <div className="flex flex-wrap items-center gap-2">
         <MessageClient
           clientId={task.clientId}
@@ -182,6 +178,10 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
         />
       </div>
 
+      {/* Above the hours and the thread, and that placement is the
+          argument: the steps are what is left to do, and the two panels
+          below are the record of what has been done. A person opening
+          this screen mid-task is asking the first question. */}
       <TaskSteps
         // The book itself, reduced to what the picker shows. The step
         // titles stay on the server: the screen never renders them, and
