@@ -9,6 +9,7 @@ import {
   setClientDocumentVisibilityAction,
 } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
+import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
 import { DOCUMENT_KIND_LABELS } from "@/lib/app-domain/portal-labels";
 import type { ClientDocumentKind } from "@prisma/client";
 
@@ -190,7 +191,15 @@ export function DocumentsPanel({
   );
 }
 
-export function SummaryPanel({ clientId, summaries }: { clientId: string; summaries: SummaryRow[] }) {
+export function SummaryPanel({
+  clientId,
+  summaries,
+  composer,
+}: {
+  clientId: string;
+  summaries: SummaryRow[];
+  composer: ComposerProps | null;
+}) {
   const generate = useActionForm(generateSummaryAction);
   const latest = summaries[0];
 
@@ -213,7 +222,7 @@ export function SummaryPanel({ clientId, summaries }: { clientId: string; summar
         {generate.error && <p className="text-sm text-error">{generate.error}</p>}
       </form>
 
-      {latest ? <SummaryEditor key={latest.id} summary={latest} /> : null}
+      {latest ? <SummaryEditor key={latest.id} summary={latest} clientId={clientId} composer={composer} /> : null}
 
       {summaries.length > 1 && (
         <ul className="mt-4 space-y-2 border-t border-lineDark pt-4">
@@ -239,7 +248,15 @@ export function SummaryPanel({ clientId, summaries }: { clientId: string; summar
 /// The text in the box is what gets approved. A "generate then approve"
 /// flow that discards the approver's edits would be asking someone to put
 /// their name to something they were not allowed to change.
-function SummaryEditor({ summary }: { summary: SummaryRow }) {
+function SummaryEditor({
+  summary,
+  clientId,
+  composer,
+}: {
+  summary: SummaryRow;
+  clientId: string;
+  composer: ComposerProps | null;
+}) {
   const { onSubmit, pending, error, ok } = useActionForm(approveSummaryAction);
   const [busy, startTransition] = useTransition();
   const [discardError, setDiscardError] = useState<string | null>(null);
@@ -285,12 +302,27 @@ function SummaryEditor({ summary }: { summary: SummaryRow }) {
             ביטול הטיוטה
           </button>
 
+          {/* Only once it is published. Before that there is nothing to
+              tell anybody about, and a button offering to announce a
+              draft is a button offering to be wrong. */}
+          {summary.status === "APPROVED" && composer && (
+            <MessageClient
+              clientId={clientId}
+              buttonLabel="להודיע ללקוח"
+              preselectKind="summary_ready"
+              {...composer}
+            />
+          )}
+
           <button
             type="submit"
             disabled={pending}
             className="ms-auto rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
           >
-            {pending ? "מאשר..." : summary.status === "APPROVED" ? "שמירה ואישור מחדש" : "אישור ושליחה ללקוח"}
+            {/* Not "שליחה". Approving publishes the summary to the
+                portal; nothing leaves the building. The button beside
+                this one is how a client finds out. */}
+            {pending ? "מאשר..." : summary.status === "APPROVED" ? "שמירה ואישור מחדש" : "אישור ופרסום בפורטל"}
           </button>
         </div>
       </form>

@@ -21,6 +21,9 @@ import { DocumentsPanel, SummaryPanel } from "./FilePanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import { TasksPanel } from "./TasksPanel";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
+import { MessageClient } from "@/components/app/MessageClient";
+import { messageComposerProps } from "@/lib/app-domain/client-messages";
+import { appBaseUrl } from "@/lib/email-templates";
 import { listCategories } from "@/lib/app-domain/categories";
 import type { ImportantDateStatus } from "@prisma/client";
 
@@ -58,13 +61,22 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
     listPortalSummaries(user, client.id),
     clientTaskOverview(user, client.id),
     listCategories(),
+    // No subject. On this screen the message is about the client and
+    // not about one piece of work, and a draft that names a task
+    // somebody did not have in mind is a draft they have to delete a
+    // sentence out of before sending.
+    messageComposerProps({
+      clientId: client.id,
+      fromName: user.name,
+      portalUrl: `${appBaseUrl()}/app/portal`,
+    }),
   ]);
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
@@ -90,7 +102,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           <Link href="/app/clients" className="text-xs text-appNavy/50 hover:text-gold-dim">
             ← חזרה לרשימת הלקוחות
           </Link>
-          <h1 className="mt-2 text-xl font-medium text-appNavy">{client.name}</h1>
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
+            {/* The same button as on a task, on the screen somebody
+                opens when they want to write to a client without a task
+                in mind. Nothing here sends by itself. See
+                claude/client-communication-rule-2026-09-25.md. */}
+            {composer && <MessageClient clientId={client.id} {...composer} />}
+          </div>
         </div>
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
@@ -131,6 +150,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
         <SummaryPanel
           clientId={client.id}
+          composer={composer}
           summaries={summaries.map((s) => ({
             id: s.id,
             periodLabel: monthLabel(s.periodStart),
@@ -145,6 +165,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <DecisionsPanel
           clientId={client.id}
           ceilingMinor={client.approvalCeilingMinor}
+          composer={composer}
           decisions={decisions.map((d) => ({
             id: d.id,
             question: d.question,

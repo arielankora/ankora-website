@@ -91,6 +91,30 @@ test.describe("client detail", () => {
   });
 });
 
+test.describe("writing to a client from the client's own screen", () => {
+  // The composer reached the client screen on 25.9.2026, which is the
+  // screen somebody opens when they want to write to a client without a
+  // task in mind. The unit tests prove the drafts; this proves the
+  // button is actually on the page and opens something a person can
+  // read, which is the half that a prop rename breaks silently.
+  //
+  // Nothing is sent and nothing is recorded here: the drawer is opened
+  // and closed. The record path is asserted once, in the task screen
+  // spec, because it is the same action.
+  test("the button opens a draft somebody can read", async ({ page }) => {
+    const result = await openFirstDetail(page, "/app/clients", "/app/clients/");
+    test.skip(result.skipped, "no clients in this database to open");
+
+    await page.getByRole("button", { name: "הודעה ללקוח" }).click();
+    await page.getByRole("button", { name: "סיימנו" }).click();
+
+    const composer = page.getByLabel("נוסח ההודעה");
+    await expect(composer).toBeVisible({ timeout: 30_000 });
+    // Written, and about this client rather than about nothing.
+    expect((await composer.inputValue()).length).toBeGreaterThan(40);
+  });
+});
+
 test.describe("category detail", () => {
   test("the first category in the list opens its own page", async ({ page }) => {
     const result = await openFirstDetail(page, "/app/categories", "/app/categories/");
