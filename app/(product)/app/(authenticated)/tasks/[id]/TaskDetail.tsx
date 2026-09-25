@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
+import { TASK_BLOCKER_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
 import {
   startTimerForTaskAction,
   stopTimerForTaskAction,
   updateTaskDetailAction,
 } from "./actions";
-import type { TaskPriority, TaskStatus } from "@prisma/client";
+import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Mirrors the label maps in lib/app-domain/tasks.ts. Duplicated rather
 // than imported for the same reason TaskRow duplicates its own: that
@@ -58,6 +59,10 @@ export type TaskDetailData = {
   clientVisible: boolean;
   clientTitle: string | null;
   clientOutcome: string | null;
+  /// Tasks phase 5. Null means nothing is holding this up.
+  blockedOn: TaskBlocker | null;
+  blockedReason: string | null;
+  blockedSince: string | null;
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
@@ -367,6 +372,8 @@ export function TaskDetail({
         )}
       </section>
 
+      <BlockSection task={task} pending={pending} write={write} isClosed={status === "DONE" || status === "ARCHIVED"} />
+
       <ClientSection
         task={task}
         pending={pending}
@@ -629,6 +636,141 @@ function Select({
   );
 }
 
+/// Tasks phase 5: what is holding this up.
+///
+/// Its own section, and not inside "מה הלקוח רואה" where the old
+/// `waitingOnClient` toggle lived. Waiting stopped being a portal
+/// concept the moment it could mean a supplier or an internal sign-off:
+/// an internal task can be blocked too, and a control hidden behind the
+/// portal switch would be a control that does not exist for half the
+/// work it applies to.
+///
+/// **The date is shown and never asked for.** The server writes it once,
+/// on the way in, so the age keeps counting while somebody corrects the
+/// wording. "ממתין ללקוח, 6 ימים" is the sentence this whole feature
+/// exists to be able to say.
+function BlockSection({
+  task,
+  pending,
+  write,
+  isClosed,
+}: {
+  task: TaskDetailData;
+  pending: boolean;
+  write: (
+    patch: Omit<Parameters<typeof updateTaskDetailAction>[0], "taskId">,
+    toast: { title: string; description?: string }
+  ) => Promise<boolean>;
+  isClosed: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [on, setOn] = useState<TaskBlocker>(task.blockedOn ?? "CLIENT");
+  const [reason, setReason] = useState(task.blockedReason ?? "");
+
+  const blocked = task.blockedOn !== null;
+
+  async function save() {
+    const ok = await write(
+      { block: { on, reason: reason.trim() || null } },
+      { title: TASK_BLOCKER_LABELS[on], description: reason.trim() || task.title }
+    );
+    if (ok) setOpen(false);
+  }
+
+  return (
+    <section className="rounded-2xl border border-lineDark bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-sm font-medium text-appNavy/70">ממתינים למשהו?</h2>
+        {blocked ? (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => write({ block: null }, { title: "המשימה חזרה לטיפול", description: task.title })}
+            className="rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-50"
+          >
+            כבר לא ממתינים
+          </button>
+        ) : (
+          !isClosed && (
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => setOpen((v) => !v)}
+              className="flex items-center gap-1.5 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-50"
+            >
+              <Hourglass size={14} />
+              {open ? "ביטול" : "סימון כממתין"}
+            </button>
+          )
+        )}
+      </div>
+
+      {blocked ? (
+        <div className="mt-3">
+          <p className="flex items-center gap-2 text-[13.5px] text-appNavy">
+            <Hourglass size={15} className="text-warning" />
+            {waitingTitle(task.blockedOn!, task.blockedSince)}
+          </p>
+          {task.blockedReason ? (
+            <p className="mt-1 text-[12.5px] text-appNavy/60">{task.blockedReason}</p>
+          ) : (
+            <p className="mt-1 text-[12.5px] text-appNavy/45">
+              לא נכתבה סיבה. מי שיפתח את המשימה בעוד שבוע לא ידע למה היא עצרה.
+            </p>
+          )}
+        </div>
+      ) : isClosed ? (
+        <p className="mt-2 text-[12.5px] text-appNavy/45">משימה שהושלמה לא ממתינה לאף אחד.</p>
+      ) : (
+        !open && (
+          <p className="mt-2 text-[12.5px] text-appNavy/55">
+            לא ממתינה לאף אחד. אם העבודה עצרה כי מחכים לתשובה, כדאי לסמן: המדד של ההבטחות התקועות
+            מפריד בין מה שתקוע אצלנו למה שתקוע אצלם.
+          </p>
+        )
+      )}
+
+      {open && !blocked && (
+        <div className="mt-3 space-y-2.5">
+          <div className="flex flex-wrap gap-1.5">
+            {(Object.keys(TASK_BLOCKER_LABELS) as TaskBlocker[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={on === key}
+                onClick={() => setOn(key)}
+                className={`rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
+                  on === key
+                    ? "border-warning/50 bg-warning-soft text-appNavy"
+                    : "border-lineDark bg-white text-appNavy/60 hover:border-gold"
+                }`}
+              >
+                {TASK_BLOCKER_LABELS[key]}
+              </button>
+            ))}
+          </div>
+          <input
+            value={reason}
+            disabled={pending}
+            onChange={(e) => setReason(e.target.value)}
+            aria-label="סיבת ההמתנה"
+            placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
+            className="w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+          />
+          <button
+            type="button"
+            disabled={pending}
+            onClick={save}
+            className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+          >
+            שמירה
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /// The three fields a client ever sees, in one place.
 ///
 /// Rendered even when the task is internal, because the toggle that makes
@@ -671,7 +813,14 @@ function ClientSection({
           disabled={pending}
           onClick={() =>
             write(
-              { clientVisible: !clientVisible, ...(clientVisible ? { waitingOnClient: false } : {}) },
+              {
+                clientVisible: !clientVisible,
+                // Hiding a promise stops it waiting on the CLIENT: they
+                // cannot answer something they can no longer see. A
+                // block on a supplier survives, because it has nothing
+                // to do with what the client can see.
+                ...(clientVisible && task.blockedOn === "CLIENT" ? { block: null } : {}),
+              },
               {
                 title: clientVisible ? "המשימה הוסרה מהפורטל" : "המשימה מוצגת ללקוח",
                 description: clientTitle || task.title,

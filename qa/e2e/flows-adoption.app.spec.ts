@@ -220,5 +220,11 @@ test("stopping the timer asks what stage the promise is at", async ({ page }) =>
   const row = page.locator("[data-task]").filter({ hasText: MY_PROMISE });
   // The waiting state is an icon, and its label is the only text that
   // says which way it is pointing.
-  await expect(row.getByRole("button", { name: "הלקוח כבר לא מעכב" })).toBeVisible({ timeout: 20_000 });
+  //
+  // Tasks phase 5 renamed it. The toggle used to say "הלקוח כבר לא
+  // מעכב", which stopped being true the moment the field behind it
+  // could also mean a supplier or an internal sign-off: the button asks
+  // one question, "are we still waiting", and pressing it clears
+  // whatever the answer was.
+  await expect(row.getByRole("button", { name: "כבר לא ממתינים" })).toBeVisible({ timeout: 20_000 });
 });

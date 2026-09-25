@@ -354,3 +354,87 @@ test("a message to the client is written by a person, and recorded", async ({ pa
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(page.getByText(said)).toBeVisible({ timeout: 60_000 });
 });
+
+// Tasks phase 5: what is holding this up.
+//
+// A browser test rather than a unit one for the half the domain cannot
+// answer: the control is three states in one section (nothing, a picker
+// and a reason, then a badge with an age), and the value of the feature
+// is that somebody reading the screen a week later sees the age without
+// opening anything.
+//
+// The date is what this asserts and it is the thing most likely to
+// break: the server owns it, the screen only renders it, and a wiring
+// mistake shows up as a badge with no age rather than as an error.
+test("a task says what it is waiting on, and for how long", async ({ page }) => {
+  await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
+
+  const section = page.locator("section", { hasText: "ממתינים למשהו?" });
+  await expect(section).toBeVisible({ timeout: 30_000 });
+
+  // The fixture arrives here closed: the test above this one takes it
+  // all the way to DONE, and every test in this file shares one seeded
+  // task on purpose (a second fixture is a second thing to keep in
+  // sync). A finished task is not waiting for anybody and the screen
+  // says so instead of offering the control, which is the rule and not
+  // a gap, so this reopens it the way a person would.
+  //
+  // Caught by CI on the first run of this test, which sat on a click
+  // that could never resolve. Playwright's default action timeout is
+  // infinite, so "the button is not there" arrives as a test timeout
+  // with nothing in flight.
+  const status = page.getByLabel("סטטוס");
+  if ((await status.inputValue()) !== "IN_PROGRESS") {
+    const reopened = page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+      { timeout: 30_000 }
+    );
+    await status.selectOption("IN_PROGRESS");
+    await reopened;
+  }
+
+  // Left over from a previous run of this spec: the fixture is a real
+  // row and this test blocks it. Clearing first keeps the run
+  // repeatable without a second fixture.
+  const clear = section.getByRole("button", { name: "כבר לא ממתינים" });
+  if (await clear.isVisible().catch(() => false)) {
+    const cleared = page.waitForResponse(
+      (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+      { timeout: 30_000 }
+    );
+    await clear.click();
+    await cleared;
+  }
+
+  await section.getByRole("button", { name: "סימון כממתין" }).click();
+  await section.getByRole("button", { name: "ממתין לספק" }).click();
+
+  const reason = `ההצעה אצלם, בדיקה ${Date.now()}`;
+  await section.getByLabel("סיבת ההמתנה").fill(reason);
+
+  // Waited for before anything reloads, the rule four tests in this
+  // suite learned the hard way.
+  const saved = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+    { timeout: 30_000 }
+  );
+  await section.getByRole("button", { name: "שמירה" }).click();
+  await saved;
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  const after = page.locator("section", { hasText: "ממתינים למשהו?" });
+  // "ממתין לספק, מהיום": who, and since when. A badge that renders the
+  // blocker without the age is the feature without its point.
+  await expect(after.getByText("ממתין לספק, מהיום")).toBeVisible({ timeout: 60_000 });
+  await expect(after.getByText(reason)).toBeVisible({ timeout: 30_000 });
+
+  // And it comes off, because a wait that cannot be ended is a state
+  // people learn not to enter.
+  const lifted = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+    { timeout: 30_000 }
+  );
+  await after.getByRole("button", { name: "כבר לא ממתינים" }).click();
+  await lifted;
+  await expect(after.getByRole("button", { name: "סימון כממתין" })).toBeVisible({ timeout: 30_000 });
+});

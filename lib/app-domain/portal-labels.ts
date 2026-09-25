@@ -1,4 +1,4 @@
-import type { ClientDocumentKind, PortalDigest, SupplierExperience } from "@prisma/client";
+import type { ClientDocumentKind, PortalDigest, SupplierExperience, TaskBlocker } from "@prisma/client";
 
 // Portal phase 3. The Hebrew for three enums, in a module with no
 // "server-only" at the top.
@@ -56,4 +56,35 @@ export function portalHeadline(decisions: number, waiting: number, inProgress: n
   if (inProgress === 0) return "הכל מטופל. אין כרגע דבר שדורש פעולה מצדך.";
   if (inProgress === 1) return "הבטחה אחת בטיפול. אין דבר שמחכה לך.";
   return `${inProgress} הבטחות בטיפול. אין דבר שמחכה לך.`;
+}
+
+/// Tasks phase 5. Who we are waiting on, as a person would say it.
+///
+/// Here rather than beside the domain for the reason this whole module
+/// exists: three screens that render a block are client components, and
+/// the domain is server-only.
+export const TASK_BLOCKER_LABELS: Record<TaskBlocker, string> = {
+  CLIENT: "ממתין ללקוח",
+  SUPPLIER: "ממתין לספק",
+  INTERNAL: "ממתין לגורם פנימי",
+  OTHER: "ממתין",
+};
+
+/// "ממתין ללקוח, 6 ימים".
+///
+/// The age is not decoration. A block with no age is a place to park
+/// work, and the whole argument for storing `blockedSince` rather than a
+/// boolean is that somebody reading a list can see which wait has gone
+/// on too long without opening anything.
+///
+/// Days rather than a date, because the question is "how long", and
+/// whole days rather than hours because a wait measured in hours is not
+/// yet a wait anybody needs to act on.
+export function waitingTitle(on: TaskBlocker, since: string | null): string {
+  const label = TASK_BLOCKER_LABELS[on];
+  if (!since) return label;
+  const days = Math.floor((Date.now() - new Date(since).getTime()) / 86_400_000);
+  if (days < 1) return `${label}, מהיום`;
+  if (days === 1) return `${label}, מאתמול`;
+  return `${label}, ${days} ימים`;
 }

@@ -639,6 +639,20 @@ enum TimeEntrySource {
 /// ClickUp-shaped source/externalRef columns to already exist (spec 10) -
 /// a full Tasks management screen is not part of Phase 2's stated scope
 /// ("Timer + TimeEntry + manual entry + audit revisions") and is deferred.
+/// Who or what a blocked task is waiting on.
+///
+/// Four values, because the answer a person needs is "is this on us or
+/// on them", and a longer list turns a one-second choice into a menu.
+/// CLIENT is the only one the portal surfaces, as the "מחכה לך" stage:
+/// a task waiting on a supplier is "בטיפול" from where the client sits,
+/// which is exactly what it is.
+enum TaskBlocker {
+  CLIENT
+  SUPPLIER
+  INTERNAL
+  OTHER
+}
+
 model Task {
   id          String    @id @default(cuid())
   clientId    String
@@ -681,19 +695,14 @@ model Task {
   // is not what a client should see, and rewriting it in place would
   // cost the team the shorthand they work with.
   //
-  // `waitingOnClientSince` is the ONE thing the client-facing stage
-  // cannot derive from `status`. The four stages the portal shows are
-  // התקבל / בטיפול / מחכה לך / הושלם: three of them are exactly
-  // OPEN / IN_PROGRESS / DONE, and only "waiting on the client" has no
-  // internal equivalent. A parallel client-stage enum would have to be
-  // kept in sync with `status` by hand on every change, which is the
-  // kind of dual write that silently drifts and then shows a client a
-  // task marked "בטיפול" that closed last week. A timestamp rather
-  // than a boolean so the portal can say how long it has been waiting,
-  // which is the number that actually moves a person to answer.
+  // The client-facing stage the portal shows is derived, never stored:
+  // התקבל / בטיפול / מחכה לך / הושלם come from `status` plus the block
+  // fields below. A parallel client-stage enum would have to be kept in
+  // sync by hand on every change, which is the kind of dual write that
+  // silently drifts and then shows a client a task marked "בטיפול"
+  // that closed last week.
   clientVisible        Boolean   @default(false)
   clientTitle          String?
-  waitingOnClientSince DateTime?
 
   // Portal phase 3 ("ספקים וגורמים"), and deliberately not a Supplier
   // table.
@@ -789,6 +798,46 @@ model Task {
   approvedById     String?
   approvedAt       DateTime?
 
+  // Tasks phase 5 ("חסימה פשוטה"), and the generalisation of a field
+  // that has been here since portal phase 1.
+  //
+  // `waitingOnClientSince` was this, for one blocker. The portal read it
+  // as the "מחכה לך" stage, the list had a one-click toggle for it, and
+  // the timer wrote it when somebody stopped the clock on a promise. It
+  // covered the commonest wait in this business and none of the others:
+  // a supplier who has not quoted, a municipality that has not replied,
+  // an internal sign-off. Those were invisible, so a task that everybody
+  // was right to leave alone looked exactly like a task nobody had
+  // touched.
+  //
+  // Adding a second "waiting" field beside it was the obvious move and
+  // the wrong one. Two columns that both mean "we are waiting" is the
+  // dual write this schema warns about three times elsewhere, and it
+  // drifts on the second day. So the old field became these three.
+  //
+  // **A flag, not a status.** `BLOCKED` is deliberately NOT in
+  // TaskStatus: every filter, every count and every board column would
+  // have to decide about it, and the board would grow a fifth column,
+  // which is where work goes to die. "In progress, and waiting on the
+  // client since Tuesday" is a more accurate description of the world
+  // than "blocked".
+  //
+  // `blockedSince` is written by the server on the transition into
+  // blocked and never moved again, exactly like `startedAt` and
+  // `supplierRecordedAt`. Editing the reason a week later must not
+  // reset the clock, because the age is the entire point: "waiting"
+  // with no age is a place to hide work.
+  //
+  // `blockedOn` is required whenever the task is blocked, and
+  // `blockedReason` is not. That asymmetry is deliberate: the two
+  // one-click gestures already in production (the list toggle and the
+  // timer's stage buttons) mean "waiting on the client", and putting a
+  // required text field in front of a fast gesture is how a good field
+  // gets routed around. The task screen offers both together.
+  blockedSince  DateTime?
+  blockedOn     TaskBlocker?
+  blockedReason String?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -836,6 +885,10 @@ model Task {
   /// Every screen that lists work asks "and which of these are steps of
   /// something else", so this is read on almost every task query.
   @@index([parentId, status])
+  /// Tasks phase 5: "what are we waiting on, and for how long". Leading
+  /// with the blocker so the common question ("which of these is the
+  /// client sitting on") does not scan every blocked row.
+  @@index([blockedOn, blockedSince])
   @@map("tasks")
 }
 

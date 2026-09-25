@@ -27,7 +27,8 @@ async function seedTask(
       clientTitle: overrides.clientTitle ?? null,
       clientVisible: overrides.clientVisible ?? true,
       status: overrides.status ?? "OPEN",
-      waitingOnClientSince: overrides.waitingOnClientSince ?? null,
+      blockedOn: overrides.waitingOnClientSince ? "CLIENT" : null,
+      blockedSince: overrides.waitingOnClientSince ?? null,
     },
   });
 }
@@ -134,21 +135,23 @@ describe("task portal fields", () => {
 
     expect(created.clientVisible).toBe(true);
     expect(created.clientTitle).toBe("מה שהלקוח רואה");
-    expect(created.waitingOnClientSince).toBeNull();
+    expect(created.blockedOn).toBeNull();
 
-    const waiting = await updateTask(admin, created.id, { waitingOnClientSince: new Date() });
-    expect(waiting.waitingOnClientSince).not.toBeNull();
+    const waiting = await updateTask(admin, created.id, { block: { on: "CLIENT" } });
+    expect(waiting.blockedOn).toBe("CLIENT");
+    expect(waiting.blockedSince).not.toBeNull();
 
     // An absent key must not blank a field - the patch contract the whole
     // task module rests on.
     const untouched = await updateTask(admin, created.id, { title: "Internal, renamed" });
     expect(untouched.clientVisible).toBe(true);
     expect(untouched.clientTitle).toBe("מה שהלקוח רואה");
-    expect(untouched.waitingOnClientSince).not.toBeNull();
+    expect(untouched.blockedOn).toBe("CLIENT");
 
-    const cleared = await updateTask(admin, created.id, { clientTitle: null, waitingOnClientSince: null });
+    const cleared = await updateTask(admin, created.id, { clientTitle: null, block: null });
     expect(cleared.clientTitle).toBeNull();
-    expect(cleared.waitingOnClientSince).toBeNull();
+    expect(cleared.blockedOn).toBeNull();
+    expect(cleared.blockedSince).toBeNull();
   });
 
   it("defaults a new task to invisible", async () => {

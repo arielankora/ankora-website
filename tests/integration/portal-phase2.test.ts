@@ -152,7 +152,8 @@ describe("respondToDecision()", () => {
         clientId: client.id,
         title: "ביקור טכנאי",
         clientVisible: true,
-        waitingOnClientSince: new Date(),
+        blockedOn: "CLIENT",
+        blockedSince: new Date(),
       },
     });
 
@@ -162,7 +163,8 @@ describe("respondToDecision()", () => {
     await respondToDecision(clientAdmin, decision.id, options[0].id);
 
     const after = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
-    expect(after.waitingOnClientSince).toBeNull();
+    expect(after.blockedOn).toBeNull();
+    expect(after.blockedSince).toBeNull();
   });
 });
 

@@ -256,7 +256,9 @@ async function main() {
   const WAITING_PORTAL = {
     clientVisible: true,
     clientTitle: "[DEMO] אישור מועד לביקור הטכנאי",
-    waitingOnClientSince: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+    blockedOn: "CLIENT" as const,
+    blockedReason: "נשלחו שלושה מועדים, ממתינים לבחירה",
+    blockedSince: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
   };
   await prisma.task.upsert({
     where: { id: "demo-task-waiting-on-client" },

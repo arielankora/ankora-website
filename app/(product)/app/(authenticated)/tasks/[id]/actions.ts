@@ -6,7 +6,7 @@ import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-d
 import { getActiveTimer, startTimer, stopTimer, ActiveTimerExistsError } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
-import type { TaskPriority, TaskStatus } from "@prisma/client";
+import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Tasks phase 1, the writes behind /app/tasks/[id].
 //
@@ -56,7 +56,11 @@ export async function updateTaskDetailAction(input: {
   // reads is the kind of errand that makes a field stop being filled in.
   clientVisible?: boolean;
   clientTitle?: string | null;
-  waitingOnClient?: boolean;
+  /// Tasks phase 5. The full control lives on this screen, so this
+  /// takes the whole thing: who we are waiting on and why, or null to
+  /// say we are not waiting any more. The one-click gestures elsewhere
+  /// (the list row, the timer) still speak in booleans and translate.
+  block?: { on: TaskBlocker; reason?: string | null } | null;
 }) {
   const user = await requireUser();
   try {
@@ -76,12 +80,9 @@ export async function updateTaskDetailAction(input: {
       requiresApproval: input.requiresApproval,
       clientVisible: input.clientVisible,
       clientTitle: input.clientTitle,
-      // The screen says "is it waiting", the column stores "since when".
-      // Translated here rather than in the browser, so the timestamp is
-      // the server's and cannot be back-dated by a caller - the same
-      // reasoning as the Tasks row's own portal action.
-      waitingOnClientSince:
-        input.waitingOnClient === undefined ? undefined : input.waitingOnClient ? new Date() : null,
+      // The date is not here, and cannot be: the domain owns it, so a
+      // caller cannot back-date a wait. Same reasoning as completedAt.
+      block: input.block,
     });
     revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath("/app/tasks");
@@ -104,7 +105,9 @@ export async function updateTaskDetailAction(input: {
       clientVisible: updated.clientVisible,
       clientTitle: updated.clientTitle,
       clientOutcome: updated.clientOutcome,
-      waitingOnClient: updated.waitingOnClientSince !== null,
+      blockedOn: updated.blockedOn,
+      blockedReason: updated.blockedReason,
+      blockedSince: updated.blockedSince?.toISOString() ?? null,
     };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
