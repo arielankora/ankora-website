@@ -16,7 +16,7 @@ const ctx = {
   clientName: "אורביט",
   fromName: "הדס",
   subject: "החלפת ספק ניקיון",
-  portalUrl: "https://www.ankora.co.il/app/portal/decisions",
+  portalUrl: "https://www.ankora.co.il/app/portal",
 };
 
 describe("every draft is a message somebody could send", () => {
@@ -108,5 +108,36 @@ describe("a WhatsApp link that opens the right conversation, or none", () => {
     expect(whatsappDigits("")).toBeNull();
     expect(whatsappDigits("050-123")).toBeNull();
     expect(whatsappDigits("לשאול את מיכל")).toBeNull();
+  });
+});
+
+describe("the portal link is built per draft, from one base", () => {
+  // The base used to be the decisions URL itself, which worked exactly
+  // as long as one draft wanted a link. The second one - the monthly
+  // summary, which lives at the portal root - would have linked a client
+  // to the decisions screen to read a summary.
+  const base = "https://www.ankora.co.il/app/portal";
+
+  it("sends a decision to the decisions screen and a summary to the portal", () => {
+    expect(buildMessage("decision_waiting", ctx).body).toContain(`${base}/decisions`);
+
+    const summary = buildMessage("summary_ready", ctx).body;
+    expect(summary).toContain(base);
+    expect(summary).not.toContain("/decisions");
+  });
+
+  it("survives a trailing slash without producing a double one", () => {
+    const draft = buildMessage("decision_waiting", { ...ctx, portalUrl: `${base}/` });
+    expect(draft.body).toContain(`${base}/decisions`);
+    expect(draft.body).not.toContain("//app");
+  });
+
+  it("leaves no dangling link when there is no portal to point at", () => {
+    for (const kind of MESSAGE_KINDS) {
+      const draft = buildMessage(kind, { clientName: "אורביט", fromName: "הדס" });
+      expect(draft.body, kind).not.toContain("http");
+      // And no gap where a link would have been.
+      expect(draft.body, kind).not.toMatch(/\n{3,}/);
+    }
   });
 });

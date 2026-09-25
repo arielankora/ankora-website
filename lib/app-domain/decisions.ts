@@ -354,11 +354,3 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
 
   return response;
 }
-
-// ---------------------------------------------------------------------------
-
-/// Tells the client a decision is waiting. Email only in this phase: the
-/// WhatsApp side of this notification is built and visibly not connected
-/// (see the portal's own comment on the WhatsApp button), and pretending
-/// otherwise would be the one thing a notification must never do.
-///

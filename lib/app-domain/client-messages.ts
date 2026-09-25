@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
+import type { ComposerProps } from "@/components/app/MessageClient";
 import type { User } from "@prisma/client";
 
 // A person sends. The system never does.
@@ -27,6 +28,7 @@ import type { User } from "@prisma/client";
 
 export type MessageKind =
   | "decision_waiting"
+  | "summary_ready"
   | "promise_update"
   | "promise_done"
   | "need_information"
@@ -47,6 +49,8 @@ export type MessageContext = {
   /// client's language because the product refuses to close one without
   /// it.
   outcome?: string | null;
+  /// The portal's base address. Each draft appends its own path, so
+  /// nothing here has to know that decisions live one level down.
   portalUrl?: string | null;
 };
 
@@ -77,7 +81,8 @@ export type MessageDraft = {
 export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDraft {
   const who = ctx.fromName;
   const about = ctx.subject?.trim() || null;
-  const portal = ctx.portalUrl ? `\n\n${ctx.portalUrl}` : "";
+  const base = ctx.portalUrl?.trim().replace(/\/+$/, "") || null;
+  const link = (path: string) => (base ? `\n\n${base}${path}` : "");
 
   switch (kind) {
     case "decision_waiting":
@@ -89,7 +94,24 @@ export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDra
           `היי,\n\n` +
           `יש החלטה אחת שמחכה לך${about ? ` בנושא ${about}` : ""}. ` +
           `ריכזנו את האפשרויות והמחירים, ויש גם המלצה שלנו.\n\n` +
-          `אפשר לאשר בלחיצה אחת, ואפשר לענות לי כאן אם עדיף לדבר על זה.${portal}\n\n` +
+          `אפשר לאשר בלחיצה אחת, ואפשר לענות לי כאן אם עדיף לדבר על זה.${link("/decisions")}\n\n` +
+          `${who}`,
+      };
+
+    // The other moment where something became available to the client
+    // and nobody told them. Approving a monthly summary publishes it to
+    // the portal; until 25.9.2026 the button said "שליחה", which was
+    // the screen describing a send that never happened.
+    case "summary_ready":
+      return {
+        kind,
+        label: "הסיכום החודשי מוכן",
+        emailSubject: about ? `הסיכום של ${about}` : "הסיכום החודשי",
+        body:
+          `היי,\n\n` +
+          `הסיכום${about ? ` של ${about}` : " החודשי"} מוכן וממתין לך בפורטל. ` +
+          `הוא מרכז מה נעשה החודש ואיפה הושקעו השעות.\n\n` +
+          `אם משהו שם לא מסתדר, אני כאן.${link("")}\n\n` +
           `${who}`,
       };
 
@@ -163,6 +185,7 @@ export function buildMessage(kind: MessageKind, ctx: MessageContext): MessageDra
 
 export const MESSAGE_KINDS: MessageKind[] = [
   "decision_waiting",
+  "summary_ready",
   "promise_update",
   "promise_done",
   "need_information",
@@ -264,3 +287,66 @@ const CHANNEL_LABELS: Record<MessageChannel, string> = {
   email: "נשלח במייל",
   copied: "הועתק ונשלח",
 };
+
+/// Everything the composer needs, gathered once.
+///
+/// Mounting the button on a screen was eleven lines of prisma and a map
+/// over MESSAGE_KINDS, and the first two screens to want it would have
+/// copied them. Two copies of a query that reads `preferenceNever` is
+/// two places for the field to be forgotten, and the whole point of that
+/// field is that it is never forgotten.
+///
+/// So the screen asks for the props and mounts them:
+///
+///     const composer = await messageComposerProps({ clientId, fromName: user.name });
+///     {composer && <MessageClient clientId={id} {...composer} />}
+///
+/// It reads nothing about the actor's access on purpose. Every screen
+/// that mounts this has already decided the person may see this client,
+/// and a second, weaker check here would only disagree with the first.
+export async function messageComposerProps(input: {
+  clientId: string;
+  /// The person who will press send, for the sign-off.
+  fromName: string;
+  /// What the client calls this piece of work, where the screen knows.
+  /// The client screen does not, and leaving it out is correct there:
+  /// the draft then talks about the client rather than about a task.
+  subject?: string | null;
+  outcome?: string | null;
+  portalUrl?: string | null;
+}): Promise<ComposerProps | null> {
+  const client = await prisma.client.findUnique({
+    where: { id: input.clientId },
+    select: {
+      name: true,
+      whatsappNumber: true,
+      preferenceContact: true,
+      preferenceNever: true,
+      portalUsers: {
+        // The client's own admins, and only the ones who could actually
+        // read it: a deleted or suspended user's address is a bounce
+        // with somebody's name on it.
+        where: { role: "ADMIN", user: { deletedAt: null, status: { in: ["ACTIVE", "INVITED"] } } },
+        select: { user: { select: { email: true } } },
+      },
+    },
+  });
+  if (!client) return null;
+
+  return {
+    clientName: client.name,
+    preference: client.preferenceContact,
+    never: client.preferenceNever,
+    whatsappDigits: whatsappDigits(client.whatsappNumber),
+    emails: client.portalUsers.map((p) => p.user.email),
+    drafts: MESSAGE_KINDS.map((kind) =>
+      buildMessage(kind, {
+        clientName: client.name,
+        fromName: input.fromName,
+        subject: input.subject,
+        outcome: input.outcome,
+        portalUrl: input.portalUrl,
+      })
+    ),
+  };
+}

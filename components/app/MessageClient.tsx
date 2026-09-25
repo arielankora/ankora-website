@@ -25,6 +25,22 @@ import { recordClientMessageAction } from "@/app/(product)/app/(authenticated)/c
 
 export type MessageDraftChoice = { kind: string; label: string; emailSubject: string; body: string };
 
+/// Everything about a client that the composer needs, as one object, so
+/// that a screen mounting the button writes `{...composer}` and cannot
+/// leave out the field whose whole job is to be remembered.
+///
+/// Built on the server by messageComposerProps. Declared here rather
+/// than beside it because two panels take it as a prop, and a type they
+/// each redeclare is a type that drifts.
+export type ComposerProps = {
+  clientName: string;
+  preference: string | null;
+  never: string | null;
+  whatsappDigits: string | null;
+  emails: string[];
+  drafts: MessageDraftChoice[];
+};
+
 export function MessageClient({
   clientId,
   taskId,
@@ -34,6 +50,8 @@ export function MessageClient({
   emails,
   preference,
   never,
+  buttonLabel = "הודעה ללקוח",
+  preselectKind,
 }: {
   clientId: string;
   taskId?: string | null;
@@ -47,6 +65,16 @@ export function MessageClient({
   /// And what they said must never happen. The one field in this product
   /// whose entire purpose is to stop somebody doing the obvious thing.
   never: string | null;
+  /// What the button says, where the screen already knows why somebody
+  /// would press it. On a task it is "הודעה ללקוח", because the reason
+  /// could be any of the six. Beside a decision that was just created it
+  /// is "להודיע ללקוח", because there is exactly one reason.
+  buttonLabel?: string;
+  /// Skip the situation list and open on this draft. Only for a screen
+  /// where the situation is not a question: a decision is waiting, and
+  /// asking the person to pick "משהו מחכה להחלטה" out of six options is
+  /// asking them to confirm what they just did.
+  preselectKind?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [chosen, setChosen] = useState<MessageDraftChoice | null>(null);
@@ -60,6 +88,12 @@ export function MessageClient({
     setText(draft.body);
     setError(null);
     setSent(null);
+  }
+
+  function begin() {
+    const pre = preselectKind ? drafts.find((d) => d.kind === preselectKind) : null;
+    if (pre) start(pre);
+    setOpen(true);
   }
 
   function dismiss() {
@@ -90,11 +124,11 @@ export function MessageClient({
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={begin}
         className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold"
       >
         <MessageSquare size={14} strokeWidth={2} />
-        הודעה ללקוח
+        {buttonLabel}
       </button>
 
       {open && (
@@ -199,7 +233,11 @@ export function MessageClient({
                         onClick={() => setChosen(null)}
                         className="rounded-full px-3 py-2 text-[12.5px] text-appNavy/55 hover:text-appNavy"
                       >
-                        חזרה
+                        {/* Back to the six situations, even when the
+                            screen opened on one of them: somebody who
+                            meant to write something else should not have
+                            to close the drawer and find another button. */}
+                        נוסח אחר
                       </button>
                     </div>
                   )}

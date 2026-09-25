@@ -4,6 +4,7 @@ import { useFormState, useFormStatus } from "react-dom";
 import { createDecisionAction, cancelDecisionAction } from "../actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { formatMinor } from "@/lib/money";
+import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
 
 // Portal phase 2, Ankora's side of a decision.
 //
@@ -20,7 +21,12 @@ function SubmitButton() {
       disabled={pending}
       className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
-      {pending ? "נשלח..." : "שליחה ללקוח"}
+      {/* Not "שליחה ללקוח". Since 25.9.2026 creating a decision sends
+          nothing: it puts the question in the client's portal and hands
+          the person a written message to send themselves. A button that
+          says "שליחה" when nothing is sent is the screen lying to the
+          person who pressed it. */}
+      {pending ? "נוצרת..." : "יצירת ההחלטה"}
     </button>
   );
 }
@@ -53,6 +59,7 @@ export function DecisionsPanel({
   clientId,
   decisions,
   ceilingMinor,
+  composer,
 }: {
   clientId: string;
   decisions: {
@@ -64,6 +71,9 @@ export function DecisionsPanel({
     answer: { optionLabel: string; respondedByName: string; respondedAt: string } | null;
   }[];
   ceilingMinor: number | null;
+  /// The composer, ready. Null only when the client row vanished between
+  /// the two reads, in which case the panel simply has no button.
+  composer: ComposerProps | null;
 }) {
   const { showToast } = useToast();
   const [state, formAction] = useFormState(createDecisionAction, {});
@@ -143,13 +153,31 @@ export function DecisionsPanel({
           </div>
 
           {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-          {state?.ok && <p className="text-sm text-emerald-700">ההחלטה נשלחה ללקוח.</p>}
-          <SubmitButton />
+          {state?.ok && (
+            <p className="text-sm text-emerald-700">
+              ההחלטה מחכה ללקוח בפורטל. הוא לא יודע על זה עדיין.
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <SubmitButton />
+            {/* The second half of the sentence above, as a button, and
+                only once there is something to announce. Offered before
+                the decision exists it would write to a client about a
+                question nobody has asked yet. */}
+            {state?.ok && composer && (
+              <MessageClient
+                clientId={clientId}
+                buttonLabel="להודיע ללקוח"
+                preselectKind="decision_waiting"
+                {...composer}
+              />
+            )}
+          </div>
         </form>
       )}
 
       {decisions.length === 0 ? (
-        <p className="mt-3 text-sm text-appNavy/50">עוד לא נשלחו החלטות ללקוח הזה.</p>
+        <p className="mt-3 text-sm text-appNavy/50">עוד לא נפתחו החלטות ללקוח הזה.</p>
       ) : (
         <ul className="mt-4 divide-y divide-lineDark/60">
           {decisions.map((d) => (
