@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { addTaskComment, createTask, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { getActiveTimer, startTimer, stopTimer, ActiveTimerExistsError } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -253,6 +253,19 @@ export async function setTaskStepDoneAction(input: { stepId: string; parentId: s
     revalidatePath(`/app/tasks/${input.stepId}`);
     revalidatePath("/app/tasks");
     return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Tasks phase 5: run one of the SOP book's procedures on this task.
+export async function applyTaskTemplateAction(input: { taskId: string; templateId: string }) {
+  const user = await requireUser();
+  try {
+    const { created } = await applyTaskTemplate(user, input.taskId, input.templateId);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/tasks");
+    return { ok: true as const, created };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

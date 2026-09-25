@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
-import { addTaskStepAction, setTaskStepDoneAction } from "./actions";
+import { addTaskStepAction, applyTaskTemplateAction, setTaskStepDoneAction } from "./actions";
 import type { TaskStatus } from "@prisma/client";
 
 // Tasks phase 5: the steps of a task.
@@ -35,16 +35,20 @@ export type Step = {
 
 const OPEN: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
 
+export type TemplateChoice = { id: string; name: string; when: string; stepCount: number };
+
 export function TaskSteps({
   taskId,
   clientId,
   steps,
   parentIsClosed,
+  templates,
 }: {
   taskId: string;
   clientId: string;
   steps: Step[];
   parentIsClosed: boolean;
+  templates: TemplateChoice[];
 }) {
   const done = steps.filter((s) => !OPEN.includes(s.status)).length;
 
@@ -74,7 +78,12 @@ export function TaskSteps({
       {/* A task that is finished does not grow new steps. The server
           refuses it either way (PARENT_CLOSED_MESSAGE); hiding the field
           means nobody types a sentence only to be told no. */}
-      {!parentIsClosed && <AddStep taskId={taskId} clientId={clientId} />}
+      {!parentIsClosed && (
+        <>
+          <AddStep taskId={taskId} clientId={clientId} />
+          <FromTheBook taskId={taskId} templates={templates} />
+        </>
+      )}
     </div>
   );
 }
@@ -159,4 +168,78 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
 
 function formatDay(iso: string) {
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "short" });
+}
+
+/// The procedures from the SOP book, one click away.
+///
+/// Closed by default and opened by a link rather than sitting open as a
+/// row of buttons. Most tasks are not one of these seven situations, and
+/// a permanent row of seven names on every task screen would be seven
+/// things to read past on the way to the thing somebody came for.
+///
+/// Each one says WHEN to reach for it, not what is in it. A person
+/// choosing between "טעות שהתגלתה" and "משבר" is asking which situation
+/// they are in, and the step list will answer the other question a
+/// second later.
+function FromTheBook({ taskId, templates }: { taskId: string; templates: TemplateChoice[] }) {
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function apply(templateId: string) {
+    if (busy) return;
+    setBusy(templateId);
+    setError(null);
+    const result = await applyTaskTemplateAction({ taskId, templateId });
+    if (!result.ok) setError(result.error);
+    else setOpen(false);
+    setBusy(null);
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 text-[12.5px] text-gold-dim transition-colors hover:text-appNavy"
+      >
+        מתוך ספר הנהלים
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-lineDark bg-cream/40 p-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[12.5px] font-medium text-appNavy">מתוך ספר הנהלים</p>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="text-[11.5px] text-appNavy/50 hover:text-appNavy"
+        >
+          סגירה
+        </button>
+      </div>
+      <p className="mt-0.5 text-[11.5px] text-appNavy/55">
+        השלבים נוספים למה שכבר יש כאן, ולא במקומו.
+      </p>
+      <ul className="mt-2 space-y-1">
+        {templates.map((t) => (
+          <li key={t.id}>
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => apply(t.id)}
+              className="w-full rounded-lg px-2 py-1.5 text-start transition-colors hover:bg-white disabled:opacity-40"
+            >
+              <span className="text-[13px] text-appNavy">{t.name}</span>
+              <span className="font-jbmono text-[11px] text-appNavy/45"> · {t.stepCount}</span>
+              <span className="block text-[11.5px] text-appNavy/55">{t.when}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <p className="mt-1.5 text-[11.5px] text-error">{error}</p>}
+    </div>
+  );
 }

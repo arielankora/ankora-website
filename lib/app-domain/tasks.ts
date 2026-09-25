@@ -3,8 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { localDateTimeToUtc } from "@/lib/timezone";
+import { localDateTimeToUtc, TIMEZONE, localDateKey } from "@/lib/timezone";
 import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
+import { findTemplate } from "@/lib/app-domain/sop-templates";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -651,6 +652,76 @@ async function assertParentUsable(actor: User, clientId: string, parentId: strin
   if (!accessible.some((c) => c.id === parent.clientId)) {
     throw new ForbiddenError("You are not assigned to this client.");
   }
+}
+
+/// Tasks phase 5: turn a procedure from the SOP book into steps.
+///
+/// Through `createTask` one step at a time rather than a single
+/// `createMany`, and that is deliberate. Every rule a step has to obey
+/// lives in `createTask`: the parent has to be open, on the same client,
+/// and not itself a step. A bulk insert would bypass all three and be
+/// faster at doing the wrong thing.
+///
+/// **Appends, never replaces.** Somebody who has already written two
+/// steps of their own and then reaches for the procedure meant to add
+/// it to what they have. Replacing would throw away the part they
+/// thought of themselves, which is the part the book does not know
+/// about.
+///
+/// The deadlines are the book's own: the ladder of reminders to a silent
+/// client is at one, three and seven days, and a ladder without its
+/// rungs is the same sentence three times. Each one lands on UTC
+/// midnight of that day in Israel, which is exactly what the date field
+/// on the screen produces, so a date set here and a date set by hand are
+/// the same kind of value.
+export const TEMPLATE_NOT_FOUND_MESSAGE = "התבנית הזו לא קיימת.";
+
+export async function applyTaskTemplate(actor: User, taskId: string, templateId: string) {
+  const template = findTemplate(templateId);
+  if (!template) throw new Error(TEMPLATE_NOT_FOUND_MESSAGE);
+
+  const parent = await prisma.task.findFirst({
+    where: { id: taskId, deletedAt: null },
+    select: { id: true, clientId: true },
+  });
+  if (!parent) throw new Error("Task not found.");
+
+  const created = [];
+  for (const step of template.steps) {
+    created.push(
+      await createTask(actor, {
+        clientId: parent.clientId,
+        title: step.title,
+        parentId: parent.id,
+        dueDate: step.dueInDays === undefined ? null : dueInDays(step.dueInDays),
+      })
+    );
+  }
+
+  // One line for the template, not one per step: the steps are already
+  // in the log as creations, and the fact worth being able to find later
+  // is that this task was run by the book.
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.template_applied",
+    entityType: "Task",
+    entityId: parent.id,
+    clientId: parent.clientId,
+    after: { templateId: template.id, steps: created.length },
+  });
+
+  return { template, created: created.length };
+}
+
+/// Midnight UTC of the day that is `days` from today in Israel.
+///
+/// The two-step conversion matters: adding 24 hours per day to `now`
+/// would drift past a daylight-saving change, and "three days from now"
+/// would land at 23:00 on the second day. A date is a day, so the
+/// arithmetic happens on the day.
+function dueInDays(days: number): Date {
+  const target = new Date(Date.now() + days * 24 * 3600_000);
+  return new Date(localDateKey(target, TIMEZONE));
 }
 
 /// Throws unless `assignedToId` names someone who could actually see a

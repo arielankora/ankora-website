@@ -114,6 +114,11 @@ export const ACTION_LABEL: Record<string, string> = {
   // above it is closed. Named for what a person reading the log needs to
   // know: this step did not close on its own.
   "task.step_closed_with_parent": "סגירת שלב עם המשימה שמעליו",
+  // Tasks phase 5: a procedure from the SOP book was applied to a task.
+  // Worth its own line rather than being inferred from a burst of
+  // creations, because "האם עבדנו לפי הנוהל" is a question somebody asks
+  // about a specific task months later.
+  "task.template_applied": "החלת נוהל על משימה",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.
