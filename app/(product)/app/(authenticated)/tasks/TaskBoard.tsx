@@ -1,9 +1,11 @@
 "use client";
 import Link from "next/link";
+import { Hourglass } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { toggleTaskDoneAction } from "./actions";
-import type { TaskPriority, TaskStatus } from "@prisma/client";
+import { waitingTitle } from "@/lib/app-domain/portal-labels";
+import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Tasks phase 4, the board.
 //
@@ -67,6 +69,9 @@ export type BoardCard = {
   assignedToName: string | null;
   clientVisible: boolean;
   hasOutcome: boolean;
+  /// Tasks phase 5. Null means nothing is holding this card up.
+  blockedOn: TaskBlocker | null;
+  blockedSince: string | null;
 };
 
 export function TaskBoard({ cards }: { cards: BoardCard[] }) {
@@ -227,6 +232,17 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
       </div>
 
       <p className="mt-1.5 truncate text-[12px] text-appNavy/50">{card.clientName}</p>
+
+      {/* A line on the card, not a fifth column. A blocked task has not
+          left the stage it is in - somebody is still on it, they are
+          just waiting - and a column called "חסום" is where cards go to
+          be forgotten. See the schema comment on Task.blockedOn. */}
+      {card.blockedOn && (
+        <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-warning">
+          <Hourglass size={12} strokeWidth={1.8} />
+          {waitingTitle(card.blockedOn, card.blockedSince)}
+        </p>
+      )}
 
       {(card.assignedToName || card.dueDate) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">

@@ -58,6 +58,8 @@ export function TaskListView({
           clientName: row.clientName,
           status: row.status,
           priority: row.priority,
+          blockedOn: row.blockedOn,
+          blockedSince: row.blockedSince,
           dueDate: row.dueDate,
           assignedToName: row.assignedToName,
           clientVisible: row.clientVisible,

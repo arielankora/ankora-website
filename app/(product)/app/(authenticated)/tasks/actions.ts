@@ -4,7 +4,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
-import type { SupplierExperience, TaskPriority, TaskStatus } from "@prisma/client";
+import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 type FormState = { error?: string; ok?: boolean; created?: CreatedTaskRow };
 
@@ -37,7 +37,9 @@ export type CreatedTaskRow = {
   supplierName: string | null;
   supplierExperience: SupplierExperience | null;
   clientTitle: string | null;
-  waitingOnClient: boolean;
+  /// Tasks phase 5. Both null on a create: a task is not born waiting.
+  blockedOn: TaskBlocker | null;
+  blockedSince: string | null;
   clientOutcome: string | null;
   /// Tasks phase 5. Both zero on a create, because a task is born
   /// without steps, and carried anyway for the same reason
@@ -106,7 +108,8 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       supplierName: created.supplierName,
       supplierExperience: created.supplierExperience,
       clientTitle: created.clientTitle,
-      waitingOnClient: created.waitingOnClientSince !== null,
+      blockedOn: created.blockedOn,
+      blockedSince: created.blockedSince?.toISOString() ?? null,
       clientOutcome: created.clientOutcome,
       // A task is born without steps. Stated rather than inferred, so
       // this object stays a complete CreatedTaskRow and the compiler
@@ -181,12 +184,13 @@ export async function updateTaskPortalAction(input: {
       clientOutcome: input.clientOutcome,
       clientVisible: input.clientVisible,
       clientTitle: input.clientTitle,
-      // The row speaks in "is it waiting", the column stores "since
-      // when" - the translation belongs here rather than in the browser,
-      // so the timestamp is the server's and cannot be back-dated by a
-      // caller.
-      waitingOnClientSince:
-        input.waitingOnClient === undefined ? undefined : input.waitingOnClient ? new Date() : null,
+      // The row's toggle is one click and says one thing: the client is
+      // what we are waiting on. Tasks phase 5 widened the field behind
+      // it to four blockers and a reason, and this gesture deliberately
+      // did not grow a form - see the schema comment on Task.blockedOn.
+      // The task screen is where the other three live.
+      block:
+        input.waitingOnClient === undefined ? undefined : input.waitingOnClient ? { on: "CLIENT" } : null,
       supplierName: input.supplierName,
       supplierExperience: input.supplierExperience,
     });
@@ -196,7 +200,8 @@ export async function updateTaskPortalAction(input: {
       ok: true as const,
       clientVisible: updated.clientVisible,
       clientTitle: updated.clientTitle,
-      waitingOnClient: updated.waitingOnClientSince !== null,
+      blockedOn: updated.blockedOn,
+      blockedSince: updated.blockedSince?.toISOString() ?? null,
       supplierName: updated.supplierName,
       supplierExperience: updated.supplierExperience,
       clientOutcome: updated.clientOutcome,

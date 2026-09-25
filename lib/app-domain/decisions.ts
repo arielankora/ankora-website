@@ -334,8 +334,18 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
       },
     }),
     prisma.decision.update({ where: { id: decision.id }, data: { status: "ANSWERED" } }),
+    // The client just answered, so the client is no longer what we are
+    // waiting on. Scoped to a block that names THEM: a task waiting on
+    // a supplier keeps waiting, and clearing it here because a
+    // different question was answered would quietly tell everyone the
+    // supplier came back.
     ...(decision.taskId
-      ? [prisma.task.update({ where: { id: decision.taskId }, data: { waitingOnClientSince: null } })]
+      ? [
+          prisma.task.updateMany({
+            where: { id: decision.taskId, blockedOn: "CLIENT" },
+            data: { blockedOn: null, blockedReason: null, blockedSince: null },
+          }),
+        ]
       : []),
   ]);
 

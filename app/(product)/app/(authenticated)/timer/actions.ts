@@ -135,7 +135,13 @@ export async function recordPromiseStageAction(input: {
       // Clearing it on the two non-waiting stages matters: a promise
       // that was waiting on the client and is now being worked on again
       // must stop telling the client it is their turn.
-      waitingOnClientSince: input.stage === "WAITING_ON_CLIENT" ? new Date() : null,
+      //
+      // Tasks phase 5: one of four blockers now, and this button means
+      // the commonest one. No reason is asked for here on purpose, for
+      // the same reason the list toggle does not ask: this is a person
+      // stopping a clock, and a text field in that moment is a text
+      // field nobody fills.
+      block: input.stage === "WAITING_ON_CLIENT" ? { on: "CLIENT" as const } : null,
       clientOutcome: input.clientOutcome,
     });
     revalidatePath("/app/timer");

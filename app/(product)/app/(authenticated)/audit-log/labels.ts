@@ -123,6 +123,8 @@ export const ACTION_LABEL: Record<string, string> = {
   // sent it. This line is the other half of that rule - a message a
   // person sent is a message the product can account for later.
   "client.message_sent": "הודעה נשלחה ללקוח",
+  "task.blocked": "המשימה ממתינה",
+  "task.unblocked": "ההמתנה הסתיימה",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.

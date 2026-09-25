@@ -557,8 +557,14 @@ export interface PortalPromise {
 /// Waiting on the client wins over the internal status: a task can be
 /// IN_PROGRESS internally and still be blocked on an answer, and the
 /// blocked state is the one the client needs to see.
-function stageOf(task: { status: string; waitingOnClientSince: Date | null }): PortalStage {
-  if (task.waitingOnClientSince) return "WAITING_ON_CLIENT";
+///
+/// Tasks phase 5 generalised the field this reads. A task can now be
+/// blocked on a supplier or on an internal sign-off as well, and those
+/// deliberately do NOT reach this stage: from where the client sits,
+/// work we are chasing a supplier about is "בטיפול", which is exactly
+/// what it is. Only CLIENT means the ball is theirs.
+function stageOf(task: { status: string; blockedOn: string | null }): PortalStage {
+  if (task.blockedOn === "CLIENT") return "WAITING_ON_CLIENT";
   if (task.status === "DONE") return "DONE";
   // Tasks phase 2: PENDING_APPROVAL is ours, not theirs. To the client
   // it is still being handled, because from where they sit it is - the
@@ -575,7 +581,8 @@ function toPromise(task: {
   title: string;
   clientTitle: string | null;
   status: string;
-  waitingOnClientSince: Date | null;
+  blockedOn: string | null;
+  blockedSince: Date | null;
   dueDate: Date | null;
   updatedAt: Date;
   completedAt: Date | null;
@@ -585,7 +592,7 @@ function toPromise(task: {
     id: task.id,
     title: task.clientTitle?.trim() || task.title,
     stage: stageOf(task),
-    waitingSince: task.waitingOnClientSince,
+    waitingSince: task.blockedOn === "CLIENT" ? task.blockedSince : null,
     dueDate: task.dueDate,
     movedAt: task.completedAt ?? task.updatedAt,
     outcome: task.clientOutcome?.trim() || null,
@@ -615,7 +622,8 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       title: true,
       clientTitle: true,
       status: true,
-      waitingOnClientSince: true,
+      blockedOn: true,
+      blockedSince: true,
       dueDate: true,
       updatedAt: true,
       completedAt: true,

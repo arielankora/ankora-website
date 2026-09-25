@@ -196,6 +196,11 @@ export default async function AppHomePage() {
 
   const stalledTotal = stalled?.reduce((sum, row) => sum + row.count, 0) ?? 0;
   const stalledOverdue = stalled?.reduce((sum, row) => sum + row.overdue, 0) ?? 0;
+  // Tasks phase 5: the promises the CLIENT is sitting on. Deliberately
+  // not added to the number above. The two ask for different things -
+  // one is work to pick up, the other is a reminder to send - and a
+  // single total that mixes them is a total nobody can act on.
+  const stalledWaiting = stalled?.reduce((sum, row) => sum + row.waiting, 0) ?? 0;
 
   const cards = [
     canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
@@ -368,6 +373,7 @@ export default async function AppHomePage() {
             {stalledTotal === 0 ? (
               <p className="mt-1.5 text-[12.5px] text-appNavy/55">
                 כל ההבטחות שהלקוחות רואים זזו היום. זה מה שהפורטל אמור להראות.
+                {stalledWaiting > 0 && ` ${stalledWaiting} ממתינות ללקוחות עצמם.`}
               </p>
             ) : (
               <>
@@ -381,6 +387,7 @@ export default async function AppHomePage() {
                       </span>
                     </>
                   )}
+                  {stalledWaiting > 0 && ` ועוד ${stalledWaiting} ממתינות ללקוחות עצמם, ולא לנו.`}
                 </p>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {stalled.slice(0, 8).map((row) => (
@@ -391,6 +398,7 @@ export default async function AppHomePage() {
                     >
                       {row.clientName} · {row.count}
                       {row.overdue > 0 && <span className="text-warning"> · {row.overdue} באיחור</span>}
+                      {row.waiting > 0 && <span className="text-appNavy/45"> · {row.waiting} ממתינות להם</span>}
                     </Link>
                   ))}
                 </div>

@@ -4,7 +4,7 @@ import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { localDateTimeToUtc, TIMEZONE, localDateKey } from "@/lib/timezone";
-import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
+import type { SupplierExperience, TaskBlocker, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
 import { findTemplate } from "@/lib/app-domain/sop-templates";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
@@ -483,6 +483,15 @@ export type StalledClientRow = {
   /// How many of this client's stalled promises are also past the date
   /// they were promised for. A subset of `count`, never a second total.
   overdue: number;
+  /// Tasks phase 5, and NOT a subset of `count`: these are the promises
+  /// this client is sitting on themselves.
+  ///
+  /// Until the block field existed, a task somebody had done everything
+  /// about and was waiting on an answer for counted exactly like a task
+  /// nobody had touched. Two completely different actions, one number,
+  /// and the number loses its meaning as the team grows. This is the
+  /// same mistake #114 fixed in its other form.
+  waiting: number;
 };
 
 /// The promises a client can see that nobody has moved today.
@@ -531,7 +540,13 @@ export async function stalledPromisesByClient(
       status: { in: OPEN_STATUSES },
       updatedAt: { lt: since },
     },
-    select: { id: true, clientId: true, dueDate: true, client: { select: { name: true } } },
+    select: {
+      id: true,
+      clientId: true,
+      dueDate: true,
+      blockedOn: true,
+      client: { select: { name: true } },
+    },
   });
   if (candidates.length === 0) return [];
 
@@ -558,19 +573,30 @@ export async function stalledPromisesByClient(
   const byClient = new Map<string, StalledClientRow>();
   for (const t of candidates) {
     if (moved.has(t.id)) continue;
+    // Waiting on the client is not stalled. It is the one row on this
+    // list where doing nothing is the correct behaviour, and counting it
+    // beside the forgotten ones is what teaches a manager to stop
+    // reading the number.
+    //
+    // Only CLIENT. A promise waiting on a supplier IS stalled from the
+    // client's point of view: they asked us, and chasing the supplier is
+    // our job, not theirs.
+    const waiting = t.blockedOn === "CLIENT";
     // `since` is the start of the local day, so a task due yesterday is
     // late and one due today is not late yet.
-    const late = t.dueDate !== null && t.dueDate < since;
+    const late = !waiting && t.dueDate !== null && t.dueDate < since;
     const found = byClient.get(t.clientId);
     if (found) {
-      found.count += 1;
+      if (waiting) found.waiting += 1;
+      else found.count += 1;
       if (late) found.overdue += 1;
     } else {
       byClient.set(t.clientId, {
         clientId: t.clientId,
         clientName: t.client.name,
-        count: 1,
+        count: waiting ? 0 : 1,
         overdue: late ? 1 : 0,
+        waiting: waiting ? 1 : 0,
       });
     }
   }
@@ -578,7 +604,13 @@ export async function stalledPromisesByClient(
   // Late first, then by how many. A client with one promise a week past
   // its date needs the conversation before a client with four that are
   // merely quiet.
-  return [...byClient.values()].sort((a, b) => b.overdue - a.overdue || b.count - a.count);
+  // Late first, then the ones stuck on us, and only then the ones the
+  // client is sitting on. A row can arrive here with count 0 and
+  // waiting 3: that client is still worth a chip, it just says
+  // something else.
+  return [...byClient.values()].sort(
+    (a, b) => b.overdue - a.overdue || b.count - a.count || b.waiting - a.waiting
+  );
 }
 
 /// Who may be given a task on this client.
@@ -863,7 +895,14 @@ export type TaskPatch = {
   // Portal phase 1.
   clientVisible?: boolean;
   clientTitle?: string | null;
-  waitingOnClientSince?: Date | null;
+  /// Tasks phase 5: what this task is waiting on, or null to say it is
+  /// waiting on nothing any more.
+  ///
+  /// One object rather than three loose fields, and that is the point:
+  /// a reason with no target, or a target with no date, are states this
+  /// contract simply cannot express. `blockedSince` is not here at all
+  /// because the server owns it, exactly like `startedAt`.
+  block?: { on: TaskBlocker; reason?: string | null } | null;
   // Portal phase 3: who did the work, and how they were. Recorded on the
   // task rather than in a supplier directory - see the schema comment on
   // Task.supplierName for why that is a decision and not a shortcut.
@@ -957,6 +996,31 @@ export const NEEDS_APPROVAL_MESSAGE =
 export const NOT_THE_SUPERVISOR_MESSAGE =
   "רק המפקח של המשימה יכול לאשר אותה או לוותר על האישור.";
 
+export const BLOCK_ON_CLOSED_MESSAGE =
+  "משימה שהושלמה לא ממתינה לאף אחד. אם עדיין מחכים למשהו, צריך לפתוח אותה מחדש.";
+
+/// Tasks phase 5, and the shortest rule in this file.
+///
+/// Exported and pure for the same reason `assertApprovable` is: it is a
+/// function of the current row and the patch, and a test should not
+/// need a database to ask it a question.
+///
+/// Only one thing is refused here, and everything else the feature
+/// could get wrong is refused by the SHAPE of `TaskPatch.block` rather
+/// than by a check: a reason with no target, a target with no date, and
+/// a date a caller chose are all unrepresentable. That is deliberate.
+/// A rule enforced by a type cannot be forgotten by a new caller.
+export function assertBlockable(
+  current: { status: TaskStatus },
+  data: { blockedOn?: TaskBlocker | null; status?: TaskStatus }
+) {
+  if (data.blockedOn === undefined || data.blockedOn === null) return;
+  const nextStatus = data.status ?? current.status;
+  // Blocking something on its way out, or something already closed.
+  // Both are the same sentence: finished work is not waiting.
+  if (nextStatus === "DONE" || nextStatus === "ARCHIVED") throw new Error(BLOCK_ON_CLOSED_MESSAGE);
+}
+
 /// Exported, and narrowed to the two fields of the actor it actually
 /// reads, so it can be called directly from a test.
 ///
@@ -1028,12 +1092,15 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // Not TaskPatch: this carries three fields the patch contract
   // deliberately does not expose (supplierRecordedAt, completedAt and
   // startedAt, all of which the server owns).
-  const data: TaskPatch & {
+  const data: Omit<TaskPatch, "block"> & {
     supplierRecordedAt?: Date | null;
     completedAt?: Date | null;
     startedAt?: Date | null;
     approvedById?: string | null;
     approvedAt?: Date | null;
+    blockedOn?: TaskBlocker | null;
+    blockedReason?: string | null;
+    blockedSince?: Date | null;
   } = {};
   const withCompletion = data;
 
@@ -1061,7 +1128,13 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
   if (patch.clientVisible !== undefined) data.clientVisible = patch.clientVisible;
   if (patch.clientTitle !== undefined) data.clientTitle = patch.clientTitle?.trim() || null;
-  if (patch.waitingOnClientSince !== undefined) data.waitingOnClientSince = patch.waitingOnClientSince;
+  // What we are waiting on. The two caller-owned halves go in here, so
+  // they land in `callerChanged` and read as somebody's decision; the
+  // date is added further down with the other server-owned columns.
+  if (patch.block !== undefined) {
+    data.blockedOn = patch.block?.on ?? null;
+    data.blockedReason = patch.block?.reason?.trim() || null;
+  }
 
   // The supplier line, and the timestamp that goes with it.
   //
@@ -1094,6 +1167,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
 
   assertClosable(task, data);
   assertApprovable(actor, task, data);
+  assertBlockable(task, data);
 
   // `completedAt` is the server's, not the caller's.
   //
@@ -1123,6 +1197,32 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     if (task.startedAt) withCompletion.startedAt = null;
   } else if (!task.startedAt) {
     withCompletion.startedAt = new Date();
+  }
+
+  // `blockedSince`, and the server's for the same reason as the two
+  // above: the age is the entire value of the feature.
+  //
+  // Written once, on the way into blocked, and NOT touched when the
+  // reason or the target is edited later. Somebody who corrects
+  // "ממתין ללקוח" to "ממתין לספק" on Thursday is describing a wait that
+  // began on Monday, and a date that reset there would quietly tell
+  // everyone the task is three days younger than it is.
+  //
+  // Cleared when the block is lifted, and cleared on the way out of
+  // open work too: a task that is finished is not waiting on anybody,
+  // and a closed row still claiming to be blocked would keep showing up
+  // in the answer to "what are we waiting on".
+  const nextBlocker = data.blockedOn !== undefined ? data.blockedOn : task.blockedOn;
+  if (nextStatus === "DONE" || nextStatus === "ARCHIVED") {
+    if (task.blockedOn !== null) {
+      withCompletion.blockedOn = null;
+      withCompletion.blockedReason = null;
+      withCompletion.blockedSince = null;
+    }
+  } else if (nextBlocker === null) {
+    if (task.blockedSince) withCompletion.blockedSince = null;
+  } else if (!task.blockedSince) {
+    withCompletion.blockedSince = new Date();
   }
 
   // The signature, and the server's like the two above it.
@@ -1216,9 +1316,30 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   /// stops being checked for a Hebrew label.
   const approving = updated.approvedAt !== null && task.approvedAt === null;
 
+  /// Blocking and unblocking are their own lines in the history, for the
+  /// same reason an approval is: "why did this sit for a week" is a
+  /// question somebody asks later, and "task.update" is not an answer.
+  ///
+  /// Gated on the CALLER having asked. Closing a task clears its block
+  /// as a consequence, and naming that "task.unblocked" would file the
+  /// close under the wrong verb.
+  ///
+  /// The literals stay inside the `action:` expression below, as the
+  /// note above explains.
+  const blockAsked = patch.block !== undefined;
+  const blocking = blockAsked && updated.blockedOn !== null && task.blockedOn === null;
+  const unblocking = blockAsked && updated.blockedOn === null && task.blockedOn !== null;
+
   await recordAudit({
     actorId: actor.id,
-    action: approving ? "task.approve" : statusOnly ? "task.status_change" : "task.update",
+    // One line, and it has to stay one line. The scanner in
+    // tests/unit/audit-labels.test.ts reads this key up to the next one
+    // or to the end of the line, so a ternary broken across lines hides
+    // every literal after the first from it. Prettier is happy to wrap
+    // it; the test is not. (Nor may this comment name that key, for the
+    // same reason: the scanner would match the comment instead.)
+    // prettier-ignore
+    action: blocking ? "task.blocked" : unblocking ? "task.unblocked" : approving ? "task.approve" : statusOnly ? "task.status_change" : "task.update",
     entityType: "Task",
     entityId: taskId,
     clientId: task.clientId,
@@ -1344,7 +1465,8 @@ const FIELD_LABELS: Record<string, string> = {
   dueDate: "תאריך יעד",
   clientVisible: "הצגה ללקוח",
   clientTitle: "כותרת ללקוח",
-  waitingOnClientSince: "ממתין ללקוח",
+  blockedOn: "ממתינים ל",
+  blockedReason: "סיבת ההמתנה",
   clientOutcome: "משפט התוצאה",
   supplierName: "ספק",
   supplierExperience: "חוויה מהספק",
@@ -1356,6 +1478,9 @@ const FIELD_LABELS: Record<string, string> = {
 const DERIVED_FIELDS = new Set([
   "updatedAt",
   "startedAt",
+  // Tasks phase 5: when the wait began. The history already has a line
+  // saying the task was blocked, and that line carries the date.
+  "blockedSince",
   "completedAt",
   "supplierRecordedAt",
   // Tasks phase 2. Who signed and when is a line of its own in the

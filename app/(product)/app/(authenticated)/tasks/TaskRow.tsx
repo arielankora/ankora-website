@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
-import { SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
-import type { SupplierExperience, TaskPriority, TaskStatus } from "@prisma/client";
+import { SUPPLIER_EXPERIENCE_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
+import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Mirrors lib/app-domain/tasks.ts's TASK_STATUS_LABELS - duplicated
 // (rather than imported) because that module starts with `import
@@ -72,7 +72,9 @@ export function TaskRow({
     // Portal phase 1.
     clientVisible: boolean;
     clientTitle: string | null;
-    waitingOnClient: boolean;
+    /// Tasks phase 5. Null means nothing is holding this up.
+    blockedOn: TaskBlocker | null;
+    blockedSince: string | null;
     stepsTotal: number;
     stepsDone: number;
     // Portal phase 3.
@@ -93,7 +95,8 @@ export function TaskRow({
   // knows a task is client-facing is the moment they are looking at it
   // in this list.
   const [clientVisible, setClientVisible] = useState(task.clientVisible);
-  const [waitingOnClient, setWaitingOnClient] = useState(task.waitingOnClient);
+  const [blockedOn, setBlockedOn] = useState(task.blockedOn);
+  const [blockedSince, setBlockedSince] = useState(task.blockedSince);
   const [clientTitle, setClientTitle] = useState(task.clientTitle ?? "");
   const [editingTitle, setEditingTitle] = useState(false);
   const [portalPending, setPortalPending] = useState(false);
@@ -135,7 +138,8 @@ export function TaskRow({
     if (!result.ok) {
       // Roll the optimistic state back to what the server still holds.
       setClientVisible(task.clientVisible);
-      setWaitingOnClient(task.waitingOnClient);
+      setBlockedOn(task.blockedOn);
+      setBlockedSince(task.blockedSince);
       setClientTitle(task.clientTitle ?? "");
       setSupplierName(task.supplierName ?? "");
       setSupplierExperience(task.supplierExperience);
@@ -144,7 +148,8 @@ export function TaskRow({
       return;
     }
     setClientVisible(result.clientVisible);
-    setWaitingOnClient(result.waitingOnClient);
+    setBlockedOn(result.blockedOn);
+    setBlockedSince(result.blockedSince);
     setClientTitle(result.clientTitle ?? "");
     setSupplierName(result.supplierName ?? "");
     setSupplierExperience(result.supplierExperience);
@@ -158,7 +163,10 @@ export function TaskRow({
     // Hiding a task also stops it waiting: a client cannot answer
     // something they can no longer see, and leaving the flag set would
     // make it reappear as "מחכה לך" the moment it is shown again.
-    if (!next) setWaitingOnClient(false);
+    if (!next) {
+      setBlockedOn(null);
+      setBlockedSince(null);
+    }
     await writePortal(
       { clientVisible: next, ...(next ? {} : { waitingOnClient: false }) },
       {
@@ -169,9 +177,17 @@ export function TaskRow({
     );
   }
 
+  /// One click, and it means the client.
+  ///
+  /// Tasks phase 5 gave the field four blockers and a reason, and this
+  /// gesture deliberately stayed one click: the task screen is where
+  /// somebody says "ממתין לספק, ההצעה אצלם מיום ראשון". Pressing it
+  /// while the task waits on anything at all clears it, because the
+  /// button asks one question and it is "are we still waiting".
   async function toggleWaiting() {
-    const next = !waitingOnClient;
-    setWaitingOnClient(next);
+    const next = blockedOn === null;
+    setBlockedOn(next ? "CLIENT" : null);
+    setBlockedSince(next ? new Date().toISOString() : null);
     await writePortal(
       { waitingOnClient: next },
       {
@@ -529,16 +545,19 @@ export function TaskRow({
         {clientVisible ? <Eye size={15} strokeWidth={1.6} /> : <EyeOff size={15} strokeWidth={1.6} />}
       </button>
 
-      {clientVisible && (
+      {/* Also when the task is internal and blocked: a task waiting on
+          a supplier is not a portal concept, and the person looking at
+          this row still needs to see it and to be able to clear it. */}
+      {(clientVisible || blockedOn !== null) && (
         <button
           type="button"
-          aria-pressed={waitingOnClient}
-          aria-label={waitingOnClient ? "הלקוח כבר לא מעכב" : "סימון כמחכה ללקוח"}
-          title={waitingOnClient ? "מחכה ללקוח" : "לא מחכה ללקוח"}
+          aria-pressed={blockedOn !== null}
+          aria-label={blockedOn ? "כבר לא ממתינים" : "סימון כמחכה ללקוח"}
+          title={blockedOn ? waitingTitle(blockedOn, blockedSince) : "לא ממתין לאף אחד"}
           disabled={portalPending}
           onClick={toggleWaiting}
           className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
-            waitingOnClient
+            blockedOn !== null
               ? "border-warning/50 bg-warning-soft text-warning"
               : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
           }`}

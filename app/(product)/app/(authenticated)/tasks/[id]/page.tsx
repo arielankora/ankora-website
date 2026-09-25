@@ -122,6 +122,9 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           clientVisible: task.clientVisible,
           clientTitle: task.clientTitle,
           clientOutcome: task.clientOutcome,
+          blockedOn: task.blockedOn,
+          blockedReason: task.blockedReason,
+          blockedSince: task.blockedSince?.toISOString() ?? null,
           startedAt: task.startedAt?.toISOString() ?? null,
           completedAt: task.completedAt?.toISOString() ?? null,
           createdAt: task.createdAt.toISOString(),
@@ -153,7 +156,14 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           claude/client-communication-rule-2026-09-25.md. */}
       {composer && (
         <div className="flex flex-wrap items-center gap-2">
-          <MessageClient clientId={task.clientId} taskId={task.id} {...composer} />
+          <MessageClient
+            clientId={task.clientId}
+            taskId={task.id}
+            // Waiting on the client is the one situation where the
+            // product knows which draft is wanted, so it opens on it.
+            preselectKind={task.blockedOn === "CLIENT" ? "need_information" : undefined}
+            {...composer}
+          />
         </div>
       )}
 
