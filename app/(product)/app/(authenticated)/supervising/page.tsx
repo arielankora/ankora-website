@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { listTasks } from "@/lib/app-domain/tasks";
+import { OPEN_STATUSES, listTasks } from "@/lib/app-domain/tasks";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { TaskRow } from "../tasks/TaskRow";
@@ -108,6 +108,8 @@ function Section({
               clientTitle: task.clientTitle,
               waitingOnClient: task.waitingOnClientSince !== null,
               clientOutcome: task.clientOutcome,
+              stepsTotal: task.subtasks.length,
+              stepsDone: task.subtasks.filter((s) => !OPEN_STATUSES.includes(s.status)).length,
             }}
           />
         ))}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { listTasks } from "@/lib/app-domain/tasks";
+import { OPEN_STATUSES, listTasks } from "@/lib/app-domain/tasks";
 import { timed } from "@/lib/slow-log";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -322,5 +322,7 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
     clientTitle: task.clientTitle,
     waitingOnClient: task.waitingOnClientSince !== null,
     clientOutcome: task.clientOutcome,
+    stepsTotal: task.subtasks.length,
+    stepsDone: task.subtasks.filter((s) => !OPEN_STATUSES.includes(s.status)).length,
   };
 }

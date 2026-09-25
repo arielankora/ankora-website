@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalClient, assertPortalWritable } from "@/lib/app-domain/client-portal";
@@ -93,6 +94,7 @@ export async function getPortalFile(actor: User): Promise<PortalFile> {
       where: {
         clientId: client.id,
         deletedAt: null,
+        ...TOP_LEVEL_ONLY,
         clientVisible: true,
         supplierName: { not: null },
         supplierRecordedAt: { not: null },

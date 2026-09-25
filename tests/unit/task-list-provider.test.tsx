@@ -35,6 +35,8 @@ function row(over: Partial<ListRow> = {}): ListRow {
     clientTitle: null,
     waitingOnClient: false,
     clientOutcome: null,
+    stepsTotal: 0,
+    stepsDone: 0,
     ...over,
   };
 }

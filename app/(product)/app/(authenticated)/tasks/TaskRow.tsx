@@ -73,6 +73,8 @@ export function TaskRow({
     clientVisible: boolean;
     clientTitle: string | null;
     waitingOnClient: boolean;
+    stepsTotal: number;
+    stepsDone: number;
     // Portal phase 3.
     supplierName: string | null;
     supplierExperience: SupplierExperience | null;
@@ -346,6 +348,15 @@ export function TaskRow({
         <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
           {task.clientName}
           {task.categoryName ? ` · ${task.categoryName}` : ""}
+          {/* Tasks phase 5: how far into its steps this task is.
+              Beside the client and the category rather than as its own
+              badge, because it is a fact about the task and not a state
+              of it. Hidden entirely at zero: most tasks here have no
+              steps, and "0/0" on every row is noise that teaches people
+              to stop reading this line. */}
+          {task.stepsTotal > 0 && (
+            <span className="font-jbmono"> · {task.stepsDone}/{task.stepsTotal}</span>
+          )}
         </p>
 
         {clientVisible &&

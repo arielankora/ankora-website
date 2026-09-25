@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { addTaskComment, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, createTask, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { getActiveTimer, startTimer, stopTimer, ActiveTimerExistsError } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -211,6 +211,47 @@ export async function deleteTaskCommentAction(input: { commentId: string }) {
   try {
     const removed = await deleteTaskComment(user, input.commentId);
     revalidatePath(`/app/tasks/${removed.taskId}`);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Tasks phase 5: add a step to this task.
+///
+/// Through `createTask` like any other task, because that is what it is.
+/// A step carries its own assignee, deadline and timer, and the only
+/// thing it does not carry is a client of its own: that comes from the
+/// parent, and `assertParentUsable` refuses anything else.
+///
+/// Deliberately thin. The drawer that creates a full task asks for
+/// seven fields; this asks for one, because a step somebody stops to
+/// fill in a form for is a step they do not write down. Everything else
+/// is editable afterwards on the step's own screen.
+export async function addTaskStepAction(input: { taskId: string; clientId: string; title: string }) {
+  const user = await requireUser();
+  try {
+    await createTask(user, { clientId: input.clientId, title: input.title, parentId: input.taskId });
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/tasks");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Tick a step, or untick it.
+///
+/// `updateTask` and not a direct write, so the close rule applies to a
+/// step exactly as it applies to anything else: a step somebody made
+/// client-visible still needs its outcome sentence before it closes.
+export async function setTaskStepDoneAction(input: { stepId: string; parentId: string; done: boolean }) {
+  const user = await requireUser();
+  try {
+    await updateTask(user, input.stepId, { status: input.done ? "DONE" : "OPEN" });
+    revalidatePath(`/app/tasks/${input.parentId}`);
+    revalidatePath(`/app/tasks/${input.stepId}`);
+    revalidatePath("/app/tasks");
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

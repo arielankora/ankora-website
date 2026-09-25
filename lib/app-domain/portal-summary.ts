@@ -4,7 +4,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
-import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
+import { OPEN_STATUSES, TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import type { User } from "@prisma/client";
 
 // Portal phase 3: the monthly summary.
@@ -72,6 +72,7 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
       where: {
         clientId,
         deletedAt: null,
+        ...TOP_LEVEL_ONLY,
         clientVisible: true,
         status: "DONE",
         // Which month a promise belongs to is the month it CLOSED.
@@ -96,6 +97,7 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
       where: {
         clientId,
         deletedAt: null,
+        ...TOP_LEVEL_ONLY,
         clientVisible: true,
         supplierName: { not: null },
         supplierRecordedAt: { gte: periodStart, lt: periodEnd },
@@ -106,7 +108,7 @@ export async function buildSummaryDraft(clientId: string, periodStart: Date, per
       // OPEN_STATUSES rather than the list written out: phase 2 added
       // PENDING_APPROVAL and a second copy of "what counts as open" is a
       // copy that gets missed. It was missed here once already.
-      where: { clientId, deletedAt: null, clientVisible: true, status: { in: OPEN_STATUSES } },
+      where: { clientId, deletedAt: null, ...TOP_LEVEL_ONLY, clientVisible: true, status: { in: OPEN_STATUSES } },
     }),
   ]);
 
