@@ -11,6 +11,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
 import { TaskThread } from "./TaskThread";
+import { TaskSteps } from "./TaskSteps";
 import { TaskTimeSummary } from "./TaskTimeSummary";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -51,7 +52,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
     );
   }
 
-  const { task, time, thread, commentCount } = detail;
+  const { task, time, thread, commentCount, subtasks } = detail;
 
   const [people, allCategories, activeTimer] = await Promise.all([
     assignableUsers(user, task.clientId),
@@ -124,6 +125,23 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
               }
             : null
         }
+      />
+
+      {/* Above the hours and the thread, and that placement is the
+          argument: the steps are what is left to do, and the two panels
+          below are the record of what has been done. A person opening
+          this screen mid-task is asking the first question. */}
+      <TaskSteps
+        taskId={task.id}
+        clientId={task.clientId}
+        parentIsClosed={task.status === "DONE" || task.status === "ARCHIVED"}
+        steps={subtasks.map((s) => ({
+          id: s.id,
+          title: s.title,
+          status: s.status,
+          dueDate: s.dueDate?.toISOString() ?? null,
+          assignedToName: s.assignedTo?.name ?? null,
+        }))}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

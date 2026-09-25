@@ -783,6 +783,8 @@ model Task {
   // survived a reopen would be a signature on work that changed after it
   // was given.
   supervisorId     String?
+  /// Tasks phase 5. Null means this is a task in its own right.
+  parentId     String?
   requiresApproval Boolean   @default(false)
   approvedById     String?
   approvedAt       DateTime?
@@ -796,6 +798,20 @@ model Task {
   assignedTo    User?          @relation("TaskAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
   supervisor    User?          @relation("TaskSupervisor", fields: [supervisorId], references: [id], onDelete: SetNull)
   approvedBy    User?          @relation("TaskApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  /// Tasks phase 5: the task this one is a step of.
+  ///
+  /// ONE level, enforced in createTask: a subtask cannot have subtasks.
+  /// A tree is a navigation problem, and this product's tasks live for
+  /// days. One level is a checklist whose items happen to be real tasks,
+  /// so a step can carry its own assignee, deadline and timer without
+  /// anybody learning a second concept.
+  ///
+  /// Cascade on delete, unlike every other relation here: a step has no
+  /// meaning without the thing it is a step of. Deletes in this product
+  /// are soft, so this fires only if a row is ever truly removed.
+  parent        Task?          @relation("TaskParent", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks      Task[]         @relation("TaskParent")
   importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
   timeEntries   TimeEntry[]
   decisions     Decision[]
@@ -817,6 +833,9 @@ model Task {
   // Team adoption: promises that have not moved, for the manager's metric
   // and for one person's own rows on the home screen.
   @@index([clientVisible, status, updatedAt])
+  /// Every screen that lists work asks "and which of these are steps of
+  /// something else", so this is read on almost every task query.
+  @@index([parentId, status])
   @@map("tasks")
 }
 

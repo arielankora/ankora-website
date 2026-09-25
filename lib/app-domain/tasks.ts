@@ -61,6 +61,25 @@ import type { SupplierExperience, User, TaskPriority, TaskStatus, UserRole } fro
 /// out, so a status added to the enum is a change in one place.
 export const OPEN_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
 
+/// Steps are not tasks, to every screen that counts tasks.
+///
+/// Tasks phase 5 lets a task be a step of another one. That single
+/// column reaches every query in this file and several outside it, and
+/// getting it wrong is not a cosmetic bug: a step that leaks into the
+/// portal is a second promise the client never made, and a step that
+/// leaks into the manager's stalled number inflates it by however many
+/// steps somebody bothered to write down.
+///
+/// So the rule is stated once, here, and spread into every `where` that
+/// means "tasks a person would count". `tests/unit/subtask-isolation.test.ts`
+/// reads this file and the four beside it as TEXT and fails when a task
+/// query appears without either this constant or an explicit opt-in
+/// comment - the same technique `audit-labels.test.ts` uses, and for the
+/// same reason: a rule that depends on everyone remembering is a rule
+/// with a half-life.
+export const TOP_LEVEL_ONLY = { parentId: null } as const;
+
+
 /// The roles that reach every active client without a UserClientAccess
 /// row - derived from the permission rather than written out, so it
 /// cannot drift from canManageClients()/listAccessibleClients(). Needed
@@ -93,6 +112,13 @@ export type TaskFilters = {
   /// would remember about a task. See `searchWhere` below for what that
   /// covers and why. Ignored under two characters.
   q?: string;
+  /// Tasks phase 5: the steps of one task, instead of the tasks
+  /// themselves. Omitted, this list holds only tasks in their own right.
+  ///
+  /// There is deliberately no "give me both" option. A list that mixes
+  /// the two is a list where the same work is counted twice, and every
+  /// screen that shows one would have to explain which it meant.
+  parentId?: string;
 };
 
 /// The shortest search worth running.
@@ -176,6 +202,9 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       dueDate: filters.dueBefore ? { not: null, lte: filters.dueBefore } : undefined,
       priority: filters.minPriority ? { in: priorityAtLeast(filters.minPriority) } : undefined,
       supervisorId: filters.supervisorId || undefined,
+      // Steps only when asked for them by name; otherwise none at all.
+      // See TOP_LEVEL_ONLY above for why this is not left to callers.
+      ...(filters.parentId ? { parentId: filters.parentId } : TOP_LEVEL_ONLY),
       // Sits beside the other keys rather than wrapping them, which
       // makes it an AND with all of them: a search inside a status pill
       // stays inside that pill. The alternative reads the same and
@@ -205,6 +234,14 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       category: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
       supervisor: { select: { id: true, name: true } },
+      // Tasks phase 5: enough to draw "3/5" on the row, and no more.
+      //
+      // Statuses rather than Prisma's `_count`, because the row needs
+      // two numbers (done and total) and `_count` gives one per
+      // relation. These are two columns on a handful of rows per task,
+      // loaded in the same batched query Prisma already makes for the
+      // four relations above.
+      subtasks: { where: { deletedAt: null }, select: { status: true } },
     },
     // Open/In-progress first (spec §11: "open/recent tasks"), then by
     // deadline, then newest first. The dueDate leg is Phase 16: with due
@@ -254,6 +291,7 @@ export async function clientTaskOverview(actor: User, clientId: string, now: Dat
       where: {
         clientId,
         deletedAt: null,
+        ...TOP_LEVEL_ONLY,
         status: "DONE",
         completedAt: { gte: new Date(now.getTime() - RECENTLY_CLOSED_DAYS * 86_400_000) },
       },
@@ -306,6 +344,7 @@ export async function listOpenPromises(actor: User) {
   return prisma.task.findMany({
     where: {
       deletedAt: null,
+      ...TOP_LEVEL_ONLY,
       clientId: { in: ids },
       clientVisible: true,
       status: { in: OPEN_STATUSES },
@@ -351,6 +390,7 @@ export async function listMyOpenTasks(actor: User, take = 8) {
   const rows = await prisma.task.findMany({
     where: {
       deletedAt: null,
+      ...TOP_LEVEL_ONLY,
       clientId: { in: ids },
       assignedToId: actor.id,
       status: { in: OPEN_STATUSES },
@@ -415,6 +455,7 @@ export async function supervisionCounts(actor: User): Promise<{ total: number; p
     by: ["status"],
     where: {
       deletedAt: null,
+      ...TOP_LEVEL_ONLY,
       clientId: { in: ids },
       supervisorId: actor.id,
       // Finished work is not supervision any more. Counting it would
@@ -483,6 +524,7 @@ export async function stalledPromisesByClient(
   const candidates = await prisma.task.findMany({
     where: {
       deletedAt: null,
+      ...TOP_LEVEL_ONLY,
       clientId: { in: ids },
       clientVisible: true,
       status: { in: OPEN_STATUSES },
@@ -576,6 +618,41 @@ export async function assignableUsers(actor: User, clientId: string) {
   return users;
 }
 
+/// Throws unless this task may become a step of that one.
+///
+/// Three refusals, and each one is a different kind of wrong:
+///
+///   - a parent on another client: it would pass every access check on
+///     its own and still put a step where nobody looking at that client
+///     would ever find it;
+///   - a parent that is itself a step: one level, so that a list of
+///     steps is a list and not a tree. See the comment on Task.parentId;
+///   - a parent that is finished: adding work under something already
+///     closed is how a closed task quietly reopens in somebody's head
+///     while every screen still calls it done.
+export const PARENT_OTHER_CLIENT_MESSAGE = "אפשר לפרק משימה לשלבים רק בתוך אותו לקוח.";
+export const PARENT_IS_SUBTASK_MESSAGE = "שלב לא מתפרק לשלבים. אפשר להוסיף אותו למשימה עצמה.";
+export const PARENT_CLOSED_MESSAGE = "המשימה הזו כבר נסגרה, אז אי אפשר להוסיף לה שלב.";
+
+async function assertParentUsable(actor: User, clientId: string, parentId: string) {
+  const parent = await prisma.task.findFirst({
+    where: { id: parentId, deletedAt: null },
+    select: { id: true, clientId: true, parentId: true, status: true },
+  });
+  if (!parent) throw new Error("Task not found.");
+  if (parent.clientId !== clientId) throw new Error(PARENT_OTHER_CLIENT_MESSAGE);
+  if (parent.parentId) throw new Error(PARENT_IS_SUBTASK_MESSAGE);
+  if (!OPEN_STATUSES.includes(parent.status)) throw new Error(PARENT_CLOSED_MESSAGE);
+  // The actor's own access to that client, checked the same way every
+  // other write here checks it. The caller has already checked it for
+  // `clientId`, and this is the same id - but stating it costs one
+  // comparison and survives somebody later letting the two differ.
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === parent.clientId)) {
+    throw new ForbiddenError("You are not assigned to this client.");
+  }
+}
+
 /// Throws unless `assignedToId` names someone who could actually see a
 /// task on this client. See the Phase 16 note at the top of the file.
 async function assertAssignable(actor: User, clientId: string, assignedToId: string) {
@@ -641,6 +718,12 @@ export async function createTask(
     /// Task.clientVisible for why not every task is a promise.
     clientVisible?: boolean;
     clientTitle?: string | null;
+    /// Tasks phase 5: make this a step of an existing task.
+    ///
+    /// The client is taken from the parent and cannot be overridden: a
+    /// step on a different client than the task it belongs to would pass
+    /// every access check on its own and still be nonsense.
+    parentId?: string | null;
   }
 ) {
   // permissions.ts requires every server-side entry point to assert, and
@@ -662,8 +745,11 @@ export async function createTask(
   // needing an approval nobody can give is a task born unclosable.
   if (input.requiresApproval && !input.supervisorId) throw new Error(APPROVAL_WITHOUT_SUPERVISOR_MESSAGE);
 
+  if (input.parentId) await assertParentUsable(actor, input.clientId, input.parentId);
+
   const task = await prisma.task.create({
     data: {
+      parentId: input.parentId || null,
       clientId: input.clientId,
       categoryId: input.categoryId || null,
       title,
@@ -986,7 +1072,55 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     withCompletion.approvedAt = null;
   }
 
-  const updated = await prisma.task.update({ where: { id: taskId }, data });
+  /// Closing a task closes the steps under it.
+  ///
+  /// The alternative was to refuse the close while a step is open, and
+  /// it is the wrong one. Half the steps somebody writes down turn out
+  /// not to be needed, and a product that makes them open each one and
+  /// close it by hand is a product that teaches people not to write
+  /// steps down. The whole value of the feature is that writing a step
+  /// down is cheap.
+  ///
+  /// Leaving them open is worse still: a step belongs to nothing once
+  /// its task is closed, but it keeps appearing in "what is on me" and
+  /// in every count, and nobody knows where it came from.
+  ///
+  /// So one gesture, and never a silent one: the count comes back to the
+  /// caller, the screen says it, and the log records each step.
+  const closing =
+    data.status !== undefined &&
+    !OPEN_STATUSES.includes(data.status) &&
+    OPEN_STATUSES.includes(task.status);
+
+  const [updated, closedSteps] = await prisma.$transaction(async (tx) => {
+    const row = await tx.task.update({ where: { id: taskId }, data });
+    if (!closing || task.parentId) return [row, [] as { id: string; title: string }[]] as const;
+    const open = await tx.task.findMany({
+      where: { parentId: taskId, deletedAt: null, status: { in: OPEN_STATUSES } },
+      select: { id: true, title: true },
+    });
+    if (open.length > 0) {
+      await tx.task.updateMany({
+        where: { id: { in: open.map((t) => t.id) } },
+        // The parent's own completion timestamp, not each step's own
+        // `new Date()`: they finished because it did, and a report that
+        // sorts by minute should not scatter them.
+        data: { status: "DONE", completedAt: withCompletion.completedAt ?? new Date() },
+      });
+    }
+    return [row, open] as const;
+  });
+
+  for (const step of closedSteps) {
+    await recordAudit({
+      actorId: actor.id,
+      action: "task.step_closed_with_parent",
+      entityType: "Task",
+      entityId: step.id,
+      clientId: task.clientId,
+      after: { parentId: taskId },
+    });
+  }
 
   // Kept as the existing action name when status is the only change, so
   // the audit log stays queryable the way it already was.
@@ -1295,13 +1429,18 @@ export async function getTaskDetail(actor: User, taskId: string) {
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c) => c.id === task.clientId)) return null;
 
-  const [entries, audit, comments, files] = await Promise.all([
+  const [entries, audit, comments, files, subtasks] = await Promise.all([
     // Every reported minute on this task, by whom. Running timers
     // (endAt null, so actualSeconds null) are counted separately rather
     // than as zero - a task with a timer running on it right now is not
     // a task with no time on it.
     prisma.timeEntry.findMany({
-      where: { taskId: task.id, deletedAt: null },
+      // The task AND its steps. "How long did this take" is a question
+      // about the work, and once work is broken into steps the timer
+      // runs on the steps. A parent that reported zero while five steps
+      // under it reported six hours would be the most confident wrong
+      // number on the screen.
+      where: { task: { OR: [{ id: task.id }, { parentId: task.id }] }, deletedAt: null },
       orderBy: { startAt: "desc" },
       select: {
         id: true,
@@ -1354,6 +1493,27 @@ export async function getTaskDetail(actor: User, taskId: string) {
         clientVisible: true,
         createdAt: true,
         uploadedBy: { select: { name: true } },
+      },
+    }),
+    // The steps under this task.
+    //
+    // Their own `deletedAt` and not the parent's: a step removed from a
+    // task is gone from it, and the task carries on. Ordered oldest
+    // first, because a list of steps is a sequence somebody wrote in an
+    // order that meant something, and re-sorting it by status would
+    // scramble that every time one is ticked.
+    prisma.task.findMany({
+      // subtasks-included: the-steps-of-one-parent. The one query in
+      // this file whose whole purpose is to return steps, asked for by
+      // the id of the task they belong to.
+      where: { parentId: task.id, deletedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        dueDate: true,
+        assignedTo: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -1411,6 +1571,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
       runningCount: entries.filter((e) => e.endAt === null).length,
       entryCount: entries.length,
     },
+    subtasks,
     thread,
     /// How many of the thread's entries are somebody's words rather than
     /// the system's. The screen says "no comments yet" only when this is

@@ -124,6 +124,10 @@ async function fetchTimeEntriesSheetData() {
 
 async function fetchTasksSheetData() {
   const tasks = await prisma.task.findMany({
+    // subtasks-included: the-backup-sheet. A backup that omits the steps
+    // under a task is a backup that cannot restore the task. Every other
+    // task query in this product excludes them (see TOP_LEVEL_ONLY in
+    // app-domain/tasks.ts); this one and the dump below must not.
     where: { deletedAt: null },
     include: { client: true, category: true, assignedTo: true },
     orderBy: { createdAt: "asc" },
@@ -149,7 +153,10 @@ async function dumpCoreTables() {
     prisma.client.findMany({ where: { deletedAt: null } }),
     prisma.user.findMany({ where: { deletedAt: null } }),
     prisma.category.findMany({ where: { deletedAt: null } }),
-    prisma.task.findMany({ where: { deletedAt: null } }),
+    prisma.task.findMany({
+      // subtasks-included: the-backup-dump. Same reason as the sheet above.
+      where: { deletedAt: null },
+    }),
     prisma.timeEntry.findMany({ where: { deletedAt: null } }),
     prisma.hourBank.findMany({ where: { deletedAt: null } }),
   ]);

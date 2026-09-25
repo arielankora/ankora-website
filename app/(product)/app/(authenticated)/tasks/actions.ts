@@ -39,6 +39,11 @@ export type CreatedTaskRow = {
   clientTitle: string | null;
   waitingOnClient: boolean;
   clientOutcome: string | null;
+  /// Tasks phase 5. Both zero on a create, because a task is born
+  /// without steps, and carried anyway for the same reason
+  /// `assignedToName` is: one shape, not a near-miss of one.
+  stepsTotal: number;
+  stepsDone: number;
 };
 
 function friendlyError(err: unknown): string {
@@ -103,6 +108,11 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       clientTitle: created.clientTitle,
       waitingOnClient: created.waitingOnClientSince !== null,
       clientOutcome: created.clientOutcome,
+      // A task is born without steps. Stated rather than inferred, so
+      // this object stays a complete CreatedTaskRow and the compiler
+      // keeps saying so when the shape grows again.
+      stepsTotal: 0,
+      stepsDone: 0,
     },
   };
 }

@@ -110,6 +110,10 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.approve": "אישור משימה",
   "task.comment": "הערה על משימה",
   "task.comment_delete": "מחיקת הערה על משימה",
+  // Tasks phase 5. Written once per step, by the server, when the task
+  // above it is closed. Named for what a person reading the log needs to
+  // know: this step did not close on its own.
+  "task.step_closed_with_parent": "סגירת שלב עם המשימה שמעליו",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.

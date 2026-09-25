@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { assertCan, can, ForbiddenError } from "@/lib/app-auth/permissions";
 import { getCurrentHourBank, listHourBanksForClient } from "@/lib/app-domain/hour-banks";
 import { getClient } from "@/lib/app-domain/clients";
@@ -344,7 +345,7 @@ export async function getWeeklyActivity(actor: User, weekStart?: Date) {
 /// MONTHLY_DETAILED ReportSchedule, if one exists.
 async function tasksCompletedCount(clientId: string, from: Date, to: Date) {
   return prisma.task.count({
-    where: { clientId, status: "DONE", deletedAt: null, updatedAt: { gte: from, lt: to } },
+    where: { clientId, status: "DONE", deletedAt: null, ...TOP_LEVEL_ONLY, updatedAt: { gte: from, lt: to } },
   });
 }
 
@@ -605,6 +606,7 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
     where: {
       clientId,
       deletedAt: null,
+      ...TOP_LEVEL_ONLY,
       clientVisible: true,
       status: { not: "ARCHIVED" },
     },
