@@ -5,6 +5,8 @@ import {
   PARENT_CLOSED_MESSAGE,
   PARENT_IS_SUBTASK_MESSAGE,
   PARENT_OTHER_CLIENT_MESSAGE,
+  TEMPLATE_NOT_FOUND_MESSAGE,
+  applyTaskTemplate,
   createTask,
   getTaskDetail,
   listMyOpenTasks,
@@ -212,5 +214,67 @@ describe("the hours on a task include the hours on its steps", () => {
     // number on the screen.
     expect(detail!.time.totalSeconds).toBe(2_400);
     expect(detail!.subtasks.map((s) => s.title)).toEqual(["שלב"]);
+  });
+});
+
+describe("a procedure from the book becomes steps", () => {
+  it("adds them in order, with the book's own deadlines, and appends", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "לקוח שתק" });
+
+    // Something the person thought of themselves, before reaching for
+    // the book. The procedure must not replace it.
+    await createTask(actor, { clientId: client.id, title: "לבדוק אם המייל נחסם", parentId: task.id });
+
+    const { created } = await applyTaskTemplate(actor, task.id, "client-silent");
+    expect(created).toBe(4);
+
+    const steps = await prisma.task.findMany({
+      where: { parentId: task.id, deletedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { title: true, dueDate: true },
+    });
+
+    expect(steps[0].title).toBe("לבדוק אם המייל נחסם");
+    expect(steps.slice(1).map((s) => s.title)).toEqual([
+      "תזכורת ראשונה ללקוח",
+      "תזכורת שנייה ללקוח",
+      "תזכורת אחרונה ללקוח",
+      "העברה למצב ממתין ללקוח והקפאת לוחות הזמנים",
+    ]);
+
+    // The ladder is the procedure. Three reminders on the same day are
+    // the same sentence three times.
+    const days = steps.slice(1).map((s) => s.dueDate!.getTime());
+    expect(days).toEqual([...days].sort((a, b) => a - b));
+    expect(new Set(days).size).toBe(4);
+  });
+
+  it("records one line for the procedure, not one per step", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "משבר" });
+
+    await applyTaskTemplate(actor, task.id, "crisis");
+
+    const applied = await prisma.auditEvent.findMany({
+      where: { entityType: "Task", entityId: task.id, action: "task.template_applied" },
+    });
+    expect(applied).toHaveLength(1);
+  });
+
+  it("refuses an unknown procedure, and refuses to run one on a step", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "משימה" });
+    const step = await createTask(actor, { clientId: client.id, title: "שלב", parentId: task.id });
+
+    await expect(applyTaskTemplate(actor, task.id, "no-such-thing")).rejects.toThrow(
+      TEMPLATE_NOT_FOUND_MESSAGE
+    );
+    // Through createTask, so the one-level rule applies to a procedure
+    // exactly as it applies to a step typed by hand.
+    await expect(applyTaskTemplate(actor, step.id, "crisis")).rejects.toThrow(PARENT_IS_SUBTASK_MESSAGE);
   });
 });

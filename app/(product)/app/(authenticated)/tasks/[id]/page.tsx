@@ -12,6 +12,7 @@ import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
 import { TaskThread } from "./TaskThread";
 import { TaskSteps } from "./TaskSteps";
+import { TASK_TEMPLATES } from "@/lib/app-domain/sop-templates";
 import { TaskTimeSummary } from "./TaskTimeSummary";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -132,6 +133,16 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           below are the record of what has been done. A person opening
           this screen mid-task is asking the first question. */}
       <TaskSteps
+        // The book itself, reduced to what the picker shows. The step
+        // titles stay on the server: the screen never renders them, and
+        // shipping seven procedures to every browser to display seven
+        // names would be the list nobody reads, downloaded.
+        templates={TASK_TEMPLATES.map((t) => ({
+          id: t.id,
+          name: t.name,
+          when: t.when,
+          stepCount: t.steps.length,
+        }))}
         taskId={task.id}
         clientId={task.clientId}
         parentIsClosed={task.status === "DONE" || task.status === "ARCHIVED"}
