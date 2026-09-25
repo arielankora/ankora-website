@@ -7,6 +7,7 @@ import {
   updateOwnTimezone,
   updateOwnName,
   updateLongRunningTimerEmailPreference,
+  updateDailyDigestPreference,
 } from "@/lib/app-domain/profile";
 
 type FormState = { error?: string; ok?: boolean };
@@ -68,6 +69,17 @@ export async function updateNotificationPreferenceAction(enabled: boolean): Prom
   const user = await requireUser();
   try {
     await updateLongRunningTimerEmailPreference(user, enabled);
+    revalidatePath("/app/profile");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+  }
+}
+
+export async function updateDailyDigestPreferenceAction(enabled: boolean): Promise<ToggleState> {
+  const user = await requireUser();
+  try {
+    await updateDailyDigestPreference(user, enabled);
     revalidatePath("/app/profile");
     return { ok: true };
   } catch (err) {

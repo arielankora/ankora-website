@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { listNotificationsForUser } from "@/lib/app-domain/notifications";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -48,7 +49,17 @@ export default async function NotificationsPage() {
             <div key={n.id} className="flex items-start justify-between gap-4 px-5 py-4">
               <div>
                 <div className="flex items-center gap-2">
-                  <p className="font-medium text-appNavy">{n.title}</p>
+                  {/* Tasks: the row is a way in, not only a record. A
+                      notification about work that landed on you and
+                      cannot be opened from here is a notification that
+                      sends you to go and look for it. */}
+                  {n.entityType === "Task" && n.entityId ? (
+                    <Link href={`/app/tasks/${n.entityId}`} className="font-medium text-appNavy hover:text-gold-dim">
+                      {n.title}
+                    </Link>
+                  ) : (
+                    <p className="font-medium text-appNavy">{n.title}</p>
+                  )}
                   {!n.readAt && <StatusBadge label="חדש" tone="amber" />}
                 </div>
                 <p className="mt-1 text-sm text-appNavy/70">{n.body}</p>

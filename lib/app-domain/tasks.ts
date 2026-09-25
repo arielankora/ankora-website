@@ -6,6 +6,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { localDateTimeToUtc, TIMEZONE, localDateKey } from "@/lib/timezone";
 import type { SupplierExperience, TaskBlocker, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
 import { findTemplate } from "@/lib/app-domain/sop-templates";
+import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -875,6 +876,19 @@ export async function createTask(
     clientId: task.clientId,
     after: task,
   });
+
+  // A task can be born on somebody else, and until now that was the
+  // quietest thing in the product: the row appeared in a list they had
+  // to think to open. `before` is an empty pair rather than the task
+  // itself, because at creation every name on it is new.
+  const client = accessible.find((c) => c.id === task.clientId);
+  await notifyTaskPeople(
+    actor.id,
+    task,
+    client?.name ?? "",
+    { assignedToId: null, supervisorId: null },
+    task
+  );
   return task;
 }
 
@@ -1085,9 +1099,11 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   if (!task) throw new Error("Task not found.");
 
   const accessible = await listAccessibleClients(actor);
-  if (!accessible.some((c) => c.id === task.clientId)) {
+  const taskClient = accessible.find((c) => c.id === task.clientId);
+  if (!taskClient) {
     throw new ForbiddenError("You are not assigned to this client.");
   }
+  const taskClientName = taskClient.name;
 
   // Not TaskPatch: this carries three fields the patch contract
   // deliberately does not expose (supplierRecordedAt, completedAt and
@@ -1346,6 +1362,12 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     before: task,
     after: updated,
   });
+
+  // Handing work over is the other half of the same gap. Passing the
+  // row from BEFORE the write alongside the one after it is what makes
+  // "somebody newly named" answerable at all: a patch that renames a
+  // task must not re-announce an assignee who has had it for a week.
+  await notifyTaskPeople(actor.id, updated, taskClientName, task, updated);
   return updated;
 }
 

@@ -3,6 +3,7 @@ import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileAllClientAlerts, retryFailedEmailDeliveries } from "@/lib/app-domain/alerts";
 import { notifyLongRunningTimers } from "@/lib/app-domain/notifications";
 import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
+import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers, importantDates] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates, digest] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
@@ -34,6 +35,13 @@ export async function GET(request: Request) {
       // reasoning as reconcileAllClientAlerts/notifyLongRunningTimers
       // above).
       reconcileImportantDates(),
+      // The morning digest, on this same cron for the same ADR 11.3
+      // reason as everything above it, and because this one already
+      // runs at the right hour: 05:00 UTC is 08:00 in Israel through
+      // the summer. It drifts to 07:00 when the clocks go back, which
+      // is early rather than wrong - the email waits in an inbox, it
+      // does not ring. See lib/app-domain/task-digest.ts.
+      sendDailyTaskDigest(),
     ]);
 
     return NextResponse.json({
@@ -42,6 +50,7 @@ export async function GET(request: Request) {
       retried,
       longTimersNotified: longTimers.notified,
       importantDates,
+      digest,
     });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);
