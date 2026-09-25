@@ -4,8 +4,6 @@ import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { resolvePortalClient, assertPortalWritable } from "@/lib/app-domain/client-portal";
-import { sendEmail } from "@/lib/email";
-import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
 import type { User } from "@prisma/client";
 
 // Portal phase 2: decisions.
@@ -204,7 +202,19 @@ export async function createDecision(
     after: { question: decision.question, amountMinor: decision.amountMinor, options: options.length },
   });
 
-  await notifyClientOfDecision(client.id, decision.id, question);
+  // Deliberately NOT notifying the client from here.
+  //
+  // Ariel, 25.9.2026: nothing goes out to a client automatically. This
+  // was the one place in the product that did - an email fired as a side
+  // effect of creating a decision, which nobody chose to send and nobody
+  // read before it went.
+  //
+  // Nothing was lost by removing it. The decision screen offers the
+  // "הודעה ללקוח" composer with the message already written, so the
+  // person who created the decision reads it, fixes it, and sends it
+  // themselves. Same client, same information, one person in between.
+  //
+  // See claude/client-communication-rule-2026-09-25.md.
 
   return decision;
 }
@@ -352,27 +362,3 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
 /// (see the portal's own comment on the WhatsApp button), and pretending
 /// otherwise would be the one thing a notification must never do.
 ///
-/// Never throws - a mail failure must not roll back a decision that
-/// already exists, and the decision is visible in the portal either way.
-async function notifyClientOfDecision(clientId: string, decisionId: string, question: string) {
-  const recipients = await prisma.clientUser.findMany({
-    where: { clientId, role: "ADMIN", user: { deletedAt: null, status: { in: ["ACTIVE", "INVITED"] } } },
-    select: { user: { select: { email: true, name: true } } },
-  });
-  if (recipients.length === 0) return;
-
-  const { html, text } = renderActionEmail({
-    title: "משהו מחכה להחלטה שלך",
-    body: [question, "אפשר לאשר בפורטל בלחיצה אחת, או לבקש שנדבר על זה."],
-    buttonLabel: "לצפייה בהחלטה",
-    url: `${appBaseUrl()}/app/portal/decisions`,
-    footnote: "אם אין לך מה להחליט כרגע, אפשר להשאיר את זה ולחזור אליו מאוחר יותר.",
-  });
-
-  await sendEmail({
-    to: recipients.map((r) => r.user.email),
-    subject: "משהו מחכה להחלטה שלך",
-    text,
-    html,
-  });
-}

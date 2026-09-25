@@ -301,3 +301,56 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   await expect(page).not.toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
   await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
 });
+
+// @covers action:(product)/app/(authenticated)/clients/message-actions
+//
+// A person sends. The system never does.
+//
+// Ariel's rule, 25.9.2026, and the reason this flow is worth a browser
+// test rather than a unit one: the value of the button is that somebody
+// reads the draft before it leaves. That is three screens of state - a
+// list of situations, a textarea, and a row of ways out - and none of
+// it means anything if the record at the end does not happen.
+//
+// The copy path is the one asserted because it is the only one that
+// finishes inside this browser. WhatsApp leaves for another app and
+// email needs a portal user; both share the same action and the same
+// record, and this proves the action.
+test("a message to the client is written by a person, and recorded", async ({ page }) => {
+  await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
+
+  await page.getByRole("button", { name: "הודעה ללקוח" }).click();
+
+  // The situation, not the wording. Somebody choosing here is saying
+  // what happened, and the draft answers the other question.
+  await page.getByRole("button", { name: "עדכון באמצע" }).click();
+
+  const composer = page.getByLabel("נוסח ההודעה");
+  await expect(composer).toBeVisible({ timeout: 30_000 });
+
+  // The draft arrives written, and written about THIS task. A composer
+  // that opens empty is a text box with extra steps.
+  const draft = await composer.inputValue();
+  expect(draft.length).toBeGreaterThan(40);
+
+  const said = `בדיקה אוטומטית ${Date.now()}`;
+  await composer.fill(said);
+
+  // The write, caught before anything reloads. Four tests in this suite
+  // have been caught asserting on their own optimistic state and then
+  // cancelling the write with a reload; see the board spec's comment.
+  const recorded = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.url().includes("/app/tasks/"),
+    { timeout: 30_000 }
+  );
+  await page.getByRole("button", { name: "העתקה" }).click();
+  await recorded;
+
+  await expect(page.getByText("נרשם")).toBeVisible({ timeout: 30_000 });
+
+  // And it is on the thread, which is the whole point: "מה אמרנו
+  // ללקוח" has to be answerable by the next person to open this task,
+  // not only by whoever typed it.
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.getByText(said)).toBeVisible({ timeout: 60_000 });
+});
