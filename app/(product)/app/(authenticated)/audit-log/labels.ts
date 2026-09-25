@@ -119,6 +119,10 @@ export const ACTION_LABEL: Record<string, string> = {
   // creations, because "האם עבדנו לפי הנוהל" is a question somebody asks
   // about a specific task months later.
   "task.template_applied": "החלת נוהל על משימה",
+  // 25.9.2026, Ariel's rule: nothing reaches a client unless a person
+  // sent it. This line is the other half of that rule - a message a
+  // person sent is a message the product can account for later.
+  "client.message_sent": "הודעה נשלחה ללקוח",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.

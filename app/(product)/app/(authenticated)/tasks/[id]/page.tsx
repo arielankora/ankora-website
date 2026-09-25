@@ -7,12 +7,15 @@ import { clientDocumentsFolder } from "@/lib/google-drive";
 import { MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { listCategories } from "@/lib/app-domain/categories";
 import { getActiveTimer } from "@/lib/app-domain/time-entries";
+import { prisma } from "@/lib/prisma";
 import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
 import { TaskThread } from "./TaskThread";
 import { TaskSteps } from "./TaskSteps";
 import { TASK_TEMPLATES } from "@/lib/app-domain/sop-templates";
+import { MessageClient } from "@/components/app/MessageClient";
+import { MESSAGE_KINDS, buildMessage, whatsappDigits } from "@/lib/app-domain/client-messages";
 import { TaskTimeSummary } from "./TaskTimeSummary";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -55,7 +58,25 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
 
   const { task, time, thread, commentCount, subtasks } = detail;
 
-  const [people, allCategories, activeTimer] = await Promise.all([
+  // Everything the "הודעה ללקוח" button needs, and nothing it does not.
+  //
+  // The client's own words about how to reach them travel to the screen
+  // and are SHOWN there. They are never parsed into a preferred channel:
+  // see the comment in lib/app-domain/client-messages.ts for the version
+  // that was, and the sentence that killed it.
+  const [contact, people, allCategories, activeTimer] = await Promise.all([
+    prisma.client.findUnique({
+      where: { id: task.clientId },
+      select: {
+        whatsappNumber: true,
+        preferenceContact: true,
+        preferenceNever: true,
+        portalUsers: {
+          where: { role: "ADMIN", user: { deletedAt: null, status: { in: ["ACTIVE", "INVITED"] } } },
+          select: { user: { select: { email: true } } },
+        },
+      },
+    }),
     assignableUsers(user, task.clientId),
     listCategories(),
     getActiveTimer(user.id),
@@ -127,6 +148,35 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
             : null
         }
       />
+
+      {/* The button that writes to the client, above the steps and above
+          the record below them. Nothing here sends by itself: it opens a
+          draft, and a person presses send. See
+          claude/client-communication-rule-2026-09-25.md. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <MessageClient
+          clientId={task.clientId}
+          taskId={task.id}
+          clientName={task.client.name}
+          preference={contact?.preferenceContact ?? null}
+          never={contact?.preferenceNever ?? null}
+          whatsappDigits={whatsappDigits(contact?.whatsappNumber)}
+          emails={(contact?.portalUsers ?? []).map((p) => p.user.email)}
+          drafts={MESSAGE_KINDS.map((kind) => {
+            const draft = buildMessage(kind, {
+              clientName: task.client.name,
+              fromName: user.name,
+              // What the CLIENT calls this piece of work. The internal
+              // title is our shorthand and has no business in a message
+              // to them; it is the fallback only so the draft is never
+              // about nothing.
+              subject: task.clientTitle || task.title,
+              outcome: task.clientOutcome,
+            });
+            return { kind: draft.kind, label: draft.label, emailSubject: draft.emailSubject, body: draft.body };
+          })}
+        />
+      </div>
 
       {/* Above the hours and the thread, and that placement is the
           argument: the steps are what is left to do, and the two panels
