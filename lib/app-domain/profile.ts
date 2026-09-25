@@ -122,6 +122,26 @@ export async function getLastPasswordChangeAt(actor: User): Promise<Date | null>
 /// actually gates. The prototype's full toggle *list* (several rows of
 /// notification categories) isn't reproduced - this is the only one with
 /// a real, currently-existing notification behind it.
+/// The morning digest, on or off, for this person.
+///
+/// A second real toggle beside the one below, and the reason it exists
+/// at all is written on User.dailyDigestByEmail: an email somebody
+/// cannot turn off is an email they filter, and a filtered email is
+/// worse than none because everyone keeps believing it arrived.
+export async function updateDailyDigestPreference(actor: User, enabled: boolean): Promise<void> {
+  await prisma.user.update({
+    where: { id: actor.id },
+    data: { dailyDigestByEmail: enabled },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "profile.notification_preference_update",
+    entityType: "User",
+    entityId: actor.id,
+    after: { dailyDigestByEmail: enabled },
+  });
+}
+
 export async function updateLongRunningTimerEmailPreference(actor: User, enabled: boolean): Promise<void> {
   await prisma.user.update({
     where: { id: actor.id },

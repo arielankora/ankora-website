@@ -151,6 +151,29 @@ model User {
   /// true preserves today's behavior for every existing row.
   notifyLongRunningTimerByEmail Boolean @default(true)
 
+  /// The morning digest, and the two columns behind it.
+  ///
+  /// Hadas, 25.9.2026: a task was opened on her and she did not notice.
+  /// Two different failures hide in that sentence - she was never told,
+  /// and there was nowhere quiet to look - and this is the second half.
+  /// The first is the in-app notification the bell has been ready to
+  /// show since phase 9 and that nothing on a task ever wrote to.
+  ///
+  /// `dailyDigestAt` is WHEN THE LAST ONE WENT, not a preference. The
+  /// obvious implementation of "what is new" is a fixed 24-hour window,
+  /// and it drops work silently: the week here runs Sunday to Thursday,
+  /// so Sunday's email has to cover everything since Thursday
+  /// afternoon. A remembered timestamp covers a long weekend, a holiday
+  /// and a day the cron did not run, and a fixed window covers none of
+  /// them.
+  ///
+  /// `dailyDigestByEmail` follows the precedent above it. An alert
+  /// somebody cannot turn off is an alert they filter, and a filtered
+  /// email is worse than no email at all, because everyone keeps
+  /// believing it arrived.
+  dailyDigestByEmail Boolean   @default(true)
+  dailyDigestAt      DateTime?
+
   /// Incremented to invalidate every previously-issued session JWT at once
   /// (spec 4.2: "logout all sessions" for admins) without needing a
   /// database-backed session table for a Credentials-only auth flow.

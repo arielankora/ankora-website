@@ -1121,6 +1121,13 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-09-25"
+    },
+    "domain:task-digest": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-25"
     }
   },
   "waivers": {},

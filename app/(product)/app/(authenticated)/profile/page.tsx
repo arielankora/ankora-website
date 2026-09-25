@@ -3,7 +3,7 @@ import { getLastPasswordChangeAt } from "@/lib/app-domain/profile";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TimezoneForm } from "./TimezoneForm";
 import { NameForm } from "./NameForm";
-import { NotificationPreferenceForm } from "./NotificationPreferenceForm";
+import { DailyDigestPreferenceForm, NotificationPreferenceForm } from "./NotificationPreferenceForm";
 import { getMyClaudeConnection } from "@/lib/app-domain/mcp-connections";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
 
@@ -85,7 +85,12 @@ export default async function ProfilePage() {
         <div className="space-y-6">
           <div className="rounded-2xl border border-lineDark bg-white p-6">
             <h2 className="mb-3 text-sm font-medium text-appNavy">התראות אישיות</h2>
-            <NotificationPreferenceForm enabled={user.notifyLongRunningTimerByEmail} />
+            <div className="divide-y divide-lineDark/70">
+              <DailyDigestPreferenceForm enabled={user.dailyDigestByEmail} />
+              <div className="pt-3">
+                <NotificationPreferenceForm enabled={user.notifyLongRunningTimerByEmail} />
+              </div>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-lineDark bg-white p-6">

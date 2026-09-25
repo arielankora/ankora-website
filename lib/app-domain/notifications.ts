@@ -152,3 +152,97 @@ export async function notifyLongRunningTimers(): Promise<{ notified: number }> {
 
   return { notified };
 }
+
+// ---------------------------------------------------------------------
+// Tasks: work that landed on somebody.
+//
+// Hadas, 25.9.2026: a task was opened on her and she did not notice.
+//
+// The bell, the unread counter in the nav and the /app/notifications
+// screen have all existed since phase 9, and until now exactly two
+// things wrote to them: a timer somebody forgot to stop, and a
+// reminder from an important date. **Nothing about a task ever did.**
+// So the only way to find out that work had landed on you was to open
+// the app and look, which is the habit this product is supposed to be
+// replacing rather than requiring.
+//
+// This is internal, to the team. The rule Ariel set on 25.9 is about
+// clients, and nothing here reaches one.
+
+export const TASK_ASSIGNED_NOTIFICATION_TYPE = "task_assigned";
+export const TASK_SUPERVISING_NOTIFICATION_TYPE = "task_supervising";
+
+/// Who, if anybody, needs to be told about this change.
+///
+/// Pure, and exported for the same reason `isPastLongTimerThreshold` is:
+/// the interesting cases are all about who did what to whom, and none
+/// of them need a database to answer.
+///
+/// Three rules, and the third is the one that matters most:
+///
+///   1. only somebody newly named, so an edit to a title does not
+///      re-announce work that landed last week,
+///   2. never yourself, because a person who has just assigned
+///      themselves a task knows,
+///   3. and the person REPLACED is not told. "It is no longer yours" is
+///      a message with nothing to do attached, and the whole value of
+///      this bell is that everything in it is something to act on.
+export function whoToNotify(
+  actorId: string,
+  before: { assignedToId: string | null; supervisorId: string | null },
+  after: { assignedToId: string | null; supervisorId: string | null }
+): { userId: string; type: string }[] {
+  const out: { userId: string; type: string }[] = [];
+  if (after.assignedToId && after.assignedToId !== before.assignedToId && after.assignedToId !== actorId) {
+    out.push({ userId: after.assignedToId, type: TASK_ASSIGNED_NOTIFICATION_TYPE });
+  }
+  if (after.supervisorId && after.supervisorId !== before.supervisorId && after.supervisorId !== actorId) {
+    out.push({ userId: after.supervisorId, type: TASK_SUPERVISING_NOTIFICATION_TYPE });
+  }
+  return out;
+}
+
+/// Writes the rows `whoToNotify` asked for.
+///
+/// No email, deliberately. A task landing on somebody is almost never
+/// urgent, and a message for each one is noise within a week. Noise is
+/// how an alert loses trust, and an alert that has lost trust does not
+/// get it back. The morning digest is where these turn into something
+/// a person reads (lib/app-domain/task-digest.ts).
+///
+/// Never throws into the caller. A notification that fails must not
+/// undo the assignment it was announcing, which is the same rule the
+/// client-preferences notification follows in client-file.ts.
+export async function notifyTaskPeople(
+  actorId: string,
+  task: { id: string; title: string; clientTitle: string | null },
+  clientName: string,
+  before: { assignedToId: string | null; supervisorId: string | null },
+  after: { assignedToId: string | null; supervisorId: string | null }
+): Promise<void> {
+  const targets = whoToNotify(actorId, before, after);
+  if (targets.length === 0) return;
+
+  // The INTERNAL title. This is a message between colleagues, and the
+  // sentence written for the client is the wrong one here: it says what
+  // the client was promised, not what somebody has to go and do.
+  const subject = task.title;
+
+  for (const target of targets) {
+    try {
+      await prisma.notification.create({
+        data: {
+          userId: target.userId,
+          type: target.type,
+          title:
+            target.type === TASK_ASSIGNED_NOTIFICATION_TYPE ? "משימה חדשה אצלך" : "מונית למפקח על משימה",
+          body: `${subject} · ${clientName}`,
+          entityType: "Task",
+          entityId: task.id,
+        },
+      });
+    } catch (err) {
+      console.error("task notification failed:", err);
+    }
+  }
+}
