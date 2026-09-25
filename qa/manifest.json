@@ -1100,8 +1100,15 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-09-24"
+    },
+    "domain:sop-templates": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-25"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-24"
+  "lastScan": "2026-09-25"
 }

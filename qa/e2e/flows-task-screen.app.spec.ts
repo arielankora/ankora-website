@@ -293,6 +293,10 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   // clearing the search is a navigation to this screen without `q`, and
   // saying so in the markup is what lets it be opened in a new tab and
   // read correctly by a screen reader.
+  //
+  // A PLAIN anchor, not next/link. The assertion below is what caught
+  // the difference: a `<Link>` navigates by fetching an RSC payload,
+  // and this screen has now been measured twice losing exactly that.
   await page.getByRole("link", { name: "ניקוי החיפוש" }).click();
   await expect(page).not.toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
   await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });

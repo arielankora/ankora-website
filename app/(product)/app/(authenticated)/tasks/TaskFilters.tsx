@@ -138,7 +138,26 @@ export function TaskFilters({
           className="min-w-0 flex-1 bg-transparent text-[13.5px] text-appNavy outline-none placeholder:text-appNavy/35"
         />
         {text && (
-          <Link
+          // A plain anchor, and NOT next/link.
+          //
+          // This one got away in the round that made the box a real
+          // form. Enter was fixed and the X was left as a `<Link>`,
+          // which in the App Router is the same cancellable RSC fetch
+          // the whole change was escaping. CI caught it with the same
+          // signature, on the same screen, one day later:
+          //
+          //     Expect "not toHaveURL" with timeout 60000ms
+          //     64 × unexpected value ".../app/tasks?q=ועד+הבית"
+          //
+          // Sixty seconds after clicking clear, the search was still on.
+          // A raw `<a href>` is a document navigation that Next does not
+          // intercept, which is what the box beside it already does.
+          //
+          // Worth stating plainly: two controls on one line had two
+          // different navigation mechanisms, and only one of them was
+          // fixed. That is what a partial fix looks like from the
+          // inside - correct, tested, and half.
+          <a
             href={clearedHref}
             aria-label="ניקוי החיפוש"
             // The box empties before the navigation lands, so the control
@@ -147,7 +166,7 @@ export function TaskFilters({
             className="shrink-0 text-appNavy/40 hover:text-appNavy"
           >
             <X size={14} />
-          </Link>
+          </a>
         )}
       </div>
 
