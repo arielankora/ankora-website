@@ -288,6 +288,12 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   await expect(other).toHaveCount(0, { timeout: WHOLE_LIST });
 
   // And clearing it gives the list back.
-  await page.getByRole("button", { name: "ניקוי החיפוש" }).click();
+  //
+  // A link rather than a button since the search box became a real form:
+  // clearing the search is a navigation to this screen without `q`, and
+  // saying so in the markup is what lets it be opened in a new tab and
+  // read correctly by a screen reader.
+  await page.getByRole("link", { name: "ניקוי החיפוש" }).click();
+  await expect(page).not.toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
   await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
 });
