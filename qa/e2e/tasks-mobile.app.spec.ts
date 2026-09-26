@@ -26,7 +26,9 @@ import type { Page } from "@playwright/test";
 
 test.describe.configure({ timeout: 90_000 });
 
-const TASKS = "/app/tasks";
+// Everybody's tasks: "שלי" is on by default since 26.9.2026, and the rows
+// this file reads are not all assigned to the signed-in admin.
+const TASKS = "/app/tasks?mine=0";
 const SHOTS = "qa/reports/screens";
 
 // Supervised by the demo admin since the seed. Read, never written, by
@@ -90,7 +92,7 @@ for (const width of [360, 390]) {
     });
 
     test("the board scrolls its columns, not the page", async ({ page }) => {
-      await page.goto(`${TASKS}?view=board`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${TASKS}&view=board`, { waitUntil: "domcontentloaded" });
       await expect(page.locator("[data-column]").first()).toBeVisible({ timeout: 30_000 });
       await page.screenshot({ path: `${SHOTS}/tasks-board-${width}.png`, fullPage: true });
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(1);

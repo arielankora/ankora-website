@@ -32,7 +32,9 @@ import { test, expect } from "./fixtures";
 
 test.describe.configure({ timeout: 90_000 });
 
-const TASKS = "/app/tasks";
+// Everybody's tasks, not only mine: "שלי" is on by default since
+// 26.9.2026, and the fixtures this file reads are nobody's in particular.
+const TASKS = "/app/tasks?mine=0";
 const TIMER = "/app/timer";
 
 // This file's own task. Matched loosely: every seeded name carries a

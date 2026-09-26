@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
+import { OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM } from "./drawer-keys";
 
 // Redesign direction A: replaces the old pattern of an inline "add" form
 // sitting permanently above every list screen's table (Clients, Users,
@@ -61,12 +62,38 @@ export function Drawer({
   triggerLabel,
   title,
   children,
+  openKey,
+  triggerClassName = "",
 }: {
   triggerLabel: string;
   title: string;
   children: ReactNode;
+  /// When set, `?new=<openKey>` in the address opens this drawer on
+  /// arrival, and an OPEN_DRAWER_EVENT carrying the same key opens it in
+  /// place.
+  openKey?: string;
+  /// Extra classes for the trigger button, e.g. to hide it where another
+  /// entry point already exists.
+  triggerClassName?: string;
 }) {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!openKey) return;
+    const url = new URL(window.location.href);
+    if (url.searchParams.get(OPEN_DRAWER_PARAM) === openKey) {
+      setOpen(true);
+      // Dropped from the address without a navigation, so a reload or a
+      // shared link does not reopen a form somebody already closed.
+      url.searchParams.delete(OPEN_DRAWER_PARAM);
+      window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    }
+    const onOpen = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === openKey) setOpen(true);
+    };
+    window.addEventListener(OPEN_DRAWER_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_DRAWER_EVENT, onOpen);
+  }, [openKey]);
   /// Bumped once per accepted write. A counter rather than a flag: two
   /// saves in a row are two refreshes, and a flag that is already set is
   /// a refresh that never happens.
@@ -128,7 +155,7 @@ export function Drawer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy"
+        className={`inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy ${triggerClassName}`}
       >
         <Plus size={16} strokeWidth={2.25} />
         {triggerLabel}

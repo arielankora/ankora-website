@@ -1,9 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
-  Users,
-  Tag,
-  UserCog,
   Timer,
   Clock,
   Wallet,
@@ -13,7 +10,6 @@ import {
   LayoutGrid,
   ListChecks,
   TriangleAlert,
-  type LucideIcon,
 } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
@@ -21,7 +17,7 @@ import { KpiCard } from "@/components/app/KpiCard";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { listClients } from "@/lib/app-domain/clients";
-import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
+import { cycleElapsedShare, getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import { getHoursTrend } from "@/lib/app-domain/overview-trend";
@@ -35,28 +31,16 @@ import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-async function loadCounts(canSeeClients: boolean, canSeeCategories: boolean, canSeeUsers: boolean) {
-  const [clients, categories, users] = await Promise.all([
-    canSeeClients ? prisma.client.count({ where: { deletedAt: null, status: "ACTIVE" } }) : null,
-    canSeeCategories ? prisma.category.count({ where: { deletedAt: null, active: true } }) : null,
-    canSeeUsers ? prisma.user.count({ where: { deletedAt: null, status: { not: "ARCHIVED" } } }) : null,
-  ]);
-  return { clients, categories, users };
-}
-
-/// Phase 5 (spec 12 Overview row): "KPI cards: active timers, total
-/// today/month, client utilization, alerts, overdue anomalies." Gated on
-/// report.internal.view - Overview sits in spec 12's admin-screens table
-/// alongside Reports/Hour Banks/Alerts, not the employee-facing screens of
-/// spec 11, so an ANKORA_EMPLOYEE (who lacks report.internal.view) keeps
-/// seeing today's simple empty-state Overview rather than operational
-/// metrics about every client/employee that spec 4.1 never grants them
-/// visibility into.
 async function loadOperationalMetrics() {
   const now = new Date();
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // Israel's day and month, not the server's. These were
+  // `setHours(0, 0, 0, 0)` and `new Date(year, month, 1)`, which on a
+  // server running in UTC start "today" at 03:00 Israel time (02:00 in
+  // winter): anything logged between midnight and three was counted as
+  // yesterday. Found 26.9.2026 while making the card clickable.
+  const todayKey = localDateKey(now);
+  const startOfToday = localDateTimeToUtc(todayKey, "00:00", TIMEZONE);
+  const startOfMonth = localDateTimeToUtc(`${todayKey.slice(0, 8)}01`, "00:00", TIMEZONE);
   const longTimerCutoff = new Date(now.getTime() - LONG_TIMER_HOURS * 3600_000);
 
   const [activeTimersCount, longRunningCount, todayAgg, monthAgg, activeClients] = await Promise.all([
@@ -85,10 +69,26 @@ async function loadOperationalMetrics() {
   const bankSnapshots = [
     ...(await getCurrentHourBanksForClients(activeClients.map((c) => c.id))).values(),
   ];
-  const avgUtilizationPct =
-    bankSnapshots.length > 0
-      ? Math.round(bankSnapshots.reduce((sum, s) => sum + s.utilization.utilizationPct, 0) / bankSnapshots.length)
-      : null;
+  // Ariel, 26.9.2026: "כמה שעות מתוך כמה, ומה היה צפוי".
+  //
+  // Hours rather than an average of percentages. The card used to show
+  // the mean of every client's own percentage, which cannot be written as
+  // "55 of 100 hours": a client with a 5-hour bank moved it as much as a
+  // client with 80. Summing the hours makes the percentage and the hours
+  // the same fact, and weights each client by how much is at stake.
+  //
+  // The pace is each bank's elapsed share of its OWN cycle, weighted the
+  // same way. Cycles do not all start on the first of the month, so "we
+  // are half way through the month" would be wrong for any bank that
+  // renews on the 15th.
+  const bankTotalMinutes = bankSnapshots.reduce((sum, s) => sum + Math.max(0, s.utilization.totalMinutes), 0);
+  const bankConsumedMinutes = bankSnapshots.reduce((sum, s) => sum + s.utilization.consumedMinutes, 0);
+  const expectedMinutes = bankSnapshots.reduce(
+    (sum, s) => sum + Math.max(0, s.utilization.totalMinutes) * cycleElapsedShare(s.bank.cycleStart, s.bank.cycleEnd, now),
+    0
+  );
+  const avgUtilizationPct = bankTotalMinutes > 0 ? Math.round((bankConsumedMinutes / bankTotalMinutes) * 100) : null;
+  const expectedUtilizationPct = bankTotalMinutes > 0 ? Math.round((expectedMinutes / bankTotalMinutes) * 100) : null;
   const clientsNearLimitCount = bankSnapshots.filter((s) => s.utilization.utilizationPct >= 90).length;
 
   return {
@@ -97,8 +97,17 @@ async function loadOperationalMetrics() {
     todayMinutes: Math.round((todayAgg._sum.actualSeconds ?? 0) / 60),
     monthMinutes: Math.round((monthAgg._sum.actualSeconds ?? 0) / 60),
     avgUtilizationPct,
+    expectedUtilizationPct,
+    bankTotalMinutes,
+    bankConsumedMinutes,
     clientsNearLimitCount,
   };
+}
+
+/// Whole hours for the card: "55 מתוך 100 שעות". A bank is sold in
+/// hours, and minutes on a summary card are precision nobody asked for.
+function wholeHours(minutes: number): string {
+  return Math.round(minutes / 60).toLocaleString("he-IL");
 }
 
 function formatMinutes(minutes: number): string {
@@ -151,9 +160,6 @@ export default async function AppHomePage() {
   // gap for the "Ankora" logo link and anyone who bookmarks /app itself.
   if (user.role === "CLIENT_USER") redirect("/app/portal");
 
-  const canSeeClients = can(user.role, "client.manage");
-  const canSeeCategories = can(user.role, "category.manage");
-  const canSeeUsers = can(user.role, "user.manage");
   const canSeeAudit = can(user.role, "audit.view");
   const canSeeReports = can(user.role, "report.internal.view");
   const canSeeAlerts = can(user.role, "alert.manage");
@@ -168,13 +174,13 @@ export default async function AppHomePage() {
   // Team adoption: "today" is the local day boundary, so a manager
   // reading the stalled-promises number at four in the afternoon is
   // asking what has been untouched since this morning.
-  const startOfToday = localDateTimeToUtc(localDateKey(new Date()), "00:00", TIMEZONE);
+  const todayKey = localDateKey(new Date());
+  const startOfToday = localDateTimeToUtc(todayKey, "00:00", TIMEZONE);
 
-  const [counts, metrics, openAlerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
+  const [metrics, openAlerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
     "screen.dashboard.load",
     () =>
     Promise.all([
-    loadCounts(canSeeClients, canSeeCategories, canSeeUsers),
     canSeeReports ? loadOperationalMetrics() : null,
     canSeeAlerts ? countOpenAlertEvents() : null,
     canSeeReports ? getHoursTrend() : null,
@@ -202,12 +208,6 @@ export default async function AppHomePage() {
   // single total that mixes them is a total nobody can act on.
   const stalledWaiting = stalled?.reduce((sum, row) => sum + row.waiting, 0) ?? 0;
 
-  const cards = [
-    canSeeClients && { href: "/app/clients", label: "לקוחות פעילים", value: counts.clients, icon: Users },
-    canSeeCategories && { href: "/app/categories", label: "קטגוריות פעילות", value: counts.categories, icon: Tag },
-    canSeeUsers && { href: "/app/users", label: "משתמשים", value: counts.users, icon: UserCog },
-  ].filter(Boolean) as { href: string; label: string; value: number | null; icon: LucideIcon }[];
-
   // App redesign (handoff README, screen 1): "ריבוע תאריך 42px (אדום כשדחוף)".
   // "Urgent" here is a simple ≤2-day threshold for this small dashboard
   // widget - the full Important Dates screen (its own redesign pass) is
@@ -218,14 +218,16 @@ export default async function AppHomePage() {
     return occursAt.getTime() - Date.now() <= URGENT_WITHIN_DAYS * 86_400_000;
   }
 
-  const hasAnyContent = cards.length > 0 || !!metrics;
+  // The counts row (clients, categories, users) was removed on 26.9.2026
+  // at Ariel's request: numbers that change once a month, on the screen
+  // people open every morning.
+  const hasAnyContent = !!metrics || (myTasks?.length ?? 0) > 0 || (upcomingDates?.length ?? 0) > 0;
 
   return (
     <>
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-medium text-appNavy">שלום, {user.name.split(" ")[0]}</h1>
-          <p className="mt-1 text-sm text-appNavy/60">סקירה כללית של המערכת.</p>
         </div>
 
         {/* Team adoption, mechanism two: the work this person is holding.
@@ -309,7 +311,15 @@ export default async function AppHomePage() {
                 )
               }
             />
-            <KpiCard icon={Clock} label="שעות דווחו היום (כל הלקוחות)" value={formatMinutes(metrics.todayMinutes)} />
+            {/* Clickable since 26.9.2026: the number invites "by whom, for
+                whom", and the matrix report answers exactly that for one
+                day. The date is Israel's, the same day the number counts. */}
+            <KpiCard
+              href={`/app/reports?type=employee_client_matrix&from=${todayKey}&to=${todayKey}`}
+              icon={Clock}
+              label="שעות דווחו היום (כל הלקוחות)"
+              value={formatMinutes(metrics.todayMinutes)}
+            />
             <KpiCard
               href="/app/reports?type=hours_by_client"
               icon={Wallet}
@@ -318,7 +328,28 @@ export default async function AppHomePage() {
               footer={
                 metrics.avgUtilizationPct !== null && (
                   <div className="mt-2.5">
-                    <ProgressBar percent={metrics.avgUtilizationPct} dangerAt={90} />
+                    <p className="-mt-1.5 mb-2.5 text-[12px] text-appNavy/60">
+                      <span className="font-jbmono">{wholeHours(metrics.bankConsumedMinutes)}</span> מתוך{" "}
+                      <span className="font-jbmono">{wholeHours(metrics.bankTotalMinutes)}</span> שעות
+                    </p>
+                    <ProgressBar
+                      percent={metrics.avgUtilizationPct}
+                      dangerAt={90}
+                      markerAt={metrics.expectedUtilizationPct ?? undefined}
+                    />
+                    {metrics.expectedUtilizationPct !== null && (
+                      <p className="mt-1.5 text-[11.5px] text-appNavy/55">
+                        צפי להיום: <span className="font-jbmono">{metrics.expectedUtilizationPct}%</span>
+                        {/* Said in words, not only by colour: ahead of the
+                            pace is where a bank runs out before its cycle
+                            does. Five points either way is "on pace". */}
+                        {metrics.avgUtilizationPct > metrics.expectedUtilizationPct + 5
+                          ? " · מעל הקצב"
+                          : metrics.avgUtilizationPct < metrics.expectedUtilizationPct - 5
+                            ? " · מתחת לקצב"
+                            : " · בקצב"}
+                      </p>
+                    )}
                     {metrics.clientsNearLimitCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] font-medium text-error">
                         {metrics.clientsNearLimitCount} לקוחות מעל 90% ניצול
@@ -465,17 +496,6 @@ export default async function AppHomePage() {
           <div>
             <h2 className="mb-3 text-sm font-medium text-appNavy/70">טיימרים פעילים כרגע</h2>
             <ActiveTimersList rows={activeTimerRows} longTimerHours={LONG_TIMER_HOURS} />
-          </div>
-        )}
-
-        {cards.length > 0 && (
-          <div>
-            {metrics && <h2 className="mb-3 text-sm font-medium text-appNavy/70">ספירות</h2>}
-            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3.5">
-              {cards.map((card) => (
-                <KpiCard key={card.href} href={card.href} icon={card.icon} label={card.label} value={card.value} />
-              ))}
-            </div>
           </div>
         )}
 
