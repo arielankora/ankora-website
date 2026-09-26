@@ -305,7 +305,11 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   // and this screen has now been measured twice losing exactly that.
   await page.getByRole("link", { name: "ניקוי החיפוש" }).click();
   await expect(page).not.toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
-  await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
+  // Back to the default list, which since 26.9.2026 is active work only.
+  // "other" is closed by the supervision flow, so it is not the right
+  // witness any more: an empty box and a list of rows are.
+  await expect(box).toHaveValue("", { timeout: WHOLE_LIST });
+  await expect(page.locator("[data-task]").first()).toBeVisible({ timeout: WHOLE_LIST });
 });
 
 // @covers action:(product)/app/(authenticated)/clients/message-actions
