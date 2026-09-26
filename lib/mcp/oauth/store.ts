@@ -234,14 +234,37 @@ export type RefreshOutcome =
   | { ok: true; tokens: IssuedTokens }
   | { ok: false; error: "invalid_grant"; description: string };
 
+/// How long a rotated grant keeps working for callers that raced the
+/// rotation.
+///
+/// Claude runs a connector from several places at once (the chat, Cowork
+/// sessions, scheduled tasks), and they share ONE stored grant. When two of
+/// them notice an expiring token at the same moment, both refresh. Before
+/// this window existed the rotation revoked the old row outright, which did
+/// two things at once: it killed the access token the other caller was
+/// still using mid-request, and it turned the other caller's refresh into a
+/// "reuse" that revoked the whole grant. The result was a loop of 401s on
+/// /api/mcp immediately after successful token exchanges, ending with the
+/// connector marked as needing re-authorization.
+///
+/// Inside this window a rotated refresh token is treated as a benign race,
+/// not a breach: it is exchanged for a fresh pair, and the previous access
+/// token stays valid until the window closes. Outside it, reuse is still a
+/// breach signal and still revokes the grant.
+export const ROTATION_GRACE_SECONDS = 60;
+
 /// Exchanges a refresh token for a new pair, rotating it.
 ///
 /// Rotation is required for public clients by the MCP authorization spec.
-/// This implementation also treats REUSE of an already-rotated refresh
-/// token as a breach signal and revokes the whole grant for that user and
-/// client: a legitimate client never replays a rotated token, so a replay
-/// means either the token leaked or two clients share one grant. Revoking
-/// is the conservative answer to both.
+/// REUSE of an already-rotated refresh token outside ROTATION_GRACE_SECONDS
+/// is treated as a breach signal and revokes the whole grant for that user
+/// and client: after the grace window, a replay means the token leaked.
+///
+/// Rotation deliberately does NOT set `revokedAt` on the old row. That
+/// column means "this grant was revoked" (reuse, disconnect, logout all
+/// sessions) and it also kills the row's access token. Rotation instead
+/// ends the refresh token (`refreshExpiresAt = now`) and shortens the old
+/// access token to the grace window.
 export async function rotateRefreshToken(rawRefresh: string, clientId: string): Promise<RefreshOutcome> {
   if (!looksLikeRefreshToken(rawRefresh)) {
     return { ok: false, error: "invalid_grant", description: "Malformed refresh token." };
@@ -255,24 +278,8 @@ export async function rotateRefreshToken(rawRefresh: string, clientId: string): 
     return { ok: false, error: "invalid_grant", description: "Unknown refresh token." };
   }
 
-  if (row.rotatedToId) {
-    await prisma.oAuthToken.updateMany({
-      where: { userId: row.userId, clientId: row.clientId, revokedAt: null },
-      data: { revokedAt: new Date() },
-    });
-    console.error("[mcp-oauth] refresh token reuse detected; grant revoked", {
-      clientId,
-      userId: row.userId,
-    });
-    return {
-      ok: false,
-      error: "invalid_grant",
-      description: "This refresh token was already used. The grant has been revoked; sign in again.",
-    };
-  }
-
   const now = new Date();
-  if (row.revokedAt || (row.refreshExpiresAt && row.refreshExpiresAt <= now)) {
+  if (row.revokedAt) {
     return { ok: false, error: "invalid_grant", description: "Refresh token expired or revoked." };
   }
 
@@ -281,23 +288,66 @@ export async function rotateRefreshToken(rawRefresh: string, clientId: string): 
     return { ok: false, error: "invalid_grant", description: "The account is no longer active." };
   }
 
-  // Claim this row before minting the replacement, so two concurrent
-  // refreshes cannot both succeed.
-  const claimed = await prisma.oAuthToken.updateMany({
-    where: { id: row.id, rotatedToId: null, revokedAt: null },
-    data: { revokedAt: now },
-  });
-  if (claimed.count !== 1) {
-    return { ok: false, error: "invalid_grant", description: "Refresh token already used." };
+  const issueReplacement = () =>
+    issueTokens({
+      clientId: row.clientId,
+      userId: row.userId,
+      scope: row.scope,
+      resource: row.resource,
+      tokenVersion: user.tokenVersion,
+    });
+
+  // Already rotated (by us or by a concurrent caller). `refreshExpiresAt`
+  // was set to the rotation time, so it doubles as "rotated at".
+  if (row.rotatedToId || (row.refreshExpiresAt && row.refreshExpiresAt <= now)) {
+    if (row.rotatedToId && isWithinGrace(row.refreshExpiresAt, now)) {
+      return { ok: true, tokens: await issueReplacement() };
+    }
+    if (row.rotatedToId) {
+      await prisma.oAuthToken.updateMany({
+        where: { userId: row.userId, clientId: row.clientId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+      console.error("[mcp-oauth] refresh token reuse detected; grant revoked", {
+        clientId,
+        userId: row.userId,
+      });
+      return {
+        ok: false,
+        error: "invalid_grant",
+        description: "This refresh token was already used. The grant has been revoked; sign in again.",
+      };
+    }
+    // Rotation claimed but the replacement not linked yet: a concurrent
+    // refresh is in flight right now. Same benign race as above.
+    if (isWithinGrace(row.refreshExpiresAt, now)) {
+      return { ok: true, tokens: await issueReplacement() };
+    }
+    return { ok: false, error: "invalid_grant", description: "Refresh token expired or revoked." };
   }
 
-  const tokens = await issueTokens({
-    clientId: row.clientId,
-    userId: row.userId,
-    scope: row.scope,
-    resource: row.resource,
-    tokenVersion: user.tokenVersion,
+  // Claim this row before minting the replacement, so exactly one caller
+  // performs the rotation. The loser of a simultaneous race falls into the
+  // grace path above on its own terms instead of failing.
+  const graceEnd = secondsFromNow(ROTATION_GRACE_SECONDS, now);
+  const claimed = await prisma.oAuthToken.updateMany({
+    where: {
+      id: row.id,
+      rotatedToId: null,
+      revokedAt: null,
+      OR: [{ refreshExpiresAt: null }, { refreshExpiresAt: { gt: now } }],
+    },
+    data: {
+      refreshExpiresAt: now,
+      accessExpiresAt: row.accessExpiresAt < graceEnd ? row.accessExpiresAt : graceEnd,
+    },
   });
+  if (claimed.count !== 1) {
+    // Someone else claimed it between our read and our write.
+    return { ok: true, tokens: await issueReplacement() };
+  }
+
+  const tokens = await issueReplacement();
 
   const replacement = await prisma.oAuthToken.findUnique({
     where: { accessTokenHash: hashCredential(tokens.accessToken) },
@@ -307,6 +357,11 @@ export async function rotateRefreshToken(rawRefresh: string, clientId: string): 
   }
 
   return { ok: true, tokens };
+}
+
+function isWithinGrace(rotatedAt: Date | null, now: Date): boolean {
+  if (!rotatedAt) return false;
+  return now.getTime() - rotatedAt.getTime() <= ROTATION_GRACE_SECONDS * 1000;
 }
 
 /// Resolves a bearer access token to the acting user.
