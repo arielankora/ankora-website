@@ -13,13 +13,13 @@ import { ClientSummaryView } from "./ClientSummaryView";
 import { formatDuration, formatSource } from "@/lib/time-entry-format";
 import { buildClientActivityPrompt, type ActivityPromptEntry } from "@/lib/client-activity-prompt";
 import type { TimeEntrySource } from "@prisma/client";
+import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 function parseDate(value?: string): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T00:00:00`);
-  return isNaN(d.getTime()) ? undefined : d;
+  // Israel's midnight, not the server's. See dayStartInZone.
+  return dayStartInZone(value);
 }
 
 // Overnight bug-hunt (docs/adr/0001 section 19.5): a "to" filter parsed as
@@ -28,9 +28,7 @@ function parseDate(value?: string): Date | undefined {
 // week" would silently lose the last day. "to" specifically needs the end
 // of that day, not its start.
 function parseDateEndOfDay(value?: string): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T23:59:59.999`);
-  return isNaN(d.getTime()) ? undefined : d;
+  return dayEndInZone(value);
 }
 
 function isReportType(value: string | undefined): value is ReportType {

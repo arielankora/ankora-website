@@ -32,7 +32,9 @@ import { test, expect } from "./fixtures";
 
 test.describe.configure({ timeout: 90_000 });
 
-const TASKS = "/app/tasks";
+// Everybody's tasks, not only mine: "שלי" is on by default since
+// 26.9.2026, and the fixtures this file reads are nobody's in particular.
+const TASKS = "/app/tasks?mine=0";
 const TIMER = "/app/timer";
 
 // This file's own task. Matched loosely: every seeded name carries a
@@ -227,7 +229,11 @@ test("a comment is written on the task and comes back on the screen", async ({ p
 // What only a browser can say is that typing into the box and pressing
 // Enter narrows the list a person is looking at.
 test("the list finds a task by a word, and hides the rest", async ({ page }) => {
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+  // Opened on a first search rather than on the bare list. Since
+  // 26.9.2026 the bare list shows only active work, and "other" below is
+  // a fixture the supervision flow closes. A search looks in every
+  // status, so this is also where the row is guaranteed to be.
+  await page.goto(`${TASKS}&q=${encodeURIComponent("ניקיון")}`, { waitUntil: "domcontentloaded" });
 
   const box = page.getByLabel("חיפוש במשימות");
   await expect(box).toBeVisible({ timeout: 30_000 });
@@ -299,7 +305,11 @@ test("the list finds a task by a word, and hides the rest", async ({ page }) => 
   // and this screen has now been measured twice losing exactly that.
   await page.getByRole("link", { name: "ניקוי החיפוש" }).click();
   await expect(page).not.toHaveURL(/[?&]q=/, { timeout: WHOLE_LIST });
-  await expect(other.first()).toBeVisible({ timeout: WHOLE_LIST });
+  // Back to the default list, which since 26.9.2026 is active work only.
+  // "other" is closed by the supervision flow, so it is not the right
+  // witness any more: an empty box and a list of rows are.
+  await expect(box).toHaveValue("", { timeout: WHOLE_LIST });
+  await expect(page.locator("[data-task]").first()).toBeVisible({ timeout: WHOLE_LIST });
 });
 
 // @covers action:(product)/app/(authenticated)/clients/message-actions

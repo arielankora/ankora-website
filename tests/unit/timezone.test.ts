@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
+import { dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 
 // Phase 8 regression tests: spec section 24's pre-production checklist item
 // "Timezone tests around midnight/month boundary" was previously untested,
@@ -45,5 +45,33 @@ describe("localDateTimeToUtc()", () => {
     const utc = localDateTimeToUtc("2026-09-01", "00:00", "Asia/Jerusalem");
     expect(utc.toISOString()).toBe("2026-08-31T21:00:00.000Z");
     expect(localDateKey(utc)).toBe("2026-09-01");
+  });
+});
+
+// 26.9.2026: report date filters now mean Israel's day, not the server's.
+describe("dayStartInZone / dayEndInZone - a report's date filter", () => {
+  it("starts an Israeli summer day at 21:00 UTC the evening before", () => {
+    expect(dayStartInZone("2026-09-26")?.toISOString()).toBe("2026-09-25T21:00:00.000Z");
+  });
+
+  it("ends it one millisecond before the next Israeli midnight", () => {
+    expect(dayEndInZone("2026-09-26")?.toISOString()).toBe("2026-09-26T20:59:59.999Z");
+  });
+
+  it("uses winter time after the clocks change", () => {
+    expect(dayStartInZone("2026-12-01")?.toISOString()).toBe("2026-11-30T22:00:00.000Z");
+  });
+
+  it("keeps a DST change inside the day: the October change day is 25 hours long", () => {
+    // Israel leaves summer time on Sunday 25.10.2026.
+    const start = dayStartInZone("2026-10-25")!;
+    const end = dayEndInZone("2026-10-25")!;
+    expect((end.getTime() + 1 - start.getTime()) / 3600_000).toBe(25);
+  });
+
+  it("refuses anything that is not a YYYY-MM-DD date", () => {
+    expect(dayStartInZone("26/09/2026")).toBeUndefined();
+    expect(dayStartInZone("")).toBeUndefined();
+    expect(dayEndInZone(undefined)).toBeUndefined();
   });
 });
