@@ -55,7 +55,7 @@ export default async function CategoriesPage() {
               קטגוריות גלובליות זמינות לכל הלקוחות. קטגוריה ייעודית מופיעה רק אצל הלקוח שלה.
             </p>
           </div>
-          <Drawer triggerLabel="+ קטגוריה" title="קטגוריה חדשה">
+          <Drawer triggerLabel="קטגוריה" title="קטגוריה חדשה">
             <CreateCategoryForm clients={clients.filter((c) => c.status === "ACTIVE")} />
           </Drawer>
         </div>

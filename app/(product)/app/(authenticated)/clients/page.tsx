@@ -63,7 +63,7 @@ export default async function ClientsPage() {
             <h1 className="text-xl font-medium text-appNavy">לקוחות</h1>
             <p className="mt-1 text-sm text-appNavy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
           </div>
-          <Drawer triggerLabel="+ לקוח חדש" title="לקוח חדש">
+          <Drawer triggerLabel="לקוח חדש" title="לקוח חדש">
             <CreateClientForm />
           </Drawer>
         </div>

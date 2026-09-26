@@ -119,7 +119,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
             <h1 className="text-xl font-medium text-appNavy">מועדים חשובים</h1>
             <p className="mt-1 text-sm text-appNavy/60">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
           </div>
-          <Drawer triggerLabel="+ מועד חדש" title="מועד חשוב חדש">
+          <Drawer triggerLabel="מועד חדש" title="מועד חשוב חדש">
             {/* `users` is mapped down to the three fields the form declares,
                 not passed whole. ImportantDateForm is a client component, so
                 whatever reaches it is serialised into this page's HTML - and

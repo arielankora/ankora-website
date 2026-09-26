@@ -194,7 +194,7 @@ test.describe("tasks/actions - create and complete", () => {
     const title = tag("e2e-task");
 
     await page.goto("/app/tasks");
-    await page.getByRole("button", { name: "+ משימה" }).click();
+    await page.getByRole("button", { name: "משימה", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

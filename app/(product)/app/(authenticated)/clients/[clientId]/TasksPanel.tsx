@@ -58,7 +58,7 @@ export function TasksPanel({
           <Link href={`/app/tasks?clientId=${clientId}`} className="text-xs text-gold-dim underline underline-offset-4">
             לכל המשימות של הלקוח
           </Link>
-          <Drawer triggerLabel="+ משימה" title={`משימה חדשה: ${clientName}`}>
+          <Drawer triggerLabel="משימה" title={`משימה חדשה: ${clientName}`}>
             <CreateTaskForm
               clients={[{ id: clientId, name: clientName }]}
               categories={categories}

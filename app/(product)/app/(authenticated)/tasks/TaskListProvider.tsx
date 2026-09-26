@@ -63,19 +63,25 @@ export type ListRow = CreatedTaskRow;
 /// right now.
 ///
 /// Deliberately narrow: only the filters a new task can fail. It is
-/// always OPEN, never assigned, and carries whatever client and client
-/// visibility the form set, so those are the four that can put it out of
-/// view. Search is not checked here - a person who just typed a title is
+/// always OPEN, carries whatever client the form set, and since
+/// 26.9.2026 may be born on somebody else, so status, client and "שלי"
+/// are the filters that can put it out of view. Search is not checked here - a person who just typed a title is
 /// not searching for something else at the same time, and guessing at
 /// the server's matching rules in the browser is how the two drift.
-function accepts(
-  row: ListRow,
-  filters: { status?: string; clientId?: string; clientName?: string }
-): boolean {
+function accepts(row: ListRow, filters: ListFilters): boolean {
   if (filters.status && filters.status !== row.status) return false;
   if (filters.clientId && filters.clientName && filters.clientName !== row.clientName) return false;
+  if (filters.assignedToId && filters.assignedToId !== row.assignedToId) return false;
   return true;
 }
+
+type ListFilters = {
+  status?: string;
+  clientId?: string;
+  clientName?: string;
+  /// Set while "שלי" is on: only tasks assigned to this person belong.
+  assignedToId?: string;
+};
 
 /// `children` is a plain ReactNode and NOT a render prop, which is not a
 /// style preference.
@@ -96,7 +102,7 @@ export function TaskListProvider({
   children,
 }: {
   rows: ListRow[];
-  filters: { status?: string; clientId?: string; clientName?: string };
+  filters: ListFilters;
   children: ReactNode;
 }) {
   const [extra, setExtra] = useState<ListRow[]>([]);

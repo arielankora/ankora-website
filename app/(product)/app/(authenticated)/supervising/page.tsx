@@ -100,6 +100,8 @@ function Section({
               clientName: task.client.name,
               categoryName: task.category?.name ?? null,
               dueDate: task.dueDate?.toISOString() ?? null,
+              assignedToName: task.assignedTo?.name ?? null,
+              supervisorName: task.supervisor?.name ?? null,
               status: task.status,
               priority: task.priority,
               clientVisible: task.clientVisible,

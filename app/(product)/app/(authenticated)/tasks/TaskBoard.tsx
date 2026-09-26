@@ -67,6 +67,8 @@ export type BoardCard = {
   priority: TaskPriority;
   dueDate: string | null;
   assignedToName: string | null;
+  /// 26.9.2026: the card names the supervisor too, same as the list row.
+  supervisorName: string | null;
   clientVisible: boolean;
   hasOutcome: boolean;
   /// Tasks phase 5. Null means nothing is holding this card up.
@@ -244,9 +246,12 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         </p>
       )}
 
-      {(card.assignedToName || card.dueDate) && (
+      {(card.assignedToName || card.supervisorName || card.dueDate) && (
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">
-          {card.assignedToName && <span className="text-appNavy/55">{card.assignedToName}</span>}
+          {/* Labelled, because there are two names on the card now and
+              an unlabelled pair of names reads as two assignees. */}
+          {card.assignedToName && <span className="text-appNavy/55">אחראי: {card.assignedToName}</span>}
+          {card.supervisorName && <span className="text-appNavy/55">מפקח: {card.supervisorName}</span>}
           {card.dueDate && (
             <span className={overdue ? "font-medium text-error" : "text-appNavy/45"}>
               {formatDue(card.dueDate)}

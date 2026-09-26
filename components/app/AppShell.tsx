@@ -192,7 +192,10 @@ export function AppShell({
           showPrimaryCta={showPrimaryCta}
         />
 
-        <main className="mx-auto max-w-appContent space-y-4 px-7 py-7 pb-24 md:pb-7">
+        {/* 16px sides on a phone, 28px from md. At 28px a 360px phone kept
+            304px for content, and the tasks list (26.9.2026) was one of
+            several screens that ran out of room because of it. */}
+        <main className="mx-auto max-w-appContent space-y-4 px-4 py-5 pb-24 md:px-7 md:py-7 md:pb-7">
           <OfflineBanner />
           {children}
         </main>

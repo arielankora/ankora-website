@@ -85,7 +85,7 @@ test("a promise the client can see cannot be closed without a sentence for them"
   // Its own task, created through the screen, so this test does not
   // consume a fixture anything else depends on.
   const title = `[E2E] הבטחה-${Date.now().toString(36)}`;
-  await page.getByRole("button", { name: "+ משימה" }).click();
+  await page.getByRole("button", { name: "משימה", exact: true }).click();
   await page.locator('select[name="clientId"]').selectOption({ index: 1 });
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="clientVisible"]').check();
