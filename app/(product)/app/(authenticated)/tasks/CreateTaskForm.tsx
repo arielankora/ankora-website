@@ -1,12 +1,16 @@
 "use client";
-import { useMemo, useState } from "react";
-import { createTaskAction } from "./actions";
+import { useEffect, useMemo, useState } from "react";
+import { createTaskAction, listAssignablePeopleAction } from "./actions";
 import { useDrawerClose } from "@/components/app/Drawer";
 import { useTaskList } from "./TaskListProvider";
 import { useActionForm } from "@/components/app/useActionForm";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
+type Person = { id: string; name: string };
+
+const SELECT_CLASS =
+  "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40";
 
 function SubmitButton({ pending }: { pending: boolean }) {
   return (
@@ -50,6 +54,43 @@ export function CreateTaskForm({
     close();
   });
 
+  // Ariel, 26.9.2026: "להוסיף בחירת אחראי ובחירת מפקח". Who can hold a
+  // task depends on the client (only colleagues who can open it), so the
+  // list is asked for once a client is chosen and asked again when it
+  // changes. A choice made for the previous client is dropped with it:
+  // the server would refuse a person without access to the new one, and
+  // a picker still showing them would be promising something it cannot
+  // keep.
+  const [people, setPeople] = useState<Person[]>([]);
+  const [peopleLoading, setPeopleLoading] = useState(false);
+  const [peopleError, setPeopleError] = useState<string | null>(null);
+  const [assignedToId, setAssignedToId] = useState("");
+  const [supervisorId, setSupervisorId] = useState("");
+
+  useEffect(() => {
+    setAssignedToId("");
+    setSupervisorId("");
+    setPeopleError(null);
+    if (!clientId) {
+      setPeople([]);
+      return;
+    }
+    let current = true;
+    setPeopleLoading(true);
+    listAssignablePeopleAction(clientId).then((result) => {
+      if (!current) return;
+      setPeopleLoading(false);
+      if (result.ok) setPeople(result.people);
+      else {
+        setPeople([]);
+        setPeopleError(result.error);
+      }
+    });
+    return () => {
+      current = false;
+    };
+  }, [clientId]);
+
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
     [categories, clientId]
@@ -79,7 +120,7 @@ export function CreateTaskForm({
         <select
           name="categoryId"
           disabled={!clientId}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
+          className={SELECT_CLASS}
         >
           <option value="">ללא קטגוריה</option>
           {availableCategories.map((c) => (
@@ -97,6 +138,53 @@ export function CreateTaskForm({
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
+
+      {/* Side by side from the small breakpoint up, stacked on a phone:
+          two selects in one row at 360px leave each about 150px, which
+          cuts most Hebrew names in half. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="create-task-assignee" className="block text-xs font-medium text-appNavy/60">
+            אחראי
+          </label>
+          <select
+            id="create-task-assignee"
+            name="assignedToId"
+            value={assignedToId}
+            onChange={(e) => setAssignedToId(e.target.value)}
+            disabled={!clientId || peopleLoading}
+            className={SELECT_CLASS}
+          >
+            <option value="">{peopleLoading ? "טוען..." : "ללא אחראי"}</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="create-task-supervisor" className="block text-xs font-medium text-appNavy/60">
+            מפקח
+          </label>
+          <select
+            id="create-task-supervisor"
+            name="supervisorId"
+            value={supervisorId}
+            onChange={(e) => setSupervisorId(e.target.value)}
+            disabled={!clientId || peopleLoading}
+            className={SELECT_CLASS}
+          >
+            <option value="">{peopleLoading ? "טוען..." : "ללא מפקח"}</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      {peopleError && <p className="-mt-2 text-xs text-red-600">{peopleError}</p>}
 
       {/* Portal phase 1. Off by default: an internal task stays internal
           unless someone says otherwise, which is the safe direction for a

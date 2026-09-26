@@ -39,7 +39,7 @@ function isoDay(offsetDays: number) {
  */
 async function createClient(page: import("@playwright/test").Page, name: string): Promise<void> {
   await page.goto("/app/clients");
-  await page.getByRole("button", { name: "+ לקוח חדש" }).click();
+  await page.getByRole("button", { name: "לקוח חדש", exact: true }).click();
 
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();

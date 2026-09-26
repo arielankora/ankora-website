@@ -68,7 +68,7 @@ test.describe("clients/actions", () => {
     const name = tag("[E2E] לקוח");
 
     await page.goto("/app/clients");
-    await page.getByRole("button", { name: "+ לקוח חדש" }).click();
+    await page.getByRole("button", { name: "לקוח חדש", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -96,7 +96,7 @@ test.describe("categories/actions", () => {
     const name = tag("[E2E] קטגוריה");
 
     await page.goto("/app/categories");
-    await page.getByRole("button", { name: "+ קטגוריה" }).click();
+    await page.getByRole("button", { name: "קטגוריה", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

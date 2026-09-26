@@ -28,7 +28,9 @@ function row(over: Partial<ListRow> = {}): ListRow {
     dueDate: null,
     status: "OPEN",
     priority: "NORMAL",
+    assignedToId: null,
     assignedToName: null,
+    supervisorName: null,
     clientVisible: false,
     supplierName: null,
     supplierExperience: null,
@@ -76,7 +78,7 @@ function Rows() {
 
 function renderList(
   rows: ListRow[],
-  filters: { status?: string; clientId?: string; clientName?: string } = {},
+  filters: { status?: string; clientId?: string; clientName?: string; assignedToId?: string } = {},
   created?: ListRow
 ) {
   return render(
@@ -150,6 +152,19 @@ describe("a row that does not belong is not shown", () => {
       { clientId: "c1", clientName: "לקוח א" },
       row({ id: "new", title: "חדשה", clientName: "לקוח א" })
     );
+    expect(screen.getByText("חדשה")).toBeDefined();
+  });
+
+  // The create form can name an assignee since 26.9.2026, so a task is
+  // no longer always born unassigned. Under "שלי", one given to somebody
+  // else is not mine and would vanish on the next render.
+  it("drops it under \"mine\" when it was assigned to somebody else", () => {
+    renderList([], { assignedToId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "someone-else" }));
+    expect(screen.queryByText("חדשה")).toBeNull();
+  });
+
+  it("keeps it under \"mine\" when it was assigned to me", () => {
+    renderList([], { assignedToId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "me" }));
     expect(screen.getByText("חדשה")).toBeDefined();
   });
 });

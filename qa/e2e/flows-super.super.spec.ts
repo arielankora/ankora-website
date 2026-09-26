@@ -305,7 +305,7 @@ test.describe("important-dates/actions", () => {
     const title = tag("[E2E] מועד");
 
     await page.goto("/app/important-dates");
-    await page.getByRole("button", { name: "+ מועד חדש" }).click();
+    await page.getByRole("button", { name: "מועד חדש", exact: true }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

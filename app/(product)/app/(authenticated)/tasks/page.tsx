@@ -209,11 +209,14 @@ export default async function TasksPage(props: {
             clientId: searchParams.clientId,
             clientName: clients.find((c) => c.id === searchParams.clientId)
               ?.name,
+            // The create form can now name an assignee, so a task born
+            // on somebody else no longer belongs under "שלי".
+            assignedToId: mine ? user.id : undefined,
           }}
         >
           <div className="flex flex-wrap items-center gap-2.5">
             <TaskFilters clients={clients} categories={categories} />
-            <Drawer triggerLabel="+ משימה" title="משימה חדשה">
+            <Drawer triggerLabel="משימה" title="משימה חדשה">
               <CreateTaskForm clients={clients} categories={categories} />
             </Drawer>
           </div>
@@ -243,13 +246,20 @@ export default async function TasksPage(props: {
               ))}
             </div>
 
+            {/* Scrolls sideways on a phone rather than running off the
+              edge: five pills are wider than a 360px screen, and before
+              26.9.2026 the last one was simply cut off, with "ממתינות
+              לאישור" folded onto two lines beside it. */}
             {!board && (
-              <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+              <div
+                data-testid="status-pills"
+                className="flex max-w-full overflow-x-auto rounded-full border border-lineDark bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              >
                 {FILTER_PILLS.map((pill) => (
                   <Link
                     key={pill.value}
                     href={pillHref(pill.value)}
-                    className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                    className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
                       activePill === pill.value
                         ? "bg-appNavy text-cream"
                         : "text-appNavy/60 hover:text-appNavy"
@@ -315,7 +325,9 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
     dueDate: task.dueDate?.toISOString() ?? null,
     status: task.status,
     priority: task.priority,
+    assignedToId: task.assignedTo?.id ?? null,
     assignedToName: task.assignedTo?.name ?? null,
+    supervisorName: task.supervisor?.name ?? null,
     clientVisible: task.clientVisible,
     supplierName: task.supplierName,
     supplierExperience: task.supplierExperience,

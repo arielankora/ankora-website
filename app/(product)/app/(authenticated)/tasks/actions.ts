@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { createTask, updateTask } from "@/lib/app-domain/tasks";
+import { assignableUsers, createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -29,10 +29,14 @@ export type CreatedTaskRow = {
   dueDate: string | null;
   status: TaskStatus;
   priority: TaskPriority;
-  /// Always null on a create, because the create form has no assignee
-  /// picker. Carried anyway so this type is the ONE shape every view on
-  /// the tasks screen renders from, rather than a near-miss of it.
+  /// Set on a create when the form named someone (26.9.2026: the create
+  /// form gained an assignee and a supervisor picker). The id travels with
+  /// the name so the list can tell whether a new task belongs under "שלי".
+  assignedToId: string | null;
   assignedToName: string | null;
+  /// Shown on every row since 26.9.2026, beside the assignee: who signs
+  /// for the work is as much a part of "whose is this" as who does it.
+  supervisorName: string | null;
   clientVisible: boolean;
   supplierName: string | null;
   supplierExperience: SupplierExperience | null;
@@ -60,6 +64,8 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   const title = String(formData.get("title") || "").trim();
   if (!clientId) return { error: "יש לבחור לקוח." };
   if (!title) return { error: "יש להזין שם משימה." };
+  const assignedToId = String(formData.get("assignedToId") || "") || null;
+  const supervisorId = String(formData.get("supervisorId") || "") || null;
 
   let created;
   try {
@@ -72,6 +78,10 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       // the client's words in their head.
       clientVisible: formData.get("clientVisible") === "on",
       clientTitle: String(formData.get("clientTitle") || "") || null,
+      // Checked by createTask against the same list the form offered
+      // (assignableUsers), so a stale or forged id is refused there.
+      assignedToId,
+      supervisorId,
     });
   } catch (err) {
     return { error: friendlyError(err) };
@@ -81,17 +91,25 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
   // after the write rather than taken from the form, because the form
   // holds ids and the screen shows names, and a name the browser sent is
   // a name the browser could have been wrong about.
-  const [client, category] = await Promise.all([
+  const peopleIds = [created.assignedToId, created.supervisorId].filter((id): id is string => Boolean(id));
+  const [client, category, people] = await Promise.all([
     prisma.client.findUnique({ where: { id: created.clientId }, select: { name: true } }),
     created.categoryId
       ? prisma.category.findUnique({ where: { id: created.categoryId }, select: { name: true } })
       : Promise.resolve(null),
+    peopleIds.length
+      ? prisma.user.findMany({ where: { id: { in: peopleIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
   ]);
+  const nameOf = (id: string | null) => (id ? (people.find((p) => p.id === id)?.name ?? null) : null);
 
   // Still revalidated. The returned row is what the person sees now; this
   // is what every OTHER open tab, and this one on its next navigation,
   // sees. Dropping it would trade one stale screen for another.
   revalidatePath("/app/tasks");
+  // The client screen lists the same client's open tasks and opens this
+  // same form, so a task created there should be on it without a reload.
+  revalidatePath(`/app/clients/${created.clientId}`);
 
   return {
     ok: true,
@@ -103,7 +121,9 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       dueDate: created.dueDate?.toISOString() ?? null,
       status: created.status,
       priority: created.priority,
-      assignedToName: null,
+      assignedToId: created.assignedToId,
+      assignedToName: nameOf(created.assignedToId),
+      supervisorName: nameOf(created.supervisorId),
       clientVisible: created.clientVisible,
       supplierName: created.supplierName,
       supplierExperience: created.supplierExperience,
@@ -133,6 +153,27 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
 // task is refused DONE without one (updateTask's assertClosable), so the
 // row asks for the sentence and sends it in the same call - rather than
 // closing the task and then hoping somebody comes back to explain it.
+/// The people a task on this client can be given to, for the create
+/// form's assignee and supervisor pickers.
+///
+/// Asked per client, after the client is chosen, because the answer is
+/// per client: assignableUsers returns only colleagues who can open this
+/// client's tasks, the same list the task screen offers. Loading every
+/// client's list up front would put the whole staff-to-client map in the
+/// page for a form that uses one row of it.
+export async function listAssignablePeopleAction(
+  clientId: string
+): Promise<{ ok: true; people: { id: string; name: string }[] } | { ok: false; error: string }> {
+  const user = await requireUser();
+  if (!clientId) return { ok: true, people: [] };
+  try {
+    const people = await assignableUsers(user, clientId);
+    return { ok: true, people: people.map((p) => ({ id: p.id, name: p.name })) };
+  } catch (err) {
+    return { ok: false, error: friendlyError(err) };
+  }
+}
+
 export async function toggleTaskDoneAction(input: {
   taskId: string;
   nextStatus: TaskStatus;

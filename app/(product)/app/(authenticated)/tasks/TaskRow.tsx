@@ -67,6 +67,9 @@ export function TaskRow({
     clientName: string;
     categoryName: string | null;
     dueDate: string | null;
+    /// 26.9.2026: shown on every row, on a phone as much as on a desk.
+    assignedToName: string | null;
+    supervisorName: string | null;
     status: TaskStatus;
     priority: TaskPriority;
     // Portal phase 1.
@@ -305,12 +308,55 @@ export function TaskRow({
     }
   }
 
+  const dueLabel = task.dueDate
+    ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
+        new Date(task.dueDate)
+      )
+    : "-";
+
   return (
     // `data-task` is the row's own handle, for the browser suite. The
     // alternative is a locator built out of layout classes, which
     // silently stops matching the day someone changes the padding - and
     // a test that quietly matches nothing is worse than no test.
-    <div data-task={task.id} className="flex items-center gap-3.5 px-[18px] py-3.5">
+    //
+    // Ariel, 26.9.2026, from a phone: "אין גלילה לראות מה המשימה.
+    // תצוגה נדרשת: לקוח, שם המשימה, תאריך, אחראי, סטטוס, מפקח."
+    //
+    // The row used to be one flex line: checkbox, title column, two
+    // icons, the status select and a 72px date. On a phone the fixed
+    // parts took the whole width and the title column - the only
+    // flexible thing in the line - was squeezed to nothing, so every row
+    // showed controls and a date and no task.
+    //
+    // It is now one grid with two arrangements of the SAME cells, rather
+    // than two copies of the row. Two copies would mean two status
+    // selects in the page, one of them hidden, and a test (or a screen
+    // reader) that finds the wrong one.
+    //
+    //   below xl, a card:          from xl, one line per task:
+    //     client          icons      client | task | date | assignee
+    //     task                              | status | supervisor | icons
+    //     date · assignee
+    //     status · supervisor
+    //
+    // The icons sit beside the client on the card, not beside the
+    // status: on a 360px phone the status line needs its whole width for
+    // the select and a supervisor's name.
+    //
+    // xl and not md: with the sidebar open, md leaves about 460px and lg
+    // about 720px for the list, and six columns plus two icons do not fit
+    // in either without cutting the title down to a word.
+    <div
+      data-task={task.id}
+      className={[
+        "grid items-center gap-x-3 gap-y-1 px-4 py-3.5 xl:gap-y-0 xl:px-[18px]",
+        "grid-cols-[20px_minmax(0,1fr)_auto]",
+        "[grid-template-areas:'check_client_icons''check_title_title''check_meta_meta''check_status_status']",
+        "xl:grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px]",
+        "xl:[grid-template-areas:'check_client_title_date_assignee_status_supervisor_icons']",
+      ].join(" ")}
+    >
       <button
         type="button"
         role="checkbox"
@@ -318,19 +364,27 @@ export function TaskRow({
         aria-label={isDone ? "סימון כפתוחה" : "סימון כהושלמה"}
         disabled={pending}
         onClick={() => changeStatus(isDone ? "OPEN" : "DONE")}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-[6px] border transition-colors disabled:opacity-50 ${
+        className={`flex h-5 w-5 shrink-0 items-center justify-center self-start rounded-[6px] border transition-colors [grid-area:check] disabled:opacity-50 xl:self-center ${
           isDone ? "border-success bg-success" : "border-lineDark bg-white hover:border-gold"
         }`}
       >
         {isDone && <Check size={13} strokeWidth={3} className="text-white" />}
       </button>
 
-      <div className="min-w-0 flex-1">
+      {/* dir="auto" so an English client name truncates at its own end
+          ("Rimed Medical Tech...") rather than losing its first word to
+          the right-to-left page; text-right keeps it aligned with the
+          Hebrew around it. */}
+      <p dir="auto" data-cell="client" className="min-w-0 truncate text-right text-[11.5px] font-medium text-appNavy/55 [grid-area:client] xl:text-[12.5px] xl:font-normal xl:text-appNavy/70">
+        {task.clientName}
+      </p>
+
+      <div data-cell="title" className="min-w-0 [grid-area:title]">
         {/* Tasks phase 1: the title is the way in to the task's own
             screen. A row is where work is ticked off; everything else
             about a task - its description, its hours, who changed what -
             lives one click away and had nowhere to be until now. */}
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
           {task.priority !== "NORMAL" && (
             <span
               title={`עדיפות ${PRIORITY_LABELS[task.priority]}`}
@@ -339,253 +393,267 @@ export function TaskRow({
           )}
           <Link
             href={`/app/tasks/${task.id}`}
-            // Same decision as the nav, for the same reason, and this
-            // time with the run that proves it.
-            //
             // A task screen is dynamic, signed-in and database-backed, so
             // there is nothing here for Next to prefetch but a loading
             // shell - at the cost of one session check and one render per
-            // ROW, fired the moment the list paints.
-            //
-            // The browser suite caught the consequence on the run that
-            // added these links: a task created from the drawer took a
-            // reload to appear, and the traffic beside the failure was a
-            // burst of `/app/tasks/<id>?_rsc=` prefetches, all aborted,
-            // sharing a single-worker runner with the refresh that was
-            // supposed to bring the row in. The nav's own comment had
-            // already recorded this pattern; these links reintroduced it
-            // one per row.
+            // ROW, fired the moment the list paints. The browser suite
+            // caught the consequence once already: a burst of aborted
+            // per-row prefetches starving the refresh that was supposed
+            // to bring a new row in.
             prefetch={false}
-            className={`truncate text-[13.5px] hover:underline ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}
+            // Wraps on a phone instead of truncating: the title is the
+            // one thing on the card a person came to read, and a card has
+            // the height to spare. One line on a desk, where the row does.
+            className={`min-w-0 break-words text-[13.5px] leading-snug hover:underline xl:truncate ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}
           >
             {task.title}
           </Link>
         </div>
-        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
-          {task.clientName}
-          {task.categoryName ? ` · ${task.categoryName}` : ""}
-          {/* Tasks phase 5: how far into its steps this task is.
-              Beside the client and the category rather than as its own
-              badge, because it is a fact about the task and not a state
-              of it. Hidden entirely at zero: most tasks here have no
-              steps, and "0/0" on every row is noise that teaches people
-              to stop reading this line. */}
-          {task.stepsTotal > 0 && (
-            <span className="font-jbmono"> · {task.stepsDone}/{task.stepsTotal}</span>
-          )}
-        </p>
+        {/* The client moved to its own cell; what is left of this line
+            is the category and, from phase 5, how far into its steps the
+            task is. Hidden entirely when there is neither. */}
+        {(task.categoryName || task.stepsTotal > 0) && (
+          <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
+            {task.categoryName}
+            {task.categoryName && task.stepsTotal > 0 ? " · " : ""}
+            {task.stepsTotal > 0 && (
+              <span className="font-jbmono">
+                {task.stepsDone}/{task.stepsTotal}
+              </span>
+            )}
+          </p>
+        )}
 
-        {clientVisible &&
-          (editingTitle ? (
-            <input
-              autoFocus
-              value={clientTitle}
-              disabled={portalPending}
-              onChange={(e) => setClientTitle(e.target.value)}
-              onBlur={saveTitle}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-                if (e.key === "Escape") {
-                  setClientTitle(task.clientTitle ?? "");
-                  setEditingTitle(false);
-                }
-              }}
-              placeholder="איך זה ייקרא אצל הלקוח"
-              className="mt-1.5 w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setEditingTitle(true)}
-              className="mt-1 truncate text-[11.5px] text-gold-dim hover:underline"
-            >
-              {clientTitle || "הוספת כותרת ללקוח"}
-            </button>
-          ))}
-
-        {/* Team adoption: the definition of done.
-
-            Opened by the checkbox when a visible promise is being closed
-            with nothing written about it, and shown from then on so the
-            sentence stays editable - a result the client reads should be
-            fixable without reopening the work. */}
-        {clientVisible && (closing || isDone || clientOutcome) && (
-          <div className="mt-1.5">
-            {closing ? (
-              <div className="rounded-[10px] border border-gold/40 bg-[#FBF7F0] p-2.5">
-                <p className="text-[11.5px] text-appNavy/70">מה נגיד ללקוח שקרה?</p>
-                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                  <input
-                    autoFocus
-                    value={clientOutcome}
-                    disabled={pending}
-                    onChange={(e) => setClientOutcome(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void confirmClose();
-                      if (e.key === "Escape") cancelClose();
-                    }}
-                    placeholder="משפט אחד, בשפה שלו"
-                    className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
-                  />
-                  <button
-                    type="button"
-                    disabled={pending || !clientOutcome.trim()}
-                    onClick={() => void confirmClose()}
-                    className="rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
-                  >
-                    סיום
-                  </button>
-                  <button type="button" onClick={cancelClose} className="text-[11px] text-appNavy/40 hover:text-appNavy">
-                    ביטול
-                  </button>
-                </div>
-              </div>
-            ) : editingOutcome ? (
+          {clientVisible &&
+            (editingTitle ? (
               <input
                 autoFocus
-                value={clientOutcome}
+                value={clientTitle}
                 disabled={portalPending}
-                onChange={(e) => setClientOutcome(e.target.value)}
-                onBlur={saveOutcome}
+                onChange={(e) => setClientTitle(e.target.value)}
+                onBlur={saveTitle}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") e.currentTarget.blur();
                   if (e.key === "Escape") {
-                    setClientOutcome(task.clientOutcome ?? "");
-                    setEditingOutcome(false);
+                    setClientTitle(task.clientTitle ?? "");
+                    setEditingTitle(false);
                   }
                 }}
-                placeholder="מה קרה בפועל, בשפה של הלקוח"
-                className="w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                placeholder="איך זה ייקרא אצל הלקוח"
+                className="mt-1.5 w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
               />
             ) : (
               <button
                 type="button"
-                onClick={() => setEditingOutcome(true)}
-                className="truncate text-[11.5px] text-appNavy/60 hover:underline"
+                onClick={() => setEditingTitle(true)}
+                dir="auto"
+              className="mt-1 block max-w-full truncate text-right text-[11.5px] text-gold-dim hover:underline"
               >
-                {clientOutcome || "הוספת שורת תוצאה"}
+                {clientTitle || "הוספת כותרת ללקוח"}
               </button>
-            )}
-          </div>
-        )}
+            ))}
 
-        {/* Portal phase 3. Only once the task is both shown to the client
-            and closed: before that the answer is not known, and for a
-            task the client never sees there is nobody to show it to. */}
-        {clientVisible && (isDone || supplierName) && (
-          <div className="mt-1.5">
-            {editingSupplier ? (
-              <div className="flex flex-wrap items-center gap-1.5">
+          {/* Team adoption: the definition of done.
+
+              Opened by the checkbox when a visible promise is being closed
+              with nothing written about it, and shown from then on so the
+              sentence stays editable - a result the client reads should be
+              fixable without reopening the work. */}
+          {clientVisible && (closing || isDone || clientOutcome) && (
+            <div className="mt-1.5">
+              {closing ? (
+                <div className="rounded-[10px] border border-gold/40 bg-[#FBF7F0] p-2.5">
+                  <p className="text-[11.5px] text-appNavy/70">מה נגיד ללקוח שקרה?</p>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <input
+                      autoFocus
+                      value={clientOutcome}
+                      disabled={pending}
+                      onChange={(e) => setClientOutcome(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") void confirmClose();
+                        if (e.key === "Escape") cancelClose();
+                      }}
+                      placeholder="משפט אחד, בשפה שלו"
+                      className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                    />
+                    <button
+                      type="button"
+                      disabled={pending || !clientOutcome.trim()}
+                      onClick={() => void confirmClose()}
+                      className="rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
+                    >
+                      סיום
+                    </button>
+                    <button type="button" onClick={cancelClose} className="text-[11px] text-appNavy/40 hover:text-appNavy">
+                      ביטול
+                    </button>
+                  </div>
+                </div>
+              ) : editingOutcome ? (
                 <input
                   autoFocus
-                  value={supplierName}
+                  value={clientOutcome}
                   disabled={portalPending}
-                  onChange={(e) => setSupplierName(e.target.value)}
+                  onChange={(e) => setClientOutcome(e.target.value)}
+                  onBlur={saveOutcome}
                   onKeyDown={(e) => {
+                    if (e.key === "Enter") e.currentTarget.blur();
                     if (e.key === "Escape") {
-                      setSupplierName(task.supplierName ?? "");
-                      setEditingSupplier(false);
+                      setClientOutcome(task.clientOutcome ?? "");
+                      setEditingOutcome(false);
                     }
                   }}
-                  placeholder="מי ביצע בפועל"
-                  className="w-40 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                  placeholder="מה קרה בפועל, בשפה של הלקוח"
+                  className="w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
                 />
-                {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    disabled={portalPending || !supplierName.trim()}
-                    onClick={() => saveSupplier(key)}
-                    className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/70 hover:border-gold disabled:opacity-40"
-                  >
-                    {SUPPLIER_EXPERIENCE_LABELS[key]}
-                  </button>
-                ))}
-                {task.supplierName && (
-                  <button
-                    type="button"
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingOutcome(true)}
+                  className="block max-w-full truncate text-start text-[11.5px] text-appNavy/60 hover:underline"
+                >
+                  {clientOutcome || "הוספת שורת תוצאה"}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Portal phase 3. Only once the task is both shown to the client
+              and closed: before that the answer is not known, and for a
+              task the client never sees there is nobody to show it to. */}
+          {clientVisible && (isDone || supplierName) && (
+            <div className="mt-1.5">
+              {editingSupplier ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <input
+                    autoFocus
+                    value={supplierName}
                     disabled={portalPending}
-                    onClick={clearSupplier}
-                    className="text-[11px] text-appNavy/40 hover:text-error"
-                  >
-                    הסרה
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setEditingSupplier(true)}
-                className="truncate text-[11.5px] text-gold-dim hover:underline"
-              >
-                {supplierName
-                  ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
-                  : "מי ביצע בפועל?"}
-              </button>
-            )}
-          </div>
-        )}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") {
+                        setSupplierName(task.supplierName ?? "");
+                        setEditingSupplier(false);
+                      }
+                    }}
+                    placeholder="מי ביצע בפועל"
+                    className="w-40 max-w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                  />
+                  {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
+                    <button
+                      key={key}
+                      type="button"
+                      disabled={portalPending || !supplierName.trim()}
+                      onClick={() => saveSupplier(key)}
+                      className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/70 hover:border-gold disabled:opacity-40"
+                    >
+                      {SUPPLIER_EXPERIENCE_LABELS[key]}
+                    </button>
+                  ))}
+                  {task.supplierName && (
+                    <button
+                      type="button"
+                      disabled={portalPending}
+                      onClick={clearSupplier}
+                      className="text-[11px] text-appNavy/40 hover:text-error"
+                    >
+                      הסרה
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setEditingSupplier(true)}
+                  className="block max-w-full truncate text-start text-[11.5px] text-gold-dim hover:underline"
+                >
+                  {supplierName
+                    ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
+                    : "מי ביצע בפועל?"}
+                </button>
+              )}
+            </div>
+          )}
       </div>
 
-      {/* Portal phase 1. Two icons, not a panel: the row already carries
-          five controls, and these are both binary. The hourglass only
-          appears once the task is visible, because "waiting on the
-          client" is meaningless for something the client cannot see. */}
-      <button
-        type="button"
-        aria-pressed={clientVisible}
-        aria-label={clientVisible ? "הסרה מהפורטל" : "הצגה ללקוח בפורטל"}
-        title={clientVisible ? "מוצג ללקוח" : "לא מוצג ללקוח"}
-        disabled={portalPending}
-        onClick={toggleVisible}
-        className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
-          clientVisible ? "border-gold/50 bg-gold/12 text-appNavy" : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
-        }`}
-      >
-        {clientVisible ? <Eye size={15} strokeWidth={1.6} /> : <EyeOff size={15} strokeWidth={1.6} />}
-      </button>
+      {/* Below xl the date and the assignee share one line; from xl each
+          is its own column. `contents` lets the two spans become grid
+          cells on a desk while staying one flex line on a phone. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-appNavy/55 [grid-area:meta] xl:contents">
+        <span data-cell="date" className="shrink-0 [grid-area:date] xl:text-end xl:text-xs xl:text-appNavy/50">
+          {dueLabel}
+        </span>
+        <span aria-hidden className="text-appNavy/25 xl:hidden">
+          ·
+        </span>
+        <span data-cell="assignee" className="max-w-full truncate [grid-area:assignee] xl:min-w-0 xl:text-xs">
+          <span className="text-appNavy/40 xl:hidden">אחראי: </span>
+          {task.assignedToName ?? <span className="text-appNavy/35">ללא אחראי</span>}
+        </span>
+      </div>
 
-      {/* Also when the task is internal and blocked: a task waiting on
-          a supplier is not a portal concept, and the person looking at
-          this row still needs to see it and to be able to clear it. */}
-      {(clientVisible || blockedOn !== null) && (
+      {/* Wraps instead of squeezing: with both icons on a 360px phone a
+          long supervisor name used to be cut to "אריאל ...". It now drops
+          under the status and is only truncated if it is longer than the
+          whole line. */}
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 [grid-area:status] xl:contents">
+        <select
+          value={status}
+          disabled={pending}
+          aria-label="סטטוס"
+          onChange={(e) => changeStatus(e.target.value as TaskStatus)}
+          className={`shrink-0 justify-self-start rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none [grid-area:status] disabled:opacity-50 ${STATUS_TAG_CLASSES[status]}`}
+        >
+          {STATUS_OPTIONS.map((opt) => (
+            <option key={opt} value={opt} className="bg-white text-appNavy">
+              {TASK_STATUS_LABELS[opt]}
+            </option>
+          ))}
+        </select>
+        <span data-cell="supervisor" className="max-w-full truncate text-[12px] text-appNavy/55 [grid-area:supervisor] xl:min-w-0 xl:text-xs">
+          <span className="text-appNavy/40 xl:hidden">מפקח: </span>
+          {task.supervisorName ?? <span className="text-appNavy/35">ללא מפקח</span>}
+        </span>
+      </div>
+
+      {/* Portal phase 1. Two icons, not a panel: both are binary. The
+          hourglass only appears once the task is visible or already
+          waiting, because "waiting on the client" is meaningless for
+          something the client cannot see. The cell keeps its width
+          either way so the columns on a desk stay aligned. */}
+      <div className="flex items-center justify-end gap-1.5 self-start [grid-area:icons] xl:self-center">
+        {(clientVisible || blockedOn !== null) && (
+          <button
+            type="button"
+            aria-pressed={blockedOn !== null}
+            aria-label={blockedOn ? "כבר לא ממתינים" : "סימון כמחכה ללקוח"}
+            title={blockedOn ? waitingTitle(blockedOn, blockedSince) : "לא ממתין לאף אחד"}
+            disabled={portalPending}
+            onClick={toggleWaiting}
+            className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
+              blockedOn !== null
+                ? "border-warning/50 bg-warning-soft text-warning"
+                : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+            }`}
+          >
+            <Hourglass size={15} strokeWidth={1.6} />
+          </button>
+        )}
         <button
           type="button"
-          aria-pressed={blockedOn !== null}
-          aria-label={blockedOn ? "כבר לא ממתינים" : "סימון כמחכה ללקוח"}
-          title={blockedOn ? waitingTitle(blockedOn, blockedSince) : "לא ממתין לאף אחד"}
+          aria-pressed={clientVisible}
+          aria-label={clientVisible ? "הסרה מהפורטל" : "הצגה ללקוח בפורטל"}
+          title={clientVisible ? "מוצג ללקוח" : "לא מוצג ללקוח"}
           disabled={portalPending}
-          onClick={toggleWaiting}
+          onClick={toggleVisible}
           className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
-            blockedOn !== null
-              ? "border-warning/50 bg-warning-soft text-warning"
-              : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+            clientVisible ? "border-gold/50 bg-gold/12 text-appNavy" : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
           }`}
         >
-          <Hourglass size={15} strokeWidth={1.6} />
+          {clientVisible ? <Eye size={15} strokeWidth={1.6} /> : <EyeOff size={15} strokeWidth={1.6} />}
         </button>
-      )}
-
-      <select
-        value={status}
-        disabled={pending}
-        onChange={(e) => changeStatus(e.target.value as TaskStatus)}
-        className={`shrink-0 rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none disabled:opacity-50 ${STATUS_TAG_CLASSES[status]}`}
-      >
-        {STATUS_OPTIONS.map((opt) => (
-          <option key={opt} value={opt} className="bg-white text-appNavy">
-            {TASK_STATUS_LABELS[opt]}
-          </option>
-        ))}
-      </select>
-
-      <span className="w-[72px] shrink-0 text-end text-xs text-appNavy/50">
-        {task.dueDate
-          ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
-              new Date(task.dueDate)
-            )
-          : "-"}
-      </span>
+      </div>
     </div>
   );
 }

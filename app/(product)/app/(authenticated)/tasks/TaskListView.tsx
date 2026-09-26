@@ -62,6 +62,7 @@ export function TaskListView({
           blockedSince: row.blockedSince,
           dueDate: row.dueDate,
           assignedToName: row.assignedToName,
+          supervisorName: row.supervisorName,
           clientVisible: row.clientVisible,
           // The board needs to know WHETHER there is an outcome, not what
           // it says: that is the difference between asking for the
@@ -82,10 +83,13 @@ export function TaskListView({
               {clientName}
               <span className="mr-2 font-normal text-appNavy/45">{inClient.length}</span>
             </h2>
-            <div className="mt-2 divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-              {inClient.map((row) => (
-                <TaskRow key={row.id} task={row} />
-              ))}
+            <div className="mt-2 rounded-2xl border border-lineDark bg-white">
+              <ColumnHeader />
+              <div className="divide-y divide-lineDark">
+                {inClient.map((row) => (
+                  <TaskRow key={row.id} task={row} />
+                ))}
+              </div>
             </div>
           </section>
         ))}
@@ -94,10 +98,40 @@ export function TaskListView({
   }
 
   return (
-    <div className="divide-y divide-lineDark rounded-2xl border border-lineDark bg-white">
-      {rows.map((row) => (
-        <TaskRow key={row.id} task={row} />
-      ))}
+    // The header sits outside the divided list: a hidden first child
+    // still counts for `divide-y`, and gave the first card a stray top
+    // border on a phone.
+    <div className="rounded-2xl border border-lineDark bg-white">
+      <ColumnHeader />
+      <div className="divide-y divide-lineDark">
+        {rows.map((row) => (
+          <TaskRow key={row.id} task={row} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/// Column names for the one-line-per-task layout, from xl up only.
+///
+/// The same grid template as TaskRow's xl arrangement, so the labels sit
+/// over their columns. Below xl every value on the card carries its own
+/// label ("אחראי:", "מפקח:") or is self-evident (a client, a date), and
+/// a header over a stack of cards would label nothing.
+function ColumnHeader() {
+  return (
+    <div
+      aria-hidden
+      className="hidden border-b border-lineDark grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-appNavy/45 xl:grid"
+    >
+      <span />
+      <span>לקוח</span>
+      <span>משימה</span>
+      <span className="text-end">תאריך</span>
+      <span>אחראי</span>
+      <span>סטטוס</span>
+      <span>מפקח</span>
+      <span />
     </div>
   );
 }
