@@ -98,7 +98,14 @@ export default async function TasksPage(props: {
   const status = FILTER_STATUSES.has(searchParams.status as TaskStatus)
     ? (searchParams.status as TaskStatus)
     : undefined;
-  const activePill = status ?? "ACTIVE";
+  const q0 = searchParams.q?.trim() || undefined;
+  // A search with no pill chosen looks in every status, finished work
+  // included: "where is the task about the plumber" is asked about closed
+  // tasks as often as open ones, and "פעילות" would silently hide half
+  // the answers. No pill is lit while that is happening, because none of
+  // them describes the list on screen.
+  const searchAll = Boolean(q0) && !status;
+  const activePill = searchAll ? null : (status ?? "ACTIVE");
 
   // Team adoption, mechanism three: "mine".
   //
@@ -160,7 +167,7 @@ export default async function TasksPage(props: {
           clientId: searchParams.clientId,
           categoryId: searchParams.categoryId,
           status: listStatus,
-          statusIn: board || listStatus ? undefined : ACTIVE_STATUSES,
+          statusIn: board || listStatus || searchAll ? undefined : ACTIVE_STATUSES,
           completedSince:
             listStatus === "DONE" && !allClosed ? new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000) : undefined,
           involvedUserId: mine ? user.id : undefined,
@@ -195,7 +202,7 @@ export default async function TasksPage(props: {
     if (searchParams.clientId) params.set("clientId", searchParams.clientId);
     if (searchParams.categoryId)
       params.set("categoryId", searchParams.categoryId);
-    const nextStatus = next.status ?? activePill;
+    const nextStatus = next.status ?? activePill ?? "ACTIVE";
     if (nextStatus !== "ACTIVE") params.set("status", nextStatus);
     // On is the default, so only "off" needs saying.
     if (!(next.mine ?? mine)) params.set("mine", "0");

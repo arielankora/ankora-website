@@ -2,7 +2,7 @@
 import { useRouter } from "next/navigation";
 import { createContext, startTransition, useContext, useEffect, useState, type ReactNode } from "react";
 import { Plus, X } from "lucide-react";
-import { OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM } from "./drawer-keys";
+import { OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
 
 // Redesign direction A: replaces the old pattern of an inline "add" form
 // sitting permanently above every list screen's table (Clients, Users,
@@ -80,6 +80,11 @@ export function Drawer({
 
   useEffect(() => {
     if (!openKey) return;
+    const w = window as unknown as Record<string, unknown>;
+    if (w[PENDING_OPEN_KEY] === openKey) {
+      delete w[PENDING_OPEN_KEY];
+      setOpen(true);
+    }
     const url = new URL(window.location.href);
     if (url.searchParams.get(OPEN_DRAWER_PARAM) === openKey) {
       setOpen(true);
@@ -89,7 +94,11 @@ export function Drawer({
       window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
     }
     const onOpen = (e: Event) => {
-      if ((e as CustomEvent<string>).detail === openKey) setOpen(true);
+      const detail = (e as CustomEvent<OpenDrawerDetail>).detail;
+      if (detail?.key === openKey) {
+        detail.handled = true;
+        setOpen(true);
+      }
     };
     window.addEventListener(OPEN_DRAWER_EVENT, onOpen);
     return () => window.removeEventListener(OPEN_DRAWER_EVENT, onOpen);

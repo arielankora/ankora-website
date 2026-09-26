@@ -229,7 +229,11 @@ test("a comment is written on the task and comes back on the screen", async ({ p
 // What only a browser can say is that typing into the box and pressing
 // Enter narrows the list a person is looking at.
 test("the list finds a task by a word, and hides the rest", async ({ page }) => {
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+  // Opened on a first search rather than on the bare list. Since
+  // 26.9.2026 the bare list shows only active work, and "other" below is
+  // a fixture the supervision flow closes. A search looks in every
+  // status, so this is also where the row is guaranteed to be.
+  await page.goto(`${TASKS}&q=${encodeURIComponent("ניקיון")}`, { waitUntil: "domcontentloaded" });
 
   const box = page.getByLabel("חיפוש במשימות");
   await expect(box).toBeVisible({ timeout: 30_000 });

@@ -22,7 +22,9 @@ import { test, expect } from "./fixtures";
 
 test.describe.configure({ timeout: 90_000 });
 
-const BOARD = "/app/tasks?view=board";
+// Everybody's cards: "שלי" is on by default since 26.9.2026, and this
+// file's fixtures are nobody's in particular.
+const BOARD = "/app/tasks?view=board&mine=0";
 
 // This file's own card. Seeded with a fixed id, internal, unsupervised,
 // and read by nothing else: a card this spec drags is a card whose

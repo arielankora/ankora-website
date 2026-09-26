@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import type { NavItem } from "./Sidebar";
 import { LiveTimerPill } from "./LiveTimerPill";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
-import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM } from "./drawer-keys";
+import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
 
 // App redesign (handoff README, App Shell section): "סרגל עליון:
 // position:sticky, backdrop-filter:blur(8px), רקע rgba(255,255,255,.92),
@@ -60,7 +60,11 @@ export function TopBar({
             onClick={(e) => {
               if (pathname === "/app/tasks") {
                 e.preventDefault();
-                window.dispatchEvent(new CustomEvent(OPEN_DRAWER_EVENT, { detail: NEW_TASK_KEY }));
+                const detail: OpenDrawerDetail = { key: NEW_TASK_KEY, handled: false };
+                window.dispatchEvent(new CustomEvent(OPEN_DRAWER_EVENT, { detail }));
+                // The page's drawer has not hydrated yet: leave a note it
+                // reads when it mounts. See PENDING_OPEN_KEY.
+                if (!detail.handled) (window as unknown as Record<string, unknown>)[PENDING_OPEN_KEY] = NEW_TASK_KEY;
               }
             }}
             className="flex items-center gap-1.5 rounded-full border border-gold/60 bg-white px-4 py-2 text-[13px] font-medium text-navy hover:border-gold"

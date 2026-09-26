@@ -16,5 +16,18 @@
 export const OPEN_DRAWER_EVENT = "ankora:open-drawer";
 export const OPEN_DRAWER_PARAM = "new";
 
+/// Set by the top bar when it asked a drawer to open and nobody answered.
+///
+/// The top bar is in the layout and hydrates before the page under it,
+/// which streams in behind a loading boundary. A click in that gap fires
+/// an event no drawer is listening for yet. So the asker leaves a note
+/// on `window`, and a drawer checks for it the moment it mounts. The
+/// browser suite caught the gap on the first run (26.9.2026).
+export const PENDING_OPEN_KEY = "__ankoraPendingDrawer";
+
+/// Detail of OPEN_DRAWER_EVENT. `handled` is set by the drawer that
+/// opened, so the sender knows whether to leave the note.
+export type OpenDrawerDetail = { key: string; handled: boolean };
+
 /// The key the tasks screen's create-task drawer answers to.
 export const NEW_TASK_KEY = "task";

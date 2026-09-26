@@ -157,8 +157,9 @@ test.describe("desktop", () => {
     await expect(page.locator("[data-task]").first()).toBeVisible({ timeout: 30_000 });
     await page.screenshot({ path: `${SHOTS}/tasks-list-1280.png`, fullPage: true });
 
+    const header = page.getByTestId("task-columns").first();
     for (const label of ["לקוח", "משימה", "תאריך", "אחראי", "סטטוס", "מפקח"]) {
-      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
+      await expect(header.getByText(label, { exact: true })).toBeVisible();
     }
 
     const supervised = page.locator(`[data-task="${SUPERVISED}"]`);
