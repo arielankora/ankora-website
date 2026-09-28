@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/app-auth/session";
+import { parsePeriodOffset, MAX_WEEK_OFFSET } from "@/lib/period-offset";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -27,7 +28,7 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
   const searchParams = await props.searchParams;
   const user = await requireUser();
 
-  const weekOffset = Number(searchParams.weekOffset || 0);
+  const weekOffset = parsePeriodOffset(searchParams.weekOffset, MAX_WEEK_OFFSET);
   const referenceDate = new Date();
   referenceDate.setUTCDate(referenceDate.getUTCDate() + weekOffset * 7);
 

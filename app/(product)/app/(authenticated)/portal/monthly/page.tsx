@@ -1,4 +1,5 @@
 import { requireUser } from "@/lib/app-auth/session";
+import { parsePeriodOffset, MAX_MONTH_OFFSET } from "@/lib/period-offset";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
@@ -38,7 +39,7 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
   const searchParams = await props.searchParams;
   const user = await requireUser();
 
-  const monthOffset = Number(searchParams.monthOffset || 0);
+  const monthOffset = parsePeriodOffset(searchParams.monthOffset, MAX_MONTH_OFFSET);
   const referenceDate = new Date();
   referenceDate.setUTCMonth(referenceDate.getUTCMonth() + monthOffset);
 
