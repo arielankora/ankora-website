@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
@@ -391,16 +390,25 @@ export function TaskRow({
               className={`h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOTS[task.priority]}`}
             />
           )}
-          <Link
+          {/* A plain anchor, not next/link (28.9.2026).
+              The level-3 run of 28.9 had four tests in one file fail
+              their first attempt the same way: the row was clicked, the
+              client-side fetch for the task screen was aborted by the
+              router at 40ms, and the page never moved. It is the same
+              shape as the search box (#117) and the portal decision
+              (#118): an App Router navigation that is cancelled and
+              reports nothing. For a person it reads as "I tapped the task
+              and nothing happened", on the one gesture this screen exists
+              for.
+              A document navigation cannot be cancelled that way. The task
+              screen is dynamic and was never prefetched (the old link
+              carried prefetch={false}), so the soft navigation saved
+              little: the difference is a full page load against a
+              server render that happens either way. The cause of the
+              aborts is still not understood; see
+              claude/search-navigation-lost-2026-09-25. */}
+          <a
             href={`/app/tasks/${task.id}`}
-            // A task screen is dynamic, signed-in and database-backed, so
-            // there is nothing here for Next to prefetch but a loading
-            // shell - at the cost of one session check and one render per
-            // ROW, fired the moment the list paints. The browser suite
-            // caught the consequence once already: a burst of aborted
-            // per-row prefetches starving the refresh that was supposed
-            // to bring a new row in.
-            prefetch={false}
             // Wraps on a phone instead of truncating: the title is the
             // one thing on the card a person came to read, and a card has
             // the height to spare. One line on a desk, where the row does.
@@ -413,7 +421,7 @@ export function TaskRow({
             className={`min-w-0 text-[13.5px] leading-snug [overflow-wrap:anywhere] hover:underline xl:truncate ${isDone ? "text-appNavy/45" : "text-appNavy"}`}
           >
             {task.title}
-          </Link>
+          </a>
         </div>
         {/* The client moved to its own cell; what is left of this line
             is the category and, from phase 5, how far into its steps the

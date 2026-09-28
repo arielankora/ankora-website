@@ -1,5 +1,4 @@
 "use client";
-import Link from "next/link";
 import { Hourglass } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -222,7 +221,10 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         {/* Only where it means something: NORMAL is most cards, and a dot
             on every one of them is a dot that says nothing. */}
         <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[card.priority]}`} />
-        <Link
+        {/* A plain anchor for the same reason as the list row (see the
+            note in TaskRow): a soft navigation to a task was being
+            cancelled by the router and reporting nothing. */}
+        <a
           href={`/app/tasks/${card.id}`}
           // Dragging a link is the browser's own gesture and it wins over
           // ours, so the link does not carry the drag: the card does.
@@ -233,7 +235,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
           className="min-w-0 flex-1 text-[13.5px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70"
         >
           {card.title}
-        </Link>
+        </a>
       </div>
 
       <p className="mt-1.5 truncate text-[12px] text-appNavy/50">{card.clientName}</p>
