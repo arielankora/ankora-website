@@ -83,6 +83,14 @@ async function main() {
     { label: "Production-only branches", level: 1 },
     staticChecks.productionBranches,
   );
+  // Blocks. A Hebrew filename in a Content-Disposition header throws in
+  // the Response constructor, so the download 500s before any bytes are
+  // sent - see the note in checks/static.mjs.
+  await run.check(
+    "download-headers",
+    { label: "Download filenames", level: 1 },
+    staticChecks.downloadHeaders,
+  );
   await run.check("unit", { label: "Unit tests", level: 1, skipIf: needs.prisma }, vitest.unit);
   await run.check(
     "production",

@@ -3,6 +3,7 @@ import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { toCsv } from "@/lib/csv";
+import { attachmentDisposition } from "@/lib/http-headers";
 import { auditSearchWhere } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "חיפוש + סינון
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="audit-log.csv"`,
+      "Content-Disposition": attachmentDisposition("audit-log.csv"),
     },
   });
 }

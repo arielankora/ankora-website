@@ -4,6 +4,7 @@ import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
+import { attachmentDisposition } from "@/lib/http-headers";
 import { formatDuration, formatSource } from "@/lib/time-entry-format";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
@@ -92,11 +93,11 @@ export async function GET(req: NextRequest) {
     // for xlsx requests, same reasoning as app/api/reports/export/route.ts.
     const { toXlsx } = await import("@/lib/xlsx");
     const buf = await toXlsx("דיווחי זמן", headers, rows);
-    const filename = `time-entries_${clientSlug}_${dateStr}.xlsx`.replace(/[^\w.\-֐-׿]+/g, "-");
+    const filename = `time-entries_${clientSlug}_${dateStr}.xlsx`;
     return new Response(buf, {
       headers: {
         "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": attachmentDisposition(filename),
       },
     });
   }
@@ -115,11 +116,11 @@ export async function GET(req: NextRequest) {
       headers,
       rows,
     });
-    const filename = `time-entries_${clientSlug}_${dateStr}.pdf`.replace(/[^\w.\-֐-׿]+/g, "-");
+    const filename = `time-entries_${clientSlug}_${dateStr}.pdf`;
     return new Response(buf, {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": attachmentDisposition(filename),
       },
     });
   }
@@ -127,12 +128,12 @@ export async function GET(req: NextRequest) {
   // toCsv (lib/csv.ts) - shared, unit-tested, dependency-free; prepends
   // the UTF-8 BOM Excel needs for Hebrew (spec 14.4).
   const csv = toCsv(headers, rows);
-  const filename = `time-entries_${clientSlug}_${dateStr}.csv`.replace(/[^\w.\-֐-׿]+/g, "-");
+  const filename = `time-entries_${clientSlug}_${dateStr}.csv`;
 
   return new Response(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": attachmentDisposition(filename),
     },
   });
 }

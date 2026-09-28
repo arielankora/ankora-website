@@ -110,3 +110,70 @@ export async function productionBranches() {
     ),
   ];
 }
+
+// ── Download filenames ────────────────────────────────────────────────
+//
+// 26.9.2026, level-3 hunt. Six call sites across the reports and
+// time-entry export routes built `Content-Disposition` by interpolating
+// the client's name into `filename="..."`. Every Ankora client is named
+// in Hebrew, and a header value is a ByteString: the Response
+// constructor throws on any character above 255, before a byte of the
+// file is sent. Every client-filtered export returned 500, in CSV, XLSX
+// and PDF alike.
+//
+// The same fault had already been found in September, fixed in the
+// portal-document route, and left standing in the two routes the product
+// actually exports from, which is the argument for a check rather than
+// a comment. The shape is what matters, not the instance.
+//
+// Blocking on purpose: the fix is to call the helper, and the failure it
+// prevents is a 500 on a button the customer presses.
+
+const DISPOSITION_HOME = "lib/http-headers.ts";
+const DISPOSITION = /["'`]?Content-Disposition["'`]?\s*:/i;
+
+export async function downloadHeaders() {
+  const files = [];
+  for (const root of ["lib", "app"]) {
+    try {
+      files.push(...(await walk(root)));
+    } catch {
+      // A root that does not exist is not a finding about this rule.
+    }
+  }
+
+  const strays = [];
+  for (const file of new Set(files)) {
+    const path = relative(".", file);
+    if (path === DISPOSITION_HOME) continue;
+    let src;
+    try {
+      src = await readFile(path, "utf-8");
+    } catch {
+      continue;
+    }
+    src.split("\n").forEach((line, i) => {
+      const code = line.replace(/\/\/.*$/, "").replace(/\/\*.*?\*\//g, "");
+      if (!DISPOSITION.test(code)) return;
+      // The helper's own call is the approved spelling.
+      if (/attachmentDisposition\s*\(/.test(code)) return;
+      strays.push(`${path}:${i + 1}: ${line.trim()}`);
+    });
+  }
+
+  if (strays.length === 0) return [];
+  return [
+    finding(
+      "blocker",
+      `${strays.length} hand-built Content-Disposition header(s)`,
+      [
+        "A header value is a ByteString. A Hebrew filename reaching one throws in the",
+        "Response constructor, and the download returns 500 before any bytes are sent.",
+        `Use attachmentDisposition() from ${DISPOSITION_HOME}: it emits an ASCII`,
+        "fallback and an RFC 5987 filename*, and tests/unit/http-headers.test.ts covers it.",
+        "",
+        ...strays,
+      ].join("\n"),
+    ),
+  ];
+}

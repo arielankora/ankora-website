@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { monthlyDetailedToCsv } from "@/lib/app-domain/report-schedules";
+import { attachmentDisposition } from "@/lib/http-headers";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): same `?format=` addition as
 // app/api/reports/export/route.ts - CSV stays the unchanged default.
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
         status: 200,
         headers: {
           "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-          "Content-Disposition": `attachment; filename="${period}.xlsx"`,
+          "Content-Disposition": attachmentDisposition(`${period}.xlsx`),
         },
       });
     }
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
         status: 200,
         headers: {
           "Content-Type": "application/pdf",
-          "Content-Disposition": `attachment; filename="${period}.pdf"`,
+          "Content-Disposition": attachmentDisposition(`${period}.pdf`),
         },
       });
     }
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
       status: 200,
       headers: {
         "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": attachmentDisposition(filename),
       },
     });
   } catch (err) {

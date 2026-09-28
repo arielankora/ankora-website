@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalDocument } from "@/lib/app-domain/client-file";
 import { downloadFileFromDrive } from "@/lib/google-drive";
+import { attachmentDisposition } from "@/lib/http-headers";
 
 // Portal phase 3: the only way a document reaches a client.
 //
@@ -36,10 +37,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ doc
   return new NextResponse(file.body, {
     headers: {
       "Content-Type": doc.mimeType,
-      // RFC 5987, because these titles are Hebrew and a raw Hebrew
-      // filename in this header throws before the response is ever sent -
-      // the same fault that took down the time-entry export in September.
-      "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(doc.title)}`,
+      // RFC 6266 via the shared helper. This route already did the right
+      // thing by hand; the helper adds the ASCII fallback and makes the
+      // rule enforceable (qa/checks/static.mjs).
+      "Content-Disposition": attachmentDisposition(doc.title),
       "Cache-Control": "private, no-store",
     },
   });
