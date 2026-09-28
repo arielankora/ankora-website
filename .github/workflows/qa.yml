@@ -3,6 +3,7 @@
 # Three entry points, one runner:
 #   - every pull request        -> level 1, blocking. ~4 minutes.
 #   - every night at 03:00 UTC  -> level 2 against main, reporting.
+#   - Sunday's 03:00 UTC run     -> level 3, the weekly fault hunt.
 #   - manual dispatch           -> any level, on demand.
 #
 # Why CI and not only the agent: this repo's own tooling notes record that
@@ -107,8 +108,18 @@ jobs:
         run: npx prisma migrate deploy
 
       # The level: an explicit dispatch input wins; a pull request is
-      # level 1 so the gate stays fast; anything else is the default deep
-      # regression.
+      # level 1 so the gate stays fast; Sunday's nightly run is the weekly
+      # fault hunt; anything else is the default deep regression.
+      #
+      # 26.9.2026: the weekly level 3 used to be a scheduled assistant
+      # session that dispatched this workflow by hand. That session runs
+      # in the cloud with no bridge to anyone's machine, and GitHub's API
+      # is not reachable from there - so the one run of the week that is
+      # supposed to look hardest could not start itself, and had not for
+      # at least a week. A schedule that depends on something being able
+      # to press a button is not a schedule. 03:00 UTC is already 06:00
+      # in Israel, which is the hour the weekly hunt was meant to run, so
+      # this needs no second cron - only the day.
       #
       # The one exception: a pull request that changes the browser suite
       # itself runs at level 2, because level 1 does not open a browser -
@@ -121,7 +132,15 @@ jobs:
           if [ -n "${{ inputs.level }}" ]; then
             echo "value=${{ inputs.level }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "value=2" >> "$GITHUB_OUTPUT"
+            # %u is 7 on Sunday. The schedule fires at 03:00 UTC, so the
+            # day is unambiguous - no run of this branch straddles
+            # midnight.
+            if [ "$(date -u +%u)" = "7" ]; then
+              echo "sunday - running the weekly fault hunt"
+              echo "value=3" >> "$GITHUB_OUTPUT"
+            else
+              echo "value=2" >> "$GITHUB_OUTPUT"
+            fi
           elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
                | grep -qE '^(qa/(e2e/|playwright\.config\.ts)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
             # Level 1 runs types, lint and the unit suite. It does not run
