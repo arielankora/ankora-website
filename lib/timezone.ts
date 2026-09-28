@@ -59,12 +59,53 @@ export function localDateKey(date: Date, timeZone: string = TIMEZONE): string {
 /// boundary back into the correct UTC instant for its Prisma query range,
 /// instead of computing those boundaries in UTC calendar terms - see the
 /// Phase 8 ADR addendum for the bug this fixes.
+///
+/// **The offset is sampled twice (28.9.2026).** The first version sampled
+/// it once, at the naive instant (the wall-clock time read as UTC). That
+/// instant can sit on the other side of a DST change from the answer: on
+/// 25.10.2026 Israel's midnight is 21:00 UTC (still summer time, +3), but
+/// the naive instant 00:00 UTC is already 02:00 winter time (+2), so the
+/// result came out an hour late and the first hour of the day fell outside
+/// every date filter. It only showed on a server running in UTC, which is
+/// exactly what Vercel and CI are; a machine set to Israel time got the
+/// right answer by accident. Sampling again at the first guess lands on
+/// the right side of the change. Found by the weekly docs check; see
+/// claude/bug-dst-day-boundary-2026-09-28.
 export function localDateTimeToUtc(dateStr: string, timeStr: string, timeZone: string = TIMEZONE): Date {
   const naiveUtc = new Date(`${dateStr}T${timeStr}:00Z`);
-  const asIfTargetZone = new Date(naiveUtc.toLocaleString("en-US", { timeZone }));
-  const asIfUtc = new Date(naiveUtc.toLocaleString("en-US", { timeZone: "UTC" }));
-  const offsetMs = asIfUtc.getTime() - asIfTargetZone.getTime();
-  return new Date(naiveUtc.getTime() + offsetMs);
+  const first = new Date(naiveUtc.getTime() + zoneOffsetMsAt(naiveUtc, timeZone));
+  return new Date(naiveUtc.getTime() + zoneOffsetMsAt(first, timeZone));
+}
+
+/// UTC minus local wall-clock time at one instant, in milliseconds.
+/// Read from formatted parts rather than by re-parsing a locale string,
+/// so the process's own zone never enters the calculation.
+function zoneOffsetMsAt(instant: Date, timeZone: string): number {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(instant)
+      .map((p) => [p.type, p.value])
+  );
+  const wallAsUtc = Date.UTC(
+    Number(parts.year),
+    Number(parts.month) - 1,
+    Number(parts.day),
+    Number(parts.hour),
+    Number(parts.minute),
+    Number(parts.second)
+  );
+  // Whole seconds on both sides: the formatted parts carry no
+  // milliseconds, so the instant's are dropped before comparing.
+  return Math.floor(instant.getTime() / 1000) * 1000 - wallAsUtc;
 }
 
 /// The first instant of a `YYYY-MM-DD` day in Israel, for a date filter.
