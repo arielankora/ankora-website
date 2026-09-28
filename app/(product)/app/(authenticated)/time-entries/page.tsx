@@ -9,24 +9,22 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { FilterBar } from "./FilterBar";
 import { AdminCreateEntryForm } from "./AdminCreateEntryForm";
 import { EntriesTable } from "./EntriesTable";
+import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
 export const metadata = { robots: { index: false, follow: false } };
 
 const TIMEZONE = "Asia/Jerusalem";
 
 function parseDate(value?: string): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T00:00:00`);
-  return isNaN(d.getTime()) ? undefined : d;
+  // Israel's midnight, not the server's (UTC on Vercel). See dayStartInZone.
+  return dayStartInZone(value);
 }
 
 // Overnight bug-hunt (docs/adr/0001 section 19.5): same end-of-day fix as
 // the Reports screen/export route - "to" parsed as midnight excluded the
 // entire selected end date from listTimeEntriesForAdmin's gte/lte range.
 function parseDateEndOfDay(value?: string): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T23:59:59.999`);
-  return isNaN(d.getTime()) ? undefined : d;
+  return dayEndInZone(value);
 }
 
 // Spec 12 Admin screens table: "Time Entries - cross-client table +

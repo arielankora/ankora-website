@@ -5,6 +5,7 @@ import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
 import { formatDuration, formatSource } from "@/lib/time-entry-format";
+import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
 // Same additive `?format=` pattern as app/api/reports/export/route.ts
 // (docs/adr/0001 section 17/18.14): csv stays the default for every
@@ -16,9 +17,8 @@ function parseFormat(value: string | null): ExportFormat {
 }
 
 function parseDate(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T00:00:00`);
-  return isNaN(d.getTime()) ? undefined : d;
+  // Israel's midnight, not the server's (UTC on Vercel). See dayStartInZone.
+  return dayStartInZone(value);
 }
 
 // Overnight bug-hunt (docs/adr/0001 section 19.5): "to" must mean
@@ -27,9 +27,7 @@ function parseDate(value: string | null): Date | undefined {
 // last day of the selected range relative to what the on-screen table
 // shows for the same filters.
 function parseDateEndOfDay(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T23:59:59.999`);
-  return isNaN(d.getTime()) ? undefined : d;
+  return dayEndInZone(value);
 }
 
 // Ariel (2026-09-11): admin Time Entries screen needs a per-client,

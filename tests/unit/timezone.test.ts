@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc } from "@/lib/timezone";
+import { addDaysToKey, dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc, weekdayOfKey } from "@/lib/timezone";
 
 // Phase 8 regression tests: spec section 24's pre-production checklist item
 // "Timezone tests around midnight/month boundary" was previously untested,
@@ -73,5 +73,25 @@ describe("dayStartInZone / dayEndInZone - a report's date filter", () => {
     expect(dayStartInZone("26/09/2026")).toBeUndefined();
     expect(dayStartInZone("")).toBeUndefined();
     expect(dayEndInZone(undefined)).toBeUndefined();
+  });
+});
+
+// 28.9.2026: "הזמן שלי" counts its week on date keys, so a DST change
+// cannot move a day.
+describe("addDaysToKey / weekdayOfKey - the week on the my-time screen", () => {
+  it("moves across a month and a year", () => {
+    expect(addDaysToKey("2026-09-30", 1)).toBe("2026-10-01");
+    expect(addDaysToKey("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDaysToKey("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("is unaffected by the October clock change", () => {
+    expect(addDaysToKey("2026-10-24", 1)).toBe("2026-10-25");
+    expect(addDaysToKey("2026-10-25", 1)).toBe("2026-10-26");
+  });
+
+  it("knows Sunday is the first day of the Israeli week", () => {
+    expect(weekdayOfKey("2026-09-27")).toBe(0); // a Sunday
+    expect(addDaysToKey("2026-10-01", -weekdayOfKey("2026-10-01"))).toBe("2026-09-27");
   });
 });

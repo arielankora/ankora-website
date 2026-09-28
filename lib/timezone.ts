@@ -91,3 +91,18 @@ export function dayEndInZone(value: string | null | undefined, timeZone: string 
   const next = dayStartInZone(localDateKey(noonNextDay, timeZone), timeZone);
   return next ? new Date(next.getTime() - 1) : undefined;
 }
+
+/// A `YYYY-MM-DD` key moved by whole calendar days. Pure date arithmetic
+/// on the key itself, so it never passes through an instant and a DST
+/// change cannot turn "tomorrow" into "today at 23:00".
+export function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d + days));
+  return t.toISOString().slice(0, 10);
+}
+
+/// Day of the week of a `YYYY-MM-DD` key, Sunday = 0.
+export function weekdayOfKey(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
