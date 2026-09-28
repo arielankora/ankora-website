@@ -92,6 +92,14 @@ async function main() {
     staticChecks.downloadHeaders,
   );
   await run.check("unit", { label: "Unit tests", level: 1, skipIf: needs.prisma }, vitest.unit);
+  // The same suite with the process in UTC, which is what production runs
+  // in. CI pins Israel time, which hid a DST bug until main went red (see
+  // unitUtc in checks/vitest.mjs). Blocks like the run above it.
+  await run.check(
+    "unit-utc",
+    { label: "Unit tests (UTC, like the server)", level: 1, skipIf: needs.prisma },
+    vitest.unitUtc,
+  );
   await run.check(
     "production",
     { label: "Production probe", level: 1, skipIf: production.skipIfUnreachable },
