@@ -110,6 +110,17 @@ export type TaskFilters = {
   /// Tasks phase 2: only tasks this person is the supervisor of. Pass
   /// the actor's own id for the supervision screen.
   supervisorId?: string;
+  /// 26.9.2026, the tasks screen's "שלי": tasks this person is the
+  /// assignee OR the supervisor of. Ariel chose both: a manager's own
+  /// list includes the work waiting on their sign-off, not only the work
+  /// in their hands. `assignedToId` stays the narrow one for callers that
+  /// mean exactly "assigned to".
+  involvedUserId?: string;
+  /// 26.9.2026: only tasks closed at or after this instant. For "הושלמו",
+  /// which only grows: the screen shows the last thirty days unless asked
+  /// for everything. A task closed before `completedAt` existed falls
+  /// back to its last change.
+  completedSince?: Date;
   /// Tasks phase 4: free text, matched against everything a person
   /// would remember about a task. See `searchWhere` below for what that
   /// covers and why. Ignored under two characters.
@@ -207,11 +218,26 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // Steps only when asked for them by name; otherwise none at all.
       // See TOP_LEVEL_ONLY above for why this is not left to callers.
       ...(filters.parentId ? { parentId: filters.parentId } : TOP_LEVEL_ONLY),
-      // Sits beside the other keys rather than wrapping them, which
-      // makes it an AND with all of them: a search inside a status pill
-      // stays inside that pill. The alternative reads the same and
-      // quietly widens every other filter the person set.
-      OR: search ? searchWhere(search) : undefined,
+      // Each OR group sits inside AND rather than beside the other keys,
+      // which makes it an AND with all of them: a search inside a status
+      // pill stays inside that pill, and "שלי" narrows a search rather
+      // than widening it. Two ORs cannot share one key, hence the array.
+      AND: [
+        ...(search ? [{ OR: searchWhere(search) }] : []),
+        ...(filters.involvedUserId
+          ? [{ OR: [{ assignedToId: filters.involvedUserId }, { supervisorId: filters.involvedUserId }] }]
+          : []),
+        ...(filters.completedSince
+          ? [
+              {
+                OR: [
+                  { completedAt: { gte: filters.completedSince } },
+                  { completedAt: null, updatedAt: { gte: filters.completedSince } },
+                ],
+              },
+            ]
+          : []),
+      ],
     },
     // Four names, not four rows.
     //

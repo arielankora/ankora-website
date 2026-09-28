@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { ACTION_LABEL, ENTITY_TYPES, classifyAction } from "../../app/(product)/app/(authenticated)/audit-log/labels";
+import { ACTION_LABEL, ENTITY_TYPES, auditSearchWhere, classifyAction } from "../../app/(product)/app/(authenticated)/audit-log/labels";
 
 /**
  * `recordAudit` writes a row; the audit screen decides how to show it. Nothing
@@ -120,5 +120,30 @@ describe("audit log registries", () => {
     expect(classifyAction("important_date.delete").label).toBe("מחיקה");
     expect(classifyAction("important_date.create").label).toBe("יצירה");
     expect(classifyAction("time_entry.update").label).toBe("עריכה");
+  });
+});
+
+// Ariel, 26.9.2026: the audit search only matched the English action key.
+describe("auditSearchWhere - what the audit search box looks in", () => {
+  it("finds actions by their Hebrew label, not only by the English key", () => {
+    const where = auditSearchWhere("יצירת משימה") as { OR: Record<string, unknown>[] };
+    const byLabel = where.OR.find((c) => "action" in c && (c.action as { in?: string[] }).in);
+    expect((byLabel?.action as { in: string[] }).in).toContain("task.create");
+  });
+
+  it("looks in who did it, the client and the entity", () => {
+    const where = auditSearchWhere("Hadas") as { OR: Record<string, unknown>[] };
+    const keys = where.OR.map((c) => Object.keys(c)[0]);
+    expect(keys).toEqual(expect.arrayContaining(["action", "actor", "client", "entityType", "entityId"]));
+  });
+
+  it("drops a leading # so the short id copied off the screen finds its row", () => {
+    const where = auditSearchWhere("#z2o1de") as { OR: Record<string, unknown>[] };
+    const byId = where.OR.find((c) => "entityId" in c);
+    expect((byId?.entityId as { contains: string }).contains).toBe("z2o1de");
+  });
+
+  it("adds nothing for an empty search", () => {
+    expect(auditSearchWhere("   ")).toEqual({});
   });
 });

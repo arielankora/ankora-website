@@ -8,6 +8,7 @@ import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { Drawer } from "@/components/app/Drawer";
+import { NEW_TASK_KEY } from "@/components/app/drawer-keys";
 import { CreateTaskForm } from "./CreateTaskForm";
 import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
@@ -22,8 +23,16 @@ export const metadata = { robots: { index: false, follow: false } };
 // (הכל / פתוחות / בטיפול / הושלמו)". ARCHIVED deliberately has no pill
 // here (matching the reference screenshot) - it stays reachable only
 // through each row's own status control, same as before this redesign.
-const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
-  { value: "ALL", label: "הכל" },
+// Ariel, 26.9.2026: "אין אופציה לראות את כל המשימות הפתוחות בלי
+// ההושלמו, ההושלמו זאת רשימה ארוכה שרק תלך ותיגדל".
+//
+// So the first pill, and the default, is "פעילות": everything not
+// finished (open, in progress, waiting for approval). "הכל" is gone: a
+// list that grows by every task ever closed is not a working view, and
+// the closed ones have their own pill. ARCHIVED still has no pill and is
+// reachable only through a row's own status control, as before.
+const FILTER_PILLS: { value: TaskStatus | "ACTIVE"; label: string }[] = [
+  { value: "ACTIVE", label: "פעילות" },
   { value: "OPEN", label: "פתוחות" },
   { value: "IN_PROGRESS", label: "בטיפול" },
   { value: "PENDING_APPROVAL", label: "ממתינות לאישור" },
@@ -31,12 +40,18 @@ const FILTER_PILLS: { value: TaskStatus | "ALL"; label: string }[] = [
 ];
 
 /// The pill values that are real statuses, derived from the list above so
-/// a pill added there is selectable without a second edit. The guard
-/// below used to be three `===` comparisons, which is exactly the shape
-/// that silently ignores a new one.
+/// a pill added there is selectable without a second edit.
 const FILTER_STATUSES = new Set(
-  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ALL"),
+  FILTER_PILLS.map((p) => p.value).filter((v): v is TaskStatus => v !== "ACTIVE"),
 );
+
+/// "פעילות": every status that is still somebody's work.
+const ACTIVE_STATUSES: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
+
+/// "הושלמו" shows this many days back unless asked for everything. A
+/// month covers "what did we close lately" and keeps the pill a page
+/// rather than an archive.
+const DONE_WINDOW_DAYS = 30;
 
 // The pre-redesign client/category filter bar was dropped by the
 // redesign, on the grounds that the handoff screenshot did not show one.
@@ -63,6 +78,7 @@ export default async function TasksPage(props: {
     categoryId?: string;
     status?: string;
     mine?: string;
+    closed?: string;
     q?: string;
     group?: string;
     view?: string;
@@ -82,7 +98,14 @@ export default async function TasksPage(props: {
   const status = FILTER_STATUSES.has(searchParams.status as TaskStatus)
     ? (searchParams.status as TaskStatus)
     : undefined;
-  const activePill = status ?? "ALL";
+  const q0 = searchParams.q?.trim() || undefined;
+  // A search with no pill chosen looks in every status, finished work
+  // included: "where is the task about the plumber" is asked about closed
+  // tasks as often as open ones, and "פעילות" would silently hide half
+  // the answers. No pill is lit while that is happening, because none of
+  // them describes the list on screen.
+  const searchAll = Boolean(q0) && !status;
+  const activePill = searchAll ? null : (status ?? "ACTIVE");
 
   // Team adoption, mechanism three: "mine".
   //
@@ -90,7 +113,14 @@ export default async function TasksPage(props: {
   // reach, with no way to tell which are theirs - so the answer to "what
   // am I holding" was a visual scan of somebody else's work. The column
   // has existed since phase 10; this is a filter, not a model.
-  const mine = searchParams.mine === "1";
+  //
+  // On by default since 26.9.2026 (Ariel): the first thing a person
+  // opening this screen wants is their own list. `mine=0` turns it off;
+  // `mine=1` still means on, so every link written before today works.
+  // "Mine" is assignee OR supervisor - see TaskFilters.involvedUserId.
+  const mine = searchParams.mine !== "0";
+  /// "הושלמו" only: the whole history instead of the last month.
+  const allClosed = searchParams.closed === "all";
   const q = searchParams.q?.trim() || undefined;
   /// Grouped by client, which is how the people using this screen think:
   /// one account manager, one client, one set of open loops. Off by
@@ -137,7 +167,10 @@ export default async function TasksPage(props: {
           clientId: searchParams.clientId,
           categoryId: searchParams.categoryId,
           status: listStatus,
-          assignedToId: mine ? user.id : undefined,
+          statusIn: board || listStatus || searchAll ? undefined : ACTIVE_STATUSES,
+          completedSince:
+            listStatus === "DONE" && !allClosed ? new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000) : undefined,
+          involvedUserId: mine ? user.id : undefined,
           q,
         }),
         listAccessibleClients(user),
@@ -160,7 +193,7 @@ export default async function TasksPage(props: {
   // Both controls write the same query string, so picking a status keeps
   // "mine" on and turning "mine" off keeps the status.
   function href(next: {
-    status?: TaskStatus | "ALL";
+    status?: TaskStatus | "ACTIVE";
     mine?: boolean;
     group?: boolean;
     view?: "list" | "board";
@@ -169,9 +202,10 @@ export default async function TasksPage(props: {
     if (searchParams.clientId) params.set("clientId", searchParams.clientId);
     if (searchParams.categoryId)
       params.set("categoryId", searchParams.categoryId);
-    const nextStatus = next.status ?? activePill;
-    if (nextStatus !== "ALL") params.set("status", nextStatus);
-    if (next.mine ?? mine) params.set("mine", "1");
+    const nextStatus = next.status ?? activePill ?? "ACTIVE";
+    if (nextStatus !== "ACTIVE") params.set("status", nextStatus);
+    // On is the default, so only "off" needs saying.
+    if (!(next.mine ?? mine)) params.set("mine", "0");
     // Carried through every pill and toggle, so narrowing by status does
     // not silently throw away what somebody searched for.
     if (q) params.set("q", q);
@@ -181,7 +215,8 @@ export default async function TasksPage(props: {
     const query = params.toString();
     return query ? `/app/tasks?${query}` : "/app/tasks";
   }
-  const pillHref = (value: TaskStatus | "ALL") => href({ status: value });
+  const pillHref = (value: TaskStatus | "ACTIVE") => href({ status: value });
+  const allClosedHref = `${href({})}${href({}).includes("?") ? "&" : "?"}closed=all`;
   const mineHref = href({ mine: !mine });
   const groupHref = href({ group: !grouped });
   const listHref = href({ view: "list" });
@@ -211,12 +246,16 @@ export default async function TasksPage(props: {
               ?.name,
             // The create form can now name an assignee, so a task born
             // on somebody else no longer belongs under "שלי".
-            assignedToId: mine ? user.id : undefined,
+            involvedUserId: mine ? user.id : undefined,
           }}
         >
           <div className="flex flex-wrap items-center gap-2.5">
             <TaskFilters clients={clients} categories={categories} />
-            <Drawer triggerLabel="משימה" title="משימה חדשה">
+            {/* The trigger is for phones only since 26.9.2026: on a desk
+              "משימה חדשה" sits in the top bar and opens this same drawer
+              (openKey), and two buttons for one action is one too many.
+              The top bar is hidden below md, so a phone keeps this one. */}
+            <Drawer triggerLabel="משימה" title="משימה חדשה" openKey={NEW_TASK_KEY} triggerClassName="md:hidden">
               <CreateTaskForm clients={clients} categories={categories} />
             </Drawer>
           </div>
@@ -304,6 +343,17 @@ export default async function TasksPage(props: {
           </div>
 
           <TaskListView board={board} grouped={grouped} mine={mine} q={q} />
+
+          {/* Says what the pill is hiding and how to see it, rather than
+              leaving somebody to wonder where March went. */}
+          {!board && listStatus === "DONE" && !allClosed && (
+            <p className="text-[12.5px] text-appNavy/55">
+              מוצגות משימות שהושלמו ב-{DONE_WINDOW_DAYS} הימים האחרונים.{" "}
+              <Link href={allClosedHref} className="text-gold-dim underline underline-offset-4">
+                להצגת כל ההיסטוריה
+              </Link>
+            </p>
+          )}
         </TaskListProvider>
       </div>
     </>
@@ -327,6 +377,7 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
     priority: task.priority,
     assignedToId: task.assignedTo?.id ?? null,
     assignedToName: task.assignedTo?.name ?? null,
+    supervisorId: task.supervisor?.id ?? null,
     supervisorName: task.supervisor?.name ?? null,
     clientVisible: task.clientVisible,
     supplierName: task.supplierName,

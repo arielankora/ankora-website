@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computeUtilization, computeRolloverInMinutes } from "@/lib/app-domain/hour-banks";
+import { computeUtilization, computeRolloverInMinutes, cycleElapsedShare } from "@/lib/app-domain/hour-banks";
 
 // Phase 3 - spec 8.3's utilization formula and 8.2's rollover modes.
 // Pure-function tests only, no database.
@@ -81,5 +81,33 @@ describe("computeRolloverInMinutes() - spec 8.2's four rollover modes", () => {
     expect(
       computeRolloverInMinutes({ ...closedCycle, rolloverMode: "FULL" as const, rolloverCapMinutes: null }, 20, undefined)
     ).toBe(80);
+  });
+});
+
+// Ariel, 26.9.2026: the Home bank card shows "צפי להיום" - where the
+// hours should be by now if they were used evenly across the cycle.
+describe("cycleElapsedShare() - the pace on the Home bank card", () => {
+  const start = new Date("2026-09-01T00:00:00Z");
+  const end = new Date("2026-10-01T00:00:00Z");
+
+  it("is half way through on the middle day of a cycle", () => {
+    expect(cycleElapsedShare(start, end, new Date("2026-09-16T00:00:00Z"))).toBeCloseTo(0.5, 5);
+  });
+
+  it("follows the bank's own cycle, not the calendar month", () => {
+    // A bank renewing on the 15th is at its start on the 15th, whatever
+    // the month says.
+    const s15 = new Date("2026-09-15T00:00:00Z");
+    const e15 = new Date("2026-10-15T00:00:00Z");
+    expect(cycleElapsedShare(s15, e15, new Date("2026-09-15T00:00:00Z"))).toBe(0);
+  });
+
+  it("stays between 0 and 1 outside the cycle", () => {
+    expect(cycleElapsedShare(start, end, new Date("2026-08-20T00:00:00Z"))).toBe(0);
+    expect(cycleElapsedShare(start, end, new Date("2026-10-20T00:00:00Z"))).toBe(1);
+  });
+
+  it("treats a cycle with no length as finished rather than dividing by zero", () => {
+    expect(cycleElapsedShare(start, start, start)).toBe(1);
   });
 });

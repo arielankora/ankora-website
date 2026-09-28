@@ -50,42 +50,46 @@ test("the home screen says what is on this person", async ({ page }) => {
   await expect(page.getByText(MY_PROMISE).first()).toBeVisible();
 });
 
-test("the tasks screen can show only this person's work", async ({ page }) => {
+test("the tasks screen opens on this person's active work, and can show everyone's", async ({ page }) => {
+  // Ariel, 26.9.2026: "שלי" is on by default, and the first pill is
+  // "פעילות" (open, in progress and waiting for approval).
   await page.goto(TASKS, { waitUntil: "domcontentloaded" });
-
-  // Everything, including work assigned to nobody.
-  await expect(page.getByText(MY_PROMISE).first()).toBeVisible();
+  await expect(page.getByText(MY_PROMISE).first()).toBeVisible({ timeout: 30_000 });
 
   // Asserted on where the controls POINT rather than by clicking through
   // them. The first version clicked, and spent a round failing on a URL
   // that had not changed - which says nothing about whether the filter
   // works and everything about when a client-side navigation settles.
-  // Where a link points is the behaviour; the router getting there is
-  // Next's job and is exercised by every other navigation in this suite.
   const mineToggle = page.getByRole("link", { name: "שלי", exact: true });
-  await expect(mineToggle).toHaveAttribute("href", "/app/tasks?mine=1");
+  await expect(mineToggle).toHaveAttribute("href", "/app/tasks?mine=0");
+  await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks");
+  // "הכל" is gone: a list that grows with every closed task is not a
+  // working view.
+  await expect(page.getByRole("link", { name: "הכל", exact: true })).toHaveCount(0);
 
-  await page.goto("/app/tasks?mine=1", { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(MY_PROMISE).first()).toBeVisible();
+  // Everyone's work, including work assigned to nobody.
+  await page.goto("/app/tasks?mine=0", { waitUntil: "domcontentloaded" });
+  await expect(page.getByText(MY_PROMISE).first()).toBeVisible({ timeout: 30_000 });
 
-  // The filter combines with the status pills rather than replacing
-  // them, which is the whole reason it is a separate control: from the
-  // filtered screen, every pill keeps it on.
+  // The pills keep "off" once it is off, and the toggle points back to
+  // the default.
   await expect(page.getByRole("link", { name: "בטיפול", exact: true })).toHaveAttribute(
     "href",
-    "/app/tasks?status=IN_PROGRESS&mine=1"
+    "/app/tasks?status=IN_PROGRESS&mine=0"
   );
-  // And the toggle now points back out, keeping nothing behind it.
   await expect(page.getByRole("link", { name: "שלי", exact: true })).toHaveAttribute("href", "/app/tasks");
 });
 
 test("a promise the client can see cannot be closed without a sentence for them", async ({ page }) => {
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+  // mine=0: the task this creates has no assignee.
+  await page.goto(`${TASKS}?mine=0`, { waitUntil: "domcontentloaded" });
 
   // Its own task, created through the screen, so this test does not
   // consume a fixture anything else depends on.
   const title = `[E2E] הבטחה-${Date.now().toString(36)}`;
-  await page.getByRole("button", { name: "משימה", exact: true }).click();
+  // On a desk the create-task entry point is the top bar's "משימה
+  // חדשה" (26.9.2026); the in-page button is for phones only.
+  await page.getByRole("link", { name: "משימה חדשה" }).click();
   await page.locator('select[name="clientId"]').selectOption({ index: 1 });
   await page.locator('input[name="title"]').fill(title);
   await page.locator('input[name="clientVisible"]').check();
@@ -216,7 +220,7 @@ test("stopping the timer asks what stage the promise is at", async ({ page }) =>
   await expect(page.getByText("הלקוח מעודכן")).toBeVisible({ timeout: 30_000 });
 
   // And it reached the promise itself.
-  await page.goto(TASKS, { waitUntil: "domcontentloaded" });
+  await page.goto(`${TASKS}?mine=0`, { waitUntil: "domcontentloaded" });
   const row = page.locator("[data-task]").filter({ hasText: MY_PROMISE });
   // The waiting state is an icon, and its label is the only text that
   // says which way it is pointing.

@@ -193,8 +193,12 @@ test.describe("tasks/actions - create and complete", () => {
   test("a task is created from the drawer and can be marked done", async ({ page }) => {
     const title = tag("e2e-task");
 
-    await page.goto("/app/tasks");
-    await page.getByRole("button", { name: "משימה", exact: true }).click();
+    // mine=0: the task this creates has no assignee, and "שלי" is on by
+    // default since 26.9.2026.
+    await page.goto("/app/tasks?mine=0");
+    // On a desk the create-task entry point is the top bar's "משימה
+    // חדשה" (26.9.2026); the in-page button is for phones only.
+    await page.getByRole("link", { name: "משימה חדשה" }).click();
 
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

@@ -177,3 +177,41 @@ export function classifyAction(action: string): { label: string; tone: "green" |
   if (action.includes(".create") || action.includes(".requested")) return { label: "יצירה", tone: "green" };
   return { label: "עריכה", tone: "amber" };
 }
+
+/// What the audit screen's search box looks in.
+///
+/// Ariel, 26.9.2026: "צריך להכיר את השם באנגלית וזה מחפש רק בשדה הזה".
+/// The box matched only the raw action key (`task.create`), which is not
+/// what the screen shows: the screen shows "יצירת משימה", a person's name,
+/// a client and a short id. So it now looks in all of them:
+///
+///   - the action key, as before, for anyone who knows it;
+///   - the Hebrew label: every key whose label contains the words typed,
+///     so "משימה" finds task.create, task.update and the rest;
+///   - who did it, by name or email;
+///   - the client;
+///   - the entity, by type or by id, with a leading "#" dropped so the
+///     short id copied off the screen ("#z2o1de") finds its row.
+///
+/// Shared by the screen and the CSV export, so the file always holds the
+/// rows the screen showed.
+export function auditSearchWhere(raw: string) {
+  const q = raw.trim();
+  if (!q) return {};
+  const contains = { contains: q, mode: "insensitive" as const };
+  const idQuery = q.replace(/^#/, "");
+  const labelled = Object.entries(ACTION_LABEL)
+    .filter(([, label]) => label.includes(q))
+    .map(([action]) => action);
+  return {
+    OR: [
+      { action: contains },
+      ...(labelled.length > 0 ? [{ action: { in: labelled } }] : []),
+      { actor: { name: contains } },
+      { actor: { email: contains } },
+      { client: { name: contains } },
+      { entityType: contains },
+      ...(idQuery ? [{ entityId: { contains: idQuery, mode: "insensitive" as const } }] : []),
+    ],
+  };
+}

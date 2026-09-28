@@ -30,6 +30,7 @@ function row(over: Partial<ListRow> = {}): ListRow {
     priority: "NORMAL",
     assignedToId: null,
     assignedToName: null,
+    supervisorId: null,
     supervisorName: null,
     clientVisible: false,
     supplierName: null,
@@ -78,7 +79,7 @@ function Rows() {
 
 function renderList(
   rows: ListRow[],
-  filters: { status?: string; clientId?: string; clientName?: string; assignedToId?: string } = {},
+  filters: { status?: string; clientId?: string; clientName?: string; involvedUserId?: string } = {},
   created?: ListRow
 ) {
   return render(
@@ -159,12 +160,22 @@ describe("a row that does not belong is not shown", () => {
   // no longer always born unassigned. Under "שלי", one given to somebody
   // else is not mine and would vanish on the next render.
   it("drops it under \"mine\" when it was assigned to somebody else", () => {
-    renderList([], { assignedToId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "someone-else" }));
+    renderList([], { involvedUserId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "someone-else" }));
     expect(screen.queryByText("חדשה")).toBeNull();
   });
 
   it("keeps it under \"mine\" when it was assigned to me", () => {
-    renderList([], { assignedToId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "me" }));
+    renderList([], { involvedUserId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "me" }));
+    expect(screen.getByText("חדשה")).toBeDefined();
+  });
+
+  // 26.9.2026: "שלי" is the assignee OR the supervisor.
+  it("keeps it under \"mine\" when I am its supervisor", () => {
+    renderList(
+      [],
+      { involvedUserId: "me" },
+      row({ id: "new", title: "חדשה", assignedToId: "someone-else", supervisorId: "me" })
+    );
     expect(screen.getByText("חדשה")).toBeDefined();
   });
 });

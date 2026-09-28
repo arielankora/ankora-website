@@ -66,3 +66,28 @@ export function localDateTimeToUtc(dateStr: string, timeStr: string, timeZone: s
   const offsetMs = asIfUtc.getTime() - asIfTargetZone.getTime();
   return new Date(naiveUtc.getTime() + offsetMs);
 }
+
+/// The first instant of a `YYYY-MM-DD` day in Israel, for a date filter.
+///
+/// Report filters used to parse `new Date(\`${value}T00:00:00\`)`, which
+/// is midnight in the SERVER's zone. On Vercel that is UTC, so "today"
+/// started at 03:00 Israel time (02:00 in winter) and the last three
+/// hours of the chosen end date belonged to the next day. Found on
+/// 26.9.2026 when the Home screen's "hours today" card started linking to
+/// a report for today, and the two numbers disagreed.
+export function dayStartInZone(value: string | null | undefined, timeZone: string = TIMEZONE): Date | undefined {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined;
+  const d = localDateTimeToUtc(value, "00:00", timeZone);
+  return isNaN(d.getTime()) ? undefined : d;
+}
+
+/// The last millisecond of that day in Israel. Computed as one
+/// millisecond before the NEXT day's start rather than as 23:59:59.999,
+/// so a DST change inside the day cannot shift it.
+export function dayEndInZone(value: string | null | undefined, timeZone: string = TIMEZONE): Date | undefined {
+  const start = dayStartInZone(value, timeZone);
+  if (!start) return undefined;
+  const noonNextDay = new Date(start.getTime() + 36 * 3600_000);
+  const next = dayStartInZone(localDateKey(noonNextDay, timeZone), timeZone);
+  return next ? new Date(next.getTime() - 1) : undefined;
+}

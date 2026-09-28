@@ -3,6 +3,7 @@ import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { toCsv } from "@/lib/csv";
+import { auditSearchWhere } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "חיפוש + סינון
 // סוג פעולה + ייצוא." Same query shape (entityType/q filter) as the
@@ -34,7 +35,8 @@ export async function GET(req: NextRequest) {
   const events = await prisma.auditEvent.findMany({
     where: {
       ...(entityType ? { entityType } : {}),
-      ...(q ? { action: { contains: q, mode: "insensitive" as const } } : {}),
+      // The same search as the screen, so the file holds what was shown.
+      ...(q ? auditSearchWhere(q) : {}),
     },
     include: { actor: true, client: true },
     orderBy: { createdAt: "desc" },

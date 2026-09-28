@@ -404,7 +404,13 @@ export function TaskRow({
             // Wraps on a phone instead of truncating: the title is the
             // one thing on the card a person came to read, and a card has
             // the height to spare. One line on a desk, where the row does.
-            className={`min-w-0 break-words text-[13.5px] leading-snug hover:underline xl:truncate ${isDone ? "text-appNavy/40 line-through" : "text-appNavy"}`}
+            // No strike-through on a finished task (Ariel, 26.9.2026): the
+            // green check and the dimmed text already say "done", and a
+            // line through the words makes a closed task hard to read
+            // back - which is most of what anyone opens "הושלמו" to do.
+            // `overflow-wrap: anywhere` so a pasted link breaks inside the
+            // row instead of running past it.
+            className={`min-w-0 text-[13.5px] leading-snug [overflow-wrap:anywhere] hover:underline xl:truncate ${isDone ? "text-appNavy/45" : "text-appNavy"}`}
           >
             {task.title}
           </Link>

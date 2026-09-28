@@ -122,6 +122,7 @@ function ColumnHeader() {
   return (
     <div
       aria-hidden
+      data-testid="task-columns"
       className="hidden border-b border-lineDark grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-appNavy/45 xl:grid"
     >
       <span />

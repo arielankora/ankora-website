@@ -36,6 +36,7 @@ export type CreatedTaskRow = {
   assignedToName: string | null;
   /// Shown on every row since 26.9.2026, beside the assignee: who signs
   /// for the work is as much a part of "whose is this" as who does it.
+  supervisorId: string | null;
   supervisorName: string | null;
   clientVisible: boolean;
   supplierName: string | null;
@@ -123,6 +124,7 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       priority: created.priority,
       assignedToId: created.assignedToId,
       assignedToName: nameOf(created.assignedToId),
+      supervisorId: created.supervisorId,
       supervisorName: nameOf(created.supervisorId),
       clientVisible: created.clientVisible,
       supplierName: created.supplierName,

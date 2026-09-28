@@ -4,7 +4,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { ACTION_LABEL, ENTITY_TYPES, classifyAction } from "./labels";
+import { ACTION_LABEL, ENTITY_TYPES, auditSearchWhere, classifyAction } from "./labels";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -39,7 +39,7 @@ export default async function AuditLogPage(
 
   const where = {
     ...(entityType ? { entityType } : {}),
-    ...(q ? { action: { contains: q, mode: "insensitive" as const } } : {}),
+    ...(q ? auditSearchWhere(q) : {}),
   };
 
   const [events, total] = await Promise.all([
@@ -80,12 +80,12 @@ export default async function AuditLogPage(
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">חיפוש פעולה</label>
+            <label className="block text-xs font-medium text-appNavy/60">חיפוש</label>
             <input
               name="q"
               defaultValue={q ?? ""}
-              placeholder="למשל login.failure"
-              className="mt-1.5 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              placeholder="פעולה, שם, לקוח או מזהה"
+              className="mt-1.5 w-64 max-w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
           <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy/70 hover:border-gold">

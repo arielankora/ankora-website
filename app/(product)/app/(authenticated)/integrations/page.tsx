@@ -1,22 +1,10 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { listIntegrationConnections, getProvider } from "@/lib/app-domain/integrations";
 import { getMyClaudeConnection, getClaudeOrgSummary } from "@/lib/app-domain/mcp-connections";
 import { Forbidden } from "@/components/app/Forbidden";
-import { StatusBadge } from "@/components/app/StatusBadge";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
-
-const PROVIDER_LABEL: Record<string, string> = {
-  clickup: "ClickUp",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  NOT_CONNECTED: "לא מחובר",
-  CONNECTED: "מחובר",
-  ERROR: "שגיאה",
-};
 
 // Spec 12's admin screens table: "Integrations - placeholder + ClickUp
 // connection config when developed." Spec 17.3: "אפשר כבר ליצור מסך
@@ -33,6 +21,12 @@ const STATUS_LABEL: Record<string, string> = {
 // works comes first, the placeholder second. The old copy ("אין עדיין
 // חיבור פעיל לאף מערכת") was true when it was written and is not any
 // more.
+//
+// 26.9.2026: the "בפיתוח" half is gone. Ariel: "אפשר למחוק את clickup -
+// לא נשתמש בו כבר". It was the only card there, a placeholder that could
+// never be connected, on a screen whose job is to show what is. The
+// provider interface in lib/app-domain/integrations.ts is kept: it is the
+// shape the next real integration plugs into, and nothing renders it.
 export default async function IntegrationsPage() {
   const user = await requireUser();
 
@@ -44,8 +38,7 @@ export default async function IntegrationsPage() {
     );
   }
 
-  const [connections, claude, claudeOrg] = await Promise.all([
-    listIntegrationConnections(user),
+  const [claude, claudeOrg] = await Promise.all([
     getMyClaudeConnection(user),
     getClaudeOrgSummary(user),
   ]);
@@ -62,26 +55,6 @@ export default async function IntegrationsPage() {
 
         <ClaudeConnectionCard status={claude} orgSummary={claudeOrg} />
 
-        <div>
-          <h2 className="text-sm font-medium text-appNavy/50">בפיתוח</h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2">
-            {connections.map((connection) => {
-              const provider = getProvider(connection.provider);
-              const label = PROVIDER_LABEL[connection.provider] ?? connection.provider;
-              return (
-                <div key={connection.id} className="rounded-2xl border border-lineDark bg-white p-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-base font-medium text-appNavy">{label}</h3>
-                    <StatusBadge label={STATUS_LABEL[connection.status] ?? connection.status} tone={connection.status === "CONNECTED" ? "green" : connection.status === "ERROR" ? "red" : "gray"} />
-                  </div>
-                  <p className="mt-2 text-sm text-appNavy/60">
-                    {provider ? "בקרוב - טרם פותח חיבור אמיתי." : "ספק לא ידוע."}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
       </div>
     </>
   );

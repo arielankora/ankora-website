@@ -54,6 +54,16 @@ export function computeUtilization(
   };
 }
 
+/// How far through its cycle a bank is, from 0 (just started) to 1
+/// (ended). The Home screen's "צפי להיום" weights this by each bank's
+/// size. A cycle with no length counts as finished rather than dividing
+/// by zero.
+export function cycleElapsedShare(cycleStart: Date, cycleEnd: Date, now: Date): number {
+  const span = cycleEnd.getTime() - cycleStart.getTime();
+  if (span <= 0) return 1;
+  return Math.min(1, Math.max(0, (now.getTime() - cycleStart.getTime()) / span));
+}
+
 async function sumAdjustments(hourBankId: string): Promise<number> {
   const agg = await prisma.hourBankAdjustment.aggregate({
     where: { hourBankId },

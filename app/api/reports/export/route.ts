@@ -5,6 +5,7 @@ import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
 import type { TimeEntrySource } from "@prisma/client";
+import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): spec 14.4 marks XLSX/PDF as
 // "מומלץ" (recommended, not mandatory) alongside the mandatory CSV - this
@@ -29,9 +30,8 @@ function parseFormat(value: string | null): ExportFormat {
 // what the on-screen table shows.
 
 function parseDate(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T00:00:00`);
-  return isNaN(d.getTime()) ? undefined : d;
+  // Israel's midnight, not the server's. See dayStartInZone.
+  return dayStartInZone(value);
 }
 
 // Overnight bug-hunt (docs/adr/0001 section 19.5): see the identical fix
@@ -39,9 +39,7 @@ function parseDate(value: string | null): Date | undefined {
 // midnight, or the export silently drops the entire last day of the
 // selected range (same runReport() callees, same gte/lte bug).
 function parseDateEndOfDay(value: string | null): Date | undefined {
-  if (!value) return undefined;
-  const d = new Date(`${value}T23:59:59.999`);
-  return isNaN(d.getTime()) ? undefined : d;
+  return dayEndInZone(value);
 }
 
 function isReportType(value: string | null): value is ReportType {
