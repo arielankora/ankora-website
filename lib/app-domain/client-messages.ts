@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { ComposerProps } from "@/components/app/MessageClient";
 import type { User } from "@prisma/client";
 
@@ -256,6 +257,41 @@ export async function recordClientMessage(
   const body = input.body.trim();
   if (!body) throw new Error("אין מה לשמור: ההודעה ריקה.");
 
+  // The task is checked here, and it has to be checked here.
+  //
+  // 26.9.2026, level-3 hunt. The caller verifies the CLIENT against the
+  // actor's own list and then passes `taskId` straight through. Nothing
+  // looked at it. So a comment could be written onto any task in the
+  // system - a task belonging to a client the actor was never assigned
+  // to, or was assigned to once and is not any more - by sending a task
+  // id that is not the client's own.
+  //
+  // Two paths reach this same write and only the other one guarded it:
+  // addTaskComment() resolves the task, reads its client, and refuses if
+  // the actor is not on it. A rule that lives on one of two roads is not
+  // a rule.
+  //
+  // Scoping the lookup by clientId is what makes this correct rather
+  // than merely careful: the client was already established as the
+  // actor's, so a task that answers to that client is one the actor may
+  // write on, and a task that does not is refused without this function
+  // needing its own idea of who the actor is.
+  //
+  // It also fixes the audit line. The row records `clientId` from the
+  // input while the comment landed on a task belonging to someone else,
+  // so the log stated confidently that a message went to the wrong
+  // client. A trace that is wrong is worse than a trace that is missing.
+  let task: { id: string } | null = null;
+  if (input.taskId) {
+    task = await prisma.task.findFirst({
+      where: { id: input.taskId, clientId: input.clientId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!task) {
+      throw new ForbiddenError("המשימה הזו אינה של הלקוח הזה.");
+    }
+  }
+
   await recordAudit({
     actorId: actor.id,
     action: "client.message_sent",
@@ -265,10 +301,10 @@ export async function recordClientMessage(
     after: { kind: input.kind, channel: input.channel, taskId: input.taskId ?? null, length: body.length },
   });
 
-  if (input.taskId) {
+  if (task) {
     await prisma.taskComment.create({
       data: {
-        taskId: input.taskId,
+        taskId: task.id,
         authorId: actor.id,
         // Prefixed so the thread reads as what happened rather than as
         // an internal note somebody wrote to themselves. The thread
