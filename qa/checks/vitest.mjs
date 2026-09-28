@@ -25,8 +25,8 @@ function daysSince(iso) {
   return Math.round((Date.now() - new Date(iso).getTime()) / 86_400_000);
 }
 
-async function runSuite(dir, env = {}, extraArgs = []) {
-  const outFile = path.join(ROOT, "qa", "reports", `vitest-${path.basename(dir)}.json`);
+async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basename(dir)) {
+  const outFile = path.join(ROOT, "qa", "reports", `vitest-${reportName}.json`);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   const r = await sh(
     "npx",
@@ -101,6 +101,31 @@ function analyse(parsed, r, suiteName) {
 export async function unit() {
   const { r, parsed } = await runSuite("tests/unit");
   return analyse(parsed, r, "unit");
+}
+
+/// The unit suite again, with the process in UTC - the zone Vercel runs
+/// production in.
+///
+/// Added 28.9.2026 after a DST bug shipped in #127. qa.yml pins
+/// TZ=Asia/Jerusalem for determinism, and in that zone the broken
+/// date code happened to give the right answer: the test that described
+/// the bug passed in CI, and main went red the moment anything ran it in
+/// UTC. The weekly hunt of 27.9 found a second one of the same shape (the
+/// home screen counting "today" from 03:00). A pin that makes CI agree
+/// with a laptop in Tel Aviv also makes it disagree with the server,
+/// and the server is the one that matters.
+///
+/// So both runs happen. The Israel one stays: it is how the people using
+/// this read the dates, and a test that is only right in UTC is also
+/// wrong. The UTC one is the server's view. A failure in only one of the
+/// two is a date bug by definition, and it blocks like any other.
+///
+/// Same baseline, same rules. A known failure accepted for the Israel run
+/// is not silently accepted here unless its waiver says `suite: "unit"`
+/// and it fails the same way, which is the point.
+export async function unitUtc() {
+  const { r, parsed } = await runSuite("tests/unit", { TZ: "UTC" }, [], "unit-utc");
+  return analyse(parsed, r, "unit (UTC)");
 }
 
 export async function integration() {
