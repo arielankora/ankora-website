@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc } from "@/lib/timezone";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { addDaysToKey, dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc, weekdayOfKey } from "@/lib/timezone";
 
 // Phase 8 regression tests: spec section 24's pre-production checklist item
 // "Timezone tests around midnight/month boundary" was previously untested,
@@ -69,9 +69,76 @@ describe("dayStartInZone / dayEndInZone - a report's date filter", () => {
     expect((end.getTime() + 1 - start.getTime()) / 3600_000).toBe(25);
   });
 
+  it("keeps the March change too: the spring change day is 23 hours long", () => {
+    // Israel enters summer time on Friday 27.3.2026.
+    const start = dayStartInZone("2026-03-27")!;
+    const end = dayEndInZone("2026-03-27")!;
+    expect((end.getTime() + 1 - start.getTime()) / 3600_000).toBe(23);
+  });
+
+  it("puts midnight on the October change day in summer time, where it is", () => {
+    expect(dayStartInZone("2026-10-25")?.toISOString()).toBe("2026-10-24T21:00:00.000Z");
+    expect(dayStartInZone("2026-10-26")?.toISOString()).toBe("2026-10-25T22:00:00.000Z");
+  });
+
   it("refuses anything that is not a YYYY-MM-DD date", () => {
     expect(dayStartInZone("26/09/2026")).toBeUndefined();
     expect(dayStartInZone("")).toBeUndefined();
     expect(dayEndInZone(undefined)).toBeUndefined();
+  });
+});
+
+// 28.9.2026: "הזמן שלי" counts its week on date keys, so a DST change
+// cannot move a day.
+describe("addDaysToKey / weekdayOfKey - the week on the my-time screen", () => {
+  it("moves across a month and a year", () => {
+    expect(addDaysToKey("2026-09-30", 1)).toBe("2026-10-01");
+    expect(addDaysToKey("2026-12-31", 1)).toBe("2027-01-01");
+    expect(addDaysToKey("2026-03-01", -1)).toBe("2026-02-28");
+  });
+
+  it("is unaffected by the October clock change", () => {
+    expect(addDaysToKey("2026-10-24", 1)).toBe("2026-10-25");
+    expect(addDaysToKey("2026-10-25", 1)).toBe("2026-10-26");
+  });
+
+  it("knows Sunday is the first day of the Israeli week", () => {
+    expect(weekdayOfKey("2026-09-27")).toBe(0); // a Sunday
+    expect(addDaysToKey("2026-10-01", -weekdayOfKey("2026-10-01"))).toBe("2026-09-27");
+  });
+});
+
+// 28.9.2026: the October DST bug above passed here for a day because CI
+// runs with TZ=Asia/Jerusalem (qa.yml), while production on Vercel runs
+// in UTC, and the old code was only wrong under UTC. So the day bounds
+// are checked again with the process switched to UTC and to a third zone.
+// Node re-reads process.env.TZ when it changes, so this is the server's
+// view without a second CI job.
+describe.each(["UTC", "America/New_York"])("day bounds with the server in %s", (zone) => {
+  let saved: string | undefined;
+  beforeAll(() => {
+    saved = process.env.TZ;
+    process.env.TZ = zone;
+  });
+  afterAll(() => {
+    if (saved === undefined) delete process.env.TZ;
+    else process.env.TZ = saved;
+  });
+
+  it("really runs in that zone", () => {
+    expect(Intl.DateTimeFormat().resolvedOptions().timeZone).toBe(zone);
+  });
+
+  it("gives the same Israel midnights on both DST change days", () => {
+    expect(dayStartInZone("2026-10-25")?.toISOString()).toBe("2026-10-24T21:00:00.000Z");
+    expect(dayStartInZone("2026-10-26")?.toISOString()).toBe("2026-10-25T22:00:00.000Z");
+    expect(dayStartInZone("2026-03-27")?.toISOString()).toBe("2026-03-26T22:00:00.000Z");
+    expect(dayStartInZone("2026-03-28")?.toISOString()).toBe("2026-03-27T21:00:00.000Z");
+  });
+
+  it("gives an ordinary day 24 hours", () => {
+    const start = dayStartInZone("2026-09-28")!;
+    const end = dayEndInZone("2026-09-28")!;
+    expect((end.getTime() + 1 - start.getTime()) / 3600_000).toBe(24);
   });
 });

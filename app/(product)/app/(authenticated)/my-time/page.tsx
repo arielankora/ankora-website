@@ -7,6 +7,7 @@ import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ManualEntryForm } from "./ManualEntryForm";
 import { EntryRow } from "./EntryRow";
+import { addDaysToKey, dayStartInZone, weekdayOfKey } from "@/lib/timezone";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -24,19 +25,21 @@ const WEEKLY_TARGET_HOURS = 40;
 // 8-hour day reads as fully saturated gold, half a day half as much.
 const FULL_DAY_HOURS = 8;
 
-function startOfWeek(date: Date): Date {
-  // Israeli work-week convention: Sunday is day 0.
-  const key = new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(date);
-  const d = new Date(`${key}T00:00:00`);
-  const dow = d.getDay();
-  d.setDate(d.getDate() - dow);
-  return d;
+// The week is Israel's (28.9.2026). These used to build midnight with
+// `new Date(\`${key}T00:00:00\`)`, which is the SERVER's midnight: on
+// Vercel (UTC) the week started at 03:00 on Sunday Israel time, so work
+// logged between midnight and three landed in the previous week. Days are
+// now counted on the date key and turned into instants at Israel's
+// midnight, so a DST change cannot shift a day either.
+
+/// The Sunday (Israeli work week, Sunday = 0) of the week holding `key`.
+function weekStartKey(key: string): string {
+  return addDaysToKey(key, -weekdayOfKey(key));
 }
 
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date);
-  d.setDate(d.getDate() + days);
-  return d;
+/// Israel's midnight at the start of a `YYYY-MM-DD` day.
+function dayStart(key: string): Date {
+  return dayStartInZone(key) as Date;
 }
 
 function dateKey(date: Date): string {
@@ -78,11 +81,13 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
     );
   }
 
-  const anchor = searchParams.week ? new Date(`${searchParams.week}T00:00:00`) : new Date();
-  const weekStart = startOfWeek(anchor);
-  const weekEnd = addDays(weekStart, 7);
-  const prevWeek = dateKey(addDays(weekStart, -7));
-  const nextWeek = dateKey(addDays(weekStart, 7));
+  const anchorKey =
+    searchParams.week && dayStartInZone(searchParams.week) ? searchParams.week : dateKey(new Date());
+  const startKey = weekStartKey(anchorKey);
+  const weekStart = dayStart(startKey);
+  const weekEnd = dayStart(addDaysToKey(startKey, 7));
+  const prevWeek = addDaysToKey(startKey, -7);
+  const nextWeek = addDaysToKey(startKey, 7);
   const todayKeyStr = dateKey(new Date());
 
   const [entries, clients, allCategories] = await Promise.all([
@@ -102,7 +107,10 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
     if (!byDay.has(key)) byDay.set(key, []);
     byDay.get(key)!.push(entry);
   }
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+  // Noon rather than midnight for each day's instant: every formatter on
+  // this screen reads the date in Israel's zone, and noon is the same
+  // calendar day there whatever the offset that day is.
+  const days = Array.from({ length: 7 }, (_, i) => new Date(dayStart(addDaysToKey(startKey, i)).getTime() + 12 * 3600_000));
   const weekTotalSeconds = entries.reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
 
   return (
@@ -127,7 +135,7 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
                 ›
               </Link>
               <span className="text-[13.5px] font-medium text-appNavy">
-                {formatDay(weekStart)} – {formatDay(addDays(weekStart, 6))}
+                {formatDay(days[0])} - {formatDay(days[6])}
               </span>
               <Link
                 href={`/app/my-time?week=${nextWeek}`}
