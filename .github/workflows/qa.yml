@@ -126,6 +126,8 @@ jobs:
       # so without this, a change to the e2e specs would merge having
       # never once been executed. The suite has to be able to test the
       # thing it is made of.
+      # The same holds for qa/checks/vitest.mjs, which decides how the
+      # integration suite runs (added 29.9.2026 with the UTC run, #132).
       - name: Choose level
         id: level
         run: |
@@ -142,7 +144,7 @@ jobs:
               echo "value=2" >> "$GITHUB_OUTPUT"
             fi
           elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
-               | grep -qE '^(qa/(e2e/|playwright\.config\.ts)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
+               | grep -qE '^(qa/(e2e/|playwright\.config\.ts|checks/vitest\.mjs)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
             # Level 1 runs types, lint and the unit suite. It does not run
             # the integration suite, and it does not open a browser - so a
             # pull request that changes domain logic, or adds an
