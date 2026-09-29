@@ -128,27 +128,79 @@ export async function unitUtc() {
   return analyse(parsed, r, "unit (UTC)");
 }
 
-export async function integration() {
-  const env = {
+function integrationEnv() {
+  return {
     DATABASE_URL:
       process.env.QA_DATABASE_URL ??
       process.env.DATABASE_URL ??
       "postgresql://ankora:ankora_dev_only@127.0.0.1:55432/ankora_dev",
   };
-  // --no-file-parallelism is not a performance choice, it is a
-  // correctness one.
-  //
-  // Every file under tests/integration shares ONE database and calls
-  // resetDb() - a TRUNCATE of every table - in its own beforeEach. Run
-  // two files at once and one of them truncates the rows the other is
-  // mid-way through using. The first CI run showed exactly that: 67
-  // failures, foreign-key violations on creates across a dozen unrelated
-  // tables, and assertions like "expected 90 to be 150" where rows had
-  // simply vanished underneath the test.
-  //
-  // It reads as 67 broken features. It is one broken assumption. The
-  // suite has raced itself since it was written; running the files in
-  // sequence is what makes any of its results mean anything.
-  const { r, parsed } = await runSuite("tests/integration", env, ["--no-file-parallelism"]);
+}
+
+// --no-file-parallelism is not a performance choice, it is a
+// correctness one.
+//
+// Every file under tests/integration shares ONE database and calls
+// resetDb() - a TRUNCATE of every table - in its own beforeEach. Run
+// two files at once and one of them truncates the rows the other is
+// mid-way through using. The first CI run showed exactly that: 67
+// failures, foreign-key violations on creates across a dozen unrelated
+// tables, and assertions like "expected 90 to be 150" where rows had
+// simply vanished underneath the test.
+//
+// It reads as 67 broken features. It is one broken assumption. The
+// suite has raced itself since it was written; running the files in
+// sequence is what makes any of its results mean anything.
+export async function integration() {
+  const { r, parsed } = await runSuite("tests/integration", integrationEnv(), ["--no-file-parallelism"]);
   return analyse(parsed, r, "integration");
+}
+
+/// The files whose code turns an instant into a day, a week, a month or a
+/// billing cycle. Chosen 29.9.2026 by what each file exercises, not by
+/// name: time entries, hour banks and their batch job, the client portal's
+/// periods, adoption and alerts (both count "today"), notification
+/// digests, reports, billing, important dates, the backup export and the
+/// portal's third phase. A new date-heavy file belongs on this list; the
+/// level-3 run covers everything regardless, so a file missing here is
+/// caught weekly, not never.
+export const DATE_SENSITIVE_INTEGRATION = [
+  "time-entries",
+  "hour-banks",
+  "hour-banks-batch",
+  "client-portal",
+  "team-adoption",
+  "alerts",
+  "task-notifications",
+  "reports",
+  "billing",
+  "important-dates",
+  "backup-export",
+  "portal-phase3",
+].map((name) => `tests/integration/${name}.test.ts`);
+
+/// The integration suite again, with the process in UTC, the zone Vercel
+/// runs production in. Same reason as unitUtc above, one layer down: the
+/// unit run proves the date helpers, this proves the queries that use
+/// them return the right rows around midnight and across DST.
+///
+/// A full second run would add ~11 minutes to every PR gate, so level 2
+/// runs the date-sensitive files and level 3 runs all of them. Files run
+/// in sequence for the same reason as the Israel run: they share one
+/// database and truncate it.
+export async function integrationUtc(level) {
+  const files = level >= 3 ? ["tests/integration"] : DATE_SENSITIVE_INTEGRATION;
+  const missing = files.filter((f) => !fs.existsSync(path.join(ROOT, f)));
+  if (missing.length) {
+    // A renamed file would otherwise drop out of the UTC run in silence.
+    return [finding("blocker", "UTC integration list names a file that does not exist", missing.join("\n"))];
+  }
+  const [first, ...rest] = files;
+  const { r, parsed } = await runSuite(
+    first,
+    { ...integrationEnv(), TZ: "UTC" },
+    [...rest, "--no-file-parallelism"],
+    "integration-utc",
+  );
+  return analyse(parsed, r, "integration (UTC)");
 }
