@@ -110,6 +110,13 @@ async function main() {
   // Everything below needs either a database, a build, or a browser -
   // which is exactly why it is not in the fast lane.
   await run.check("integration", { label: "Integration tests", level: 2, skipIf: needs.database }, vitest.integration);
+  // The same suite in UTC, like the server (see integrationUtc in
+  // checks/vitest.mjs). Level 2 runs the date-sensitive files, level 3 all.
+  await run.check(
+    "integration-utc",
+    { label: "Integration tests (UTC, like the server)", level: 2, skipIf: needs.database },
+    () => vitest.integrationUtc(level),
+  );
   await run.check("build", { label: "Production build", level: 2, skipIf: needs.prisma }, async () => {
     const r = await sh("npx", ["next", "build"], { timeoutMs: 20 * 60_000, env: { SKIP_ENV_VALIDATION: "1" } });
     if (r.code === 0) return [];
