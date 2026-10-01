@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import TechnologyClient from "./TechnologyClient";
 
 const meta = {
@@ -27,9 +28,10 @@ export async function generateMetadata(
     description: m.description,
     alternates: {
       canonical: `/${locale}/technology`,
-      languages: { he: "/he/technology", en: "/en/technology" },
+      languages: { he: "/he/technology", en: "/en/technology", "x-default": "/he/technology" },
     },
     openGraph: {
+      ...ogBase(locale, `/technology`),
       title: m.title,
       description: m.description,
       type: "website",

@@ -85,6 +85,14 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             <Link href={withLocale(locale, "/ankora-vs-personal-assistant")} className={LINK}>
               {dict.nav.ankoraVsPersonalAssistant}
             </Link>
+            {/* The two comparison/answer pages had 5 and 7 internal links each and
+                were never crawled as often as the rest (SEO/GEO audit, 1.10.2026). */}
+            <Link href={withLocale(locale, "/ankora-vs-ai-assistants")} className={LINK}>
+              {dict.nav.ankoraVsAiAssistants}
+            </Link>
+            <Link href={withLocale(locale, "/personal-assistant-for-executives")} className={LINK}>
+              {dict.nav.personalAssistantForExecutives}
+            </Link>
             <Link href={withLocale(locale, "/privacy")} className={LINK}>{dict.footer.privacy}</Link>
             <Link href={withLocale(locale, "/terms")} className={LINK}>{dict.footer.terms}</Link>
             <Link href={withLocale(locale, "/service-terms")} className={LINK}>{dict.footer.serviceTerms}</Link>

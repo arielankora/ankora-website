@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { getAllPosts, BLOG_CATEGORY_SLUGS } from "@/lib/blog";
@@ -18,9 +19,10 @@ export async function generateMetadata(
     description: dict.blog.sub,
     alternates: {
       canonical: `/${locale}/blog`,
-      languages: { he: "/he/blog", en: "/en/blog" },
+      languages: { he: "/he/blog", en: "/en/blog", "x-default": "/he/blog" },
     },
     openGraph: {
+      ...ogBase(locale, `/blog`),
       title: `${dict.blog.title} | Ankora`,
       description: dict.blog.sub,
       type: "website",

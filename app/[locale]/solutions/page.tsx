@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import SolutionsIndexClient from "./SolutionsIndexClient";
 
 const meta = {
   en: {
-    title: "Personal Operations Management — Who It's For | Ankora",
+    title: "Personal Operations Management: Who It's For | Ankora",
     description:
       "Ankora provides Personal Operations Management, an outsourced alternative to hiring another assistant, for executives, founders, growing companies and family offices in Israel.",
   },
@@ -27,9 +28,10 @@ export async function generateMetadata(
     description: m.description,
     alternates: {
       canonical: `/${locale}/solutions`,
-      languages: { he: "/he/solutions", en: "/en/solutions" },
+      languages: { he: "/he/solutions", en: "/en/solutions", "x-default": "/he/solutions" },
     },
     openGraph: {
+      ...ogBase(locale, `/solutions`),
       title: m.title,
       description: m.description,
       type: "website",

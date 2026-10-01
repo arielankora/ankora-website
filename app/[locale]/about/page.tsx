@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { AboutPageClient } from "@/components/sections/AboutPageClient";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { orgRef, WEBSITE_ID } from "@/lib/schema";
 
 export async function generateMetadata(
   props: {
@@ -17,9 +19,10 @@ export async function generateMetadata(
     description: dict.meta.aboutDescription,
     alternates: {
       canonical: `/${locale}/about`,
-      languages: { he: "/he/about", en: "/en/about" },
+      languages: { he: "/he/about", en: "/en/about", "x-default": "/he/about" },
     },
     openGraph: {
+      ...ogBase(locale, `/about`),
       title: dict.meta.aboutTitle,
       description: dict.meta.aboutDescription,
       type: "website",
@@ -34,27 +37,24 @@ export default async function AboutPage(props: { params: Promise<{ locale: strin
   const p = dict.pages.about;
   const base = SITE_URL;
 
-  const organizationSchema = {
+  // The Organization itself is published once, by the layout (lib/schema.ts).
+  // This page is ABOUT it, and says so.
+  const aboutSchema = {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Ankora",
-    url: base,
-    logo: `${base}/logo.png`,
+    "@type": "AboutPage",
+    "@id": `${base}/${locale}/about#webpage`,
+    url: `${base}/${locale}/about`,
+    name: dict.meta.aboutTitle,
     description: p.entityDefinition,
-    email: "hello@ankora.co.il",
-    areaServed: "IL",
-    address: { "@type": "PostalAddress", addressLocality: "Tel Aviv", addressCountry: "IL" },
-    contactPoint: {
-      "@type": "ContactPoint",
-      email: "hello@ankora.co.il",
-      contactType: "customer service",
-      areaServed: "IL",
-    },
+    inLanguage: locale,
+    about: orgRef,
+    mainEntity: orgRef,
+    isPartOf: { "@id": WEBSITE_ID },
   };
 
   return (
     <>
-      <JsonLd id="about-organization-schema" data={organizationSchema} />
+      <JsonLd id="about-page-schema" data={aboutSchema} />
       <AboutPageClient dict={dict} locale={locale} />
     </>
   );

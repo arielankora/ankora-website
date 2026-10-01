@@ -17,6 +17,8 @@ type Locale = "he" | "en";
 const TRANSLATIONS: Record<string, string> = {
   "he/esta": "forgot-to-renew-your-esta-and-only-found-out-at-the-airport-here-s-what-to-do",
   "en/forgot-to-renew-your-esta-and-only-found-out-at-the-airport-here-s-what-to-do": "esta",
+  "he/business-travel-planning": "business-travel-starts-long-before-you-board-the-plane",
+  "en/business-travel-starts-long-before-you-board-the-plane": "business-travel-planning",
 };
 
 /**

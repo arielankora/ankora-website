@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SegmentPage } from "@/components/sections/SegmentPage";
 import { getStoriesForSolution } from "@/lib/customer-stories";
@@ -29,9 +30,10 @@ export async function generateMetadata(
     description: m.description,
     alternates: {
       canonical: `/${locale}/solutions/companies`,
-      languages: { he: "/he/solutions/companies", en: "/en/solutions/companies" },
+      languages: { he: "/he/solutions/companies", en: "/en/solutions/companies", "x-default": "/he/solutions/companies" },
     },
     openGraph: {
+      ...ogBase(locale, `/solutions/companies`),
       title: m.title,
       description: m.description,
       type: "website",

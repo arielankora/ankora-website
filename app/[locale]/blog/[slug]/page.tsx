@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote-client/rsc";
@@ -13,6 +14,8 @@ import { BlogCard } from "@/components/sections/BlogCard";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { Reveal } from "@/components/motion/Reveal";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { getTranslatedBlogSlug } from "@/lib/blog-translations";
+import { orgRef, WEBSITE_ID } from "@/lib/schema";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
   const locale = params.locale === "en" ? "en" : "he";
@@ -28,14 +31,28 @@ export async function generateMetadata(
   const locale = params.locale === "en" ? "en" : "he";
   const post = getPostBySlug(locale as Locale, params.slug);
   if (!post) return {};
+  const other = locale === "he" ? "en" : "he";
+  const translated = getTranslatedBlogSlug(locale as Locale, post.slug);
 
   return {
     title: `${post.title} | Ankora Blog`,
     description: post.excerpt,
     alternates: {
       canonical: `/${locale}/blog/${post.slug}`,
+      // hreflang only when the other language really has this post; slugs differ
+      // per locale, so the pair comes from lib/blog-translations.ts.
+      ...(translated
+        ? {
+            languages: {
+              [locale]: `/${locale}/blog/${post.slug}`,
+              [other]: `/${other}/blog/${translated}`,
+              "x-default": locale === "he" ? `/he/blog/${post.slug}` : `/he/blog/${translated}`,
+            },
+          }
+        : {}),
     },
     openGraph: {
+      ...ogBase(locale, `/blog/${post.slug}`),
       title: post.title,
       description: post.excerpt,
       type: "article",
@@ -111,13 +128,16 @@ export default async function BlogPostPage(
     description: post.excerpt,
     datePublished: post.publishedAt,
     dateModified: post.updatedAt || post.publishedAt,
-    ...(post.coverImage ? { image: post.coverImage } : {}),
-    author: { "@type": "Organization", name: post.author || "Ankora", url: base },
-    publisher: {
-      "@type": "Organization",
-      name: "Ankora",
-      logo: { "@type": "ImageObject", url: `${base}/logo.png` },
-    },
+    inLanguage: locale,
+    ...(post.coverImage ? { image: post.coverImage.startsWith("http") ? post.coverImage : `${base}${post.coverImage}` } : {}),
+    // A named author is a person, not an organisation. Posts without one are
+    // written by Ankora itself.
+    author:
+      post.author && post.author !== "Ankora"
+        ? { "@type": "Person", name: post.author, worksFor: orgRef }
+        : orgRef,
+    publisher: orgRef,
+    isPartOf: { "@id": WEBSITE_ID },
     mainEntityOfPage: { "@type": "WebPage", "@id": `${base}/${locale}/blog/${post.slug}` },
   };
 

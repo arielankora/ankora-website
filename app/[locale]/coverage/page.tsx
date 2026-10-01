@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import CoverageClient from "./CoverageClient";
 import { SITE_URL } from "@/lib/site";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { orgRef } from "@/lib/schema";
 
 const meta = {
   en: {
@@ -48,9 +50,10 @@ export async function generateMetadata(
     description: m.description,
     alternates: {
       canonical: `/${locale}/coverage`,
-      languages: { he: "/he/coverage", en: "/en/coverage" },
+      languages: { he: "/he/coverage", en: "/en/coverage", "x-default": "/he/coverage" },
     },
     openGraph: {
+      ...ogBase(locale, `/coverage`),
       title: m.title,
       description: m.description,
       type: "website",
@@ -69,7 +72,7 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
     "@type": "Service",
     serviceType: "Personal Operations Management",
     name: m.title,
-    provider: { "@type": "Organization", name: "Ankora", url: base },
+    provider: orgRef,
     areaServed: "IL",
     description: m.description,
     url: `${base}/${locale}/coverage`,
