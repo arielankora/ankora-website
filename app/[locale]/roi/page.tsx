@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import RoiClient from "./RoiClient";
 
-// /he: dedicated title/description so this conversion page doesn't fall back to the
-// generic site meta (flagged and fixed per Ariel's production QA pass). /en keeps its
-// prior behaviour (no override) -- untouched, per project convention.
-const heMeta = {
-  title: "מחשבון ROI | כמה Ankora חוסכת לכם | Ankora",
-  description:
-    "מחשבון אינטראקטיבי: הזינו את שעות התפעול השבועיות שלכם וקבלו הערכה מיידית של שעות וכסף שאנקורה יכולה לחסוך לכם בחודש.",
-};
+// Both locales get a dedicated title and description, like /contact. /en used to
+// fall back to the generic site meta (SEO/GEO audit, 1.10.2026).
+const PAGE_META = {
+  he: {
+    title: "מחשבון ROI | כמה Ankora חוסכת לכם | Ankora",
+    description:
+      "מחשבון אינטראקטיבי: הזינו את שעות התפעול השבועיות שלכם וקבלו הערכה מיידית של שעות וכסף שאנקורה יכולה לחסוך לכם בחודש.",
+  },
+  en: {
+    title: "ROI Calculator: How Much Time Ankora Gives Back | Ankora",
+    description:
+      "Enter your weekly hours of operational work and see an instant estimate of the time and money Ankora returns to you each month.",
+  },
+} as const;
 
 export async function generateMetadata(
   props: {
@@ -17,12 +23,11 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const locale = params.locale === "en" ? "en" : "he";
-  const meta =
-    locale === "he"
-      ? { title: heMeta.title, description: heMeta.description }
-      : {};
+  const meta = PAGE_META[locale];
   return {
-    ...meta,
+    title: meta.title,
+    description: meta.description,
+    openGraph: { title: meta.title, description: meta.description, type: "website" },
     alternates: {
       canonical: `/${locale}/roi`,
       languages: { he: "/he/roi", en: "/en/roi" },

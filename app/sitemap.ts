@@ -39,9 +39,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
   for (const locale of ["he", "en"] as const) {
     for (const route of routes) {
+      // No lastModified for static routes. It used to be new Date(), which told
+      // Google every page changed on every build; Google only trusts lastmod
+      // when it is consistently accurate, so a wrong one is worse than none.
+      // Blog posts and stories below carry their real dates.
       entries.push({
         url: `${base}/${locale}${route.path}`,
-        lastModified: new Date(),
         changeFrequency: route.changeFrequency,
         priority: route.priority,
       });
