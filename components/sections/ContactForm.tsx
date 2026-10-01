@@ -1,27 +1,11 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { track } from "@/lib/analytics";
 import type { Dictionary } from "@/content";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 
 type Status = "idle" | "loading" | "success" | "error";
-
-/**
- * The one conversion GA4 should count: a contact request the server accepted.
- * The old key event, "Contact_us_page", fired on every view of /contact, so it
- * counted bots and browsers as leads (14 of its 32 hits in the 90 days to
- * 1.10.2026 came from US data centres). Mark generate_lead as the key event in
- * GA4 and retire Contact_us_page there. gtag is absent for automated browsers
- * (see the layout), and a failure here must never touch the form.
- */
-function trackLead() {
-  try {
-    const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
-    gtag?.("event", "generate_lead", { form: "contact" });
-  } catch {
-    // Analytics is never allowed to break a submitted form.
-  }
-}
 
 const FIELD =
   "w-full min-h-[44px] border border-[rgba(243,234,219,0.18)] bg-[rgba(11,27,51,0.5)] px-4 py-3 text-cream outline-none transition-colors duration-200 focus:border-gold focus:bg-[rgba(176,141,87,0.06)]";
@@ -38,10 +22,37 @@ const FIELD =
 export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
   const [status, setStatus] = useState<Status>("idle");
   const id = useId();
+  // Funnel events (see lib/analytics.ts). Each fires once per page view, so a
+  // person who fixes a typo does not count twice.
+  const started = useRef(false);
+  const fieldsDone = useRef(new Set<string>());
+  const invalidReported = useRef(false);
+
+  function onFirstInteraction() {
+    if (started.current) return;
+    started.current = true;
+    track("contact_form_start", { form: "contact" });
+  }
+
+  function onFieldBlur(e: React.FocusEvent<HTMLFormElement>) {
+    const el = e.target as unknown as HTMLInputElement | HTMLTextAreaElement;
+    if (!el.name || !el.value.trim() || fieldsDone.current.has(el.name)) return;
+    fieldsDone.current.add(el.name);
+    track("contact_form_field", { form: "contact", field: el.name, fields_done: fieldsDone.current.size });
+  }
+
+  function onInvalid(e: React.FormEvent<HTMLInputElement>) {
+    // "invalid" fires once per bad field; report the first one per attempt.
+    if (invalidReported.current) return;
+    invalidReported.current = true;
+    track("contact_form_invalid", { form: "contact", field: e.currentTarget.name });
+    setTimeout(() => (invalidReported.current = false), 0);
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setStatus("loading");
+    track("contact_form_submit", { form: "contact", fields_done: fieldsDone.current.size });
     const form = e.currentTarget;
     const data = new FormData(form);
 
@@ -57,12 +68,20 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
         }),
       });
 
-      if (!res.ok) throw new Error("Request failed");
+      if (!res.ok) {
+        track("contact_form_error", { form: "contact", reason: `http_${res.status}` });
+        setStatus("error");
+        return;
+      }
 
       setStatus("success");
       form.reset();
-      trackLead();
+      // The one conversion GA4 should count: a request the server accepted.
+      // Marked as the key event in GA4; the old Contact_us_page (fired on every
+      // view of /contact) was unmarked on 1.10.2026.
+      track("generate_lead", { form: "contact" });
     } catch {
+      track("contact_form_error", { form: "contact", reason: "network" });
       setStatus("error");
     }
   }
@@ -71,12 +90,18 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
 
   return (
     <GlassPanel elevated className="p-[clamp(22px,3vw,40px)]">
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        onFocus={onFirstInteraction}
+        onInput={onFirstInteraction}
+        onBlur={onFieldBlur}
+        className="space-y-5"
+      >
         <div>
           <label htmlFor={`${id}-name`} className={label}>
             {p.nameLabel}
           </label>
-          <input id={`${id}-name`} name="name" type="text" autoComplete="name" required className={FIELD} />
+          <input id={`${id}-name`} name="name" type="text" autoComplete="name" required onInvalid={onInvalid} className={FIELD} />
         </div>
         <div>
           <label htmlFor={`${id}-email`} className={label}>
@@ -88,6 +113,7 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
             type="email"
             autoComplete="email"
             required
+            onInvalid={onInvalid}
             dir="ltr"
             className={`${FIELD} text-end`}
           />
