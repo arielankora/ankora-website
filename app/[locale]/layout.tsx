@@ -1,20 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import "@fontsource/heebo/200.css";
-import "@fontsource/heebo/300.css";
-import "@fontsource/heebo/400.css";
-import "@fontsource/heebo/500.css";
-import "@fontsource/heebo/600.css";
-import "@fontsource/heebo/700.css";
-import "@fontsource/heebo/800.css";
-// Redesign (/he) typography: Assistant for body/lead/eyebrow, JetBrains Mono for captions.
-import "@fontsource/assistant/200.css";
-import "@fontsource/assistant/300.css";
-import "@fontsource/assistant/400.css";
-import "@fontsource/assistant/500.css";
-import "@fontsource/assistant/600.css";
-import "@fontsource/jetbrains-mono/300.css";
-import "@fontsource/jetbrains-mono/400.css";
+// Brand fonts (Heebo, Assistant, JetBrains Mono) as self-hosted variable fonts.
+import "../fonts.css";
 import "../globals.css";
 import { getDictionary, locales, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
@@ -94,6 +81,14 @@ export default async function LocaleLayout(
   return (
     <html lang={locale} dir={dir}>
       <head>
+        {/* The headline face, fetched with the HTML instead of after the CSS. */}
+        <link
+          rel="preload"
+          href={locale === "he" ? "/fonts/heebo-hebrew-var-v5.woff2" : "/fonts/heebo-latin-var-v5.woff2"}
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
         {/* Google tag (gtag.js). Not loaded for automated browsers: about 97% of
             GA4 users in the 90 days to 1.10.2026 were headless Chrome in US data
             centres (0s engagement), which made every report unusable.

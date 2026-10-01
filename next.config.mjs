@@ -139,6 +139,12 @@ const nextConfig = {
   },
   async headers() {
     return [
+      // Self-hosted brand fonts (app/fonts.css). The version is in the file
+      // name, so a new font version is a new URL and these can be cached forever.
+      {
+        source: '/fonts/:file*',
+        headers: [{ key: 'Cache-Control', value: 'public, max-age=31536000, immutable' }],
+      },
       {
         source: '/:path*',
         headers: [
