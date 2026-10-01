@@ -224,7 +224,18 @@ export interface SegmentContent {
   eyebrow: string;
   title: string;
   sub: string;
+  /** <title> and search snippet (at most ~155 characters). */
+  metaTitle: string;
+  metaDescription: string;
+  /** The "In short" paragraph: answers "what does Ankora do for this profile" in one
+   *  self-contained passage, which is the part search engines and AI models quote. */
+  directAnswer: string;
+  /** Typical situations for the profile. Descriptions of the work, not client stories. */
+  situations: { title: string; body: string }[];
   bullets: { title: string; body: string }[];
+  afterMonth: string[];
+  /** Also published as FAQPage structured data. */
+  faq: { q: string; a: string }[];
   closing: string;
 }
 
@@ -241,6 +252,11 @@ export interface SegmentBridge {
   comparisonLink: string;
   post: string;
   moreLabel: string;
+  inShortLabel: string;
+  situationsTitle: string;
+  takesTitle: string;
+  afterMonthTitle: string;
+  faqTitle: string;
 }
 
 export interface SimplePageContent {

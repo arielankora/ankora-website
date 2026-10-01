@@ -2,20 +2,11 @@ import type { Metadata } from "next";
 import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SegmentPage } from "@/components/sections/SegmentPage";
+import { JsonLd } from "@/components/seo/JsonLd";
 import { getStoriesForSolution } from "@/lib/customer-stories";
+import { segmentSchemas } from "@/lib/segment-schema";
 
-const meta = {
-  en: {
-    title: "Personal Operations Management for Executives | Ankora",
-    description:
-      "An outsourced Personal Operations Management service for senior executives in Israel: a dedicated Operations Manager who owns vendors, travel, personal administration and scheduling end to end, without hiring another full-time assistant.",
-  },
-  he: {
-    title: "ניהול תפעול אישי למנהלים בכירים | Ankora",
-    description:
-      "שירות חיצוני לניהול תפעול אישי למנהלים בכירים בישראל: מנהל תפעול ייעודי שלוקח אחריות על ספקים, נסיעות, מנהלה ותיאומים, בלי לגייס עובד נוסף.",
-  },
-} as const;
+const PATH = "/solutions/executives";
 
 export async function generateMetadata(
   props: {
@@ -23,19 +14,19 @@ export async function generateMetadata(
   }
 ): Promise<Metadata> {
   const params = await props.params;
-  const locale = params.locale === "en" ? "en" : "he";
-  const m = meta[locale];
+  const locale = (params.locale === "en" ? "en" : "he") as Locale;
+  const c = getDictionary(locale).pages.segments.executives;
   return {
-    title: m.title,
-    description: m.description,
+    title: c.metaTitle,
+    description: c.metaDescription,
     alternates: {
-      canonical: `/${locale}/solutions/executives`,
-      languages: { he: "/he/solutions/executives", en: "/en/solutions/executives", "x-default": "/he/solutions/executives" },
+      canonical: `/${locale}${PATH}`,
+      languages: { he: `/he${PATH}`, en: `/en${PATH}`, "x-default": `/he${PATH}` },
     },
     openGraph: {
-      ...ogBase(locale, `/solutions/executives`),
-      title: m.title,
-      description: m.description,
+      ...ogBase(locale, PATH),
+      title: c.metaTitle,
+      description: c.metaDescription,
       type: "website",
     },
   };
@@ -45,14 +36,20 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
+  const content = dict.pages.segments.executives;
+  const { service, faq } = segmentSchemas({ locale, path: PATH, content });
   return (
-    <SegmentPage
-      dict={dict}
-      content={dict.pages.segments.executives}
-      locale={locale}
-      cta={dict.hero.ctaPrimary}
-      currentHref="/solutions/executives"
-      stories={getStoriesForSolution(locale, "/solutions/executives", 2)}
-    />
+    <>
+      <JsonLd id="segment-service-schema" data={service} />
+      <JsonLd id="segment-faq-schema" data={faq} />
+      <SegmentPage
+        dict={dict}
+        content={content}
+        locale={locale}
+        cta={dict.hero.ctaPrimary}
+        currentHref={PATH}
+        stories={getStoriesForSolution(locale, PATH, 2)}
+      />
+    </>
   );
 }
