@@ -21,6 +21,7 @@ import { SITE_URL } from "@/lib/site";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PageShell } from "@/components/layout/PageShell";
+import { CtaTracking } from "@/components/analytics/CtaTracking";
 
 function isLocale(value: string): value is Locale {
   return (locales as string[]).includes(value);
@@ -116,6 +117,7 @@ export default async function LocaleLayout(
           <main>{children}</main>
           <Footer dict={dict} locale={locale} />
         </PageShell>
+        <CtaTracking />
       </body>
     </html>
   );
