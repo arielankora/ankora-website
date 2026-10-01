@@ -29,9 +29,9 @@ const en: Dictionary = {
     blog: "Blog",
     solutionsMenu: [
       { label: "Executives", blurb: "Focus your attention on what actually deserves it.", href: "/solutions/executives" },
-      { label: "Founders", blurb: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
+      { label: "Self-Employed", blurb: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
       { label: "Growing Companies", blurb: "Operational infrastructure that scales with you.", href: "/solutions/companies" },
-      { label: "Family Offices", blurb: "One layer of management, full peace of mind.", href: "/solutions/family-office" },
+      { label: "Small Offices", blurb: "One layer of management, full peace of mind.", href: "/solutions/family-office" },
     ],
   },
   hero: {
@@ -149,9 +149,9 @@ const en: Dictionary = {
     itemCta: "Learn more →",
     items: [
       { title: "Executives", body: "Focus on the decisions that actually require you.", href: "/solutions/executives" },
-      { title: "Founders", body: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
+      { title: "Self-Employed", body: "Grow without carrying every operational detail alone.", href: "/solutions/founders" },
       { title: "Growing Companies", body: "Operational infrastructure that scales with you, not against you.", href: "/solutions/companies" },
-      { title: "Family Offices", body: "One management layer for the complexity of several lives.", href: "/solutions/family-office" },
+      { title: "Small Offices", body: "One management layer for the complexity of several areas of responsibility.", href: "/solutions/family-office" },
     ],
   },
   trust: {
@@ -506,29 +506,140 @@ const en: Dictionary = {
       categoryLink: "Personal Operations Management",
       mid: " in practice, ",
       comparisonLink: "an alternative to hiring a personal assistant",
-      post: " for executives, founders and family offices.",
+      post: " for executives, the self-employed, growing companies and small offices.",
       moreLabel: "More solutions",
+      inShortLabel: "In short",
+      situationsTitle: "What it looks like in practice",
+      takesTitle: "What Ankora takes on",
+      afterMonthTitle: "What changes after a month",
+      faqTitle: "Frequently asked questions",
     },
     segments: {
       executives: {
         eyebrow: "Executives",
         title: "Focus on the decisions that actually require you.",
         sub: "Your success requires hundreds of decisions a day. Not all of them need to go through you.",
+        metaTitle: "Personal Operations Management for Executives | Ankora",
+        metaDescription: "A dedicated Operations Manager, backed by AI, who owns the admin, vendors and personal logistics of senior executives, so your focus stays on the business.",
+        directAnswer: "At work, a senior executive has a team, a budget and assistants. Outside work, they manage everything alone: authorities, banks, home vendors, renewals, travel and family logistics. Ankora gives senior executives in Israel a dedicated Operations Manager, backed by AI orchestration, who takes full ownership of that side. Not isolated tasks, but whole areas of responsibility, from the request to the close. You explain once, approve only what genuinely needs you, and pay only for time actually worked.",
+        situations: [
+          {
+            title: "A renewal nobody remembered",
+            body: "A passport, a driver's license, an insurance policy or a subscription. Your Operations Manager tracks the deadlines, prepares the documents, books the appointment and confirms the renewal is closed. You hear about it only when a signature or your presence is needed.",
+          },
+          {
+            title: "A problem at home in a packed week",
+            body: "The air conditioning, a leak or the alarm system. Your Operations Manager finds the right professional, arranges access to the house, follows the repair to the end and checks it does not come back. Your business calendar never opens for it.",
+          },
+          {
+            title: "A trip that changes on the way",
+            body: "A cancelled flight, a meeting that moved, a hotel stay to extend. The system monitors the changes, and your Operations Manager arranges an alternative based on the preferences already on file. You get the solution, not the problem.",
+          },
+          {
+            title: "What belongs to the family",
+            body: "Classes, doctors, gifts and events. Managed in parallel, separate from your business day, and never routed through your office assistant.",
+          },
+        ],
         bullets: [
-          { title: "Time & commitment management", body: "A calendar, reminders, and follow-up that don't require you to remember." },
-          { title: "Administrative liaison", body: "With authorities, banks, and institutions, without you standing in line." },
-          { title: "Personal & family coordination", body: "Handled separately, without spilling into your business day." },
+          {
+            title: "Time & commitment management",
+            body: "Reminders, deadlines and follow-up, so nothing depends on your memory.",
+          },
+          {
+            title: "Administrative liaison",
+            body: "With authorities, banks, insurers and health funds, from filing the request to receiving the answer.",
+          },
+          {
+            title: "Personal & family coordination",
+            body: "Home, vendors, travel and events, kept out of your business day.",
+          },
+        ],
+        afterMonth: [
+          "Requests get shorter. The system remembers preferences, vendors and past decisions, so you never explain twice.",
+          "Updates arrive before you ask: what closed, what is in progress, and what is waiting for a decision.",
+          "The list of open items in your head gets shorter, because each of them has an owner.",
+        ],
+        faq: [
+          {
+            q: "I already have an assistant at the office. Why would I need someone else?",
+            a: "An office assistant manages your business calendar and what belongs to your role. Ankora manages what sits outside it: your home, the authorities, vendors and family. That keeps your personal side out of the office, and the two layers work in parallel.",
+          },
+          {
+            q: "How is discretion protected?",
+            a: "Access to information is limited to whoever is actually handling it, every action is documented, and confidentiality is the default. Financial or sensitive decisions always go through a person and are never made without your approval.",
+          },
+          {
+            q: "How much does it cost?",
+            a: "You pay only for time actually worked, from a monthly hour bank. Every task is tracked to the minute, with a 15-minute minimum, and unused hours roll over to the next month. The details are on the pricing page.",
+          },
+          {
+            q: "What do I still need to do myself?",
+            a: "Say what needs to happen, by call, message or email, and approve what requires you. Everything else stays with your Operations Manager until it is closed.",
+          },
         ],
         closing: "One Operations Manager who knows your pace.",
       },
       founders: {
-        eyebrow: "Founders",
+        eyebrow: "Self-Employed",
         title: "Grow without carrying every operational detail alone.",
-        sub: "In the early stages you do everything. Ankora gives you an operational layer without hiring another role.",
+        sub: "In the early stages you do everything yourself. Ankora adds an operational layer, without hiring another role.",
+        metaTitle: "Operations Management for the Self-Employed | Ankora",
+        metaDescription: "An operational layer for the self-employed: a dedicated Operations Manager for vendors, admin and personal tasks. No hire, no long-term commitment.",
+        directAnswer: "When you work for yourself, you are the product, the sales team and the operations department. Every hour spent on vendors, paperwork and coordination is an hour that does not go to clients. Ankora gives self-employed professionals and small business owners in Israel a dedicated Operations Manager, backed by AI orchestration, who takes on the operational side of the business and of life. You pay only for hours actually worked, with no employment and no long-term commitment, and the scope goes up or down month by month.",
+        situations: [
+          {
+            title: "A vendor you need to choose",
+            body: "An accountant, a lawyer, a designer or an IT provider. Your Operations Manager brings options from a vetted vendor network, compares quotes and presents a recommendation. You decide, and from there your Operations Manager coordinates and follows through.",
+          },
+          {
+            title: "The admin that piles up",
+            body: "Documents for your accountant, renewals to track, forms and requests to the bank or the authorities. Your Operations Manager gathers them, reminds you ahead of time and closes them, so the end of the month is not an evening of errands.",
+          },
+          {
+            title: "A project that takes over the month",
+            body: "When client work takes all your time, operations do not stop. The hour bank grows for one month, and in a quieter month the unused hours roll over.",
+          },
+          {
+            title: "The home next to the business",
+            body: "Many self-employed people work from home, and the line blurs. Repairs, home vendors and travel are managed in the same place, from the same hour bank, without interrupting your working day.",
+          },
+        ],
         bullets: [
-          { title: "Ongoing operations", body: "What steals time from product and team gets managed elsewhere." },
-          { title: "Vendor coordination", body: "From a vetted network, without burning time on comparisons." },
-          { title: "Full flexibility", body: "Scales up and down with what the company needs right now." },
+          {
+            title: "Ongoing operations",
+            body: "What steals time from your business and your clients is managed elsewhere, followed through to the end.",
+          },
+          {
+            title: "Vendor coordination",
+            body: "From a vetted network, including comparison, coordination and quality control.",
+          },
+          {
+            title: "Full flexibility",
+            body: "The scope goes up and down with what you need, and you can pause any month with no penalty.",
+          },
+        ],
+        afterMonth: [
+          "More hours working on the business, fewer hours working around it.",
+          "A clear picture of what is open and what is closed, with a report of every minute worked.",
+          "Regular vendors who know your business, without searching again each time.",
+        ],
+        faq: [
+          {
+            q: "My business is small. Is this for me?",
+            a: "Yes. You do not need a team to start. On the pricing page, the smallest example package is 10 hours a month, and a small task is tracked from 15 minutes.",
+          },
+          {
+            q: "How is this different from an hourly freelancer?",
+            a: "A freelancer carries out a task you defined. An Operations Manager takes ownership of an area: identifies what needs to happen, follows what is open, and remembers what has already been done.",
+          },
+          {
+            q: "What happens in a quiet month?",
+            a: "Unused hours roll over to the next month, as long as the plan renews. You can also pause the plan any month, with no penalty and no explanation needed.",
+          },
+          {
+            q: "Can I combine business and personal tasks?",
+            a: "Yes. The same Operations Manager handles both, from the same hour bank, and the report shows what was done in each area.",
+          },
         ],
         closing: "Operational infrastructure that grows with you.",
       },
@@ -536,23 +647,129 @@ const en: Dictionary = {
         eyebrow: "Growing Companies",
         title: "Operational infrastructure that scales with you, not against you.",
         sub: "Fast growth creates operational complexity no job description covers.",
+        metaTitle: "Managed Business Operations for Growing Companies | Ankora",
+        metaDescription: "Vendors, procurement, office and travel for growing companies, owned by a dedicated Operations Manager. Transparent hours, no new hire.",
+        directAnswer: "In a company that grows fast, operations scatter between the founders, the office manager and whoever has a free moment. Ankora gives small and growing companies in Israel a dedicated Operations Manager, backed by AI orchestration, who takes ownership of vendors, procurement, office needs and business travel. It is a layer that joins your existing team, not another role to recruit and manage. The company pays only for hours actually worked, and can see at any moment what is in progress and what is done.",
+        situations: [
+          {
+            title: "An office move or expansion",
+            body: "Contractors, furniture, connectivity, cleaning and movers. Your Operations Manager coordinates every vendor on one timeline, checks the work and updates management only when a decision is needed.",
+          },
+          {
+            title: "Procurement nobody owns",
+            body: "Equipment for new hires, subscriptions, service contracts and recurring orders. Your Operations Manager compares quotes, orders after approval and tracks renewal dates, so no commitment renews without someone deciding it should.",
+          },
+          {
+            title: "A business trip for several people",
+            body: "Flights, accommodation, ground transport and meetings, coordinated together and monitored for changes. If something moves, your Operations Manager handles it in real time.",
+          },
+          {
+            title: "The tasks between the roles",
+            body: "A repair at the office, a team event, holiday gifts. Things everyone knows need doing and nobody owns. Now someone does.",
+          },
+        ],
         bullets: [
-          { title: "Ongoing operational support", body: "For small teams that need more without hiring more." },
-          { title: "Vendor & procurement management", body: "Comparison, coordination, and quality control in one place." },
-          { title: "Reporting & clarity", body: "See what's in progress, what's done, and what needs attention." },
+          {
+            title: "Ongoing operational support",
+            body: "For small teams that need more, without hiring more.",
+          },
+          {
+            title: "Vendor & procurement management",
+            body: "Comparison, coordination and quality control in one place, across a vetted vendor network.",
+          },
+          {
+            title: "Reporting & clarity",
+            body: "See what is in progress, what is done, what needs attention, and how much time went into each task.",
+          },
+        ],
+        afterMonth: [
+          "One address for everything without an owner, instead of a thread in the team chat.",
+          "Founders and team members go back to the job they were hired for.",
+          "Vendors, contracts and preferences are documented in one place, and do not leave with an employee who does.",
+        ],
+        faq: [
+          {
+            q: "When is it better to hire an office manager instead?",
+            a: "When there is a full-time role's worth of work that needs someone physically present every day. Until then, an hour bank that flexes month to month costs less than salary, benefits and management time, and does not disappear when someone goes on vacation.",
+          },
+          {
+            q: "Who approves spending?",
+            a: "The company. Your Operations Manager prepares the comparison and the recommendation, and financial decisions always go through a person on the company's side.",
+          },
+          {
+            q: "How many people in the company can make requests?",
+            a: "As many as you need. Every request reaches the same Operations Manager, and all of them appear in the same report.",
+          },
+          {
+            q: "How do we see what the hours were spent on?",
+            a: "Every task is tracked to the minute and documented with a description of what was done. Nothing is rounded up.",
+          },
         ],
         closing: "An operational layer you can trust while growing fast.",
       },
       familyOffice: {
-        eyebrow: "Family Offices",
-        title: "One management layer for the complexity of several lives.",
-        sub: "Several properties, several family members, dozens of vendors: one place managing all of it.",
-        bullets: [
-          { title: "Property operations", body: "Maintenance, vendors, and quality control across several properties at once." },
-          { title: "Family coordination", body: "Events, travel, and commitments, coordinated with full transparency." },
-          { title: "Absolute discretion", body: "Limited access, full documentation, confidentiality by default." },
+        eyebrow: "Small Offices",
+        title: "One management layer for the complexity of several areas of responsibility.",
+        sub: "Several areas, several team members, dozens of vendors, and one place managing all of them.",
+        metaTitle: "Operations Management for Small Offices | Ankora",
+        metaDescription: "A dedicated Operations Manager for small offices: vendors, maintenance, travel and admin in one place, with full discretion and no added headcount.",
+        directAnswer: "A small office, such as a law firm, an accounting practice, an architecture studio or an investment office, runs like a company without an operations department. Vendors, maintenance, travel and admin fall on people who should be working on clients. Ankora gives small offices in Israel a dedicated Operations Manager, backed by AI orchestration, who brings all of these areas into one place, with limited access, full documentation and confidentiality by default. You pay only for time actually worked, with no added headcount.",
+        situations: [
+          {
+            title: "Ongoing office maintenance",
+            body: "Air conditioning, cleaning, printers, connectivity and small renovations. Your Operations Manager coordinates vendors, checks the work was done properly and tracks recurring service.",
+          },
+          {
+            title: "Vendors everyone calls and nobody manages",
+            body: "The facilities company, the IT provider, insurance, couriers. Every request goes through one address, and the system keeps what was agreed with each vendor.",
+          },
+          {
+            title: "Travel and events",
+            body: "A client meeting abroad, a conference, a team event. Your Operations Manager coordinates every part, with full transparency to whoever needs to know.",
+          },
+          {
+            title: "Admin involving sensitive information",
+            body: "License renewals, requests to authorities and documents not everyone should see. Access is limited to whoever is handling it, and every action is documented.",
+          },
         ],
-        closing: "Peace of mind that covers more than one domain.",
+        bullets: [
+          {
+            title: "Ongoing operational management",
+            body: "Maintenance, vendors and quality control across several areas at once.",
+          },
+          {
+            title: "Team coordination",
+            body: "Events, travel and commitments, coordinated with full transparency.",
+          },
+          {
+            title: "Absolute discretion",
+            body: "Limited access, full documentation, confidentiality by default.",
+          },
+        ],
+        afterMonth: [
+          "The professionals in the office work on clients, not on vendors.",
+          "Every vendor has one point of contact, and every job is documented.",
+          "The office gains the operational capacity of a large company, without changing its size.",
+        ],
+        faq: [
+          {
+            q: "How is this different from a secretary or an office manager?",
+            a: "A secretary is in the office and handles what happens there. An Operations Manager takes ownership of the whole area, and you pay only for hours actually worked. The two can work together.",
+          },
+          {
+            q: "Who sees the office's information?",
+            a: "Only whoever is actually handling it. Access is limited, every action is documented, and sensitive decisions always go through a person.",
+          },
+          {
+            q: "Can we start with one area?",
+            a: "Yes. You can start with vendors or maintenance and expand once you see it working. The scope of hours is set during the intro call.",
+          },
+          {
+            q: "What happens when the Operations Manager is on vacation?",
+            a: "The operational memory lives in the system, not in one person's head, so the work continues. You pay only for hours worked, not for vacation or sick days.",
+          },
+        ],
+        closing: "Peace of mind that covers more than one area.",
       },
     },
     coverage: {
