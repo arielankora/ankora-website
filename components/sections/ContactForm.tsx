@@ -6,6 +6,23 @@ import { GlassPanel } from "@/components/ui/GlassPanel";
 
 type Status = "idle" | "loading" | "success" | "error";
 
+/**
+ * The one conversion GA4 should count: a contact request the server accepted.
+ * The old key event, "Contact_us_page", fired on every view of /contact, so it
+ * counted bots and browsers as leads (14 of its 32 hits in the 90 days to
+ * 1.10.2026 came from US data centres). Mark generate_lead as the key event in
+ * GA4 and retire Contact_us_page there. gtag is absent for automated browsers
+ * (see the layout), and a failure here must never touch the form.
+ */
+function trackLead() {
+  try {
+    const gtag = (window as unknown as { gtag?: (...args: unknown[]) => void }).gtag;
+    gtag?.("event", "generate_lead", { form: "contact" });
+  } catch {
+    // Analytics is never allowed to break a submitted form.
+  }
+}
+
 const FIELD =
   "w-full min-h-[44px] border border-[rgba(243,234,219,0.18)] bg-[rgba(11,27,51,0.5)] px-4 py-3 text-cream outline-none transition-colors duration-200 focus:border-gold focus:bg-[rgba(176,141,87,0.06)]";
 
@@ -44,6 +61,7 @@ export function ContactForm({ p }: { p: Dictionary["pages"]["contact"] }) {
 
       setStatus("success");
       form.reset();
+      trackLead();
     } catch {
       setStatus("error");
     }

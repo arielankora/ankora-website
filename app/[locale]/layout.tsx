@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import "@fontsource/heebo/200.css";
 import "@fontsource/heebo/300.css";
 import "@fontsource/heebo/400.css";
@@ -21,6 +22,10 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PageShell } from "@/components/layout/PageShell";
 
+function isLocale(value: string): value is Locale {
+  return (locales as string[]).includes(value);
+}
+
 export function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
 }
@@ -31,10 +36,21 @@ export async function generateMetadata(
   }
 ): Promise<Metadata> {
   const params = await props.params;
-  const locale = params.locale === "en" ? "en" : "he";
+  if (!isLocale(params.locale)) notFound();
+  const locale = params.locale;
   const dict = getDictionary(params.locale);
   return {
     metadataBase: new URL(SITE_URL),
+    // The marketing site had no icon at all: browsers and Google fell back to
+    // a generic globe, and /favicon.ico was swallowed by the [locale] route.
+    icons: {
+      icon: [
+        { url: "/favicon.ico", sizes: "any" },
+        { url: "/site-icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/site-icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/site-apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
     title: dict.meta.title,
     description: dict.meta.description,
     alternates: {
@@ -62,23 +78,34 @@ export default async function LocaleLayout(
     children
   } = props;
 
-  const locale = (params.locale === "en" ? "en" : "he") as Locale;
+  // Any single path segment lands in this layout as a "locale". Before this
+  // check, /favicon.ico, /llms.txt and /anything rendered the Hebrew home page
+  // with a 200 (soft 404s in Search Console).
+  if (!isLocale(params.locale)) notFound();
+  const locale: Locale = params.locale;
   const dict = getDictionary(locale);
   const dir = locale === "he" ? "rtl" : "ltr";
 
   return (
     <html lang={locale} dir={dir}>
       <head>
-        {/* Google tag (gtag.js) */}
-        <script async src="https://www.googletagmanager.com/gtag/js?id=G-XZ1T8Z0NDY"></script>
+        {/* Google tag (gtag.js). Not loaded for automated browsers: about 97% of
+            GA4 users in the 90 days to 1.10.2026 were headless Chrome in US data
+            centres (0s engagement), which made every report unusable.
+            navigator.webdriver is set by Playwright, Puppeteer and Selenium. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
-              gtag('js', new Date());
-
-              gtag('config', 'G-XZ1T8Z0NDY');
+              if (!navigator.webdriver) {
+                var s = document.createElement('script');
+                s.async = true;
+                s.src = 'https://www.googletagmanager.com/gtag/js?id=G-XZ1T8Z0NDY';
+                document.head.appendChild(s);
+                gtag('js', new Date());
+                gtag('config', 'G-XZ1T8Z0NDY');
+              }
             `,
           }}
         />
