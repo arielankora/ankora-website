@@ -3,13 +3,12 @@ import legal from "./legal/en";
 
 const en: Dictionary = {
   meta: {
-    title: "Ankora — Personal Operations Management",
-    description:
-      "Ankora is an outsourced Personal Operations Management service for executives, founders and busy families in Israel — a dedicated human Operations Manager, backed by AI orchestration, taking end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
+    title: "Ankora | Personal Operations Management",
+    description: "Personal Operations Management for executives, founders and busy families in Israel: a dedicated Operations Manager, backed by AI orchestration.",
     homeTitle: "Ankora | Personal Operations Management for Executives & Founders",
-    homeDescription: "Ankora is an outsourced Personal Operations Management service for executives, founders and busy families in Israel — an alternative to hiring another full-time personal assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
+    homeDescription: "Ankora runs everything around your business: a dedicated Operations Manager, backed by AI, for executives, founders and busy families in Israel.",
     aboutTitle: "About Ankora | Personal Operations Management Company",
-    aboutDescription: "Ankora is an Israeli Personal Operations Management company. Learn about our Human + AI model, the Operational Intelligence philosophy behind it, and who we serve.",
+    aboutDescription: "Ankora is an Israeli Personal Operations Management company. Our Human + AI model, the Operational Intelligence behind it, and who we serve.",
   },
   nav: {
     // Breadcrumb root label.
@@ -47,7 +46,7 @@ const en: Dictionary = {
     ctaSecondary: "How it works",
     definitionPre: "Ankora is a ",
     definitionLinked: "Personal Operations Management",
-    definitionPost: " service for executives, founders and busy families in Israel — an outsourced alternative to hiring another full-time assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
+    definitionPost: " service for executives, founders and busy families in Israel, an outsourced alternative to hiring another full-time assistant. A dedicated human Operations Manager, backed by AI orchestration, takes end-to-end ownership of personal, household, vendor, administrative, travel and business operations.",
     live: {
       nowLabel: "IN PROGRESS",
       closedLabel: "CLOSED TODAY",
@@ -77,28 +76,28 @@ const en: Dictionary = {
   problem: {
     label: "The problem",
     title: "Your success requires hundreds of decisions a day.",
-    body: "Not all of them need to go through you. Small tasks — an appointment, a renewal, a booking, a follow-up — don't take much time on their own. But they never disappear. They just move from tomorrow to tomorrow, taking up space you don't notice until it's gone.",
+    body: "Not all of them need to go through you. Small tasks (an appointment, a renewal, a booking, a follow-up) don't take much time on their own. But they never disappear. They just move from tomorrow to tomorrow, taking up space you don't notice until it's gone.",
   },
   insight: {
     label: "The insight",
     title: "You don't need more time. You need fewer things to think about.",
-    body: "Mental load, not lack of time, is what actually slows down high performers. Ankora was built to remove that layer entirely — not another tool to manage, but less to manage in the first place.",
+    body: "Mental load, not lack of time, is what actually slows down high performers. Ankora was built to remove that layer entirely. Not another tool to manage, but less to manage in the first place.",
   },
   category: {
     label: "A new category",
     title: "This isn't just a personal assistant. It's Personal Operations Management.",
-    body: "Ankora combines a dedicated human Operations Manager with AI orchestration — a combination we call Operational Intelligence — to take full ownership of your operational complexity, not just complete tasks. It's an outsourced service, not another employee to manage. We don't perform isolated tasks. We buy back your time, attention, and peace of mind.",
+    body: "Ankora combines a dedicated human Operations Manager with AI orchestration, a combination we call Operational Intelligence, to take full ownership of your operational complexity, not just complete tasks. It's an outsourced service, not another employee to manage. We don't perform isolated tasks. We buy back your time, attention, and peace of mind.",
   },
   howItWorks: {
     label: "How it works",
     title: "A process that disappears once it starts working",
     sub: "Five steps. None of them require you to manage them.",
     steps: [
-      { title: "Request", body: "You share what needs to happen — in plain language, no forms, no long intake process." },
+      { title: "Request", body: "You share what needs to happen, in plain language, no forms, no long intake process." },
       { title: "Human Operations Manager", body: "A dedicated Operations Manager gets to know you, your preferences, and what matters to you." },
-      { title: "AI Orchestration", body: "Our system coordinates, tracks, and follows up on what's needed — without being asked." },
+      { title: "AI Orchestration", body: "Our system coordinates, tracks, and follows up on what's needed, without being asked." },
       { title: "Execution", body: "The work is managed end to end, with full ownership, as if it were our own." },
-      { title: "Proactive Update", body: "You hear from us before you have to ask — when things are on track, and when they're not." },
+      { title: "Proactive Update", body: "You hear from us before you have to ask: when things are on track, and when they're not." },
     ],
     railLabel: "One task, two routes",
     attentionLabel: "YOUR ATTENTION",
@@ -113,9 +112,9 @@ const en: Dictionary = {
     label: "Technology",
     titleLine1: "AI that remembers.",
     titleLine2: "People who decide.",
-    body: "Our system remembers your preferences, schedules work, tracks progress, and flags what needs attention. Our Operations Managers bring judgment, empathy, and accountability — the parts AI shouldn't replace.",
+    body: "Our system remembers your preferences, schedules work, tracks progress, and flags what needs attention. Our Operations Managers bring judgment, empathy, and accountability: the parts AI shouldn't replace.",
     pillars: [
-      { key: "MEMORY", title: "Memory", body: "Every preference, every decision, always available — without repeating yourself." },
+      { key: "MEMORY", title: "Memory", body: "Every preference, every decision, always available, without repeating yourself." },
       { key: "ORCHESTRATION", title: "Orchestration", body: "Many tasks, many parties, one transparent coordination layer." },
       { key: "MONITORING", title: "Monitoring", body: "Continuous tracking of every open thread, so you don't have to check." },
       { key: "PREDICTION", title: "Prediction", body: "Flagging what needs attention before it becomes a problem." },
@@ -131,14 +130,14 @@ const en: Dictionary = {
       { id: "vendors", key: "VENDORS", title: "Vendor & Service Coordination", body: "Selection, coordination, and quality control across a vetted network." },
       { id: "personal", key: "PERSONAL OPS", title: "Personal Operations", body: "Your daily tasks, time, and commitments, managed in one place." },
       { id: "admin", key: "ADMIN", title: "Administrative Liaison", body: "Handling institutions and authorities on your behalf, start to finish." },
-      { id: "travel", key: "TRAVEL", title: "Travel & Logistics", body: "Planning, bookings, and changes — coordinated ahead of time." },
+      { id: "travel", key: "TRAVEL", title: "Travel & Logistics", body: "Planning, bookings, and changes, coordinated ahead of time." },
       { id: "property", key: "PROPERTY", title: "Property & Household Operations", body: "Maintenance, coordination, and quality control for your home and property." },
     ],
   },
   humanAI: {
     label: "Human + AI",
     title: "Not a replacement. A combination.",
-    body: "Behind every task is a person. AI multiplies what they can do — it doesn't replace their accountability.",
+    body: "Behind every task is a person. AI multiplies what they can do. It doesn't replace their accountability.",
     humanTitle: "Humans bring",
     human: ["Judgment", "Empathy", "Relationships", "Trust", "Decision-making"],
     aiTitle: "AI brings",
@@ -175,11 +174,11 @@ const en: Dictionary = {
       },
       {
         q: "How is Ankora different from a personal assistant?",
-        a: "A personal assistant generally executes tasks you hand them. Ankora manages an operating layer: a dedicated Operations Manager takes full ownership of outcomes, is backed by AI orchestration with persistent memory of your preferences, and proactively surfaces what needs attention before you ask. Personal Assistant is a real and useful category — Ankora starts where it typically stops.",
+        a: "A personal assistant generally executes tasks you hand them. Ankora manages an operating layer: a dedicated Operations Manager takes full ownership of outcomes, is backed by AI orchestration with persistent memory of your preferences, and proactively surfaces what needs attention before you ask. Personal Assistant is a real and useful category; Ankora starts where it typically stops.",
       },
       {
         q: "How is Ankora different from a concierge service?",
-        a: "Concierge services are typically request-based: you ask, they fulfill a specific, often one-off request. Ankora provides continuous, proactive ownership of recurring operational areas — personal, household, vendor, administrative, travel and business — tracked and followed through by the same dedicated Operations Manager over time, not handled as isolated requests to a rotating team.",
+        a: "Concierge services are typically request-based: you ask, they fulfill a specific, often one-off request. Ankora provides continuous, proactive ownership of recurring operational areas: personal, household, vendor, administrative, travel and business, tracked and followed through by the same dedicated Operations Manager over time, not handled as isolated requests to a rotating team.",
       },
       {
         q: "What types of tasks can Ankora manage?",
@@ -199,11 +198,11 @@ const en: Dictionary = {
       },
       {
         q: "What does the AI actually do?",
-        a: "The AI layer maintains persistent memory of your preferences and history, orchestrates and tracks multiple open tasks at once, monitors deadlines and recurring obligations, and flags what needs attention before it becomes urgent. It supports the Operations Manager's judgment — it doesn't replace it.",
+        a: "The AI layer maintains persistent memory of your preferences and history, orchestrates and tracks multiple open tasks at once, monitors deadlines and recurring obligations, and flags what needs attention before it becomes urgent. It supports the Operations Manager's judgment. It doesn't replace it.",
       },
       {
         q: "Does AI replace the human Operations Manager?",
-        a: "No. AI handles memory, orchestration, monitoring and prediction — the parts of the work that benefit from consistency and scale. Judgment, empathy, relationships and accountability stay with your human Operations Manager. Ankora is built as a combination of the two, not a substitute of one for the other.",
+        a: "No. AI handles memory, orchestration, monitoring and prediction: the parts of the work that benefit from consistency and scale. Judgment, empathy, relationships and accountability stay with your human Operations Manager. Ankora is built as a combination of the two, not a substitute of one for the other.",
       },
       {
         q: "Who is Ankora designed for?",
@@ -215,7 +214,7 @@ const en: Dictionary = {
       },
       {
         q: "How does Ankora handle recurring tasks?",
-        a: "Recurring obligations — renewals, maintenance schedules, regular appointments — are tracked by the AI layer so they surface automatically ahead of time, rather than depending on you or us remembering. Your Operations Manager acts on them before they become time-sensitive.",
+        a: "Recurring obligations (renewals, maintenance schedules, regular appointments) are tracked by the AI layer so they surface automatically ahead of time, rather than depending on you or us remembering. Your Operations Manager acts on them before they become time-sensitive.",
       },
       {
         q: "How does Ankora protect sensitive information?",
@@ -227,7 +226,7 @@ const en: Dictionary = {
       },
       {
         q: "How do I get started?",
-        a: "Book a short strategy call. We'll get to know you, map your operational footprint, and show you exactly how Ankora would work for your situation — no generic price lists, no long onboarding forms.",
+        a: "Book a short strategy call. We'll get to know you, map your operational footprint, and show you exactly how Ankora would work for your situation. No generic price lists, no long onboarding forms.",
       },
     ],
   },
@@ -263,15 +262,15 @@ const en: Dictionary = {
       title: "One process. Zero management on your end.",
       sub: "From the first message, Ankora takes full ownership of what needs to happen.",
       blocks: [
-        { title: "Request", body: "You share what needs to happen — a message, a call, a short note. No long forms, no questionnaires." },
-        { title: "Intro call", body: "Your Operations Manager gets to know you, not just the task — what matters to you, what bothers you, which decisions you want us to make on your behalf." },
-        { title: "Planning", body: "We research, compare, and bring you a clear recommendation — not a long list to sort through yourself." },
-        { title: "Execution & AI orchestration", body: "The task is managed end to end. Our AI tracks it, follows up, and flags delays — so nothing falls through the cracks." },
+        { title: "Request", body: "You share what needs to happen: a message, a call, a short note. No long forms, no questionnaires." },
+        { title: "Intro call", body: "Your Operations Manager gets to know you, not just the task: what matters to you, what bothers you, which decisions you want us to make on your behalf." },
+        { title: "Planning", body: "We research, compare, and bring you a clear recommendation, not a long list to sort through yourself." },
+        { title: "Execution & AI orchestration", body: "The task is managed end to end. Our AI tracks it, follows up, and flags delays, so nothing falls through the cracks." },
         { title: "Proactive update & follow-up", body: "You hear from us at the moments that matter, not every small step. A few days after completion, we check that everything landed well." },
       ],
       vignette: {
         title: "One day, without you noticing",
-        body: "A collection closed, a work trip rebooked in time, a passport renewed and a technician who showed up — four completely different tasks, two from the business and two from life, coordinated by the same operational layer, without you having to remember any of them.",
+        body: "A collection closed, a work trip rebooked in time, a passport renewed and a technician who showed up: four completely different tasks, two from the business and two from life, coordinated by the same operational layer, without you having to remember any of them.",
         items: [
           { time: "Morning", title: "A collection closed", note: "An unpaid invoice was spotted, a reminder went out, and the payment came in." },
           { time: "Midday", title: "A work trip rebooked in time", note: "The change was caught before the penalty and settled with the airline." },
@@ -283,12 +282,12 @@ const en: Dictionary = {
     technology: {
       eyebrow: "Technology",
       title: "The layer that remembers you, so you don't have to explain again.",
-      sub: "Our system isn't a chatbot executing commands. It's an orchestration layer connecting your request, your Operations Manager, and the execution network — with persistent memory that stays with you.",
+      sub: "Our system isn't a chatbot executing commands. It's an orchestration layer connecting your request, your Operations Manager, and the execution network, with persistent memory that stays with you.",
       orchestrationLabel: "ORCHESTRATION LAYER",
       sideYou: "YOU",
       sideAnkora: "ANKORA",
       layers: [
-        { tag: "01 · REQUEST", side: "you", title: "What needs to happen", body: "You get in touch however suits you — a call, a message or an email" },
+        { tag: "01 · REQUEST", side: "you", title: "What needs to happen", body: "You get in touch however suits you: a call, a message or an email" },
         { tag: "02 · OPERATIONS MANAGER", side: "ankora", title: "Human judgment", body: "Decides what is right, what is urgent, and what genuinely needs you." },
         { tag: "03 · AI ORCHESTRATION", side: "ankora", title: "Memory, monitoring, prediction", body: "Holds the context and flags delays before they land." },
         { tag: "04 · EXECUTION NETWORK", side: "ankora", title: "Vendors and service providers", body: "Coordinated, supervised and quality-checked end to end." },
@@ -296,10 +295,10 @@ const en: Dictionary = {
       persistenceNote: "The memory persists across all four stages, which is why the next request is shorter than the last.",
       ctaTitle: "Want to see how this would work for you?",
       blocks: [
-        { title: "Persistent memory", body: "Every preference you've shared, every decision you've made, is stored and used the next time — without repeating yourself." },
+        { title: "Persistent memory", body: "Every preference you've shared, every decision you've made, is stored and used the next time, without repeating yourself." },
         { title: "Multi-party orchestration", body: "When a task touches several vendors or parties, the system coordinates between them and keeps information consistent everywhere." },
-        { title: "Monitoring & prediction", body: "The system tracks every open thread and flags what's about to slip — before it becomes your problem." },
-        { title: "A human in the loop, always", body: "Financial, sensitive, or exceptional decisions always go through a person. AI prepares — it doesn't decide for you." },
+        { title: "Monitoring & prediction", body: "The system tracks every open thread and flags what's about to slip, before it becomes your problem." },
+        { title: "A human in the loop, always", body: "Financial, sensitive, or exceptional decisions always go through a person. AI prepares. It doesn't decide for you." },
       ],
     },
     about: {
@@ -309,8 +308,11 @@ const en: Dictionary = {
       entityDefinition: "Ankora is an Israeli Personal Operations Management company. We give executives, founders and busy families a dedicated human Operations Manager, backed by AI orchestration, who takes end-to-end ownership of personal, household, vendor, administrative, travel and selected business operations. Ankora operates in Israel. This model, a human Operations Manager combined with AI orchestration and persistent operational memory, is what we call Operational Intelligence.",
       blocks: [
         { title: "Vision", body: "The world is full of small tasks that together create enormous mental load. We believe people shouldn't have to carry that load alone." },
-        { title: "Mission", body: "To give people managing a lot — a business, a family, a career — one operational layer they can trust completely." },
+        { title: "Mission", body: "To give people managing a lot (a business, a family, a career) one operational layer they can trust completely." },
       ],
+      foundersLabel: "Founders",
+      foundersTitle: "The people accountable for Ankora",
+      foundersLinkLabel: "LinkedIn profile",
       principlesLabel: "Our principles",
       principles: [
         { title: "Reliability above all", body: "If we committed to it, we deliver. If there's a delay, you hear it from us before you ask." },
@@ -514,7 +516,7 @@ const en: Dictionary = {
         sub: "Your success requires hundreds of decisions a day. Not all of them need to go through you.",
         bullets: [
           { title: "Time & commitment management", body: "A calendar, reminders, and follow-up that don't require you to remember." },
-          { title: "Administrative liaison", body: "With authorities, banks, and institutions — without you standing in line." },
+          { title: "Administrative liaison", body: "With authorities, banks, and institutions, without you standing in line." },
           { title: "Personal & family coordination", body: "Handled separately, without spilling into your business day." },
         ],
         closing: "One Operations Manager who knows your pace.",
@@ -544,10 +546,10 @@ const en: Dictionary = {
       familyOffice: {
         eyebrow: "Family Offices",
         title: "One management layer for the complexity of several lives.",
-        sub: "Several properties, several family members, dozens of vendors — one place managing all of it.",
+        sub: "Several properties, several family members, dozens of vendors: one place managing all of it.",
         bullets: [
           { title: "Property operations", body: "Maintenance, vendors, and quality control across several properties at once." },
-          { title: "Family coordination", body: "Events, travel, and commitments — coordinated with full transparency." },
+          { title: "Family coordination", body: "Events, travel, and commitments, coordinated with full transparency." },
           { title: "Absolute discretion", body: "Limited access, full documentation, confidentiality by default." },
         ],
         closing: "Peace of mind that covers more than one domain.",
@@ -827,6 +829,7 @@ const en: Dictionary = {
       sub: "An operating model for people who need to delegate ownership, not just tasks.",
       directAnswerLabel: "In short",
       directAnswer: "Personal Operations Management is an outsourced operating model in which an individual or family delegates ongoing operational ownership, not just isolated tasks, to a dedicated Operations Manager backed by AI orchestration, without hiring another full-time employee. Instead of coordinating vendors, appointments, paperwork and follow-ups yourself, one person takes end-to-end responsibility for the outcome, across your personal, household, administrative, travel and selected business operations. Ankora provides this service to executives, founders and busy families in Israel.",
+      metaDescription: "Personal Operations Management: one dedicated Operations Manager, backed by AI, owns your personal, household and business operations in Israel.",
       problem: {
         title: "The problem isn't the amount of work",
         intro: "Most operational tasks are individually small. The difficulty is everything they touch:",
@@ -941,6 +944,8 @@ const en: Dictionary = {
       title: "Looking for a Personal Assistant? You May Need More Than an Assistant.",
       sub: "What a Personal Assistant typically covers, and where executives often need something broader.",
       directAnswer: "Most executives who search for a Personal Assistant are really looking for relief from operational complexity, not just a calendar manager. A traditional PA is an excellent solution for scheduling, correspondence and day-to-day support. When personal, household, vendor, administrative and business operations start overlapping, many executives find they need broader ownership than a single assistant, however capable, can provide alone. Ankora is an outsourced alternative to hiring another full-time personal assistant: executives and founders in Israel get a dedicated Operations Manager without adding headcount.",
+      metaDescription: "Most executives who search for a personal assistant need relief from operational complexity. Where a PA fits, and where an Operations Manager does.",
+      metaTitle: "Personal Assistant for Executives? There Is a Broader Option | Ankora",
       expectations: {
         title: "What executives typically expect from a Personal Assistant",
         items: [
@@ -1005,6 +1010,7 @@ const en: Dictionary = {
       title: "Ankora vs. Personal Assistant: Which One Do You Actually Need?",
       sub: "A genuine comparison, not a sales pitch. Both models are legitimate. They fit different situations.",
       directAnswer: "A Personal Assistant is best when you need someone physically present with you, managing real-time scheduling and in-person tasks. Ankora is best when the real problem is fragmented operational ownership across personal, household, vendor, administrative, travel and business areas that need continuous, proactive management rather than task-by-task execution. Ankora is an outsourced service, not a new hire: you get a dedicated Operations Manager without adding an employee.",
+      metaDescription: "A personal assistant executes tasks in person. Ankora owns ongoing operations across home, vendors, travel and business. Which one do you need?",
       tableTitle: "The comparison, row by row",
       columnA: "Personal Assistant",
       columnB: "Ankora",
@@ -1067,6 +1073,7 @@ const en: Dictionary = {
       title: "Ankora vs. Autonomous AI Assistants: Who Owns the Outcome",
       sub: "These tools are good, and they are improving fast. The question is what happens at the step they don't finish.",
       directAnswer: "An autonomous AI assistant like Instinct or Martin is software that performs tasks on your behalf: booking a table, filling a form, triaging an inbox. Ankora is a service that takes ownership of operational outcomes, through a dedicated Operations Manager backed by AI orchestration and a team. These are not two competing products but two layers: Ankora runs AI agents itself. The difference is that when the agent stops, a person at Ankora continues from that point, and the responsibility stays with us rather than moving to you.",
+      metaDescription: "AI assistants like Instinct or Martin perform tasks. Ankora owns the outcome: an Operations Manager, backed by AI, who continues where the agent stops.",
       whatAiDoesWell: {
         title: "What an AI agent does well",
         body: [

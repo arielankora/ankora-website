@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
@@ -6,6 +7,7 @@ import { storiesUi } from "@/content/customer-stories/ui";
 import { getAllStories, getAllStorySlugs, getStoryBySlug } from "@/lib/customer-stories";
 import { CustomerStoryPage } from "@/components/sections/CustomerStoryPage";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { orgRef } from "@/lib/schema";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
@@ -30,9 +32,11 @@ export async function generateMetadata(props: {
       languages: {
         he: `/he/customer-stories/${story.slug}`,
         en: `/en/customer-stories/${story.slug}`,
+        "x-default": `/he/customer-stories/${story.slug}`,
       },
     },
     openGraph: {
+      ...ogBase(locale, `/customer-stories/${story.slug}`),
       title,
       description: story.summary,
       type: "article",
@@ -69,13 +73,8 @@ export default async function Page(props: { params: Promise<{ locale: string; sl
     datePublished: story.publishedDate,
     dateModified: story.updatedDate || story.publishedDate,
     ...(story.image ? { image: `${base}${story.image.src}` } : {}),
-    author: { "@type": "Organization", name: "Ankora", url: base },
-    publisher: {
-      "@type": "Organization",
-      name: "Ankora",
-      url: base,
-      logo: { "@type": "ImageObject", url: `${base}/logo.png` },
-    },
+    author: orgRef,
+    publisher: orgRef,
     mainEntityOfPage: { "@type": "WebPage", "@id": url },
     about: {
       "@type": "Person",
@@ -92,7 +91,7 @@ export default async function Page(props: { params: Promise<{ locale: string; sl
       "@type": "Service",
       serviceType: "Personal Operations Management",
       name: "Ankora Personal Operations Management",
-      provider: { "@type": "Organization", name: "Ankora", url: base },
+      provider: orgRef,
       areaServed: "IL",
       url: `${base}/${locale}/personal-operations-management`,
     },

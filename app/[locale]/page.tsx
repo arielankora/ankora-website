@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { Hero } from "@/components/sections/Hero";
@@ -15,6 +16,7 @@ import { getFeaturedStories } from "@/lib/customer-stories";
 import { FAQ } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { orgRef } from "@/lib/schema";
 
 export async function generateMetadata(
   props: {
@@ -29,9 +31,10 @@ export async function generateMetadata(
     description: dict.meta.homeDescription,
     alternates: {
       canonical: `/${locale}`,
-      languages: { he: "/he", en: "/en" },
+      languages: { he: "/he", en: "/en", "x-default": "/he" },
     },
     openGraph: {
+      ...ogBase(locale, ``),
       title: dict.meta.homeTitle,
       description: dict.meta.homeDescription,
       type: "website",
@@ -46,30 +49,12 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
   const featuredStories = getFeaturedStories(locale, 1);
   const base = SITE_URL;
 
-  const organizationSchema = {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Ankora",
-    url: base,
-    logo: `${base}/logo.png`,
-    description: dict.meta.homeDescription,
-    email: "hello@ankora.co.il",
-    areaServed: "IL",
-    address: { "@type": "PostalAddress", addressLocality: "Tel Aviv", addressCountry: "IL" },
-    contactPoint: {
-      "@type": "ContactPoint",
-      email: "hello@ankora.co.il",
-      contactType: "customer service",
-      areaServed: "IL",
-    },
-  };
-
   const serviceSchema = {
     "@context": "https://schema.org",
     "@type": "Service",
     serviceType: "Personal Operations Management",
     name: "Ankora Personal Operations Management",
-    provider: { "@type": "Organization", name: "Ankora", url: base },
+    provider: orgRef,
     areaServed: "IL",
     description: dict.pages.personalOperationsManagement.directAnswer,
     url: `${base}/${locale}/personal-operations-management`,
@@ -87,7 +72,6 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
 
   return (
     <>
-      <JsonLd id="organization-schema" data={organizationSchema} />
       <JsonLd id="service-schema" data={serviceSchema} />
       <JsonLd id="faq-schema" data={faqSchema} />
       <Hero dict={dict} locale={locale} />

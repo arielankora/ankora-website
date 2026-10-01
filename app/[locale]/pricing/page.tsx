@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import PricingClient from "./PricingClient";
 
 const meta = {
@@ -27,9 +28,10 @@ export async function generateMetadata(
     description: m.description,
     alternates: {
       canonical: `/${locale}/pricing`,
-      languages: { he: "/he/pricing", en: "/en/pricing" },
+      languages: { he: "/he/pricing", en: "/en/pricing", "x-default": "/he/pricing" },
     },
     openGraph: {
+      ...ogBase(locale, `/pricing`),
       title: m.title,
       description: m.description,
       type: "website",

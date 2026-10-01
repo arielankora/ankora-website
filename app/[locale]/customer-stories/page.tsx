@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
 import { storiesUi } from "@/content/customer-stories/ui";
 import { getAllStories } from "@/lib/customer-stories";
 import { CustomerStoriesIndexPage } from "@/components/sections/CustomerStoriesIndexPage";
 import { JsonLd } from "@/components/seo/JsonLd";
+import { orgRef } from "@/lib/schema";
 
 export async function generateMetadata(props: {
   params: Promise<{ locale: string }>;
@@ -17,9 +19,10 @@ export async function generateMetadata(props: {
     description: ui.metaDescription,
     alternates: {
       canonical: `/${locale}/customer-stories`,
-      languages: { he: "/he/customer-stories", en: "/en/customer-stories" },
+      languages: { he: "/he/customer-stories", en: "/en/customer-stories", "x-default": "/he/customer-stories" },
     },
     openGraph: {
+      ...ogBase(locale, `/customer-stories`),
       title: ui.metaTitle,
       description: ui.metaDescription,
       type: "website",
@@ -53,7 +56,7 @@ export default async function Page(props: { params: Promise<{ locale: string }> 
     about: {
       "@type": "Service",
       serviceType: "Personal Operations Management",
-      provider: { "@type": "Organization", name: "Ankora", url: base },
+      provider: orgRef,
       areaServed: "IL",
     },
     mainEntity: {

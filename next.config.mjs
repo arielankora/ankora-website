@@ -122,6 +122,13 @@ const nextConfig = {
       // (assuming identical slugs across locales, which blog posts don't
       // guarantee - see lib/blog-translations.ts). Google crawled and
       // indexed it as a live 404. Redirect straight to the real article.
+      // The Hebrew business-travel post was published under an auto-generated
+      // id (post-mto775ru). Renamed to a readable slug (SEO/GEO audit, 1.10.2026).
+      {
+        source: '/he/blog/post-mto775ru',
+        destination: '/he/blog/business-travel-planning',
+        statusCode: 301,
+      },
       {
         source: '/en/blog/esta',
         destination:

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import RoiClient from "./RoiClient";
 
 // Both locales get a dedicated title and description, like /contact. /en used to
@@ -27,10 +28,11 @@ export async function generateMetadata(
   return {
     title: meta.title,
     description: meta.description,
-    openGraph: { title: meta.title, description: meta.description, type: "website" },
+    openGraph: {
+      ...ogBase(locale, `/roi`), title: meta.title, description: meta.description, type: "website" },
     alternates: {
       canonical: `/${locale}/roi`,
-      languages: { he: "/he/roi", en: "/en/roi" },
+      languages: { he: "/he/roi", en: "/en/roi", "x-default": "/he/roi" },
     },
   };
 }

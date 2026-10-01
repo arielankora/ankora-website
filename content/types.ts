@@ -275,6 +275,10 @@ export interface PagesContent {
   };
   about: SimplePageContent & {
     entityDefinition: string;
+    /** The founders section; the people themselves come from lib/founders.ts. */
+    foundersLabel: string;
+    foundersTitle: string;
+    foundersLinkLabel: string;
     principlesLabel: string;
     principles: { title: string; body: string }[];
   };
@@ -482,6 +486,8 @@ export interface PagesContent {
     sub: string;
     directAnswerLabel: string;
     directAnswer: string;
+    /** Search snippet, at most ~155 characters. directAnswer stays the long "In short" answer in the page body. */
+    metaDescription?: string;
     problem: {
       title: string;
       intro: string;
@@ -535,6 +541,10 @@ export interface PagesContent {
     title: string;
     sub: string;
     directAnswer: string;
+    /** Search snippet, at most ~155 characters. directAnswer stays the long "In short" answer in the page body. */
+    metaDescription?: string;
+    /** <title> when it should differ from the eyebrow. */
+    metaTitle?: string;
     expectations: { title: string; items: string[] };
     whenPARight: { title: string; body: string };
     wherePAFalls: { title: string; body: string; items: string[] };
@@ -550,6 +560,8 @@ export interface PagesContent {
     title: string;
     sub: string;
     directAnswer: string;
+    /** Search snippet, at most ~155 characters. directAnswer stays the long "In short" answer in the page body. */
+    metaDescription?: string;
     /** Heading over section 01, which is the table. The page had no heading for it,
      *  because the previous design opened straight into the table with no section
      *  structure at all. */
@@ -570,6 +582,8 @@ export interface PagesContent {
     title: string;
     sub: string;
     directAnswer: string;
+    /** Search snippet, at most ~155 characters. directAnswer stays the long "In short" answer in the page body. */
+    metaDescription?: string;
     /** Section 01 concedes the category's strengths before the page argues anything.
      *  It is first because a visitor who has used one of these tools abandons a page
      *  that opens by telling them the thing they liked does not work. */

@@ -22,6 +22,9 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PageShell } from "@/components/layout/PageShell";
 import { CtaTracking } from "@/components/analytics/CtaTracking";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { siteGraph } from "@/lib/schema";
+import { ogBase } from "@/lib/seo-meta";
 
 function isLocale(value: string): value is Locale {
   return (locales as string[]).includes(value);
@@ -56,14 +59,15 @@ export async function generateMetadata(
     description: dict.meta.description,
     alternates: {
       canonical: `/${locale}`,
-      languages: { he: "/he", en: "/en" },
+      languages: { he: "/he", en: "/en", "x-default": "/he" },
     },
     openGraph: {
       title: dict.meta.title,
       description: dict.meta.description,
       type: "website",
-      locale: locale === "he" ? "he_IL" : "en_US",
+      ...ogBase(locale, ""),
     },
+    twitter: { card: "summary_large_image" },
   };
 }
 
@@ -118,6 +122,8 @@ export default async function LocaleLayout(
           <Footer dict={dict} locale={locale} />
         </PageShell>
         <CtaTracking />
+        {/* Ankora as one entity, on every page (lib/schema.ts). */}
+        <JsonLd id="site-graph" data={siteGraph(locale)} />
       </body>
     </html>
   );

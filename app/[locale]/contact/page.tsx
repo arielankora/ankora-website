@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { WideContainer } from "@/components/ui/WideContainer";
 import { Reveal } from "@/components/motion/Reveal";
@@ -21,7 +22,7 @@ const PAGE_META = {
   en: {
     title: "Book a Call | Ankora",
     description:
-      "A twenty-minute call with Ankora. No commitment and no long forms \u2014 we get to know you, understand your needs, and show you how personal operations management could work for you.",
+      "A twenty-minute call with Ankora. No commitment and no long forms. We get to know you, understand your needs, and show you how personal operations management could work for you.",
   },
 } as const;
 
@@ -36,10 +37,11 @@ export async function generateMetadata(
   return {
     title: meta.title,
     description: meta.description,
-    openGraph: { title: meta.title, description: meta.description, type: "website" },
+    openGraph: {
+      ...ogBase(locale, `/contact`), title: meta.title, description: meta.description, type: "website" },
     alternates: {
       canonical: `/${locale}/contact`,
-      languages: { he: "/he/contact", en: "/en/contact" },
+      languages: { he: "/he/contact", en: "/en/contact", "x-default": "/he/contact" },
     },
   };
 }

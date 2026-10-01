@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ogBase } from "@/lib/seo-meta";
 import { getDictionary, type Locale } from "@/content";
 import { LegalPage } from "@/components/sections/LegalPage";
 
@@ -16,9 +17,10 @@ export async function generateMetadata(props: {
     description: doc.sub,
     alternates: {
       canonical: `/${locale}${PATH}`,
-      languages: { he: `/he${PATH}`, en: `/en${PATH}` },
+      languages: { he: `/he${PATH}`, en: `/en${PATH}`, "x-default": `/he${PATH}` },
     },
     openGraph: {
+      ...ogBase(locale, `${PATH}`),
       title: `${doc.title} | Ankora`,
       description: doc.sub,
       type: "website",
