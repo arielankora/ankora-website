@@ -15,7 +15,7 @@ import { FinalCTA } from "@/components/sections/FinalCTA";
 import { Reveal } from "@/components/motion/Reveal";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { getTranslatedBlogSlug } from "@/lib/blog-translations";
-import { orgRef, WEBSITE_ID } from "@/lib/schema";
+import { authorNode, orgRef, WEBSITE_ID } from "@/lib/schema";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
   const locale = params.locale === "en" ? "en" : "he";
@@ -134,7 +134,7 @@ export default async function BlogPostPage(
     // written by Ankora itself.
     author:
       post.author && post.author !== "Ankora"
-        ? { "@type": "Person", name: post.author, worksFor: orgRef }
+        ? authorNode(post.author, locale)
         : orgRef,
     publisher: orgRef,
     isPartOf: { "@id": WEBSITE_ID },

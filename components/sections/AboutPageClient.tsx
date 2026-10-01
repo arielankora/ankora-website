@@ -10,10 +10,17 @@ import { Eyebrow } from "@/components/ui/Eyebrow";
 import { GlassPanel } from "@/components/ui/GlassPanel";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
+import Image from "next/image";
+import { FOUNDERS } from "@/lib/founders";
 
 /**
- * About: intro paragraph, vision and mission as two glass panels, then the four
- * principle cards.
+ * About: intro paragraph, vision and mission as two glass panels, the founders,
+ * then the four principle cards.
+ *
+ * The founders section exists because this is the page search engines and AI
+ * models read to learn who stands behind Ankora; before it, the page named no
+ * one (SEO/GEO audit, 1.10.2026). Photos are monochrome so two portraits shot
+ * against different backgrounds sit as one editorial pair on navy.
  *
  * This page writes its own hero rather than using PageHero, because its `sub`
  * ("Not time. Attention.") is a gold hook line at heading scale, not a lead
@@ -70,6 +77,47 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
                 <p className="mt-4 font-assistant font-light leading-[1.8] text-muted">
                   {block.body}
                 </p>
+              </GlassPanel>
+            </Reveal>
+          ))}
+        </div>
+      </SectionShell>
+
+      <SectionShell>
+        <Reveal>
+          <Eyebrow>{p.foundersLabel}</Eyebrow>
+        </Reveal>
+        <Reveal delay={0.08}>
+          <h2 className="mt-5 max-w-2xl text-balance text-[clamp(1.6rem,3vw,2.4rem)] font-extralight leading-[1.2] tracking-[-0.02em] text-cream">
+            {p.foundersTitle}
+          </h2>
+        </Reveal>
+        <div
+          className="mt-10 grid gap-6"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))" }}
+        >
+          {FOUNDERS.map((f, i) => (
+            <Reveal key={f.linkedin} delay={i * 0.08} className="h-full">
+              <GlassPanel elevated className="flex h-full items-center gap-6 p-[clamp(20px,2.4vw,32px)]">
+                <Image
+                  src={f.image}
+                  alt={f.name[locale]}
+                  width={112}
+                  height={112}
+                  className="h-24 w-24 shrink-0 rounded-full object-cover grayscale contrast-[1.05] md:h-28 md:w-28"
+                />
+                <div className="min-w-0">
+                  <h3 className="text-[1.2rem] font-normal text-cream">{f.name[locale]}</h3>
+                  <p className="mt-1 font-assistant text-sm font-light leading-[1.6] text-muted">{f.role[locale]}</p>
+                  <a
+                    href={f.linkedin}
+                    target="_blank"
+                    rel="noopener noreferrer me"
+                    className="mt-3 inline-flex min-h-[24px] items-center font-assistant text-[13px] text-gold underline-offset-4 transition-colors hover:text-gold-light hover:underline"
+                  >
+                    {p.foundersLinkLabel}
+                  </a>
+                </div>
               </GlassPanel>
             </Reveal>
           ))}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { COMPANY_PROFILES } from "@/lib/founders";
 import Image from "next/image";
 import type { Dictionary, Locale } from "@/content";
 import { withLocale } from "@/lib/nav";
@@ -98,6 +99,16 @@ export function Footer({ dict, locale }: { dict: Dictionary; locale: Locale }) {
             <Link href={withLocale(locale, "/service-terms")} className={LINK}>{dict.footer.serviceTerms}</Link>
             <Link href={withLocale(locale, "/security")} className={LINK}>{dict.footer.security}</Link>
             <Link href={withLocale(locale, "/dpa")} className={LINK}>{dict.footer.dpa}</Link>
+            {/* The official company profile, linked both ways (it is also the
+                Organization's sameAs in lib/schema.ts). */}
+            <a
+              href={COMPANY_PROFILES[0]}
+              target="_blank"
+              rel="noopener noreferrer me"
+              className={LINK}
+            >
+              LinkedIn
+            </a>
           </div>
         </div>
       </div>

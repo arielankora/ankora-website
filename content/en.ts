@@ -310,6 +310,9 @@ const en: Dictionary = {
         { title: "Vision", body: "The world is full of small tasks that together create enormous mental load. We believe people shouldn't have to carry that load alone." },
         { title: "Mission", body: "To give people managing a lot (a business, a family, a career) one operational layer they can trust completely." },
       ],
+      foundersLabel: "Founders",
+      foundersTitle: "The people accountable for Ankora",
+      foundersLinkLabel: "LinkedIn profile",
       principlesLabel: "Our principles",
       principles: [
         { title: "Reliability above all", body: "If we committed to it, we deliver. If there's a delay, you hear it from us before you ask." },

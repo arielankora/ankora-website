@@ -1,6 +1,7 @@
 import "server-only";
 import { execFileSync } from "node:child_process";
 import { SITE_URL } from "@/lib/site";
+import { COMPANY_PROFILES, FOUNDERS } from "@/lib/founders";
 
 /**
  * Structured data that describes Ankora as ONE entity across the whole site.
@@ -11,18 +12,30 @@ import { SITE_URL } from "@/lib/site";
  * audit, 1.10.2026). Now the layout publishes the Organization and the WebSite
  * once, each with a stable @id, and every page points at them by @id.
  *
- * Profiles and people are added here, in one place, as they become available:
- * - SAME_AS: the official profiles (LinkedIn company page and the like). Entity
- *   recognition works by matching the same entity across sources; without these
- *   there is nothing to match.
- * - FOUNDERS: name, role and profile of each founder.
+ * Profiles and people live in lib/founders.ts:
+ * - COMPANY_PROFILES -> sameAs. Entity recognition works by matching the same
+ *   entity across sources; without these there is nothing to match.
+ * - FOUNDERS -> founder, each a Person with their own profile as sameAs.
  */
 export const ORG_ID = `${SITE_URL}/#organization`;
 export const WEBSITE_ID = `${SITE_URL}/#website`;
 
-const SAME_AS: string[] = [];
 
-const FOUNDERS: { name: string; jobTitle: string; sameAs?: string[] }[] = [];
+const SAME_AS: string[] = COMPANY_PROFILES;
+
+export function founderNode(f: (typeof FOUNDERS)[number], locale: "he" | "en") {
+  const other = locale === "he" ? "en" : "he";
+  return {
+    "@type": "Person",
+    "@id": `${SITE_URL}/#person-${f.linkedin.split("/in/")[1].replace(/\/$/, "")}`,
+    name: f.name[locale],
+    alternateName: f.name[other],
+    jobTitle: f.role[locale],
+    image: `${SITE_URL}${f.image}`,
+    sameAs: [f.linkedin],
+    worksFor: { "@id": ORG_ID },
+  };
+}
 
 type Locale = "he" | "en";
 
@@ -60,9 +73,7 @@ export function organizationNode(locale: Locale) {
       availableLanguage: ["he", "en"],
     },
     ...(SAME_AS.length ? { sameAs: SAME_AS } : {}),
-    ...(FOUNDERS.length
-      ? { founder: FOUNDERS.map((f) => ({ "@type": "Person", name: f.name, jobTitle: f.jobTitle, ...(f.sameAs ? { sameAs: f.sameAs } : {}) })) }
-      : {}),
+    ...(FOUNDERS.length ? { founder: FOUNDERS.map((f) => founderNode(f, locale)) } : {}),
   };
 }
 
@@ -143,4 +154,14 @@ export function articleNode(opts: {
     isPartOf: { "@id": WEBSITE_ID },
     image: `${SITE_URL}/${opts.locale}/opengraph-image`,
   };
+}
+
+/**
+ * A blog author: the founder's Person node when the author is a founder (by
+ * either spelling of the name), otherwise a plain Person who works for Ankora.
+ */
+export function authorNode(name: string, locale: Locale) {
+  const f = FOUNDERS.find((x) => x.name.he === name || x.name.en === name);
+  if (f) return founderNode(f, locale);
+  return { "@type": "Person", name, worksFor: orgRef };
 }

@@ -275,6 +275,10 @@ export interface PagesContent {
   };
   about: SimplePageContent & {
     entityDefinition: string;
+    /** The founders section; the people themselves come from lib/founders.ts. */
+    foundersLabel: string;
+    foundersTitle: string;
+    foundersLinkLabel: string;
     principlesLabel: string;
     principles: { title: string; body: string }[];
   };
