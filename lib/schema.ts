@@ -31,6 +31,7 @@ export function founderNode(f: (typeof FOUNDERS)[number], locale: "he" | "en") {
     name: f.name[locale],
     alternateName: f.name[other],
     jobTitle: f.role[locale],
+    description: f.bio[locale],
     image: `${SITE_URL}${f.image}`,
     sameAs: [f.linkedin],
     worksFor: { "@id": ORG_ID },

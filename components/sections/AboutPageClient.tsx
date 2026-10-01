@@ -98,26 +98,29 @@ export function AboutPageClient({ dict, locale }: { dict: Dictionary; locale: Lo
         >
           {FOUNDERS.map((f, i) => (
             <Reveal key={f.linkedin} delay={i * 0.08} className="h-full">
-              <GlassPanel elevated className="flex h-full items-center gap-6 p-[clamp(20px,2.4vw,32px)]">
-                <Image
-                  src={f.image}
-                  alt={f.name[locale]}
-                  width={112}
-                  height={112}
-                  className="h-24 w-24 shrink-0 rounded-full object-cover grayscale contrast-[1.05] md:h-28 md:w-28"
-                />
-                <div className="min-w-0">
-                  <h3 className="text-[1.2rem] font-normal text-cream">{f.name[locale]}</h3>
-                  <p className="mt-1 font-assistant text-sm font-light leading-[1.6] text-muted">{f.role[locale]}</p>
-                  <a
-                    href={f.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer me"
-                    className="mt-3 inline-flex min-h-[24px] items-center font-assistant text-[13px] text-gold underline-offset-4 transition-colors hover:text-gold-light hover:underline"
-                  >
-                    {p.foundersLinkLabel}
-                  </a>
+              <GlassPanel elevated className="h-full p-[clamp(20px,2.4vw,32px)]">
+                <div className="flex items-center gap-5">
+                  <Image
+                    src={f.image}
+                    alt={f.name[locale]}
+                    width={112}
+                    height={112}
+                    className="h-20 w-20 shrink-0 rounded-full object-cover grayscale contrast-[1.05] md:h-24 md:w-24"
+                  />
+                  <div className="min-w-0">
+                    <h3 className="text-[1.2rem] font-normal text-cream">{f.name[locale]}</h3>
+                    <p className="mt-1 font-assistant text-sm font-light leading-[1.6] text-gold">{f.role[locale]}</p>
+                  </div>
                 </div>
+                <p className="mt-6 font-assistant font-light leading-[1.8] text-muted">{f.bio[locale]}</p>
+                <a
+                  href={f.linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer me"
+                  className="mt-4 inline-flex min-h-[24px] items-center font-assistant text-[13px] text-gold underline-offset-4 transition-colors hover:text-gold-light hover:underline"
+                >
+                  {p.foundersLinkLabel}
+                </a>
               </GlassPanel>
             </Reveal>
           ))}
