@@ -18,8 +18,17 @@ const CONTACT_WINDOW_MS = 10 * 60 * 1000;
 // inquiry and bound the payload.
 const MAX_NAME = 200;
 const MAX_EMAIL = 320; // RFC 5321 maximum address length
-const MAX_COMPANY = 200;
 const MAX_MESSAGE = 5000;
+const MAX_AREAS = 12;
+const MAX_AREA = 80;
+
+// The redesigned form (2.10.2026) asks for email (required), phone (optional) and
+// the areas the request is about. The older shape ({ name, email, company,
+// message }) is a subset of it, so a page cached before the deploy keeps working.
+const PHONE_RE = /^\+?[\d\s\-().]{8,24}$/;
+function digitCount(v: string) {
+  return v.replace(/\D/g, "").length;
+}
 
 // Deliberately permissive - just enough to reject values that are not
 // addresses at all (and that would land in Resend's reply_to field).
@@ -31,10 +40,16 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const name = typeof body.name === "string" ? body.name.trim().slice(0, MAX_NAME) : "";
-    const email = typeof body.email === "string" ? body.email.trim().slice(0, MAX_EMAIL) : "";
-    const company = typeof body.company === "string" ? body.company.trim().slice(0, MAX_COMPANY) : "";
-    const message = typeof body.message === "string" ? body.message.trim().slice(0, MAX_MESSAGE) : "";
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const name = str(body.name, MAX_NAME);
+    const message = str(body.message, MAX_MESSAGE);
+    const company = str(body.company, 200);
+    const areas: string[] = Array.isArray(body.areas)
+      ? body.areas.filter((a: unknown) => typeof a === "string").slice(0, MAX_AREAS).map((a: string) => a.trim().slice(0, MAX_AREA)).filter(Boolean)
+      : [];
+
+    const email = str(body.email, MAX_EMAIL);
+    const phone = str(body.phone, 40);
 
     if (!name || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -47,6 +62,9 @@ export async function POST(request: Request) {
     if (!EMAIL_RE.test(email)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
+    // Phone is optional, so an oddly typed number never blocks a lead: it is
+    // passed on as typed, and only a plausible one gets a WhatsApp link.
+    const phoneValid = phone !== "" && PHONE_RE.test(phone) && digitCount(phone) >= 9 && digitCount(phone) <= 15;
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
@@ -68,7 +86,10 @@ export async function POST(request: Request) {
         text: [
           `Name: ${name}`,
           `Email: ${email}`,
-          `Company: ${company || "-"}`,
+          `Phone: ${phone || "-"}`,
+          ...(phoneValid ? [`WhatsApp: https://wa.me/${phone.replace(/\D/g, "").replace(/^0/, "972")}`] : []),
+          `Areas: ${areas.length ? areas.join(", ") : "-"}`,
+          ...(company ? [`Company: ${company}`] : []),
           "",
           "Message:",
           message || "-",

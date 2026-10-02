@@ -5,9 +5,8 @@ import { WideContainer } from "@/components/ui/WideContainer";
 import { Reveal } from "@/components/motion/Reveal";
 import { ContactForm } from "@/components/sections/ContactForm";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
-import { InnerCTA } from "@/components/sections/InnerCTA";
+import Image from "next/image";
 import { Eyebrow } from "@/components/ui/Eyebrow";
-import { MonoLabel } from "@/components/ui/MonoLabel";
 
 // Both locales get a dedicated title and description. The Hebrew pair was added during
 // Ariel's production QA pass; English was left on the generic site meta at the time
@@ -17,12 +16,12 @@ const PAGE_META = {
   he: {
     title: "שיחת היכרות | Ankora",
     description:
-      "קבעו שיחת היכרות של עשרים דקות עם Ankora. בלי מחויבות, בלי טפסים ארוכים, כדי להבין איך ניהול תפעול אישי יכול לעבוד עבורכם.",
+      "שיחת היכרות אישית של עשרים דקות עם מנכ״ל Ankora. בלי מחויבות: משאירים פרטים ובוחרים מועד ביומן, באותו מסך.",
   },
   en: {
     title: "Book a Call | Ankora",
     description:
-      "A twenty-minute call with Ankora. No commitment and no long forms. We get to know you, understand your needs, and show you how personal operations management could work for you.",
+      "A personal twenty-minute call with Ankora's CEO. No commitment: leave your details and pick a time in the calendar, on the same screen.",
   },
 } as const;
 
@@ -47,80 +46,78 @@ export async function generateMetadata(
 }
 
 /**
- * Contact: the direct details on one side, the four-field form on the other.
+ * Contact, redesigned 2.10.2026 (claude/contact-page-redesign-2026-10.md).
  *
- * Like the about page, it writes its own hero instead of using PageHero — the hero
- * and the form share one two-column grid, so the form sits beside the headline rather
- * than below a full-width hero band.
+ * Three blocks in one grid: the intro (headline and who you will speak to), the
+ * form, and "what happens next". On a phone they stack in that order, so the
+ * form starts on the first screen (it used to start at 795px of an 844px
+ * screen). On a wide screen the intro and the steps share the first column and
+ * the form takes the second.
+ *
+ * The closing CTA banner is gone: on this page it linked to this page.
  */
 export default async function ContactPage(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.contact;
+  const areas = dict.capabilities.items.map((item) => item.title);
 
   return (
-    <>
-      <section className="relative overflow-hidden pb-16 pt-40 md:pb-20 md:pt-48">
-        <WideContainer className="relative z-[1]">
-          <div className="mb-8">
-            <Breadcrumbs
-              locale={locale}
-              items={[{ label: dict.nav.home, href: "/" }, { label: p.eyebrow }]}
-            />
-          </div>
-          <div
-            className="grid gap-12 lg:items-start"
-            style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 400px), 1fr))" }}
-          >
-            <div>
-              <Reveal>
-                <Eyebrow>{p.eyebrow}</Eyebrow>
-              </Reveal>
-              <Reveal delay={0.08}>
-                <h1 className="mt-6 text-balance text-[clamp(2.2rem,5.2vw,4.7rem)] font-extralight leading-[1.1] tracking-[-0.03em] text-cream">
-                  {p.title}
-                </h1>
-              </Reveal>
-              <Reveal delay={0.16}>
-                <p className="mt-6 max-w-[48ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body">
-                  {p.sub}
-                </p>
-              </Reveal>
-              <Reveal delay={0.22}>
-                <div className="mt-10 border-t border-[rgba(243,234,219,0.12)] pt-8">
-                  <MonoLabel tracking="0.15em" className="text-muted">
-                    {p.directTitle}
-                  </MonoLabel>
-                  <p className="mt-3 font-assistant text-sm font-light leading-[1.8] text-muted">
-                    {p.directBody}
-                  </p>
-                  <a
-                    href="mailto:hello@ankora.co.il"
-                    dir="ltr"
-                    className="mt-3 inline-flex min-h-[46px] items-center font-jbmono text-sm text-gold underline decoration-[rgba(176,141,87,0.45)] underline-offset-4 transition-colors hover:text-cream"
-                  >
-                    hello@ankora.co.il
-                  </a>
-                  <ul className="mt-6 flex flex-col gap-2.5">
-                    {p.directPoints.map((point) => (
-                      <li key={point} className="flex items-center gap-2.5 font-assistant text-sm font-light text-cream">
-                        <span className="h-1 w-1 shrink-0 rounded-full bg-gold" />
-                        {point}
-                      </li>
-                    ))}
-                  </ul>
+    <section className="relative overflow-hidden pb-20 pt-28 md:pb-28 md:pt-40">
+      <WideContainer className="relative z-[1]">
+        <div className="mb-6 hidden md:block">
+          <Breadcrumbs locale={locale} items={[{ label: dict.nav.home, href: "/" }, { label: p.eyebrow }]} />
+        </div>
+        <div className="grid gap-x-[clamp(40px,6vw,88px)] gap-y-8 lg:grid-cols-2 lg:grid-rows-[auto_1fr] lg:items-start">
+          <div className="lg:col-start-1 lg:row-start-1">
+            <Reveal>
+              <Eyebrow>{p.eyebrow}</Eyebrow>
+            </Reveal>
+            <Reveal delay={0.08}>
+              <h1 className="mt-4 text-balance text-[clamp(2rem,5vw,3.6rem)] font-extralight leading-[1.1] tracking-[-0.02em] text-cream md:mt-6">
+                {p.title}
+              </h1>
+            </Reveal>
+            <Reveal delay={0.12}>
+              <p className="mt-4 hidden max-w-[46ch] font-assistant text-[clamp(1.02rem,1.2vw,1.14rem)] font-light leading-[1.8] text-body md:block">
+                {p.sub}
+              </p>
+            </Reveal>
+            <Reveal delay={0.16}>
+              <div className="mt-5 flex items-center gap-3.5 md:mt-8">
+                <Image
+                  src="/team/ariel-utnik.jpg"
+                  alt=""
+                  width={56}
+                  height={56}
+                  className="h-11 w-11 border border-[rgba(176,141,87,0.5)] object-cover grayscale md:h-14 md:w-14"
+                />
+                <div>
+                  <p className="text-[15px] text-cream">{p.hostName}</p>
+                  <p className="mt-0.5 font-assistant text-sm text-[rgba(248,244,236,0.55)]">{p.hostRole}</p>
                 </div>
-              </Reveal>
-            </div>
-            <Reveal delay={0.1}>
-              <ContactForm p={p} />
+              </div>
             </Reveal>
           </div>
-        </WideContainer>
-      </section>
 
-      <InnerCTA dict={dict} locale={locale} />
-    </>
+          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <ContactForm p={p} areas={areas} locale={locale} />
+          </div>
+
+          <Reveal className="lg:col-start-1 lg:row-start-2">
+            <ol className="grid grid-cols-3 gap-px border border-[rgba(243,234,219,0.12)] bg-[rgba(243,234,219,0.12)]">
+              {p.steps.map((step, i) => (
+                <li key={step.title} className="bg-navy p-3.5 sm:p-5">
+                  <span className="font-jbmono text-[13px] text-gold-light">{String(i + 1).padStart(2, "0")}</span>
+                  <p className="mt-2 text-sm leading-snug text-cream sm:mt-2.5 sm:text-[15px]">{step.title}</p>
+                  <p className="mt-1 font-assistant text-[13px] leading-snug text-[rgba(248,244,236,0.55)] sm:text-sm">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </Reveal>
+        </div>
+      </WideContainer>
+    </section>
   );
 }

@@ -427,16 +427,29 @@ export interface PagesContent {
     eyebrow: string;
     title: string;
     sub: string;
+    /** "What happens next": three short steps beside the form. */
+    steps: { title: string; body: string }[];
+    /** The person the visitor will speak to. One name, because it is a promise. */
+    hostName: string;
+    hostRole: string;
+    /** The form is step 1 of 2, the calendar step 2: the meeting is the
+     *  next step, not an option offered after a thank-you. */
+    stepDetails: string;
+    stepBooking: string;
     nameLabel: string;
     emailLabel: string;
-    companyLabel: string;
+    phoneLabel: string;
+    /** The topics come from home.capabilities (same six, same order); this is only the question. */
+    areasLabel: string;
     messageLabel: string;
     submit: string;
-    directTitle: string;
-    directBody: string;
-    // Two short reassurances beside the direct-contact details.
-    directPoints: string[];
-    successMessage: string;
+    privacy: string;
+    privacyLink: string;
+    whatsappPrompt: string;
+    whatsappLink: string;
+    bookingTitle: string;
+    bookingSub: string;
+    bookingFallback: string;
     errorMessage: string;
   };
   legal: LegalContent;
