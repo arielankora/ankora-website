@@ -427,16 +427,28 @@ export interface PagesContent {
     eyebrow: string;
     title: string;
     sub: string;
+    /** "What happens next": three short steps beside the form. */
+    steps: { title: string; body: string }[];
+    /** The person the visitor will speak to. One name, because it is a promise. */
+    hostName: string;
+    hostRole: string;
     nameLabel: string;
-    emailLabel: string;
-    companyLabel: string;
+    channelLabel: string;
+    /** Reply channels, in display order. `field` labels the one input that follows. */
+    channels: { id: "whatsapp" | "phone" | "email"; label: string; field: string; reply: string }[];
+    /** The topics come from home.capabilities (same six, same order); this is only the question. */
+    areasLabel: string;
     messageLabel: string;
     submit: string;
-    directTitle: string;
-    directBody: string;
-    // Two short reassurances beside the direct-contact details.
-    directPoints: string[];
-    successMessage: string;
+    privacy: string;
+    privacyLink: string;
+    whatsappPrompt: string;
+    whatsappLink: string;
+    successTitle: string;
+    bookingEyebrow: string;
+    bookingTitle: string;
+    bookingCta: string;
+    bookingNote: string;
     errorMessage: string;
   };
   legal: LegalContent;

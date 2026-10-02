@@ -18,8 +18,24 @@ const CONTACT_WINDOW_MS = 10 * 60 * 1000;
 // inquiry and bound the payload.
 const MAX_NAME = 200;
 const MAX_EMAIL = 320; // RFC 5321 maximum address length
-const MAX_COMPANY = 200;
 const MAX_MESSAGE = 5000;
+const MAX_AREAS = 12;
+const MAX_AREA = 80;
+
+// The redesigned form (2.10.2026) asks how to reply: WhatsApp, phone or email,
+// and one contact field for that channel. The old shape ({ name, email, company,
+// message }) is still accepted, so a page cached before the deploy keeps working.
+const CHANNELS = ["whatsapp", "phone", "email"] as const;
+type Channel = (typeof CHANNELS)[number];
+const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", phone: "Phone", email: "Email" };
+
+// An Israeli or international number: digits with optional +, spaces, dashes,
+// dots and brackets, 9 to 15 digits in all. Lenient on purpose: a person who
+// typed their number a little oddly is still a lead.
+const PHONE_RE = /^\+?[\d\s\-().]{8,24}$/;
+function digitCount(v: string) {
+  return v.replace(/\D/g, "").length;
+}
 
 // Deliberately permissive - just enough to reject values that are not
 // addresses at all (and that would land in Resend's reply_to field).
@@ -31,12 +47,20 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const name = typeof body.name === "string" ? body.name.trim().slice(0, MAX_NAME) : "";
-    const email = typeof body.email === "string" ? body.email.trim().slice(0, MAX_EMAIL) : "";
-    const company = typeof body.company === "string" ? body.company.trim().slice(0, MAX_COMPANY) : "";
-    const message = typeof body.message === "string" ? body.message.trim().slice(0, MAX_MESSAGE) : "";
+    const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+    const name = str(body.name, MAX_NAME);
+    const message = str(body.message, MAX_MESSAGE);
+    const company = str(body.company, 200);
+    const areas: string[] = Array.isArray(body.areas)
+      ? body.areas.filter((a: unknown) => typeof a === "string").slice(0, MAX_AREAS).map((a: string) => a.trim().slice(0, MAX_AREA)).filter(Boolean)
+      : [];
 
-    if (!name || !email) {
+    const channel: Channel = CHANNELS.includes(body.channel) ? body.channel : "email";
+    const contact = str(body.contact ?? body.email, MAX_EMAIL);
+    const email = channel === "email" ? contact : "";
+    const phone = channel === "email" ? "" : contact;
+
+    if (!name || !contact) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -44,8 +68,11 @@ export async function POST(request: Request) {
     // `reply_to`. Resend takes JSON so there is no CRLF header-injection
     // path, but a malformed address still silently breaks every reply
     // Ankora tries to send back to a genuine lead.
-    if (!EMAIL_RE.test(email)) {
+    if (email && !EMAIL_RE.test(email)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+    }
+    if (phone && (!PHONE_RE.test(phone) || digitCount(phone) < 9 || digitCount(phone) > 15)) {
+      return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
     }
 
     const apiKey = process.env.RESEND_API_KEY;
@@ -63,12 +90,15 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         from: "Ankora Website <noreply@ankora.co.il>",
         to: ["info@ankora.co.il"],
-        reply_to: email,
-        subject: `New website inquiry from ${name}`,
+        ...(email ? { reply_to: email } : {}),
+        subject: `New website inquiry from ${name} (${CHANNEL_LABEL[channel]})`,
         text: [
           `Name: ${name}`,
-          `Email: ${email}`,
-          `Company: ${company || "-"}`,
+          `Reply by: ${CHANNEL_LABEL[channel]}`,
+          email ? `Email: ${email}` : `Phone: ${phone}`,
+          ...(phone && channel === "whatsapp" ? [`WhatsApp: https://wa.me/${phone.replace(/\D/g, "").replace(/^0/, "972")}`] : []),
+          `Areas: ${areas.length ? areas.join(", ") : "-"}`,
+          ...(company ? [`Company: ${company}`] : []),
           "",
           "Message:",
           message || "-",
