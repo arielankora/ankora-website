@@ -6,8 +6,8 @@
  *
  * BOOKING_EMBED_URL is Ariel's Google Calendar booking page (appointment schedule
  * "30 min with Ariel (Ankora)", short link calendar.app.google/PvjgmqK21PuXWrYRA)
- * in Google's embed form (`?gv=true`), shown inside the page after the form was
- * accepted, so the lead is already saved whether or not a time is booked. The
+ * in Google's embed form (`?gv=true`), shown inside the page as step 2, as soon as
+ * the form is accepted, so the lead is already saved whether or not a time is booked. The
  * frame is Google's and cannot be styled. Google does not report bookings back to
  * the site: the site measures booking_open, and actual bookings are seen in the
  * calendar. next.config.mjs allows https://calendar.google.com in frame-src.

@@ -22,16 +22,9 @@ const MAX_MESSAGE = 5000;
 const MAX_AREAS = 12;
 const MAX_AREA = 80;
 
-// The redesigned form (2.10.2026) asks how to reply: WhatsApp, phone or email,
-// and one contact field for that channel. The old shape ({ name, email, company,
-// message }) is still accepted, so a page cached before the deploy keeps working.
-const CHANNELS = ["whatsapp", "phone", "email"] as const;
-type Channel = (typeof CHANNELS)[number];
-const CHANNEL_LABEL: Record<Channel, string> = { whatsapp: "WhatsApp", phone: "Phone", email: "Email" };
-
-// An Israeli or international number: digits with optional +, spaces, dashes,
-// dots and brackets, 9 to 15 digits in all. Lenient on purpose: a person who
-// typed their number a little oddly is still a lead.
+// The redesigned form (2.10.2026) asks for email (required), phone (optional) and
+// the areas the request is about. The older shape ({ name, email, company,
+// message }) is a subset of it, so a page cached before the deploy keeps working.
 const PHONE_RE = /^\+?[\d\s\-().]{8,24}$/;
 function digitCount(v: string) {
   return v.replace(/\D/g, "").length;
@@ -55,12 +48,10 @@ export async function POST(request: Request) {
       ? body.areas.filter((a: unknown) => typeof a === "string").slice(0, MAX_AREAS).map((a: string) => a.trim().slice(0, MAX_AREA)).filter(Boolean)
       : [];
 
-    const channel: Channel = CHANNELS.includes(body.channel) ? body.channel : "email";
-    const contact = str(body.contact ?? body.email, MAX_EMAIL);
-    const email = channel === "email" ? contact : "";
-    const phone = channel === "email" ? "" : contact;
+    const email = str(body.email, MAX_EMAIL);
+    const phone = str(body.phone, 40);
 
-    if (!name || !contact) {
+    if (!name || !email) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
@@ -68,12 +59,12 @@ export async function POST(request: Request) {
     // `reply_to`. Resend takes JSON so there is no CRLF header-injection
     // path, but a malformed address still silently breaks every reply
     // Ankora tries to send back to a genuine lead.
-    if (email && !EMAIL_RE.test(email)) {
+    if (!EMAIL_RE.test(email)) {
       return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
     }
-    if (phone && (!PHONE_RE.test(phone) || digitCount(phone) < 9 || digitCount(phone) > 15)) {
-      return NextResponse.json({ error: "Invalid phone number" }, { status: 400 });
-    }
+    // Phone is optional, so an oddly typed number never blocks a lead: it is
+    // passed on as typed, and only a plausible one gets a WhatsApp link.
+    const phoneValid = phone !== "" && PHONE_RE.test(phone) && digitCount(phone) >= 9 && digitCount(phone) <= 15;
 
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
@@ -90,13 +81,13 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         from: "Ankora Website <noreply@ankora.co.il>",
         to: ["info@ankora.co.il"],
-        ...(email ? { reply_to: email } : {}),
-        subject: `New website inquiry from ${name} (${CHANNEL_LABEL[channel]})`,
+        reply_to: email,
+        subject: `New website inquiry from ${name}`,
         text: [
           `Name: ${name}`,
-          `Reply by: ${CHANNEL_LABEL[channel]}`,
-          email ? `Email: ${email}` : `Phone: ${phone}`,
-          ...(phone && channel === "whatsapp" ? [`WhatsApp: https://wa.me/${phone.replace(/\D/g, "").replace(/^0/, "972")}`] : []),
+          `Email: ${email}`,
+          `Phone: ${phone || "-"}`,
+          ...(phoneValid ? [`WhatsApp: https://wa.me/${phone.replace(/\D/g, "").replace(/^0/, "972")}`] : []),
           `Areas: ${areas.length ? areas.join(", ") : "-"}`,
           ...(company ? [`Company: ${company}`] : []),
           "",

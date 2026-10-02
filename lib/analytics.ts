@@ -9,13 +9,13 @@
  *   contact_form_submit ..... the submit button pressed (attempt)
  *   contact_form_invalid .... the browser blocked the submit (empty required field)
  *   contact_form_error ...... the server or network refused it
- *   generate_lead ........... the server accepted it (the key event), with channel
+ *   generate_lead ........... the server accepted it (the key event), with has_phone
  *
  * Added with the contact page redesign (2.10.2026), outside the funnel steps:
  *   contact_channel_click ... the direct WhatsApp or email link (leaves the form;
  *                             never counted as a lead). channel: whatsapp_link | email_link
- *   booking_open ............ the booking calendar opened after an accepted request.
- *                             Google does not report the booking itself.
+ *   booking_open ............ step 2, the booking calendar, shown after an accepted
+ *                             request. Google does not report the booking itself.
  *
  * gtag is absent for automated browsers (see app/[locale]/layout.tsx), and
  * analytics must never break the page, so every call is guarded.

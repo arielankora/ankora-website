@@ -16,12 +16,12 @@ const PAGE_META = {
   he: {
     title: "שיחת היכרות | Ankora",
     description:
-      "קבעו שיחת היכרות אישית של עשרים דקות עם מנכ״ל Ankora. בלי מחויבות: חוזרים אליכם בוואטסאפ, בטלפון או במייל תוך יום עסקים.",
+      "שיחת היכרות אישית של עשרים דקות עם מנכ״ל Ankora. בלי מחויבות: משאירים פרטים ובוחרים מועד ביומן, באותו מסך.",
   },
   en: {
     title: "Book a Call | Ankora",
     description:
-      "A personal twenty-minute call with Ankora's CEO. No commitment: we reply on WhatsApp, by phone or by email within one business day.",
+      "A personal twenty-minute call with Ankora's CEO. No commitment: leave your details and pick a time in the calendar, on the same screen.",
   },
 } as const;
 
