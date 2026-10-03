@@ -87,6 +87,9 @@ vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
+// The decisions module is reached through lib/mcp/task-extra-tools.ts.
+// Mocked so importing the tool surface never instantiates Prisma.
+vi.mock("@/lib/app-domain/decisions", () => ({ createDecision: vi.fn(), listDecisionsForClient: vi.fn() }));
 vi.mock("@/lib/app-auth/permissions", () => permissions);
 // Serialisation turns a full entry row into the tool's wire shape and
 // would throw on the skeleton objects below. What is under test here is

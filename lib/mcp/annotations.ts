@@ -60,6 +60,14 @@ export const TOOL_ANNOTATIONS = {
   // create_task, which makes a second task. Same reasoning as
   // update_timer_note.
   update_task: { ...WRITES, idempotentHint: true },
+  // NUX handover pass (lib/mcp/task-extra-tools.ts).
+  get_task: READ_ONLY,
+  list_decisions: READ_ONLY,
+  add_task_steps: WRITES,
+  // Ticking a step that is already ticked leaves it ticked.
+  set_task_step: { ...WRITES, idempotentHint: true },
+  add_task_comment: WRITES,
+  create_decision: WRITES,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -77,6 +85,10 @@ export const WRITE_TOOLS = [
   "create_time_entry",
   "create_task",
   "update_task",
+  "add_task_steps",
+  "set_task_step",
+  "add_task_comment",
+  "create_decision",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.
@@ -87,3 +99,20 @@ export const WRITE_TOOLS = [
 /// gates. list_tasks does surface an assignee's name, but only for tasks
 /// on clients the caller already works on, which is the same scope the
 /// Tasks screen has always had.
+
+// The client portal connector (lib/mcp/portal-tools.ts, /api/mcp/portal).
+// A separate table because it is a separate server: a client's Claude
+// sees these and nothing from TOOL_ANNOTATIONS. One write, the portal's
+// own: answering a decision. It is final, so it is not idempotent - a
+// second call is refused by the domain, never applied twice.
+export const PORTAL_TOOL_ANNOTATIONS = {
+  get_status: READ_ONLY,
+  list_tasks: READ_ONLY,
+  list_decisions: READ_ONLY,
+  answer_decision: WRITES,
+  weekly_report: READ_ONLY,
+  monthly_report: READ_ONLY,
+  hour_bank: READ_ONLY,
+} as const;
+
+export const PORTAL_WRITE_TOOLS = ["answer_decision"] as const;

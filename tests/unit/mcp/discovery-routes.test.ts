@@ -74,6 +74,35 @@ describe("/api/mcp/oauth/metadata/protected-resource (RFC 9728)", () => {
   });
 });
 
+describe("/api/mcp/oauth/metadata/protected-resource/portal (client portal connector)", () => {
+  const portalReq = (origin = ORIGIN) => new Request(`${origin}/.well-known/oauth-protected-resource/api/mcp/portal`);
+
+  it("names the portal endpoint as the resource, not the staff one", async () => {
+    // Same failure mode as the staff document: a resource that differs
+    // from the URL the client typed fails audience validation silently.
+    const { GET } = await import("@/app/api/mcp/oauth/metadata/protected-resource/portal/route");
+    const body = await (await GET(portalReq())).json();
+    expect(body.resource).toBe(`${ORIGIN}/api/mcp/portal`);
+    expect(body.authorization_servers).toContain(ORIGIN);
+  });
+
+  it("derives the origin from the request", async () => {
+    const { GET } = await import("@/app/api/mcp/oauth/metadata/protected-resource/portal/route");
+    const body = await (await GET(portalReq("https://ankora-website-preview.vercel.app"))).json();
+    expect(body.resource).toBe("https://ankora-website-preview.vercel.app/api/mcp/portal");
+  });
+
+  it("is routed before the catch-all that serves the staff document", async () => {
+    const config = (await import("../../../next.config.mjs")).default as { rewrites: () => Promise<{ source: string; destination: string }[]> };
+    const rules = await config.rewrites();
+    const portal = rules.findIndex((r) => r.source === "/.well-known/oauth-protected-resource/api/mcp/portal");
+    const catchAll = rules.findIndex((r) => r.source === "/.well-known/oauth-protected-resource/:path*");
+    expect(portal).toBeGreaterThanOrEqual(0);
+    expect(rules[portal].destination).toBe("/api/mcp/oauth/metadata/protected-resource/portal");
+    expect(portal).toBeLessThan(catchAll);
+  });
+});
+
 describe("/api/mcp/oauth/metadata/authorization-server (RFC 8414)", () => {
   it("advertises dynamic client registration", async () => {
     // Without registration_endpoint, Claude stops looking for a way in and

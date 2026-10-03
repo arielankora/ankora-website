@@ -83,11 +83,22 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
 
       <div className="mt-6 rounded-lg border border-appNavy/10 bg-cream p-4 text-sm leading-relaxed text-appNavy/80">
         <p className="font-medium text-appNavy">מה Claude יוכל לעשות</p>
-        <ul className="mt-2 list-disc space-y-1 pe-5">
-          <li>לראות את הלקוחות והקטגוריות שאתה רשאי לדווח עליהם</li>
-          <li>לקרוא את דיווחי הזמן שלך</li>
-          <li>להפעיל ולעצור טיימר, ולרשום זמן בשמך</li>
-        </ul>
+        {user.role === "CLIENT_USER" ? (
+          // A portal user connects the portal connector (/api/mcp/portal),
+          // which reads what their portal shows and answers decisions -
+          // nothing about timers or other clients applies to them.
+          <ul className="mt-2 list-disc space-y-1 pe-5">
+            <li>לראות את סטטוס המשימות שאנקורה מטפלת בהן עבורכם, כפי שהן מופיעות בפורטל</li>
+            <li>לקרוא את הדוח השבועי, הדוח החודשי ובנק השעות</li>
+            <li>לראות החלטות שממתינות לכם, ולענות עליהן בשמכם אם אתם מנהלי החשבון</li>
+          </ul>
+        ) : (
+          <ul className="mt-2 list-disc space-y-1 pe-5">
+            <li>לראות את הלקוחות והקטגוריות שאתה רשאי לדווח עליהם</li>
+            <li>לקרוא את דיווחי הזמן שלך</li>
+            <li>להפעיל ולעצור טיימר, ולרשום זמן בשמך</li>
+          </ul>
+        )}
         <p className="mt-3 text-appNavy/60">
           Claude פועל בהרשאות שלך בלבד — בדיוק מה שאתה רואה במערכת, לא יותר. מחיקה אינה אפשרית דרך החיבור
           הזה.
