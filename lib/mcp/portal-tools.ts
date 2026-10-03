@@ -14,11 +14,13 @@ import {
   getPortalDashboard,
   getPortalHistory,
   getPortalHome,
+  getPortalProgress,
   getPortalTimeline,
   getWeeklyActivity,
   resolvePortalClient,
   type PortalPromise,
   type PortalStage,
+  type PortalStageCounts,
 } from "@/lib/app-domain/client-portal";
 import { getPortalDecisions, respondToDecision } from "@/lib/app-domain/decisions";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
@@ -81,20 +83,17 @@ function serializePromise(p: PortalPromise, tz: string) {
   };
 }
 
-/// Counts by stage. "How far along are we" is the first question a
-/// client asks of a project, and a model counting a list by hand gets it
-/// wrong often enough that the server should say it.
-export function stageCounts(promises: { stage: PortalStage }[]) {
-  const count = (s: PortalStage) => promises.filter((p) => p.stage === s).length;
-  const total = promises.length;
-  const done = count("DONE");
+/// Progress as the model should report it, from the server's own counts
+/// over ALL visible promises (getPortalProgress), never from a list the
+/// model or a capped query would have to count.
+export function progressOf(c: PortalStageCounts) {
   return {
-    total,
-    done,
-    inProgress: count("IN_PROGRESS"),
-    notStarted: count("RECEIVED"),
-    waitingForYou: count("WAITING_ON_CLIENT"),
-    percentDone: total > 0 ? Math.round((done / total) * 100) : 0,
+    total: c.total,
+    done: c.DONE,
+    inProgress: c.IN_PROGRESS,
+    notStarted: c.RECEIVED,
+    waitingForYou: c.WAITING_ON_CLIENT,
+    percentDone: c.total > 0 ? Math.round((c.DONE / c.total) * 100) : 0,
   };
 }
 
@@ -119,10 +118,10 @@ export function registerPortalTools(server: McpServer): void {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
         const tz = actor.timezone;
-        const [home, timeline] = await Promise.all([getPortalHome(actor), getPortalTimeline(actor)]);
+        const [home, counts] = await Promise.all([getPortalHome(actor), getPortalProgress(actor)]);
         return toolJson({
           client: home.client.name,
-          progress: stageCounts(timeline.promises),
+          progress: progressOf(counts),
           decisionsWaitingForYou: home.openDecisions,
           waitingForYou: home.waitingOnClient.map((p) => serializePromise(p, tz)),
           inProgress: home.inProgress.map((p) => serializePromise(p, tz)),
@@ -163,15 +162,18 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
-        const { client, promises } = await getPortalTimeline(actor);
+        const [{ client, promises }, counts] = await Promise.all([getPortalTimeline(actor), getPortalProgress(actor)]);
         const q = args.search?.trim().toLowerCase();
         const shown = promises
           .filter((p) => !args.stage || p.stage === args.stage)
           .filter((p) => !q || p.title.toLowerCase().includes(q));
         return toolJson({
           client: client.name,
-          progress: stageCounts(promises),
+          progress: progressOf(counts),
           count: shown.length,
+          // The stream is bounded (TIMELINE_TAKE); say so rather than let
+          // the model present a partial list as the whole of it.
+          listTruncated: promises.length < counts.total,
           tasks: shown.map((p) => serializePromise(p, actor.timezone)),
         });
       } catch (err) {

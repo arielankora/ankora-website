@@ -700,7 +700,13 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
   };
 }
 
-const TIMELINE_TAKE = 60;
+/// How many promises the activity stream shows. Was 60, which a single
+/// project crossed on its first day (NUX handover, 55 visible tasks on
+/// day one, 3.10.2026): past it, the oldest promises silently dropped off
+/// the screen. 200 keeps the stream bounded for a long-running client
+/// while a project of this size fits whole. Counts never come from this
+/// list - see getPortalProgress below.
+export const TIMELINE_TAKE = 200;
 
 /// The activity screen: the same promises as a single stream, newest
 /// movement first. Replaces the row-per-time-entry table as the client's
@@ -710,4 +716,31 @@ export async function getPortalTimeline(actor: User): Promise<{ client: Client; 
   const { client } = await resolvePortalClient(actor);
   const tasks = await listVisibleTasks(client.id, { take: TIMELINE_TAKE });
   return { client, promises: tasks.map(toPromise) };
+}
+
+export type PortalStageCounts = Record<PortalStage, number> & { total: number };
+
+/// How many of the client's promises sit at each stage - ALL of them,
+/// never a page of them.
+///
+/// Separate from getPortalTimeline on purpose. A count taken from a
+/// capped list is quietly wrong the day the list fills, and "how far along
+/// are we" is exactly the number a client quotes back to us. One query on
+/// two narrow columns, the same visibility filter as everything else the
+/// portal shows (listVisibleTasks), and the same stage rule (stageOf).
+export async function getPortalProgress(actor: User): Promise<PortalStageCounts> {
+  const { client } = await resolvePortalClient(actor);
+  const rows = await prisma.task.findMany({
+    where: {
+      clientId: client.id,
+      deletedAt: null,
+      ...TOP_LEVEL_ONLY,
+      clientVisible: true,
+      status: { not: "ARCHIVED" },
+    },
+    select: { status: true, blockedOn: true },
+  });
+  const counts: PortalStageCounts = { total: rows.length, RECEIVED: 0, IN_PROGRESS: 0, WAITING_ON_CLIENT: 0, DONE: 0 };
+  for (const row of rows) counts[stageOf(row)] += 1;
+  return counts;
 }
