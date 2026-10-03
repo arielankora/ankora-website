@@ -290,11 +290,11 @@ test.describe("hour-banks/actions", () => {
     await expectDrawerClosed(page, "opening an hour-bank cycle");
     await page.reload();
 
-    // Ten hours; the screen renders banks in H:MM, so the
+    // Ten hours; the screen renders banks in decimal hours, so the
     // assertion is on the cycle being open at all rather than on a format
     // this test should not be pinning.
     await expect(
-      page.getByText(/10:00|600/).first(),
+      page.getByText(/10\.00|10:00|600/).first(),
       "the opened cycle is not visible on the screen",
     ).toBeVisible({ timeout: 15_000 });
   });
