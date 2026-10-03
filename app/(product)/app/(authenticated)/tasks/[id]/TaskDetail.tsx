@@ -58,6 +58,7 @@ export type TaskDetailData = {
   dueDate: string | null;
   clientVisible: boolean;
   clientTitle: string | null;
+  clientRequest: string | null;
   clientOutcome: string | null;
   /// Tasks phase 5. Null means nothing is holding this up.
   blockedOn: TaskBlocker | null;
@@ -754,16 +755,12 @@ function BlockSection({
             disabled={pending}
             onChange={(e) => setReason(e.target.value)}
             aria-label="סיבת ההמתנה"
-            placeholder={
-              on === "CLIENT" && task.clientVisible
-                ? "מה הלקוח צריך לעשות, במשפט. הלקוח רואה את זה בפורטל."
-                : "למה עצרנו, במשפט. לא חובה, ושווה."
-            }
+            placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
             className="w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
           />
           {on === "CLIENT" && task.clientVisible && (
             <p className="text-[12px] text-appNavy/55">
-              המשפט הזה מוצג ללקוח תחת &quot;מחכה לך&quot;. כותבים אותו כבקשה ללקוח, לא כהערה פנימית.
+              הסיבה נשארת פנימית. מה שהלקוח רואה תחת &quot;מחכה לך&quot; כותבים ב&quot;מה הלקוח רואה&quot;, בשדה &quot;מה מבקשים מהלקוח&quot;.
             </p>
           )}
           <button
@@ -812,6 +809,7 @@ function ClientSection({
   isDone: boolean;
 }) {
   const [clientTitle, setClientTitle] = useState(task.clientTitle ?? "");
+  const [clientRequest, setClientRequest] = useState(task.clientRequest ?? "");
 
   return (
     <section className="rounded-2xl border border-lineDark bg-white p-5">
@@ -859,6 +857,27 @@ function ClientSection({
                 );
               }}
               placeholder={task.title}
+              className="mt-1 w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+            />
+          </div>
+
+          {/* The one sentence a client reads under "מחכה לך". Written to
+              them, so it lives here with the other things they read, and
+              not in the block reason, which stays ours. */}
+          <div>
+            <label className="text-[12.5px] text-appNavy/50">מה מבקשים מהלקוח (מוצג תחת &quot;מחכה לך&quot;)</label>
+            <input
+              value={clientRequest}
+              disabled={pending}
+              onChange={(e) => setClientRequest(e.target.value)}
+              onBlur={async () => {
+                if (clientRequest.trim() === (task.clientRequest ?? "")) return;
+                await write(
+                  { clientRequest: clientRequest.trim() || null },
+                  { title: "הבקשה ללקוח עודכנה", description: clientRequest.trim() || task.title }
+                );
+              }}
+              placeholder="במשפט אחד, ישירות ללקוח: מה לעשות, איפה, וכמה זמן זה לוקח."
               className="mt-1 w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
             />
           </div>

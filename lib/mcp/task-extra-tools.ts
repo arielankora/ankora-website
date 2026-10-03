@@ -114,6 +114,7 @@ export function registerTaskExtraTools(server: McpServer): void {
           details: task.description,
           clientVisible: task.clientVisible,
           clientTitle: task.clientTitle,
+          clientRequest: task.clientRequest,
           outcome: task.clientOutcome,
           waitingOn: task.blockedOn,
           waitingReason: task.blockedReason,

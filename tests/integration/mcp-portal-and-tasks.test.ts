@@ -204,10 +204,18 @@ describe("what the client sees when a promise waits on them", () => {
       });
     }
 
+    await as(ariel, staff, "update_task", {
+      task: "ספי אישור",
+      client: nux.name,
+      clientRequest: "לענות על 2 שאלות בלשונית החלטות",
+    });
+
     const before = await as(oren, portal, "get_status");
     expect(before.waitingForYou).toHaveLength(1);
     expect(before.waitingForYou[0].decisionsToAnswer).toBe(2);
-    expect(before.waitingForYou[0].whatIsNeededFromYou).toBeTruthy();
+    expect(before.waitingForYou[0].whatIsNeededFromYou).toBe("לענות על 2 שאלות בלשונית החלטות");
+    // The block reason create_decision wrote is ours, and stays ours.
+    expect(JSON.stringify(before)).not.toContain("סף לרכישת תוכנה?");
 
     // The first answer must NOT clear the wait: one question is still open.
     await as(oren, portal, "answer_decision", { decision: "תוכנה", option: "עד 3,000" });

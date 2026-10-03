@@ -726,6 +726,12 @@ model Task {
   // that closed last week.
   clientVisible        Boolean   @default(false)
   clientTitle          String?
+  /// What we are asking the client to do, in one sentence addressed to
+  /// them, shown under "מחכה לך" while the task waits on the client.
+  /// Separate from `blockedReason` on purpose: that one is our internal
+  /// note ("לא עונה לטלפון") and must never reach the client
+  /// (tests/integration/task-blocking.test.ts). NUX handover, 3.10.2026.
+  clientRequest        String?
 
   // Portal phase 3 ("ספקים וגורמים"), and deliberately not a Supplier
   // table.

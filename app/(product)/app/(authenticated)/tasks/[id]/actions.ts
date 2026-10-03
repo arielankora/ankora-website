@@ -56,6 +56,7 @@ export async function updateTaskDetailAction(input: {
   // reads is the kind of errand that makes a field stop being filled in.
   clientVisible?: boolean;
   clientTitle?: string | null;
+  clientRequest?: string | null;
   /// Tasks phase 5. The full control lives on this screen, so this
   /// takes the whole thing: who we are waiting on and why, or null to
   /// say we are not waiting any more. The one-click gestures elsewhere
@@ -80,6 +81,7 @@ export async function updateTaskDetailAction(input: {
       requiresApproval: input.requiresApproval,
       clientVisible: input.clientVisible,
       clientTitle: input.clientTitle,
+      clientRequest: input.clientRequest,
       // The date is not here, and cannot be: the domain owns it, so a
       // caller cannot back-date a wait. Same reasoning as completedAt.
       block: input.block,
@@ -104,6 +106,7 @@ export async function updateTaskDetailAction(input: {
       completedAt: updated.completedAt?.toISOString() ?? null,
       clientVisible: updated.clientVisible,
       clientTitle: updated.clientTitle,
+      clientRequest: updated.clientRequest,
       clientOutcome: updated.clientOutcome,
       blockedOn: updated.blockedOn,
       blockedReason: updated.blockedReason,

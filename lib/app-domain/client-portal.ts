@@ -553,8 +553,8 @@ export interface PortalPromise {
   /// finished promise - closing a visible one without it is refused.
   outcome: string | null;
   /// What exactly the client has to do, in one line, while the promise is
-  /// waiting on them: the reason Ankora wrote when it marked the task as
-  /// waiting on the client. Null otherwise. Before this the portal showed
+  /// waiting on them: Task.clientRequest, written for the client. Never
+  /// the internal block reason. Null otherwise. Before this the portal showed
   /// only the title and "waiting N days", and a client reading "Approval
   /// Matrix" could not tell in ten seconds what was asked of them (NUX
   /// handover, 3.10.2026).
@@ -598,7 +598,7 @@ function toPromise(task: {
   updatedAt: Date;
   completedAt: Date | null;
   clientOutcome: string | null;
-  blockedReason?: string | null;
+  clientRequest?: string | null;
   _count?: { decisions: number };
 }): PortalPromise {
   return {
@@ -609,7 +609,9 @@ function toPromise(task: {
     dueDate: task.dueDate,
     movedAt: task.completedAt ?? task.updatedAt,
     outcome: task.clientOutcome?.trim() || null,
-    waitingFor: task.blockedOn === "CLIENT" ? task.blockedReason?.trim() || null : null,
+    // clientRequest, never blockedReason: the reason is our internal note
+    // and is kept off the portal by design (task-blocking.test.ts).
+    waitingFor: task.blockedOn === "CLIENT" ? task.clientRequest?.trim() || null : null,
     openDecisions: task._count?.decisions ?? 0,
   };
 }
@@ -643,7 +645,7 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       updatedAt: true,
       completedAt: true,
       clientOutcome: true,
-      blockedReason: true,
+      clientRequest: true,
       // Only OPEN ones: an answered or withdrawn decision asks nothing of
       // the client any more.
       _count: { select: { decisions: { where: { status: "OPEN" } } } },

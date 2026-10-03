@@ -121,6 +121,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           dueDate: task.dueDate?.toISOString() ?? null,
           clientVisible: task.clientVisible,
           clientTitle: task.clientTitle,
+          clientRequest: task.clientRequest,
           clientOutcome: task.clientOutcome,
           blockedOn: task.blockedOn,
           blockedReason: task.blockedReason,
