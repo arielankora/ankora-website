@@ -913,7 +913,9 @@ export function registerAnkoraTools(server: McpServer): void {
         waitingReason: z
           .string()
           .optional()
-          .describe("What exactly is being waited for, in one line. Only with waitingOn."),
+          .describe(
+            "What exactly is being waited for, in one line. Only with waitingOn. With waitingOn CLIENT on a task the client can see, the client reads this on their portal as 'what is needed from you', so write it as a request to them, not an internal note."
+          ),
         clearWaiting: z.boolean().optional().describe("The task is no longer waiting on anyone."),
       }),
       annotations: { ...WRITES, idempotentHint: true },

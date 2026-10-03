@@ -754,9 +754,18 @@ function BlockSection({
             disabled={pending}
             onChange={(e) => setReason(e.target.value)}
             aria-label="סיבת ההמתנה"
-            placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
+            placeholder={
+              on === "CLIENT" && task.clientVisible
+                ? "מה הלקוח צריך לעשות, במשפט. הלקוח רואה את זה בפורטל."
+                : "למה עצרנו, במשפט. לא חובה, ושווה."
+            }
             className="w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
           />
+          {on === "CLIENT" && task.clientVisible && (
+            <p className="text-[12px] text-appNavy/55">
+              המשפט הזה מוצג ללקוח תחת &quot;מחכה לך&quot;. כותבים אותו כבקשה ללקוח, לא כהערה פנימית.
+            </p>
+          )}
           <button
             type="button"
             disabled={pending}

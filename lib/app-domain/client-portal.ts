@@ -552,6 +552,17 @@ export interface PortalPromise {
   /// What came of it, in the client's language. Only ever set on a
   /// finished promise - closing a visible one without it is refused.
   outcome: string | null;
+  /// What exactly the client has to do, in one line, while the promise is
+  /// waiting on them: the reason Ankora wrote when it marked the task as
+  /// waiting on the client. Null otherwise. Before this the portal showed
+  /// only the title and "waiting N days", and a client reading "Approval
+  /// Matrix" could not tell in ten seconds what was asked of them (NUX
+  /// handover, 3.10.2026).
+  waitingFor: string | null;
+  /// Open decisions attached to this promise. Above zero, the row offers
+  /// a direct way to answer them instead of leaving the client to find
+  /// the decisions tab on their own.
+  openDecisions: number;
 }
 
 /// Waiting on the client wins over the internal status: a task can be
@@ -587,6 +598,8 @@ function toPromise(task: {
   updatedAt: Date;
   completedAt: Date | null;
   clientOutcome: string | null;
+  blockedReason?: string | null;
+  _count?: { decisions: number };
 }): PortalPromise {
   return {
     id: task.id,
@@ -596,6 +609,8 @@ function toPromise(task: {
     dueDate: task.dueDate,
     movedAt: task.completedAt ?? task.updatedAt,
     outcome: task.clientOutcome?.trim() || null,
+    waitingFor: task.blockedOn === "CLIENT" ? task.blockedReason?.trim() || null : null,
+    openDecisions: task._count?.decisions ?? 0,
   };
 }
 
@@ -628,6 +643,10 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       updatedAt: true,
       completedAt: true,
       clientOutcome: true,
+      blockedReason: true,
+      // Only OPEN ones: an answered or withdrawn decision asks nothing of
+      // the client any more.
+      _count: { select: { decisions: { where: { status: "OPEN" } } } },
     },
     orderBy: { updatedAt: "desc" },
     take: opts.take,
