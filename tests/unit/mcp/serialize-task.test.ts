@@ -105,6 +105,7 @@ describe("the payload", () => {
         "assignedTo",
         "category",
         "client",
+        "clientVisible",
         "createdAt",
         "dueDate",
         "id",
@@ -114,6 +115,7 @@ describe("the payload", () => {
         "status",
         "supervisor",
         "title",
+        "waitingOn",
       ].sort()
     );
   });

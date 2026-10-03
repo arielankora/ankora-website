@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import type { User } from "@prisma/client";
 import { actorFromAuthInfo } from "@/lib/mcp/auth";
-import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
+import { PortalUserOnStaffConnectorError, toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import {
   elapsedMinutes,
   serializeClient,
@@ -44,6 +44,7 @@ import {
 } from "@/lib/app-domain/time-entries";
 import { localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
+import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
@@ -64,6 +65,10 @@ import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 
 const MAX_ENTRIES = 200;
 
+/// Steps per task in one call. The SOP templates top out well below this;
+/// a longer list is a project, not a checklist.
+const MAX_STEPS = 15;
+
 const DATE = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
@@ -72,7 +77,11 @@ const CLOCK = z
   .regex(/^\d{2}:\d{2}$/, "Use 24-hour HH:MM");
 
 function actorOf(ctx: ServerContext): User {
-  return actorFromAuthInfo(ctx.http?.authInfo);
+  const actor = actorFromAuthInfo(ctx.http?.authInfo);
+  // A portal user on the staff connector gets pointed at their own one
+  // rather than a run of generic refusals (see lib/mcp/portal-tools.ts).
+  if (actor.role === "CLIENT_USER") throw new PortalUserOnStaffConnectorError();
+  return actor;
 }
 
 export function registerAnkoraTools(server: McpServer): void {
@@ -667,7 +676,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Open a task",
       description:
-        "Creates a new Ankora task on one client. The task is visible to everyone who works on that client. Assigning it to a colleague is allowed only if they have access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
+        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
@@ -687,6 +696,31 @@ export function registerAnkoraTools(server: McpServer): void {
           .enum(["LOW", "NORMAL", "HIGH", "URGENT"])
           .optional()
           .describe("How urgent. Omit unless the user said so - NORMAL is the default and most work is ordinary."),
+        supervisor: z
+          .string()
+          .optional()
+          .describe("Colleague's name or email to watch over this task. Must have access to the client. Clients cannot be supervisors."),
+        requireApproval: z
+          .boolean()
+          .optional()
+          .describe("Whether the supervisor must sign it off before it can close. Needs `supervisor`."),
+        clientVisible: z
+          .boolean()
+          .optional()
+          .describe(
+            "Show this task on the client's portal as a promise they can follow. Off by default: most internal work is not something the client needs to watch. A visible task cannot be closed later without an outcome sentence."
+          ),
+        clientTitle: z
+          .string()
+          .optional()
+          .describe("The title the client sees, in their language, when it should differ from the internal title. Only meaningful with clientVisible."),
+        steps: z
+          .array(z.string().min(1))
+          .max(MAX_STEPS)
+          .optional()
+          .describe(
+            `Checklist steps to create under this task, in order, as one-line titles. Up to ${MAX_STEPS}. Steps are internal and never shown on the portal.`
+          ),
       }),
       annotations: WRITES,
     },
@@ -699,11 +733,21 @@ export function registerAnkoraTools(server: McpServer): void {
         due?: string;
         details?: string;
         priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
+        supervisor?: string;
+        requireApproval?: boolean;
+        clientVisible?: boolean;
+        clientTitle?: string;
+        steps?: string[];
       },
       ctx: ServerContext
     ) => {
       try {
         const actor = actorOf(ctx);
+        // Checked before any lookup, so a refused call writes nothing.
+        if (args.requireApproval && !args.supervisor) {
+          return toolText("requireApproval needs a supervisor - pass `supervisor` as well, or drop requireApproval.");
+        }
+
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
 
@@ -725,6 +769,18 @@ export function registerAnkoraTools(server: McpServer): void {
           assigneeName = person.value.name;
         }
 
+        // Same lookup as the assignee: the same question (who, among the
+        // people with access to this client) and the same refusal for a
+        // client-side user, who can never sign for Ankora's work.
+        let supervisorId: string | null = null;
+        let supervisorName: string | null = null;
+        if (args.supervisor) {
+          const person = await lookupAssignee(actor, client.value.id, args.supervisor);
+          if (!person.ok) return toolText(person.message);
+          supervisorId = person.value.id;
+          supervisorName = person.value.name;
+        }
+
         const task = await createTask(actor, {
           clientId: client.value.id,
           categoryId,
@@ -732,10 +788,32 @@ export function registerAnkoraTools(server: McpServer): void {
           description: args.details ?? null,
           priority: args.priority,
           assignedToId,
+          supervisorId,
+          requiresApproval: args.requireApproval ?? false,
+          clientVisible: args.clientVisible ?? false,
+          clientTitle: args.clientVisible ? (args.clientTitle ?? null) : null,
           // End of the due day, not its start: a task due today should not
           // read as overdue at nine in the morning.
           dueDate: args.due ? localDateTimeToUtc(args.due, "23:59", actor.timezone) : null,
         });
+
+        // Steps one at a time through createTask, like the app's own
+        // "add step" and the SOP templates, so every rule a step obeys is
+        // checked. If one fails the task and the earlier steps stay, and
+        // the answer says exactly which ones exist - a retry of the whole
+        // call would create a second task.
+        const createdSteps: string[] = [];
+        let stepError: string | null = null;
+        for (const step of args.steps ?? []) {
+          try {
+            await createTask(actor, { clientId: client.value.id, title: step, parentId: task.id });
+            createdSteps.push(step);
+          } catch (err) {
+            console.error("[mcp] create_task step failed", err);
+            stepError = `The task was created, but adding steps stopped at "${step}". Do not call create_task again; add the remaining steps with add_task_steps.`;
+            break;
+          }
+        }
 
         return toolJson({
           created: true,
@@ -744,9 +822,14 @@ export function registerAnkoraTools(server: McpServer): void {
           client: client.value.name,
           category: categoryName,
           assignedTo: assigneeName,
+          supervisor: supervisorName,
+          requiresApproval: task.requiresApproval,
+          clientVisible: task.clientVisible,
           dueDate: args.due ?? null,
           status: task.status,
           priority: task.priority,
+          steps: createdSteps,
+          ...(stepError ? { warning: stepError } : {}),
         });
       } catch (err) {
         console.error("[mcp] create_task failed", err);
@@ -760,7 +843,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update a task",
       description:
-        "Changes an existing Ankora task: its status, owner, due date, title or category. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal.",
+        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal.",
       inputSchema: z.object({
         task: z.string().describe("The task's title, or enough of it to identify it."),
         client: z.string().optional().describe("Client name, to disambiguate when several tasks share a title."),
@@ -813,6 +896,25 @@ export function registerAnkoraTools(server: McpServer): void {
           .describe(
             "One sentence, in the client's own language, saying what actually came of this. Required to finish a task the client can see - Ankora refuses DONE without it. Write what happened, not what it was called: the client reads this on their portal and it goes into their monthly summary."
           ),
+        clientVisible: z
+          .boolean()
+          .optional()
+          .describe("Show (true) or hide (false) this task on the client's portal. Making a finished task visible needs an outcome sentence."),
+        clientTitle: z
+          .string()
+          .optional()
+          .describe("The title the client sees on their portal. Pass an empty string to fall back to the internal title."),
+        waitingOn: z
+          .enum(["CLIENT", "SUPPLIER", "INTERNAL", "OTHER"])
+          .optional()
+          .describe(
+            "Mark the task as blocked, waiting on someone. CLIENT shows on the client's portal as 'waiting for you', so use it only when the client themselves has to act. Cannot be set on a finished task."
+          ),
+        waitingReason: z
+          .string()
+          .optional()
+          .describe("What exactly is being waited for, in one line. Only with waitingOn."),
+        clearWaiting: z.boolean().optional().describe("The task is no longer waiting on anyone."),
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
@@ -834,12 +936,23 @@ export function registerAnkoraTools(server: McpServer): void {
         clearSupervisor?: boolean;
         requireApproval?: boolean;
         outcome?: string;
+        clientVisible?: boolean;
+        clientTitle?: string;
+        waitingOn?: "CLIENT" | "SUPPLIER" | "INTERNAL" | "OTHER";
+        waitingReason?: string;
+        clearWaiting?: boolean;
       },
       ctx: ServerContext
     ) => {
       try {
         const actor = actorOf(ctx);
 
+        if (args.waitingOn && args.clearWaiting) {
+          return toolText("Pass either waitingOn or clearWaiting, not both - they contradict each other.");
+        }
+        if (args.waitingReason !== undefined && !args.waitingOn) {
+          return toolText("waitingReason needs waitingOn - say who the task is waiting on.");
+        }
         if (args.assignTo && args.clearAssignee) {
           return toolText("Pass either assignTo or clearAssignee, not both - they contradict each other.");
         }
@@ -890,6 +1003,10 @@ export function registerAnkoraTools(server: McpServer): void {
           patch.requiresApproval = false;
         }
         if (args.requireApproval !== undefined) patch.requiresApproval = args.requireApproval;
+        if (args.clientVisible !== undefined) patch.clientVisible = args.clientVisible;
+        if (args.clientTitle !== undefined) patch.clientTitle = args.clientTitle;
+        if (args.clearWaiting) patch.block = null;
+        if (args.waitingOn) patch.block = { on: args.waitingOn, reason: args.waitingReason ?? null };
 
         if (args.category !== undefined) {
           const category = await lookupCategory(actor, taskClientId, args.category);
@@ -914,7 +1031,7 @@ export function registerAnkoraTools(server: McpServer): void {
 
         if (Object.keys(patch).length === 0) {
           return toolText(
-            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due or outcome."
+            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due, outcome, clientVisible, clientTitle, waitingOn or clearWaiting."
           );
         }
 
@@ -933,6 +1050,9 @@ export function registerAnkoraTools(server: McpServer): void {
       }
     }
   );
+
+  // Steps, comments, a full read of one task, and the portal's decisions.
+  registerTaskExtraTools(server);
 }
 
 export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";

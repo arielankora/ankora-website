@@ -1128,8 +1128,22 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-09-25"
+    },
+    "api:/api/mcp/oauth/metadata/protected-resource/portal": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-03"
+    },
+    "api:/api/mcp/portal": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-03"
     }
   },
   "waivers": {},
-  "lastScan": "2026-09-25"
+  "lastScan": "2026-10-03"
 }

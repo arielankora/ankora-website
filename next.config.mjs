@@ -96,6 +96,12 @@ const nextConfig = {
         source: '/.well-known/oauth-protected-resource',
         destination: '/api/mcp/oauth/metadata/protected-resource',
       },
+      // The client portal connector has its own resource document, so it
+      // must match before the catch-all below (rewrites run in order).
+      {
+        source: '/.well-known/oauth-protected-resource/api/mcp/portal',
+        destination: '/api/mcp/oauth/metadata/protected-resource/portal',
+      },
       {
         source: '/.well-known/oauth-protected-resource/:path*',
         destination: '/api/mcp/oauth/metadata/protected-resource',

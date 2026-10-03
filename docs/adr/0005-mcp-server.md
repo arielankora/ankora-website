@@ -638,3 +638,54 @@ or argument description that reinstates a "call X first" instruction, in
 either its imperative form or the softer "exactly as list_X returned it".
 It caught one on its first run — `create_task` still carried a
 `list_assignable_people` preamble that the manual pass had missed.
+
+## Addendum: task completeness and the client portal connector (3.10.2026)
+
+Driven by the NUX handover: Ariel wanted to run a 90-day handover out of
+Ankora rather than a spreadsheet, with Ankora's team working through
+Claude and the client's people (a CEO who approves, a departing operator
+who follows) reading status from their own Claude.
+
+### Staff connector (`/api/mcp`)
+
+- `create_task` now takes `supervisor`, `requireApproval`, `clientVisible`,
+  `clientTitle` and `steps`. Visibility stays opt-in: a task reaches the
+  portal only when the model passed `clientVisible: true`. Steps are
+  created one by one through `createTask` with `parentId`, the same path
+  as the app's "add step" and the SOP templates. A failed step stops the
+  loop and the answer lists what exists, because retrying the whole call
+  would create a second task.
+- `update_task` now takes `clientVisible`, `clientTitle` and
+  `waitingOn` / `waitingReason` / `clearWaiting` (the task's blocker).
+- New: `get_task`, `add_task_steps`, `set_task_step`, `add_task_comment`,
+  `create_decision`, `list_decisions` (`lib/mcp/task-extra-tools.ts`).
+  `create_decision` does not notify the client, per the 25.9.2026 rule
+  that nothing reaches a client without a person sending it; its answer
+  says so.
+- A `CLIENT_USER` on this connector gets one message pointing at the
+  portal connector (`PortalUserOnStaffConnectorError`) instead of a run
+  of generic refusals.
+
+### Client portal connector (`/api/mcp/portal`)
+
+A second endpoint, not a second tool list on the first one: the tool list
+is fixed when the stateless server is built, before the request's user is
+known, and a client's Claude should never be shown staff tools.
+
+- Tools (`lib/mcp/portal-tools.ts`): `get_status`, `list_tasks`,
+  `list_decisions`, `answer_decision`, `weekly_report`, `monthly_report`,
+  `hour_bank`.
+- Every tool refuses anyone but a `CLIENT_USER` before touching the
+  domain, and none takes a client: each calls the same
+  `lib/app-domain/client-portal.ts` / `decisions.ts` function the portal
+  screen calls, which resolves the client from the user's membership. So
+  the connector can show nothing the portal does not.
+- One write, the portal's own: `answer_decision`, admin only, resolved
+  by question and option label.
+- Sign-in is unchanged (same OAuth server, same personal tokens). The
+  connector has its own RFC 9728 document at
+  `/.well-known/oauth-protected-resource/api/mcp/portal`, rewritten
+  before the catch-all, so its `resource` matches the URL the client
+  pasted. The consent screen lists portal capabilities for a portal user.
+- Known limit: a portal user with several memberships gets their first
+  one, as the portal does when no selection cookie is present.

@@ -32,6 +32,13 @@ const KNOWN: Record<string, McpToolError> = {
       "Permission denied: your Ankora role does not allow this action. Do not retry this tool. Tell the user which action was refused and suggest they ask an Ankora admin.",
     recoverable: false,
   },
+  // A client portal user who connected the staff endpoint. Their own
+  // connector is /api/mcp/portal; nothing on this one is theirs.
+  PortalUserOnStaffConnectorError: {
+    message:
+      "This connector is for Ankora staff. Client portal users connect to the Ankora client portal connector instead: the same address with /portal at the end (/api/mcp/portal). Do not retry; tell the user to add that connector.",
+    recoverable: false,
+  },
   UnauthorizedError: {
     message:
       "Your Ankora MCP token is no longer valid (revoked, expired, or the account was deactivated). Do not retry. Tell the user to issue a new token.",
@@ -77,6 +84,16 @@ const KNOWN: Record<string, McpToolError> = {
 /// output straight to a model that may repeat it back to the user or into
 /// a chat log. Known errors are curated above; everything else is logged
 /// server-side and summarised here.
+/// Thrown by the staff tools when the signed-in person is a client portal
+/// user. Named so toMcpToolError can point them at the right connector
+/// instead of a generic permission refusal.
+export class PortalUserOnStaffConnectorError extends Error {
+  constructor() {
+    super("Client portal users use /api/mcp/portal");
+    this.name = "PortalUserOnStaffConnectorError";
+  }
+}
+
 export function toMcpToolError(err: unknown): McpToolError {
   const name = err instanceof Error ? err.name : "";
   const known = KNOWN[name];

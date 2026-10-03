@@ -4,6 +4,13 @@ import { getPortalFile } from "@/lib/app-domain/client-file";
 import { DOCUMENT_KIND_LABELS, SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
+import { CopyValue } from "@/components/app/CopyValue";
+import { SITE_URL } from "@/lib/site";
+
+/// The client portal connector (app/api/mcp/portal). Built from SITE_URL
+/// for the same reason as the staff one in ClaudeConnectionCard: the OAuth
+/// `resource` must match exactly what the person pastes.
+const PORTAL_CONNECTOR_URL = `${SITE_URL}/api/mcp/portal`;
 import { PreferencesForm, DigestForm } from "./PreferencesForm";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -183,6 +190,25 @@ export default async function PortalFilePage() {
           </ul>
         )}
       </Block>
+
+      <div id="claude">
+        <Block title="חיבור ל-Claude" subtitle="אפשר לשאול את Claude מה המצב, מה מחכה לך ומה היה החודש, ולקבל תשובה מתוך הפורטל.">
+          <ol className="list-decimal space-y-1.5 pe-5 text-[13px] leading-relaxed text-appNavy/75">
+            <li>ב-Claude: הגדרות, Connectors, הוספת Connector מותאם אישית.</li>
+            <li>להדביק את הכתובת שלמטה ולאשר את החיבור עם המשתמש שלך באנקורה.</li>
+            <li>לשאול, למשל: &quot;איפה עומדת החפיפה?&quot; או &quot;מה מחכה לי?&quot;.</li>
+          </ol>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <code dir="ltr" className="rounded bg-cream px-2 py-1 font-jbmono text-[12px] text-appNavy">
+              {PORTAL_CONNECTOR_URL}
+            </code>
+            <CopyValue value={PORTAL_CONNECTOR_URL} label="העתקת כתובת החיבור" />
+          </div>
+          <p className="mt-3 text-[12px] text-appNavy/55">
+            Claude רואה רק את מה שמופיע לך בפורטל. רק מנהל החשבון יכול לענות דרכו על החלטות.
+          </p>
+        </Block>
+      </div>
     </div>
   );
 }

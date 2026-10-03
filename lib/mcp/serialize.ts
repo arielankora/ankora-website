@@ -117,6 +117,8 @@ export type TaskLike = {
   assignedTo?: { name: string } | null;
   supervisor?: { name: string } | null;
   requiresApproval?: boolean;
+  clientVisible?: boolean;
+  blockedOn?: string | null;
 };
 
 export type SerializedTask = {
@@ -140,6 +142,11 @@ export type SerializedTask = {
   /// approve this" when Dana is only watching would be wrong in the
   /// direction that stops work.
   requiresApproval: boolean;
+  /// Whether the client follows this task on their portal.
+  clientVisible: boolean;
+  /// Who the task is waiting on (CLIENT, SUPPLIER, INTERNAL, OTHER), or
+  /// null when it is not blocked.
+  waitingOn: string | null;
   createdAt: string;
 };
 
@@ -181,6 +188,8 @@ export function serializeTask(
     priority: task.priority,
     supervisor: task.supervisor?.name ?? null,
     requiresApproval: task.requiresApproval ?? false,
+    clientVisible: task.clientVisible ?? false,
+    waitingOn: task.blockedOn ?? null,
     createdAt: task.createdAt.toISOString(),
   };
 }

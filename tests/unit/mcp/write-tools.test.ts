@@ -79,6 +79,9 @@ vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
+// The decisions module is reached through lib/mcp/task-extra-tools.ts.
+// Mocked so importing the tool surface never instantiates Prisma.
+vi.mock("@/lib/app-domain/decisions", () => ({ createDecision: vi.fn(), listDecisionsForClient: vi.fn() }));
 vi.mock("@/lib/app-auth/permissions", () => ({ assertCan: vi.fn() }));
 
 import { registerAnkoraTools } from "@/lib/mcp/tools";
@@ -329,6 +332,13 @@ describe("create_task", () => {
       description: null,
       priority: undefined,
       assignedToId: null,
+      // NUX handover pass: supervision and portal visibility are passed
+      // explicitly too, off by default. A task nobody asked to show the
+      // client must never land on their portal by omission.
+      supervisorId: null,
+      requiresApproval: false,
+      clientVisible: false,
+      clientTitle: null,
       dueDate: null,
     });
   });
