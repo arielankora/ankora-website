@@ -22,6 +22,7 @@ const portal = vi.hoisted(() => ({
   getPortalDashboard: vi.fn(),
   getPortalHistory: vi.fn(),
   getPortalHome: vi.fn(),
+  getPortalProgress: vi.fn(),
   getPortalTimeline: vi.fn(),
   getWeeklyActivity: vi.fn(),
   resolvePortalClient: vi.fn(),
@@ -45,7 +46,7 @@ vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/tasks", () => ({}));
 vi.mock("@/lib/mcp/lookup", () => ({}));
 
-import { registerPortalTools, stageCounts, STAFF_ON_PORTAL_MESSAGE } from "@/lib/mcp/portal-tools";
+import { registerPortalTools, progressOf, STAFF_ON_PORTAL_MESSAGE } from "@/lib/mcp/portal-tools";
 import { PORTAL_TOOL_ANNOTATIONS, PORTAL_WRITE_TOOLS } from "@/lib/mcp/annotations";
 
 type Handler = (args: unknown, ctx: unknown) => Promise<{ content: { type: string; text: string }[] }>;
@@ -171,18 +172,12 @@ describe("get_status", () => {
       recentlyDone: [promise("Slack", "DONE", { outcome: "אנקורה צורפה ל-Slack" })],
       cycle: { usedMinutes: 600, totalMinutes: 2400, pct: 25, daysLeft: 20 },
     });
-    portal.getPortalTimeline.mockResolvedValue({
-      client: { name: "NUX" },
-      promises: [
-        promise("a", "DONE"),
-        promise("b", "DONE"),
-        promise("c", "IN_PROGRESS"),
-        promise("d", "WAITING_ON_CLIENT"),
-        promise("e", "RECEIVED"),
-      ],
-    });
+    // The counts come from their own uncapped query, not from any list.
+    portal.getPortalProgress.mockResolvedValue({ total: 5, DONE: 2, IN_PROGRESS: 1, WAITING_ON_CLIENT: 1, RECEIVED: 1 });
 
     const out = await call("get_status");
+
+    expect(portal.getPortalTimeline).not.toHaveBeenCalled();
 
     expect(portal.getPortalHome).toHaveBeenCalledWith(OREN);
     expect(out.progress).toEqual({ total: 5, done: 2, inProgress: 1, notStarted: 1, waitingForYou: 1, percentDone: 40 });
@@ -193,7 +188,7 @@ describe("get_status", () => {
   });
 
   it("reports 0% rather than NaN for a client with nothing visible yet", () => {
-    expect(stageCounts([]).percentDone).toBe(0);
+    expect(progressOf({ total: 0, DONE: 0, IN_PROGRESS: 0, WAITING_ON_CLIENT: 0, RECEIVED: 0 }).percentDone).toBe(0);
   });
 });
 
@@ -203,9 +198,26 @@ describe("list_tasks", () => {
       client: { name: "NUX" },
       promises: [promise("Payroll ישראל", "IN_PROGRESS"), promise("Payroll ארה״ב", "DONE"), promise("Slack", "DONE")],
     });
+    portal.getPortalProgress.mockResolvedValue({ total: 3, DONE: 2, IN_PROGRESS: 1, WAITING_ON_CLIENT: 0, RECEIVED: 0 });
     const out = await call("list_tasks", { stage: "DONE", search: "payroll" });
     expect(out.tasks.map((t: { title: string }) => t.title)).toEqual(["Payroll ארה״ב"]);
     expect(out.progress.total).toBe(3);
+    expect(out.listTruncated).toBe(false);
+  });
+
+  it("says when the list is shorter than the whole, and keeps the true total", async () => {
+    // The bug this guards: 55 visible tasks against a 60-row stream on
+    // the first day of the NUX handover. Progress must count all of
+    // them, and a capped list must say it is capped.
+    portal.getPortalTimeline.mockResolvedValue({
+      client: { name: "NUX" },
+      promises: Array.from({ length: 200 }, (_, i) => promise(`t${i}`, "RECEIVED")),
+    });
+    portal.getPortalProgress.mockResolvedValue({ total: 230, DONE: 30, IN_PROGRESS: 0, WAITING_ON_CLIENT: 0, RECEIVED: 200 });
+    const out = await call("list_tasks");
+    expect(out.progress.total).toBe(230);
+    expect(out.progress.percentDone).toBe(13);
+    expect(out.listTruncated).toBe(true);
   });
 });
 

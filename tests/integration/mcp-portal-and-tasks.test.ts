@@ -162,3 +162,30 @@ describe("each side stays on its own connector", () => {
     expect(list.count).toBe(0);
   });
 });
+
+describe("progress counts every visible task, past any list cap", () => {
+  it("counts 65 visible promises as 65, ignoring hidden, archived and steps", async () => {
+    const { nux, oren } = await setup();
+    await prisma.task.createMany({
+      data: Array.from({ length: 65 }, (_, i) => ({
+        clientId: nux.id,
+        title: `תהליך ${i}`,
+        clientVisible: true,
+        status: i < 13 ? ("DONE" as const) : ("OPEN" as const),
+      })),
+    });
+    const parent = await prisma.task.findFirstOrThrow({ where: { clientId: nux.id, title: "תהליך 20" } });
+    await prisma.task.createMany({
+      data: [
+        { clientId: nux.id, title: "פנימי", clientVisible: false },
+        { clientId: nux.id, title: "בוטל", clientVisible: true, status: "ARCHIVED" },
+        { clientId: nux.id, title: "שלב", clientVisible: true, parentId: parent.id },
+      ],
+    });
+
+    const status = await as(oren, portal, "get_status");
+    expect(status.progress.total).toBe(65);
+    expect(status.progress.done).toBe(13);
+    expect(status.progress.percentDone).toBe(20);
+  });
+});
