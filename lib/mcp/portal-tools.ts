@@ -80,6 +80,8 @@ function serializePromise(p: PortalPromise, tz: string) {
     waitingForYouSince: day(p.waitingSince, tz),
     lastMoved: day(p.movedAt, tz),
     outcome: p.outcome,
+    whatIsNeededFromYou: p.waitingFor,
+    decisionsToAnswer: p.openDecisions,
   };
 }
 

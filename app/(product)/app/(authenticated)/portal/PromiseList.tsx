@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { PORTAL_STAGE_LABELS, type PortalPromise } from "@/lib/app-domain/client-portal";
 
 // Portal phase 1. One row shape for a promise, used by the home screen
@@ -47,6 +48,22 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
             without one is refused upstream rather than nudged. */}
         {promise.outcome && (
           <span className="mt-1 block text-[12.5px] leading-relaxed text-appNavy/60">{promise.outcome}</span>
+        )}
+        {/* What is being asked of the client, and the shortest way to do
+            it. The title says what the task is called; this says what to
+            do, so the row can be acted on in ten seconds. */}
+        {promise.stage === "WAITING_ON_CLIENT" && promise.waitingFor && (
+          <span className="mt-1 block text-[12.5px] leading-relaxed text-appNavy/75">
+            מה צריך ממך: {promise.waitingFor}
+          </span>
+        )}
+        {promise.stage !== "DONE" && promise.openDecisions > 0 && (
+          <Link
+            href="/app/portal/decisions"
+            className="mt-1.5 inline-block rounded-full border border-gold/50 bg-white px-3 py-1 text-[12px] font-medium text-appNavy hover:border-gold"
+          >
+            {promise.openDecisions === 1 ? "לענות על ההחלטה" : `לענות על ${promise.openDecisions} החלטות`}
+          </Link>
         )}
       </span>
       <span className="flex items-center gap-2.5">

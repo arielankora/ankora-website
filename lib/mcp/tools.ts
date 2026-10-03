@@ -913,7 +913,13 @@ export function registerAnkoraTools(server: McpServer): void {
         waitingReason: z
           .string()
           .optional()
-          .describe("What exactly is being waited for, in one line. Only with waitingOn."),
+          .describe("What exactly is being waited for, in one line. Only with waitingOn. Internal: never shown to the client."),
+        clientRequest: z
+          .string()
+          .optional()
+          .describe(
+            "What we ask the client to do, as one sentence addressed to them: what, where and how long it takes. Shown on their portal under 'waiting for you' while the task waits on the client. Pass an empty string to clear it."
+          ),
         clearWaiting: z.boolean().optional().describe("The task is no longer waiting on anyone."),
       }),
       annotations: { ...WRITES, idempotentHint: true },
@@ -941,6 +947,7 @@ export function registerAnkoraTools(server: McpServer): void {
         waitingOn?: "CLIENT" | "SUPPLIER" | "INTERNAL" | "OTHER";
         waitingReason?: string;
         clearWaiting?: boolean;
+        clientRequest?: string;
       },
       ctx: ServerContext
     ) => {
@@ -1005,6 +1012,7 @@ export function registerAnkoraTools(server: McpServer): void {
         if (args.requireApproval !== undefined) patch.requiresApproval = args.requireApproval;
         if (args.clientVisible !== undefined) patch.clientVisible = args.clientVisible;
         if (args.clientTitle !== undefined) patch.clientTitle = args.clientTitle;
+        if (args.clientRequest !== undefined) patch.clientRequest = args.clientRequest;
         if (args.clearWaiting) patch.block = null;
         if (args.waitingOn) patch.block = { on: args.waitingOn, reason: args.waitingReason ?? null };
 
@@ -1031,7 +1039,7 @@ export function registerAnkoraTools(server: McpServer): void {
 
         if (Object.keys(patch).length === 0) {
           return toolText(
-            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due, outcome, clientVisible, clientTitle, waitingOn or clearWaiting."
+            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due, outcome, clientVisible, clientTitle, clientRequest, waitingOn or clearWaiting."
           );
         }
 

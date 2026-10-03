@@ -189,3 +189,56 @@ describe("progress counts every visible task, past any list cap", () => {
     expect(status.progress.percentDone).toBe(20);
   });
 });
+
+describe("what the client sees when a promise waits on them", () => {
+  it("shows the reason and the open decisions, and keeps waiting until the last one is answered", async () => {
+    const { nux, ariel, oren } = await setup();
+    await as(ariel, staff, "create_task", { client: nux.name, title: "ספי אישור", clientVisible: true });
+    for (const question of ["סף לרכישת תוכנה?", "סף לציוד לעובד?"]) {
+      await as(ariel, staff, "create_decision", {
+        client: nux.name,
+        question,
+        options: [{ label: "עד 1,000" }, { label: "עד 3,000" }],
+        task: "ספי אישור",
+        markTaskWaiting: true,
+      });
+    }
+
+    await as(ariel, staff, "update_task", {
+      task: "ספי אישור",
+      client: nux.name,
+      clientRequest: "לענות על 2 שאלות בלשונית החלטות",
+    });
+
+    const before = await as(oren, portal, "get_status");
+    expect(before.waitingForYou).toHaveLength(1);
+    expect(before.waitingForYou[0].decisionsToAnswer).toBe(2);
+    expect(before.waitingForYou[0].whatIsNeededFromYou).toBe("לענות על 2 שאלות בלשונית החלטות");
+    // The block reason create_decision wrote is ours, and stays ours.
+    expect(JSON.stringify(before)).not.toContain("סף לרכישת תוכנה?");
+
+    // The first answer must NOT clear the wait: one question is still open.
+    await as(oren, portal, "answer_decision", { decision: "תוכנה", option: "עד 3,000" });
+    const middle = await as(oren, portal, "get_status");
+    expect(middle.waitingForYou).toHaveLength(1);
+    expect(middle.waitingForYou[0].decisionsToAnswer).toBe(1);
+
+    await as(oren, portal, "answer_decision", { decision: "ציוד", option: "עד 1,000" });
+    const after = await as(oren, portal, "get_status");
+    expect(after.waitingForYou).toHaveLength(0);
+  });
+
+  it("never shows the reason of a wait that is not on the client", async () => {
+    const { nux, ariel, oren } = await setup();
+    await as(ariel, staff, "create_task", { client: nux.name, title: "מחכים לספק", clientVisible: true });
+    await as(ariel, staff, "update_task", {
+      task: "מחכים לספק",
+      client: nux.name,
+      waitingOn: "SUPPLIER",
+      waitingReason: "הערה פנימית על הספק",
+    });
+    const list = await as(oren, portal, "list_tasks");
+    expect(list.tasks[0].whatIsNeededFromYou).toBeNull();
+    expect(JSON.stringify(list)).not.toContain("הערה פנימית");
+  });
+});

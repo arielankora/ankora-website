@@ -322,6 +322,16 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
   const option = decision.options.find((o) => o.id === optionId);
   if (!option) throw new Error("האפשרות שנבחרה אינה שייכת להחלטה הזו.");
 
+  // A task can wait on more than one question (the NUX approval matrix
+  // asked two). Answering the first must not tell the client nothing is
+  // waiting for them while the second is still open, so the wait clears
+  // only with the LAST open decision on that task.
+  const otherOpenOnTask = decision.taskId
+    ? await prisma.decision.count({
+        where: { taskId: decision.taskId, status: "OPEN", id: { not: decision.id } },
+      })
+    : 0;
+
   const [response] = await prisma.$transaction([
     prisma.decisionResponse.create({
       data: {
@@ -339,7 +349,7 @@ export async function respondToDecision(actor: User, decisionId: string, optionI
     // a supplier keeps waiting, and clearing it here because a
     // different question was answered would quietly tell everyone the
     // supplier came back.
-    ...(decision.taskId
+    ...(decision.taskId && otherOpenOnTask === 0
       ? [
           prisma.task.updateMany({
             where: { id: decision.taskId, blockedOn: "CLIENT" },

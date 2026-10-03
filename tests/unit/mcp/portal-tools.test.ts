@@ -300,3 +300,14 @@ describe("reports", () => {
     expect(out.summary).toBeNull();
   });
 });
+
+describe("what is needed from the client", () => {
+  it("passes the request and the number of open decisions through to the model", async () => {
+    portal.getPortalTimeline.mockResolvedValue({
+      client: { name: "NUX" },
+      promises: [promise("ספי אישור", "WAITING_ON_CLIENT", { waitingFor: "לבחור 2 ספי אישור", openDecisions: 2 })],
+    });
+    const out = await call("list_tasks");
+    expect(out.tasks[0]).toMatchObject({ whatIsNeededFromYou: "לבחור 2 ספי אישור", decisionsToAnswer: 2 });
+  });
+});

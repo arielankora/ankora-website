@@ -935,6 +935,9 @@ export type TaskPatch = {
   // Portal phase 1.
   clientVisible?: boolean;
   clientTitle?: string | null;
+  /// What we ask the client to do, addressed to them. Shown on the portal
+  /// while the task waits on the client; never the internal block reason.
+  clientRequest?: string | null;
   /// Tasks phase 5: what this task is waiting on, or null to say it is
   /// waiting on nothing any more.
   ///
@@ -1170,6 +1173,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   if (patch.dueDate !== undefined) data.dueDate = patch.dueDate;
   if (patch.clientVisible !== undefined) data.clientVisible = patch.clientVisible;
   if (patch.clientTitle !== undefined) data.clientTitle = patch.clientTitle?.trim() || null;
+  if (patch.clientRequest !== undefined) data.clientRequest = patch.clientRequest?.trim() || null;
   // What we are waiting on. The two caller-owned halves go in here, so
   // they land in `callerChanged` and read as somebody's decision; the
   // date is added further down with the other server-owned columns.
