@@ -106,7 +106,7 @@ describe("a step never counts as a task", () => {
     ).toEqual([]);
   });
 
-  it("the queries that do want them are exactly the three that should", () => {
+  it("the queries that do want them are exactly the four that should", () => {
     // Each opt-out names itself, and the names are listed here.
     //
     // By NAME and not by file:line, so that moving code around does not
@@ -118,7 +118,7 @@ describe("a step never counts as a task", () => {
       .flatMap((q) => [...q.body.matchAll(/subtasks-included:\s*([a-z-]+)/g)].map((m) => m[1]))
       .sort();
 
-    expect(named).toEqual(["the-backup-dump", "the-backup-sheet", "the-steps-of-one-parent"]);
+    expect(named).toEqual(["the-backup-dump", "the-backup-sheet", "the-steps-of-one-parent", "the-steps-to-remove"]);
 
     // And nothing opted out without naming itself.
     const anonymous = queries.filter(

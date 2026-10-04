@@ -1682,7 +1682,8 @@ export async function removeTaskSteps(actor: User, parentId: string, stepIds: st
   }
 
   const steps = await prisma.task.findMany({
-    // subtasks-included: the-steps-of-one-parent, by id, to remove them.
+    // subtasks-included: the-steps-to-remove. The steps of one parent, by id,
+    // read only to remove them.
     where: { id: { in: stepIds }, parentId: parent.id, deletedAt: null },
     select: {
       id: true,
