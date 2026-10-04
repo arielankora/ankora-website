@@ -205,11 +205,27 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
             const dayEntries = byDay.get(key) ?? [];
             if (dayEntries.length === 0) return null;
             const dayTotalSeconds = dayEntries.reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
+            // Billed total next to the worked total, only when they differ
+            // (a client with a minimum or rounding policy). The weekly strip
+            // and target stay on actual time: that is hours worked, not hours
+            // billed.
+            const dayBillableSeconds = dayEntries.reduce((sum, e) => sum + (e.billableSeconds ?? 0), 0);
+            const dayClosedActualSeconds = dayEntries.reduce(
+              (sum, e) => sum + (e.endAt ? (e.actualSeconds ?? 0) : 0),
+              0
+            );
             return (
               <div key={key} className="rounded-2xl border border-lineDark bg-white">
                 <div className="flex items-center justify-between border-b border-lineDark bg-cream px-5 py-3">
                   <p className="text-sm font-medium text-appNavy">{formatDay(day)}</p>
-                  <span className="font-jbmono text-sm text-appNavy">{formatDuration(dayTotalSeconds)}</span>
+                  <span className="text-sm text-appNavy">
+                    <span className="font-jbmono">{formatDuration(dayTotalSeconds)}</span>
+                    {dayBillableSeconds !== dayClosedActualSeconds && (
+                      <span className="ms-2 text-[12px] text-gold-dim" data-testid="day-billable">
+                        לחיוב <span className="font-jbmono">{formatDuration(dayBillableSeconds)}</span>
+                      </span>
+                    )}
+                  </span>
                 </div>
                 <div className="divide-y divide-lineDark">
                   {dayEntries.map((entry) => (
@@ -220,6 +236,7 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
                         startAt: entry.startAt.toISOString(),
                         endAt: entry.endAt?.toISOString() ?? null,
                         actualSeconds: entry.actualSeconds,
+                        billableSeconds: entry.billableSeconds,
                         note: entry.note,
                         isEdited: entry.isEdited,
                         isManual: entry.isManual,
