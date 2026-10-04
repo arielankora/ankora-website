@@ -33,6 +33,7 @@ const entry = {
   startAt: "2026-10-13T07:00:00.000Z",
   endAt: "2026-10-13T07:30:00.000Z",
   actualSeconds: 1800,
+  billableSeconds: 1800,
   note: "before",
   isEdited: false,
   isManual: true,
