@@ -41,10 +41,11 @@ describe("the read/write split", () => {
     expect(declaredWrites).toEqual([...WRITE_TOOLS].sort());
   });
 
-  it("marks nothing as destructive, because nothing here deletes", () => {
-    for (const [name, ann] of Object.entries(TOOL_ANNOTATIONS)) {
-      expect(ann.destructiveHint, name).toBe(false);
-    }
+  it("marks only replace_task_steps as destructive, because it is the only one that removes", () => {
+    const destructive = Object.entries(TOOL_ANNOTATIONS)
+      .filter(([, ann]) => ann.destructiveHint)
+      .map(([name]) => name);
+    expect(destructive).toEqual(["replace_task_steps"]);
   });
 
   it("does not claim create_time_entry is idempotent", () => {

@@ -1445,6 +1445,7 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   // saying a comment was written would be the same fact twice.
   "task.comment": "נוספה הערה",
   "task.comment_delete": "הערה נמחקה",
+  "task.steps_removed": "שלבים הוסרו מהמשימה",
 };
 
 /// Audit actions the thread deliberately drops, because the thing they
@@ -1655,6 +1656,68 @@ export async function deleteTaskComment(actor: User, commentId: string) {
     after: { commentId },
   });
   return removed;
+}
+
+/// Takes steps off a task.
+///
+/// A step is a small task with a parent, and removing one is the same
+/// soft delete everything else here uses: `deletedAt`, never a row
+/// gone, so the audit log still has something to point at. Three things
+/// are refused rather than removed, and returned so the caller can say
+/// so: a step already done (that is history, not a plan), a step with
+/// time logged against it (the hours would lose the line they were
+/// billed to), and anything that is not a step of this task.
+export async function removeTaskSteps(actor: User, parentId: string, stepIds: string[]) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const parent = await prisma.task.findFirst({
+    where: { id: parentId, deletedAt: null, parentId: null },
+    select: { id: true, clientId: true },
+  });
+  if (!parent) throw new Error("Task not found.");
+
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c) => c.id === parent.clientId)) {
+    throw new ForbiddenError("You are not assigned to this client.");
+  }
+
+  const steps = await prisma.task.findMany({
+    // subtasks-included: the-steps-to-remove. The steps of one parent, by id,
+    // read only to remove them.
+    where: { id: { in: stepIds }, parentId: parent.id, deletedAt: null },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      _count: { select: { timeEntries: { where: { deletedAt: null } } } },
+    },
+  });
+
+  const removed: { id: string; title: string }[] = [];
+  const kept: { id: string; title: string; why: "done" | "time_logged" }[] = [];
+  for (const step of steps) {
+    if (step.status === "DONE") kept.push({ id: step.id, title: step.title, why: "done" });
+    else if (step._count.timeEntries > 0) kept.push({ id: step.id, title: step.title, why: "time_logged" });
+    else removed.push({ id: step.id, title: step.title });
+  }
+  const notSteps = stepIds.filter((id) => !steps.some((s) => s.id === id));
+
+  if (removed.length > 0) {
+    await prisma.task.updateMany({
+      where: { id: { in: removed.map((s) => s.id) } },
+      data: { deletedAt: new Date() },
+    });
+    await recordAudit({
+      actorId: actor.id,
+      action: "task.steps_removed",
+      entityType: "Task",
+      entityId: parent.id,
+      clientId: parent.clientId,
+      after: { steps: removed.map((s) => s.title) },
+    });
+  }
+
+  return { removed, kept, notSteps };
 }
 
 export async function getTaskDetail(actor: User, taskId: string) {

@@ -6,10 +6,10 @@ import { actorFromAuthInfo } from "@/lib/mcp/auth";
 import { PortalUserOnStaffConnectorError, toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import { lookupClient, lookupTask } from "@/lib/mcp/lookup";
 import { describeResolveFailure, resolveByName } from "@/lib/mcp/resolve";
-import { addTaskComment, createTask, getTaskDetail, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, createTask, getTaskDetail, removeTaskSteps, updateTask } from "@/lib/app-domain/tasks";
 import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisions";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
-import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
+import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
 
 // MCP tasks, second pass (NUX handover, 3.10.2026).
 //
@@ -167,6 +167,74 @@ export function registerTaskExtraTools(server: McpServer): void {
         return toolJson({ task: found.value.name, added: created });
       } catch (err) {
         console.error("[mcp] add_task_steps failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "replace_task_steps",
+    {
+      title: "Replace a task's steps",
+      description:
+        "Replaces the checklist steps of an existing, unfinished task with a new list, in order. Steps already done, and steps with time logged against them, are kept and reported, never removed; every other step is removed. Use it when the way a process is run has changed and the old steps no longer describe it. Running it twice with the same list leaves the same result.",
+      inputSchema: z.object({
+        ...TASK_ARGS,
+        steps: z
+          .array(z.string().min(1))
+          .min(1)
+          .max(MAX_STEPS)
+          .describe(`The new one-line step titles, in order, up to ${MAX_STEPS}.`),
+      }),
+      annotations: TOOL_ANNOTATIONS.replace_task_steps,
+    },
+    async (args: { task: string; client?: string; steps: string[] }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await findTask(actor, args);
+        if (!found.ok) return toolText(found.message);
+
+        const detail = await getTaskDetail(actor, found.value.id);
+        if (!detail) return toolText("That task is not available to this user.");
+        if (detail.task.parentId) return toolText(`"${found.value.name}" is itself a step. Name the task it belongs to.`);
+
+        const result = await removeTaskSteps(
+          actor,
+          found.value.id,
+          detail.subtasks.map((s) => s.id)
+        );
+
+        // A kept step whose title is already in the new list stays as
+        // that step; adding it again would show it twice.
+        const keptTitles = new Set(result.kept.map((s) => s.title.trim()));
+        const added: string[] = [];
+        for (const step of args.steps) {
+          if (keptTitles.has(step.trim())) continue;
+          try {
+            await createTask(actor, { clientId: found.value.clientId, title: step, parentId: found.value.id });
+            added.push(step);
+          } catch (err) {
+            console.error("[mcp] replace_task_steps step failed", err);
+            return toolJson({
+              task: found.value.name,
+              removed: result.removed.map((s) => s.title),
+              kept: result.kept,
+              added,
+              warning: `Stopped at "${step}". The old steps are already removed; run replace_task_steps again with the same list to finish.`,
+            });
+          }
+        }
+        return toolJson({
+          task: found.value.name,
+          removed: result.removed.map((s) => s.title),
+          kept: result.kept.map((s) => ({
+            title: s.title,
+            why: s.why === "done" ? "already done" : "has time logged against it",
+          })),
+          added,
+        });
+      } catch (err) {
+        console.error("[mcp] replace_task_steps failed", err);
         return toolFailure(err);
       }
     }

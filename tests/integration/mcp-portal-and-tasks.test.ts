@@ -242,3 +242,32 @@ describe("what the client sees when a promise waits on them", () => {
     expect(JSON.stringify(list)).not.toContain("הערה פנימית");
   });
 });
+
+describe("replacing a task's steps when the process changes", () => {
+  it("removes the open steps, keeps a done one, and adds the new list", async () => {
+    const { nux, ariel, hadas } = await setup();
+    await as(ariel, staff, "create_task", {
+      client: nux.name,
+      title: "התאמות לפי התהליך הישן",
+      steps: ["היקף וטריגר", "נוהל", "ביצוע משותף"],
+    });
+    await as(hadas, staff, "set_task_step", { task: "התאמות לפי", step: "היקף", done: true });
+
+    const out = await as(ariel, staff, "replace_task_steps", {
+      task: "התאמות לפי",
+      client: nux.name,
+      steps: ["שיחת הסבר", "מסמך עבודה"],
+    });
+    expect(out.removed.sort()).toEqual(["ביצוע משותף", "נוהל"]);
+    expect(out.kept).toEqual([{ title: "היקף וטריגר", why: "already done" }]);
+
+    const detail = await as(ariel, staff, "get_task", { task: "התאמות לפי", client: nux.name });
+    expect(detail.stepsTotal).toBe(3);
+
+    // The removed steps are soft-deleted, not gone, and the log says so.
+    const removed = await prisma.task.findMany({ where: { title: "נוהל", deletedAt: { not: null } } });
+    expect(removed.length).toBeGreaterThan(0);
+    const audit = await prisma.auditEvent.findFirst({ where: { action: "task.steps_removed" } });
+    expect(audit).not.toBeNull();
+  });
+});
