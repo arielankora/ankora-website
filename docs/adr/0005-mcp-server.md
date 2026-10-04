@@ -218,7 +218,8 @@ be reachable through a mistake in one tool's gating.
 
 **No `delete_time_entry`.** Deletion stays in the UI, where a human can
 see what is about to disappear. Every annotation in this surface carries
-`destructiveHint: false`, and a test asserts it.
+`destructiveHint: false`, and a test asserts it. (One exception since
+4.10.2026, `replace_task_steps`; see the addendum at the end.)
 
 **No writing on behalf of someone else.** `createManualEntry` supports it
 (`assertCan(... "time_entry.edit_others")` when the target is not the
@@ -689,3 +690,19 @@ known, and a client's Claude should never be shown staff tools.
   pasted. The consent screen lists portal capabilities for a portal user.
 - Known limit: a portal user with several memberships gets their first
   one, as the portal does when no selection cookie is present.
+
+### Addendum, 4.10.2026: replacing a task's steps
+
+The NUX handover changed how each process is handed over, so the steps
+already written under 42 tasks no longer described the work. Nothing in
+the app could remove a step, so `replace_task_steps` was added
+(`lib/mcp/task-extra-tools.ts`, domain `removeTaskSteps` in
+`lib/app-domain/tasks.ts`).
+
+- It soft-deletes the task's steps (`deletedAt`, audit
+  `task.steps_removed`) and adds the new list in order.
+- It never removes a step already done, or one with time logged against
+  it. Those are kept and reported, and a kept step whose title is in the
+  new list is not added twice.
+- It is the one tool annotated `destructiveHint: true`, so a client asks
+  before calling it. The annotation test now asserts it is the only one.

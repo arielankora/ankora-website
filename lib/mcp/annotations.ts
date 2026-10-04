@@ -21,10 +21,9 @@ export const READ_ONLY = {
 
 /// Tools that write.
 ///
-/// `destructiveHint: false` is accurate and deliberate: every write in
-/// this surface creates or amends the caller's own entry, and nothing
-/// deletes. Deletion stays in the UI, where a human can see what is about
-/// to disappear.
+/// `destructiveHint: false` is accurate and deliberate: almost every write
+/// in this surface creates or amends, and nothing else deletes. The single
+/// exception, replace_task_steps, says so in its own entry below.
 ///
 /// `idempotentHint: false` matters most on create_time_entry: calling it
 /// twice makes two entries, and a client that assumed otherwise could
@@ -68,6 +67,12 @@ export const TOOL_ANNOTATIONS = {
   set_task_step: { ...WRITES, idempotentHint: true },
   add_task_comment: WRITES,
   create_decision: WRITES,
+  // The one tool here that removes something: the open steps of a task,
+  // replaced by a new list. Marked destructive so a client asks before
+  // calling it. It never removes a step already done or one with time
+  // logged against it (removeTaskSteps in lib/app-domain/tasks.ts), and
+  // running it twice with the same list leaves the same steps.
+  replace_task_steps: { ...WRITES, destructiveHint: true, idempotentHint: true },
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -89,6 +94,7 @@ export const WRITE_TOOLS = [
   "set_task_step",
   "add_task_comment",
   "create_decision",
+  "replace_task_steps",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

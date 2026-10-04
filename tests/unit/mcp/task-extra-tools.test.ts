@@ -22,6 +22,7 @@ const tasks = vi.hoisted(() => ({
   assignableUsers: vi.fn(async () => [] as unknown[]),
   addTaskComment: vi.fn(),
   getTaskDetail: vi.fn(),
+  removeTaskSteps: vi.fn(),
   OPEN_STATUSES: ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"],
 }));
 
@@ -405,5 +406,50 @@ describe("a client portal user on the staff connector", () => {
     expect(tasks.createTask).not.toHaveBeenCalled();
     expect(tasks.listTasks).not.toHaveBeenCalled();
     expect(decisions.createDecision).not.toHaveBeenCalled();
+  });
+});
+
+describe("replace_task_steps", () => {
+  beforeEach(() => {
+    tasks.getTaskDetail.mockResolvedValue(DETAIL);
+    tasks.removeTaskSteps.mockResolvedValue({
+      removed: [
+        { id: "s2", title: "נוהל" },
+        { id: "s3", title: "ביצוע משותף" },
+      ],
+      kept: [{ id: "s1", title: "היקף וטריגר", why: "done" }],
+      notSteps: [],
+    });
+  });
+
+  it("asks to remove every step of the task, then adds the new list in order", async () => {
+    const out = await call("replace_task_steps", { task: "התאמת", steps: ["שיחת הסבר", "מסמך עבודה"] });
+    expect(tasks.removeTaskSteps).toHaveBeenCalledWith(ACTOR, "t1", ["s1", "s2", "s3"]);
+    expect(tasks.createTask.mock.calls.map((c) => c[1])).toEqual([
+      { clientId: "c-nux", title: "שיחת הסבר", parentId: "t1" },
+      { clientId: "c-nux", title: "מסמך עבודה", parentId: "t1" },
+    ]);
+    expect(out.removed).toEqual(["נוהל", "ביצוע משותף"]);
+    expect(out.kept).toEqual([{ title: "היקף וטריגר", why: "already done" }]);
+    expect(out.added).toEqual(["שיחת הסבר", "מסמך עבודה"]);
+  });
+
+  it("does not add a second copy of a kept step that is in the new list", async () => {
+    const out = await call("replace_task_steps", { task: "התאמת", steps: ["היקף וטריגר", "שיחת הסבר"] });
+    expect(out.added).toEqual(["שיחת הסבר"]);
+    expect(tasks.createTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("writes nothing when the task is not found", async () => {
+    lookup.lookupTask.mockResolvedValueOnce({ ok: false, message: "No task matches." });
+    const out = await call("replace_task_steps", { task: "nothing", steps: ["x"] });
+    expect(out.text).toContain("No task");
+    expect(tasks.removeTaskSteps).not.toHaveBeenCalled();
+    expect(tasks.createTask).not.toHaveBeenCalled();
+  });
+
+  it("is the one write marked destructive", () => {
+    expect(TOOL_ANNOTATIONS.replace_task_steps.destructiveHint).toBe(true);
+    expect(WRITE_TOOLS as readonly string[]).toContain("replace_task_steps");
   });
 });
