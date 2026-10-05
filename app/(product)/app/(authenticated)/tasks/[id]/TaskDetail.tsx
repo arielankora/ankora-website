@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
+import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { TASK_BLOCKER_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
@@ -73,13 +74,13 @@ export function TaskDetail({
   task,
   people,
   categories,
-  activeTimer,
+  activeTimers,
   canApprove,
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
   categories: { id: string; name: string }[];
-  activeTimer: { id: string; startAt: string; onThisTask: boolean } | null;
+  activeTimers: TaskActiveTimer[];
   /// Whether this person may sign this task off. Decided on the server,
   /// where the rule lives.
   canApprove: boolean;
@@ -217,7 +218,7 @@ export function TaskDetail({
             <p className="mt-1 text-[13px] text-appNavy/55">{task.clientName}</p>
           </div>
 
-          <TimerButton task={task} activeTimer={activeTimer} disabled={pending} />
+          <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
@@ -963,27 +964,42 @@ function ClientSection({
   );
 }
 
+/// One of this person's running timers, as the task screen needs it.
+export type TaskActiveTimer = {
+  id: string;
+  startAt: string;
+  clientName: string;
+  onThisTask: boolean;
+  onThisClient: boolean;
+};
+
 /// Start the clock from the work, not from a picker.
 ///
-/// Three states, and the third is the only interesting one. The product
-/// holds one active timer per person (a partial unique index, not a
-/// convention), so when another timer is already running this cannot just
-/// start: it says what is running and offers to swap in one click, which
-/// is the same shape the timer screen uses for the same collision.
+/// A person may run two timers at once, on two different clients
+/// (5.10.2026). So when something is already running, this cannot just
+/// start: it asks, in the surface the person is looking at, and the
+/// answer is one tap.
+///
+/// - A timer on this task: the button is that timer, with a stop.
+/// - A timer on this task's client: a client never has two, so the only
+///   offer is to stop it and start here.
+/// - A timer on another client: run in parallel, or stop it and start
+///   here. "In parallel" is the confirmation the domain requires.
+/// - Two running: pick which one to stop.
 function TimerButton({
   task,
-  activeTimer,
+  activeTimers,
   disabled,
 }: {
   task: TaskDetailData;
-  activeTimer: { id: string; startAt: string; onThisTask: boolean } | null;
+  activeTimers: TaskActiveTimer[];
   disabled?: boolean;
 }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
-  const running = activeTimer?.onThisTask ? activeTimer : null;
+  const running = activeTimers.find((t) => t.onThisTask) ?? null;
 
   useEffect(() => {
     if (!running) return;
@@ -994,15 +1010,19 @@ function TimerButton({
     return () => clearInterval(id);
   }, [running]);
 
-  async function start(stopRunning: boolean) {
+  async function start(opts: { stopTimerId?: string; confirmParallel?: boolean }) {
     setPending(true);
-    const result = await startTimerForTaskAction({ taskId: task.id, stopRunning });
+    const result = await startTimerForTaskAction({ taskId: task.id, ...opts });
     setPending(false);
     if (!result.ok) {
       showToast({ tone: "error", title: "הטיימר לא הופעל", description: result.error });
       return;
     }
-    showToast({ tone: "success", title: "הטיימר רץ", description: task.title });
+    showToast({
+      tone: "success",
+      title: opts.confirmParallel ? "הטיימר רץ במקביל" : "הטיימר רץ",
+      description: task.title,
+    });
   }
 
   async function stop() {
@@ -1015,6 +1035,71 @@ function TimerButton({
       return;
     }
     showToast({ tone: "success", title: "הטיימר נעצר", description: task.title });
+  }
+
+  function ask() {
+    if (activeTimers.length === 0) {
+      void start({});
+      return;
+    }
+
+    const sameClient = activeTimers.find((t) => t.onThisClient);
+    if (sameClient) {
+      showToast({
+        tone: "warning",
+        title: "כבר רץ טיימר על הלקוח הזה",
+        description: "ללקוח אחד רץ טיימר אחד. אפשר לעצור אותו ולהתחיל כאן.",
+        ask: {
+          question: "לעצור את הטיימר של הלקוח ולהתחיל על המשימה הזו?",
+          choices: [
+            { value: "switch", label: "לעצור ולהתחיל כאן" },
+            { value: "keep", label: "להשאיר כמו שהוא" },
+          ],
+          onAnswer: async (value) => {
+            if (value === "switch") await start({ stopTimerId: sameClient.id });
+          },
+        },
+      });
+      return;
+    }
+
+    if (activeTimers.length >= MAX_PARALLEL_TIMERS) {
+      showToast({
+        tone: "warning",
+        title: `רצים ${activeTimers.length} טיימרים`,
+        description: "כדי להתחיל כאן, עוצרים אחד מהם.",
+        ask: {
+          question: "איזה טיימר לעצור?",
+          choices: [
+            ...activeTimers.map((t) => ({ value: t.id, label: `לעצור את ${t.clientName}` })),
+            { value: "keep", label: "להשאיר כמו שהם" },
+          ],
+          onAnswer: async (value) => {
+            if (value !== "keep") await start({ stopTimerId: value });
+          },
+        },
+      });
+      return;
+    }
+
+    const other = activeTimers[0];
+    showToast({
+      tone: "warning",
+      title: `רץ טיימר על ${other.clientName}`,
+      description: "הפעלה במקביל סופרת את הזמן במלואו לשני הלקוחות.",
+      ask: {
+        question: "להפעיל במקביל, או לעצור ולהתחיל כאן?",
+        choices: [
+          { value: "parallel", label: "להפעיל במקביל" },
+          { value: "switch", label: "לעצור ולהתחיל כאן" },
+          { value: "keep", label: "ביטול" },
+        ],
+        onAnswer: async (value) => {
+          if (value === "parallel") await start({ confirmParallel: true });
+          if (value === "switch") await start({ stopTimerId: other.id });
+        },
+      },
+    });
   }
 
   if (running) {
@@ -1036,30 +1121,7 @@ function TimerButton({
     <button
       type="button"
       disabled={disabled || pending}
-      onClick={() => {
-        if (!activeTimer) {
-          void start(false);
-          return;
-        }
-        // Another timer is running. Not an error to show after the fact:
-        // the question is asked first, in the surface the person is
-        // already looking at, and answering it is one tap.
-        showToast({
-          tone: "warning",
-          title: "כבר רץ טיימר אחר",
-          description: "אפשר לעצור אותו ולהתחיל כאן.",
-          ask: {
-            question: "לעצור את הטיימר הפעיל ולהתחיל על המשימה הזו?",
-            choices: [
-              { value: "switch", label: "לעצור ולהתחיל כאן" },
-              { value: "keep", label: "להשאיר כמו שהוא" },
-            ],
-            onAnswer: async (value) => {
-              if (value === "switch") await start(true);
-            },
-          },
-        });
-      }}
+      onClick={ask}
       className="flex items-center gap-2 rounded-full border border-appNavy bg-white px-4 py-2 text-[13.5px] font-medium text-appNavy disabled:opacity-50"
     >
       <Play size={15} />

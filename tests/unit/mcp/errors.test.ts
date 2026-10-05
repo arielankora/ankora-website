@@ -24,11 +24,25 @@ describe("toMcpToolError()", () => {
     expect(result.message).toMatch(/do not retry/i);
   });
 
-  it("points an active-timer collision at the tool that resolves it", () => {
-    const result = toMcpToolError(namedError("ActiveTimerExistsError"));
+  it("points a same-client timer collision at stop_timer and forbids a second start", () => {
+    const result = toMcpToolError(namedError("SameClientTimerError"));
+    expect(result.recoverable).toBe(true);
+    expect(result.message).toContain("stop_timer");
+    expect(result.message).toMatch(/do not start another/i);
+  });
+
+  it("points the parallel-timer limit at the tools that resolve it", () => {
+    const result = toMcpToolError(namedError("TimerLimitError"));
     expect(result.recoverable).toBe(true);
     expect(result.message).toContain("get_active_timer");
     expect(result.message).toContain("stop_timer");
+  });
+
+  it("makes a parallel start wait for the user's explicit yes", () => {
+    const result = toMcpToolError(namedError("ParallelTimerConfirmationRequiredError"));
+    expect(result.recoverable).toBe(true);
+    expect(result.message).toContain("confirmParallel");
+    expect(result.message).toMatch(/ask the user/i);
   });
 
   it("treats the 48-hour edit window as a dead end, not something to retry", () => {

@@ -159,6 +159,13 @@ error message, but the database constraint is the actual race-safe guarantee —
 functionally (not just structurally) against a local Postgres: two concurrent `INSERT`s with
 `end_at IS NULL` for the same user, second one correctly rejected with `23505`.
 
+**Superseded 5.10.2026 (parallel timers).** A person may now run up to two timers at once,
+never two on the same client, and the second only after an explicit confirmation. The index
+moved to `(userId, clientId) WHERE "endAt" IS NULL AND "deletedAt" IS NULL` (migration
+`20261005120000_parallel_timers_per_client`). The cap of two is not expressible as an index;
+`startTimer` and `reopenTimer` enforce it inside a transaction under `pg_advisory_xact_lock`
+keyed on the user. The rule itself is `lib/app-domain/parallel-timers.ts`.
+
 **Idempotent timer stop** (spec §18.2: "בקשת Stop חוזרת עם אותו idempotency key לא יוצרת Entry
 כפול"): implemented as a conditional `UPDATE ... WHERE id = ? AND end_at IS NULL` (Prisma
 `updateMany`, checking the affected-row count), rather than a separate idempotency-key table.

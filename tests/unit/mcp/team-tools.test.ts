@@ -24,7 +24,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const domain = vi.hoisted(() => ({
   startTimer: vi.fn(),
   stopTimer: vi.fn(),
-  getActiveTimer: vi.fn(),
+  getActiveTimers: vi.fn(),
   updateActiveTimerNote: vi.fn(),
   createManualEntry: vi.fn(),
   listMyTimeEntries: vi.fn(async () => []),

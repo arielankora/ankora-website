@@ -3,7 +3,7 @@ import type { Notification, Client } from "@prisma/client";
 import { requireUser } from "@/lib/app-auth/session";
 import { AppShell } from "@/components/app/AppShell";
 import { can } from "@/lib/app-auth/permissions";
-import { getActiveTimer } from "@/lib/app-domain/time-entries";
+import { getActiveTimers } from "@/lib/app-domain/time-entries";
 import { listNotificationsForUser, unreadNotificationCount } from "@/lib/app-domain/notifications";
 import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
@@ -42,7 +42,7 @@ import { supervisionCounts } from "@/lib/app-domain/tasks";
 /// Notifications). Fetched once here, alongside requireUser(), so
 /// individual page.tsx files don't each need to know about the shell's
 /// data needs. Every call below is either already used elsewhere in the
-/// app (getActiveTimer, listNotificationsForUser, countOpenAlertEvents,
+/// app (getActiveTimers, listNotificationsForUser, countOpenAlertEvents,
 /// listUpcomingImportantDates, listAccessibleClients) or a thin read on
 /// top of one - no new domain logic was added for this.
 export default async function AuthenticatedAppLayout({ children }: { children: ReactNode }) {
@@ -53,7 +53,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
   const isClientUser = user.role === "CLIENT_USER";
 
   const [
-    activeTimerRow,
+    activeTimerRows,
     notificationRows,
     unreadCount,
     importantDates,
@@ -61,7 +61,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
     accessibleClients,
     supervising,
   ] = await Promise.all([
-      canTrackTime ? getActiveTimer(user.id) : Promise.resolve(null),
+      canTrackTime ? getActiveTimers(user.id) : Promise.resolve([]),
       listNotificationsForUser(user.id),
       unreadNotificationCount(user.id),
       // Reused only for its length as a nav counter - listUpcomingImportantDates
@@ -86,7 +86,13 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
   return (
     <AppShell
       user={user}
-      activeTimer={activeTimerRow ? { startAt: activeTimerRow.startAt.toISOString() } : null}
+      // Parallel timers: one pill, for the oldest, with "+1" when a
+      // second is running. The timer screen is where both are shown.
+      activeTimer={
+        activeTimerRows.length > 0
+          ? { startAt: activeTimerRows[0].startAt.toISOString(), extraCount: activeTimerRows.length - 1 }
+          : null
+      }
       notifications={notificationRows.map((n: Notification) => ({
         id: n.id,
         title: n.title,

@@ -1142,8 +1142,15 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-10-03"
+    },
+    "domain:parallel-timers": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-05"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-03"
+  "lastScan": "2026-10-05"
 }

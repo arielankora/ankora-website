@@ -15,10 +15,24 @@ function formatElapsed(totalSeconds: number): string {
  * Timer screen. Ticks client-side from the server-provided `startAt` the
  * same way TimerWidget.tsx already does, but this instance is global (it
  * shows on every screen, not just /app/timer) - it reads the same
- * `getActiveTimer` result the (authenticated) layout fetches once per
+ * `getActiveTimers` result the (authenticated) layout fetches once per
  * request, it doesn't duplicate the start/stop logic itself.
+ *
+ * Parallel timers (5.10.2026): one pill, never two. It counts the oldest
+ * running timer and says "+1" when another is going. Two clocks side by
+ * side in the top bar ask the eye to compare them; one clock and a count
+ * says "there is more" and leaves the detail to the timer screen.
  */
-export function LiveTimerPill({ startAt, className = "" }: { startAt: string; className?: string }) {
+export function LiveTimerPill({
+  startAt,
+  extraCount = 0,
+  className = "",
+}: {
+  startAt: string;
+  /// How many more timers are running besides this one.
+  extraCount?: number;
+  className?: string;
+}) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -38,6 +52,15 @@ export function LiveTimerPill({ startAt, className = "" }: { startAt: string; cl
       <span className="font-jbmono text-[12.5px]" dir="ltr">
         {formatElapsed(elapsed)}
       </span>
+      {extraCount > 0 && (
+        <span
+          className="rounded-full bg-gold/25 px-1.5 py-px font-jbmono text-[11px] text-gold-light"
+          dir="ltr"
+          aria-label={`ועוד ${extraCount} טיימר פעיל`}
+        >
+          +{extraCount}
+        </span>
+      )}
     </Link>
   );
 }

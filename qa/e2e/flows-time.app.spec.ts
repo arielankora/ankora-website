@@ -102,6 +102,43 @@ test.describe("timer/actions - start and stop", () => {
     await page.goto("/app/my-time");
     await expect(page.getByText(note, { exact: false }).first()).toBeVisible();
   });
+
+  // Parallel timers (5.10.2026): two at once on two clients, the second
+  // only after the person says yes, and stopping one leaves the other.
+  test("a second timer on another client asks first, then runs in parallel", async ({ page }) => {
+    await page.goto("/app/timer");
+    await expect(page.getByText("אין טיימר פעיל"), "a timer from an earlier spec is still running").toBeVisible({
+      timeout: 15_000,
+    });
+
+    const clientSelect = page.getByLabel("לקוח");
+    const clientCount = await clientSelect.locator("option").count();
+    test.skip(clientCount < 3, "the seeded employee needs two clients for this flow");
+
+    await clientSelect.selectOption({ index: 1 });
+    await page.getByLabel("קטגוריה").selectOption({ index: 1 });
+    await page.getByRole("button", { name: "התחלת טיימר" }).click();
+    const stops = page.getByRole("button", { name: "עצירה ושמירה" });
+    await expect(stops).toHaveCount(1, { timeout: 15_000 });
+
+    // The second start is folded away until asked for, and the client
+    // already running is not offered.
+    await page.getByRole("button", { name: "הפעלת טיימר נוסף" }).click();
+    await page.getByLabel("לקוח").selectOption({ index: 1 });
+    await page.getByLabel("קטגוריה").selectOption({ index: 1 });
+    await page.getByRole("button", { name: "הפעלה במקביל" }).click();
+
+    // Not started yet: the question comes first.
+    await page.getByRole("button", { name: "להפעיל במקביל" }).click();
+    await expect(stops, "the parallel timer did not start").toHaveCount(2, { timeout: 15_000 });
+    await expect(page.getByText(/רצים 2 טיימרים/)).toBeVisible();
+
+    await stops.first().click();
+    await expect(stops, "stopping one should leave the other running").toHaveCount(1, { timeout: 15_000 });
+
+    await stops.first().click();
+    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 15_000 });
+  });
 });
 
 test.describe("my-time/actions - manual entry", () => {

@@ -1,6 +1,6 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { getActiveTimer, listRecentCombinations, listMyTimeEntries } from "@/lib/app-domain/time-entries";
+import { getActiveTimers, listRecentCombinations, listMyTimeEntries } from "@/lib/app-domain/time-entries";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { listOpenPromises } from "@/lib/app-domain/tasks";
@@ -28,6 +28,8 @@ async function loadTodayEntries(userId: string): Promise<TodayEntry[]> {
       clientName: e.client.name,
       categoryName: e.category.name,
       actualSeconds: e.actualSeconds as number,
+      startAt: e.startAt.toISOString(),
+      endAt: (e.endAt as Date).toISOString(),
     }));
 }
 
@@ -44,8 +46,8 @@ export default async function TimerPage() {
     );
   }
 
-  const [activeTimer, clients, allCategories, recent, todayEntries, openPromises] = await Promise.all([
-    getActiveTimer(user.id),
+  const [activeTimers, clients, allCategories, recent, todayEntries, openPromises] = await Promise.all([
+    getActiveTimers(user.id),
     listAccessibleClients(user),
     listCategories(),
     // Spec 6.2 quick-start bullet: exactly three one-click combos.
@@ -69,22 +71,18 @@ export default async function TimerPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-medium text-appNavy">טיימר</h1>
-          <p className="mt-1 text-sm text-appNavy/60">טיימר פעיל, לקוח וקטגוריה, שילובים אחרונים.</p>
+          <p className="mt-1 text-sm text-appNavy/60">טיימרים פעילים, לקוח וקטגוריה, שילובים אחרונים.</p>
         </div>
 
         <TimerWidget
-          activeTimer={
-            activeTimer
-              ? {
-                  id: activeTimer.id,
-                  startAt: activeTimer.startAt.toISOString(),
-                  clientId: activeTimer.clientId,
-                  categoryId: activeTimer.categoryId,
-                  note: activeTimer.note,
-                  taskId: activeTimer.taskId,
-                }
-              : null
-          }
+          activeTimers={activeTimers.map((t) => ({
+            id: t.id,
+            startAt: t.startAt.toISOString(),
+            clientId: t.clientId,
+            categoryId: t.categoryId,
+            note: t.note,
+            taskId: t.taskId,
+          }))}
           clients={clients.map((c) => ({ id: c.id, name: c.name }))}
           categories={categories.map((cat) => ({
             id: cat.id,

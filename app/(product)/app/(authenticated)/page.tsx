@@ -43,7 +43,7 @@ async function loadOperationalMetrics() {
   const startOfMonth = localDateTimeToUtc(`${todayKey.slice(0, 8)}01`, "00:00", TIMEZONE);
   const longTimerCutoff = new Date(now.getTime() - LONG_TIMER_HOURS * 3600_000);
 
-  const [activeTimersCount, longRunningCount, todayAgg, monthAgg, activeClients] = await Promise.all([
+  const [activeTimersCount, longRunningCount, todayAgg, monthAgg, activeClients, timersByPerson] = await Promise.all([
     prisma.timeEntry.count({ where: { endAt: null, deletedAt: null } }),
     prisma.timeEntry.count({ where: { endAt: null, deletedAt: null, startAt: { lte: longTimerCutoff } } }),
     prisma.timeEntry.aggregate({
@@ -55,6 +55,10 @@ async function loadOperationalMetrics() {
       _sum: { actualSeconds: true },
     }),
     listClients().then((clients) => clients.filter((c) => c.status === "ACTIVE")),
+    // Parallel timers (5.10.2026): the count above is timers, not people.
+    // Grouped by person so the card can say how many people that is and
+    // how many of them are running two at once.
+    prisma.timeEntry.groupBy({ by: ["userId"], where: { endAt: null, deletedAt: null }, _count: { _all: true } }),
   ]);
 
   // One batched lookup, not one per client.
@@ -93,6 +97,8 @@ async function loadOperationalMetrics() {
 
   return {
     activeTimersCount,
+    activeTimerPeopleCount: timersByPerson.length,
+    parallelTimerPeopleCount: timersByPerson.filter((g: { _count: { _all: number } }) => g._count._all > 1).length,
     longRunningCount,
     todayMinutes: Math.round((todayAgg._sum.actualSeconds ?? 0) / 60),
     monthMinutes: Math.round((monthAgg._sum.actualSeconds ?? 0) / 60),
@@ -304,10 +310,19 @@ export default async function AppHomePage() {
               label="טיימרים פעילים כרגע"
               value={metrics.activeTimersCount}
               footer={
-                metrics.longRunningCount > 0 && (
-                  <p className="mt-1.5 text-[11.5px] font-medium text-error">
-                    {metrics.longRunningCount} מהם רצים מעל {LONG_TIMER_HOURS} שעות ברצף (חריגה)
-                  </p>
+                (metrics.parallelTimerPeopleCount > 0 || metrics.longRunningCount > 0) && (
+                  <>
+                    {metrics.parallelTimerPeopleCount > 0 && (
+                      <p className="mt-1.5 text-[11.5px] text-appNavy/55">
+                        {metrics.activeTimerPeopleCount} עובדים, מתוכם {metrics.parallelTimerPeopleCount} עם שני טיימרים במקביל
+                      </p>
+                    )}
+                    {metrics.longRunningCount > 0 && (
+                      <p className="mt-1.5 text-[11.5px] font-medium text-error">
+                        {metrics.longRunningCount} מהם רצים מעל {LONG_TIMER_HOURS} שעות ברצף (חריגה)
+                      </p>
+                    )}
+                  </>
                 )
               }
             />

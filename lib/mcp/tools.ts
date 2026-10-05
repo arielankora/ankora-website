@@ -35,7 +35,7 @@ import {
 import {
   combineWallClockTime,
   createManualEntry,
-  getActiveTimer,
+  getActiveTimers,
   listMyTimeEntries,
   listTimeEntriesForAdmin,
   startTimer,
@@ -43,6 +43,7 @@ import {
   updateActiveTimerNote,
 } from "@/lib/app-domain/time-entries";
 import { localDateTimeToUtc } from "@/lib/timezone";
+import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 
@@ -75,6 +76,38 @@ const DATE = z
 const CLOCK = z
   .string()
   .regex(/^\d{2}:\d{2}$/, "Use 24-hour HH:MM");
+
+/// Which running timer a stop or a note update means.
+///
+/// Parallel timers (5.10.2026): with one running there is nothing to ask.
+/// With two, the model must say which, by client name, because stopping
+/// the wrong one books a client's time under the wrong end time and
+/// nobody notices until the monthly report. Never guessed.
+async function resolveRunningTimer(
+  actor: User,
+  clientName: string | undefined,
+  verb: string
+): Promise<{ ok: true; entry: Awaited<ReturnType<typeof getActiveTimers>>[number] } | { ok: false; text: string }> {
+  const running = await getActiveTimers(actor.id);
+  if (running.length === 0) return { ok: false, text: `No timer is running for this user, so there is nothing to ${verb}.` };
+  const names = running.map((t) => t.client.name).join(", ");
+
+  if (clientName) {
+    const client = await lookupClient(actor, clientName);
+    if (!client.ok) return { ok: false, text: client.message };
+    const match = running.find((t) => t.clientId === client.value.id);
+    if (!match) {
+      return { ok: false, text: `No timer is running for ${client.value.name}. Running timers: ${names}. Nothing was changed.` };
+    }
+    return { ok: true, entry: match };
+  }
+
+  if (running.length === 1) return { ok: true, entry: running[0] };
+  return {
+    ok: false,
+    text: `${running.length} timers are running (${names}). Nothing was changed. Ask the user which one to ${verb}, then call again with that client's name in \`client\`.`,
+  };
+}
 
 function actorOf(ctx: ServerContext): User {
   const actor = actorFromAuthInfo(ctx.http?.authInfo);
@@ -136,20 +169,23 @@ export function registerAnkoraTools(server: McpServer): void {
   server.registerTool(
     "get_active_timer",
     {
-      title: "Get the running timer",
-      description:
-        "Returns the employee's currently running Ankora timer, or reports that none is running. Ankora allows exactly one running timer per user. Use it when the user asks what they are working on, or after start_timer reports that a timer is already running - not as a routine check before starting one, since start_timer refuses on its own and says what to do.",
+      title: "Get the running timers",
+      description: `Returns the employee's running Ankora timers, oldest first, or reports that none is running. A person can run up to ${MAX_PARALLEL_TIMERS} timers at once, never two on the same client. Use it when the user asks what they are working on, or after a timer tool says it needs to know which timer is meant - not as a routine check before starting one, since start_timer refuses on its own and says what to do.`,
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },
     async (_args: unknown, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const entry = await getActiveTimer(actor.id);
-        if (!entry) return toolText("No timer is currently running for this user.");
+        const running = await getActiveTimers(actor.id);
+        if (running.length === 0) return toolText("No timer is currently running for this user.");
         return toolJson({
-          ...serializeTimeEntry(entry),
-          elapsedMinutes: elapsedMinutes(entry.startAt),
+          count: running.length,
+          maxParallel: MAX_PARALLEL_TIMERS,
+          timers: running.map((entry) => ({
+            ...serializeTimeEntry(entry),
+            elapsedMinutes: elapsedMinutes(entry.startAt),
+          })),
           userTimezone: actor.timezone,
         });
       } catch (err) {
@@ -303,7 +339,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Start a timer",
       description:
-        "Starts a running Ankora timer for the signed-in employee, against one client and category. Ankora allows exactly one running timer per user: if one is already running this refuses and tells you what is running, so there is no need to check first. The entry is recorded as created through Claude.",
+        `Starts a running Ankora timer for the signed-in employee, against one client and category. A person can run up to ${MAX_PARALLEL_TIMERS} timers at once, never two on the same client. When another timer is already running this does not start: it says what is running, and you must ask the user whether to run both in parallel (each client is billed the full time) and only then call again with confirmParallel: true. There is no need to check first. The entry is recorded as created through Claude.`,
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         category: z.string().describe("Category name. Ankora matches it against the categories usable for this client and lists them if it cannot."),
@@ -312,10 +348,19 @@ export function registerAnkoraTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Title of an existing Ankora task to log this time against, as the user referred to it."),
+        confirmParallel: z
+          .boolean()
+          .optional()
+          .describe(
+            "Set to true only after the user explicitly agreed to run this timer in parallel with the one already running. Never set it on a first attempt."
+          ),
       }),
       annotations: WRITES,
     },
-    async (args: { client: string; category: string; note?: string; task?: string }, ctx: ServerContext) => {
+    async (
+      args: { client: string; category: string; note?: string; task?: string; confirmParallel?: boolean },
+      ctx: ServerContext
+    ) => {
       try {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
@@ -342,6 +387,7 @@ export function registerAnkoraTools(server: McpServer): void {
           note: args.note ?? null,
           taskId,
           createdVia: "MCP",
+          confirmParallel: args.confirmParallel === true,
         });
         return toolJson({
           started: true,
@@ -352,6 +398,15 @@ export function registerAnkoraTools(server: McpServer): void {
           entryId: entry.id,
         });
       } catch (err) {
+        // Matched by name, like lib/mcp/errors.ts, so the tool surface
+        // does not depend on the class identity of a domain error.
+        if (err instanceof Error && err.name === "ParallelTimerConfirmationRequiredError") {
+          const running = (err as Error & { running: { clientName: string }[] }).running;
+          const names = running.map((t) => t.clientName).join(", ");
+          return toolText(
+            `Not started. A timer is already running for ${names}. Running a second one in parallel bills each client the full time. Ask the user whether to run both in parallel or to stop the running timer first. If they choose parallel, call start_timer again with the same arguments and confirmParallel: true. If they choose to stop, call stop_timer with client "${running[0].clientName}", then start_timer again.`
+          );
+        }
         console.error("[mcp] start_timer failed", err);
         return toolFailure(err);
       }
@@ -363,25 +418,31 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Stop the running timer",
       description:
-        "Stops the signed-in employee's running timer and records the elapsed time. Refuses if no timer is running. An optional note replaces whatever note the timer was carrying.",
+        "Stops one of the signed-in employee's running timers and records the elapsed time. With one timer running, `client` can be omitted. With two running, pass the client of the one to stop; without it nothing is stopped and the running timers are listed. Refuses if no timer is running. An optional note replaces whatever note the timer was carrying.",
       inputSchema: z.object({
+        client: z
+          .string()
+          .optional()
+          .describe("Client of the timer to stop, as the user said it. Required only when more than one timer is running."),
         note: z.string().optional().describe("Final note for the entry. Omit to keep the existing one."),
       }),
       annotations: WRITES,
     },
-    async (args: { note?: string }, ctx: ServerContext) => {
+    async (args: { client?: string; note?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        // The id comes from the server, never from the model: there is
-        // exactly one running timer per user, so asking for it would only
-        // create an opportunity to stop the wrong entry.
-        const running = await getActiveTimer(actor.id);
-        if (!running) {
+        // The id comes from the server, never from the model: the timer
+        // is resolved by client name among this person's own running
+        // timers, so there is no id to invent.
+        const running = await resolveRunningTimer(actor, args.client, "stop");
+        if (!running.ok) {
           return toolText(
-            "No timer is running for this user, so there is nothing to stop. If the user meant to record time they already spent, use create_time_entry instead."
+            running.text.startsWith("No timer is running for this user")
+              ? `${running.text} If the user meant to record time they already spent, use create_time_entry instead.`
+              : running.text
           );
         }
-        const entry = await stopTimer(actor, running.id, args.note ? { note: args.note } : undefined);
+        const entry = await stopTimer(actor, running.entry.id, args.note ? { note: args.note } : undefined);
         return toolJson({
           stopped: true,
           entryId: entry.id,
@@ -400,19 +461,23 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update the running timer's note",
       description:
-        "Replaces the note on the signed-in employee's running timer, without stopping it. Use this when the user says what they are working on while the clock is already going.",
+        "Replaces the note on one of the signed-in employee's running timers, without stopping it. Use this when the user says what they are working on while the clock is already going. With two timers running, pass the client of the one the note is for.",
       inputSchema: z.object({
+        client: z
+          .string()
+          .optional()
+          .describe("Client of the timer the note is for, as the user said it. Required only when more than one timer is running."),
         note: z.string().describe("The new note. Replaces the existing one entirely."),
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
-    async (args: { note: string }, ctx: ServerContext) => {
+    async (args: { client?: string; note: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const running = await getActiveTimer(actor.id);
-        if (!running) return toolText("No timer is running for this user, so there is no note to update.");
-        await updateActiveTimerNote(actor, running.id, args.note);
-        return toolJson({ updated: true, entryId: running.id, note: args.note });
+        const running = await resolveRunningTimer(actor, args.client, "update the note on");
+        if (!running.ok) return toolText(running.text);
+        await updateActiveTimerNote(actor, running.entry.id, args.note);
+        return toolJson({ updated: true, entryId: running.entry.id, client: running.entry.client.name, note: args.note });
       } catch (err) {
         console.error("[mcp] update_timer_note failed", err);
         return toolFailure(err);

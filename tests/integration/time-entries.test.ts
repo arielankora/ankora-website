@@ -8,8 +8,11 @@ import {
   createManualEntry,
   updateTimeEntry,
   deleteTimeEntry,
-  getActiveTimer,
-  ActiveTimerExistsError,
+  reopenTimer,
+  getActiveTimers,
+  SameClientTimerError,
+  TimerLimitError,
+  ParallelTimerConfirmationRequiredError,
   OverlapError,
   EditWindowExpiredError,
   BackdateReasonRequiredError,
@@ -56,13 +59,16 @@ describe("startTimer - spec 6.1 / 18.1 timer/start", () => {
     expect(entry.userId).toBe(employee.id);
   });
 
-  it("blocks a second concurrent timer for the same user (spec 5.1: one active timer per user)", async () => {
+  it("blocks a second timer on the same client, even with a parallel confirmation", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
     await startTimer(employee, { clientId: client.id, categoryId: category.id });
 
     await expect(startTimer(employee, { clientId: client.id, categoryId: category.id })).rejects.toBeInstanceOf(
-      ActiveTimerExistsError
+      SameClientTimerError
     );
+    await expect(
+      startTimer(employee, { clientId: client.id, categoryId: category.id, confirmParallel: true })
+    ).rejects.toBeInstanceOf(SameClientTimerError);
   });
 
   it("blocks starting a timer against a client the employee has no UserClientAccess for (spec 4.1)", async () => {
@@ -84,12 +90,165 @@ describe("startTimer - spec 6.1 / 18.1 timer/start", () => {
     expect(entry.userId).toBe(admin.id);
   });
 
-  it("is visible cross-device via getActiveTimer (spec 6.1: shown on any device with the same time)", async () => {
+  it("is visible cross-device via getActiveTimers (spec 6.1: shown on any device with the same time)", async () => {
     const { employee, client, category } = await setupEmployeeWithClient();
     const started = await startTimer(employee, { clientId: client.id, categoryId: category.id });
 
-    const active = await getActiveTimer(employee.id);
-    expect(active?.id).toBe(started.id);
+    const active = await getActiveTimers(employee.id);
+    expect(active.map((t) => t.id)).toEqual([started.id]);
+  });
+});
+
+// Parallel timers (Ariel, 5.10.2026): up to two at once, never two on one
+// client, and the second only after an explicit yes. Each client is
+// billed the full time of its own timer.
+describe("parallel timers", () => {
+  async function setupWithClients(n: number) {
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const clients = [];
+    for (let i = 0; i < n; i++) clients.push(await createTestClient());
+    const category = await createTestCategory();
+    await setUserClientAccess(
+      superAdmin,
+      employee.id,
+      clients.map((c) => c.id)
+    );
+    return { employee, clients, category };
+  }
+
+  it("refuses a second timer on another client until it is confirmed", async () => {
+    const { employee, clients, category } = await setupWithClients(2);
+    await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+
+    const refusal = await startTimer(employee, { clientId: clients[1].id, categoryId: category.id }).catch((e) => e);
+    expect(refusal).toBeInstanceOf(ParallelTimerConfirmationRequiredError);
+    expect(refusal.running.map((t: { clientId: string }) => t.clientId)).toEqual([clients[0].id]);
+    expect(await getActiveTimers(employee.id)).toHaveLength(1);
+  });
+
+  it("runs two timers on two clients once confirmed, and flags both as confirmed overlap", async () => {
+    const { employee, clients, category } = await setupWithClients(2);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    const second = await startTimer(employee, {
+      clientId: clients[1].id,
+      categoryId: category.id,
+      confirmParallel: true,
+    });
+
+    const active = await getActiveTimers(employee.id);
+    expect(active.map((t) => t.id)).toEqual([first.id, second.id]);
+    expect(active.every((t) => t.isOverlapConfirmed)).toBe(true);
+  });
+
+  it("does not flag a timer that runs alone", async () => {
+    const { employee, clients, category } = await setupWithClients(1);
+    const only = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    expect(only.isOverlapConfirmed).toBe(false);
+  });
+
+  it("bills each client the full time of its own timer", async () => {
+    const { employee, clients, category } = await setupWithClients(2);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    const second = await startTimer(employee, {
+      clientId: clients[1].id,
+      categoryId: category.id,
+      confirmParallel: true,
+    });
+    // Both started ten minutes ago, together.
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60_000);
+    await prisma.timeEntry.updateMany({ where: { id: { in: [first.id, second.id] } }, data: { startAt: tenMinutesAgo } });
+
+    const a = await stopTimer(employee, first.id);
+    const b = await stopTimer(employee, second.id);
+    expect(a.actualSeconds).toBeGreaterThanOrEqual(600);
+    expect(b.actualSeconds).toBeGreaterThanOrEqual(600);
+    expect(a.billableSeconds).toBe(a.actualSeconds);
+    expect(b.billableSeconds).toBe(b.actualSeconds);
+  });
+
+  it("refuses a third timer, confirmed or not", async () => {
+    const { employee, clients, category } = await setupWithClients(3);
+    await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    await startTimer(employee, { clientId: clients[1].id, categoryId: category.id, confirmParallel: true });
+
+    await expect(
+      startTimer(employee, { clientId: clients[2].id, categoryId: category.id, confirmParallel: true })
+    ).rejects.toBeInstanceOf(TimerLimitError);
+    expect(await getActiveTimers(employee.id)).toHaveLength(2);
+  });
+
+  it("never lets concurrent starts on the same client create two timers", async () => {
+    const { employee, clients, category } = await setupWithClients(1);
+    const results = await Promise.allSettled(
+      [0, 1, 2].map(() => startTimer(employee, { clientId: clients[0].id, categoryId: category.id, confirmParallel: true }))
+    );
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await getActiveTimers(employee.id)).toHaveLength(1);
+  });
+
+  it("never lets concurrent confirmed starts on different clients exceed the limit", async () => {
+    const { employee, clients, category } = await setupWithClients(4);
+    await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+
+    // Three racing for the one free slot. Without the per-user lock each
+    // would see one running timer and insert a second.
+    const results = await Promise.allSettled(
+      [1, 2, 3].map((i) => startTimer(employee, { clientId: clients[i].id, categoryId: category.id, confirmParallel: true }))
+    );
+
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    expect(await getActiveTimers(employee.id)).toHaveLength(2);
+  });
+
+  it("lets a stopped timer be reopened next to another client's timer, without asking again", async () => {
+    const { employee, clients, category } = await setupWithClients(2);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    await stopTimer(employee, first.id);
+    const second = await startTimer(employee, { clientId: clients[1].id, categoryId: category.id });
+
+    const reopened = await reopenTimer(employee, first.id);
+    expect(reopened.endAt).toBeNull();
+    expect(reopened.isOverlapConfirmed).toBe(true);
+
+    const active = await getActiveTimers(employee.id);
+    expect(active.map((t) => t.id).sort()).toEqual([first.id, second.id].sort());
+    expect(active.every((t) => t.isOverlapConfirmed)).toBe(true);
+  });
+
+  it("refuses to reopen a stopped timer while its client has another timer running", async () => {
+    const { employee, clients, category } = await setupWithClients(1);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    await stopTimer(employee, first.id);
+    await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+
+    await expect(reopenTimer(employee, first.id)).rejects.toBeInstanceOf(SameClientTimerError);
+  });
+
+  it("refuses to reopen a stopped timer when two others are running", async () => {
+    const { employee, clients, category } = await setupWithClients(3);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    await stopTimer(employee, first.id);
+    await startTimer(employee, { clientId: clients[1].id, categoryId: category.id });
+    await startTimer(employee, { clientId: clients[2].id, categoryId: category.id, confirmParallel: true });
+
+    await expect(reopenTimer(employee, first.id)).rejects.toBeInstanceOf(TimerLimitError);
+  });
+
+  it("stopping one parallel timer leaves the other running", async () => {
+    const { employee, clients, category } = await setupWithClients(2);
+    const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
+    const second = await startTimer(employee, {
+      clientId: clients[1].id,
+      categoryId: category.id,
+      confirmParallel: true,
+    });
+
+    await stopTimer(employee, first.id);
+
+    const active = await getActiveTimers(employee.id);
+    expect(active.map((t) => t.id)).toEqual([second.id]);
   });
 });
 
@@ -581,7 +740,7 @@ describe("deleteTimeEntry - spec 5.1 soft delete only", () => {
 
   // 24.9.2026: discarding a running timer left endAt null, which the
   // one-active-per-user index still counted as active while
-  // getActiveTimer (deletedAt: null) did not. Every later start failed
+  // getActiveTimers (deletedAt: null) did not. Every later start failed
   // on the index and surfaced as "כבר קיים טיימר פעיל" with no timer to
   // stop - a permanent block for that user. Asserted at both levels: the
   // discarded row is closed, and the next start actually succeeds.
@@ -594,7 +753,7 @@ describe("deleteTimeEntry - spec 5.1 soft delete only", () => {
     const discarded = await prisma.timeEntry.findUnique({ where: { id: running.id } });
     expect(discarded?.endAt).not.toBeNull();
     expect(discarded?.actualSeconds).toBe(0);
-    expect(await getActiveTimer(employee.id)).toBeNull();
+    expect(await getActiveTimers(employee.id)).toHaveLength(0);
 
     const next = await startTimer(employee, { clientId: client.id, categoryId: category.id });
     expect(next.endAt).toBeNull();
