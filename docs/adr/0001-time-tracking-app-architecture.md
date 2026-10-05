@@ -3346,6 +3346,86 @@ Editor, (3) the four env vars set in Vercel, (4) this PR merged and
 deployed, (5) one live nightly run watched end-to-end before considering the
 old Claude-relay task safe to retire.
 
+### 22.9 The dump was not a backup yet (2026-09-29)
+
+**What prompted this.** A question, not an incident: could we actually
+restore if the environment were deleted. Reading 22.4's data scope
+against the schema answered it - no.
+
+**What was wrong.** `dumpCoreTables()` listed six models by hand. The
+schema had thirty-six. The six were not arbitrary, but the list had no
+way to say it had fallen behind, and it had:
+
+- `BillingPolicy` was missing. Rounding, minimum and increment per
+  client. Time entries restored without it bill differently than they
+  originally did, silently.
+- `HourBankAdjustment` was missing. `HourBank` carries a balance; this
+  carries how the balance got there, with the reason and the author.
+  Recalculating after a restore gives a different number that nobody can
+  explain to the client.
+- `ClientDocument`, `UserClientAccess`, `ClientUser`, `TaskComment`,
+  `Decision*`, `ImportantDate`, `ReminderRule` and the append-only
+  history tables were all missing too.
+
+So 22.4's stated scope ("what a human would need to reconstruct who is
+owed what") was not met by the thing that claimed it.
+
+**Three decisions.**
+
+*Coverage is a decision per model, written down.*
+`lib/app-domain/backup-coverage.ts` classifies all thirty-six: thirty
+DUMP, six SKIP - every SKIP a credential table, and every SKIP naming how
+that data is regained after a restore. `tests/unit/backup-coverage.test.ts`
+reads `prisma/schema.prisma` and fails the build on a model with no
+decision, on a decision for a model that is gone, and on a
+credential-shaped column name entering a dumped table without being
+redacted or explicitly acknowledged. A new model cannot reach production
+without someone answering the question once.
+
+*Soft-deleted rows are dumped.* Every other query in this product filters
+`deletedAt: null` and the old dump did too. A live `TimeEntry` can
+reference a soft-deleted `Client`; dropping that client makes the restore
+a foreign-key violation. "Deleted" is an application meaning. Referential
+integrity is not. The Excel report is unchanged - it is read by a person
+and still hides deleted rows.
+
+*A restore path, not an archive.* `scripts/restore-from-dump.mjs` loads a
+dump into a migrated database: it refuses a dump whose schema migration
+differs from the target's, derives insert order from the target's own
+foreign-key graph, orders `tasks` parent-first, and runs in one
+transaction. It is written against `pg` and not against Prisma on
+purpose - on the day it is needed, `prisma generate` reaching out to the
+network is one dependency too many.
+
+**What the round trip found.** `tests/integration/backup-restore-roundtrip.test.ts`
+fills every table from the database catalog, dumps, truncates everything,
+runs the restore script as a child process the way an operator would, and
+compares row for row. Its first run against a real Postgres failed
+immediately: `users.passwordHash` is NOT NULL, so redacting it to null
+produced a dump that could not be restored at all. Redaction now writes a
+placeholder that is deliberately not a valid bcrypt string (`bcrypt.compare`
+returns false rather than throwing), so restored accounts fail closed at
+sign-in and recover through the existing forgot-password flow. That bug
+was three years of never being noticed away from being found during an
+actual restore.
+
+**Known ceiling, and how it announces itself.** The whole database is
+held in memory as JSON inside one function invocation. On today's data
+that is roughly 25KB compressed and not worth engineering around. Two
+guards say when it stops being true: over 8MB compressed the nightly job
+logs a warning naming the largest tables, and over 20MB the dump still
+goes to Drive in full but stops riding along on the email, which is the
+better failure than a message the provider rejects whole. The successor
+when that fires is a real `pg_dump` on its own schedule, not a bigger
+version of this.
+
+**Not addressed here.** Neon PITR remains the full-fidelity backup within
+its retention window, and on the free plan that window is short - worth
+checking against what this dump is now expected to cover. An offsite
+`pg_dump` would also carry the schema itself; today the schema comes from
+`prisma/migrations` in git, which is a real dependency on GitHub being
+there.
+
 ## 23. Addendum: Profile & Guide screens redesign (screen 18)
 
 **Context.** Continuing the screen-by-screen App redesign (section 20) per

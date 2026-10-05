@@ -19,9 +19,22 @@ vi.mock("@/lib/google-drive", () => ({
   DRIVE_FOLDER_DB_DUMPS: "dump-folder",
 }));
 
+import { gunzipSync } from "node:zlib";
 import { sendEmail } from "@/lib/email";
 import { uploadFileToDriveFolder } from "@/lib/google-drive";
 import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
+import { dumpedTables, REDACTED_PASSWORD_HASH } from "@/lib/app-domain/backup-coverage";
+
+/// Reads the gzipped dump back out of the email the job just "sent".
+/// This is the only place the Prisma-backed executor is exercised: the
+/// round-trip test drives the same dump builder through plain `pg`, so
+/// without this the app's actual query path would be untested.
+function dumpFromLastEmail() {
+  const [call] = vi.mocked(sendEmail).mock.calls;
+  const attachment = (call[0].attachments ?? []).find((a) => a.filename.endsWith(".json.gz"));
+  if (!attachment) throw new Error("no dump attached to the nightly email");
+  return JSON.parse(gunzipSync(attachment.content as Buffer).toString("utf8"));
+}
 
 beforeEach(() => {
   vi.mocked(sendEmail).mockReset();
@@ -83,6 +96,53 @@ describe("sendNightlyDataExport()", () => {
     expect(result.ok).toBe(true);
     expect(result.drive?.excel.ok).toBe(false);
     expect(result.drive?.dbDump.ok).toBe(false);
+  });
+
+  it("dumps every table the coverage map claims, with nothing to report", async () => {
+    await seedOneOfEach();
+
+    const result = await sendNightlyDataExport(new Date("2026-03-15T02:00:00Z"));
+
+    const dump = dumpFromLastEmail();
+    expect(dump.format).toBe(2);
+    expect(Object.keys(dump.tables).sort()).toEqual(dumpedTables());
+    // A problem here means the coverage map and the database disagree -
+    // usually a table renamed on one side only.
+    expect(dump.problems).toEqual([]);
+    expect(dump.schemaMigration).toBeTruthy();
+    expect(result.dump?.rows).toBeGreaterThan(0);
+  });
+
+  it("keeps a soft-deleted client out of the report and inside the dump", async () => {
+    // The two artefacts answer different questions and this is the line
+    // between them: the Excel report is what a person reads, so it hides
+    // deleted rows; the dump is what a restore reads, and a live time
+    // entry can still point at a deleted client. Dropping it there would
+    // make the dump unrestorable.
+    const { client } = await seedOneOfEach();
+    await prisma.client.update({ where: { id: client.id }, data: { deletedAt: new Date() } });
+
+    const result = await sendNightlyDataExport(new Date("2026-03-15T02:00:00Z"));
+
+    expect(result.counts.clients).toBe(0);
+    const dump = dumpFromLastEmail();
+    const idIdx = dump.tables.clients.columns.indexOf("id");
+    expect(dump.tables.clients.rows.map((r: unknown[]) => r[idIdx])).toContain(client.id);
+  });
+
+  it("never lets a password hash into the file", async () => {
+    await seedOneOfEach();
+
+    await sendNightlyDataExport(new Date("2026-03-15T02:00:00Z"));
+
+    const dump = dumpFromLastEmail();
+    const idx = dump.tables.users.columns.indexOf("passwordHash");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(dump.tables.users.rows.map((r: unknown[]) => r[idx])).toEqual(
+      dump.tables.users.rows.map(() => REDACTED_PASSWORD_HASH)
+    );
+    // And not anywhere else in the file either.
+    expect(JSON.stringify(dump)).not.toContain("$2");
   });
 
   it("records the delivery, so a night that did not run is visible afterwards", async () => {
