@@ -29,7 +29,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const domain = vi.hoisted(() => ({
   startTimer: vi.fn(),
   stopTimer: vi.fn(),
-  getActiveTimer: vi.fn(),
+  getActiveTimers: vi.fn(),
   updateActiveTimerNote: vi.fn(),
   createManualEntry: vi.fn(),
   listMyTimeEntries: vi.fn(),
@@ -160,7 +160,40 @@ describe("start_timer", () => {
       // to whatever the domain layer defaults to.
       taskId: null,
       createdVia: "MCP",
+      // Parallel timers: never confirmed on the model's first attempt.
+      confirmParallel: false,
     });
+  });
+
+  it("does not start a second timer the user has not agreed to, and says how to ask", async () => {
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c2", name: "Initech" } });
+    lookup.lookupCategory.mockResolvedValue({ ok: true, value: { id: "cat1", name: "Development" } });
+    const refusal = Object.assign(new Error("needs confirmation"), {
+      name: "ParallelTimerConfirmationRequiredError",
+      running: [{ id: "e1", clientId: "c1", clientName: "Globex", startAt: new Date() }],
+    });
+    domain.startTimer.mockRejectedValue(refusal);
+
+    const out = payload(
+      await tools.get("start_timer")!.handler({ client: "Initech", category: "Development" }, CTX),
+    );
+
+    expect(out.text).toContain("Globex");
+    expect(out.text).toContain("confirmParallel");
+    expect(out.text).toMatch(/ask the user/i);
+  });
+
+  it("passes the user's yes through only when the model sends it explicitly", async () => {
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c2", name: "Initech" } });
+    lookup.lookupCategory.mockResolvedValue({ ok: true, value: { id: "cat1", name: "Development" } });
+    domain.startTimer.mockResolvedValue({ id: "e2", startAt: new Date() });
+
+    await tools.get("start_timer")!.handler(
+      { client: "Initech", category: "Development", confirmParallel: true },
+      CTX,
+    );
+
+    expect(domain.startTimer).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ confirmParallel: true }));
   });
 
   it("writes nothing when the client name does not resolve", async () => {
@@ -261,9 +294,12 @@ describe("create_time_entry", () => {
   });
 });
 
+const RUNNING_GLOBEX = { id: "e5", clientId: "c1", client: { name: "Globex" } };
+const RUNNING_INITECH = { id: "e6", clientId: "c2", client: { name: "Initech" } };
+
 describe("update_timer_note", () => {
   it("updates the note on the running timer without stopping it", async () => {
-    domain.getActiveTimer.mockResolvedValue({ id: "e5" });
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX]);
 
     const out = payload(await tools.get("update_timer_note")!.handler({ note: "refactor" }, CTX));
 
@@ -273,7 +309,7 @@ describe("update_timer_note", () => {
   });
 
   it("says so plainly when no timer is running, instead of writing something", async () => {
-    domain.getActiveTimer.mockResolvedValue(null);
+    domain.getActiveTimers.mockResolvedValue([]);
 
     const out = payload(await tools.get("update_timer_note")!.handler({ note: "refactor" }, CTX));
 
@@ -282,9 +318,73 @@ describe("update_timer_note", () => {
   });
 
   it("looks up the running timer for the token's user, not an arbitrary id", async () => {
-    domain.getActiveTimer.mockResolvedValue({ id: "e5" });
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX]);
     await tools.get("update_timer_note")!.handler({ note: "x", entryId: "e-someone-else" }, CTX);
-    expect(domain.getActiveTimer).toHaveBeenCalledWith(ACTOR.id);
+    expect(domain.getActiveTimers).toHaveBeenCalledWith(ACTOR.id);
+    expect(domain.updateActiveTimerNote).toHaveBeenCalledWith(ACTOR, "e5", "x");
+  });
+
+  it("with two timers running and no client named, writes nothing and lists them", async () => {
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX, RUNNING_INITECH]);
+
+    const out = payload(await tools.get("update_timer_note")!.handler({ note: "x" }, CTX));
+
+    expect(domain.updateActiveTimerNote).not.toHaveBeenCalled();
+    expect(out.text).toContain("Globex");
+    expect(out.text).toContain("Initech");
+  });
+
+  it("with two timers running, writes to the one whose client was named", async () => {
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX, RUNNING_INITECH]);
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c2", name: "Initech" } });
+
+    await tools.get("update_timer_note")!.handler({ note: "x", client: "Initech" }, CTX);
+
+    expect(domain.updateActiveTimerNote).toHaveBeenCalledWith(ACTOR, "e6", "x");
+  });
+});
+
+describe("stop_timer", () => {
+  it("stops the only running timer without needing a client", async () => {
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX]);
+    domain.stopTimer.mockResolvedValue({ id: "e5", actualSeconds: 600, billableSeconds: 900 });
+
+    const out = payload(await tools.get("stop_timer")!.handler({}, CTX));
+
+    expect(domain.stopTimer).toHaveBeenCalledWith(ACTOR, "e5", undefined);
+    expect(out.stopped).toBe(true);
+  });
+
+  it("with two timers running and no client named, stops nothing", async () => {
+    // The one that matters: guessing here books one client's time with
+    // the wrong end, silently.
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX, RUNNING_INITECH]);
+
+    const out = payload(await tools.get("stop_timer")!.handler({}, CTX));
+
+    expect(domain.stopTimer).not.toHaveBeenCalled();
+    expect(out.text).toMatch(/nothing was changed/i);
+    expect(out.text).toContain("client");
+  });
+
+  it("with two timers running, stops the one whose client was named", async () => {
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX, RUNNING_INITECH]);
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c2", name: "Initech" } });
+    domain.stopTimer.mockResolvedValue({ id: "e6", actualSeconds: 60, billableSeconds: 60 });
+
+    await tools.get("stop_timer")!.handler({ client: "Initech" }, CTX);
+
+    expect(domain.stopTimer).toHaveBeenCalledWith(ACTOR, "e6", undefined);
+  });
+
+  it("stops nothing when the named client has no running timer", async () => {
+    domain.getActiveTimers.mockResolvedValue([RUNNING_GLOBEX]);
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c9", name: "Umbrella" } });
+
+    const out = payload(await tools.get("stop_timer")!.handler({ client: "Umbrella" }, CTX));
+
+    expect(domain.stopTimer).not.toHaveBeenCalled();
+    expect(out.text).toContain("Umbrella");
   });
 });
 

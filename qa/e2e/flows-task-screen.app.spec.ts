@@ -43,17 +43,19 @@ const FIXTURE = /תיאום מול ועד הבית/;
 
 /// Leave no timer of an earlier spec running.
 ///
-/// One active timer per person is a database constraint, not a
-/// convention, so a timer left behind by another file would make the
-/// start below refuse - and read as a broken mechanism rather than as
-/// untidy fixtures.
+/// A person can run two timers, and the second only after a question, so
+/// a timer left behind by another file would make the start below ask
+/// instead of start - and read as a broken mechanism rather than as
+/// untidy fixtures. Stops every one, not just the first.
 async function clearRunningTimer(page: import("@playwright/test").Page) {
   await page.goto(TIMER, { waitUntil: "domcontentloaded" });
-  const stop = page.getByRole("button", { name: /עצירה ושמירה/ });
-  if (await stop.isVisible().catch(() => false)) {
-    await stop.click();
-    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
+  const stops = page.getByRole("button", { name: /עצירה ושמירה/ });
+  for (let i = 0; i < 3 && (await stops.first().isVisible().catch(() => false)); i++) {
+    const before = await stops.count();
+    await stops.first().click();
+    await expect(stops).toHaveCount(before - 1, { timeout: 20_000 });
   }
+  await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
 }
 
 // The seed gives this task a fixed id, so every test after the first can

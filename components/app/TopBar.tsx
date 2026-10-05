@@ -26,7 +26,7 @@ export function TopBar({
   showPrimaryCta,
 }: {
   items: NavItem[];
-  activeTimer: { startAt: string } | null;
+  activeTimer: { startAt: string; extraCount?: number } | null;
   notifications: NotificationSummary[];
   unreadCount: number;
   showPrimaryCta: boolean;
@@ -38,7 +38,7 @@ export function TopBar({
     <header className="sticky top-0 z-30 hidden min-h-[62px] flex-wrap items-center justify-between gap-4 border-b border-lineDark bg-white/92 px-7 py-[11px] backdrop-blur-[8px] md:flex">
       {/* Right (start) side: live timer pill, notification bell, primary CTA. */}
       <div className="flex items-center gap-3">
-        {activeTimer && <LiveTimerPill startAt={activeTimer.startAt} />}
+        {activeTimer && <LiveTimerPill startAt={activeTimer.startAt} extraCount={activeTimer.extraCount} />}
         <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
         {showPrimaryCta && (
           <Link

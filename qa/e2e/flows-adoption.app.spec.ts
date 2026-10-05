@@ -192,13 +192,16 @@ test("a promise the client can see cannot be closed without a sentence for them"
 test("stopping the timer asks what stage the promise is at", async ({ page }) => {
   await page.goto(TIMER, { waitUntil: "domcontentloaded" });
 
-  // Leave no timer of a previous spec running: one per person is the
-  // rule, and a start refused here would read as a broken mechanism.
-  const runningStop = page.getByRole("button", { name: /עצירה ושמירה/ });
-  if (await runningStop.isVisible().catch(() => false)) {
-    await runningStop.click();
-    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
+  // Leave no timer of a previous spec running: a second start asks
+  // first, and a question here would read as a broken mechanism. Up to
+  // two can be running, so stop every one.
+  const runningStops = page.getByRole("button", { name: /עצירה ושמירה/ });
+  for (let i = 0; i < 3 && (await runningStops.first().isVisible().catch(() => false)); i++) {
+    const before = await runningStops.count();
+    await runningStops.first().click();
+    await expect(runningStops).toHaveCount(before - 1, { timeout: 20_000 });
   }
+  await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
 
   await selectByText(page.locator("select").first(), CLIENT);
   // Category, then the promise: the third select only exists once a

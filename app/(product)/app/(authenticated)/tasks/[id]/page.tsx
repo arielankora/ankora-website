@@ -6,7 +6,7 @@ import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
 import { clientDocumentsFolder } from "@/lib/google-drive";
 import { MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { listCategories } from "@/lib/app-domain/categories";
-import { getActiveTimer } from "@/lib/app-domain/time-entries";
+import { getActiveTimers } from "@/lib/app-domain/time-entries";
 import { Forbidden } from "@/components/app/Forbidden";
 import { NotFound } from "@/components/app/states/NotFound";
 import { TaskDetail } from "./TaskDetail";
@@ -64,7 +64,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
   // and are SHOWN there. They are never parsed into a preferred channel:
   // see the comment in lib/app-domain/client-messages.ts for the version
   // that was, and the sentence that killed it.
-  const [composer, people, allCategories, activeTimer] = await Promise.all([
+  const [composer, people, allCategories, activeTimers] = await Promise.all([
     messageComposerProps({
       clientId: task.clientId,
       fromName: user.name,
@@ -77,7 +77,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
     }),
     assignableUsers(user, task.clientId),
     listCategories(),
-    getActiveTimer(user.id),
+    getActiveTimers(user.id),
   ]);
 
   // The same filter the create form uses: global categories, plus the
@@ -138,17 +138,16 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
         // domain refuses the write regardless, so a wrong answer here is
         // a confusing screen rather than a hole.
         canApprove={user.id === task.supervisorId || can(user.role, "time_entry.edit_others")}
-        // Only this person's own timer, and only enough of it to answer
-        // two questions: is one running, and is it on this task.
-        activeTimer={
-          activeTimer
-            ? {
-                id: activeTimer.id,
-                startAt: activeTimer.startAt.toISOString(),
-                onThisTask: activeTimer.taskId === task.id,
-              }
-            : null
-        }
+        // Only this person's own timers, and only enough of each to
+        // answer three questions: is it on this task, is it on this
+        // task's client (then it has to stop first), and what to call it.
+        activeTimers={activeTimers.map((t) => ({
+          id: t.id,
+          startAt: t.startAt.toISOString(),
+          clientName: t.client.name,
+          onThisTask: t.taskId === task.id,
+          onThisClient: t.clientId === task.clientId,
+        }))}
       />
 
       {/* The button that writes to the client, above the steps and above

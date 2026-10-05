@@ -617,24 +617,24 @@ model AuditEvent {
 // so Phase 3 doesn't need a backfill migration.
 //
 // IMPORTANT - constraint that lives ONLY in the hand-authored migration
-// SQL, not expressible in this file: spec 18.2 requires "concurrent start
-// requests create max one active timer." Prisma's schema DSL has no
-// portable way to declare a partial unique index (unique per user only
-// among rows where endAt IS NULL), so the actual enforcement is a
-// Postgres partial unique index created directly in
-// prisma/migrations/.../migration.sql:
-//   CREATE UNIQUE INDEX time_entries_one_active_per_user
-//     ON time_entries (user_id) WHERE end_at IS NULL AND deleted_at IS NULL;
-// The deletedAt half of that predicate is not decoration: without it the
-// index and getActiveTimer disagree about what "active" means, and a
-// soft-deleted running timer (discard on the timer screen) blocks every
-// future start for that user with an error they cannot clear - the
-// 24.9.2026 report. See the 20260924120000 migration.
-// Application code in lib/app-domain/time-entries.ts additionally
-// pre-checks for a friendlier error message, but the database constraint
-// is the actual race-safe guarantee - the pre-check alone is not enough
-// under concurrent requests. If this file and the migration ever appear
-// to drift on this specific index, the migration is the source of truth;
+// SQL, not expressible in this file. Prisma's schema DSL has no portable
+// way to declare a partial unique index, so the enforcement is a Postgres
+// partial unique index created directly in prisma/migrations/:
+//   CREATE UNIQUE INDEX time_entries_one_active_per_user_client
+//     ON time_entries ("userId", "clientId")
+//     WHERE "endAt" IS NULL AND "deletedAt" IS NULL;
+// History: Phase 2 allowed one active timer per user (index on userId
+// alone). 5.10.2026 (migration 20261005120000) allows parallel timers on
+// different clients, so the index moved to (userId, clientId): two
+// timers on the same client stay impossible under any race. The cap of
+// MAX_PARALLEL_TIMERS per user cannot be an index; startTimer enforces
+// it under a per-user advisory lock (lib/app-domain/time-entries.ts).
+// The deletedAt half of the predicate is not decoration: without it the
+// index and getActiveTimers disagree about what "active" means, and a
+// soft-deleted running timer blocks every future start with an error
+// nobody can clear - the 24.9.2026 report, migration 20260924120000.
+// If this file and the migration ever appear to drift on this specific
+// index, the migration is the source of truth;
 // do not let a Prisma-generated migration silently drop it.
 
 /// Phase 14 (MCP server writes, docs/adr/0005): WHERE an entry was created

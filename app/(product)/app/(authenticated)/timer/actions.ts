@@ -7,14 +7,19 @@ import {
   reopenTimer,
   updateActiveTimerNote,
   deleteTimeEntry,
-  ActiveTimerExistsError,
+  SameClientTimerError,
+  TimerLimitError,
+  ParallelTimerConfirmationRequiredError,
   EditWindowExpiredError,
 } from "@/lib/app-domain/time-entries";
+import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updateTask } from "@/lib/app-domain/tasks";
 
 function friendlyError(err: unknown): string {
-  if (err instanceof ActiveTimerExistsError) return "כבר קיים טיימר פעיל. יש לעצור אותו קודם.";
+  if (err instanceof SameClientTimerError) return "כבר רץ טיימר על הלקוח הזה. יש לעצור אותו קודם.";
+  if (err instanceof TimerLimitError) return `אפשר להריץ עד ${MAX_PARALLEL_TIMERS} טיימרים במקביל. יש לעצור אחד קודם.`;
+  if (err instanceof ParallelTimerConfirmationRequiredError) return "כבר רץ טיימר אחר. יש לאשר הפעלה במקביל.";
   if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
   if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
   if (err instanceof Error) return err.message;
@@ -29,6 +34,10 @@ export async function startTimerAction(input: {
   // plenty of work is not a promise, and a required field here would be
   // the extra step the whole mechanism exists to avoid.
   taskId?: string | null;
+  /// Parallel timers: the person said yes to running this next to the
+  /// timer already going. Without it the domain refuses, and the screen
+  /// gets `needsConfirmation` back so it can ask.
+  confirmParallel?: boolean;
 }) {
   const user = await requireUser();
   try {
@@ -37,11 +46,20 @@ export async function startTimerAction(input: {
       categoryId: input.categoryId,
       note: input.note || null,
       taskId: input.taskId || null,
+      confirmParallel: !!input.confirmParallel,
     });
     revalidatePath("/app/timer");
     revalidatePath("/app/my-time");
     return { ok: true as const, entry };
   } catch (err) {
+    if (err instanceof ParallelTimerConfirmationRequiredError) {
+      return {
+        ok: false as const,
+        needsConfirmation: true as const,
+        runningClientNames: err.running.map((t) => t.clientName),
+        error: friendlyError(err),
+      };
+    }
     return { ok: false as const, error: friendlyError(err) };
   }
 }

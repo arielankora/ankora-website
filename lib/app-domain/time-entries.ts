@@ -9,6 +9,7 @@ import { afterResponse } from "@/lib/after-response";
 import { timed } from "@/lib/slow-log";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { resolveOverlapDecision, keepStoredIfSameMinute } from "@/lib/app-domain/time-entry-overlap";
+import { decideTimerStart, decideTimerReopen, MAX_PARALLEL_TIMERS, type TimerStartDecision } from "@/lib/app-domain/parallel-timers";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -54,10 +55,31 @@ export class OverlapError extends Error {
   }
 }
 
-export class ActiveTimerExistsError extends Error {
-  constructor() {
-    super("You already have an active timer running.");
-    this.name = "ActiveTimerExistsError";
+/// Parallel timers (5.10.2026): what can stand in the way of a start.
+/// Three distinct errors, not one, because each has a different answer:
+/// a same-client collision is solved by stopping that timer, the limit
+/// by stopping either one, and a missing confirmation by asking the
+/// person. Each carries the running timers so the caller can name them.
+export type RunningTimerSummary = { id: string; clientId: string; clientName: string; startAt: Date };
+
+export class SameClientTimerError extends Error {
+  constructor(public readonly running: RunningTimerSummary) {
+    super("A timer is already running for this client.");
+    this.name = "SameClientTimerError";
+  }
+}
+
+export class TimerLimitError extends Error {
+  constructor(public readonly running: RunningTimerSummary[]) {
+    super(`At most ${MAX_PARALLEL_TIMERS} timers can run at the same time.`);
+    this.name = "TimerLimitError";
+  }
+}
+
+export class ParallelTimerConfirmationRequiredError extends Error {
+  constructor(public readonly running: RunningTimerSummary[]) {
+    super("Another timer is running. Starting this one runs both in parallel and needs confirmation.");
+    this.name = "ParallelTimerConfirmationRequiredError";
   }
 }
 
@@ -265,11 +287,48 @@ async function assertNoOverlap(
 // Timer (spec 6.1, 6.2, 18.1 timer/start + timer/stop)
 // ---------------------------------------------------------------------
 
-export async function getActiveTimer(userId: string): Promise<TimeEntry | null> {
-  return prisma.timeEntry.findFirst({
+/// Every timer this person has running, oldest first. Up to
+/// MAX_PARALLEL_TIMERS of them, never two on the same client (5.10.2026).
+/// Oldest first is the order every surface shows them in: the top bar's
+/// pill names the oldest and counts the rest.
+export async function getActiveTimers(userId: string) {
+  return prisma.timeEntry.findMany({
     where: { userId, endAt: null, deletedAt: null },
+    orderBy: { startAt: "asc" },
     include: { client: true, category: true, task: true },
   });
+}
+
+type ActiveTimerWithClient = TimeEntry & { client: { name: string } };
+
+function summarise(t: ActiveTimerWithClient): RunningTimerSummary {
+  return { id: t.id, clientId: t.clientId, clientName: t.client.name, startAt: t.startAt };
+}
+
+function throwForDecision(decision: TimerStartDecision, running: ActiveTimerWithClient[], clientId: string): void {
+  if (decision.allowed) return;
+  if (decision.reason === "same_client") {
+    throw new SameClientTimerError(summarise(running.find((t) => t.clientId === clientId)!));
+  }
+  if (decision.reason === "limit") throw new TimerLimitError(running.map(summarise));
+  throw new ParallelTimerConfirmationRequiredError(running.map(summarise));
+}
+
+/// Serialises every start and reopen for one person.
+///
+/// The partial unique index on (userId, clientId) makes two timers on the
+/// same client impossible however the requests race. It cannot express
+/// "at most two per person", so the count is read and acted on under a
+/// transaction-scoped advisory lock keyed on the user: two concurrent
+/// starts for different clients wait for each other instead of both
+/// seeing one running timer and both inserting a second. The lock is
+/// released at commit or rollback, so it cannot leak.
+async function lockTimersFor(tx: Prisma.TransactionClient, userId: string) {
+  await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${"timers:" + userId}))`;
+}
+
+function isUniqueViolation(err: any): boolean {
+  return err?.code === "P2002" || err?.code === "23505";
 }
 
 export async function startTimer(
@@ -283,6 +342,11 @@ export async function startTimer(
     /// defaulted so every existing caller (the timer screen) keeps its
     /// current behaviour without a change.
     createdVia?: EntryOrigin;
+    /// Parallel timers: the person has said yes to running this one next
+    /// to a timer that is already going. Enforced here, not only in the
+    /// UI, so no caller (MCP included) can start a second timer that
+    /// nobody agreed to. Ignored when nothing else is running.
+    confirmParallel?: boolean;
   }
 ) {
   assertCan(actor.role, "time_entry.create_self");
@@ -290,36 +354,61 @@ export async function startTimer(
   await assertActiveTargets(actor, input.clientId, input.categoryId);
   await assertTaskMatchesClient(input.clientId, input.taskId);
 
-  // Friendly pre-check (spec 5.1: "טיימר פעיל אחד לכל משתמש כברירת מחדל.
-  // ניסיון להפעיל שני מציג החלטה: עצור קודם / בטל."). The database's
-  // partial unique index (see prisma/schema.prisma's Phase 2 header) is
-  // the actual race-safe guarantee for concurrent start requests (spec
-  // 18.2) - this pre-check only produces a nicer error on the common,
-  // non-racing path.
-  const existingActive = await getActiveTimer(actor.id);
-  if (existingActive) throw new ActiveTimerExistsError();
-
-  let entry: TimeEntry;
+  let created: { entry: TimeEntry; flagged: { before: TimeEntry; after: TimeEntry }[] };
   try {
-    entry = await prisma.timeEntry.create({
-      data: {
-        userId: actor.id,
+    created = await prisma.$transaction(async (tx) => {
+      await lockTimersFor(tx, actor.id);
+      const running = await tx.timeEntry.findMany({
+        where: { userId: actor.id, endAt: null, deletedAt: null },
+        orderBy: { startAt: "asc" },
+        include: { client: { select: { name: true } } },
+      });
+      const decision = decideTimerStart({
+        running,
         clientId: input.clientId,
-        categoryId: input.categoryId,
-        taskId: input.taskId ?? null,
-        startAt: new Date(),
-        endAt: null,
-        note: input.note?.trim() || null,
-        source: "TIMER",
-        isManual: false,
-        createdVia: input.createdVia ?? "APP",
-      },
+        confirmParallel: !!input.confirmParallel,
+      });
+      throwForDecision(decision, running, input.clientId);
+      const parallel = decision.allowed && decision.parallel;
+
+      const entry = await tx.timeEntry.create({
+        data: {
+          userId: actor.id,
+          clientId: input.clientId,
+          categoryId: input.categoryId,
+          taskId: input.taskId ?? null,
+          startAt: new Date(),
+          endAt: null,
+          note: input.note?.trim() || null,
+          source: "TIMER",
+          isManual: false,
+          createdVia: input.createdVia ?? "APP",
+          // Phase 12's flag for "this overlaps another client's entry and
+          // someone said that is fine". Starting in parallel is exactly
+          // that confirmation, so both rows carry it, the same way a
+          // confirmed cross-client manual entry does.
+          isOverlapConfirmed: parallel,
+        },
+      });
+
+      const flagged: { before: TimeEntry; after: TimeEntry }[] = [];
+      if (parallel) {
+        for (const other of running.filter((t) => !t.isOverlapConfirmed)) {
+          const after = await tx.timeEntry.update({ where: { id: other.id }, data: { isOverlapConfirmed: true } });
+          const { client: _client, ...before } = other;
+          flagged.push({ before, after });
+        }
+      }
+      return { entry, flagged };
     });
   } catch (err: any) {
-    // Postgres 23505 = unique_violation. Catches the rare race the
-    // pre-check above missed and turns it into the same friendly error.
-    if (err?.code === "P2002" || err?.code === "23505") {
-      throw new ActiveTimerExistsError();
+    // The index is the last word on same-client starts. Losing that race
+    // reads as the same friendly refusal the pre-check gives.
+    if (isUniqueViolation(err)) {
+      const running = await getActiveTimers(actor.id);
+      const same = running.find((t) => t.clientId === input.clientId);
+      if (same) throw new SameClientTimerError(summarise(same));
+      throw new TimerLimitError(running.map(summarise));
     }
     throw err;
   }
@@ -328,11 +417,22 @@ export async function startTimer(
     actorId: actor.id,
     action: "time_entry.create",
     entityType: "TimeEntry",
-    entityId: entry.id,
-    clientId: entry.clientId,
-    after: entry,
+    entityId: created.entry.id,
+    clientId: created.entry.clientId,
+    after: created.entry,
   });
-  return entry;
+  for (const f of created.flagged) {
+    await recordAudit({
+      actorId: actor.id,
+      action: "time_entry.update",
+      entityType: "TimeEntry",
+      entityId: f.after.id,
+      clientId: f.after.clientId,
+      before: f.before,
+      after: f.after,
+    });
+  }
+  return created.entry;
 }
 
 export async function stopTimer(
@@ -403,9 +503,10 @@ export async function stopTimer(
 /// *real* undo, not just a client-side state rewind - this re-opens the
 /// just-closed entry (clears endAt/actualSeconds/billableSeconds) so it
 /// resumes counting from its original startAt, exactly as if it had never
-/// been stopped. Guarded the same way startTimer's own "one active timer"
-/// rule is, since undoing a stop while a *different* timer was started in
-/// the meantime would otherwise violate that invariant.
+/// been stopped. Guarded by the same parallel-timer rules as startTimer
+/// (never two on one client, at most MAX_PARALLEL_TIMERS), since a timer
+/// may have been started in the meantime. No confirmation is asked: see
+/// decideTimerReopen.
 export async function reopenTimer(actor: User, timeEntryId: string) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
   const isSelf = entry.userId === actor.id;
@@ -413,13 +514,42 @@ export async function reopenTimer(actor: User, timeEntryId: string) {
 
   if (!entry.endAt) return entry; // already running - nothing to undo
 
-  const existingActive = await getActiveTimer(entry.userId);
-  if (existingActive) throw new ActiveTimerExistsError();
-
-  const updated = await prisma.timeEntry.update({
-    where: { id: timeEntryId },
-    data: { endAt: null, actualSeconds: null, billableSeconds: null },
-  });
+  let updated: TimeEntry;
+  try {
+    updated = await prisma.$transaction(async (tx) => {
+      await lockTimersFor(tx, entry.userId);
+      const running = await tx.timeEntry.findMany({
+        where: { userId: entry.userId, endAt: null, deletedAt: null },
+        orderBy: { startAt: "asc" },
+        include: { client: { select: { name: true } } },
+      });
+      throwForDecision(decideTimerReopen({ running, clientId: entry.clientId }), running, entry.clientId);
+      if (running.length > 0) {
+        await tx.timeEntry.updateMany({
+          where: { id: { in: running.map((t) => t.id) }, isOverlapConfirmed: false },
+          data: { isOverlapConfirmed: true },
+        });
+      }
+      return tx.timeEntry.update({
+        where: { id: timeEntryId },
+        data: {
+          endAt: null,
+          actualSeconds: null,
+          billableSeconds: null,
+          // Running again next to another client's timer is the same
+          // parallel time a confirmed start produces.
+          ...(running.length > 0 ? { isOverlapConfirmed: true } : {}),
+        },
+      });
+    });
+  } catch (err: any) {
+    if (isUniqueViolation(err)) {
+      const running = await getActiveTimers(entry.userId);
+      const same = running.find((t) => t.clientId === entry.clientId);
+      if (same) throw new SameClientTimerError(summarise(same));
+    }
+    throw err;
+  }
 
   await recordAudit({
     actorId: actor.id,
@@ -719,7 +849,7 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
   // A delete that lands on a RUNNING timer (the timer screen's "מחיקה
   // ללא שמירה") closes the row as well as marking it deleted. Leaving
   // endAt null was the 24.9.2026 bug: the row stayed invisible to
-  // getActiveTimer and visible to the one-active-per-user index, which
+  // getActiveTimers and visible to the active-timer unique index, which
   // blocked every later start with an error the person could not clear.
   // The index now ignores deleted rows, so this is belt and braces - but
   // it is also what makes restoreTimeEntry safe, since restoring a row

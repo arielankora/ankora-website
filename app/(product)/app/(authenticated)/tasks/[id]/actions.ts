@@ -3,7 +3,15 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
-import { getActiveTimer, startTimer, stopTimer, ActiveTimerExistsError } from "@/lib/app-domain/time-entries";
+import {
+  getActiveTimers,
+  startTimer,
+  stopTimer,
+  SameClientTimerError,
+  TimerLimitError,
+  ParallelTimerConfirmationRequiredError,
+} from "@/lib/app-domain/time-entries";
+import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -13,11 +21,13 @@ import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 // Every one of them goes through lib/app-domain/tasks.ts's updateTask or
 // lib/app-domain/time-entries.ts, never straight to Prisma - the close
 // rule (assertClosable), the assignee rule (assertAssignable) and the
-// one-active-timer guarantee all live in those modules, and a second
+// parallel-timer rules all live in those modules, and a second
 // write path around them is how a rule quietly stops applying.
 
 function friendlyError(err: unknown): string {
-  if (err instanceof ActiveTimerExistsError) return "כבר קיים טיימר פעיל. יש לעצור אותו קודם.";
+  if (err instanceof SameClientTimerError) return "כבר רץ טיימר על הלקוח הזה. יש לעצור אותו קודם.";
+  if (err instanceof TimerLimitError) return `אפשר להריץ עד ${MAX_PARALLEL_TIMERS} טיימרים במקביל. יש לעצור אחד קודם.`;
+  if (err instanceof ParallelTimerConfirmationRequiredError) return "כבר רץ טיימר אחר. יש לאשר הפעלה במקביל.";
   if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
   if (err instanceof Error) return err.message;
   return "אירעה שגיאה. נסו שוב.";
@@ -124,17 +134,25 @@ export async function updateTaskDetailAction(input: {
 /// not at a picker, and the moment they decide to do it is the moment the
 /// clock should start.
 ///
-/// `stopRunning` is the answer to the one thing in the way. The product
-/// holds one active timer per person, enforced by a partial unique index,
-/// so starting a second is a real decision and not a detail to hide. The
-/// screen makes it one click: it already knows a timer is running and on
-/// what, says so, and passes this flag when the person says go ahead.
+/// What can stand in the way is another timer. A person may run two at
+/// once, on two different clients (5.10.2026), so the screen asks before
+/// it starts, and says which of two answers it got:
+///
+/// - `stopTimerId`: stop that timer first, then start here. The id is
+///   the person's choice, not the server's guess, and must be one of
+///   their own running timers.
+/// - `confirmParallel`: run this one next to what is already running.
+///   The domain refuses a second timer without it.
 ///
 /// The category is the task's own. A task with none cannot start a timer
 /// here at all, because a time entry without a category cannot be billed
 /// and inventing one silently is worse than asking - the screen asks for
 /// the category first and this refuses in case it is ever called without.
-export async function startTimerForTaskAction(input: { taskId: string; stopRunning?: boolean }) {
+export async function startTimerForTaskAction(input: {
+  taskId: string;
+  stopTimerId?: string;
+  confirmParallel?: boolean;
+}) {
   const user = await requireUser();
   try {
     const task = await prisma.task.findFirst({
@@ -146,15 +164,14 @@ export async function startTimerForTaskAction(input: { taskId: string; stopRunni
       return { ok: false as const, error: "למשימה אין קטגוריה, ודיווח זמן חייב קטגוריה. בחרו קטגוריה ונסו שוב." };
     }
 
-    const running = await getActiveTimer(user.id);
-    if (running) {
-      if (!input.stopRunning) {
-        return { ok: false as const, error: "כבר קיים טיימר פעיל. יש לעצור אותו קודם." };
-      }
+    if (input.stopTimerId) {
+      const running = await getActiveTimers(user.id);
+      const target = running.find((t) => t.id === input.stopTimerId);
+      if (!target) return { ok: false as const, error: "הטיימר שביקשת לעצור כבר לא רץ. רעננו ונסו שוב." };
       // Stopped with no note and no task of its own: whatever that timer
       // was against, this call is not the place to guess it. The stop
       // keeps every field the entry already had.
-      await stopTimer(user, running.id);
+      await stopTimer(user, target.id);
     }
 
     const entry = await startTimer(user, {
@@ -165,6 +182,7 @@ export async function startTimerForTaskAction(input: { taskId: string; stopRunni
       // The client's monthly report reads these lines, and a note that
       // names the task is one nobody has to write twice.
       note: task.title,
+      confirmParallel: !!input.confirmParallel,
     });
 
     revalidatePath(`/app/tasks/${task.id}`);

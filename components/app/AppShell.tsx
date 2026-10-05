@@ -139,7 +139,7 @@ export function AppShell({
   children,
 }: {
   user: User;
-  activeTimer: { startAt: string } | null;
+  activeTimer: { startAt: string; extraCount?: number } | null;
   notifications: NotificationSummary[];
   unreadCount: number;
   importantDatesCount: number;
@@ -179,7 +179,7 @@ export function AppShell({
           {/* Spec, Responsive/Mobile: "פס טיימר חי מתחת לכותרת בכל מסך (לחיצה → טיימר)". */}
           {activeTimer && (
             <div className="border-t border-lineDark px-6 py-2">
-              <LiveTimerPill startAt={activeTimer.startAt} />
+              <LiveTimerPill startAt={activeTimer.startAt} extraCount={activeTimer.extraCount} />
             </div>
           )}
         </header>

@@ -44,9 +44,23 @@ const KNOWN: Record<string, McpToolError> = {
       "Your Ankora MCP token is no longer valid (revoked, expired, or the account was deactivated). Do not retry. Tell the user to issue a new token.",
     recoverable: false,
   },
-  ActiveTimerExistsError: {
+  // Parallel timers (5.10.2026): up to two running, never two on one
+  // client. ParallelTimerConfirmationRequiredError is answered inside
+  // start_timer itself, with the running client's name; this entry is the
+  // fallback if it ever surfaces from another tool.
+  SameClientTimerError: {
     message:
-      "A timer is already running for this user. Call get_active_timer to see what it is, then either stop it with stop_timer or leave it running. Ankora allows only one active timer per user.",
+      "A timer is already running for this client, and a client can only have one. Ask the user whether to stop it (stop_timer with that client) or leave it running. Do not start another for the same client.",
+    recoverable: true,
+  },
+  TimerLimitError: {
+    message:
+      "The user already has the maximum number of timers running. Call get_active_timer to see them, then ask the user which one to stop with stop_timer (pass its client) before starting another.",
+    recoverable: true,
+  },
+  ParallelTimerConfirmationRequiredError: {
+    message:
+      "Another timer is already running. Ask the user whether to run both in parallel (each client is billed the full time). Only if they agree, call start_timer again with confirmParallel: true.",
     recoverable: true,
   },
   EditWindowExpiredError: {
