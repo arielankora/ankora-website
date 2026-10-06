@@ -1226,6 +1226,13 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-10-06"
+    },
+    "domain:credential-exposure": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-06"
     }
   },
   "waivers": {},

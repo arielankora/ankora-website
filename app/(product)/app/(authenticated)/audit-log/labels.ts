@@ -162,6 +162,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "credential.reveal": "צפייה בפרטי גישה",
   "credential.reveal_denied": "ניסיון צפייה בפרטי גישה שנחסם",
   "credential.stepup_failed": "אימות זהות שנכשל",
+  "credential.exposure_report": "הפקת דוח גישות שנצפו",
   "passkey.create": "הוספת passkey",
   "passkey.delete": "הסרת passkey",
 };
@@ -177,6 +178,7 @@ export function classifyAction(action: string): { label: string; tone: "green" |
   // A secret was shown to someone. Not an edit, and the one row an admin
   // reading this screen most needs to be able to pick out.
   if (action.endsWith(".reveal")) return { label: "חשיפה", tone: "amber" };
+  if (action.endsWith("_report")) return { label: "דוח", tone: "gray" };
   if (action.startsWith("login.") || action === "logout" || action.includes("logout_all_sessions"))
     return { label: "התחברות", tone: "gray" };
   if (

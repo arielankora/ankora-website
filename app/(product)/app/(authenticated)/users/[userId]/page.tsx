@@ -8,6 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { EditRoleStatusForm } from "./EditRoleStatusForm";
 import { ClientAccessForm } from "./ClientAccessForm";
 import { ResendInviteForm } from "./ResendInviteForm";
+import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 
@@ -151,6 +152,23 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             )}
           </div>
         </div>
+
+        {/* DPA section 4 (7.10.2026): when someone leaves, each client is
+            told which of its logins that person saw, so it can change
+            exactly those. Internal staff only; a client user never
+            reveals anything. */}
+        {targetUser.role !== "CLIENT_USER" && (
+          <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <h2 className="text-sm font-medium text-appNavy">גישות של לקוחות שנצפו</h2>
+            <p className="mt-1 text-sm text-appNavy/60">
+              פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת עובד,
+              שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה.
+            </p>
+            <div className="mt-3">
+              <ExposureReport userId={targetUser.id} />
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

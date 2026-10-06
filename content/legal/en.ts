@@ -9,8 +9,8 @@ import type { LegalContent } from "../types";
  * pointing at it even when sections are reordered. Never rename an id in use.
  */
 const legal: LegalContent = {
-  updated: "Last updated: September 2026",
-  updatedISO: "2026-09",
+  updated: "Last updated: October 2026",
+  updatedISO: "2026-10",
   contentsLabel: "Contents",
   tableLabel: "Table",
   pages: {
@@ -449,6 +449,7 @@ const legal: LegalContent = {
               ["Operational and accounting documents", "The client, its suppliers and its customers", "Issuing, collecting and tracking"],
               ["Payment and billing details", "The client's suppliers", "Making payments under authorization"],
               ["Recordings and transcripts", "Participants in the call", "Documentation, continuity of context and quality"],
+              ["Access credentials for the client's systems (username, password, codes)", "The client, and whoever provided the access on its behalf", "Carrying out the tasks the client instructed in that system"],
               ["Sensitive data, only where provided for a task", "As defined in the instruction", "That task alone"],
             ],
           },
@@ -458,6 +459,9 @@ const legal: LegalContent = {
           title: "3. Scope of access and systems",
           body: [
             "The client specifies in writing the systems to which access is granted, the scope of that access, and the actions Ankora may perform in each system: view only, update, or create new records.",
+            "Access credentials that the client provides to Ankora for its systems are stored in Ankora's credentials vault only, and not in messages, documents or personal password managers. Access to them is limited to the members of the Ankora team assigned to the client. Every view of them requires identity verification on that person's own device, and is recorded in the audit log with the viewer, the time, and the task in the course of which it took place. A blocked attempt to view is recorded as well.",
+            "On the client's request, Ankora will provide it with the list of views of its access credentials.",
+            "The client may ask at any time for access credentials to be removed, and Ankora will delete them from the vault within one business day. Ankora recommends that the client change a password provided to it once it is no longer needed.",
             "Access is granted to identified individuals only. Each member of the Ankora team works under a personal, identified user in Ankora's systems, in a way that allows the activity to be monitored and controlled.",
             "Every material action is recorded in an audit log with the actor, the time, the entity and the state before and after.",
             "Ankora does not access data that the task does not require, even where it is technically accessible. The list of people holding permissions is available to the client on request.",
@@ -468,7 +472,7 @@ const legal: LegalContent = {
           title: "4. Confidentiality",
           body: [
             "Every person acting on Ankora's behalf who is granted access has signed a personal undertaking of confidentiality and of use of the data for the purpose of the task alone. The undertaking survives the end of their work at Ankora.",
-            "When a person's work at Ankora ends, their permissions in Ankora's systems are revoked, and Ankora notifies the authorized contact at the client so that the client can revoke the permissions granted in its own systems.",
+            "When a person's work at Ankora ends, their permissions in Ankora's systems are revoked, and Ankora notifies the authorized contact at the client so that the client can revoke the permissions granted in its own systems, and gives the client the list of its access credentials that person viewed in the ninety days before their work ended, so that the client can change them.",
           ],
         },
         {
@@ -476,6 +480,7 @@ const legal: LegalContent = {
           title: "5. Information security",
           body: [
             "Encryption in transit and at rest, permissions on a need basis, structural separation between clients in the portal, an audit log, rate limiting, and documented periodic security reviews. The full and current detail is in the security and trust page, Document 4.",
+            "Access credentials for the client's systems are encrypted separately for each record with AES-256-GCM, under an encryption key that is not stored in the database and is not included in backups.",
           ],
         },
         {
@@ -494,6 +499,7 @@ const legal: LegalContent = {
             "Ankora integrates AI systems into the operational layer, as described in the privacy policy, section 6.",
             "**Ankora does not train models on the client's data.** Neither its own models nor those of others. Ankora's engagement with its AI providers prohibits the provider from training models on data that passes through it.",
             "A decision made towards the client or towards a third party is always made by a person. The data passed to the AI systems is limited to what the task requires.",
+            "Access credentials for the client's systems are never passed to AI systems.",
           ],
         },
         {
@@ -542,6 +548,7 @@ const legal: LegalContent = {
             "This addendum is in force for as long as the engagement is active and for as long as Ankora holds the client's data.",
             "On termination Ankora revokes the permissions under its control within three business days, and makes a full export of the data available to the client for up to thirty days.",
             "Ankora will delete the data in its possession within sixty days of termination, other than data the law requires it to retain and backups that are erased in the ordinary backup cycle. On completion of the deletion Ankora will give the client a closing report setting out what was deleted, when, and what was retained and why.",
+            "Access credentials for the client's systems are deleted from the vault within three business days of termination, together with the revocation of permissions, and are not part of the export window. Encrypted copies of them in backups cannot be opened without a key that is not included in the backup, and are erased in the ordinary backup cycle.",
           ],
         },
         {

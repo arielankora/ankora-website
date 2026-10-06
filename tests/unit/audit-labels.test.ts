@@ -127,6 +127,7 @@ describe("audit log registries", () => {
     expect(classifyAction("credential.stepup_failed").label).toBe("כשלון");
     expect(classifyAction("credential.create").label).toBe("יצירה");
     expect(classifyAction("credential.delete").label).toBe("מחיקה");
+    expect(classifyAction("credential.exposure_report").label).toBe("דוח");
   });
 });
 
