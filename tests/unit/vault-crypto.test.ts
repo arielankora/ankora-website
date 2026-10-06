@@ -7,8 +7,8 @@ vi.mock("@vercel/oidc", () => ({ getVercelOidcToken: vi.fn(async () => "oidc-tok
 // The vault's cryptography (claude/credentials-vault-spec-2026-10-06.md).
 // What these pin is not that AES works, but the three properties the
 // design leans on: a ciphertext opens only on the row it was written for,
-// any change to the stored bytes is a refusal, and production can never
-// fall back to a key that sits in an environment variable.
+// any change to the stored bytes is a refusal, and production refuses the
+// test key that sits in the public CI workflow.
 
 const SECRET = { username: "dana@example.com", password: "  pass with spaces  ", notes: null };
 
@@ -61,35 +61,54 @@ describe("key provider selection", () => {
     return import("@/lib/vault/keys");
   }
 
-  it("refuses to run in production without KMS, even when a local key is set", async () => {
+  // Decision of 6.10.2026: production runs on a sensitive VAULT_KEK in
+  // Vercel rather than on Cloud KMS.
+  it("runs in production on its own environment key", async () => {
     process.env.VERCEL_ENV = "production";
-    process.env.VAULT_LOCAL_KEK = randomBytes(32).toString("base64");
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
+    delete process.env.GCP_VAULT_KMS_KEY;
+    const k = await keys();
+    expect(k.isVaultConfigured()).toBe(true);
+    const w = await k.wrapDataKey(generateDataKey(), Buffer.from("aad"));
+    expect(w.kekRef).toMatch(/^env:[0-9a-f]{16}$/);
+  });
+
+  it("refuses the public CI key in production", async () => {
+    process.env.VERCEL_ENV = "production";
+    process.env.VAULT_KEK = "Y2ktb25seS12YXVsdC1rZXktbm90LWEtc2VjcmV0ISE=";
+    delete process.env.GCP_VAULT_KMS_KEY;
+    const k = await keys();
+    expect(k.isVaultConfigured()).toBe(false);
+  });
+
+  it("is not configured without any key", async () => {
+    delete process.env.VAULT_KEK;
     delete process.env.GCP_VAULT_KMS_KEY;
     const k = await keys();
     expect(k.isVaultConfigured()).toBe(false);
     await expect(k.wrapDataKey(generateDataKey(), Buffer.from("aad"))).rejects.toBeInstanceOf(k.VaultUnavailableError);
   });
 
-  it("wraps and unwraps with the local key outside production", async () => {
+  it("wraps and unwraps with the environment key", async () => {
     delete process.env.VERCEL_ENV;
     delete process.env.GCP_VAULT_KMS_KEY;
-    process.env.VAULT_LOCAL_KEK = randomBytes(32).toString("base64");
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
     const k = await keys();
     const dek = generateDataKey();
     const aad = Buffer.from("aad");
     const w = await k.wrapDataKey(dek, aad);
-    expect(w.kekRef).toMatch(/^local:[0-9a-f]{16}$/);
+    expect(w.kekRef).toMatch(/^env:[0-9a-f]{16}$/);
     expect((await k.unwrapDataKey(w.wrapped, w.kekRef, aad)).equals(dek)).toBe(true);
   });
 
   it("refuses, in words, a row wrapped by another environment's key", async () => {
     delete process.env.VERCEL_ENV;
     delete process.env.GCP_VAULT_KMS_KEY;
-    process.env.VAULT_LOCAL_KEK = randomBytes(32).toString("base64");
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
     let k = await keys();
     const w = await k.wrapDataKey(generateDataKey(), Buffer.from("aad"));
 
-    process.env.VAULT_LOCAL_KEK = randomBytes(32).toString("base64");
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
     k = await keys();
     await expect(k.unwrapDataKey(w.wrapped, w.kekRef, Buffer.from("aad"))).rejects.toBeInstanceOf(k.VaultKeyMismatchError);
     // A KMS-wrapped production row opened by a preview on a local key.

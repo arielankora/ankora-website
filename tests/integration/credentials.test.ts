@@ -40,7 +40,7 @@ beforeEach(() => {
   auditControl.failOn = null;
   delete process.env.GCP_VAULT_KMS_KEY;
   delete process.env.VERCEL_ENV;
-  process.env.VAULT_LOCAL_KEK = process.env.VAULT_LOCAL_KEK ?? randomBytes(32).toString("base64");
+  process.env.VAULT_KEK = process.env.VAULT_KEK ?? randomBytes(32).toString("base64");
 });
 
 async function employeeOn(clientId: string) {

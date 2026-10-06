@@ -3,22 +3,24 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { getVaultAccessToken } from "./gcp-token";
 import { isProductionDeployment } from "@/lib/env";
 
-// Credentials vault, the key-encryption half (decision 1, 6.10.2026).
+// Credentials vault, the key-encryption half.
 //
-// Wraps and unwraps each row's data key. Two providers, chosen by
-// environment, never mixed:
+// Wraps and unwraps each row's data key. Two providers, never mixed:
 //
-//   * Cloud KMS (GCP_VAULT_KMS_KEY set). Production. The key-encryption
-//     key lives in KMS and never leaves it; this module only ever sends a
-//     32-byte data key to be wrapped, or a wrapped one to be unwrapped.
-//     A database dump plus every environment variable in Vercel is still
-//     not enough to read a password. That is the property the spec chose
-//     KMS for.
+//   * Environment key (VAULT_KEK, base64 of 32 random bytes). What runs
+//     today, in every environment, each with its OWN value. Decision of
+//     6.10.2026: Ariel chose this over Cloud KMS rather than open a Google
+//     billing account for the project. In production the variable must be
+//     of type "sensitive" in Vercel, which nobody can read back from the
+//     dashboard or the API. The price, stated so it is not forgotten: a
+//     leak of the database AND of the production environment together
+//     exposes every password. KMS would have closed that.
 //
-//   * Local key (VAULT_LOCAL_KEK, base64 of 32 bytes). Development, tests
-//     and preview deployments. REFUSED in production, in code, so a
-//     misconfigured production deploy fails loudly instead of quietly
-//     storing client passwords under a key that sits in an env var.
+//   * Cloud KMS (GCP_VAULT_KMS_KEY set). Built and tested, not configured.
+//     The key-encryption key would live in KMS and never leave it. Setting
+//     the variable switches new writes to KMS; rows wrapped by the
+//     environment key keep their own kekRef and need a one-off re-wrap
+//     before VAULT_KEK can be removed.
 //
 // Every wrapped key records which key wrapped it (`kekRef`). A row written
 // under one environment's key is refused by another's with a sentence
@@ -92,12 +94,22 @@ function kmsProvider(keyName: string): KeyProvider {
   };
 }
 
-// ── Local key (never production) ──────────────────────────────────────
+// ── Environment key ───────────────────────────────────────────────────
 
-function localProvider(kekB64: string): KeyProvider {
+/// A key that is not 32 bytes, or is one of the well-known test values,
+/// is refused in production rather than used. The CI key is in a public
+/// workflow file.
+const PUBLIC_TEST_KEYS = new Set(["Y2ktb25seS12YXVsdC1rZXktbm90LWEtc2VjcmV0ISE="]);
+
+function envProvider(kekB64: string): KeyProvider {
+  if (isProductionDeployment() && PUBLIC_TEST_KEYS.has(kekB64.trim())) {
+    throw new VaultUnavailableError("VAULT_KEK בפרודקשן הוא מפתח הבדיקה הציבורי.");
+  }
   const kek = Buffer.from(kekB64, "base64");
-  if (kek.length !== 32) throw new VaultUnavailableError("VAULT_LOCAL_KEK חייב להיות 32 בתים בקידוד base64.");
-  const ref = `local:${createHash("sha256").update(kek).digest("hex").slice(0, 16)}`;
+  if (kek.length !== 32) throw new VaultUnavailableError("VAULT_KEK חייב להיות 32 בתים בקידוד base64.");
+  // A fingerprint, not the key: the first 64 bits of its SHA-256. Enough
+  // to tell two environments' keys apart, useless for recovering either.
+  const ref = `env:${createHash("sha256").update(kek).digest("hex").slice(0, 16)}`;
 
   return {
     async wrap(dek, aad) {
@@ -123,12 +135,8 @@ function localProvider(kekB64: string): KeyProvider {
 function provider(): KeyProvider {
   const kmsKey = process.env.GCP_VAULT_KMS_KEY;
   if (kmsKey) return kmsProvider(kmsKey);
-  if (isProductionDeployment()) {
-    // The one configuration this file exists to prevent.
-    throw new VaultUnavailableError();
-  }
-  const local = process.env.VAULT_LOCAL_KEK;
-  if (local) return localProvider(local);
+  const envKey = process.env.VAULT_KEK;
+  if (envKey) return envProvider(envKey);
   throw new VaultUnavailableError();
 }
 

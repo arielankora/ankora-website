@@ -57,7 +57,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     if (err instanceof VaultKeyMismatchError || err instanceof VaultUnavailableError) {
       return json({ error: "vault_unavailable", message: err.message }, 503);
     }
-    // Anything else - a KMS outage, an authentication failure on the
+    // Anything else - a key service outage, an authentication failure on the
     // ciphertext - is a refusal with no detail. The audit row for the
     // attempt already exists.
     return json({ error: "reveal_failed" }, 500);

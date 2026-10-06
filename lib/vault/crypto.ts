@@ -6,9 +6,10 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 // data key (DEK). The row's secrets (username, password, notes) are one
 // JSON document, encrypted once with AES-256-GCM under that DEK. The DEK
 // is then wrapped by the key-encryption key in lib/vault/keys.ts, which in
-// production never leaves Cloud KMS. What the database stores is the
+// production lives only in a sensitive Vercel variable (or, if it is ever
+// configured, never leaves Cloud KMS). What the database stores is the
 // ciphertext, the IV, the GCM tag and the wrapped DEK. None of it is
-// usable without a call to KMS.
+// usable without that key.
 //
 // The AAD (additional authenticated data) binds every ciphertext to the
 // row it was written for: `ankora.credential.v1|<id>|<clientId>`. GCM
@@ -16,7 +17,7 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 // ciphertext onto another client's row - by a bug, or by someone with
 // write access to the database - fails to decrypt instead of quietly
 // handing client B's bank password to whoever is assigned to client A.
-// The same AAD is passed to KMS when wrapping the DEK, so the wrapped key
+// The same AAD is used when wrapping the DEK, so the wrapped key
 // is bound to the row too.
 //
 // No dependency: node:crypto only.

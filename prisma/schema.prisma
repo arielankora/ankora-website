@@ -2094,7 +2094,8 @@ enum PortalSummaryStatus {
 /// plain text: anyone assigned to the client sees them. Username, password
 /// and notes live only inside `secretCiphertext`, as one AES-256-GCM
 /// encrypted JSON document under a per-row data key (`wrappedDek`), which
-/// is itself wrapped by a key that never leaves Cloud KMS. See
+/// is itself wrapped by the key-encryption key (VAULT_KEK, a sensitive
+/// Vercel variable; Cloud KMS is supported but not configured). See
 /// lib/vault/ for the scheme and lib/app-domain/credentials.ts for the
 /// rules. Nothing outside the reveal route ever turns these bytes back
 /// into text.
