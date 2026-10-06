@@ -64,7 +64,7 @@ export function CredentialForm({
         <input id="cred-name" name="systemName" required maxLength={120} defaultValue={existing?.systemName} className={INPUT} />
       </div>
       <div>
-        <label className={LABEL} htmlFor="cred-url">קישור</label>
+        <label className={LABEL} htmlFor="cred-url">קישור לאתר (לא חובה)</label>
         <input
           id="cred-url"
           name="url"
@@ -73,8 +73,12 @@ export function CredentialForm({
           placeholder="https://"
           maxLength={2048}
           defaultValue={existing?.url ?? ""}
+          aria-describedby="cred-url-help"
           className={INPUT}
         />
+        <p id="cred-url-help" className="mt-1 text-xs text-appNavy/50">
+          כתובת האתר שנכנסים בו. לקובץ או למערכת בלי כתובת, להשאיר ריק ולכתוב את הפרטים בהערות.
+        </p>
       </div>
 
       <div className="rounded-xl border border-lineDark bg-cream-dim p-4">

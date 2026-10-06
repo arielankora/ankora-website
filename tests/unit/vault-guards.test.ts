@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { cleanUrl } from "@/lib/vault/url";
 
 // Structural guards for the credentials vault
 // (claude/credentials-vault-spec-2026-10-06.md). Each one is a rule the
@@ -54,5 +55,22 @@ describe("credentials vault guards", () => {
 
   it("never logs inside the reveal route", () => {
     expect(read("app/api/credentials/[id]/reveal/route.ts")).not.toMatch(/console\.|logger\./);
+  });
+});
+
+// 6.10.2026, the first real entry: a description typed into the link
+// field. A phrase must be refused with a sentence that says what to do,
+// and a single word must not slip through as a host with no domain.
+describe("the link field", () => {
+  it("accepts real addresses, with or without the scheme", () => {
+    expect(cleanUrl("btl.gov.il")).toBe("https://btl.gov.il/");
+    expect(cleanUrl("https://www.example.co.il/login")).toBe("https://www.example.co.il/login");
+    expect(cleanUrl("")).toBeNull();
+  });
+
+  it("refuses descriptions, and says to use the notes instead", () => {
+    for (const bad of ["אקסל מפיננס", "אקסל", "javascript:alert(1)", "ftp://x.com"]) {
+      expect(() => cleanUrl(bad)).toThrow(/בהערות/);
+    }
   });
 });
