@@ -39,6 +39,16 @@ import { tableColumns, foreignKeys, enumLabels, topoSort, fixtureValue } from ".
 const DATABASE_URL = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 const ROWS_PER_TABLE = 3;
 
+// Read `timestamp without time zone` as UTC, the way Prisma does in the
+// app. node-postgres reads it in the process's local zone by default, so
+// under the CI's TZ=Asia/Jerusalem the dump this test builds through
+// plain `pg` came out shifted by the zone offset and the round trip
+// failed, while it passed under UTC. Production builds the dump through
+// Prisma, and the restore script only writes, so neither had the bug;
+// this test's own reader did. Process-wide on purpose: the dump and both
+// snapshots must read the same way.
+pg.types.setTypeParser(pg.types.builtins.TIMESTAMP, (s: string) => new Date(`${s.replace(" ", "T")}Z`));
+
 function normalize(v: unknown): unknown {
   if (v === undefined || v === null) return null;
   if (v instanceof Date) return v.toISOString();
