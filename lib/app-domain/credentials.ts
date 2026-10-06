@@ -9,6 +9,8 @@ import { activeStepUp } from "@/lib/app-auth/step-up";
 import { credentialAad, generateDataKey, openSecret, sealSecret, ENC_VERSION, type CredentialSecret } from "@/lib/vault/crypto";
 import { unwrapDataKey, wrapDataKey } from "@/lib/vault/keys";
 import { sendVaultAlert } from "@/lib/vault/alerts";
+import { cleanUrl } from "@/lib/vault/url";
+export { cleanUrl };
 
 // Credentials vault, the rules (claude/credentials-vault-spec-2026-10-06.md,
 // approved by Ariel 6.10.2026). Every rule lives here, not in a screen.
@@ -100,23 +102,6 @@ function cleanSecret(value: unknown, max: number, label: string): string | null 
   if (value.length === 0) return null;
   if (value.length > max) throw new Error(`${label}: עד ${max} תווים.`);
   return value;
-}
-
-/// http and https only. The link is rendered as an anchor that people
-/// click, so `javascript:` or `data:` here would be stored XSS.
-export function cleanUrl(value: unknown): string | null {
-  const v = cleanText(value, LIMITS.url, "קישור");
-  if (!v) return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(/^[a-z][a-z0-9+.-]*:/i.test(v) ? v : `https://${v}`);
-  } catch {
-    throw new Error("הקישור אינו כתובת תקינה.");
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-    throw new Error("הקישור חייב להתחיל ב-http או https.");
-  }
-  return parsed.toString();
 }
 
 // ── Sealing ───────────────────────────────────────────────────────────
