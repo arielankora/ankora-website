@@ -120,6 +120,13 @@ describe("audit log registries", () => {
     expect(classifyAction("important_date.delete").label).toBe("מחיקה");
     expect(classifyAction("important_date.create").label).toBe("יצירה");
     expect(classifyAction("time_entry.update").label).toBe("עריכה");
+    // Credentials vault: a reveal is not an edit, and a refused reveal or
+    // a failed identity check is a failure.
+    expect(classifyAction("credential.reveal").label).toBe("חשיפה");
+    expect(classifyAction("credential.reveal_denied").label).toBe("כשלון");
+    expect(classifyAction("credential.stepup_failed").label).toBe("כשלון");
+    expect(classifyAction("credential.create").label).toBe("יצירה");
+    expect(classifyAction("credential.delete").label).toBe("מחיקה");
   });
 });
 

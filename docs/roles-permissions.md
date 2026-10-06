@@ -32,6 +32,9 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
 | `report.client.view` | Phase 6 | — | — | — | ✅ |
 | `integration.manage` | Phase 8 | ✅ | — | — | — |
 | `important_date.manage_catalog` | Phase 10 | ✅ | — | — | — |
+| `credential.view` | Vault | ✅ | ✅ | ✅ | |
+| `credential.reveal` | Vault | ✅ | ✅ | ✅ | |
+| `credential.manage` | Vault | ✅ | ✅ | ✅ | |
 
 ## Per-role summary
 
@@ -63,6 +66,18 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
   client-scoped distinction that only affects the narrower
   recipients-editing capability inside the portal itself — it does not
   change which top-level `Permission` a `CLIENT_USER` holds.
+
+## Credentials vault (6.10.2026)
+
+The three `credential.*` permissions belong to every internal role and to
+no client. On their own they open nothing: each one is narrowed to the
+clients a person is assigned to, through `listAccessibleClients()`, the
+same scoping tasks and important dates use. Admins are on every client,
+so they can reveal every credential; Ariel accepted that scope knowingly.
+A reveal also needs a fresh identity check (`lib/app-auth/step-up.ts`),
+and every reveal, refused reveal and failed check is written to the
+audit log. Spec: `claude/credentials-vault-spec-2026-10-06.md` in the
+project.
 
 ## Roles not modeled as a `Permission` grant
 

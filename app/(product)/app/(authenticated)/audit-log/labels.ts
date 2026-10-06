@@ -33,6 +33,8 @@ export const ENTITY_TYPES = [
   // The nightly export records itself against a "System" entity - no row
   // in any table is its subject, the run is.
   "System",
+  // Credentials vault. Failed identity checks record against "User".
+  "ClientCredential",
   // Both halves of a Claude grant's life: "OAuthClient" is what consent
   // records when access is given, "McpGrant" what revoking records when
   // it is taken away. Neither was filterable before - the granted rows
@@ -151,6 +153,14 @@ export const ACTION_LABEL: Record<string, string> = {
   // Phase 11: the nightly data export, recorded so a missing backup is
   // visible here and not only in a mailbox.
   "backup.nightly_export.sent": "שליחת גיבוי יומי",
+  // Credentials vault (6.10.2026). Every reveal, every refused reveal and
+  // every failed "verify it's you" is a row here, by design.
+  "credential.create": "הוספת גישה למערכת",
+  "credential.update": "עדכון גישה למערכת",
+  "credential.delete": "מחיקת גישה למערכת",
+  "credential.reveal": "צפייה בפרטי גישה",
+  "credential.reveal_denied": "ניסיון צפייה בפרטי גישה שנחסם",
+  "credential.stepup_failed": "אימות זהות שנכשל",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג
@@ -159,7 +169,11 @@ export const ACTION_LABEL: Record<string, string> = {
 // every action key in ACTION_LABEL above) rather than adding a parallel
 // "kind" column to the schema.
 export function classifyAction(action: string): { label: string; tone: "green" | "amber" | "gray" | "red" } {
-  if (action.includes("failure")) return { label: "כשלון", tone: "red" };
+  if (action.includes("failure") || action.endsWith("_failed") || action.endsWith("_denied"))
+    return { label: "כשלון", tone: "red" };
+  // A secret was shown to someone. Not an edit, and the one row an admin
+  // reading this screen most needs to be able to pick out.
+  if (action.endsWith(".reveal")) return { label: "חשיפה", tone: "amber" };
   if (action.startsWith("login.") || action === "logout" || action.includes("logout_all_sessions"))
     return { label: "התחברות", tone: "gray" };
   if (

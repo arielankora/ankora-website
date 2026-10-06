@@ -139,3 +139,22 @@ describe("can() - Phase 6 report.client.view (ADR addendum 13.2)", () => {
     expect(can("ANKORA_EMPLOYEE", "report.client.view")).toBe(false);
   });
 });
+
+// Credentials vault (claude/credentials-vault-spec-2026-10-06.md). Every
+// internal role holds all three; the client assignment is what narrows
+// them, and that is tested in tests/integration/credentials.test.ts. A
+// client never holds any of them: the portal does not show a client
+// their own vault.
+describe("can() - credentials vault", () => {
+  const CREDENTIAL = ["credential.view", "credential.reveal", "credential.manage"] as const;
+
+  it("grants every internal role all three", () => {
+    for (const role of ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] as UserRole[]) {
+      for (const p of CREDENTIAL) expect(can(role, p)).toBe(true);
+    }
+  });
+
+  it("grants CLIENT_USER none of them", () => {
+    for (const p of CREDENTIAL) expect(can("CLIENT_USER", p)).toBe(false);
+  });
+});

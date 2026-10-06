@@ -226,6 +226,10 @@ model User {
   preferencesTouched  Client[]         @relation("ClientPreferencesEditor")
   documentsUploaded   ClientDocument[] @relation("ClientDocumentUploader")
   summariesApproved   PortalSummary[]  @relation("PortalSummaryApprover")
+  credentialsCreated  ClientCredential[] @relation("CredentialCreator")
+  credentialsUpdated  ClientCredential[] @relation("CredentialUpdater")
+  credentialsRevealed ClientCredential[] @relation("CredentialLastRevealer")
+  stepUpGrants        StepUpGrant[]
 
   @@index([role, status])
   @@map("users")
@@ -508,6 +512,7 @@ model Client {
   // Portal phase 3.
   preferencesUpdatedBy User?            @relation("ClientPreferencesEditor", fields: [preferencesUpdatedById], references: [id], onDelete: SetNull)
   documents            ClientDocument[]
+  credentials          ClientCredential[]
   portalSummaries      PortalSummary[]
 
   @@index([status])
@@ -2081,4 +2086,70 @@ enum PortalSummaryStatus {
   DRAFT
   APPROVED
   DISCARDED
+}
+
+/// Credentials vault (claude/credentials-vault-spec-2026-10-06.md).
+///
+/// A client's login to one of their own systems. The name and the link are
+/// plain text: anyone assigned to the client sees them. Username, password
+/// and notes live only inside `secretCiphertext`, as one AES-256-GCM
+/// encrypted JSON document under a per-row data key (`wrappedDek`), which
+/// is itself wrapped by a key that never leaves Cloud KMS. See
+/// lib/vault/ for the scheme and lib/app-domain/credentials.ts for the
+/// rules. Nothing outside the reveal route ever turns these bytes back
+/// into text.
+///
+/// Deleting a credential nulls every secret column at once and keeps the
+/// row, so the audit trail still has a name to point at.
+model ClientCredential {
+  id               String    @id
+  clientId         String
+  systemName       String
+  url              String?
+  secretCiphertext Bytes?
+  secretIv         Bytes?
+  secretTag        Bytes?
+  wrappedDek       Bytes?
+  /// Which key wrapped `wrappedDek`: "kms:<cryptoKeyVersion>" or
+  /// "local:<fingerprint>". A row wrapped by one environment's key is
+  /// refused, in words, by another's.
+  kekRef           String?
+  encVersion       Int       @default(1)
+  /// Shown in the list so it can say "has a password" without decrypting.
+  hasUsername      Boolean   @default(false)
+  hasPassword      Boolean   @default(false)
+  hasNotes         Boolean   @default(false)
+  secretUpdatedAt  DateTime?
+  lastRevealedAt   DateTime?
+  lastRevealedById String?
+  createdById      String
+  updatedById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  client         Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  createdBy      User   @relation("CredentialCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  updatedBy      User   @relation("CredentialUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
+  lastRevealedBy User?  @relation("CredentialLastRevealer", fields: [lastRevealedById], references: [id], onDelete: SetNull)
+
+  @@index([clientId, deletedAt])
+  @@map("client_credentials")
+}
+
+/// "Verify it's you" before a reveal. One row per successful check, valid
+/// for a few minutes. Bound to the user's tokenVersion, so changing the
+/// password or "disconnect all sessions" closes every open window at once.
+model StepUpGrant {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenVersion Int
+  method       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("step_up_grants")
 }
