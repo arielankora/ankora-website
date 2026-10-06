@@ -106,7 +106,7 @@ describe("a step never counts as a task", () => {
     ).toEqual([]);
   });
 
-  it("the queries that do want them are exactly the four that should", () => {
+  it("the queries that do want them are exactly the three that should", () => {
     // Each opt-out names itself, and the names are listed here.
     //
     // By NAME and not by file:line, so that moving code around does not
@@ -118,7 +118,17 @@ describe("a step never counts as a task", () => {
       .flatMap((q) => [...q.body.matchAll(/subtasks-included:\s*([a-z-]+)/g)].map((m) => m[1]))
       .sort();
 
-    expect(named).toEqual(["the-backup-dump", "the-backup-sheet", "the-steps-of-one-parent", "the-steps-to-remove"]);
+    // "the-backup-dump" was here until 2026-09-29 and is deliberately
+    // gone: the nightly JSON dump no longer reads tasks through Prisma at
+    // all. It selects the whole table (lib/app-domain/backup-dump.ts),
+    // because a backup is the one reader that must see every row of
+    // every table, steps included, and a backup missing a step cannot
+    // restore its parent. That path is guarded by
+    // tests/unit/backup-coverage.test.ts and proved by
+    // tests/integration/backup-restore-roundtrip.test.ts instead of
+    // here, since this test reads `prisma.task.*` call sites and there
+    // is no longer one to read.
+    expect(named).toEqual(["the-backup-sheet", "the-steps-of-one-parent", "the-steps-to-remove"]);
 
     // And nothing opted out without naming itself.
     const anonymous = queries.filter(

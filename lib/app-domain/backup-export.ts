@@ -6,6 +6,8 @@ import { toXlsxWorkbook } from "@/lib/xlsx";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { localDateKey } from "@/lib/timezone";
 import { uploadFileToDriveFolder, DRIVE_FOLDER_EXCEL_REPORTS, DRIVE_FOLDER_DB_DUMPS } from "@/lib/google-drive";
+import { buildDump, prismaExecutor, totalRows, largestTables } from "@/lib/app-domain/backup-dump";
+import { DUMP_SIZE_WARN_BYTES, DUMP_EMAIL_ATTACH_MAX_BYTES } from "@/lib/app-domain/backup-coverage";
 import {
   CLIENTS_SHEET_NAME,
   CLIENTS_SHEET_HEADERS,
@@ -34,19 +36,27 @@ import {
 //  1. An Excel workbook (clients / time entries / tasks) - the
 //     human-readable nightly report Ariel asked for directly ("את כל
 //     הדאטה... כל יום בלילה, דיווחי שעות ברמת שורה, לקוחות וכו'").
-//  2. A gzipped JSON dump of the same core business tables (plus Users
-//     and Categories, needed as lookup context, and HourBanks) - the
-//     supplementary, coarse-grained backup this project's own automated
-//     Neon PITR (point-in-time recovery) doesn't cover once its
-//     retention window passes. This is NOT a full schema-for-schema
-//     database dump - append-only/audit-style tables (AuditEvent,
-//     TimeEntryRevision, EmailDelivery, etc.) are intentionally left
-//     out: Neon PITR is the authoritative full-fidelity backup within
-//     its retention window, this dump is the secondary safety net for
-//     the core OPERATIONAL entities specifically, scoped to what a
-//     human would actually need to reconstruct "who is owed what" if
-//     the database were lost outright. Extend the `dumpCoreTables()`
-//     model list below if that scope ever needs to grow.
+//  2. A gzipped JSON dump of every table the coverage map
+//     (lib/app-domain/backup-coverage.ts) says to dump - which as of
+//     2026-09-29 is thirty of the schema's thirty-six tables, the six
+//     exceptions all being credential tables that hold hashes and are
+//     re-issued rather than restored.
+//
+//     This used to be six tables, hand-listed in this file. That list
+//     could not tell anyone it had fallen behind, and it had: it was
+//     missing BillingPolicy and HourBankAdjustment, so the dump could
+//     not deliver what this comment claimed for it ("who is owed
+//     what"). Coverage is now a decision per model, recorded in one
+//     place, and a unit test fails the build when a new model is added
+//     to the schema without one. See that file's header for the two
+//     rules that are easy to get wrong (soft-deleted rows ARE dumped;
+//     a skip must name its recovery path).
+//
+//     Neon PITR remains the full-fidelity backup within its retention
+//     window. This dump is what survives the window closing, or the
+//     Neon project going away entirely, and
+//     tests/integration/backup-restore-roundtrip.test.ts is the proof
+//     that it actually restores rather than merely existing.
 //
 // The email stays (Ariel reads it directly, and it's a second, fully
 // independent delivery path - if Drive's service-account credentials
@@ -84,6 +94,14 @@ interface NightlyExportResult {
   drive?: {
     excel: { ok: boolean; fileId?: string; error?: string };
     dbDump: { ok: boolean; fileId?: string; error?: string };
+  };
+  dump?: {
+    tables: number;
+    rows: number;
+    compressedBytes: number;
+    schemaMigration: string | null;
+    attachedToEmail: boolean;
+    problems: string[];
   };
 }
 
@@ -143,36 +161,6 @@ async function fetchTasksSheetData() {
   }));
 }
 
-/// The secondary, coarse-grained JSON backup described in this file's
-/// header comment - core operational tables only, Users without
-/// passwordHash. Every array here is scoped to `deletedAt: null` (where
-/// the model has that column) for the same "soft-deleted = Neon PITR's
-/// job, not this dump's" reasoning above.
-async function dumpCoreTables() {
-  const [clients, users, categories, tasks, timeEntries, hourBanks] = await Promise.all([
-    prisma.client.findMany({ where: { deletedAt: null } }),
-    prisma.user.findMany({ where: { deletedAt: null } }),
-    prisma.category.findMany({ where: { deletedAt: null } }),
-    prisma.task.findMany({
-      // subtasks-included: the-backup-dump. Same reason as the sheet above.
-      where: { deletedAt: null },
-    }),
-    prisma.timeEntry.findMany({ where: { deletedAt: null } }),
-    prisma.hourBank.findMany({ where: { deletedAt: null } }),
-  ]);
-
-  return {
-    generatedAt: new Date().toISOString(),
-    scope: "core operational tables only - see backup-export.ts header comment",
-    clients,
-    users: users.map(({ passwordHash, ...rest }) => rest),
-    categories,
-    tasks,
-    timeEntries,
-    hourBanks,
-  };
-}
-
 /// Builds both attachments and sends the one nightly email to
 /// ariel@ankora.co.il + hadas@ankora.co.il. Called from the daily cron
 /// (app/api/cron/scheduled-reports/route.ts, alongside
@@ -198,8 +186,28 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
       { name: TASKS_SHEET_NAME, headers: TASKS_SHEET_HEADERS, rows: tasksToSheetRows(taskRows) },
     ]);
 
-    const dump = await dumpCoreTables();
+    const dump = await buildDump(prismaExecutor(prisma), now);
     const dumpGz = gzipSync(Buffer.from(JSON.stringify(dump)));
+
+    // Three things can be true about a dump that was produced without
+    // throwing, and all three are worth saying out loud in the logs
+    // rather than discovering during a restore.
+    for (const problem of dump.problems) console.error("Nightly dump problem:", problem);
+    if (dumpGz.length > DUMP_SIZE_WARN_BYTES) {
+      console.warn(
+        `Nightly dump is ${dumpGz.length} bytes compressed, over the ${DUMP_SIZE_WARN_BYTES} warning threshold. ` +
+          `Largest tables: ${largestTables(dump).map((t) => `${t.table}=${t.rows}`).join(", ")}. ` +
+          `This design (whole database as JSON, in one function invocation) has a ceiling; at this size the history ` +
+          `tables want a real pg_dump on their own schedule instead.`
+      );
+    }
+    // Over the hard cap the dump still reaches Drive in full, it just
+    // stops riding along on the email: a message Resend rejects for
+    // size delivers neither file, which is the worse failure.
+    const attachDumpToEmail = dumpGz.length <= DUMP_EMAIL_ATTACH_MAX_BYTES;
+    if (!attachDumpToEmail) {
+      console.warn(`Nightly dump (${dumpGz.length} bytes) exceeds the email attachment cap; sent to Drive only.`);
+    }
 
     const dateLabel = localDateKey(now);
     const summary = summaryLine(counts);
@@ -219,16 +227,16 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
           ``,
           `הדוח כולל ${summary}.`,
           ``,
-          `שני קבצים מצורפים: אקסל מסודר לקריאה, וקובץ גיבוי דחוס (JSON) שמיועד לארכוב בלבד ולא לקריאה ישירה.`,
+          attachDumpToEmail
+            ? `שני קבצים מצורפים: אקסל מסודר לקריאה, וקובץ גיבוי דחוס (JSON) שמיועד לארכוב בלבד ולא לקריאה ישירה.`
+            : `מצורף קובץ האקסל בלבד. קובץ הגיבוי הדחוס גדול מדי לשליחה במייל והועלה לגוגל דרייב בלבד.`,
         ].join("\n"),
-        attachments: [
-          { filename: excelFilename, content: excelBuffer },
-          {
-            filename: dumpFilename,
-            content: dumpGz,
-            contentType: "application/gzip",
-          },
-        ],
+        attachments: attachDumpToEmail
+          ? [
+              { filename: excelFilename, content: excelBuffer },
+              { filename: dumpFilename, content: dumpGz, contentType: "application/gzip" },
+            ]
+          : [{ filename: excelFilename, content: excelBuffer }],
       }),
       uploadFileToDriveFolder({
         name: excelFilename,
@@ -271,6 +279,13 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
         ok: result.ok,
         counts,
         drive: { excel: driveExcel.ok, dbDump: driveDump.ok },
+        dump: {
+          tables: Object.keys(dump.tables).length,
+          rows: totalRows(dump),
+          compressedBytes: dumpGz.length,
+          schemaMigration: dump.schemaMigration,
+          problems: dump.problems.length,
+        },
       },
     });
 
@@ -279,6 +294,14 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
       counts,
       error: result.error,
       drive: { excel: driveExcel, dbDump: driveDump },
+      dump: {
+        tables: Object.keys(dump.tables).length,
+        rows: totalRows(dump),
+        compressedBytes: dumpGz.length,
+        schemaMigration: dump.schemaMigration,
+        attachedToEmail: attachDumpToEmail,
+        problems: dump.problems,
+      },
     };
   } catch (err: any) {
     // Never throw - see doc comment above. Logged (Vercel's runtime
