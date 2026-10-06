@@ -108,6 +108,13 @@ export function fixtureValue(
 ): unknown {
   if (col.name === "id") return `${table}-${i}`;
 
+  // Columns a CHECK constraint ties to another column. The generator
+  // fills every column independently and has no way to read a CHECK, so
+  // each such rule is written down here instead.
+  //   client_credentials_deleted_has_no_secret: a deleted credential
+  //   holds no ciphertext. The fixture rows stay live.
+  if (table === "client_credentials" && col.name === "deletedAt") return null;
+
   if (fkTarget) {
     const parentValues = valuesByTable.get(fkTarget.parent)?.get(fkTarget.parentColumn) ?? [];
     if (!parentValues.length) return null;

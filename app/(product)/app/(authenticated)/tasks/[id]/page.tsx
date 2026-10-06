@@ -17,6 +17,9 @@ import { MessageClient } from "@/components/app/MessageClient";
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
 import { appBaseUrl } from "@/lib/email-templates";
 import { TaskTimeSummary } from "./TaskTimeSummary";
+import { listCredentials } from "@/lib/app-domain/credentials";
+import { isVaultConfigured } from "@/lib/vault/keys";
+import { RevealCredential } from "@/components/app/vault/RevealCredential";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -64,6 +67,15 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
   // and are SHOWN there. They are never parsed into a preferred channel:
   // see the comment in lib/app-domain/client-messages.ts for the version
   // that was, and the sentence that killed it.
+  // The client's logins, for work that needs them. A reveal from here
+  // carries this task's id into the audit row, so the trail says not only
+  // who looked but for what. Only the safe projection is fetched; see
+  // lib/app-domain/credentials.ts.
+  const credentials =
+    can(user.role, "credential.view") && isVaultConfigured()
+      ? (await listCredentials(user, task.clientId).catch(() => [])).filter((c) => c.hasUsername || c.hasPassword || c.hasNotes)
+      : [];
+
   const [composer, people, allCategories, activeTimers] = await Promise.all([
     messageComposerProps({
       clientId: task.clientId,
@@ -193,6 +205,29 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           assignedToName: s.assignedTo?.name ?? null,
         }))}
       />
+
+      {credentials.length > 0 && (
+        <details className="rounded-2xl border border-lineDark bg-white p-5">
+          <summary className="cursor-pointer text-sm font-medium text-appNavy">
+            גישות למערכות של {task.client.name} ({credentials.length})
+          </summary>
+          <ul className="mt-4 space-y-4">
+            {credentials.map((c) => (
+              <li key={c.id} className="flex flex-col gap-2">
+                <span className="text-sm text-appNavy">
+                  {c.systemName}
+                  {c.url && (
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-gold hover:underline">
+                      פתיחה
+                    </a>
+                  )}
+                </span>
+                <RevealCredential credentialId={c.id} taskId={task.id} />
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <TaskTimeSummary time={time} />

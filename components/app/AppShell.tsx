@@ -77,6 +77,9 @@ function navItemsFor(role: User["role"], supervises: boolean): NavItem[] {
   // group per the brief's explicit nav-placement instruction, even though
   // its permission gate matches the "העבודה שלי" items above it.
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "ניהול" });
+  // Credentials vault (6.10.2026). Its own permission, then narrowed to
+  // the person's assigned clients on the screen itself.
+  if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "ניהול" });
   // Spec 12: Admin "Time Entries" screen - cross-client table, gated on
   // the same permission that lets an admin edit someone else's entries.
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "דיווח ובקרה" });

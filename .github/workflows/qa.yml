@@ -88,6 +88,10 @@ jobs:
       AUTH_TRUST_HOST: "true"
       ADMIN_PASSWORD: ci-only-not-a-real-password
       ADMIN_SESSION_SECRET: ci-only-not-a-real-secret
+      # Credentials vault: the local key-wrapping key (lib/vault/keys.ts).
+      # 32 bytes of "ci-only-vault-key-not-a-secret!!" in base64. Never
+      # used outside this runner; production refuses a local key outright.
+      VAULT_KEK: Y2ktb25seS12YXVsdC1rZXktbm90LWEtc2VjcmV0ISE=
 
     steps:
       # Full history: the level-selection step below diffs against the

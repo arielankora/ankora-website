@@ -73,11 +73,18 @@ function quoteIdent(name: string): string {
 /// JSON has no date type and no opinion about bigint. Everything the
 /// restore has to put back has to survive this function and
 /// `JSON.parse` unchanged.
-function normalizeValue(v: unknown): unknown {
+///
+/// Bytes: Prisma 6 hands a bytea column back as a plain Uint8Array, not a
+/// Buffer, and `Buffer.isBuffer` is false for it - the value would have
+/// been written as `{"0":12,"1":201,...}` and restored as JSON into a
+/// bytea column, which fails. No table had a bytea column until the
+/// credentials vault (6.10.2026); its ciphertext is the first. A Buffer
+/// is a Uint8Array, so this one check covers both.
+export function normalizeValue(v: unknown): unknown {
   if (v === undefined || v === null) return null;
   if (v instanceof Date) return v.toISOString();
   if (typeof v === "bigint") return v.toString();
-  if (Buffer.isBuffer(v)) return { __bytes_b64: v.toString("base64") };
+  if (v instanceof Uint8Array) return { __bytes_b64: Buffer.from(v.buffer, v.byteOffset, v.byteLength).toString("base64") };
   if (Array.isArray(v)) return v.map(normalizeValue);
   return v;
 }

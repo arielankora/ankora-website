@@ -89,7 +89,23 @@ export type Permission =
   // in shape to hour_bank.manage/alert.manage (a systemic configuration
   // surface, not routine per-client data entry) than to Task creation, so
   // it follows their same SUPER_ADMIN-only precedent.
-  | "important_date.manage_catalog";
+  | "important_date.manage_catalog"
+  // Credentials vault (claude/credentials-vault-spec-2026-10-06.md,
+  // approved by Ariel 6.10.2026). Three literals rather than one, unlike
+  // Tasks and Important Dates above, because the three really can diverge:
+  // seeing that a client HAS a login to some system, reading the login
+  // itself, and changing it. Today all three go to every internal role
+  // and are then narrowed by client assignment (listAccessibleClients), so
+  // the matrix below looks redundant. It exists so that a future role
+  // (an outside contractor, say) can be given the list without the
+  // secrets by editing one line, instead of by threading a new condition
+  // through the reveal path. CLIENT_USER holds none of them: the portal
+  // does not show a client their own vault (phase 2, not approved).
+  | "credential.view"
+  | "credential.reveal"
+  | "credential.manage";
+
+const CREDENTIAL_PERMISSIONS: Permission[] = ["credential.view", "credential.reveal", "credential.manage"];
 
 // Phase 9 gap-fix (docs/adr/0001 section 17): the Tasks, Profile, and
 // Notifications screens added this phase deliberately introduce NO new
@@ -125,6 +141,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "report.internal.view",
     "integration.manage",
     "important_date.manage_catalog",
+    ...CREDENTIAL_PERMISSIONS,
   ],
   // Spec 4: Ankora Admin/Manager gets clients/categories/edits, but not
   // "critical system actions" (user management, audit) unless explicitly
@@ -142,6 +159,11 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "time_entry.edit_self",
     "time_entry.edit_others",
     "report.internal.view",
+    // Credentials vault: the procedures book gives management full access
+    // to client information. Admins are on every client, so they can
+    // reveal every credential; Ariel accepted that scope knowingly
+    // (decision 7, 6.10.2026). Every reveal is still logged.
+    ...CREDENTIAL_PERMISSIONS,
     // Spec 4's role table lists "משתמשים, לקוחות, בנקים, הרשאות, עריכות,
     // audit, דוחות" (users, clients, BANKS, permissions, edits, audit,
     // reports) under Super Admin explicitly, but Ankora Admin/Manager's
@@ -156,7 +178,11 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   ],
   // Spec 4: "טיימר ודיווחים שלו; צפייה בהיסטוריה שלו; עריכה עצמית לפי
   // window מוגדר" - own timer/entries only, no edit_others, no reports.
-  ANKORA_EMPLOYEE: ["time_entry.create_self", "time_entry.edit_self"],
+  //
+  // Credentials vault: an employee works a client's systems, so they get
+  // the vault too - limited, like everything else they see, to the
+  // clients they are assigned to.
+  ANKORA_EMPLOYEE: ["time_entry.create_self", "time_entry.edit_self", ...CREDENTIAL_PERMISSIONS],
   // Spec 4.1: "לקוח לעולם לא מקבל הרשאת edit על Time Entries של Ankora
   // ב-MVP" - Client Admin/Viewer are both read-only on time entries, so
   // CLIENT_USER (which models both) gets none of the time_entry.*

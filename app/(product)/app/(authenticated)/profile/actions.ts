@@ -86,3 +86,19 @@ export async function updateDailyDigestPreferenceAction(enabled: boolean): Promi
     return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
   }
 }
+
+/// Credentials vault, phase 1a: remove one of my own passkeys. Adding one
+/// goes through the JSON routes under /api/passkeys, because the browser
+/// has to sign a challenge in between.
+export async function removePasskeyAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  const { removeMyPasskey, PasskeyError } = await import("@/lib/app-auth/passkeys");
+  try {
+    await removeMyPasskey(user, id);
+  } catch (err) {
+    if (err instanceof PasskeyError) return { error: err.message };
+    return { error: "אירעה שגיאה. נסו שוב." };
+  }
+  revalidatePath("/app/profile");
+  return { ok: true };
+}

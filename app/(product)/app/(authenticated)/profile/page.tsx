@@ -6,6 +6,10 @@ import { NameForm } from "./NameForm";
 import { DailyDigestPreferenceForm, NotificationPreferenceForm } from "./NotificationPreferenceForm";
 import { getMyClaudeConnection } from "@/lib/app-domain/mcp-connections";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
+import { can } from "@/lib/app-auth/permissions";
+import { listMyPasskeys } from "@/lib/app-auth/passkeys";
+import { passwordStepUpAllowed } from "@/lib/app-auth/step-up";
+import { PasskeysCard } from "./PasskeysCard";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -48,10 +52,16 @@ export default async function ProfilePage() {
   // connection to a client would be an invitation to a dead end.
   const showClaudeCard = user.role !== "CLIENT_USER";
 
-  const [lastPasswordChangeAt, claude] = await Promise.all([
+  // Passkeys exist for the credentials vault, so only people who can
+  // reveal a credential see the card.
+  const showPasskeys = can(user.role, "credential.reveal");
+
+  const [lastPasswordChangeAt, claude, passkeys] = await Promise.all([
     getLastPasswordChangeAt(user),
     showClaudeCard ? getMyClaudeConnection(user) : Promise.resolve(null),
+    showPasskeys ? listMyPasskeys(user) : Promise.resolve([]),
   ]);
+  const dateFmt = new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" });
 
   return (
     <div className="space-y-6">
@@ -97,6 +107,19 @@ export default async function ProfilePage() {
             <h2 className="mb-3 text-sm font-medium text-appNavy">סיסמה</h2>
             <ChangePasswordForm lastChangedLabel={formatPasswordChangedLabel(lastPasswordChangeAt)} />
           </div>
+
+          {showPasskeys && (
+            <PasskeysCard
+              required={!passwordStepUpAllowed()}
+              passkeys={passkeys.map((p) => ({
+                id: p.id,
+                name: p.name,
+                createdAt: dateFmt.format(p.createdAt),
+                lastUsedAt: p.lastUsedAt ? dateFmt.format(p.lastUsedAt) : null,
+                backedUp: p.backedUp,
+              }))}
+            />
+          )}
 
           {claude && <ClaudeConnectionCard status={claude} />}
         </div>

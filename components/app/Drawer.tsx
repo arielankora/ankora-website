@@ -64,6 +64,7 @@ export function Drawer({
   children,
   openKey,
   triggerClassName = "",
+  variant = "primary",
 }: {
   triggerLabel: string;
   title: string;
@@ -75,6 +76,10 @@ export function Drawer({
   /// Extra classes for the trigger button, e.g. to hide it where another
   /// entry point already exists.
   triggerClassName?: string;
+  /// "link" renders the trigger as a quiet text button, for a per-row
+  /// action like "עריכה" that should not compete with the screen's one
+  /// primary button.
+  variant?: "primary" | "link";
 }) {
   const [open, setOpen] = useState(false);
 
@@ -164,9 +169,13 @@ export function Drawer({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy ${triggerClassName}`}
+        className={
+          variant === "link"
+            ? `text-xs text-appNavy/60 hover:text-appNavy ${triggerClassName}`
+            : `inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy ${triggerClassName}`
+        }
       >
-        <Plus size={16} strokeWidth={2.25} />
+        {variant === "primary" && <Plus size={16} strokeWidth={2.25} />}
         {triggerLabel}
       </button>
 

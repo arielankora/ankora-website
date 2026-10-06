@@ -43,6 +43,12 @@ const TABLES = [
   "important_dates",
   "holiday_calendar_subscriptions",
   // Phase 2 tables truncate before the Phase 1 tables they reference.
+  // Credentials vault (6.10.2026). Before clients and users, both of
+  // which it references.
+  "step_up_grants",
+  "webauthn_challenges",
+  "passkeys",
+  "client_credentials",
   "time_entry_revisions",
   "time_entries",
   "tasks",

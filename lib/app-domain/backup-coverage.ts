@@ -161,6 +161,40 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   // the kind of event that makes anyone open a backup at all. They are
   // also the tables that grow without bound, which is what
   // DUMP_SIZE_WARN_BYTES below watches.
+  // Credentials vault (6.10.2026). Dumped as stored: ciphertext, IV, tag
+  // and a data key wrapped by the production key (VAULT_KEK, a sensitive
+  // Vercel variable that is never in a backup). Without that key
+  // none of it is readable, so the dump carries no usable secret, and
+  // without the rows a restore would silently lose every client login.
+  // Restoring keeps the ids, which matters: each ciphertext is bound to
+  // its row id and client id (lib/vault/crypto.ts). The nightly XLSX
+  // never includes this table (tests/unit/vault-guards.test.ts).
+  ClientCredential: {
+    decision: "DUMP",
+    table: "client_credentials",
+    reason: "Clients' logins, encrypted under a key that is not in the backup. Not reconstructible, and unreadable without that key.",
+  },
+  // Passkeys (vault phase 1a). Public keys only; the private half never
+  // left anyone's device. Kept so a restore does not force everyone to
+  // enrol again before they can open a client's login.
+  Passkey: {
+    decision: "DUMP",
+    table: "passkeys",
+    reason: "Which devices may answer \"verify it's you\". Public keys only; without them nobody can reveal a credential until they enrol again.",
+  },
+  WebAuthnChallenge: {
+    decision: "SKIP",
+    table: "webauthn_challenges",
+    reason: "Single-use challenges that expire in five minutes.",
+    recovery: "The next prompt issues a new one.",
+  },
+  StepUpGrant: {
+    decision: "SKIP",
+    table: "step_up_grants",
+    reason: "Five-minute \"verified it's you\" windows. Expired long before any restore.",
+    recovery: "The person verifies again on their next reveal.",
+  },
+
   AuditEvent: { decision: "DUMP", table: "audit_events", reason: "The compliance trail. Irreplaceable, and the first thing asked for after an incident." },
   TimeEntryRevision: { decision: "DUMP", table: "time_entry_revisions", reason: "How a billable record changed, which is the defence when a client disputes one." },
   EmailDelivery: { decision: "DUMP", table: "email_deliveries", reason: "Proof that a report or an alert was actually sent." },
@@ -198,6 +232,17 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "important_dates.holidayKey": "A public holiday identifier.",
   "reminder_occurrences.idempotencyKey": "A de-duplication key. Losing it re-sends reminders; it grants nothing.",
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
+  // Credentials vault. Every one of these is either ciphertext that
+  // needs the production key to open, or a flag that says a value exists.
+  "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by a key that is not in the backup.",
+  "client_credentials.secretIv": "The GCM nonce. Public by design.",
+  "client_credentials.secretTag": "The GCM authentication tag. Public by design.",
+  "client_credentials.wrappedDek": "A wrapped data key. Useless without the key-encryption key, which is not in the backup.",
+  "client_credentials.kekRef": "Which key wrapped the data key: a 64-bit fingerprint or a KMS key name. An identifier, not a key.",
+  "client_credentials.hasPassword": "A yes/no flag for the list screen.",
+  "client_credentials.secretUpdatedAt": "When the secret last changed. A timestamp.",
+  "passkeys.publicKey": "The public half of a passkey. Verifies a signature; cannot make one.",
+  "passkeys.credentialId": "The authenticator's public identifier for the passkey.",
 } as const;
 
 export const SENSITIVE_COLUMN_PATTERN = /pass|secret|token|hash|key|credential/i;
