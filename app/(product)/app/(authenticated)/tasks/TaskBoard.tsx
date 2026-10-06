@@ -3,6 +3,8 @@ import { Hourglass } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { toggleTaskDoneAction } from "./actions";
+import { useTaskList } from "./TaskListProvider";
+import { taskHref } from "./list-query";
 import { waitingTitle } from "@/lib/app-domain/portal-labels";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
@@ -204,6 +206,7 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
 }
 
 function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
+  const { listQuery } = useTaskList();
   const overdue =
     card.dueDate !== null && card.status !== "DONE" && new Date(card.dueDate).getTime() < Date.now();
 
@@ -225,7 +228,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
             note in TaskRow): a soft navigation to a task was being
             cancelled by the router and reporting nothing. */}
         <a
-          href={`/app/tasks/${card.id}`}
+          href={taskHref(card.id, listQuery)}
           // Dragging a link is the browser's own gesture and it wins over
           // ours, so the link does not carry the drag: the card does.
           draggable={false}

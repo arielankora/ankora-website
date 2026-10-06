@@ -77,7 +77,12 @@ test.describe.serial("one task, from opening it to closing it", () => {
     // row to its task is the thing being asserted here.
     await page.goto(TASKS, { waitUntil: "domcontentloaded" });
     await page.getByRole("link", { name: FIXTURE }).first().click();
-    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}$`));
+    // The task remembers the list it came from (Ariel, 7.10.2026), and
+    // the way back leads to that list, not to its defaults. `mine=0` is
+    // the filter here, so landing on the bare /app/tasks would be "שלי"
+    // again and this task out of view.
+    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}\\?from=mine%3D0$`));
+    await expect(page.getByTestId("task-back")).toHaveAttribute("href", TASKS);
 
     // Rendered, not raw. The asterisks that produced this are not on the
     // screen and the emphasis is a real element, which is the whole

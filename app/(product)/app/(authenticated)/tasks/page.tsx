@@ -14,6 +14,7 @@ import { TaskRow } from "./TaskRow";
 import { TaskFilters } from "./TaskFilters";
 import { TaskListProvider, type ListRow } from "./TaskListProvider";
 import { TaskListView } from "./TaskListView";
+import { listQueryOf } from "./list-query";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -234,6 +235,7 @@ export default async function TasksPage(props: {
 
         <TaskListProvider
           rows={tasks.map(toRow)}
+          listQuery={listQueryOf(searchParams)}
           // What a newly created task has to survive to belong on the
           // screen as it is filtered right now. The client's NAME and not
           // only its id, because the row the action returns carries the

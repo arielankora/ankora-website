@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
 import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
+import { useTaskList } from "./TaskListProvider";
+import { taskHref } from "./list-query";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { SUPPLIER_EXPERIENCE_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
 import type { SupplierExperience, TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -86,6 +88,9 @@ export function TaskRow({
     clientOutcome: string | null;
   };
 }) {
+  // Outside the tasks screen (the supervising page) there is no provider
+  // and this is empty, so the row links to the task plainly.
+  const { listQuery } = useTaskList();
   const { showToast } = useToast();
   const [status, setStatus] = useState(task.status);
   const [pending, setPending] = useState(false);
@@ -408,7 +413,7 @@ export function TaskRow({
               aborts is still not understood; see
               claude/search-navigation-lost-2026-09-25. */}
           <a
-            href={`/app/tasks/${task.id}`}
+            href={taskHref(task.id, listQuery)}
             // Wraps on a phone instead of truncating: the title is the
             // one thing on the card a person came to read, and a card has
             // the height to spare. One line on a desk, where the row does.

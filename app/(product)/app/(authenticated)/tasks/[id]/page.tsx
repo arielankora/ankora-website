@@ -1,5 +1,5 @@
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight, ChevronLeft } from "lucide-react";
+import { carriedListQuery, tasksListHref } from "../list-query";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
@@ -37,8 +37,17 @@ export const metadata = { robots: { index: false, follow: false } };
 // task.* permission by design - see lib/app-auth/permissions.ts's phase 9
 // note. Whether a person may act on this task reduces to whether they may
 // act on its client, and getTaskDetail answers that by returning null.
-export default async function TaskDetailPage(props: { params: Promise<{ id: string }> }) {
+export default async function TaskDetailPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
   const { id } = await props.params;
+  // The list this task was opened from: its client, search, pills and
+  // view. See list-query.ts. Without it, "back" is the list's defaults.
+  const rawFrom = (await props.searchParams).from;
+  const from = typeof rawFrom === "string" ? rawFrom : undefined;
+  const backHref = tasksListHref(from);
+  const listQuery = carriedListQuery(from);
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
@@ -53,7 +62,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
       <NotFound
         title="המשימה לא נמצאה"
         description="ייתכן שהמשימה נמחקה, או שהיא שייכת ללקוח שאינו משויך אליך."
-        backHref="/app/tasks"
+        backHref={backHref}
         backLabel="חזרה למשימות"
       />
     );
@@ -106,11 +115,22 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
 
   return (
     <div className="space-y-6">
-      <nav className="flex items-center gap-1 text-[13px] text-appNavy/50">
-        <Link href="/app/tasks" className="hover:text-appNavy">
-          משימות
-        </Link>
-        <ChevronRight size={14} className="rotate-180" />
+      {/* Ariel, 7.10.2026: a way back that says it is one, and lands on
+          the list as it was left. It used to be a breadcrumb "משימות"
+          pointing at the bare list, which read as a label and reset
+          every filter. The arrow points right because right is back in
+          Hebrew. A plain anchor, like the links that lead here, so the
+          navigation cannot be quietly cancelled (see TaskRow). */}
+      <nav className="flex items-center gap-1.5 text-[13px] text-appNavy/50">
+        <a
+          href={backHref}
+          data-testid="task-back"
+          className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 font-medium text-appNavy/70 transition-colors hover:border-appNavy/30 hover:text-appNavy"
+        >
+          <ArrowRight size={14} />
+          חזרה למשימות
+        </a>
+        <ChevronLeft size={14} className="text-appNavy/30" />
         <span className="truncate text-appNavy/70">{task.client.name}</span>
       </nav>
 
@@ -184,6 +204,7 @@ export default async function TaskDetailPage(props: { params: Promise<{ id: stri
           below are the record of what has been done. A person opening
           this screen mid-task is asking the first question. */}
       <TaskSteps
+        listQuery={listQuery}
         // The book itself, reduced to what the picker shows. The step
         // titles stay on the server: the screen never renders them, and
         // shipping seven procedures to every browser to display seven

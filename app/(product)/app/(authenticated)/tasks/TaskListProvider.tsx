@@ -49,9 +49,13 @@ type TaskListValue = {
   rows: ListRow[];
   /// Called by the create form with what the action returned.
   addCreated: (task: CreatedTaskRow) => void;
+  /// The list's own query, carried into every task link so the task
+  /// screen can lead back to this list as filtered. Empty outside the
+  /// tasks screen, where a row links to the task plainly.
+  listQuery: string;
 };
 
-const TaskListContext = createContext<TaskListValue>({ rows: [], addCreated: () => {} });
+const TaskListContext = createContext<TaskListValue>({ rows: [], addCreated: () => {}, listQuery: "" });
 
 export function useTaskList() {
   return useContext(TaskListContext);
@@ -101,10 +105,12 @@ type ListFilters = {
 export function TaskListProvider({
   rows,
   filters,
+  listQuery = "",
   children,
 }: {
   rows: ListRow[];
   filters: ListFilters;
+  listQuery?: string;
   children: ReactNode;
 }) {
   const [extra, setExtra] = useState<ListRow[]>([]);
@@ -132,8 +138,9 @@ export function TaskListProvider({
         if (!accepts(task, filters)) return;
         setExtra((prev) => (prev.some((r) => r.id === task.id) ? prev : [task, ...prev]));
       },
+      listQuery,
     }),
-    [all, filters]
+    [all, filters, listQuery]
   );
 
   return <TaskListContext.Provider value={value}>{children}</TaskListContext.Provider>;
