@@ -1,6 +1,6 @@
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { stepUpWithPassword, StepUpFailedError, StepUpLockedError } from "@/lib/app-auth/step-up";
+import { stepUpWithPassword, StepUpFailedError, StepUpLockedError, PasskeyRequiredError } from "@/lib/app-auth/step-up";
 import { isSameOriginJsonPost } from "@/lib/same-origin";
 
 // "Verify it's you" for the credentials vault. Opens a five-minute window
@@ -39,6 +39,7 @@ export async function POST(req: Request) {
     const grant = await stepUpWithPassword(user, password);
     return json({ ok: true, expiresAt: grant.expiresAt.toISOString() }, 200);
   } catch (err) {
+    if (err instanceof PasskeyRequiredError) return json({ error: "passkey_required", message: err.message }, 403);
     if (err instanceof StepUpLockedError) return json({ error: "locked", message: err.message }, 429);
     if (err instanceof StepUpFailedError) return json({ error: "wrong_password", message: err.message }, 401);
     throw err;

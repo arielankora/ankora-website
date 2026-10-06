@@ -230,6 +230,8 @@ model User {
   credentialsUpdated  ClientCredential[] @relation("CredentialUpdater")
   credentialsRevealed ClientCredential[] @relation("CredentialLastRevealer")
   stepUpGrants        StepUpGrant[]
+  passkeys            Passkey[]
+  webauthnChallenges  WebAuthnChallenge[]
 
   @@index([role, status])
   @@map("users")
@@ -2153,4 +2155,56 @@ model StepUpGrant {
 
   @@index([userId, expiresAt])
   @@map("step_up_grants")
+}
+
+/// A passkey (Touch ID, Face ID, Windows Hello, a security key) that can
+/// answer "verify it's you" before a credential is revealed
+/// (claude/credentials-vault-spec-2026-10-06.md, phase 1a). Not a login
+/// method: signing in to Ankora is unchanged.
+///
+/// Only the public half is stored. The private key never leaves the
+/// person's device, so a database leak gives an attacker nothing to sign
+/// with.
+model Passkey {
+  id           String    @id @default(cuid())
+  userId       String
+  /// The authenticator's credential id, base64url. What the browser
+  /// sends back to say which passkey answered.
+  credentialId String    @unique
+  publicKey    Bytes
+  /// The signature counter. A counter that goes backwards means a cloned
+  /// authenticator, and is refused. Synced passkeys (iCloud) report 0.
+  counter      Int       @default(0)
+  transports   String[]
+  /// What the person called it ("MacBook של אריאל").
+  name         String
+  deviceType   String
+  backedUp     Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("passkeys")
+}
+
+/// One WebAuthn challenge, issued by the server and consumed once. Lives
+/// for minutes. A challenge the server did not issue, or already used, is
+/// refused, which is what stops a captured passkey answer from being
+/// replayed.
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  /// "register" or "step-up". A registration challenge cannot answer a
+  /// step-up, and the reverse.
+  purpose   String
+  challenge String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@map("webauthn_challenges")
 }

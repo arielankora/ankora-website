@@ -1198,6 +1198,34 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-10-06"
+    },
+    "api:/api/passkeys/register/options": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-06"
+    },
+    "api:/api/passkeys/register/verify": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-06"
+    },
+    "api:/api/step-up/passkey/options": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-06"
+    },
+    "api:/api/step-up/passkey/verify": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-06"
     }
   },
   "waivers": {},

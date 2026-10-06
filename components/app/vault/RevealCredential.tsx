@@ -1,14 +1,17 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Copy, Check, KeyRound, Lock } from "lucide-react";
+import Link from "next/link";
+import { Copy, Check, Fingerprint, KeyRound, Lock } from "lucide-react";
+import { verifyWithPasskey } from "./webauthn-client";
 
 // The one place in the browser where a client's login appears
 // (claude/credentials-vault-spec-2026-10-06.md, "חוויית המסך").
 //
 // 1. "הצגת פרטי גישה" asks the reveal route.
-// 2. If there is no open identity window, the route says so and this
-//    component asks for the person's own Ankora password, then asks the
-//    reveal route again.
+// 2. If there is no open identity window, the route says so, and says
+//    which checks this person may use: a passkey (Touch ID) if they have
+//    one, the Ankora password only where it is still accepted (never in
+//    production). Then this component asks the reveal route again.
 // 3. The values stay on screen for SHOW_MS, then disappear from state.
 //    Anything copied is overwritten in the clipboard after the same time,
 //    where the browser allows it.
@@ -19,11 +22,12 @@ import { Copy, Check, KeyRound, Lock } from "lucide-react";
 
 const SHOW_MS = 30_000;
 
+type Methods = { passkey: boolean; password: boolean };
 type Secret = { username: string | null; password: string | null; notes: string | null };
 type Phase =
   | { kind: "idle" }
   | { kind: "loading" }
-  | { kind: "step-up"; error?: string }
+  | { kind: "step-up"; methods: Methods; error?: string }
   | { kind: "shown"; secret: Secret; until: number }
   | { kind: "error"; message: string };
 
@@ -58,10 +62,20 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
       setPhase({ kind: "shown", secret: data as Secret, until: Date.now() + SHOW_MS });
       return;
     }
-    if (status === 403 && data?.error === "step_up_required") return setPhase({ kind: "step-up" });
+    if (status === 403 && data?.error === "step_up_required") {
+      const methods: Methods = { passkey: Boolean(data.methods?.passkey), password: Boolean(data.methods?.password) };
+      return setPhase({ kind: "step-up", methods });
+    }
     if (status === 404) return setPhase({ kind: "error", message: "הגישה לא נמצאה." });
     if (status === 401) return setPhase({ kind: "error", message: "פג תוקף ההתחברות. יש להתחבר מחדש." });
     setPhase({ kind: "error", message: data?.message ?? "לא ניתן להציג את פרטי הגישה כרגע." });
+  }
+
+  async function stepUpWithPasskey(methods: Methods) {
+    setPhase({ kind: "loading" });
+    const r = await verifyWithPasskey();
+    if (r.ok) return reveal();
+    setPhase({ kind: "step-up", methods, error: r.message });
   }
 
   async function stepUp(e: FormEvent<HTMLFormElement>) {
@@ -72,7 +86,9 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
     const { status, data } = await postJson("/api/step-up", { password });
     form.reset();
     if (status === 200) return reveal();
-    if (status === 401 && data?.error === "wrong_password") return setPhase({ kind: "step-up", error: data.message });
+    if (status === 401 && data?.error === "wrong_password" && phase.kind === "step-up") {
+      return setPhase({ kind: "step-up", methods: phase.methods, error: data.message });
+    }
     setPhase({ kind: "error", message: data?.message ?? "האימות נכשל." });
   }
 
@@ -114,32 +130,57 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
   }
 
   if (phase.kind === "step-up") {
+    const { methods } = phase;
     return (
-      <form onSubmit={stepUp} className="w-full max-w-sm rounded-xl border border-lineDark bg-cream-dim p-3">
+      <div className="w-full max-w-sm rounded-xl border border-lineDark bg-cream-dim p-3">
         <p className="flex items-center gap-1.5 text-xs font-medium text-appNavy">
           <Lock size={13} strokeWidth={1.75} />
           אימות זהות
         </p>
-        <p className="mt-1 text-xs text-appNavy/60">הקלידו את הסיסמה שלכם לאנקורה. האימות תקף ל-5 דקות.</p>
-        <div className="mt-2 flex gap-2">
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            autoFocus
-            aria-label="הסיסמה שלך לאנקורה"
-            className="min-w-0 flex-1 rounded-lg border border-lineDark bg-white px-3 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
-          />
-          <button type="submit" className="rounded-full bg-appNavy px-4 py-1.5 text-xs font-medium text-cream">
-            אימות
+        {methods.passkey && (
+          <button
+            type="button"
+            onClick={() => stepUpWithPasskey(methods)}
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-xs font-medium text-cream"
+          >
+            <Fingerprint size={14} strokeWidth={1.75} />
+            אימות עם Touch ID
           </button>
-          <button type="button" onClick={() => setPhase({ kind: "idle" })} className="px-2 text-xs text-appNavy/60">
-            ביטול
-          </button>
-        </div>
+        )}
+        {methods.password && (
+          <form onSubmit={stepUp} className="mt-2">
+            <p className="text-xs text-appNavy/60">
+              {methods.passkey ? "או הסיסמה שלך לאנקורה." : "הקלידו את הסיסמה שלכם לאנקורה. האימות תקף ל-5 דקות."}
+            </p>
+            <div className="mt-2 flex gap-2">
+              <input
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                autoFocus={!methods.passkey}
+                aria-label="הסיסמה שלך לאנקורה"
+                className="min-w-0 flex-1 rounded-lg border border-lineDark bg-white px-3 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+              />
+              <button type="submit" className="rounded-full bg-appNavy px-4 py-1.5 text-xs font-medium text-cream">
+                אימות
+              </button>
+            </div>
+          </form>
+        )}
+        {!methods.passkey && !methods.password && (
+          <p className="mt-2 text-xs text-appNavy/70">
+            צפייה בגישות דורשת passkey (Touch ID).{" "}
+            <Link href="/app/profile#passkeys" className="underline">
+              להגדרה בפרופיל
+            </Link>
+          </p>
+        )}
+        <button type="button" onClick={() => setPhase({ kind: "idle" })} className="mt-2 text-xs text-appNavy/60">
+          ביטול
+        </button>
         {phase.error && <p className="mt-2 text-xs text-error">{phase.error}</p>}
-      </form>
+      </div>
     );
   }
 
