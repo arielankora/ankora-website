@@ -1,7 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { deleteCredentialAction } from "./actions";
+import { useHideRow } from "./CredentialRowShell";
 
 // Two steps on the row itself rather than a browser confirm(): deleting
 // removes the secret for good, so it deserves a second look, and a modal
@@ -10,7 +10,7 @@ export function DeleteCredentialButton({ id, systemName }: { id: string; systemN
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const router = useRouter();
+  const hideRow = useHideRow();
 
   if (!asking) {
     return (
@@ -29,7 +29,7 @@ export function DeleteCredentialButton({ id, systemName }: { id: string; systemN
           start(async () => {
             const r = await deleteCredentialAction(id);
             if (r.error) setError(r.error);
-            else router.refresh();
+            else hideRow();
           })
         }
         className="font-medium text-error"

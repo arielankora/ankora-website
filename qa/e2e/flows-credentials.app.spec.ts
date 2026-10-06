@@ -43,13 +43,22 @@ test("add, stays hidden, reveal after identity check, edit without seeing, delet
   await expect(row).toBeVisible();
   expect(await page.content()).not.toContain(secret);
 
-  // Reveal: asks who you are first.
+  // Reveal: asks who you are first. On a fresh database it always asks.
+  // On a Playwright retry the first attempt's five-minute window may still
+  // be open for this same user, and then the secret appears directly -
+  // which is the window working, not a hole, so the retry accepts it.
   await row.getByRole("button", { name: "הצגת פרטי גישה" }).click();
-  await row.getByLabel("הסיסמה שלך לאנקורה").fill("definitely-wrong");
-  await row.getByRole("button", { name: "אימות" }).click();
-  await expect(row.getByText("הסיסמה שגויה.")).toBeVisible();
-  await row.getByLabel("הסיסמה שלך לאנקורה").fill(OWN_PASSWORD);
-  await row.getByRole("button", { name: "אימות" }).click();
+  const prompt = row.getByLabel("הסיסמה שלך לאנקורה");
+  await expect(prompt.or(row.getByText(secret))).toBeVisible();
+  if (await prompt.isVisible()) {
+    await prompt.fill("definitely-wrong");
+    await row.getByRole("button", { name: "אימות" }).click();
+    await expect(row.getByText("הסיסמה שגויה.")).toBeVisible();
+    await prompt.fill(OWN_PASSWORD);
+    await row.getByRole("button", { name: "אימות" }).click();
+  } else {
+    expect(test.info().retry, "no identity check on a first attempt").toBeGreaterThan(0);
+  }
   await expect(row.getByText(secret)).toBeVisible();
   await expect(row.getByText("הצפייה נרשמה.")).toBeVisible();
 

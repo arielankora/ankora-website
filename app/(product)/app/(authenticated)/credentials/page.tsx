@@ -8,6 +8,7 @@ import { RevealCredential } from "@/components/app/vault/RevealCredential";
 import { CredentialForm } from "./CredentialForm";
 import { ClientPicker } from "./ClientPicker";
 import { DeleteCredentialButton } from "./DeleteCredentialButton";
+import { CredentialRowShell } from "./CredentialRowShell";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -88,7 +89,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
           </p>
         ) : (
           rows.map((row) => (
-            <div key={row.id} className="rounded-2xl border border-lineDark bg-white p-5" data-credential-row={row.id}>
+            <CredentialRowShell key={row.id} id={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-[15px] font-medium text-appNavy">{row.systemName}</p>
@@ -129,7 +130,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
                   <RevealCredential credentialId={row.id} />
                 </div>
               )}
-            </div>
+            </CredentialRowShell>
           ))
         )}
       </div>
