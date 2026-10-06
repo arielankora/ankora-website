@@ -20,6 +20,12 @@ type Entry = {
   startAt: string;
   endAt: string | null;
   actualSeconds: number | null;
+  /// Hadas, 4.10.2026: a 5-minute timer for Grantor showed 0:05 and read as
+  /// "the 15-minute minimum didn't apply". It had: billableSeconds was 15:00.
+  /// This screen showed only the actual figure, so she edited the entry's
+  /// end time to reach 15, which corrupts the actual record. Showing the
+  /// billed figure next to the actual one removes the reason to edit.
+  billableSeconds: number | null;
   note: string | null;
   isEdited: boolean;
   isManual: boolean;
@@ -219,7 +225,14 @@ export function EntryRow({ entry }: { entry: Entry }) {
         {entry.isEdited && <StatusBadge label="נערך" tone="amber" />}
         {entry.isOverlapConfirmed && <StatusBadge label="חפיפה מאושרת" tone="amber" />}
         {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
-        <span className="font-jbmono text-[13.5px] text-appNavy">{formatDuration(entry.actualSeconds)}</span>
+        <span className="flex flex-col items-end leading-tight">
+          <span className="font-jbmono text-[13.5px] text-appNavy">{formatDuration(entry.actualSeconds)}</span>
+          {entry.endAt && entry.billableSeconds != null && entry.billableSeconds !== entry.actualSeconds && (
+            <span className="mt-0.5 text-[11px] text-gold-dim" data-testid="entry-billable">
+              לחיוב <span className="font-jbmono">{formatDuration(entry.billableSeconds)}</span>
+            </span>
+          )}
+        </span>
         <button
           type="button"
           onClick={() => setEditing(true)}
