@@ -10,6 +10,7 @@ import { HbClientPicker } from "./HbClientPicker";
 import { BillingPolicyForm } from "./BillingPolicyForm";
 import { OpenCycleForm } from "./OpenCycleForm";
 import { AdjustmentForm } from "./AdjustmentForm";
+import { bankFigures, formatDecimalHours } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -23,11 +24,13 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-function formatMinutes(minutes: number) {
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.abs(minutes) % 60;
-  const sign = minutes < 0 ? "-" : "";
-  return `${sign}${h}:${String(m).padStart(2, "0")}`;
+// Figures on this screen are decimal hours (lib/hours-format.ts). Each one is
+// wrapped in <bdi dir="ltr">: the minus sign of an overdrawn balance stays on
+// the left, while the block itself keeps the page's RTL alignment and sits
+// under its label. dir="ltr" on the block, as before, pushed the number to
+// the far side of its column, away from the label above it.
+function Hours({ children }: { children: string }) {
+  return <bdi dir="ltr">{children}</bdi>;
 }
 
 // Spec 12 admin screens table: "Hour Banks - current/historical cycles,
@@ -53,6 +56,9 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
   const [policy, banks, current] = clientId
     ? await Promise.all([getBillingPolicy(clientId), listHourBanksForClient(clientId), getCurrentHourBank(clientId)])
     : [null, [], null];
+  const currentFigures = current
+    ? bankFigures(current.utilization.totalMinutes, current.utilization.consumedMinutes)
+    : null;
 
   return (
     <>
@@ -94,7 +100,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                 prototype's placement (a button beside the client tabs, not a
                 permanently-visible card). */}
             <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-3">
-              {current ? (
+              {current && currentFigures ? (
                 <div className="rounded-[18px] bg-navy p-6 text-cream-warm">
                   <div className="flex items-baseline justify-between gap-2.5">
                     <span className="text-xs text-cream-warm/60">מחזור נוכחי</span>
@@ -116,30 +122,32 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                     />
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
-                    <span>
+                    <div>
                       <span className="block text-[11px] text-cream-warm/50">סה&quot;כ</span>
-                      <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
-                        {formatMinutes(current.utilization.totalMinutes)}
+                      <span className="mt-1 block font-jbmono text-[16px]">
+                        <Hours>{currentFigures.total}</Hours>
                       </span>
-                    </span>
-                    <span>
+                    </div>
+                    <div>
                       <span className="block text-[11px] text-cream-warm/50">נוצל</span>
-                      <span className="mt-1 block font-jbmono text-[16px]" dir="ltr">
-                        {formatMinutes(current.utilization.consumedMinutes)}
+                      <span className="mt-1 block font-jbmono text-[16px]">
+                        <Hours>{currentFigures.consumed}</Hours>
                       </span>
-                    </span>
-                    <span>
+                    </div>
+                    <div>
                       <span className="block text-[11px] text-cream-warm/50">נותר</span>
                       <span
                         className={`mt-1 block font-jbmono text-[16px] ${
-                          current.utilization.remainingMinutes < 0 ? "text-error" : "text-cream-warm"
+                          currentFigures.overdrawn ? "text-error" : "text-cream-warm"
                         }`}
-                        dir="ltr"
                       >
-                        {formatMinutes(current.utilization.remainingMinutes)}
+                        <Hours>{currentFigures.remaining}</Hours>
                       </span>
-                    </span>
+                    </div>
                   </div>
+                  <p className="mt-4 border-t border-cream-warm/10 pt-3 text-[11px] leading-relaxed text-cream-warm/45">
+                    בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.
+                  </p>
                 </div>
               ) : (
                 <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-appNavy/50">
@@ -195,6 +203,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   )}
                   {banks.map(({ bank, utilization }) => {
                     const status = STATUS_LABEL[bank.status] ?? STATUS_LABEL.OPEN;
+                    const figures = bankFigures(utilization.totalMinutes, utilization.consumedMinutes);
                     return (
                       <tr key={bank.id} className="border-b border-lineDark align-top last:border-0">
                         <td className="px-5 py-3 text-appNavy/80">
@@ -206,19 +215,23 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                             <p className="mt-1 text-[11px] text-appNavy/40">חושב מחדש: {formatDate(bank.recalculatedAt)}</p>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(bank.purchasedMinutes)}</td>
-                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(bank.rolloverInMinutes)}</td>
-                        <td className="px-5 py-3 text-appNavy/70">{formatMinutes(utilization.consumedMinutes)}</td>
+                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                          <Hours>{formatDecimalHours(bank.purchasedMinutes)}</Hours>
+                        </td>
+                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                          <Hours>{formatDecimalHours(bank.rolloverInMinutes)}</Hours>
+                        </td>
+                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                          <Hours>{figures.consumed}</Hours>
+                        </td>
                         {/* **קריטי ל-RTL** (handoff README): a signed number
-                            (remaining minutes, adjustment amount) needs
-                            dir="ltr" or the +/- renders on the wrong side. */}
+                            needs an LTR context or the minus renders on the
+                            wrong side. <Hours> gives it one without moving
+                            the figure away from its column header. */}
                         <td
-                          dir="ltr"
-                          className={`px-5 py-3 text-end font-jbmono ${
-                            utilization.remainingMinutes < 0 ? "text-error" : "text-appNavy/70"
-                          }`}
+                          className={`px-5 py-3 font-jbmono ${figures.overdrawn ? "text-error" : "text-appNavy/70"}`}
                         >
-                          {formatMinutes(utilization.remainingMinutes)}
+                          <Hours>{figures.remaining}</Hours>
                         </td>
                         <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-error" : "text-appNavy/70"}`}>
                           {utilization.utilizationPct}%
@@ -230,10 +243,10 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                             <ul className="space-y-1">
                               {bank.adjustments.map((a) => (
                                 <li key={a.id} className="text-xs">
-                                  <span dir="ltr" className={a.minutes < 0 ? "text-error" : "text-success"}>
+                                  <bdi dir="ltr" className={`font-jbmono ${a.minutes < 0 ? "text-error" : "text-success"}`}>
                                     {a.minutes > 0 ? "+" : ""}
-                                    {formatMinutes(a.minutes)}
-                                  </span>{" "}
+                                    {formatDecimalHours(a.minutes)}
+                                  </bdi>{" "}
                                   <span className="text-appNavy/40">- {a.reason}</span>
                                 </li>
                               ))}

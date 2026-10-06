@@ -49,7 +49,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           name="purchasedHours"
           inputMode="decimal"
           dir="ltr"
-          placeholder="111 או 98:30"
+          placeholder="111 או 98.5"
           required
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />

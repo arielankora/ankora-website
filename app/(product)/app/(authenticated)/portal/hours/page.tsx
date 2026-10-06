@@ -4,16 +4,14 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
+import { bankFigures, formatDecimalHours } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-function formatMinutes(minutes: number) {
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.abs(minutes) % 60;
-  const sign = minutes < 0 ? "-" : "";
-  return `${sign}${h}:${String(m).padStart(2, "0")}`;
-}
-
+// Decimal hours, like the internal bank screen and like the package the
+// client bought (lib/hours-format.ts). "3:04" beside "11:56" reads as two
+// decimals that do not add up; "3.07" beside "11.93" does. Every figure on
+// this screen goes through formatDecimalHours or bankFigures.
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
@@ -68,6 +66,9 @@ export default async function PortalHoursPage() {
 
   const { client, snapshot, daysUntilCycleEnd } = dashboard;
   const totalCategoryMinutes = categorySummary.rows.reduce((s, r) => s + r.minutes, 0);
+  const figures = snapshot
+    ? bankFigures(snapshot.utilization.totalMinutes, snapshot.utilization.consumedMinutes)
+    : null;
 
   return (
     <div className="space-y-4">
@@ -77,33 +78,31 @@ export default async function PortalHoursPage() {
         <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
         {snapshot ? (
           <p className="mt-1.5 text-[13.5px] text-appNavy/60">
-            מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} – {formatDate(snapshot.bank.cycleEnd)}
+            מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} עד {formatDate(snapshot.bank.cycleEnd)}
             {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
           </p>
         ) : (
           <p className="mt-1.5 text-[13.5px] text-appNavy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
         )}
 
-        {snapshot && (
+        {snapshot && figures && (
           <>
             <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
                 <span className="text-xs text-appNavy/55">סה&quot;כ בבנק</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.totalMinutes)}</p>
+                <p className="mt-2 font-jbmono text-2xl text-appNavy">{figures.total}</p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
                 <span className="text-xs text-appNavy/55">נוצל</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{formatMinutes(snapshot.utilization.consumedMinutes)}</p>
+                <p className="mt-2 font-jbmono text-2xl text-appNavy">{figures.consumed}</p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
                 <span className="text-xs text-appNavy/55">נותר</span>
-                <p
-                  dir="ltr"
-                  className={`mt-2 text-end font-jbmono text-2xl ${
-                    snapshot.utilization.remainingMinutes < 0 ? "text-error" : "text-appNavy"
-                  }`}
-                >
-                  {formatMinutes(snapshot.utilization.remainingMinutes)}
+                {/* <bdi dir="ltr"> keeps a negative balance's minus on the left
+                    while the figure stays aligned under its label, like the
+                    other three tiles. */}
+                <p className={`mt-2 font-jbmono text-2xl ${figures.overdrawn ? "text-error" : "text-appNavy"}`}>
+                  <bdi dir="ltr">{figures.remaining}</bdi>
                 </p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
@@ -112,7 +111,7 @@ export default async function PortalHoursPage() {
                   {snapshot.utilization.utilizationPct}%
                 </p>
                 <p className="mt-1 text-[11.5px] text-appNavy/50">
-                  {formatMinutes(snapshot.utilization.consumedMinutes)} שעות מתוך {formatMinutes(snapshot.utilization.totalMinutes)}
+                  {figures.consumed} שעות מתוך {figures.total}
                 </p>
               </div>
             </div>
@@ -122,6 +121,7 @@ export default async function PortalHoursPage() {
                 style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
               />
             </div>
+            <p className="mt-3 text-[11.5px] text-appNavy/45">בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.</p>
           </>
         )}
       </div>
@@ -138,7 +138,7 @@ export default async function PortalHoursPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-appNavy">{row.category}</span>
                     <span className="font-jbmono text-appNavy/60">
-                      {formatMinutes(row.minutes)} · {row.pctOfTotal}%
+                      {formatDecimalHours(row.minutes)} · {row.pctOfTotal}%
                     </span>
                   </div>
                   <span className="mt-1.5 block h-1.5 rounded-full bg-appNavy/7">
@@ -176,7 +176,7 @@ export default async function PortalHoursPage() {
                 }`}
               >
                 <span className="text-appNavy">{a.activity}</span>
-                <span className="font-jbmono text-appNavy/60">{formatMinutes(a.minutes)}</span>
+                <span className="font-jbmono text-appNavy/60">{formatDecimalHours(a.minutes)}</span>
               </div>
             ))
           )}

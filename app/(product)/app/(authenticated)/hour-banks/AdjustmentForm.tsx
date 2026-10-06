@@ -34,7 +34,7 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
           <input
             name="hours"
             inputMode="decimal"
-            placeholder="1:30"
+            placeholder="1.5"
             required
             dir="ltr"
             className="w-full rounded-lg border border-lineDark bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-appNavy outline-none focus:border-gold"
