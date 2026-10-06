@@ -35,6 +35,7 @@ export const ENTITY_TYPES = [
   "System",
   // Credentials vault. Failed identity checks record against "User".
   "ClientCredential",
+  "Passkey",
   // Both halves of a Claude grant's life: "OAuthClient" is what consent
   // records when access is given, "McpGrant" what revoking records when
   // it is taken away. Neither was filterable before - the granted rows
@@ -161,6 +162,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "credential.reveal": "צפייה בפרטי גישה",
   "credential.reveal_denied": "ניסיון צפייה בפרטי גישה שנחסם",
   "credential.stepup_failed": "אימות זהות שנכשל",
+  "passkey.create": "הוספת passkey",
+  "passkey.delete": "הסרת passkey",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

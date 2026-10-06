@@ -8,6 +8,7 @@ import {
 } from "@/lib/app-domain/credentials";
 import { VaultKeyMismatchError, VaultUnavailableError } from "@/lib/vault/keys";
 import { isSameOriginJsonPost } from "@/lib/same-origin";
+import { stepUpMethods } from "@/lib/app-auth/passkeys";
 
 // THE ONLY PATH BY WHICH A CLIENT'S USERNAME, PASSWORD OR NOTES LEAVE THE
 // SERVER (claude/credentials-vault-spec-2026-10-06.md).
@@ -51,7 +52,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     return json({ username: secret.username, password: secret.password, notes: secret.notes }, 200);
   } catch (err) {
     if (err instanceof CredentialNotFoundError) return json({ error: "not_found" }, 404);
-    if (err instanceof StepUpRequiredError) return json({ error: "step_up_required" }, 403);
+    // Tells the prompt what it may offer: a passkey if this person has
+    // one, the password only where the password is still accepted.
+    if (err instanceof StepUpRequiredError) return json({ error: "step_up_required", methods: await stepUpMethods(user) }, 403);
     if (err instanceof RevealRateLimitedError) return json({ error: "rate_limited", message: err.message }, 429);
     if (err instanceof ForbiddenError) return json({ error: "forbidden", message: err.message }, 403);
     if (err instanceof VaultKeyMismatchError || err instanceof VaultUnavailableError) {

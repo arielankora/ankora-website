@@ -174,6 +174,20 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     table: "client_credentials",
     reason: "Clients' logins, encrypted under a key that is not in the backup. Not reconstructible, and unreadable without that key.",
   },
+  // Passkeys (vault phase 1a). Public keys only; the private half never
+  // left anyone's device. Kept so a restore does not force everyone to
+  // enrol again before they can open a client's login.
+  Passkey: {
+    decision: "DUMP",
+    table: "passkeys",
+    reason: "Which devices may answer \"verify it's you\". Public keys only; without them nobody can reveal a credential until they enrol again.",
+  },
+  WebAuthnChallenge: {
+    decision: "SKIP",
+    table: "webauthn_challenges",
+    reason: "Single-use challenges that expire in five minutes.",
+    recovery: "The next prompt issues a new one.",
+  },
   StepUpGrant: {
     decision: "SKIP",
     table: "step_up_grants",
@@ -227,6 +241,8 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "client_credentials.kekRef": "Which key wrapped the data key: a 64-bit fingerprint or a KMS key name. An identifier, not a key.",
   "client_credentials.hasPassword": "A yes/no flag for the list screen.",
   "client_credentials.secretUpdatedAt": "When the secret last changed. A timestamp.",
+  "passkeys.publicKey": "The public half of a passkey. Verifies a signature; cannot make one.",
+  "passkeys.credentialId": "The authenticator's public identifier for the passkey.",
 } as const;
 
 export const SENSITIVE_COLUMN_PATTERN = /pass|secret|token|hash|key|credential/i;
