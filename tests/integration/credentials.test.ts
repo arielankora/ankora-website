@@ -78,7 +78,7 @@ describe("storage", () => {
     const { onA, clientA } = await setup();
     await expect(
       createCredential(onA, { clientId: clientA.id, systemName: "x", url: "javascript:alert(1)" }),
-    ).rejects.toThrow(/http/);
+    ).rejects.toThrow(/בהערות/);
   });
 
   it("audits creation with names and yes/no only", async () => {
