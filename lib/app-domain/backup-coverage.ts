@@ -161,6 +161,25 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   // the kind of event that makes anyone open a backup at all. They are
   // also the tables that grow without bound, which is what
   // DUMP_SIZE_WARN_BYTES below watches.
+  // Credentials vault (6.10.2026). Dumped as stored: ciphertext, IV, tag
+  // and a data key wrapped by Cloud KMS. Without a call to that KMS key
+  // none of it is readable, so the dump carries no usable secret, and
+  // without the rows a restore would silently lose every client login.
+  // Restoring keeps the ids, which matters: each ciphertext is bound to
+  // its row id and client id (lib/vault/crypto.ts). The nightly XLSX
+  // never includes this table (tests/unit/vault-guards.test.ts).
+  ClientCredential: {
+    decision: "DUMP",
+    table: "client_credentials",
+    reason: "Clients' logins, encrypted under a key that never leaves Cloud KMS. Not reconstructible, and unreadable without KMS.",
+  },
+  StepUpGrant: {
+    decision: "SKIP",
+    table: "step_up_grants",
+    reason: "Five-minute \"verified it's you\" windows. Expired long before any restore.",
+    recovery: "The person verifies again on their next reveal.",
+  },
+
   AuditEvent: { decision: "DUMP", table: "audit_events", reason: "The compliance trail. Irreplaceable, and the first thing asked for after an incident." },
   TimeEntryRevision: { decision: "DUMP", table: "time_entry_revisions", reason: "How a billable record changed, which is the defence when a client disputes one." },
   EmailDelivery: { decision: "DUMP", table: "email_deliveries", reason: "Proof that a report or an alert was actually sent." },
@@ -198,6 +217,15 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "important_dates.holidayKey": "A public holiday identifier.",
   "reminder_occurrences.idempotencyKey": "A de-duplication key. Losing it re-sends reminders; it grants nothing.",
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
+  // Credentials vault. Every one of these is either ciphertext that
+  // needs Cloud KMS to open, or a flag that says a value exists.
+  "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by Cloud KMS.",
+  "client_credentials.secretIv": "The GCM nonce. Public by design.",
+  "client_credentials.secretTag": "The GCM authentication tag. Public by design.",
+  "client_credentials.wrappedDek": "A data key wrapped by Cloud KMS. Useless without a decrypt call to that key.",
+  "client_credentials.kekRef": "The name of the KMS key version that wrapped the data key. An identifier, not a key.",
+  "client_credentials.hasPassword": "A yes/no flag for the list screen.",
+  "client_credentials.secretUpdatedAt": "When the secret last changed. A timestamp.",
 } as const;
 
 export const SENSITIVE_COLUMN_PATTERN = /pass|secret|token|hash|key|credential/i;

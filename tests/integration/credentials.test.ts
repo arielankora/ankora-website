@@ -15,6 +15,7 @@ import {
 } from "@/lib/app-domain/credentials";
 import { stepUpWithPassword, StepUpFailedError, StepUpLockedError, STEP_UP_FAIL_LIMIT } from "@/lib/app-auth/step-up";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { buildDump, prismaExecutor } from "@/lib/app-domain/backup-dump";
 
 // Lets one test make the audit write fail, to prove a reveal cannot
 // outrun its own log.
@@ -253,5 +254,23 @@ describe("audit_events is append-only", () => {
     await prisma.user.delete({ where: { id: user.id } });
     const row = await prisma.auditEvent.findFirstOrThrow({ where: { entityId: user.id } });
     expect(row.actorId).toBeNull();
+  });
+});
+
+describe("nightly dump", () => {
+  // The vault's ciphertext is the first bytea in the schema. It must go
+  // into the dump as the exact bytes, or a restore brings back rows that
+  // can never be opened again.
+  it("carries the ciphertext byte for byte, and no plain text", async () => {
+    const { id } = await setup();
+    const dump = await buildDump(prismaExecutor(prisma));
+    const table = dump.tables["client_credentials"];
+    expect(table).toBeDefined();
+    const row = table.rows.find((r) => r[table.columns.indexOf("id")] === id)!;
+    const enc = row[table.columns.indexOf("secretCiphertext")] as { __bytes_b64: string };
+    const stored = await prisma.clientCredential.findUniqueOrThrow({ where: { id } });
+    expect(Buffer.from(enc.__bytes_b64, "base64").equals(Buffer.from(stored.secretCiphertext!))).toBe(true);
+    expect(JSON.stringify(table)).not.toMatch(/dana@|S3cret/);
+    expect(dump.tables["step_up_grants"]).toBeUndefined();
   });
 });

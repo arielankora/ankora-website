@@ -31,7 +31,10 @@ describe("credentials vault guards", () => {
 
   it("touches the secret columns only inside the domain module", () => {
     const touching = SOURCE.filter((f) => /secretCiphertext|wrappedDek/.test(read(f)));
-    expect(touching).toEqual(["lib/app-domain/credentials.ts"]);
+    // backup-coverage.ts names them only to record why dumping the
+    // ciphertext is safe; the dump copies rows without reading meaning
+    // into any column.
+    expect(touching.sort()).toEqual(["lib/app-domain/backup-coverage.ts", "lib/app-domain/credentials.ts"]);
   });
 
   it("gives Claude (MCP) no route to the vault at all", () => {
