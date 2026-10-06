@@ -154,3 +154,45 @@ export async function revokeClaudeGrantsAction(formData: FormData) {
   await revokeClaudeGrantsForUser(actor, userId);
   revalidatePath(`/app/users/${userId}`);
 }
+
+/// DPA section 4: the credentials a person revealed in the last 90 days,
+/// grouped by client, with a message per client ready to copy. Behind a
+/// button rather than on page load, because producing it is audited and
+/// opening a user's page is not a reason to.
+export type ExposureReportView =
+  | {
+      ok: true;
+      userName: string;
+      since: string;
+      until: string;
+      clients: {
+        clientId: string;
+        clientName: string;
+        items: { credentialId: string; systemName: string; revealCount: number; lastRevealedAt: string; deleted: boolean }[];
+        message: string;
+      }[];
+    }
+  | { ok: false; error: string };
+
+export async function credentialExposureReportAction(userId: string): Promise<ExposureReportView> {
+  const user = await requireUser();
+  const { credentialExposureReport, exposureMessageFor } = await import("@/lib/app-domain/credential-exposure");
+  try {
+    const report = await credentialExposureReport(user, userId);
+    return {
+      ok: true,
+      userName: report.user.name,
+      since: report.since.toISOString(),
+      until: report.until.toISOString(),
+      clients: report.clients.map((g) => ({
+        clientId: g.clientId,
+        clientName: g.clientName,
+        items: g.items.map((i) => ({ ...i, lastRevealedAt: i.lastRevealedAt.toISOString() })),
+        message: exposureMessageFor(report, g),
+      })),
+    };
+  } catch (err) {
+    if (err instanceof ForbiddenError) return { ok: false, error: "אין לך הרשאה לבצע פעולה זו." };
+    return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+  }
+}
