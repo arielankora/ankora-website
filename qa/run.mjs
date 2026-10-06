@@ -22,6 +22,7 @@ import { accessibility, buildPresent } from "./checks/a11y.mjs";
 import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
+import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -144,6 +145,20 @@ async function main() {
   ]) {
     await run.check(id, { label, level: lvl, blocking: false, skipIf: async () => "not implemented yet (stage 2)" }, async () => []);
   }
+
+  // Executed coverage against a floor. The capability scan proves a test
+  // touches a capability; this proves its functions actually run. Never
+  // blocks - see checks/coverage.mjs for why both exist.
+  await run.check(
+    "coverage",
+    {
+      label: "Executed coverage (floor)",
+      level: 3,
+      blocking: false,
+      skipIf: async () => coverageProviderMissing() ?? (await needs.database()),
+    },
+    coverage,
+  );
 
   // The reserved a11y slot, filled. It needs a browser AND a server: the check reads
   // computed styles from a rendered page, which is the only place a composited ground
