@@ -1,4 +1,5 @@
 "use client";
+import { taskHref } from "../list-query";
 import Link from "next/link";
 import { useState } from "react";
 import { Plus } from "lucide-react";
@@ -43,7 +44,11 @@ export function TaskSteps({
   steps,
   parentIsClosed,
   templates,
+  listQuery = "",
 }: {
+  /// The list this task was opened from, handed on to each step so the
+  /// way back from a step still leads to that list.
+  listQuery?: string;
   taskId: string;
   clientId: string;
   steps: Step[];
@@ -70,7 +75,7 @@ export function TaskSteps({
       ) : (
         <ul className="mt-3 divide-y divide-lineDark/70">
           {steps.map((step) => (
-            <StepRow key={step.id} step={step} parentId={taskId} />
+            <StepRow key={step.id} step={step} parentId={taskId} listQuery={listQuery} />
           ))}
         </ul>
       )}
@@ -88,7 +93,7 @@ export function TaskSteps({
   );
 }
 
-function StepRow({ step, parentId }: { step: Step; parentId: string }) {
+function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; listQuery: string }) {
   const isDone = !OPEN.includes(step.status);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -117,7 +122,7 @@ function StepRow({ step, parentId }: { step: Step; parentId: string }) {
       />
       <div className="min-w-0 flex-1">
         <Link
-          href={`/app/tasks/${step.id}`}
+          href={taskHref(step.id, listQuery)}
           className={`block text-[13.5px] transition-colors hover:text-appNavy ${
             isDone ? "text-appNavy/45 line-through" : "text-appNavy"
           }`}
