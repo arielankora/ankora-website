@@ -3,6 +3,7 @@ import { carriedListQuery, tasksListHref } from "../list-query";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
+import { markTaskNotificationsRead } from "@/lib/app-domain/notifications";
 import { clientDocumentsFolder } from "@/lib/google-drive";
 import { MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -69,6 +70,18 @@ export default async function TaskDetailPage(props: {
   }
 
   const { task, time, thread, commentCount, subtasks } = detail;
+
+  // Opening the task is reading what the bell said about it.
+  await markTaskNotificationsRead(user.id, task.id);
+
+  // When nobody wrote a description, the first comment usually is one:
+  // 6.10.2026, the whole of a task Hadas handed over was in a comment,
+  // under a card that said "אין תיאור". The thread is newest first.
+  const firstComment = [...thread].reverse().find((e) => e.kind === "comment");
+  const leadComment =
+    firstComment && firstComment.kind === "comment"
+      ? { author: firstComment.actorName, body: firstComment.body }
+      : null;
 
   // Everything the "הודעה ללקוח" button needs, and nothing it does not.
   //
@@ -170,6 +183,8 @@ export default async function TaskDetailPage(props: {
         // domain refuses the write regardless, so a wrong answer here is
         // a confusing screen rather than a hole.
         canApprove={user.id === task.supervisorId || can(user.role, "time_entry.edit_others")}
+        leadComment={leadComment}
+        viewerId={user.id}
         // Only this person's own timers, and only enough of each to
         // answer three questions: is it on this task, is it on this
         // task's client (then it has to stop first), and what to call it.

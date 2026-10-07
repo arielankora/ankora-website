@@ -76,6 +76,8 @@ export function TaskDetail({
   categories,
   activeTimers,
   canApprove,
+  leadComment = null,
+  viewerId = null,
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
@@ -84,6 +86,11 @@ export function TaskDetail({
   /// Whether this person may sign this task off. Decided on the server,
   /// where the rule lives.
   canApprove: boolean;
+  /// The earliest comment, shown in place of an empty description.
+  leadComment?: { author: string | null; body: string } | null;
+  /// Who is looking. Only used to word the urgent toast: nobody is
+  /// messaged about their own task.
+  viewerId?: string | null;
 }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
@@ -239,9 +246,16 @@ export function TaskDetail({
               const next = v as TaskPriority;
               const previous = priority;
               setPriority(next);
+              // Raising to urgent messages the assignee now
+              // (lib/app-domain/urgent-tasks.ts). Say so, so nobody has
+              // to wonder whether they still need to call.
+              const messaged =
+                next === "URGENT" && previous !== "URGENT" && task.assignedToId && task.assignedToId !== viewerId
+                  ? `${task.assignedToName ?? "האחראי"} קיבל/ה הודעה עם קישור למשימה.`
+                  : title;
               const ok = await write(
                 { priority: next },
-                { title: `העדיפות: ${PRIORITY_LABELS[next]}`, description: title }
+                { title: `העדיפות: ${PRIORITY_LABELS[next]}`, description: messaged }
               );
               if (!ok) setPriority(previous);
             }}
@@ -369,6 +383,19 @@ export function TaskDetail({
             // before changing either side of this.
             dangerouslySetInnerHTML={{ __html: renderMarkdownLite(description) }}
           />
+        ) : leadComment ? (
+          // No description, but somebody wrote on the task. Show that
+          // rather than "אין תיאור": it is usually the whole brief.
+          <div className="mt-3">
+            <p className="text-xs text-appNavy/50">
+              {leadComment.author ? `מהתגובה של ${leadComment.author}` : "מהתגובה הראשונה"}
+            </p>
+            <div
+              className="mt-1.5 space-y-2 border-s-2 border-gold/50 ps-3 text-[14px] leading-relaxed text-appNavy/85 [&_p]:m-0"
+              // Same renderer, same escaping, as the description above.
+              dangerouslySetInnerHTML={{ __html: renderMarkdownLite(leadComment.body) }}
+            />
+          </div>
         ) : (
           <p className="mt-3 text-sm text-appNavy/45">אין תיאור. כל מה שנמצא היום בוואטסאפ שייך לכאן.</p>
         )}
