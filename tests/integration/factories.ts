@@ -62,6 +62,7 @@ export async function createTestTimeEntry(overrides: {
   endAt?: Date | null;
   source?: "MANUAL" | "TIMER";
   isManual?: boolean;
+  note?: string | null;
 }) {
   // The hour that just ended, not the hour about to start. The previous
   // default put endAt an hour into the FUTURE: this factory writes
@@ -83,6 +84,7 @@ export async function createTestTimeEntry(overrides: {
       billableSeconds: endAt ? Math.round((endAt.getTime() - startAt.getTime()) / 1000) : null,
       source: overrides.source ?? "MANUAL",
       isManual: overrides.isManual ?? true,
+      note: overrides.note ?? null,
     },
   });
 }

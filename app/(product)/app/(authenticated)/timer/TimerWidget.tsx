@@ -492,6 +492,13 @@ function RunningTimerCard({
   const category = categories.find((c) => c.id === timer.categoryId);
   const isLongRunning = elapsed > LONG_TIMER_WARNING_SECONDS;
 
+  // The task the stop will attach, worked out the same way handleStop
+  // does, so the field can say up front whether a note is required.
+  const clientPromisesForStop = openPromises.filter((p) => p.clientId === timer.clientId);
+  const taskAtStop = timer.taskId || (clientPromisesForStop.length === 1 ? clientPromisesForStop[0].id : "");
+  const noteRequired = !taskAtStop;
+  const noteInputRef = useRef<HTMLInputElement>(null);
+
   async function handleStop() {
     const durationText = formatElapsed(elapsed);
     if (noteSaveTimer.current) clearTimeout(noteSaveTimer.current);
@@ -500,8 +507,17 @@ function RunningTimerCard({
     // start, or - when the timer was started in one click and nothing
     // was chosen - the client's single open promise, if they have
     // exactly one. Guessing between two would be worse than asking.
-    const clientPromises = openPromises.filter((p) => p.clientId === timer.clientId);
-    const attached = timer.taskId || (clientPromises.length === 1 ? clientPromises[0].id : "");
+    const attached = taskAtStop;
+
+    // 7.10.2026: time on no task needs a few words, or the client's
+    // activity summary has nothing to say about it. The server refuses
+    // too (NoteRequiredError); asking here saves the round trip and
+    // keeps the timer running while the note is written.
+    if (!attached && !note.trim()) {
+      setError("כתבו הערה קצרה לפני העצירה: מה נעשה עבור הלקוח.");
+      noteInputRef.current?.focus();
+      return;
+    }
 
     setPending(true);
     setError(null);
@@ -609,8 +625,11 @@ function RunningTimerCard({
         </p>
       )}
       <label className={`block ${compact ? "mt-4" : "mt-5"}`}>
-        <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">הערה, נשמרת תוך כדי עבודה</span>
+        <span className="mb-1.5 block text-[11.5px] text-cream-warm/60">
+          {noteRequired ? "הערה, חובה לפני העצירה. נשמרת תוך כדי עבודה" : "הערה, נשמרת תוך כדי עבודה"}
+        </span>
         <input
+          ref={noteInputRef}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="על מה עובדים עכשיו?"

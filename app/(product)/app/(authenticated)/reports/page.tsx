@@ -136,6 +136,10 @@ export default async function AdminReportsPage(
         durationLabel: formatDuration(e.actualSeconds),
         sourceLabel: formatSource(e.source),
         note: e.note,
+        // What the client would call it, as the portal already does
+        // (client-portal.ts): clientTitle when set, the title otherwise.
+        taskTitle: e.task ? e.task.clientTitle?.trim() || e.task.title : null,
+        taskInternalTitle: e.task?.title ?? null,
         isEdited: e.isEdited,
       }));
 

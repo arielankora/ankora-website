@@ -424,7 +424,12 @@ export function registerAnkoraTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Client of the timer to stop, as the user said it. Required only when more than one timer is running."),
-        note: z.string().optional().describe("Final note for the entry. Omit to keep the existing one."),
+        note: z
+          .string()
+          .optional()
+          .describe(
+            "Final note for the entry. Omit to keep the existing one. Required when the timer is not on a task and carries no note yet: Ankora refuses to stop it without one."
+          ),
       }),
       annotations: WRITES,
     },
@@ -497,7 +502,10 @@ export function registerAnkoraTools(server: McpServer): void {
         date: DATE.describe("The day the work happened, YYYY-MM-DD."),
         start: CLOCK.describe("Start time, 24-hour HH:MM."),
         end: CLOCK.describe("End time, 24-hour HH:MM. Must be after start."),
-        note: z.string().optional().describe("What the work was."),
+        note: z
+          .string()
+          .optional()
+          .describe("What the work was, in a few words. Required unless `task` is given."),
         task: z
           .string()
           .optional()

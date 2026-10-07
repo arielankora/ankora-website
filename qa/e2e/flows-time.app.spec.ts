@@ -75,6 +75,25 @@ function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: strin
 test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 test.describe("timer/actions - start and stop", () => {
+  // 7.10.2026, PR #163. Stopping a timer on no task now needs a note, and
+  // this file had no cleanup of its own: it trusted the specs before it to
+  // leave nothing running. When the first test failed once, the retry
+  // found that test's own timer still going, the start fields folded
+  // away under it, and every test after it timed out on a field that was
+  // not on the screen. Same loop as flows-task-screen and flows-adoption.
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/app/timer", { waitUntil: "domcontentloaded" });
+    const stops = page.getByRole("button", { name: /עצירה ושמירה/ });
+    const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
+    for (let i = 0; i < 3 && (await stops.first().isVisible().catch(() => false)); i++) {
+      const before = await stops.count();
+      if (!(await notes.first().inputValue())) await notes.first().fill("e2e: ניקוי טיימר");
+      await stops.first().click();
+      await expect(stops).toHaveCount(before - 1, { timeout: 20_000 });
+    }
+    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
+  });
+
   test("starting a timer, then stopping it, leaves a finished entry", async ({ page }) => {
     const note = tag("e2e-timer");
 
@@ -133,9 +152,13 @@ test.describe("timer/actions - start and stop", () => {
     await expect(stops, "the parallel timer did not start").toHaveCount(2, { timeout: 15_000 });
     await expect(page.getByText(/רצים 2 טיימרים/)).toBeVisible();
 
+    // Both were started on no task, so each needs a note to stop.
+    const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
+    await notes.first().fill(tag("e2e-parallel-a"));
     await stops.first().click();
     await expect(stops, "stopping one should leave the other running").toHaveCount(1, { timeout: 15_000 });
 
+    await notes.first().fill(tag("e2e-parallel-b"));
     await stops.first().click();
     await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 15_000 });
   });

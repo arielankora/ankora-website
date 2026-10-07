@@ -150,10 +150,11 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">הערה</span>
+          <span className="mb-1.5 block text-[11px] text-appNavy/55">הערה *</span>
           <input
             name="note"
-            placeholder="אופציונלי"
+            required
+            placeholder="מה נעשה עבור הלקוח?"
             className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
           />
         </label>

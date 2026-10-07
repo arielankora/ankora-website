@@ -172,9 +172,11 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-appNavy/60">הערה</label>
+        <label className="block text-xs font-medium text-appNavy/60">הערה *</label>
         <input
           name="note"
+          required
+          placeholder="מה נעשה עבור הלקוח?"
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>

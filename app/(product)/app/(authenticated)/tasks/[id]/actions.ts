@@ -10,6 +10,7 @@ import {
   SameClientTimerError,
   TimerLimitError,
   ParallelTimerConfirmationRequiredError,
+  NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -171,7 +172,21 @@ export async function startTimerForTaskAction(input: {
       // Stopped with no note and no task of its own: whatever that timer
       // was against, this call is not the place to guess it. The stop
       // keeps every field the entry already had.
-      await stopTimer(user, target.id);
+      try {
+        await stopTimer(user, target.id);
+      } catch (err) {
+        // The timer being stopped is the other one, so the domain's own
+        // wording ("a report with no task needs a note") would read as if
+        // this task were the problem. Nothing has started yet.
+        if (err instanceof NoteRequiredError) {
+          return {
+            ok: false as const,
+            error:
+              "לטיימר שרץ עכשיו אין משימה ואין הערה, ולכן אי אפשר לעצור אותו כך. כתבו בו הערה קצרה במסך הטיימר, ואז עברו למשימה.",
+          };
+        }
+        throw err;
+      }
     }
 
     const entry = await startTimer(user, {
