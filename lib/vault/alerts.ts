@@ -23,11 +23,14 @@ export async function sendVaultAlert(subject: string, lines: string[]): Promise<
     .filter(Boolean);
   const text = [...lines, "", "הפרטים המלאים ביומן הפעולות."].join("\n");
   try {
-    const result = await sendEmail({ to, subject: `כספת הגישות: ${subject}`, text });
+    const fullSubject = `כספת הגישות: ${subject}`;
+    const result = await sendEmail({ to, subject: fullSubject, text });
     await prisma.emailDelivery.create({
       data: {
         template: "vault_alert",
         recipients: to,
+        subject: fullSubject,
+        body: text,
         status: result.ok ? "SENT" : "FAILED",
         providerMessageId: result.providerMessageId ?? null,
         error: result.error ?? null,

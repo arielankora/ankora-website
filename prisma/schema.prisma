@@ -1304,6 +1304,12 @@ model EmailDelivery {
   reportRunId      String?
   template         String
   recipients       String[]
+  /// 7.10.2026: the exact subject and text that were sent, so a retry
+  /// resends the real message instead of a stub. Null on rows written
+  /// before that date, and on the nightly backup (its attachments are not
+  /// stored, so it is never retried; the next night produces a new one).
+  subject          String?
+  body             String?
   providerMessageId String?
   status           EmailDeliveryStatus
   attempts         Int                 @default(1)

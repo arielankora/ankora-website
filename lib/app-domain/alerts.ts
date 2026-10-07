@@ -4,7 +4,8 @@ import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
-import type { User, AlertRule, AlertThresholdType, HourBank } from "@prisma/client";
+import { rebuildReportRunEmail } from "@/lib/app-domain/report-schedules";
+import type { User, AlertRule, AlertThresholdType, HourBank, EmailDelivery } from "@prisma/client";
 
 // Phase 4 domain service: spec sections 9 ("התראות") and 9.1/9.2 (threshold
 // types, delivery). See docs/adr/0001 section 11 for every decision this
@@ -275,6 +276,8 @@ async function deliverAlertEmail(
       alertEventId,
       template,
       recipients,
+      subject,
+      body: text,
       status: result.ok ? "SENT" : "FAILED",
       providerMessageId: result.ok ? result.providerMessageId ?? null : null,
       error: result.ok ? null : result.error ?? "Unknown error",
@@ -368,38 +371,78 @@ async function evaluateSingleRule(
 
 const MAX_EMAIL_ATTEMPTS = 5;
 
+/// Never retried. The nightly backup's value is its attachments, which are
+/// not stored; resending its text alone would claim a backup arrived. The
+/// next night's run produces a fresh one, and a missed night is visible in
+/// the delivery log and the backup run log.
+const NOT_RETRYABLE_TEMPLATES = ["backup.nightly_export"];
+
+/// What a retry sends: the message that failed, never a stand-in.
+///
+/// 7.10.2026. Both retry paths used to mail a fixed
+/// "[Ankora] התראת בנק שעות (ניסיון חוזר)" line naming the internal
+/// template, whatever had failed. A client whose weekly report failed got
+/// that instead of the report, and a failed vault alert came back as an
+/// "hour bank alert". Now:
+///  - a row that stored its subject and body (everything written since this
+///    date) is resent exactly;
+///  - an older report row is rebuilt from its ReportRun snapshot;
+///  - anything else has nothing truthful to resend, and returns null.
+async function retryContent(
+  delivery: Pick<EmailDelivery, "template" | "subject" | "body" | "reportRunId">
+): Promise<{ subject: string; text: string } | null> {
+  if (NOT_RETRYABLE_TEMPLATES.includes(delivery.template)) return null;
+  if (delivery.subject && delivery.body) return { subject: delivery.subject, text: delivery.body };
+  if (delivery.reportRunId) return rebuildReportRunEmail(delivery.reportRunId);
+  return null;
+}
+
+/// Sends one delivery again and records the attempt. A report that goes
+/// through on retry also advances its schedule's lastSentAt, exactly as a
+/// first-time success would have.
+async function resendDelivery(delivery: EmailDelivery, content: { subject: string; text: string }) {
+  const result = await sendEmail({ to: delivery.recipients, subject: content.subject, text: content.text });
+
+  const updated = await prisma.emailDelivery.update({
+    where: { id: delivery.id },
+    data: {
+      status: result.ok ? "SENT" : "FAILED",
+      providerMessageId: result.ok ? result.providerMessageId ?? delivery.providerMessageId : delivery.providerMessageId,
+      error: result.ok ? null : result.error ?? delivery.error,
+      attempts: { increment: 1 },
+      lastAttemptAt: new Date(),
+    },
+  });
+
+  if (result.ok && delivery.reportRunId) {
+    const run = await prisma.reportRun.findUnique({ where: { id: delivery.reportRunId }, select: { scheduleId: true } });
+    if (run) await prisma.reportSchedule.update({ where: { id: run.scheduleId }, data: { lastSentAt: new Date() } });
+  }
+
+  return { ok: result.ok, updated };
+}
+
 /// Retries every FAILED EmailDelivery under the attempt cap. Coarser than
 /// spec 9.2's "exponential backoff" ideal - see ADR 11.3 - but this is the
 /// only retry mechanism available without a job queue or sub-daily
-/// scheduler in this stack.
+/// scheduler in this stack. Rows with nothing truthful to resend (see
+/// retryContent) are left as they are and not counted.
 export async function retryFailedEmailDeliveries(): Promise<{ retried: number; nowSent: number }> {
   const failed = await prisma.emailDelivery.findMany({
-    where: { status: "FAILED", attempts: { lt: MAX_EMAIL_ATTEMPTS } },
+    where: { status: "FAILED", attempts: { lt: MAX_EMAIL_ATTEMPTS }, template: { notIn: NOT_RETRYABLE_TEMPLATES } },
   });
 
+  let retried = 0;
   let nowSent = 0;
   for (const delivery of failed) {
-    const result = await sendEmail({
-      to: delivery.recipients,
-      subject: "[Ankora] התראת בנק שעות (ניסיון חוזר)",
-      text: `ניסיון שליחה חוזר עבור עדכון התראה קודם שנכשל (${delivery.template}).`,
-    });
-
-    await prisma.emailDelivery.update({
-      where: { id: delivery.id },
-      data: {
-        status: result.ok ? "SENT" : "FAILED",
-        providerMessageId: result.ok ? result.providerMessageId ?? delivery.providerMessageId : delivery.providerMessageId,
-        error: result.ok ? null : result.error ?? delivery.error,
-        attempts: { increment: 1 },
-        lastAttemptAt: new Date(),
-      },
-    });
-
-    if (result.ok) nowSent += 1;
+    const content = await retryContent(delivery);
+    if (!content) continue;
+    retried += 1;
+    const { ok } = await resendDelivery(delivery, content);
+    if (ok) nowSent += 1;
   }
 
-  return { retried: failed.length, nowSent };
+  return { retried, nowSent };
 }
 
 /// Manually retries one specific FAILED EmailDelivery row - powers the
@@ -415,30 +458,30 @@ export async function retryEmailDelivery(actor: User, deliveryId: string) {
     throw new Error("רק שליחות שנכשלו ניתנות לניסיון חוזר.");
   }
 
-  const result = await sendEmail({
-    to: delivery.recipients,
-    subject: "[Ankora] התראת בנק שעות (ניסיון חוזר)",
-    text: `ניסיון שליחה חוזר עבור עדכון התראה קודם שנכשל (${delivery.template}).`,
-  });
+  const content = await retryContent(delivery);
+  if (!content) {
+    throw new Error("אין עותק של ההודעה המקורית, ולכן אי אפשר לשלוח אותה שוב.");
+  }
 
-  const updated = await prisma.emailDelivery.update({
-    where: { id: deliveryId },
-    data: {
-      status: result.ok ? "SENT" : "FAILED",
-      providerMessageId: result.ok ? result.providerMessageId ?? delivery.providerMessageId : delivery.providerMessageId,
-      error: result.ok ? null : result.error ?? delivery.error,
-      attempts: { increment: 1 },
-      lastAttemptAt: new Date(),
-    },
-  });
+  const { updated } = await resendDelivery(delivery, content);
 
+  // The message body stays out of the audit trail: the delivery row
+  // already holds it, and the audit is about who retried what and how it
+  // went.
+  const summary = (d: EmailDelivery) => ({
+    template: d.template,
+    recipients: d.recipients,
+    status: d.status,
+    attempts: d.attempts,
+    error: d.error,
+  });
   await recordAudit({
     actorId: actor.id,
     action: "email_delivery.retry",
     entityType: "EmailDelivery",
     entityId: deliveryId,
-    before: delivery,
-    after: updated,
+    before: summary(delivery),
+    after: summary(updated),
   });
 
   return updated;

@@ -276,16 +276,13 @@ describe("sendReportSchedule() - failures are recorded, and an empty recipient l
     expect((await prisma.reportSchedule.findUniqueOrThrow({ where: { id: scheduleA.id } })).lastSentAt).toBeNull();
   });
 
-  // PRODUCT BUG (found 2026-10-07): a scheduled report whose send failed is
-  // never actually re-delivered. sendReportSchedule creates the ReportRun
-  // even on failure, so the period is "already sent" for the cron forever;
-  // the only thing that picks the FAILED delivery up is the alerts cron's
-  // retryFailedEmailDeliveries() (lib/app-domain/alerts.ts), which mails the
-  // client's recipients a fixed "[Ankora] התראת בנק שעות (ניסיון חוזר)"
-  // stub with no report in it. User impact: after a provider outage the
-  // client never gets that week's report, and instead receives a confusing
-  // "hour bank alert" email.
-  it.fails("a failed scheduled report is eventually delivered with its real content", async () => {
+  // Found 7.10.2026: a scheduled report whose send failed was never really
+  // re-delivered. The ReportRun is created even on failure (so the cron
+  // treats the period as done), and the only retry, the alerts cron's
+  // retryFailedEmailDeliveries(), mailed a fixed "hour bank alert" stub to
+  // the client instead of the report. The delivery now stores what it sent,
+  // and the retry resends exactly that.
+  it("a failed scheduled report is eventually delivered with its real content", async () => {
     const { scheduleA } = await twoClientsWithHours();
     vi.mocked(sendEmail).mockResolvedValueOnce({ ok: false, error: "Resend 500" });
     await sendReportSchedule(scheduleA, computeReportingPeriod("WEEKLY", CRON_NOW), true);
@@ -298,6 +295,55 @@ describe("sendReportSchedule() - failures are recorded, and an empty recipient l
 
     const delivered = sentEmails().filter((e) => e.to.includes("ceo@alpha.example"));
     expect(delivered.some((e) => e.text.includes("alpha-legal-work"))).toBe(true);
+  });
+
+  it("the retry resends the identical subject and body, once, and then counts as the official send", async () => {
+    const { scheduleA } = await twoClientsWithHours();
+    vi.mocked(sendEmail).mockResolvedValueOnce({ ok: false, error: "Resend 500" });
+    await sendReportSchedule(scheduleA, computeReportingPeriod("WEEKLY", CRON_NOW), true);
+    const [original] = sentEmails();
+
+    vi.mocked(sendEmail).mockClear();
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true, providerMessageId: "retry" });
+    expect(await retryFailedEmailDeliveries()).toEqual({ retried: 1, nowSent: 1 });
+
+    const [resent] = sentEmails();
+    expect(resent).toEqual({ to: ["ceo@alpha.example"], subject: original.subject, text: original.text });
+    expect(resent.subject).not.toContain("התראת בנק שעות");
+    // A report that went through on retry advances lastSentAt like a
+    // first-time success, and is not sent a second time.
+    expect((await prisma.reportSchedule.findUniqueOrThrow({ where: { id: scheduleA.id } })).lastSentAt).not.toBeNull();
+    vi.mocked(sendEmail).mockClear();
+    await retryFailedEmailDeliveries();
+    await reconcileScheduledReports(new Date(CRON_NOW.getTime() + 24 * 3600_000));
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds a report failed before deliveries stored their text from the run's own snapshot", async () => {
+    const { scheduleA } = await twoClientsWithHours();
+    vi.mocked(sendEmail).mockResolvedValueOnce({ ok: false, error: "Resend 500" });
+    await sendReportSchedule(scheduleA, computeReportingPeriod("WEEKLY", CRON_NOW), true);
+    const [original] = sentEmails();
+    // A row as it was written before 7.10.2026: no subject, no body.
+    await prisma.emailDelivery.updateMany({ data: { subject: null, body: null } });
+    // Hours logged after the failure must not leak into the old report:
+    // the rebuild uses the snapshot the run stored, not today's data.
+    const late = await prisma.category.findFirstOrThrow({ where: { name: "alpha-legal-work" } });
+    const { user: emp } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await createTestTimeEntry({
+      userId: emp.id,
+      clientId: scheduleA.clientId,
+      categoryId: late.id,
+      startAt: new Date("2026-09-29T08:00:00Z"),
+      endAt: new Date("2026-09-29T18:00:00Z"),
+    });
+
+    vi.mocked(sendEmail).mockClear();
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true, providerMessageId: "retry" });
+    expect(await retryFailedEmailDeliveries()).toEqual({ retried: 1, nowSent: 1 });
+    const [resent] = sentEmails();
+    expect(resent.subject).toBe(original.subject);
+    expect(resent.text).toBe(original.text);
   });
 
   it("sends nothing and records nothing when the schedule has no recipients", async () => {
