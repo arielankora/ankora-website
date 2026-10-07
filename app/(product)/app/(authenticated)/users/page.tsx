@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listUsers } from "@/lib/app-domain/users";
@@ -119,9 +118,17 @@ export default async function UsersPage() {
                 </span>
               </span>
               <span className="w-[60px] text-end">
-                <Link href={`/app/users/${u.id}`} className="text-xs text-gold-dim hover:text-gold">
+                {/* A plain link, not next/link (7.10.2026). In #158's level-2
+                    run the router aborted the RSC fetch for /app/users/<id>
+                    at 12-30ms after the click and the page never moved, the
+                    same shape as the task rows fixed in #131. The user
+                    screen is dynamic and renders on the server either way,
+                    so a full load costs nothing that matters. Why the
+                    router aborts is still not understood; see
+                    claude/search-navigation-lost-2026-09-25. */}
+                <a href={`/app/users/${u.id}`} className="text-xs text-gold-dim hover:text-gold">
                   עריכה
-                </Link>
+                </a>
               </span>
             </div>
           ))}
