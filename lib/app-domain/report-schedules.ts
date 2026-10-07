@@ -431,6 +431,8 @@ export async function sendReportSchedule(
       reportRunId,
       template: persist ? `report.${schedule.reportType.toLowerCase()}` : `report.${schedule.reportType.toLowerCase()}.test`,
       recipients: schedule.recipients,
+      subject,
+      body: text,
       status: result.ok ? "SENT" : "FAILED",
       providerMessageId: result.providerMessageId,
       error: result.error,
@@ -457,6 +459,38 @@ export async function sendReportSchedule(
   }
 
   return { sent: result.ok, reason: result.error };
+}
+
+/// The email a ReportRun was sent as, rebuilt from what the run stored.
+///
+/// 7.10.2026. For a FAILED report delivery written before EmailDelivery
+/// carried its own subject and body: the run keeps the snapshot it was
+/// built from, so the retry can send the same report rather than a stub.
+/// The approved summary is matched on the run's own period, exactly as
+/// sendReportSchedule matches it. Null when the schedule or client is gone.
+export async function rebuildReportRunEmail(reportRunId: string): Promise<{ subject: string; text: string } | null> {
+  const run = await prisma.reportRun.findUnique({ where: { id: reportRunId }, include: { schedule: true } });
+  if (!run) return null;
+  const client = await getClient(run.schedule.clientId);
+  if (!client) return null;
+  const approved = await prisma.portalSummary.findFirst({
+    where: {
+      clientId: run.schedule.clientId,
+      status: "APPROVED",
+      approvedById: { not: null },
+      periodStart: { lte: run.periodStart },
+      periodEnd: { gte: run.periodStart },
+    },
+    select: { draft: true },
+  });
+  return renderEmailBody(
+    run.schedule.reportType,
+    client.name,
+    run.periodStart,
+    run.periodEnd,
+    run.snapshotJson,
+    approved?.draft ?? null
+  );
 }
 
 /// Called by the daily cron (app/api/cron/scheduled-reports/route.ts) -

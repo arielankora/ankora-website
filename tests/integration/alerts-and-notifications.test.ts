@@ -11,8 +11,10 @@ import {
   resolveAlertEvent,
   unresolveAlertEvent,
   retryFailedEmailDeliveries,
+  retryEmailDelivery,
   reconcileAllClientAlerts,
 } from "@/lib/app-domain/alerts";
+import { sendVaultAlert } from "@/lib/vault/alerts";
 import {
   listNotificationsForUser,
   unreadNotificationCount,
@@ -263,6 +265,82 @@ describe("retryFailedEmailDeliveries() - failed alert emails are retried to the 
     expect(delivery.attempts).toBe(5);
     expect(delivery.status).toBe("FAILED");
     expect(delivery.error).toBe("bounced");
+  });
+});
+
+// 7.10.2026: both retry paths used to send a fixed
+// "[Ankora] התראת בנק שעות (ניסיון חוזר)" stub, naming the internal
+// template, whatever had failed: a client's hour-bank update, a vault
+// alert, a weekly report. A retry now resends the message that failed, and
+// a row with nothing truthful to resend is left alone rather than stubbed.
+describe("email retries resend the message that failed, never a stand-in", () => {
+  it("resends a client-facing alert with its original subject and text", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    vi.mocked(sendEmail).mockResolvedValue({ ok: false, error: "provider down" });
+    await clientWithBreachableRule(superAdmin, { name: "Hot", consumed: 90, ankora: "ops@ankora.test", client: "c@hot.example" });
+    await reconcileAllClientAlerts();
+    const originals = vi.mocked(sendEmail).mock.calls.map(([i]) => i);
+
+    vi.mocked(sendEmail).mockReset();
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true, providerMessageId: "retry-ok" });
+    await retryFailedEmailDeliveries();
+    const resent = vi.mocked(sendEmail).mock.calls.map(([i]) => i);
+
+    const byRecipient = (list: typeof originals) => Object.fromEntries(list.map((i) => [i.to.join(","), i]));
+    expect(byRecipient(resent)).toEqual(byRecipient(originals));
+    const toClient = byRecipient(resent)["c@hot.example"];
+    expect(toClient.subject).toBe("עדכון ניצול שעות - Hot");
+    expect(toClient.text).not.toContain("client_facing");
+  });
+
+  it("resends a failed vault alert as the vault alert it was", async () => {
+    vi.mocked(sendEmail).mockResolvedValue({ ok: false, error: "provider down" });
+    await sendVaultAlert("נעילת אימות", ["משתמש: test", "ניסיונות: 5"]);
+    const [original] = vi.mocked(sendEmail).mock.calls.map(([i]) => i);
+
+    vi.mocked(sendEmail).mockReset();
+    vi.mocked(sendEmail).mockResolvedValue({ ok: true, providerMessageId: "retry-ok" });
+    expect(await retryFailedEmailDeliveries()).toEqual({ retried: 1, nowSent: 1 });
+    const [resent] = vi.mocked(sendEmail).mock.calls.map(([i]) => i);
+    expect(resent).toEqual(original);
+    expect(resent.subject).toBe("כספת הגישות: נעילת אימות");
+  });
+
+  it("never retries the nightly backup, whose attachments were not kept", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const backup = await prisma.emailDelivery.create({
+      data: { template: "backup.nightly_export", recipients: ["ops@ankora.test"], subject: "גיבוי", body: "counts", status: "FAILED", error: "x" },
+    });
+
+    expect(await retryFailedEmailDeliveries()).toEqual({ retried: 0, nowSent: 0 });
+    await expect(retryEmailDelivery(superAdmin, backup.id)).rejects.toThrow("אי אפשר לשלוח אותה שוב");
+    expect(sendEmail).not.toHaveBeenCalled();
+    expect((await prisma.emailDelivery.findUniqueOrThrow({ where: { id: backup.id } })).attempts).toBe(1);
+  });
+
+  it("leaves an old row with no stored text alone instead of mailing a stub", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const legacy = await prisma.emailDelivery.create({
+      data: { template: "client_facing", recipients: ["c@hot.example"], status: "FAILED", error: "x" },
+    });
+
+    expect(await retryFailedEmailDeliveries()).toEqual({ retried: 0, nowSent: 0 });
+    await expect(retryEmailDelivery(superAdmin, legacy.id)).rejects.toThrow("אין עותק של ההודעה המקורית");
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("the manual retry audits who retried and the outcome, without copying the message into the audit", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const row = await prisma.emailDelivery.create({
+      data: { template: "client_facing", recipients: ["c@hot.example"], subject: "s", body: "private body text", status: "FAILED", error: "x" },
+    });
+
+    const updated = await retryEmailDelivery(superAdmin, row.id);
+    expect(updated.status).toBe("SENT");
+    expect(vi.mocked(sendEmail).mock.calls[0][0]).toEqual({ to: ["c@hot.example"], subject: "s", text: "private body text" });
+    const audit = await prisma.auditEvent.findFirstOrThrow({ where: { action: "email_delivery.retry", entityId: row.id } });
+    expect(audit.actorId).toBe(superAdmin.id);
+    expect(JSON.stringify(audit)).not.toContain("private body text");
   });
 });
 
