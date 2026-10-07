@@ -5,6 +5,7 @@ import { listClients } from "@/lib/app-domain/clients";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateCategoryForm } from "./CreateCategoryForm";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -16,9 +17,7 @@ export const metadata = { robots: { index: false, follow: false } };
 const DOT_COLORS = ["#B08D57", "#C7AC7E", "rgba(27,42,61,.42)", "rgba(176,141,87,.55)", "rgba(27,42,61,.2)"];
 
 function formatHM(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(Math.round(seconds / 60));
 }
 
 // App redesign (handoff README, screen 6 "קטגוריות"): "טבלה: נקודת צבע +

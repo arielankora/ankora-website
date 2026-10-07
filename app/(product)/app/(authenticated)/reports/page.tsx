@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
+import { runReport, REPORT_DEFINITIONS, type ReportColumn, type ReportType } from "@/lib/app-domain/reports";
+import { formatReportCell } from "@/lib/report-cell";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
 import { listClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -35,14 +36,19 @@ function isReportType(value: string | undefined): value is ReportType {
   return REPORT_DEFINITIONS.some((r) => r.id === value);
 }
 
-function formatCell(value: string | number, type?: string): string {
-  if (type === "percent") return `${value}%`;
-  if (type === "minutes" && typeof value === "number") {
-    const h = Math.floor(value / 60);
-    const m = value % 60;
-    return `${h}:${String(m).padStart(2, "0")}`;
-  }
-  return String(value);
+// One cell of the numeric report. Figures sit in a left-to-right isolate
+// so a sign or a colon can never be reordered by the surrounding RTL text,
+// and an overdrawn bank reads "חריגה 0.35" in the same red the Hour Banks
+// screen uses. See lib/report-cell.ts.
+function ReportCellView({ row, col }: { row: Record<string, string | number>; col: ReportColumn }) {
+  const cell = formatReportCell(row, col);
+  if (!cell.figure) return <>{cell.text}</>;
+  return (
+    <span className={`tabular-nums ${cell.tone === "overdrawn" ? "font-medium text-error" : ""}`}>
+      {cell.prefix && `${cell.prefix} `}
+      <bdi dir="ltr">{cell.figure}</bdi>
+    </span>
+  );
 }
 
 function formatEntryDateTime(d: Date): string {
@@ -255,7 +261,7 @@ export default async function AdminReportsPage(
                 <tr key={i} className="border-b border-lineDark last:border-0">
                   {result.columns.map((col) => (
                     <td key={col.key} className="px-5 py-3 text-appNavy">
-                      {formatCell(row[col.key], col.type)}
+                      <ReportCellView row={row} col={col} />
                     </td>
                   ))}
                 </tr>

@@ -6,11 +6,11 @@
 // time-entry-format.test.ts and the Prisma-test limitation documented in
 // tests/unit/reports.test.ts).
 
+import { formatClockMinutes } from "@/lib/hours-format";
+
 export function formatDuration(seconds: number | null): string {
   if (seconds === null) return "פעיל";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(Math.round(seconds / 60));
 }
 
 export const SOURCE_LABEL: Record<string, string> = { MANUAL: "ידני", TIMER: "טיימר" };

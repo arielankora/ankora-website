@@ -7,15 +7,10 @@ import { whatsappHref } from "@/lib/whatsapp";
 import { PortalTabs } from "./PortalTabs";
 import { PromiseList } from "./PromiseList";
 import { portalHeadline } from "@/lib/app-domain/portal-labels";
+import { bankFigures } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-function formatMinutes(minutes: number) {
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.abs(minutes) % 60;
-  const sign = minutes < 0 ? "-" : "";
-  return `${sign}${h}:${String(m).padStart(2, "0")}`;
-}
 
 // Portal phase 1, the home screen.
 //
@@ -149,7 +144,10 @@ export default async function PortalHomePage() {
       {cycle && (
         <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-lineDark bg-white px-[18px] py-3.5">
           <span className="text-[12.5px] text-appNavy/60">
-            מחזור השעות הנוכחי: {formatMinutes(cycle.usedMinutes)} מתוך {formatMinutes(cycle.totalMinutes)}
+            {/* A bank reads in decimal hours everywhere (3.10.2026), the same
+                figures the client sees on the hours screen one click away. */}
+            מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
+            <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
             {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
           </span>
           <Link href="/app/portal/hours" className="text-xs text-gold-dim hover:underline">

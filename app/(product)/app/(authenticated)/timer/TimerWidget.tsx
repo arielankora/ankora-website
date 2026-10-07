@@ -11,6 +11,7 @@ import {
 } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { MAX_PARALLEL_TIMERS, parallelSeconds } from "@/lib/app-domain/parallel-timers";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -56,9 +57,7 @@ function formatElapsed(totalSeconds: number): string {
 }
 
 function formatHM(totalSeconds: number): string {
-  const h = Math.floor(totalSeconds / 3600);
-  const m = Math.round((totalSeconds % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(Math.round(totalSeconds / 60));
 }
 
 function formatLastUsed(iso: string): string {

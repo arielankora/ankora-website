@@ -8,6 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { ManualEntryForm } from "./ManualEntryForm";
 import { EntryRow } from "./EntryRow";
 import { addDaysToKey, dayStartInZone, weekdayOfKey } from "@/lib/timezone";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -62,9 +63,7 @@ function formatDayShort(date: Date): { weekday: string; dayMonth: string } {
 
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return "פעיל";
-  const h = Math.floor(seconds / 3600);
-  const m = Math.round((seconds % 3600) / 60);
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(Math.round(seconds / 60));
 }
 
 // Spec 11 "My Time": "רשימת entries לפי יום/שבוע, actual+billable לפי

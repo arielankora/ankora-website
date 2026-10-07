@@ -353,7 +353,10 @@ async function evaluateSingleRule(
     ``,
     `זהו עדכון אוטומטי על ניצול בנק השעות שלכם אצל Ankora.`,
     `ניצול נוכחי: ${utilization.utilizationPct}%`,
-    `דקות שנותרו: ${utilization.remainingMinutes}`,
+    // An overdrawn bank is stated in words, not as "דקות שנותרו: -21".
+    utilization.remainingMinutes < 0
+      ? `חריגה מהבנק: ${-utilization.remainingMinutes} דקות`
+      : `דקות שנותרו: ${utilization.remainingMinutes}`,
     ``,
     `בברכה,`,
     `צוות Ankora`,

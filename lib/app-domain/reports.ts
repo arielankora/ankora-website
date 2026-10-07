@@ -70,7 +70,16 @@ export interface ReportColumn {
   /// CSV/number formatting hint - "minutes" columns are rendered as
   /// H:MM in the UI table but exported as raw integer minutes in CSV
   /// (spec 21's storage convention: never float hours).
-  type?: "text" | "minutes" | "percent" | "number";
+  ///
+  /// "bankHours" is minutes that belong to an hour bank (used, remaining).
+  /// Since October 2026 a bank is read in decimal hours everywhere, through
+  /// lib/hours-format.ts's bankFigures, so the report agrees with the Hour
+  /// Banks screen to the hundredth. Rows carrying a bankHours column also
+  /// carry `totalMinutes` (not a column) so "remaining" can be derived from
+  /// the rounded figures exactly as that screen does. An overdrawn balance
+  /// reads as "חריגה 0.35", never as a negative number. See
+  /// lib/report-cell.ts. CSV and XLSX still export raw integer minutes.
+  type?: "text" | "minutes" | "bankHours" | "percent" | "number";
 }
 
 export interface ReportResult {
@@ -211,6 +220,7 @@ async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
         if (!snapshot) return null;
         return {
           client: client.name,
+          totalMinutes: snapshot.utilization.totalMinutes,
           usedMinutes: snapshot.utilization.consumedMinutes,
           remainingMinutes: snapshot.utilization.remainingMinutes,
           utilizationPct: snapshot.utilization.utilizationPct,
@@ -224,8 +234,8 @@ async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
     title: "שעות לפי לקוח",
     columns: [
       { key: "client", label: "לקוח" },
-      { key: "usedMinutes", label: "נוצל", type: "minutes" },
-      { key: "remainingMinutes", label: "נותר", type: "minutes" },
+      { key: "usedMinutes", label: "נוצל", type: "bankHours" },
+      { key: "remainingMinutes", label: "נותר", type: "bankHours" },
       { key: "utilizationPct", label: "אחוז ניצול", type: "percent" },
     ],
     rows,
@@ -445,6 +455,7 @@ async function overageAtRisk(filters: ReportFilters): Promise<ReportResult> {
       status: classification === "OVERAGE" ? "חריגה" : "בסיכון",
       utilizationPct,
       remainingMinutes: snapshot.utilization.remainingMinutes,
+      totalMinutes: snapshot.utilization.totalMinutes,
       thresholdUsed: atRiskThreshold,
     });
   }
@@ -458,7 +469,7 @@ async function overageAtRisk(filters: ReportFilters): Promise<ReportResult> {
       { key: "client", label: "לקוח" },
       { key: "status", label: "סטטוס" },
       { key: "utilizationPct", label: "אחוז ניצול", type: "percent" },
-      { key: "remainingMinutes", label: "נותר", type: "minutes" },
+      { key: "remainingMinutes", label: "נותר", type: "bankHours" },
       { key: "thresholdUsed", label: "סף שבו נעשה שימוש", type: "percent" },
     ],
     rows,

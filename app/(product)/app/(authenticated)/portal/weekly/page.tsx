@@ -4,6 +4,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -14,9 +15,7 @@ function formatDate(date: Date) {
 }
 
 function formatHours(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(minutes);
 }
 
 // Spec 13's Weekly Activity. App redesign (handoff README, screen 16): a

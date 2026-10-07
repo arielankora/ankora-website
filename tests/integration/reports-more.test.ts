@@ -322,9 +322,9 @@ describe("overage_at_risk - utilisation measured against the current hour bank",
 
     // Sorted by utilisation, highest first.
     expect(result.rows).toEqual([
-      { client: "Over", status: "חריגה", utilizationPct: 108.3, remainingMinutes: -5, thresholdUsed: 80 },
-      { client: "Risky", status: "בסיכון", utilizationPct: 85, remainingMinutes: 90, thresholdUsed: 80 },
-      { client: "Custom", status: "בסיכון", utilizationPct: 55, remainingMinutes: 270, thresholdUsed: 50 },
+      { client: "Over", status: "חריגה", utilizationPct: 108.3, remainingMinutes: -5, totalMinutes: 60, thresholdUsed: 80 },
+      { client: "Risky", status: "בסיכון", utilizationPct: 85, remainingMinutes: 90, totalMinutes: 600, thresholdUsed: 80 },
+      { client: "Custom", status: "בסיכון", utilizationPct: 55, remainingMinutes: 270, totalMinutes: 600, thresholdUsed: 50 },
     ]);
   });
 
@@ -340,7 +340,7 @@ describe("overage_at_risk - utilisation measured against the current hour bank",
     expect((await runReport(admin, "overage_at_risk", {})).rows).toEqual([]);
     const filtered = await runReport(admin, "overage_at_risk", { clientId: archived.id });
     expect(filtered.rows).toEqual([
-      { client: "Archived", status: "חריגה", utilizationPct: 200, remainingMinutes: -60, thresholdUsed: 80 },
+      { client: "Archived", status: "חריגה", utilizationPct: 200, remainingMinutes: -60, totalMinutes: 60, thresholdUsed: 80 },
     ]);
   });
 });

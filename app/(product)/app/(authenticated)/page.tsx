@@ -28,6 +28,7 @@ import { ActiveTimersList, type ActiveTimerRow } from "@/components/app/ActiveTi
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -117,9 +118,7 @@ function wholeHours(minutes: number): string {
 }
 
 function formatMinutes(minutes: number): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatClockMinutes(minutes);
 }
 
 type ActiveTimerRawRow = {
