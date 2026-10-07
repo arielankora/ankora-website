@@ -1746,6 +1746,20 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-18",
       "riskReason": "A date that starts a process moves to the process's business calendar (set on it, or its entity's country) and its day is recomputed; a wrong calendar means a filing scheduled on the wrong day"
+    },
+    "domain:task-changes": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-07"
+    },
+    "domain:urgent-tasks": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-07"
     }
   },
   "waivers": {},

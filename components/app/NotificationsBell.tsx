@@ -11,6 +11,8 @@ export type NotificationSummary = {
   body: string;
   createdAt: string; // ISO
   readAt: string | null;
+  /// Where the row leads. Only tasks today; anything else stays text.
+  href?: string | null;
 };
 
 function relativeTime(iso: string): string {
@@ -101,8 +103,8 @@ export function NotificationsBell({
             {notifications.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-appNavy/50">אין התראות</p>
             ) : (
-              notifications.slice(0, 8).map((n) => (
-                <div key={n.id} className="border-b border-lineDark/60 px-4 py-3 last:border-b-0">
+              notifications.slice(0, 8).map((n) => {
+                const inner = (
                   <div className="flex items-start gap-2">
                     {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />}
                     <div className="min-w-0 flex-1">
@@ -111,8 +113,25 @@ export function NotificationsBell({
                       <p className="mt-1 font-jbmono text-[10.5px] text-appNavy/40">{relativeTime(n.createdAt)}</p>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+                // 6.10.2026: a bell row about a task that could not be
+                // clicked sent people looking for the task by name. The
+                // task screen marks the row read when it opens.
+                return n.href ? (
+                  <Link
+                    key={n.id}
+                    href={n.href}
+                    onClick={() => setOpen(false)}
+                    className="block border-b border-lineDark/60 px-4 py-3 last:border-b-0 hover:bg-appNavy/[0.03]"
+                  >
+                    {inner}
+                  </Link>
+                ) : (
+                  <div key={n.id} className="border-b border-lineDark/60 px-4 py-3 last:border-b-0">
+                    {inner}
+                  </div>
+                );
+              })
             )}
           </div>
           <div className="border-t border-lineDark px-4 py-2.5 text-center">

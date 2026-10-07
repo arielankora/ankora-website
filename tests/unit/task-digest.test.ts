@@ -23,7 +23,7 @@ function task(id: string, title = "משימה", dueDate: Date | null = null) {
   return { id, title, clientName: "אורביט", dueDate };
 }
 
-const EMPTY: Digest = { overdue: [], today: [], fresh: [], awaitingMySignature: [], staleWaits: 0 };
+const EMPTY: Digest = { overdue: [], today: [], fresh: [], updated: [], awaitingMySignature: [], staleWaits: 0 };
 
 describe("who gets told, and who does not", () => {
   const hadas = "u-hadas";
@@ -123,10 +123,11 @@ describe("five lines to a group, then a number", () => {
       overdue: [task("a")],
       today: [task("b")],
       fresh: [task("c")],
+      updated: [task("e")],
       awaitingMySignature: [task("d")],
       staleWaits: 0,
     });
-    expect(groups.map((g) => g.heading)).toEqual(["באיחור", "להיום", "חדש אצלך", "מחכה לחתימה שלך"]);
+    expect(groups.map((g) => g.heading)).toEqual(["באיחור", "להיום", "חדש אצלך", "עודכן אצלך", "מחכה לחתימה שלך"]);
   });
 });
 

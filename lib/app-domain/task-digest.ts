@@ -5,6 +5,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { TASK_ASSIGNED_NOTIFICATION_TYPE } from "@/lib/app-domain/notifications";
+import { describeChange, quoteComment } from "@/lib/app-domain/task-changes";
 
 // The morning digest.
 //
@@ -48,11 +49,31 @@ export const STALE_WAIT_DAYS = 7;
 /// At most this many lines per group, and then a count.
 export const LINES_PER_GROUP = 5;
 
+/// At most this many change lines under one task, and then a count.
+export const CHANGES_PER_TASK = 3;
+
+/// One thing somebody else did to the task since the last digest.
+export type DigestChange = {
+  at: Date;
+  actorName: string;
+  text: string;
+};
+
 export type DigestTask = {
   id: string;
   title: string;
   clientName: string;
   dueDate: Date | null;
+  priority?: string;
+  /// "חדש אצלך" only: the description, or failing that the first
+  /// comment. 6.10.2026: the whole of a task handed to Ariel was in a
+  /// comment, and the email announcing it carried only the title.
+  excerpt?: string | null;
+  /// What others changed since the last digest, newest first, at most
+  /// CHANGES_PER_TASK of them.
+  changes?: DigestChange[];
+  /// How many more changes there were beyond those.
+  moreChanges?: number;
 };
 
 export type Digest = {
@@ -64,6 +85,10 @@ export type Digest = {
   /// say "since Thursday" on a Sunday without a second bookkeeping
   /// column to keep in sync.
   fresh: DigestTask[];
+  /// Ariel, 7.10.2026. This person's open work that somebody ELSE
+  /// changed since the last digest, and not already listed above: a
+  /// task that is late or new carries its changes on its own line.
+  updated: DigestTask[];
   /// Somebody else's work, stopped on this person's signature. In the
   /// digest because that is where work dies quietly.
   awaitingMySignature: DigestTask[];
@@ -77,6 +102,7 @@ export function isDigestEmpty(d: Digest): boolean {
     d.overdue.length === 0 &&
     d.today.length === 0 &&
     d.fresh.length === 0 &&
+    d.updated.length === 0 &&
     d.awaitingMySignature.length === 0 &&
     d.staleWaits === 0
   );
@@ -99,6 +125,13 @@ export function digestSubject(d: Digest): string {
     parts.push(
       d.awaitingMySignature.length === 1 ? "משימה אחת מחכה לחתימה שלך" : `${d.awaitingMySignature.length} מחכות לחתימה שלך`
     );
+  }
+  if (d.updated.length > 0) {
+    if (mine === 0 && parts.length === 0) {
+      parts.push(d.updated.length === 1 ? "משימה אחת שלך עודכנה" : `${d.updated.length} משימות שלך עודכנו`);
+    } else {
+      parts.push(d.updated.length === 1 ? "אחת עודכנה" : `${d.updated.length} עודכנו`);
+    }
   }
   if (parts.length === 0 && d.staleWaits > 0) parts.push("יש מה להזכיר ללקוחות");
 
@@ -134,17 +167,177 @@ function toDigestTask(t: {
   id: string;
   title: string;
   dueDate: Date | null;
+  priority: string;
   client: { name: string };
 }): DigestTask {
-  return { id: t.id, title: t.title, clientName: t.client.name, dueDate: t.dueDate };
+  return { id: t.id, title: t.title, clientName: t.client.name, dueDate: t.dueDate, priority: t.priority };
 }
 
 const TASK_SELECT = {
   id: true,
   title: true,
   dueDate: true,
+  priority: true,
   client: { select: { name: true } },
 } as const;
+
+/// The audit actions that can produce a change line. "task.create" is
+/// not here: new work is "חדש אצלך", announced once.
+const CHANGE_ACTIONS = [
+  "task.update",
+  "task.status_change",
+  "task.blocked",
+  "task.unblocked",
+  "task.approve",
+  "task.comment",
+] as const;
+
+/// Groups change lines by task, newest first, and trims each to
+/// CHANGES_PER_TASK. Pure.
+export function groupChanges(
+  rows: { taskId: string; at: Date; actorName: string; text: string | null }[]
+): Map<string, { changes: DigestChange[]; more: number }> {
+  const byTask = new Map<string, DigestChange[]>();
+  for (const r of rows) {
+    if (!r.text) continue;
+    const list = byTask.get(r.taskId) ?? [];
+    list.push({ at: r.at, actorName: r.actorName, text: r.text });
+    byTask.set(r.taskId, list);
+  }
+  const out = new Map<string, { changes: DigestChange[]; more: number }>();
+  for (const [taskId, list] of byTask) {
+    list.sort((a, b) => b.at.getTime() - a.at.getTime());
+    out.set(taskId, {
+      changes: list.slice(0, CHANGES_PER_TASK),
+      more: Math.max(0, list.length - CHANGES_PER_TASK),
+    });
+  }
+  return out;
+}
+
+/// What others changed on this person's open tasks since `since`.
+async function changesOnMyTasks(
+  userId: string,
+  since: Date
+): Promise<Map<string, { changes: DigestChange[]; more: number }>> {
+  const myTasks = await prisma.task.findMany({
+    where: { assignedToId: userId, deletedAt: null, status: { in: OPEN_STATUSES } },
+    select: { id: true, clientId: true },
+  });
+  if (myTasks.length === 0) return new Map();
+  const taskIds = myTasks.map((t) => t.id);
+  const clientIds = [...new Set(myTasks.map((t) => t.clientId))];
+
+  const [taskEvents, fileEvents] = await Promise.all([
+    prisma.auditEvent.findMany({
+      where: {
+        entityType: "Task",
+        entityId: { in: taskIds },
+        action: { in: [...CHANGE_ACTIONS] },
+        createdAt: { gte: since },
+        actorId: { not: null },
+        NOT: { actorId: userId },
+      },
+      orderBy: { createdAt: "desc" },
+      select: { action: true, entityId: true, actorId: true, beforeJson: true, afterJson: true, createdAt: true },
+    }),
+    // A file is filed against the CLIENT document, with the task in its
+    // row, so it is found by client and matched to the task here.
+    prisma.auditEvent.findMany({
+      where: {
+        action: "client_document.add",
+        clientId: { in: clientIds },
+        createdAt: { gte: since },
+        actorId: { not: null },
+        NOT: { actorId: userId },
+      },
+      select: { actorId: true, afterJson: true, createdAt: true },
+    }),
+  ]);
+
+  const mine = new Set(taskIds);
+  const files = fileEvents.filter((e) => {
+    const taskId = (e.afterJson as Record<string, unknown> | null)?.taskId;
+    return typeof taskId === "string" && mine.has(taskId);
+  });
+
+  const commentIds = taskEvents
+    .filter((e) => e.action === "task.comment")
+    .map((e) => (e.afterJson as Record<string, unknown> | null)?.commentId)
+    .filter((id): id is string => typeof id === "string");
+  const actorIds = [
+    ...new Set([...taskEvents, ...files].map((e) => e.actorId).filter((id): id is string => Boolean(id))),
+  ];
+
+  const [comments, actors] = await Promise.all([
+    commentIds.length
+      ? prisma.taskComment.findMany({
+          // A comment taken back is not news.
+          where: { id: { in: commentIds }, deletedAt: null },
+          select: { id: true, body: true },
+        })
+      : Promise.resolve([]),
+    actorIds.length
+      ? prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+  ]);
+  const commentBody = new Map(comments.map((c) => [c.id, c.body]));
+  const actorName = new Map(actors.map((a) => [a.id, a.name]));
+
+  const rows = [
+    ...taskEvents.map((e) => {
+      const commentId = (e.afterJson as Record<string, unknown> | null)?.commentId;
+      return {
+        taskId: e.entityId as string,
+        at: e.createdAt,
+        actorName: actorName.get(e.actorId as string) ?? "מישהו",
+        text: describeChange({
+          action: e.action,
+          before: e.beforeJson,
+          after: e.afterJson,
+          commentBody: typeof commentId === "string" ? (commentBody.get(commentId) ?? null) : null,
+        }),
+      };
+    }),
+    ...files.map((e) => {
+      const after = e.afterJson as Record<string, unknown> | null;
+      return {
+        taskId: after?.taskId as string,
+        at: e.createdAt,
+        actorName: actorName.get(e.actorId as string) ?? "מישהו",
+        text: describeChange({
+          action: "client_document.add",
+          before: null,
+          after,
+          fileTitle: typeof after?.title === "string" ? after.title : null,
+        }),
+      };
+    }),
+  ];
+  return groupChanges(rows);
+}
+
+/// The first line of a description, or the first comment when there is
+/// no description. Null when nothing was written.
+async function excerptsFor(taskIds: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (taskIds.length === 0) return out;
+  const [tasks, comments] = await Promise.all([
+    prisma.task.findMany({ where: { id: { in: taskIds } }, select: { id: true, description: true } }),
+    prisma.taskComment.findMany({
+      where: { taskId: { in: taskIds }, deletedAt: null },
+      orderBy: { createdAt: "asc" },
+      select: { taskId: true, body: true },
+    }),
+  ]);
+  for (const t of tasks) {
+    if (t.description?.trim()) out.set(t.id, quoteComment(t.description));
+  }
+  for (const c of comments) {
+    if (!out.has(c.taskId)) out.set(c.taskId, quoteComment(c.body));
+  }
+  return out;
+}
 
 export async function buildDigest(
   user: { id: string; dailyDigestAt: Date | null },
@@ -222,13 +415,51 @@ export async function buildDigest(
 
   const overdueIds = new Set(overdue.map((t) => t.id));
   const todayIds = new Set(today.map((t) => t.id));
+  // Something both new and already late is late. Saying it twice in
+  // one email is how a short email stops being short.
+  const freshOnly = fresh.filter((t) => !overdueIds.has(t.id) && !todayIds.has(t.id));
+
+  const [changes, excerpts] = await Promise.all([
+    changesOnMyTasks(user.id, since),
+    excerptsFor(freshOnly.map((t) => t.id)),
+  ]);
+
+  const withChanges = (t: DigestTask): DigestTask => {
+    const c = changes.get(t.id);
+    return c ? { ...t, changes: c.changes, moreChanges: c.more } : t;
+  };
+
+  // A task listed in any group above carries its changes there. Only
+  // the rest become "עודכן אצלך", urgent first, then most recent.
+  const listed = new Set([...overdueIds, ...todayIds, ...freshOnly.map((t) => t.id)]);
+  const updatedIds = [...changes.keys()].filter((id) => !listed.has(id));
+  const updatedRows = updatedIds.length
+    ? await prisma.task.findMany({ where: { id: { in: updatedIds } }, select: TASK_SELECT })
+    : [];
+  const latest = (id: string) => changes.get(id)?.changes[0]?.at.getTime() ?? 0;
+  const updated = updatedRows
+    .map(toDigestTask)
+    .sort((a, b) => {
+      const ua = a.priority === "URGENT" ? 1 : 0;
+      const ub = b.priority === "URGENT" ? 1 : 0;
+      return ub - ua || latest(b.id) - latest(a.id);
+    })
+    .map(withChanges);
 
   return {
-    overdue: overdue.map(toDigestTask),
-    today: today.map(toDigestTask),
-    // Something both new and already late is late. Saying it twice in
-    // one email is how a short email stops being short.
-    fresh: fresh.filter((t) => !overdueIds.has(t.id) && !todayIds.has(t.id)).map(toDigestTask),
+    overdue: overdue.map(toDigestTask).map(withChanges),
+    today: today.map(toDigestTask).map(withChanges),
+    fresh: freshOnly
+      .map(toDigestTask)
+      .map((t) => {
+        const excerpt = excerpts.get(t.id) ?? null;
+        const c = withChanges(t);
+        // The comment shown as the excerpt is not also a change line.
+        // Hadas's note on the RIMED task would otherwise appear twice.
+        const changes = c.changes?.filter((ch) => !excerpt || ch.text !== `תגובה: «${excerpt}»`);
+        return { ...c, changes, excerpt };
+      }),
+    updated,
     awaitingMySignature: awaiting.map(toDigestTask),
     staleWaits,
   };
@@ -247,6 +478,7 @@ export function digestGroups(d: Digest): DigestGroup[] {
     ["באיחור", d.overdue],
     ["להיום", d.today],
     ["חדש אצלך", d.fresh],
+    ["עודכן אצלך", d.updated],
     ["מחכה לחתימה שלך", d.awaitingMySignature],
   ];
   return groups
@@ -256,6 +488,24 @@ export function digestGroups(d: Digest): DigestGroup[] {
       tasks: tasks.slice(0, LINES_PER_GROUP),
       more: Math.max(0, tasks.length - LINES_PER_GROUP),
     }));
+}
+
+function formatTime(date: Date): string {
+  return new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: TIMEZONE }).format(
+    date
+  );
+}
+
+/// The small lines under a task: what was written on new work, and what
+/// others changed. Pure.
+export function taskNotes(t: DigestTask): string[] {
+  const notes: string[] = [];
+  if (t.excerpt) notes.push(`«${t.excerpt}»`);
+  for (const c of t.changes ?? []) notes.push(`${c.actorName}, ${formatTime(c.at)}: ${c.text}`);
+  if (t.moreChanges && t.moreChanges > 0) {
+    notes.push(t.moreChanges === 1 ? "ועוד עדכון אחד" : `ועוד ${t.moreChanges} עדכונים`);
+  }
+  return notes;
 }
 
 export function renderDigestEmail(d: Digest, name: string): { html: string; text: string } {
@@ -270,14 +520,27 @@ export function renderDigestEmail(d: Digest, name: string): { html: string; text
     const rows = group.tasks
       .map((t) => {
         const due = formatDue(t.dueDate);
-        textLines.push(`  ${t.title} · ${t.clientName}${due ? ` · ${due}` : ""}  ${base}/app/tasks/${t.id}`);
-        return `<tr><td style="padding:6px 0;font-size:14px;line-height:1.6;color:#1B2A3D;" dir="rtl" align="right"><a href="${base}/app/tasks/${escapeHtml(
+        const urgent = t.priority === "URGENT" ? "דחופה · " : "";
+        textLines.push(`  ${urgent}${t.title} · ${t.clientName}${due ? ` · ${due}` : ""}  ${base}/app/tasks/${t.id}`);
+        const notes = taskNotes(t);
+        for (const n of notes) textLines.push(`    ${n}`);
+        const notesHtml = notes
+          .map(
+            (n) =>
+              `<div style="margin-top:3px;padding-inline-start:10px;border-inline-start:2px solid rgba(176,141,87,.45);font-size:13px;line-height:1.55;color:rgba(27,42,61,.72);">${escapeHtml(
+                n
+              )}</div>`
+          )
+          .join("");
+        return `<tr><td style="padding:6px 0;font-size:14px;line-height:1.6;color:#1B2A3D;" dir="rtl" align="right">${
+          urgent ? `<span style="color:#9B2C2C;font-weight:600;">דחופה</span> · ` : ""
+        }<a href="${base}/app/tasks/${escapeHtml(
           t.id
         )}" style="color:#1B2A3D;text-decoration:none;border-bottom:1px solid rgba(27,42,61,.25);">${escapeHtml(
           t.title
         )}</a> <span style="color:rgba(27,42,61,.55);">· ${escapeHtml(t.clientName)}${
           due ? ` · ${escapeHtml(due)}` : ""
-        }</span></td></tr>`;
+        }</span>${notesHtml}</td></tr>`;
       })
       .join("");
     const more = group.more > 0 ? `<tr><td style="padding:4px 0;font-size:13px;color:rgba(27,42,61,.55);" dir="rtl" align="right">ועוד ${group.more}</td></tr>` : "";
