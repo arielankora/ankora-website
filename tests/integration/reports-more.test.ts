@@ -226,7 +226,7 @@ describe("capacity - an employee's period total and its split across clients", (
     ]);
   });
 
-  // PRODUCT BUG (found 2026-10-07): capacity() rounds every ENTRY to whole
+  // Found 2026-10-07, fixed the same day. Was: capacity() rounds every ENTRY to whole
   // minutes before adding it to the per-client breakdown
   // (row.perClient.set(..., + toMinutes(e.billableSeconds)), reports.ts
   // line 532), while the employee's total rounds the SUM once. Timer
@@ -235,7 +235,7 @@ describe("capacity - an employee's period total and its split across clients", (
   // the total but "8" in the breakdown. Over a month of short timer
   // entries the breakdown an admin reads to judge "how is her time split"
   // disagrees with the total in the same row by tens of minutes.
-  it.fails("the per-client breakdown adds up to the billable total (one client, short timer entries)", async () => {
+  it("the per-client breakdown adds up to the billable total (one client, short timer entries)", async () => {
     const admin = await named("SUPER_ADMIN", "Admin");
     const alice = await named("ANKORA_EMPLOYEE", "Alice");
     const client = await createTestClient({ name: "Client A" });

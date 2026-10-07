@@ -353,7 +353,7 @@ describe("getCategoryMonthlyHours() - the 'hours this month' column", () => {
     expect(hours.get(other.id)).toBe(3600);
   });
 
-  // PRODUCT BUG (found 2026-10-07): getCategoryMonthlyHours computes the
+  // Found 2026-10-07, fixed the same day. Was: getCategoryMonthlyHours computes the
   // month with getUTCMonth / Date.UTC (categories.ts:21-23), so "this
   // month" is the UTC month, not the Israel month. Every other monthly
   // figure in the product (hour banks, reports, portal) uses Asia/Jerusalem
@@ -364,7 +364,7 @@ describe("getCategoryMonthlyHours() - the 'hours this month' column", () => {
   // number on this screen disagrees with the hour bank for the same work.
   // The code comment says the UTC choice was deliberate for one summary
   // column; flagged for Ariel to decide.
-  it.fails("uses Israel month boundaries: 2026-10-31T22:30Z is November, 2026-11-30T22:30Z is December", async () => {
+  it("uses Israel month boundaries: 2026-10-31T22:30Z is November, 2026-11-30T22:30Z is December", async () => {
     freezeAt("2026-11-15T10:00:00Z");
     const { category, entry } = await fixtures();
     await entry("2026-10-31T22:30:00Z", 1); // 1 Nov 00:30 in Israel (UTC+2 after the 25.10 DST change)

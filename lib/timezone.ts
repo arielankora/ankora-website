@@ -133,6 +133,21 @@ export function dayEndInZone(value: string | null | undefined, timeZone: string 
   return next ? new Date(next.getTime() - 1) : undefined;
 }
 
+/// The calendar month `date` falls in, in `timeZone`, as a half-open UTC
+/// range [start, end): local midnight on the 1st to local midnight on the
+/// next 1st. 7.10.2026: added for the categories screen, which counted
+/// "this month" in UTC and so showed last month for the first two or three
+/// hours of every Israeli month.
+export function monthRangeInZone(date: Date, timeZone: string = TIMEZONE): { start: Date; end: Date } {
+  const [y, m] = localDateKey(date, timeZone).split("-").map(Number);
+  const key = (year: number, month: number) => `${year}-${String(month).padStart(2, "0")}-01`;
+  const next = m === 12 ? key(y + 1, 1) : key(y, m + 1);
+  return {
+    start: localDateTimeToUtc(key(y, m), "00:00", timeZone),
+    end: localDateTimeToUtc(next, "00:00", timeZone),
+  };
+}
+
 /// A `YYYY-MM-DD` key moved by whole calendar days. Pure date arithmetic
 /// on the key itself, so it never passes through an instant and a DST
 /// change cannot turn "tomorrow" into "today at 23:00".

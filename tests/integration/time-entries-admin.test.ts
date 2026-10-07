@@ -336,7 +336,7 @@ describe("listRecentCombinations() - the timer's quick-start chips", () => {
     expect(await listRecentCombinations(alice.id, 2)).toHaveLength(2);
   });
 
-  // PRODUCT BUG (found 2026-10-07): listRecentCombinations
+  // Found 2026-10-07, fixed the same day. Was: listRecentCombinations
   // (lib/app-domain/time-entries.ts:978) reads raw history with no check
   // of the client's status or the person's current access, and the timer
   // page (timer/page.tsx:54, :92) passes the result straight to the
@@ -344,7 +344,7 @@ describe("listRecentCombinations() - the timer's quick-start chips", () => {
   // client's name as a one-click start, and tapping it fails with "not
   // assigned"; an archived client's chip fails with "inactive". Each dead
   // chip also takes one of only three slots.
-  it.fails("does not offer a client I no longer have access to", async () => {
+  it("does not offer a client I no longer have access to", async () => {
     const { alice, clientA, clientB, category } = await setup();
     await createTestTimeEntry({ userId: alice.id, clientId: clientA.id, categoryId: category.id, startAt: hoursAgo(5) });
     await createTestTimeEntry({ userId: alice.id, clientId: clientB.id, categoryId: category.id, startAt: hoursAgo(1) });
@@ -354,7 +354,7 @@ describe("listRecentCombinations() - the timer's quick-start chips", () => {
     expect(combos.map((c) => c.client.name)).toEqual(["Client A"]);
   });
 
-  it.fails("does not offer an archived client", async () => {
+  it("does not offer an archived client", async () => {
     const { alice, clientA, clientB, category } = await setup();
     await createTestTimeEntry({ userId: alice.id, clientId: clientA.id, categoryId: category.id, startAt: hoursAgo(5) });
     await createTestTimeEntry({ userId: alice.id, clientId: clientB.id, categoryId: category.id, startAt: hoursAgo(1) });
@@ -362,5 +362,25 @@ describe("listRecentCombinations() - the timer's quick-start chips", () => {
 
     const combos = await listRecentCombinations(alice.id, 3);
     expect(combos.map((c) => c.client.name)).toEqual(["Client A"]);
+  });
+
+  it("does not offer a category that was retired", async () => {
+    const { alice, clientA, category } = await setup();
+    const retired = await createTestCategory({ name: "Retired" });
+    await createTestTimeEntry({ userId: alice.id, clientId: clientA.id, categoryId: category.id, startAt: hoursAgo(5) });
+    await createTestTimeEntry({ userId: alice.id, clientId: clientA.id, categoryId: retired.id, startAt: hoursAgo(1) });
+    await prisma.category.update({ where: { id: retired.id }, data: { active: false } });
+
+    const combos = await listRecentCombinations(alice.id, 3);
+    expect(combos.map((c) => c.category.name)).toEqual(["Ops"]);
+  });
+
+  it("still offers an admin their recent clients, though admins have no per-client access rows", async () => {
+    const { admin, clientA, clientB, category } = await setup();
+    await createTestTimeEntry({ userId: admin.id, clientId: clientA.id, categoryId: category.id, startAt: hoursAgo(5) });
+    await createTestTimeEntry({ userId: admin.id, clientId: clientB.id, categoryId: category.id, startAt: hoursAgo(1) });
+
+    const combos = await listRecentCombinations(admin.id, 3);
+    expect(combos.map((c) => c.client.name)).toEqual(["Client B", "Client A"]);
   });
 });

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User, CategoryVisibility } from "@prisma/client";
+import { monthRangeInZone } from "@/lib/timezone";
 
 export async function listCategories() {
   return prisma.category.findMany({
@@ -13,15 +14,12 @@ export async function listCategories() {
 }
 
 // App redesign (handoff README, screen 6 "קטגוריות"): "טבלה: ... שעות
-// החודש". Month boundaries computed the same lightweight UTC-calendar-
-// month way important-dates/page.tsx already does for its "thisMonth" KPI
-// (getUTCMonth/getUTCFullYear) - consistent with that existing precedent
-// rather than introducing a new Asia/Jerusalem month-boundary helper for
-// one screen's summary column.
-export async function getCategoryMonthlyHours(): Promise<Map<string, number>> {
-  const now = new Date();
-  const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-  const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+// החודש". The Israeli month, like the hour bank, the portal and the
+// reports (7.10.2026, Ariel). It used to be the UTC month, which for the
+// first two or three hours of every month still showed the month that had
+// just ended, and disagreed with the other screens about the same work.
+export async function getCategoryMonthlyHours(now: Date = new Date()): Promise<Map<string, number>> {
+  const { start: monthStart, end: monthEnd } = monthRangeInZone(now);
   const rows = await prisma.timeEntry.groupBy({
     by: ["categoryId"],
     where: { deletedAt: null, startAt: { gte: monthStart, lt: monthEnd }, actualSeconds: { not: null } },
