@@ -215,7 +215,7 @@ export function whoToNotify(
 /// client-preferences notification follows in client-file.ts.
 export async function notifyTaskPeople(
   actorId: string,
-  task: { id: string; title: string; clientTitle: string | null },
+  task: { id: string; title: string; clientTitle: string | null; priority?: string },
   clientName: string,
   before: { assignedToId: string | null; supervisorId: string | null },
   after: { assignedToId: string | null; supervisorId: string | null }
@@ -234,8 +234,15 @@ export async function notifyTaskPeople(
         data: {
           userId: target.userId,
           type: target.type,
+          // Urgent says so in the bell too. The email that goes with it
+          // (urgent-tasks.ts) is the same news, and the two should read
+          // as one event rather than as two different things.
           title:
-            target.type === TASK_ASSIGNED_NOTIFICATION_TYPE ? "משימה חדשה אצלך" : "מונית למפקח על משימה",
+            target.type === TASK_ASSIGNED_NOTIFICATION_TYPE
+              ? task.priority === "URGENT"
+                ? "משימה דחופה אצלך"
+                : "משימה חדשה אצלך"
+              : "מונית למפקח על משימה",
           body: `${subject} · ${clientName}`,
           entityType: "Task",
           entityId: task.id,
@@ -244,5 +251,22 @@ export async function notifyTaskPeople(
     } catch (err) {
       console.error("task notification failed:", err);
     }
+  }
+}
+
+/// Opening a task is reading what the bell said about it.
+///
+/// 6.10.2026: the bell showed 12 unread, most of them already dealt
+/// with, because the only way to clear a row was the bell's own button.
+/// A counter that never goes down by itself teaches people to ignore it.
+/// Scoped to the reader's own rows, like everything else in this file.
+export async function markTaskNotificationsRead(userId: string, taskId: string): Promise<void> {
+  try {
+    await prisma.notification.updateMany({
+      where: { userId, entityType: "Task", entityId: taskId, readAt: null },
+      data: { readAt: new Date() },
+    });
+  } catch (err) {
+    console.error("marking task notifications read failed:", err);
   }
 }

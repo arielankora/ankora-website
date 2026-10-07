@@ -99,6 +99,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
         body: n.body,
         createdAt: n.createdAt.toISOString(),
         readAt: n.readAt ? n.readAt.toISOString() : null,
+        href: n.entityType === "Task" && n.entityId ? `/app/tasks/${n.entityId}` : null,
       }))}
       unreadCount={unreadCount}
       importantDatesCount={importantDates.length}
