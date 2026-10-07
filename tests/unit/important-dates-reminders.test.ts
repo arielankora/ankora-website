@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReminderIdempotencyKey,
   buildAutoTaskOccurrenceKey,
+  occurrenceKeyFor,
   buildInAppReminderMessage,
   buildEmailReminderSubject,
   DEFAULT_REMINDER_OFFSETS_BY_CATEGORY,
@@ -12,22 +13,42 @@ import {
 
 describe("buildReminderIdempotencyKey()", () => {
   it("produces a stable, deterministic key for the same inputs", () => {
-    const params = { importantDateId: "d1", reminderRuleId: "r1", occurrenceYear: 2026, channel: "EMAIL" as const };
+    const params = { importantDateId: "d1", reminderRuleId: "r1", occurrence: 2026, channel: "EMAIL" as const };
     expect(buildReminderIdempotencyKey(params)).toBe(buildReminderIdempotencyKey(params));
   });
 
   it("differs when any single axis changes - date, rule, year, or channel", () => {
-    const base = { importantDateId: "d1", reminderRuleId: "r1", occurrenceYear: 2026, channel: "EMAIL" as const };
+    const base = { importantDateId: "d1", reminderRuleId: "r1", occurrence: 2026, channel: "EMAIL" as const };
     const variants = [
       buildReminderIdempotencyKey({ ...base, importantDateId: "d2" }),
       buildReminderIdempotencyKey({ ...base, reminderRuleId: "r2" }),
-      buildReminderIdempotencyKey({ ...base, occurrenceYear: 2027 }),
+      buildReminderIdempotencyKey({ ...base, occurrence: 2027 }),
       buildReminderIdempotencyKey({ ...base, channel: "IN_APP" }),
     ];
     const baseKey = buildReminderIdempotencyKey(base);
     for (const v of variants) expect(v).not.toBe(baseKey);
     // And all four variants are themselves distinct from each other.
     expect(new Set(variants).size).toBe(variants.length);
+  });
+});
+
+// 7.10.2026: a MONTHLY date was reminded once a year, because every
+// occurrence in a year shared the year as its key. The key is now the
+// occurrence's Israeli date for sub-annual recurrences, and stays the year
+// for ANNUAL/ONCE so rows written before the change still match.
+describe("occurrenceKeyFor()", () => {
+  it("keys MONTHLY and CUSTOM_INTERVAL dates on the occurrence's own date", () => {
+    expect(occurrenceKeyFor("MONTHLY", 2026, "2026-10-15")).toBe("2026-10-15");
+    expect(occurrenceKeyFor("MONTHLY", 2026, "2026-11-15")).not.toBe(occurrenceKeyFor("MONTHLY", 2026, "2026-10-15"));
+    expect(occurrenceKeyFor("CUSTOM_INTERVAL", 2026, "2026-10-20")).toBe("2026-10-20");
+  });
+
+  it("keeps the year for ANNUAL and ONCE dates, exactly as keys were built before", () => {
+    expect(occurrenceKeyFor("ANNUAL", 2026, "2026-11-01")).toBe(2026);
+    expect(occurrenceKeyFor("ONCE", 2026, "2026-11-01")).toBe(2026);
+    expect(buildReminderIdempotencyKey({ importantDateId: "d", reminderRuleId: "r", occurrence: occurrenceKeyFor("ANNUAL", 2026, "2026-11-01"), channel: "EMAIL" })).toBe(
+      "d:r:2026:EMAIL"
+    );
   });
 });
 

@@ -8,12 +8,14 @@ import { computeHolidayOccurrencesForYear, type HolidayCalendarKey } from "@/lib
 import {
   buildReminderIdempotencyKey,
   buildAutoTaskOccurrenceKey,
+  occurrenceKeyFor,
   buildInAppReminderMessage,
   buildEmailReminderSubject,
   buildEmailReminderBody,
   buildEscalationMessage,
 } from "@/lib/app-domain/important-dates-reminders";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
+import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
 // existing once-daily Vercel Cron (app/api/cron/alerts-reconcile/route.ts)
@@ -54,6 +56,54 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 // isolation precedent as reconcileAllClientAlerts() (lib/app-domain/alerts.ts).
 
 const MAX_REMINDER_ATTEMPTS = 5;
+
+/// Whether a reminder for `occurrenceDate` may go out right now.
+///
+/// 7.10.2026. The job used to look only at ARCHIVED and PAUSED, and only
+/// when it created a reminder, never when it sent or retried one. So a
+/// date somebody deleted, handled or snoozed kept reminding:
+///  - "cancel": the date is gone (deleted, archived), or this occurrence
+///    was marked handled. The reminder will never be wanted.
+///  - "wait": the date is paused, or snoozed past `now`. The reminder
+///    stays pending and goes out once the pause or snooze is over, which
+///    is what "remind me later" means.
+///  - "send": nothing stands in the way.
+export function reminderGate(
+  date: Pick<ImportantDate, "deletedAt" | "status" | "currentOccurrenceAt" | "snoozedUntil">,
+  occurrenceDate: Date,
+  now: Date
+): "send" | "wait" | "cancel" {
+  if (date.deletedAt || date.status === "ARCHIVED") return "cancel";
+  if (
+    date.status === "HANDLED_CURRENT" &&
+    date.currentOccurrenceAt &&
+    occurrenceDate.getTime() <= date.currentOccurrenceAt.getTime()
+  ) {
+    return "cancel";
+  }
+  if (date.status === "PAUSED") return "wait";
+  if (date.snoozedUntil && date.snoozedUntil.getTime() > now.getTime()) return "wait";
+  return "send";
+}
+
+/// Ankora admins who should hear about an escalation: people who can
+/// manage clients AND still have a live account. An admin who left
+/// (SUSPENDED, ARCHIVED or deleted) must not keep receiving client names
+/// and dates (7.10.2026; the role was the only filter before).
+async function activeAdminEmails(): Promise<string[]> {
+  const admins = await prisma.user.findMany({
+    where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN"] }, status: "ACTIVE", deletedAt: null },
+    select: { email: true, role: true },
+  });
+  return admins
+    .filter((a) => canManageClients(a.role))
+    .map((a) => a.email)
+    .filter((e): e is string => Boolean(e));
+}
+
+/// Suffix that marks a ReminderOccurrence row as an escalation, not a
+/// reminder. Escalations are never themselves escalated.
+const ESCALATION_SUFFIX = ":escalation";
 
 function currentAndNextGregorianYear(now: Date): [number, number] {
   const year = Number(localDateKey(now, TIMEZONE).slice(0, 4));
@@ -258,7 +308,11 @@ export async function createDueReminderOccurrences(now = new Date()): Promise<{ 
   let created = 0;
   for (const date of dates) {
     if (!date.nextOccurrenceAt) continue;
+    // A handled occurrence gets no further reminders (see reminderGate).
+    // Snoozed and paused dates still get their rows; sending waits.
+    if (reminderGate(date, date.nextOccurrenceAt, now) === "cancel") continue;
     const occurrenceYear = date.nextOccurrenceAt.getUTCFullYear();
+    const occurrence = occurrenceKeyFor(date.recurrence, occurrenceYear, localDateKey(date.nextOccurrenceAt, TIMEZONE));
 
     for (const rule of date.reminderRules) {
       const dueAt = new Date(date.nextOccurrenceAt.getTime() - rule.daysBefore * 86_400_000);
@@ -269,7 +323,15 @@ export async function createDueReminderOccurrences(now = new Date()): Promise<{ 
       if (rule.sendEmail) channels.push("EMAIL");
 
       for (const channel of channels) {
-        const idempotencyKey = buildReminderIdempotencyKey({ importantDateId: date.id, reminderRuleId: rule.id, occurrenceYear, channel });
+        const idempotencyKey = buildReminderIdempotencyKey({ importantDateId: date.id, reminderRuleId: rule.id, occurrence, channel });
+        // The same occurrence under a key written before occurrenceKeyFor
+        // existed (a MONTHLY date reminded this month under the year key)
+        // must not be reminded twice on the day this ships.
+        const sameOccurrence = await prisma.reminderOccurrence.findFirst({
+          where: { importantDateId: date.id, reminderRuleId: rule.id, channel, occurrenceDate: date.nextOccurrenceAt },
+          select: { id: true },
+        });
+        if (sameOccurrence) continue;
         try {
           await prisma.reminderOccurrence.create({
             data: {
@@ -312,6 +374,12 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
 
   for (const occ of due) {
     const date = occ.importantDate;
+    const gate = reminderGate(date, occ.occurrenceDate, now);
+    if (gate === "wait") continue;
+    if (gate === "cancel") {
+      await prisma.reminderOccurrence.update({ where: { id: occ.id }, data: { status: "CANCELLED" } });
+      continue;
+    }
     const daysBefore = Math.round((date.nextOccurrenceAt!.getTime() - occ.occurrenceDate.getTime()) / 86_400_000) + (occ.reminderRule?.daysBefore ?? 0);
     const messageInput = {
       clientName: date.client.name,
@@ -387,7 +455,16 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     if (dueAt.getTime() > now.getTime()) continue;
 
     const occurrenceYear = date.nextOccurrenceAt.getUTCFullYear();
-    const occurrenceKey = buildAutoTaskOccurrenceKey(occurrenceYear);
+    const occurrenceKey = buildAutoTaskOccurrenceKey(
+      occurrenceKeyFor(date.recurrence, occurrenceYear, localDateKey(date.nextOccurrenceAt, TIMEZONE))
+    );
+    // Same guard as the reminders: a task already created for this exact
+    // occurrence under the old year-only key is not created again.
+    const sameOccurrence = await prisma.task.findFirst({
+      where: { importantDateId: date.id, dueDate: date.nextOccurrenceAt },
+      select: { id: true },
+    });
+    if (sameOccurrence) continue;
 
     try {
       const task = await prisma.task.create({
@@ -423,7 +500,10 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
 
 export async function escalateUnhandledReminders(now = new Date()): Promise<{ escalated: number }> {
   const candidates = await prisma.reminderOccurrence.findMany({
-    where: { status: "SENT", channel: "EMAIL" },
+    // An escalation is stored as a SENT EMAIL row too. Before 7.10.2026 it
+    // was picked up here as if it were a reminder, and escalated again
+    // every escalateAfterDays until someone handled the date.
+    where: { status: "SENT", channel: "EMAIL", NOT: { idempotencyKey: { endsWith: ESCALATION_SUFFIX } } },
     include: {
       reminderRule: true,
       importantDate: { include: { client: true, responsibleUser: true } },
@@ -433,15 +513,8 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
   let escalated = 0;
   let cachedAdminEmails: string[] | null = null;
   async function getAdminEmails(): Promise<string[]> {
-    if (cachedAdminEmails) return cachedAdminEmails;
-    const admins = await prisma.user.findMany({ where: { role: { in: ["SUPER_ADMIN", "ANKORA_ADMIN"] } }, select: { email: true, role: true } });
-    // Let TS infer a.role/a.email from Prisma's real generated select-result type.
-    const emails: string[] = admins
-      .filter((a) => canManageClients(a.role))
-      .map((a) => a.email)
-      .filter((e): e is string => Boolean(e));
-    cachedAdminEmails = emails;
-    return emails;
+    cachedAdminEmails ??= await activeAdminEmails();
+    return cachedAdminEmails;
   }
 
   for (const occ of candidates) {
@@ -449,8 +522,9 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
     if (!rule?.escalateToManager || !rule.escalateAfterDays || !occ.sentAt) continue;
 
     const date = occ.importantDate;
-    // Already handled? Nothing to escalate.
+    // Already handled, deleted, paused or snoozed? Nothing to escalate yet.
     if (["HANDLED_CURRENT", "ARCHIVED", "PAUSED"].includes(date.status)) continue;
+    if (reminderGate(date, occ.occurrenceDate, now) !== "send") continue;
 
     const escalateAt = new Date(occ.sentAt.getTime() + rule.escalateAfterDays * 86_400_000);
     if (escalateAt.getTime() > now.getTime()) continue;
@@ -460,7 +534,7 @@ export async function escalateUnhandledReminders(now = new Date()): Promise<{ es
     // suffix) so it benefits from the exact same unique-key dedupe as any
     // other reminder, rather than inventing a parallel "escalated"
     // boolean flag that could drift out of sync under concurrent cron runs.
-    const escalationKey = `${occ.idempotencyKey}:escalation`;
+    const escalationKey = `${occ.idempotencyKey}${ESCALATION_SUFFIX}`;
     const already = await prisma.reminderOccurrence.findUnique({ where: { idempotencyKey: escalationKey } });
     if (already) continue;
 

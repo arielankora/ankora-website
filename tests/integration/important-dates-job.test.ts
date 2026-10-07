@@ -216,12 +216,13 @@ describe("sendPendingReminders() via reconcileImportantDates() - once, on the ri
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  // PRODUCT BUG (found 2026-10-07): sendPendingReminders() never re-checks
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: sendPendingReminders() never re-checks
   // the date it is reminding about. A reminder whose email failed is
   // retried on the following runs even after the date was deleted (or
   // paused/archived), so the owner and every extra recipient get
   // "תזכורת: ..." for a date somebody removed on purpose.
-  it.fails("does not retry a failed reminder once its date has been deleted", async () => {
+  it("does not retry a failed reminder once its date has been deleted", async () => {
     const { owner, client } = await setup();
     const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7, sendInApp: false, sendEmail: true }] });
     vi.mocked(sendEmail).mockResolvedValueOnce({ ok: false, error: "provider down" });
@@ -234,14 +235,15 @@ describe("sendPendingReminders() via reconcileImportantDates() - once, on the ri
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  // PRODUCT BUG (found 2026-10-07): marking a date "טופל למופע הנוכחי"
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: marking a date "טופל למופע הנוכחי"
   // (HANDLED_CURRENT) does not stop that same occurrence's remaining
   // reminders - createDueReminderOccurrences() only skips ARCHIVED/PAUSED.
   // The doc comment on updateImportantDateStatus() describes HANDLED_CURRENT
   // as suppressing reminders until the next occurrence. User impact: the
   // owner handles the insurance renewal after the 7-day reminder and is
   // still told "מחר" the day before.
-  it.fails("stays quiet for the rest of an occurrence once it is marked handled", async () => {
+  it("stays quiet for the rest of an occurrence once it is marked handled", async () => {
     const { owner, client } = await setup();
     const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7 }, { daysBefore: 1 }] });
     await reconcileImportantDates(cronAt("2026-10-25"));
@@ -253,11 +255,12 @@ describe("sendPendingReminders() via reconcileImportantDates() - once, on the ri
     expect(await prisma.notification.count()).toBe(1);
   });
 
-  // PRODUCT BUG (found 2026-10-07): snoozeImportantDate() stores
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: snoozeImportantDate() stores
   // snoozedUntil, but nothing in the daily job reads it (grep: the column is
   // only ever written). The date page offers "דחיית טיפול (Snooze)", the
   // user picks a date, and the reminders arrive anyway.
-  it.fails("does not remind while the date is snoozed", async () => {
+  it("does not remind while the date is snoozed", async () => {
     const { owner, client } = await setup();
     const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7, sendInApp: true, sendEmail: true }] });
     await snoozeImportantDate(owner, date.id, new Date("2026-10-30T00:00:00Z"));
@@ -268,14 +271,15 @@ describe("sendPendingReminders() via reconcileImportantDates() - once, on the ri
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  // PRODUCT BUG (found 2026-10-07): the reminder idempotency key is
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: the reminder idempotency key is
   // (date, rule, occurrenceYear, channel) - built for ANNUAL dates. A
   // MONTHLY date has twelve occurrences in a year that all share one key,
   // so only the first month of each year is ever reminded; every later
   // month hits the unique constraint and is silently skipped. The same
   // year-only key is used for auto-created tasks (buildAutoTaskOccurrenceKey),
   // so a monthly auto-task is created once a year too.
-  it.fails("reminds about a MONTHLY date every month, not only the first month of the year", async () => {
+  it("reminds about a MONTHLY date every month, not only the first month of the year", async () => {
     const { owner, client } = await setup();
     // 15.10.2026 in Israel (IDT): 14.10 21:00 UTC.
     await createDate({
@@ -295,6 +299,134 @@ describe("sendPendingReminders() via reconcileImportantDates() - once, on the ri
     // remind the day before, as it did in October.
     await reconcileImportantDates(cronAt("2026-11-14"));
     expect(await prisma.notification.count()).toBe(2);
+  });
+});
+
+// 7.10.2026: what the fixes above must NOT do. Snooze and pause postpone a
+// reminder, they do not swallow it; the switch to per-occurrence keys must
+// not re-send anything already sent under the old year-only keys.
+describe("reminders after the 7.10.2026 fixes - postponed, not lost, and never twice", () => {
+  it("sends the reminder once the snooze is over", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7, sendInApp: true, sendEmail: true }] });
+    await snoozeImportantDate(owner, date.id, new Date("2026-10-28T00:00:00Z"));
+
+    await reconcileImportantDates(cronAt("2026-10-25"));
+    await reconcileImportantDates(cronAt("2026-10-27"));
+    expect(await prisma.notification.count()).toBe(0);
+    expect(sendEmail).not.toHaveBeenCalled();
+
+    await reconcileImportantDates(cronAt("2026-10-28"));
+    expect(await prisma.notification.count()).toBe(1);
+    expect(emailsTo("owner@ankora.test")).toHaveLength(1);
+
+    // And only once.
+    await reconcileImportantDates(cronAt("2026-10-29"));
+    expect(await prisma.notification.count()).toBe(1);
+  });
+
+  it("holds a paused date's reminder and sends it when the date is resumed", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7 }] });
+    await reconcileImportantDates(cronAt("2026-10-24")); // window not open yet
+    await updateImportantDateStatus(owner, date.id, "PAUSED");
+    await reconcileImportantDates(cronAt("2026-10-25"));
+    expect(await prisma.notification.count()).toBe(0);
+
+    await updateImportantDateStatus(owner, date.id, "ACTIVE");
+    await reconcileImportantDates(cronAt("2026-10-26"));
+    expect(await prisma.notification.count()).toBe(1);
+  });
+
+  it("records a reminder silenced by 'handled' as CANCELLED, so the history says why it never went out", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({ clientId: client.id, responsibleUserId: owner.id, rules: [{ daysBefore: 7 }, { daysBefore: 1, sendInApp: false, sendEmail: true }] });
+    // Both reminders exist and the 1-day email failed, then the date is handled.
+    vi.mocked(sendEmail).mockResolvedValue({ ok: false, error: "provider down" });
+    await reconcileImportantDates(cronAt("2026-10-31"));
+    await updateImportantDateStatus(owner, date.id, "HANDLED_CURRENT");
+    vi.mocked(sendEmail).mockClear();
+
+    await reconcileImportantDates(cronAt("2026-11-01"));
+
+    expect(sendEmail).not.toHaveBeenCalled();
+    const failedEmail = await prisma.reminderOccurrence.findFirstOrThrow({ where: { channel: "EMAIL" } });
+    expect(failedEmail.status).toBe("CANCELLED");
+  });
+
+  it("does not remind a MONTHLY occurrence again that was already reminded under the old year-only key", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({
+      clientId: client.id,
+      responsibleUserId: owner.id,
+      recurrence: "MONTHLY",
+      day: 15,
+      month: 10,
+      nextOccurrenceAt: new Date("2026-10-14T21:00:00Z"),
+      rules: [{ daysBefore: 1 }],
+    });
+    // As written before 7.10.2026: the October reminder keyed on the year.
+    await prisma.reminderOccurrence.create({
+      data: {
+        importantDateId: date.id,
+        reminderRuleId: date.reminderRules[0].id,
+        occurrenceYear: 2026,
+        occurrenceDate: new Date("2026-10-14T21:00:00Z"),
+        channel: "IN_APP",
+        recipientUserId: owner.id,
+        scheduledFor: new Date("2026-10-13T21:00:00Z"),
+        status: "SENT",
+        sentAt: new Date("2026-10-14T05:00:00Z"),
+        attempts: 1,
+        idempotencyKey: `${date.id}:${date.reminderRules[0].id}:2026:IN_APP`,
+      },
+    });
+
+    await reconcileImportantDates(cronAt("2026-10-14"));
+    expect(await prisma.reminderOccurrence.count()).toBe(1);
+    expect(await prisma.notification.count()).toBe(0);
+  });
+
+  it("does not create a second task for a MONTHLY occurrence that already got one under the old year-only key", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({
+      clientId: client.id,
+      responsibleUserId: owner.id,
+      recurrence: "MONTHLY",
+      day: 15,
+      month: 10,
+      nextOccurrenceAt: new Date("2026-10-14T21:00:00Z"),
+      rules: [],
+    });
+    await prisma.importantDate.update({ where: { id: date.id }, data: { createAutoTask: true, autoTaskLeadDays: 2 } });
+    await prisma.task.create({
+      data: { clientId: client.id, title: date.title, dueDate: date.nextOccurrenceAt, importantDateId: date.id, importantDateOccurrenceKey: "occurrence:2026" },
+    });
+
+    await reconcileImportantDates(cronAt("2026-10-13"));
+    expect(await prisma.task.count({ where: { importantDateId: date.id } })).toBe(1);
+  });
+
+  it("creates a MONTHLY auto-task every month, and only once per month", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({
+      clientId: client.id,
+      responsibleUserId: owner.id,
+      recurrence: "MONTHLY",
+      day: 15,
+      month: 10,
+      nextOccurrenceAt: new Date("2026-10-14T21:00:00Z"),
+      rules: [],
+    });
+    await prisma.importantDate.update({ where: { id: date.id }, data: { createAutoTask: true, autoTaskLeadDays: 2 } });
+
+    await reconcileImportantDates(cronAt("2026-10-13"));
+    await reconcileImportantDates(cronAt("2026-10-14"));
+    await reconcileImportantDates(cronAt("2026-11-13"));
+    await reconcileImportantDates(cronAt("2026-11-14"));
+
+    const tasks = await prisma.task.findMany({ where: { importantDateId: date.id }, orderBy: { dueDate: "asc" } });
+    expect(tasks.map((t) => t.dueDate?.toISOString())).toEqual(["2026-10-14T21:00:00.000Z", "2026-11-14T22:00:00.000Z"]);
   });
 });
 
@@ -347,13 +479,14 @@ describe("escalateUnhandledReminders() - only after the configured delay, only t
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  // PRODUCT BUG (found 2026-10-07): the escalation is stored as a SENT
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: the escalation is stored as a SENT
   // EMAIL ReminderOccurrence under the same rule, so the next run treats
   // the escalation itself as a reminder to escalate (key
   // "...:escalation:escalation"), and so on every escalateAfterDays until
   // someone handles the date. The comment above the idempotency check says
   // the escalation row exists precisely to make it happen once.
-  it.fails("escalates a reminder only once, not again every escalateAfterDays", async () => {
+  it("escalates a reminder only once, not again every escalateAfterDays", async () => {
     await escalatingDate();
     await reconcileImportantDates(cronAt("2026-10-27"));
     await reconcileImportantDates(cronAt("2026-10-29"));
@@ -361,21 +494,23 @@ describe("escalateUnhandledReminders() - only after the configured delay, only t
     expect(sendEmail).toHaveBeenCalledTimes(1);
   });
 
-  // PRODUCT BUG (found 2026-10-07): escalation does not check deletedAt,
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: escalation does not check deletedAt,
   // so deleting a date after its reminder still mails every admin
   // "הסלמה: ..." about it.
-  it.fails("does not escalate a date that was deleted after its reminder", async () => {
+  it("does not escalate a date that was deleted after its reminder", async () => {
     const { owner, date } = await escalatingDate();
     await deleteImportantDate(owner, date.id);
     await reconcileImportantDates(cronAt("2026-10-27"));
     expect(sendEmail).not.toHaveBeenCalled();
   });
 
-  // PRODUCT BUG (found 2026-10-07): getAdminEmails() selects by role only,
+  // Found 2026-10-07, fixed the same day (reminderGate, occurrenceKeyFor,
+  // activeAdminEmails in important-dates-job.ts). Was: getAdminEmails() selects by role only,
   // never by status, so an admin whose account was SUSPENDED or ARCHIVED
   // (someone who left Ankora) keeps receiving escalation emails naming
   // clients and their dates.
-  it.fails("does not send escalations to a suspended or archived admin", async () => {
+  it("does not send escalations to a suspended or archived admin", async () => {
     const ctx = await escalatingDate();
     await prisma.user.update({ where: { id: ctx.admin.id }, data: { status: "ARCHIVED" } });
 
