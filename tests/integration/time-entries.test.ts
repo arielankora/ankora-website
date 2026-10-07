@@ -18,7 +18,9 @@ import {
   BackdateReasonRequiredError,
   ConflictError,
   FutureEntryError,
+  NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
+import { createTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
 async function setupEmployeeWithClient() {
@@ -159,8 +161,8 @@ describe("parallel timers", () => {
     const tenMinutesAgo = new Date(Date.now() - 10 * 60_000);
     await prisma.timeEntry.updateMany({ where: { id: { in: [first.id, second.id] } }, data: { startAt: tenMinutesAgo } });
 
-    const a = await stopTimer(employee, first.id);
-    const b = await stopTimer(employee, second.id);
+    const a = await stopTimer(employee, first.id, { note: "בדיקה" });
+    const b = await stopTimer(employee, second.id, { note: "בדיקה" });
     expect(a.actualSeconds).toBeGreaterThanOrEqual(600);
     expect(b.actualSeconds).toBeGreaterThanOrEqual(600);
     expect(a.billableSeconds).toBe(a.actualSeconds);
@@ -205,7 +207,7 @@ describe("parallel timers", () => {
   it("lets a stopped timer be reopened next to another client's timer, without asking again", async () => {
     const { employee, clients, category } = await setupWithClients(2);
     const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
-    await stopTimer(employee, first.id);
+    await stopTimer(employee, first.id, { note: "בדיקה" });
     const second = await startTimer(employee, { clientId: clients[1].id, categoryId: category.id });
 
     const reopened = await reopenTimer(employee, first.id);
@@ -220,7 +222,7 @@ describe("parallel timers", () => {
   it("refuses to reopen a stopped timer while its client has another timer running", async () => {
     const { employee, clients, category } = await setupWithClients(1);
     const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
-    await stopTimer(employee, first.id);
+    await stopTimer(employee, first.id, { note: "בדיקה" });
     await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
 
     await expect(reopenTimer(employee, first.id)).rejects.toBeInstanceOf(SameClientTimerError);
@@ -229,7 +231,7 @@ describe("parallel timers", () => {
   it("refuses to reopen a stopped timer when two others are running", async () => {
     const { employee, clients, category } = await setupWithClients(3);
     const first = await startTimer(employee, { clientId: clients[0].id, categoryId: category.id });
-    await stopTimer(employee, first.id);
+    await stopTimer(employee, first.id, { note: "בדיקה" });
     await startTimer(employee, { clientId: clients[1].id, categoryId: category.id });
     await startTimer(employee, { clientId: clients[2].id, categoryId: category.id, confirmParallel: true });
 
@@ -245,7 +247,7 @@ describe("parallel timers", () => {
       confirmParallel: true,
     });
 
-    await stopTimer(employee, first.id);
+    await stopTimer(employee, first.id, { note: "בדיקה" });
 
     const active = await getActiveTimers(employee.id);
     expect(active.map((t) => t.id)).toEqual([second.id]);
@@ -265,7 +267,7 @@ describe("stopTimer - spec 6.1 / 18.1 timer/stop, 18.2 idempotency", () => {
       isManual: false,
     });
 
-    const stopped = await stopTimer(employee, started.id);
+    const stopped = await stopTimer(employee, started.id, { note: "בדיקה" });
 
     expect(stopped.endAt).not.toBeNull();
     expect(stopped.actualSeconds).toBeGreaterThanOrEqual(59);
@@ -283,8 +285,8 @@ describe("stopTimer - spec 6.1 / 18.1 timer/stop, 18.2 idempotency", () => {
       isManual: false,
     });
 
-    const first = await stopTimer(employee, started.id);
-    const second = await stopTimer(employee, started.id);
+    const first = await stopTimer(employee, started.id, { note: "בדיקה" });
+    const second = await stopTimer(employee, started.id, { note: "בדיקה" });
 
     expect(second.endAt?.getTime()).toBe(first.endAt?.getTime());
     expect(second.actualSeconds).toBe(first.actualSeconds);
@@ -318,6 +320,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt: yesterday,
         endAt: yesterdayEnd,
@@ -326,6 +329,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     const entry = await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt: yesterday,
       endAt: yesterdayEnd,
@@ -347,6 +351,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt: futureStart,
         endAt: futureEnd,
@@ -362,6 +367,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt,
         endAt: futureEnd,
@@ -376,6 +382,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt: t,
         endAt: t,
@@ -388,6 +395,7 @@ describe("createManualEntry - spec 6.3", () => {
     const { startAt, endAt } = pastWindow(1, 120);
     await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt,
       endAt,
@@ -414,6 +422,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt: overlapStart,
         endAt: overlapEnd,
@@ -425,6 +434,7 @@ describe("createManualEntry - spec 6.3", () => {
     await expect(
       createManualEntry(employee, employee.id, {
         clientId: client.id,
+        note: "בדיקה",
         categoryId: category.id,
         startAt: overlapStart,
         endAt: overlapEnd,
@@ -453,6 +463,7 @@ describe("createManualEntry - spec 6.3", () => {
     const base = new Date(Date.now() - 4 * 3600_000);
     await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt: base,
       endAt: new Date(base.getTime() + 3600_000),
@@ -461,6 +472,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     const err = await createManualEntry(employee, employee.id, {
       clientId: otherClient.id,
+      note: "בדיקה",
       categoryId: otherCategory.id,
       startAt: new Date(base.getTime() + 1_800_000),
       endAt: new Date(base.getTime() + 5_400_000),
@@ -477,6 +489,7 @@ describe("createManualEntry - spec 6.3", () => {
     const base = new Date(Date.now() - 4 * 3600_000);
     const first = await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt: base,
       endAt: new Date(base.getTime() + 3600_000),
@@ -485,6 +498,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     const entry = await createManualEntry(employee, employee.id, {
       clientId: otherClient.id,
+      note: "בדיקה",
       categoryId: otherCategory.id,
       startAt: new Date(base.getTime() + 1_800_000),
       endAt: new Date(base.getTime() + 5_400_000),
@@ -510,6 +524,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     await createManualEntry(employee, employee.id, {
       clientId: otherClient.id,
+      note: "בדיקה",
       categoryId: otherCategory.id,
       startAt: base,
       endAt: new Date(base.getTime() + 3600_000),
@@ -517,6 +532,7 @@ describe("createManualEntry - spec 6.3", () => {
     });
     await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt: new Date(base.getTime() + 1_800_000),
       endAt: new Date(base.getTime() + 5_400_000),
@@ -526,6 +542,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     const err = await createManualEntry(employee, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt: new Date(base.getTime() + 900_000),
       endAt: new Date(base.getTime() + 4_500_000),
@@ -543,6 +560,7 @@ describe("createManualEntry - spec 6.3", () => {
 
     const entry = await createManualEntry(superAdmin, employee.id, {
       clientId: client.id,
+      note: "בדיקה",
       categoryId: category.id,
       startAt,
       endAt,
@@ -770,5 +788,106 @@ describe("deleteTimeEntry - spec 5.1 soft delete only", () => {
 
     const next = await startTimer(employee, { clientId: client.id, categoryId: category.id });
     expect(next.endAt).toBeNull();
+  });
+});
+
+// 7.10.2026, Ariel: the client activity summary is written from what each
+// entry says it was. An entry on a task says it through the task; an
+// entry on no task has to say it in a note.
+describe("an entry with no task needs a note", () => {
+  async function setupWithTask() {
+    const base = await setupEmployeeWithClient();
+    const task = await createTask(base.superAdmin, {
+      clientId: base.client.id,
+      categoryId: base.category.id,
+      title: "תעודת מקור לברזיל",
+    });
+    return { ...base, task };
+  }
+
+  it("refuses a manual entry with neither", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const { startAt, endAt } = pastWindow(1);
+    await expect(
+      createManualEntry(employee, employee.id, {
+        clientId: client.id,
+        categoryId: category.id,
+        startAt,
+        endAt,
+        note: "   ",
+        backdateReason: PAST_REASON,
+      })
+    ).rejects.toBeInstanceOf(NoteRequiredError);
+    expect(await prisma.timeEntry.count({ where: { userId: employee.id } })).toBe(0);
+  });
+
+  it("accepts a manual entry on a task with no note", async () => {
+    const { employee, client, category, task } = await setupWithTask();
+    const { startAt, endAt } = pastWindow(1);
+    const entry = await createManualEntry(employee, employee.id, {
+      clientId: client.id,
+      categoryId: category.id,
+      taskId: task.id,
+      startAt,
+      endAt,
+      backdateReason: PAST_REASON,
+    });
+    expect(entry.taskId).toBe(task.id);
+    expect(entry.note).toBeNull();
+  });
+
+  it("lets a timer start without a note, and refuses to stop it without one", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+
+    await expect(stopTimer(employee, running.id)).rejects.toBeInstanceOf(NoteRequiredError);
+    const still = await prisma.timeEntry.findUniqueOrThrow({ where: { id: running.id } });
+    expect(still.endAt).toBeNull();
+
+    const stopped = await stopTimer(employee, running.id, { note: "שיחה עם יוסי" });
+    expect(stopped.endAt).not.toBeNull();
+    expect(stopped.note).toBe("שיחה עם יוסי");
+  });
+
+  it("stops a timer whose note was written while it ran", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id, note: "בירור מול הבנק" });
+    const stopped = await stopTimer(employee, running.id);
+    expect(stopped.endAt).not.toBeNull();
+  });
+
+  it("stops a timer that is on a task without a note", async () => {
+    const { employee, client, category, task } = await setupWithTask();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id, taskId: task.id });
+    const stopped = await stopTimer(employee, running.id, { note: "" });
+    expect(stopped.endAt).not.toBeNull();
+  });
+
+  it("stops a timer when the task is attached at the stop", async () => {
+    const { employee, client, category, task } = await setupWithTask();
+    const running = await startTimer(employee, { clientId: client.id, categoryId: category.id });
+    const stopped = await stopTimer(employee, running.id, { note: "", taskId: task.id });
+    expect(stopped.taskId).toBe(task.id);
+  });
+
+  it("refuses an edit that removes the only description an entry had", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const entry = await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      note: "שיחה עם יוסי",
+    });
+    await expect(updateTimeEntry(employee, entry.id, { note: "" })).rejects.toBeInstanceOf(NoteRequiredError);
+    const unchanged = await prisma.timeEntry.findUniqueOrThrow({ where: { id: entry.id } });
+    expect(unchanged.note).toBe("שיחה עם יוסי");
+  });
+
+  it("still lets an old entry with no note have its times corrected", async () => {
+    const { employee, client, category } = await setupEmployeeWithClient();
+    const { startAt, endAt } = pastWindow(2);
+    const entry = await createTestTimeEntry({ userId: employee.id, clientId: client.id, categoryId: category.id, startAt, endAt });
+    const updated = await updateTimeEntry(employee, entry.id, { endAt: new Date(endAt.getTime() - 30 * 60_000) });
+    expect(updated.isEdited).toBe(true);
   });
 });

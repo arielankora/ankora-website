@@ -31,6 +31,17 @@ describe("toMcpToolError()", () => {
     expect(result.message).toMatch(/do not start another/i);
   });
 
+  // 7.10.2026: an entry with no task needs a note. Without its own entry
+  // here it fell through to "unexpected server error, do not retry", and
+  // the model would have told the user the save failed instead of asking
+  // for the one sentence that makes it succeed.
+  it("asks for the note when an entry on no task has none, and allows the retry", () => {
+    const result = toMcpToolError(namedError("NoteRequiredError"));
+    expect(result.recoverable).toBe(true);
+    expect(result.message).toMatch(/note/i);
+    expect(result.message).not.toMatch(/unexpected server error/i);
+  });
+
   it("points the parallel-timer limit at the tools that resolve it", () => {
     const result = toMcpToolError(namedError("TimerLimitError"));
     expect(result.recoverable).toBe(true);

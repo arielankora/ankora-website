@@ -50,8 +50,13 @@ const FIXTURE = /תיאום מול ועד הבית/;
 async function clearRunningTimer(page: import("@playwright/test").Page) {
   await page.goto(TIMER, { waitUntil: "domcontentloaded" });
   const stops = page.getByRole("button", { name: /עצירה ושמירה/ });
+  const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
   for (let i = 0; i < 3 && (await stops.first().isVisible().catch(() => false)); i++) {
     const before = await stops.count();
+    // 7.10.2026: a timer on no task cannot be stopped without a note.
+    // The fixture does not care what it says, only that the stop goes
+    // through; a timer that is on a task keeps whatever it carries.
+    if (!(await notes.first().inputValue())) await notes.first().fill("e2e: ניקוי טיימר");
     await stops.first().click();
     await expect(stops).toHaveCount(before - 1, { timeout: 20_000 });
   }

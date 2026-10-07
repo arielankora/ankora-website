@@ -97,6 +97,30 @@ export class BackdateReasonRequiredError extends Error {
   }
 }
 
+/// 7.10.2026, Ariel: the client activity summary (/app/reports, "תקציר
+/// פעילות ללקוח") hands every entry to an AI and asks it what was done for
+/// the client. An entry with no task and no note reaches it as a bare
+/// category and a duration, and nothing can be written about it. In the
+/// first week of October four of RIMED's ten entries were exactly that.
+///
+/// A task says what the work was, so an entry on a task needs nothing
+/// more. An entry on no task needs a few words. The message is Hebrew
+/// because every screen surfaces `err.message` as-is.
+export class NoteRequiredError extends Error {
+  constructor() {
+    super("דיווח שלא משויך למשימה צריך הערה קצרה: מה נעשה עבור הלקוח.");
+    this.name = "NoteRequiredError";
+  }
+}
+
+function hasNoteOrTask(note: string | null | undefined, taskId: string | null | undefined): boolean {
+  return !!taskId || !!note?.trim();
+}
+
+function assertNoteOrTask(note: string | null | undefined, taskId: string | null | undefined) {
+  if (!hasNoteOrTask(note, taskId)) throw new NoteRequiredError();
+}
+
 /// Overnight bug-hunt (docs/adr/0001 section 19.2): manual entries had no
 /// guard against a future start/end time. `isBackdated()` only checks
 /// "not today", so a future date was actually being mislabeled as
@@ -445,6 +469,14 @@ export async function stopTimer(
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
 
   if (!entry.endAt) {
+    // The stop is where a timer becomes a report, so it is where the
+    // note is asked for. Starting one without a note stays allowed: the
+    // note field is right there while it runs.
+    assertNoteOrTask(
+      input?.note !== undefined ? input.note : entry.note,
+      input?.taskId !== undefined ? input.taskId : entry.taskId
+    );
+
     const endAt = new Date();
     const actualSeconds = Math.max(0, Math.round((endAt.getTime() - entry.startAt.getTime()) / 1000));
     // Phase 3: billable diverges from actual per the client's
@@ -624,6 +656,7 @@ export async function createManualEntry(
   await assertClientAccess({ ...actor, id: targetUserId } as User, input.clientId);
   await assertActiveTargets(actor, input.clientId, input.categoryId);
   await assertTaskMatchesClient(input.clientId, input.taskId);
+  assertNoteOrTask(input.note, input.taskId);
 
   if (isBackdated(input.startAt) && !input.backdateReason?.trim()) {
     throw new BackdateReasonRequiredError();
@@ -725,6 +758,16 @@ export async function updateTimeEntry(
     startAt: keepStoredIfSameMinute(input.startAt, entry.startAt),
     endAt: keepStoredIfSameMinute(input.endAt, entry.endAt),
   };
+
+  // An edit may not take away the only thing that says what the work
+  // was. It does not demand a note from an entry that never had one:
+  // entries from before 7.10.2026 can still have their times corrected
+  // without someone first inventing a description for them.
+  const nextNote = input.note !== undefined ? input.note : entry.note;
+  const nextTaskId = input.taskId !== undefined ? input.taskId : entry.taskId;
+  if (hasNoteOrTask(entry.note, entry.taskId) && !hasNoteOrTask(nextNote, nextTaskId)) {
+    throw new NoteRequiredError();
+  }
 
   const nextStartAt = input.startAt ?? entry.startAt;
   const nextEndAt = input.endAt ?? entry.endAt;

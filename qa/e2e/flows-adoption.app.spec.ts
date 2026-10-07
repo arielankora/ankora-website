@@ -196,8 +196,13 @@ test("stopping the timer asks what stage the promise is at", async ({ page }) =>
   // first, and a question here would read as a broken mechanism. Up to
   // two can be running, so stop every one.
   const runningStops = page.getByRole("button", { name: /עצירה ושמירה/ });
+  const runningNotes = page.getByPlaceholder("על מה עובדים עכשיו?");
   for (let i = 0; i < 3 && (await runningStops.first().isVisible().catch(() => false)); i++) {
     const before = await runningStops.count();
+    // 7.10.2026: a timer on no task cannot be stopped without a note.
+    // The fixture does not care what it says, only that the stop goes
+    // through; a timer that is on a task keeps whatever it carries.
+    if (!(await runningNotes.first().inputValue())) await runningNotes.first().fill("e2e: ניקוי טיימר");
     await runningStops.first().click();
     await expect(runningStops).toHaveCount(before - 1, { timeout: 20_000 });
   }

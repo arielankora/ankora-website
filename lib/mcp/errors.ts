@@ -78,6 +78,11 @@ const KNOWN: Record<string, McpToolError> = {
       "Backdated entries require a reason. Ask the user why the entry is being added late, then call the tool again with that reason.",
     recoverable: true,
   },
+  NoteRequiredError: {
+    message:
+      "Ankora requires a short note on any time entry that is not linked to a task, because the client's activity summary is written from these notes. Ask the user in a few words what was done for the client, then call the tool again with that note (or with the task, if the work belongs to one).",
+    recoverable: true,
+  },
   FutureEntryError: {
     message:
       "The entry ends in the future, which Ankora does not accept. Check the date and time with the user and call again.",

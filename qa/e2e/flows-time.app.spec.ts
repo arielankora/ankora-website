@@ -133,9 +133,13 @@ test.describe("timer/actions - start and stop", () => {
     await expect(stops, "the parallel timer did not start").toHaveCount(2, { timeout: 15_000 });
     await expect(page.getByText(/רצים 2 טיימרים/)).toBeVisible();
 
+    // Both were started on no task, so each needs a note to stop.
+    const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
+    await notes.first().fill(tag("e2e-parallel-a"));
     await stops.first().click();
     await expect(stops, "stopping one should leave the other running").toHaveCount(1, { timeout: 15_000 });
 
+    await notes.first().fill(tag("e2e-parallel-b"));
     await stops.first().click();
     await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 15_000 });
   });
