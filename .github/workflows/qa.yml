@@ -147,7 +147,19 @@ jobs:
             else
               echo "value=2" >> "$GITHUB_OUTPUT"
             fi
-          elif git diff --name-only "origin/${{ github.base_ref }}...HEAD" \
+          # 7.10.2026: the diff is taken on its own line first. It used to
+          # be piped straight into grep, so when it FAILED (a stacked pull
+          # request whose base branch had been merged and deleted: there
+          # is no origin/<base> to diff against) grep saw nothing, the
+          # condition was false, and the run fell through to level 1 in
+          # silence. #155, a fix to client-facing portal code, ran that
+          # way once. A gate that cannot tell what changed now assumes the
+          # worst and runs level 2.
+          elif ! CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>&1); then
+            echo "could not diff against origin/${{ github.base_ref }} - running level 2 rather than guessing:"
+            echo "$CHANGED"
+            echo "value=2" >> "$GITHUB_OUTPUT"
+          elif printf '%s\n' "$CHANGED" \
                | grep -qE '^(qa/(e2e/|playwright\.config\.ts|checks/vitest\.mjs)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
             # Level 1 runs types, lint and the unit suite. It does not run
             # the integration suite, and it does not open a browser - so a
