@@ -6,133 +6,133 @@
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/categories/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/clients/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/hour-banks/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/important-dates/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/my-time/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/notifications/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/portal/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/profile/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/report-schedules/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/tasks/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/time-entries/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/timer/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/(authenticated)/users/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/forgot-password/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/login/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "action:(product)/app/reset-password/actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/admin/login": {
       "kind": "api",
       "area": "blog-admin",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/admin/logout": {
       "kind": "api",
       "area": "blog-admin",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/admin/posts": {
@@ -159,15 +159,16 @@
     "api:/api/audit-log/export": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "audit trail leaves the system"
     },
     "api:/api/auth/[...nextauth]": {
       "kind": "api",
       "area": "api",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/contact": {
@@ -180,114 +181,121 @@
     "api:/api/cron/alerts-reconcile": {
       "kind": "api",
       "area": "cron",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "cron, emails clients"
     },
     "api:/api/cron/scheduled-reports": {
       "kind": "api",
       "area": "cron",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "cron, emails clients"
     },
     "api:/api/health": {
       "kind": "api",
       "area": "api",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp": {
       "kind": "api",
       "area": "mcp",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "MCP entry point"
     },
     "api:/api/mcp/oauth/authorize": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp/oauth/consent": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp/oauth/metadata/authorization-server": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp/oauth/metadata/protected-resource": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp/oauth/register": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/mcp/oauth/token": {
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "api:/api/portal/export": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "client data leaves the system"
     },
     "api:/api/reports/export": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "all-client data leaves the system"
     },
     "api:/api/time-entries/export": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "all-client data leaves the system"
     },
     "cron:/api/cron/alerts-reconcile": {
       "kind": "cron",
       "area": "cron",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "cron:/api/cron/scheduled-reports": {
       "kind": "cron",
       "area": "cron",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:alerts": {
       "kind": "domain",
       "area": "app",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "unattended client emails"
     },
     "domain:backup-export": {
       "kind": "domain",
@@ -307,42 +315,42 @@
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:categories": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:client-portal": {
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:clients": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:hour-banks": {
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:important-dates": {
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:important-dates-holidays": {
@@ -355,9 +363,10 @@
     "domain:important-dates-job": {
       "kind": "domain",
       "area": "app",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "unattended reminders and escalations"
     },
     "domain:important-dates-recurrence": {
       "kind": "domain",
@@ -384,7 +393,7 @@
       "kind": "domain",
       "area": "app",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:overview-trend": {
@@ -404,15 +413,16 @@
     "domain:report-schedules": {
       "kind": "domain",
       "area": "app",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "emails client data unattended"
     },
     "domain:reports": {
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:tasks": {
@@ -426,21 +436,21 @@
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "domain:users": {
       "kind": "domain",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "mcp:create_time_entry": {
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "mcp:get_active_timer": {
@@ -474,36 +484,38 @@
     "mcp:list_team_members": {
       "kind": "mcp-tool",
       "area": "mcp",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "staff roster to a third-party model"
     },
     "mcp:list_team_time_entries": {
       "kind": "mcp-tool",
       "area": "mcp",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-20",
+      "riskReason": "others' time to a third-party model"
     },
     "mcp:start_timer": {
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "mcp:stop_timer": {
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "mcp:update_timer_note": {
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "page:/[locale]": {
@@ -531,7 +543,7 @@
       "kind": "page",
       "area": "blog-admin",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "page:/[locale]/admin/posts/edit": {
@@ -727,7 +739,7 @@
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "screen:/app/guide": {
@@ -769,7 +781,7 @@
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "screen:/app/my-time": {
@@ -790,7 +802,7 @@
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "screen:/app/portal": {
@@ -846,7 +858,7 @@
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
     "screen:/app/tasks": {
@@ -916,7 +928,7 @@
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-21"
     },
     "mcp:list_assignable_people": {
@@ -937,14 +949,14 @@
       "kind": "mcp-tool",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-21"
     },
     "action:(product)/app/(authenticated)/mcp-actions": {
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-21"
     },
     "domain:time-entry-overlap": {
@@ -979,21 +991,21 @@
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-22"
     },
     "screen:/app/login-link": {
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-22"
     },
     "screen:/app/login-link/request": {
       "kind": "screen",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-22"
     },
     "screen:/app/portal/activity": {
@@ -1014,7 +1026,7 @@
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-22"
     },
     "domain:decisions": {
@@ -1035,22 +1047,24 @@
       "kind": "server-action",
       "area": "app",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-09-23"
     },
     "api:/api/portal/documents/[documentId]": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-23"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-23",
+      "riskReason": "client documents, isolation"
     },
     "domain:client-documents": {
       "kind": "domain",
       "area": "app",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-09-23"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-09-23",
+      "riskReason": "client isolation"
     },
     "domain:client-file": {
       "kind": "domain",
@@ -1133,15 +1147,16 @@
       "kind": "api",
       "area": "mcp",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-10-03"
     },
     "api:/api/mcp/portal": {
       "kind": "api",
       "area": "mcp",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-10-03"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-03",
+      "riskReason": "MCP entry point for clients"
     },
     "domain:parallel-timers": {
       "kind": "domain",
@@ -1216,16 +1231,18 @@
     "api:/api/step-up/passkey/options": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-10-06"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-06",
+      "riskReason": "gate to the credentials vault"
     },
     "api:/api/step-up/passkey/verify": {
       "kind": "api",
       "area": "api",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-10-06"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-06",
+      "riskReason": "gate to the credentials vault"
     },
     "domain:credential-exposure": {
       "kind": "domain",
