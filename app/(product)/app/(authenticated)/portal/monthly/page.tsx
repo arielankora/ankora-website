@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/app-auth/session";
-import { parsePeriodOffset, MAX_MONTH_OFFSET } from "@/lib/period-offset";
+import { parsePeriodOffset, MAX_MONTH_OFFSET, israelMonthReference } from "@/lib/period-offset";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
@@ -40,8 +40,8 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
   const user = await requireUser();
 
   const monthOffset = parsePeriodOffset(searchParams.monthOffset, MAX_MONTH_OFFSET);
-  const referenceDate = new Date();
-  referenceDate.setUTCMonth(referenceDate.getUTCMonth() + monthOffset);
+  // Israeli month, mid-month reference: see israelMonthReference.
+  const { referenceDate } = israelMonthReference(monthOffset);
 
   let report;
   let summaries: Awaited<ReturnType<typeof getApprovedSummaries>> = [];

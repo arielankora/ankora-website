@@ -5,6 +5,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { RecipientsForm } from "../RecipientsForm";
 import { PortalTabs } from "../PortalTabs";
+import { israelMonthOffset } from "@/lib/period-offset";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -41,9 +42,10 @@ function formatMinutes(minutes: number) {
 // computed as the same monthOffset the monthly tab/export route already
 // accept. Other report types (weekly activity, etc.) have no export route
 // today, so no link is fabricated for those rows.
+// In Israeli months: a period starts at Israeli midnight on the 1st, which
+// is the previous day in UTC. See israelMonthOffset.
 function monthOffsetFor(periodStart: Date): number {
-  const now = new Date();
-  return (periodStart.getUTCFullYear() - now.getUTCFullYear()) * 12 + (periodStart.getUTCMonth() - now.getUTCMonth());
+  return israelMonthOffset(periodStart);
 }
 
 // Spec 13's History: "cycles קודמים ודוחות" - past hour-bank cycles plus

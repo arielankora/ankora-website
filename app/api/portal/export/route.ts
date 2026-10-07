@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/app-auth/session";
-import { parsePeriodOffset, MAX_MONTH_OFFSET } from "@/lib/period-offset";
+import { parsePeriodOffset, MAX_MONTH_OFFSET, israelMonthReference } from "@/lib/period-offset";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { monthlyDetailedToCsv } from "@/lib/app-domain/report-schedules";
@@ -22,12 +22,12 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const monthOffset = parsePeriodOffset(searchParams.get("monthOffset"), MAX_MONTH_OFFSET);
   const format = parseFormat(searchParams.get("format"));
-  const referenceDate = new Date();
-  referenceDate.setUTCMonth(referenceDate.getUTCMonth() + monthOffset);
+  // Israeli month, mid-month reference: see israelMonthReference.
+  const { referenceDate, year, month } = israelMonthReference(monthOffset);
 
   try {
     const report = await getMonthlyDetailed(user, referenceDate);
-    const period = `report-${referenceDate.getUTCFullYear()}-${String(referenceDate.getUTCMonth() + 1).padStart(2, "0")}`;
+    const period = `report-${year}-${String(month).padStart(2, "0")}`;
     const showEmployee = report.rows.some((r) => r.employee !== undefined);
     const headers = showEmployee
       ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "עובד"]

@@ -257,15 +257,12 @@ describe("GET /api/portal/export - the client's own monthly file", () => {
 
   // The history screen links each past monthly report to
   // ?monthOffset=-N, and the monthly screen's "previous month" button does
-  // the same. The route moves the reference date with setUTCMonth on
-  // TODAY's date, so on the 29th-31st the target month overflows: 31.10
-  // minus one month is "31.9", which JavaScript rolls to 1.10. The client
-  // asks for September and downloads October.
-  // PRODUCT BUG (found 2026-10-07): app/api/portal/export/route.ts:26 (and
-  // the same arithmetic in portal/monthly/page.tsx:44) - on the last days of
-  // a month, "previous month" in the portal returns the current month, so a
-  // client downloading last month's report receives the wrong month's hours.
-  it.fails("monthOffset=-1 on 31 October exports September, not October", async () => {
+  // the same. The route used to move the reference date with setUTCMonth on
+  // TODAY's date, so on the 29th-31st the target month overflowed: 31.10
+  // minus one month is "31.9", which JavaScript rolls to 1.10, and the
+  // client asking for September downloaded October. Found 7.10.2026, fixed
+  // with israelMonthReference (lib/period-offset.ts).
+  it("monthOffset=-1 on 31 October exports September, not October", async () => {
     const client = await createTestClient({ name: "לקוח סוף חודש" });
     const cat = await createTestCategory({ clientId: client.id, name: "כללי" });
     const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
