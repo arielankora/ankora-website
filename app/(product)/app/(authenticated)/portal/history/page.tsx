@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { RecipientsForm } from "../RecipientsForm";
 import { PortalTabs } from "../PortalTabs";
 import { israelMonthOffset } from "@/lib/period-offset";
+import { bankFigures } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -26,12 +27,6 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-function formatMinutes(minutes: number) {
-  const h = Math.floor(Math.abs(minutes) / 60);
-  const m = Math.abs(minutes) % 60;
-  const sign = minutes < 0 ? "-" : "";
-  return `${sign}${h}:${String(m).padStart(2, "0")}`;
-}
 
 // App redesign (handoff README, screen 16 "היסטוריה"): the prototype
 // shows one merged table with a "הורדה" link per row. The real domain
@@ -108,7 +103,10 @@ export default async function PortalHistoryPage() {
                         <StatusBadge label={status.label} tone={status.tone} />
                       </td>
                       <td className="px-5 py-3 text-appNavy/70">
-                        {formatMinutes(c.consumedMinutes)} / {formatMinutes(c.totalMinutes)} ({Math.round(c.utilizationPct)}%)
+                        <bdi dir="ltr">
+                          {bankFigures(c.totalMinutes, c.consumedMinutes).consumed} / {bankFigures(c.totalMinutes, c.consumedMinutes).total}
+                        </bdi>{" "}
+                        ({Math.round(c.utilizationPct)}%)
                       </td>
                     </tr>
                   );

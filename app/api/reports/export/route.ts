@@ -4,6 +4,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportType } from "@/lib/app-domain/reports";
 import { getClient } from "@/lib/app-domain/clients";
 import { toCsv } from "@/lib/csv";
+import { formatReportCell } from "@/lib/report-cell";
 import { attachmentDisposition } from "@/lib/http-headers";
 import type { TimeEntrySource } from "@prisma/client";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
@@ -112,6 +113,11 @@ export async function GET(req: NextRequest) {
     // Dynamic import - see the comment on the xlsx branch above (ADR 0001
     // section 18.14): pdfkit + fontkit are only loaded for pdf requests.
     const { toPdfTable } = await import("@/lib/pdf");
+    // CSV and XLSX keep raw integer minutes for calculation (spec 21). A
+    // PDF is only ever read, so it gets the same text as the screen: bank
+    // figures in decimal hours, an overrun as "חריגה 0.35", durations as
+    // H:MM. Before October 2026 it printed raw minutes ("1507", "-21").
+    const pdfRows = result.rows.map((row) => result.columns.map((c) => formatReportCell(row, c).text));
     const rangeParts = [
       filters.from ? filters.from.toLocaleDateString("he-IL") : null,
       filters.to ? filters.to.toLocaleDateString("he-IL") : null,
@@ -120,7 +126,7 @@ export async function GET(req: NextRequest) {
       title: reportLabel,
       subtitle: rangeParts.length ? rangeParts.join(" - ") : undefined,
       headers,
-      rows,
+      rows: pdfRows,
     });
     const filename = `${type}_${clientSlug}_${dateStr}.pdf`;
     return new Response(buf, {

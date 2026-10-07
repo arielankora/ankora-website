@@ -51,3 +51,17 @@ export function bankFigures(totalMinutes: number, consumedMinutes: number): Bank
     overdrawn: remaining < 0,
   };
 }
+
+/// Minutes as clock-style "H:MM", for durations that are NOT a bank balance
+/// (a single entry, a day's total, a running timer). Sign-safe: the sign is
+/// taken once and the hours and minutes are computed from the absolute value.
+///
+/// October 2026: the reports table did `Math.floor(-21 / 60)` and `-21 % 60`
+/// on an overdrawn bank and printed "-1:-21" for an overrun of 21 minutes,
+/// which a right-to-left table then scrambled into "21-:1-". Every H:MM
+/// formatter in the app now goes through here.
+export function formatClockMinutes(minutes: number): string {
+  const sign = minutes < 0 ? "-" : "";
+  const abs = Math.abs(Math.round(minutes));
+  return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
+}
