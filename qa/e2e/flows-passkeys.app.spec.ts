@@ -56,9 +56,18 @@ test("enrol Touch ID, then reveal a credential with it", async ({ page }) => {
     .toBe(true);
 
   // Enrol.
+  //
+  // The cookie lands before Auth.js's redirect chain has finished, and the
+  // tail of that chain (a hop to the 127.0.0.1 login page) can still fire
+  // after this goto starts. In #159's run it did: "page.goto ... is
+  // interrupted by another navigation to .../app/login?callbackUrl=...".
+  // So the goto is retried until it lands on the profile page instead of
+  // a login screen, rather than assuming the chain is over.
   const deviceName = tag("E2E Mac");
-  await page.goto(`${ORIGIN}/app/profile`);
-  await expect(page).not.toHaveURL(/\/login/);
+  await expect(async () => {
+    await page.goto(`${ORIGIN}/app/profile`);
+    await expect(page).not.toHaveURL(/\/login/);
+  }).toPass({ timeout: 30_000 });
   const card = page.locator("#passkeys");
   await card.getByRole("button", { name: "הוספת passkey" }).click();
   await card.locator('input[name="name"]').fill(deviceName);
