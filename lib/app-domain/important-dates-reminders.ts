@@ -102,10 +102,30 @@ export const DEFAULT_REMINDER_OFFSETS_BY_CATEGORY: Record<ImportantDateCategoryL
 export function buildReminderIdempotencyKey(params: {
   importantDateId: string;
   reminderRuleId: string;
-  occurrenceYear: number;
+  /// The occurrence this reminder belongs to - see occurrenceKeyFor.
+  occurrence: string | number;
   channel: "IN_APP" | "EMAIL";
 }): string {
-  return `${params.importantDateId}:${params.reminderRuleId}:${params.occurrenceYear}:${params.channel}`;
+  return `${params.importantDateId}:${params.reminderRuleId}:${params.occurrence}:${params.channel}`;
+}
+
+/// Which occurrence a reminder or auto-task belongs to, as it appears in
+/// the idempotency keys.
+///
+/// 7.10.2026. The key used to be the occurrence YEAR for every recurrence.
+/// That is right for ANNUAL and ONCE dates (one occurrence a year at most)
+/// and wrong for MONTHLY and CUSTOM_INTERVAL ones: all of a year's
+/// occurrences shared one key, so only the first was ever reminded and
+/// every later one hit the unique constraint and was skipped in silence.
+/// Sub-annual dates now key on the occurrence's own Israeli date. ANNUAL
+/// and ONCE keep the year, so rows written before this change still match
+/// and nothing already sent is sent again.
+export function occurrenceKeyFor(
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL",
+  occurrenceYear: number,
+  occurrenceLocalDate: string
+): string | number {
+  return recurrence === "MONTHLY" || recurrence === "CUSTOM_INTERVAL" ? occurrenceLocalDate : occurrenceYear;
 }
 
 /// Builds Task.importantDateOccurrenceKey for an auto-created task (spec:
@@ -117,8 +137,8 @@ export function buildReminderIdempotencyKey(params: {
 /// an ImportantDate has at most one auto-task per occurrence year
 /// regardless of how many ReminderRules exist on it (createAutoTask is a
 /// property of the ImportantDate itself, not of any one rule).
-export function buildAutoTaskOccurrenceKey(occurrenceYear: number): string {
-  return `occurrence:${occurrenceYear}`;
+export function buildAutoTaskOccurrenceKey(occurrence: string | number): string {
+  return `occurrence:${occurrence}`;
 }
 
 // ---------------------------------------------------------------------------
