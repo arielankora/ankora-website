@@ -975,9 +975,26 @@ export async function getEntryRevisions(timeEntryId: string) {
 
 /// Spec 6.2: "Recent combinations: לקוח+קטגוריה+Task אחרונים" - powers
 /// the Quick Timer screen's recent/favorites picker.
+///
+/// Only combinations the person can start right now (7.10.2026). History
+/// alone used to decide, so a client the employee was taken off, an
+/// archived client or a retired category stayed on the screen as a
+/// one-click start that failed when tapped, and took one of only three
+/// slots. Managers have no UserClientAccess rows (they reach every active
+/// client), so access is checked the same way listAccessibleClients does.
 export async function listRecentCombinations(userId: string, limit = 5) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  if (!user) return [];
+  const clientRule = canManageClients(user.role)
+    ? { deletedAt: null, status: "ACTIVE" as const }
+    : { deletedAt: null, status: "ACTIVE" as const, employeeAccess: { some: { userId } } };
   const recent = await prisma.timeEntry.findMany({
-    where: { userId, deletedAt: null },
+    where: {
+      userId,
+      deletedAt: null,
+      client: clientRule,
+      category: { deletedAt: null, active: true },
+    },
     orderBy: { startAt: "desc" },
     take: 20,
     include: { client: true, category: true, task: true },

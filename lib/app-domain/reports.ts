@@ -529,7 +529,11 @@ async function capacity(filters: ReportFilters): Promise<ReportResult> {
     };
     row.actualSeconds += e.actualSeconds ?? 0;
     row.billableSeconds += e.billableSeconds ?? 0;
-    row.perClient.set(e.client.name, (row.perClient.get(e.client.name) ?? 0) + toMinutes(e.billableSeconds));
+    // Seconds, rounded once per client below. Rounding each entry first
+    // made the split disagree with the total beside it: four 90-second
+    // entries are 6 billable minutes in total but were "8" in the split
+    // (7.10.2026).
+    row.perClient.set(e.client.name, (row.perClient.get(e.client.name) ?? 0) + (e.billableSeconds ?? 0));
     byUser.set(e.userId, row);
   }
 
@@ -538,7 +542,7 @@ async function capacity(filters: ReportFilters): Promise<ReportResult> {
       employee: r.userName,
       actualMinutes: toMinutes(r.actualSeconds),
       billableMinutes: toMinutes(r.billableSeconds),
-      clientBreakdown: [...r.perClient.entries()].map(([name, minutes]) => `${name}: ${minutes}`).join("; "),
+      clientBreakdown: [...r.perClient.entries()].map(([name, seconds]) => `${name}: ${toMinutes(seconds)}`).join("; "),
     }))
     .sort((a, b) => b.billableMinutes - a.billableMinutes);
 

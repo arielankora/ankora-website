@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { addDaysToKey, dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc, weekdayOfKey } from "@/lib/timezone";
+import { addDaysToKey, dayEndInZone, dayStartInZone, localDateKey, localDateTimeToUtc, monthRangeInZone, weekdayOfKey } from "@/lib/timezone";
 
 // Phase 8 regression tests: spec section 24's pre-production checklist item
 // "Timezone tests around midnight/month boundary" was previously untested,
@@ -140,5 +140,28 @@ describe.each(["UTC", "America/New_York"])("day bounds with the server in %s", (
     const start = dayStartInZone("2026-09-28")!;
     const end = dayEndInZone("2026-09-28")!;
     expect((end.getTime() + 1 - start.getTime()) / 3600_000).toBe(24);
+  });
+});
+
+// 7.10.2026: the categories screen counted "this month" in UTC. The Israeli
+// month runs from local midnight on the 1st, which is the evening before
+// in UTC, and the offset itself changes with DST.
+describe("monthRangeInZone", () => {
+  it("is the Israeli month: 00:30 on 1.11 in Israel is November, 23:30 on 31.10 is October", () => {
+    expect(monthRangeInZone(new Date("2026-10-31T22:30:00Z"))).toEqual({
+      start: new Date("2026-10-31T22:00:00Z"),
+      end: new Date("2026-11-30T22:00:00Z"),
+    });
+    expect(monthRangeInZone(new Date("2026-10-31T21:30:00Z"))).toEqual({
+      start: new Date("2026-09-30T21:00:00Z"), // summer time on 1.10
+      end: new Date("2026-10-31T22:00:00Z"), // winter time on 1.11
+    });
+  });
+
+  it("rolls December into January of the next year", () => {
+    expect(monthRangeInZone(new Date("2026-12-15T10:00:00Z"))).toEqual({
+      start: new Date("2026-11-30T22:00:00Z"),
+      end: new Date("2026-12-31T22:00:00Z"),
+    });
   });
 });
