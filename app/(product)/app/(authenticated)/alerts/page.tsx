@@ -1,7 +1,13 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
-import { listAlertRulesForClient, listOpenAlertEvents } from "@/lib/app-domain/alerts";
+import {
+  countEnabledRulesByClient,
+  describeThreshold,
+  listAlertRulesForClient,
+  listOpenAlertEvents,
+} from "@/lib/app-domain/alerts";
+import Link from "next/link";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { AlertsClientPicker } from "./AlertsClientPicker";
@@ -11,28 +17,6 @@ import { RetryDeliveryButton } from "./RetryDeliveryButton";
 import { OpenAlertsPanel, type OpenAlertRow } from "./OpenAlertsPanel";
 
 export const metadata = { robots: { index: false, follow: false } };
-
-const THRESHOLD_LABEL: Record<string, string> = {
-  UTILIZATION_PCT: "אחוז ניצול",
-  REMAINING_MINUTES: "דקות שנותרו",
-  CONSUMED_MINUTES: "דקות שנוצלו",
-  OVERAGE: "חריגה",
-};
-
-// Spelled out in words rather than with a >=/<= symbol: a comparison
-// symbol embedded directly in RTL Hebrew text gets visually mirrored by
-// the browser's bidi algorithm (>= renders as <= on screen even though
-// the underlying character is unchanged), which would show the opposite
-// of the real breach condition from lib/app-domain/alerts.ts's
-// isThresholdBreached(). REMAINING_MINUTES breaches at-or-below the
-// threshold; every other type breaches at-or-above it.
-function describeThreshold(type: string, thresholdValue: number): string {
-  const label = THRESHOLD_LABEL[type] ?? type;
-  if (type === "REMAINING_MINUTES") {
-    return `${label}: ${thresholdValue} או פחות`;
-  }
-  return `${label}: ${thresholdValue} או יותר`;
-}
 
 function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(
@@ -74,10 +58,20 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
   const clientId = searchParams.clientId || "";
   const selectedClient = clientId ? activeClients.find((c) => c.id === clientId) : undefined;
 
-  const [rules, openEvents] = await Promise.all([
+  const [rules, openEvents, rulesByClient] = await Promise.all([
     clientId && selectedClient ? listAlertRulesForClient(clientId) : Promise.resolve([]),
     listOpenAlertEvents(),
+    countEnabledRulesByClient(),
   ]);
+
+  // Counted over the clients this screen lists, so the sentence and the
+  // overview below can never disagree.
+  const watchedClients = activeClients.filter((c) => (rulesByClient.get(c.id) ?? 0) > 0);
+  const ruleCount = watchedClients.reduce((sum, c) => sum + (rulesByClient.get(c.id) ?? 0), 0);
+  const emptyText =
+    ruleCount === 0
+      ? "אין התראות פתוחות, אבל גם לא הוגדרו כללי התראה פעילים, כך שאין על מה להתריע."
+      : `אין התראות פתוחות · ${ruleCount} כללים פעילים על ${watchedClients.length} לקוחות`;
 
   const openAlertRows: OpenAlertRow[] = openEvents.map((e) => ({
     id: e.id,
@@ -97,13 +91,32 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
           </p>
         </div>
 
-        <OpenAlertsPanel alerts={openAlertRows} />
+        <OpenAlertsPanel alerts={openAlertRows} emptyText={emptyText} />
 
         <AlertsClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 
-        {!clientId && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
-            בחרו לקוח כדי לצפות בכללי ההתראה שלו וליצור כלל חדש.
+        {/* 9.10.2026: an overview instead of an empty box. Which clients
+            are watched, by how many rules, and one click into each. A
+            client without rules is marked, because that is the one place
+            a breach would go unseen. */}
+        {!clientId && activeClients.length > 0 && (
+          <div className="rounded-2xl border border-lineDark bg-white p-5">
+            <h2 className="text-sm font-medium text-appNavy/70">כללים פעילים לפי לקוח</h2>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {activeClients.map((c) => {
+                const n = rulesByClient.get(c.id) ?? 0;
+                return (
+                  <Link
+                    key={c.id}
+                    href={`/app/alerts?clientId=${c.id}`}
+                    className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11.5px] text-appNavy/70 transition-colors hover:border-gold"
+                  >
+                    {c.name} ·{" "}
+                    {n > 0 ? <span className="font-jbmono">{n}</span> : <span className="text-warning">ללא כללים</span>}
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         )}
 

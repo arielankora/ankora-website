@@ -31,6 +31,96 @@ function normalizeEmails(emails: string[]): string[] {
   );
 }
 
+/// 9.10.2026, Ariel: every client is watched by default.
+///
+/// Until now an alert existed only if someone had written a rule for that
+/// client by hand, and nobody had. The home screen said "0 open alerts"
+/// on the same row that said two clients were past 90% of their bank: a
+/// zero that meant "not looking", read as "all clear".
+///
+/// The defaults carry NO recipients on purpose. They make the system see;
+/// they do not decide who gets mailed. A rule that emails a client is a
+/// conversation with that client, and that stays a person's decision on
+/// the Alerts screen. Until then a breach is an open alert in the app.
+///
+/// Created with the client (createClient) and backfilled for every
+/// existing client by migration 20261009120000_default_alert_rules. Not
+/// re-created by any job: a manager who deletes one meant it.
+export const DEFAULT_ALERT_RULES: ReadonlyArray<{ type: AlertThresholdType; thresholdValue: number }> = [
+  { type: "UTILIZATION_PCT", thresholdValue: 80 },
+  { type: "UTILIZATION_PCT", thresholdValue: 100 },
+];
+
+/// Adds whichever default rules the client does not already have (same
+/// type and threshold). Safe to call twice.
+export async function ensureDefaultAlertRules(actor: Pick<User, "id">, clientId: string) {
+  const existing = await prisma.alertRule.findMany({
+    where: { clientId },
+    select: { type: true, thresholdValue: true },
+  });
+  const missing = DEFAULT_ALERT_RULES.filter(
+    (d) => !existing.some((e) => e.type === d.type && e.thresholdValue === d.thresholdValue)
+  );
+  for (const d of missing) {
+    const rule = await prisma.alertRule.create({
+      data: { clientId, type: d.type, thresholdValue: d.thresholdValue, recipientsAnkora: [], recipientsClient: [] },
+    });
+    await recordAudit({
+      actorId: actor.id,
+      action: "alert_rule.create_default",
+      entityType: "AlertRule",
+      entityId: rule.id,
+      clientId,
+      after: rule,
+    });
+  }
+}
+
+/// What the alerts are actually watching: enabled rules on clients that
+/// are not archived. The number that makes a zero mean something - "no
+/// open alerts, 24 rules on 12 clients" is a fact; "0" alone is not.
+export async function getAlertCoverage(): Promise<{ ruleCount: number; clientCount: number }> {
+  const groups = await prisma.alertRule.groupBy({
+    by: ["clientId"],
+    where: { enabled: true, client: { status: { not: "ARCHIVED" }, deletedAt: null } },
+    _count: { _all: true },
+  });
+  return {
+    ruleCount: groups.reduce((sum: number, g: { _count: { _all: number } }) => sum + g._count._all, 0),
+    clientCount: groups.length,
+  };
+}
+
+/// Enabled-rule count per client, for the Alerts screen's overview.
+export async function countEnabledRulesByClient(): Promise<Map<string, number>> {
+  const groups = await prisma.alertRule.groupBy({
+    by: ["clientId"],
+    where: { enabled: true },
+    _count: { _all: true },
+  });
+  return new Map(groups.map((g: { clientId: string; _count: { _all: number } }) => [g.clientId, g._count._all]));
+}
+
+const THRESHOLD_LABEL: Record<string, string> = {
+  UTILIZATION_PCT: "אחוז ניצול",
+  REMAINING_MINUTES: "דקות שנותרו",
+  CONSUMED_MINUTES: "דקות שנוצלו",
+  OVERAGE: "חריגה",
+};
+
+/// Moved here from the Alerts screen so the home screen can say the same
+/// words. Spelled out rather than with a >=/<= symbol: a comparison symbol
+/// inside RTL Hebrew is mirrored by the bidi algorithm, and would show the
+/// opposite of isThresholdBreached(). REMAINING_MINUTES breaches at or
+/// below the threshold; every other type at or above it.
+export function describeThreshold(type: string, thresholdValue: number): string {
+  const label = THRESHOLD_LABEL[type] ?? type;
+  if (type === "REMAINING_MINUTES") {
+    return `${label}: ${thresholdValue} או פחות`;
+  }
+  return `${label}: ${thresholdValue} או יותר`;
+}
+
 /// Phase 5 Overview KPI card ("alerts" per spec section 12) - a simple
 /// count of currently-open (unresolved) alert events across every client,
 /// reusing the same resolvedAt-based state Phase 4 already tracks rather

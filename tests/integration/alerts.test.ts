@@ -9,7 +9,10 @@ import {
   deleteAlertRule,
   evaluateAlertsForClient,
   retryEmailDelivery,
+  ensureDefaultAlertRules,
+  getAlertCoverage,
 } from "@/lib/app-domain/alerts";
+import { createClient } from "@/lib/app-domain/clients";
 
 // Phase 4 - spec 9/9.1/9.2 (Alerts). Needs a real Prisma client +
 // reachable DATABASE_URL, same as every other tests/integration/*.test.ts
@@ -281,5 +284,72 @@ describe("retryEmailDelivery() - manual retry from the Alerts admin screen", () 
     const failed = await prisma.emailDelivery.findFirstOrThrow({ where: { status: "FAILED" } });
 
     await expect(retryEmailDelivery(admin, failed.id)).rejects.toThrow(ForbiddenError);
+  });
+});
+
+// 9.10.2026: every client is watched by default. The home screen said
+// "0 open alerts" because no client had a rule, not because none was in
+// trouble.
+describe("default alert rules", () => {
+  it("a new client starts with utilization rules at 80% and 100%, mailing nobody", async () => {
+    const { superAdmin } = await setup();
+    const client = await createClient(superAdmin, { name: `default-rules-${Date.now()}` });
+
+    const rules = await prisma.alertRule.findMany({ where: { clientId: client.id }, orderBy: { thresholdValue: "asc" } });
+    expect(rules.map((r) => [r.type, r.thresholdValue])).toEqual([
+      ["UTILIZATION_PCT", 80],
+      ["UTILIZATION_PCT", 100],
+    ]);
+    for (const r of rules) {
+      expect(r.enabled).toBe(true);
+      expect(r.recipientsAnkora).toEqual([]);
+      expect(r.recipientsClient).toEqual([]);
+    }
+  });
+
+  it("does not duplicate a rule the client already has", async () => {
+    const { superAdmin, client } = await setup();
+    await createAlertRule(superAdmin, client.id, {
+      type: "UTILIZATION_PCT",
+      thresholdValue: 80,
+      recipientsAnkora: ["ops@example.invalid"],
+      recipientsClient: [],
+    });
+
+    await ensureDefaultAlertRules(superAdmin, client.id);
+    await ensureDefaultAlertRules(superAdmin, client.id);
+
+    const rules = await prisma.alertRule.findMany({ where: { clientId: client.id }, orderBy: { thresholdValue: "asc" } });
+    expect(rules.map((r) => r.thresholdValue)).toEqual([80, 100]);
+    // The hand-written rule keeps its recipients.
+    expect(rules[0].recipientsAnkora).toEqual(["ops@example.invalid"]);
+  });
+
+  it("a breach of a default rule opens an alert without sending mail", async () => {
+    const { superAdmin } = await setup();
+    const client = await createClient(superAdmin, { name: `default-breach-${Date.now()}` });
+    // The factory's entry is one hour: 60 of 70 minutes is 86%, past the
+    // 80% rule and short of the 100% one.
+    await openFutureBank(superAdmin, client.id, 70);
+    const category = await createTestCategory({ clientId: client.id });
+    await createTestTimeEntry({ userId: superAdmin.id, clientId: client.id, categoryId: category.id });
+
+    await evaluateAlertsForClient(client.id);
+
+    const open = await prisma.alertEvent.findMany({ where: { rule: { clientId: client.id }, resolvedAt: null } });
+    expect(open).toHaveLength(1);
+    expect(sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("coverage counts enabled rules on clients that are not archived", async () => {
+    const { superAdmin } = await setup();
+    const before = await getAlertCoverage();
+    const client = await createClient(superAdmin, { name: `coverage-${Date.now()}` });
+    const after = await getAlertCoverage();
+    expect(after.ruleCount - before.ruleCount).toBe(2);
+    expect(after.clientCount - before.clientCount).toBe(1);
+
+    await prisma.client.update({ where: { id: client.id }, data: { status: "ARCHIVED" } });
+    expect(await getAlertCoverage()).toEqual(before);
   });
 });

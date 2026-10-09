@@ -18,13 +18,13 @@ import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { listClients } from "@/lib/app-domain/clients";
 import { cycleElapsedShare, getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
-import { countOpenAlertEvents } from "@/lib/app-domain/alerts";
+import { getAlertCoverage, listOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import { getHoursTrend } from "@/lib/app-domain/overview-trend";
 import { HoursTrendChart } from "@/components/app/HoursTrendChart";
 import { listUpcomingImportantDates } from "@/lib/app-domain/important-dates";
 import { ProgressBar } from "@/components/app/ProgressBar";
-import { ActiveTimersList, type ActiveTimerRow } from "@/components/app/ActiveTimersList";
+import { ActiveTimerMiniRows, type ActiveTimerRow } from "@/components/app/ActiveTimersList";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
@@ -44,7 +44,7 @@ async function loadOperationalMetrics() {
   const startOfMonth = localDateTimeToUtc(`${todayKey.slice(0, 8)}01`, "00:00", TIMEZONE);
   const longTimerCutoff = new Date(now.getTime() - LONG_TIMER_HOURS * 3600_000);
 
-  const [activeTimersCount, longRunningCount, todayAgg, monthAgg, activeClients, timersByPerson] = await Promise.all([
+  const [activeTimersCount, longRunningCount, todayAgg, monthAgg, activeClients, timersByPerson, todayByClient] = await Promise.all([
     prisma.timeEntry.count({ where: { endAt: null, deletedAt: null } }),
     prisma.timeEntry.count({ where: { endAt: null, deletedAt: null, startAt: { lte: longTimerCutoff } } }),
     prisma.timeEntry.aggregate({
@@ -60,6 +60,13 @@ async function loadOperationalMetrics() {
     // Grouped by person so the card can say how many people that is and
     // how many of them are running two at once.
     prisma.timeEntry.groupBy({ by: ["userId"], where: { endAt: null, deletedAt: null }, _count: { _all: true } }),
+    // 9.10.2026: the "hours today" card names its two biggest clients.
+    // Same filter as todayAgg above, so the rows add up toward the total.
+    prisma.timeEntry.groupBy({
+      by: ["clientId"],
+      where: { deletedAt: null, endAt: { not: null }, startAt: { gte: startOfToday } },
+      _sum: { actualSeconds: true },
+    }),
   ]);
 
   // One batched lookup, not one per client.
@@ -96,7 +103,24 @@ async function loadOperationalMetrics() {
   const expectedUtilizationPct = bankTotalMinutes > 0 ? Math.round((expectedMinutes / bankTotalMinutes) * 100) : null;
   const clientsNearLimitCount = bankSnapshots.filter((s) => s.utilization.utilizationPct >= 90).length;
 
+  // Names come from the active-clients list already loaded; a client that
+  // was paused today still has a name worth showing, so fall back to a
+  // lookup for whatever is missing rather than dropping its hours.
+  const todaySorted = (todayByClient as { clientId: string; _sum: { actualSeconds: number | null } }[])
+    .map((g) => ({ clientId: g.clientId, minutes: Math.round((g._sum.actualSeconds ?? 0) / 60) }))
+    .filter((g) => g.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes);
+  const topToday = todaySorted.slice(0, 2);
+  const knownNames = new Map(activeClients.map((c) => [c.id, c.name]));
+  const unknownIds = topToday.map((t) => t.clientId).filter((id) => !knownNames.has(id));
+  if (unknownIds.length > 0) {
+    const extra = await prisma.client.findMany({ where: { id: { in: unknownIds } }, select: { id: true, name: true } });
+    for (const c of extra) knownNames.set(c.id, c.name);
+  }
+
   return {
+    todayTopClients: topToday.map((t) => ({ ...t, name: knownNames.get(t.clientId) ?? "-" })),
+    todayClientCount: todaySorted.length,
     activeTimersCount,
     activeTimerPeopleCount: timersByPerson.length,
     parallelTimerPeopleCount: timersByPerson.filter((g: { _count: { _all: number } }) => g._count._all > 1).length,
@@ -155,6 +179,42 @@ async function loadActiveTimerRows(): Promise<ActiveTimerRow[]> {
   }));
 }
 
+/// A card line, not a rule definition: "הגיע ל-80% מהבנק" reads at a
+/// glance where the Alerts screen's "אחוז ניצול: 80 או יותר" describes
+/// the rule. Also keeps the word "ניצול" off this card, which the bank
+/// card next to it is found by.
+function shortAlertLabel(type: string, value: number): string {
+  switch (type) {
+    case "UTILIZATION_PCT":
+      return `הגיע ל-${value}% מהבנק`;
+    case "REMAINING_MINUTES":
+      return `נותרו ${value} דקות או פחות`;
+    case "CONSUMED_MINUTES":
+      return `${value} דקות נוצלו`;
+    case "OVERAGE":
+      return "חריגה מהבנק";
+    default:
+      return type;
+  }
+}
+
+/// 9.10.2026: the alerts card says what the number is counting. The two
+/// most recent open alerts by name, or, when there are none, how many
+/// rules are watching - so a zero reads as "all clear" only when
+/// something is actually being watched.
+async function loadAlertSummary() {
+  const [open, coverage] = await Promise.all([listOpenAlertEvents(), getAlertCoverage()]);
+  return {
+    count: open.length,
+    top: open.slice(0, 2).map((e) => ({
+      id: e.id,
+      clientName: e.rule.client.name,
+      description: shortAlertLabel(e.rule.type, e.rule.thresholdValue),
+    })),
+    ...coverage,
+  };
+}
+
 export default async function AppHomePage() {
   const user = await requireUser();
 
@@ -182,12 +242,12 @@ export default async function AppHomePage() {
   const todayKey = localDateKey(new Date());
   const startOfToday = localDateTimeToUtc(todayKey, "00:00", TIMEZONE);
 
-  const [metrics, openAlerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
+  const [metrics, alerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
     "screen.dashboard.load",
     () =>
     Promise.all([
     canSeeReports ? loadOperationalMetrics() : null,
-    canSeeAlerts ? countOpenAlertEvents() : null,
+    canSeeAlerts ? loadAlertSummary() : null,
     canSeeReports ? getHoursTrend() : null,
     // Phase 10 ("מועדים חשובים"): dashboard "upcoming dates" card - same
     // gate as the Important Dates nav item/screen itself.
@@ -309,7 +369,7 @@ export default async function AppHomePage() {
               label="טיימרים פעילים כרגע"
               value={metrics.activeTimersCount}
               footer={
-                (metrics.parallelTimerPeopleCount > 0 || metrics.longRunningCount > 0) && (
+                (metrics.parallelTimerPeopleCount > 0 || metrics.longRunningCount > 0 || metrics.activeTimersCount > 0) && (
                   <>
                     {metrics.parallelTimerPeopleCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] text-appNavy/55">
@@ -320,6 +380,15 @@ export default async function AppHomePage() {
                       <p className="mt-1.5 text-[11.5px] font-medium text-error">
                         {metrics.longRunningCount} מהם רצים מעל {LONG_TIMER_HOURS} שעות ברצף (חריגה)
                       </p>
+                    )}
+                    {/* Longest running first: loadActiveTimerRows sorts by
+                        startAt ascending. */}
+                    {activeTimerRows && (
+                      <ActiveTimerMiniRows
+                        rows={activeTimerRows.slice(0, 2)}
+                        total={activeTimerRows.length}
+                        longTimerHours={LONG_TIMER_HOURS}
+                      />
                     )}
                   </>
                 )
@@ -333,6 +402,25 @@ export default async function AppHomePage() {
               icon={Clock}
               label="שעות דווחו היום (כל הלקוחות)"
               value={formatMinutes(metrics.todayMinutes)}
+              footer={
+                metrics.todayTopClients.length > 0 && (
+                  <div className="mt-2.5 border-t border-lineDark/70 pt-1.5">
+                    {metrics.todayTopClients.map((c) => (
+                      <div key={c.clientId} className="flex items-center justify-between gap-3 py-1.5">
+                        <span className="truncate text-[12.5px] text-appNavy">{c.name}</span>
+                        <span dir="ltr" className="shrink-0 font-jbmono text-[12.5px] text-appNavy/70">
+                          {formatMinutes(c.minutes)}
+                        </span>
+                      </div>
+                    ))}
+                    {metrics.todayClientCount > metrics.todayTopClients.length && (
+                      <p className="mt-1 text-[11.5px] text-gold-dim">
+                        ועוד {metrics.todayClientCount - metrics.todayTopClients.length} לקוחות ←
+                      </p>
+                    )}
+                  </div>
+                )
+              }
             />
             <KpiCard
               href="/app/reports?type=hours_by_client"
@@ -374,7 +462,38 @@ export default async function AppHomePage() {
               }
             />
             {canSeeAlerts ? (
-              <KpiCard href="/app/alerts" icon={Bell} label="התראות פתוחות" value={openAlerts} />
+              <KpiCard
+                href="/app/alerts"
+                icon={Bell}
+                label="התראות פתוחות"
+                value={alerts?.count ?? 0}
+                footer={
+                  alerts && (
+                    <div className="mt-2.5 border-t border-lineDark/70 pt-1.5">
+                      {alerts.count > 0 ? (
+                        <>
+                          {alerts.top.map((a) => (
+                            <div key={a.id} className="py-1.5">
+                              <p className="truncate text-[12.5px] text-appNavy">{a.clientName}</p>
+                              <p className="truncate text-[11.5px] text-error">{a.description}</p>
+                            </div>
+                          ))}
+                          {alerts.count > alerts.top.length && (
+                            <p className="mt-1 text-[11.5px] text-gold-dim">ועוד {alerts.count - alerts.top.length} ←</p>
+                          )}
+                        </>
+                      ) : alerts.ruleCount > 0 ? (
+                        <p className="py-1.5 text-[12px] text-appNavy/60">
+                          הכל תקין · <span className="font-jbmono">{alerts.ruleCount}</span> כללים על{" "}
+                          <span className="font-jbmono">{alerts.clientCount}</span> לקוחות
+                        </p>
+                      ) : (
+                        <p className="py-1.5 text-[12px] font-medium text-warning">לא הוגדרו כללי התראה</p>
+                      )}
+                    </div>
+                  )
+                }
+              />
             ) : (
               <KpiCard
                 href="/app/reports"
@@ -502,14 +621,6 @@ export default async function AppHomePage() {
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {/* App redesign: live "טיימרים פעילים כרגע" list. */}
-        {activeTimerRows && activeTimerRows.length > 0 && (
-          <div>
-            <h2 className="mb-3 text-sm font-medium text-appNavy/70">טיימרים פעילים כרגע</h2>
-            <ActiveTimersList rows={activeTimerRows} longTimerHours={LONG_TIMER_HOURS} />
           </div>
         )}
 
