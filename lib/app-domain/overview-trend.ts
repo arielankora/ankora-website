@@ -108,7 +108,12 @@ export function buildSeries(
     const segments = legendKeys.map(({ key, name }) => ({
       key,
       name,
-      hours: Math.round(((totals.get(key)?.seconds ?? 0) / 3600) * 10) / 10,
+      // Unrounded on purpose. Rounding each segment to 0.1 here and then
+      // summing the rounded segments made the total depend on how many
+      // segments a bar was split into: 130.1 hours "by employee" (three
+      // segments) but 130.3 "by client" (five) for the same entries
+      // (9.10.2026). The chart rounds once, at display time.
+      hours: (totals.get(key)?.seconds ?? 0) / 3600,
     }));
     return { label, range, segments };
   });

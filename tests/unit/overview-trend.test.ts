@@ -130,3 +130,33 @@ describe("topLegend() / buildSeries() - every hour is on the chart", () => {
     expect(series.buckets[0].segments.find((s) => s.name === "אחר")?.hours).toBe(3);
   });
 });
+
+describe("buildSeries() - the total does not depend on how the bar is split", () => {
+  it("gives the same total by employee, by client and by category", () => {
+    const window = {
+      from: new Date("2026-09-27T00:00:00Z"),
+      to: new Date("2026-10-04T00:00:00Z"),
+      label: "שבוע שעבר",
+      range: "27.9 - 3.10",
+    };
+    // Five entries of 1h 3m each (1.05h). Rounded per segment to 0.1 and
+    // then summed: one segment gives 5.3, five segments give 5 x 1.1 = 5.5.
+    const entries: EntryRow[] = Array.from({ length: 5 }, (_, i) => ({
+      startAt: new Date("2026-09-28T08:00:00Z"),
+      actualSeconds: 63 * 60,
+      userId: "u1",
+      clientId: `c${i}`,
+      categoryId: `cat${i}`,
+      userName: "Hadas",
+      clientName: `לקוח ${i}`,
+      categoryName: `קטגוריה ${i}`,
+    }));
+    const totalFor = (dimension: "employee" | "client" | "category") =>
+      buildSeries(entries, dimension, [window], topLegend(entries, dimension))
+        .buckets[0].segments.reduce((sum, s) => sum + s.hours, 0);
+
+    expect(totalFor("employee")).toBeCloseTo(5.25, 9);
+    expect(totalFor("client")).toBeCloseTo(5.25, 9);
+    expect(totalFor("category")).toBeCloseTo(5.25, 9);
+  });
+});
