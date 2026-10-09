@@ -84,6 +84,9 @@ export async function updateClient(
     preferenceContact?: string | null;
     preferenceMatters?: string | null;
     preferenceNever?: string | null;
+    /// Ankora's own work, kept out of the home-page hours chart. See
+    /// Client.isInternal.
+    isInternal?: boolean;
   }
 ) {
   assertCan(actor.role, "client.manage");
@@ -118,6 +121,7 @@ export async function updateClient(
       preferenceContact: input.preferenceContact === null ? null : input.preferenceContact?.trim() || undefined,
       preferenceMatters: input.preferenceMatters === null ? null : input.preferenceMatters?.trim() || undefined,
       preferenceNever: input.preferenceNever === null ? null : input.preferenceNever?.trim() || undefined,
+      isInternal: input.isInternal,
       // Only stamp the editor when a preference actually moved, so the
       // client's screen does not report "עודכן לאחרונה" because somebody
       // changed the timezone.

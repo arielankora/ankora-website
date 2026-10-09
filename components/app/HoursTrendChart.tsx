@@ -1,12 +1,12 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain/overview-trend";
+import type { HoursTrendData, TrendBasis, TrendDimension, TrendUnit } from "@/lib/app-domain/overview-trend";
 
 /// Overview home-page widget (Ariel's request, redesign direction A
 /// follow-up). Design direction A of three proposed mockups, approved by
 /// Ariel: "מינימלי אדיטוריאלי" - thin rounded-top bars, a muted
-/// dark-to-light navy ramp (gold reserved for the "אחר" bucket only), and
+/// navy/slate palette (gold reserved for the "אחר" bucket only), and
 /// a plain text-chip legend under the chart rather than a busy built-in
 /// legend widget. Both unit x dimension combinations are precomputed
 /// server-side (see getHoursTrend) and passed in as `data`, so toggling
@@ -19,12 +19,17 @@ import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain
 /// comprehension of a trend, and every RTL analytics product (Similarweb,
 /// Wix Analytics, etc.) keeps this convention for the same reason.
 
-const NAVY_SHADES = ["#0F1B29", "#1B2A3D", "#3D5770", "#6E8FA3", "#A3BAC7"];
+// Five series colors that stay apart from each other, still inside the
+// navy/slate family of the app. The original ramp was five shades of one
+// navy, and its two darkest (#0F1B29, #1B2A3D) could not be told apart:
+// on "לפי עובד" Ariel and Hadas looked like a single block (9.10.2026).
+// Each step now changes hue as well as lightness.
+const SERIES_COLORS = ["#1B2A3D", "#4A78A6", "#7FA89C", "#A9BCCB", "#8E7FA6"];
 const OTHER_COLOR = "#B08D57";
 const OTHER_KEY = "__other__";
 
 function colorFor(key: string, index: number): string {
-  return key === OTHER_KEY ? OTHER_COLOR : NAVY_SHADES[index % NAVY_SHADES.length];
+  return key === OTHER_KEY ? OTHER_COLOR : SERIES_COLORS[index % SERIES_COLORS.length];
 }
 
 function formatHours(hours: number): string {
@@ -63,10 +68,11 @@ function SegToggle<T extends string>({
 export function HoursTrendChart({ data }: { data: HoursTrendData }) {
   const [unit, setUnit] = useState<TrendUnit>("day");
   const [dimension, setDimension] = useState<TrendDimension>("employee");
+  const [basis, setBasis] = useState<TrendBasis>("actual");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const tooltipBaseId = useId();
 
-  const series = data[unit][dimension];
+  const series = data[basis][unit][dimension];
 
   const totalsPerBucket = useMemo(
     () => series.buckets.map((b) => b.segments.reduce((sum, s) => sum + s.hours, 0)),
@@ -81,13 +87,22 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-appNavy/60">
-            שעות מדווחות · {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים"}
+            {basis === "actual" ? "שעות בפועל" : "שעות לחיוב"} ·{" "}
+            {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים, כולל השבוע"}
           </p>
           <p className="mt-1 text-3xl font-medium text-appNavy">
             {formatHours(grandTotal)} <span className="text-base font-normal text-appNavy/50">שעות</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <SegToggle
+            value={basis}
+            onChange={setBasis}
+            options={[
+              { value: "actual", label: "בפועל" },
+              { value: "billable", label: "לחיוב" },
+            ]}
+          />
           <SegToggle
             value={unit}
             onChange={setUnit}
@@ -132,7 +147,11 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                       dir="rtl"
                       className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-appNavy px-3 py-2 text-xs text-cream shadow-lg"
                     >
-                      <p className="mb-1 font-medium">{bucket.label}</p>
+                      <p className="font-medium">{bucket.label}</p>
+                      <p className="mb-1 text-cream/60">
+                        {bucket.range}
+                        {bucket.partial ? " · עד עכשיו" : ""}
+                      </p>
                       {bucket.segments
                         .filter((s) => s.hours > 0)
                         .map((s, si) => (
@@ -152,7 +171,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   )}
                   <div
                     className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
-                    style={{ height: `${barHeightPct}%` }}
+                    // A running day or week is drawn lighter: its total is
+                    // still growing and should not read as a slow period.
+                    style={{ height: `${barHeightPct}%`, opacity: bucket.partial ? 0.5 : 1 }}
                   >
                     {bucket.segments
                       .filter((s) => s.hours > 0)
@@ -173,8 +194,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
           </div>
           <div dir="ltr" className="mt-2 flex gap-2 sm:gap-4 text-center">
             {series.buckets.map((bucket, i) => (
-              <span key={bucket.label + i} className="flex-1 truncate text-[11px] text-appNavy/45">
-                {bucket.label}
+              <span key={bucket.label + i} className="flex flex-1 flex-col truncate text-[11px] text-appNavy/45">
+                <span className="truncate">{bucket.label}</span>
+                <span className="truncate text-[10px] text-appNavy/35">{bucket.range}</span>
               </span>
             ))}
           </div>

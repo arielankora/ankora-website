@@ -440,6 +440,14 @@ model Client {
   /// requires anonymity. Documented in docs/adr/0001's Phase 6 addendum.
   portalShowEmployeeNames Boolean @default(true)
 
+  /// Ankora's own internal work (onboarding, training, internal
+  /// projects) is logged against a client record like any other, so the
+  /// timer and the reports keep working. It is not client work, though,
+  /// and the home-page hours chart leaves it out: that chart answers
+  /// "how much did we work for clients", and internal hours there read
+  /// as a client that does not exist (9.10.2026, Ariel).
+  isInternal Boolean @default(false)
+
   /// Portal phase 2. Who at Ankora owns this client operationally. Shown
   /// on the portal's home screen and named on every decision, because a
   /// decision arrives from a person, not from a system - and because a
