@@ -160,7 +160,11 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                   <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-appNavy/60 sm:grid-cols-2">
                     <div>
                       <span className="font-medium text-appNavy/70">נמענים Ankora: </span>
-                      {rule.recipientsAnkora.length ? rule.recipientsAnkora.join(", ") : <span className="text-appNavy/30">-</span>}
+                      {rule.recipientsAnkora.length || rule.notifyAccountManager ? (
+                        [...rule.recipientsAnkora, ...(rule.notifyAccountManager ? ["מנהל הלקוח"] : [])].join(", ")
+                      ) : (
+                        <span className="text-appNavy/30">-</span>
+                      )}
                     </div>
                     <div>
                       <span className="font-medium text-appNavy/70">נמענים לקוח: </span>

@@ -291,7 +291,7 @@ describe("retryEmailDelivery() - manual retry from the Alerts admin screen", () 
 // "0 open alerts" because no client had a rule, not because none was in
 // trouble.
 describe("default alert rules", () => {
-  it("a new client starts with utilization rules at 80% and 100%, mailing nobody", async () => {
+  it("a new client starts with utilization rules at 80% and 100%, for Ankora only", async () => {
     const { superAdmin } = await setup();
     const client = await createClient(superAdmin, { name: `default-rules-${Date.now()}` });
 
@@ -302,7 +302,8 @@ describe("default alert rules", () => {
     ]);
     for (const r of rules) {
       expect(r.enabled).toBe(true);
-      expect(r.recipientsAnkora).toEqual([]);
+      expect(r.recipientsAnkora).toEqual(["ariel@ankora.co.il", "hadas@ankora.co.il"]);
+      expect(r.notifyAccountManager).toBe(true);
       expect(r.recipientsClient).toEqual([]);
     }
   });
@@ -325,9 +326,11 @@ describe("default alert rules", () => {
     expect(rules[0].recipientsAnkora).toEqual(["ops@example.invalid"]);
   });
 
-  it("a breach of a default rule opens an alert without sending mail", async () => {
+  it("a breach of a default rule mails Ariel, Hadas and the account manager, and not the client", async () => {
     const { superAdmin } = await setup();
     const client = await createClient(superAdmin, { name: `default-breach-${Date.now()}` });
+    const { user: manager } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: manager.id } });
     // The factory's entry is one hour: 60 of 70 minutes is 86%, past the
     // 80% rule and short of the 100% one.
     await openFutureBank(superAdmin, client.id, 70);
@@ -338,7 +341,45 @@ describe("default alert rules", () => {
 
     const open = await prisma.alertEvent.findMany({ where: { rule: { clientId: client.id }, resolvedAt: null } });
     expect(open).toHaveLength(1);
-    expect(sendEmail).not.toHaveBeenCalled();
+    expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendEmail).mock.calls[0][0].to).toEqual([
+      "ariel@ankora.co.il",
+      "hadas@ankora.co.il",
+      manager.email.toLowerCase(),
+    ]);
+  });
+
+  it("follows the current account manager, and skips one who is suspended", async () => {
+    const { superAdmin } = await setup();
+    const client = await createClient(superAdmin, { name: `default-am-${Date.now()}` });
+    const { user: manager } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "SUSPENDED" });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: manager.id } });
+    await openFutureBank(superAdmin, client.id, 70);
+    const category = await createTestCategory({ clientId: client.id });
+    await createTestTimeEntry({ userId: superAdmin.id, clientId: client.id, categoryId: category.id });
+
+    await evaluateAlertsForClient(client.id);
+
+    expect(vi.mocked(sendEmail).mock.calls[0][0].to).toEqual(["ariel@ankora.co.il", "hadas@ankora.co.il"]);
+  });
+
+  it("a hand-written rule does not mail the account manager", async () => {
+    const { superAdmin, client } = await setup();
+    const { user: manager } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: manager.id } });
+    await createAlertRule(superAdmin, client.id, {
+      type: "UTILIZATION_PCT",
+      thresholdValue: 80,
+      recipientsAnkora: ["ops@example.invalid"],
+      recipientsClient: [],
+    });
+    await openFutureBank(superAdmin, client.id, 70);
+    const category = await createTestCategory({ clientId: client.id });
+    await createTestTimeEntry({ userId: superAdmin.id, clientId: client.id, categoryId: category.id });
+
+    await evaluateAlertsForClient(client.id);
+
+    expect(vi.mocked(sendEmail).mock.calls[0][0].to).toEqual(["ops@example.invalid"]);
   });
 
   it("coverage counts enabled rules on clients that are not archived", async () => {

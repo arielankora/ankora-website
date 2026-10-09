@@ -38,14 +38,17 @@ function normalizeEmails(emails: string[]): string[] {
 /// on the same row that said two clients were past 90% of their bank: a
 /// zero that meant "not looking", read as "all clear".
 ///
-/// The defaults carry NO recipients on purpose. They make the system see;
-/// they do not decide who gets mailed. A rule that emails a client is a
-/// conversation with that client, and that stays a person's decision on
-/// the Alerts screen. Until then a breach is an open alert in the app.
+/// Who is mailed (Ariel, 9.10.2026): the Ankora side only. Ariel, Hadas,
+/// and the client's account manager, resolved when the alert fires
+/// (notifyAccountManager). Nothing goes to the client: an email to a
+/// client is a conversation with that client, and adding client
+/// recipients stays a person's decision on the Alerts screen.
 ///
 /// Created with the client (createClient) and backfilled for every
 /// existing client by migration 20261009120000_default_alert_rules. Not
 /// re-created by any job: a manager who deletes one meant it.
+export const DEFAULT_ALERT_RECIPIENTS_ANKORA: ReadonlyArray<string> = ["ariel@ankora.co.il", "hadas@ankora.co.il"];
+
 export const DEFAULT_ALERT_RULES: ReadonlyArray<{ type: AlertThresholdType; thresholdValue: number }> = [
   { type: "UTILIZATION_PCT", thresholdValue: 80 },
   { type: "UTILIZATION_PCT", thresholdValue: 100 },
@@ -63,7 +66,14 @@ export async function ensureDefaultAlertRules(actor: Pick<User, "id">, clientId:
   );
   for (const d of missing) {
     const rule = await prisma.alertRule.create({
-      data: { clientId, type: d.type, thresholdValue: d.thresholdValue, recipientsAnkora: [], recipientsClient: [] },
+      data: {
+        clientId,
+        type: d.type,
+        thresholdValue: d.thresholdValue,
+        recipientsAnkora: [...DEFAULT_ALERT_RECIPIENTS_ANKORA],
+        recipientsClient: [],
+        notifyAccountManager: true,
+      },
     });
     await recordAudit({
       actorId: actor.id,
@@ -350,6 +360,13 @@ function formatThresholdLabel(type: AlertThresholdType): string {
   }
 }
 
+/// The rule's own Ankora list plus, when the rule asks for it, the
+/// client's account manager. Deduplicated, so a manager who is also on
+/// the list is mailed once.
+export function ankoraRecipients(listed: string[], accountManagerEmail: string | null): string[] {
+  return normalizeEmails(accountManagerEmail ? [...listed, accountManagerEmail] : listed);
+}
+
 async function deliverAlertEmail(
   alertEventId: string,
   template: "ankora_internal" | "client_facing",
@@ -389,11 +406,19 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
   if (!snapshot) return; // no open/known cycle - nothing to evaluate against
 
   const { bank, utilization } = snapshot;
-  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: { accountManager: { select: { email: true, status: true, deletedAt: true } } },
+  });
   if (!client) return;
 
+  // Only a manager who can still sign in is mailed. A suspended or deleted
+  // account manager is the case where nobody would read it.
+  const am = client.accountManager;
+  const accountManagerEmail = am && am.status === "ACTIVE" && !am.deletedAt ? am.email : null;
+
   for (const rule of rules) {
-    await evaluateSingleRule(rule, bank, utilization, client.name);
+    await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail);
   }
 }
 
@@ -401,7 +426,8 @@ async function evaluateSingleRule(
   rule: AlertRule,
   bank: Pick<HourBank, "id">,
   utilization: UtilizationSnapshotForAlerts,
-  clientName: string
+  clientName: string,
+  accountManagerEmail: string | null = null
 ): Promise<void> {
   const currentValue = currentValueForThreshold(rule.type, utilization);
   const breached = isThresholdBreached(rule.type, rule.thresholdValue, currentValue);
@@ -453,7 +479,13 @@ async function evaluateSingleRule(
   ].join("\n");
 
   await Promise.all([
-    deliverAlertEmail(event.id, "ankora_internal", rule.recipientsAnkora, subjectAnkora, textAnkora),
+    deliverAlertEmail(
+      event.id,
+      "ankora_internal",
+      ankoraRecipients(rule.recipientsAnkora, rule.notifyAccountManager ? accountManagerEmail : null),
+      subjectAnkora,
+      textAnkora
+    ),
     deliverAlertEmail(event.id, "client_facing", rule.recipientsClient, subjectClient, textClient),
   ]);
 }
