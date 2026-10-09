@@ -18,11 +18,13 @@ import { cn } from "@/lib/utils";
 /**
  * ROI calculator.
  *
- * One flat illustrative Ankora rate in both locales — the English site sells the same
- * Israeli service at the same price, and the previous $35 had drifted away from ₪130
- * (Ariel's decision, C05).
+ * One flat illustrative Ankora rate in both locales: the English site sells the same
+ * Israeli service at the same price (Ariel's decision, C05).
+ *
+ * ₪160 per hour excluding VAT, decided 9.10.2026, so the calculator quotes the same
+ * rate as the highlighted package on the pricing page. It was ₪130 before that.
  */
-const ANKORA_RATE = 130;
+const ANKORA_RATE = 160;
 const EMPLOYER_OVERHEAD_MULTIPLIER = 1.33;
 /** 52 weeks over 12 months. The previous 4.33 was a rounded stand-in for this. */
 const WEEKS_PER_MONTH = 52 / 12;

@@ -41,12 +41,15 @@ export function AnkoraVsPersonalAssistantPage({
     {
       title: p.tableTitle,
       body: (
-        <ComparisonTable
-          criterionLabel={seo.criterionLabel}
-          columnA={p.columnA}
-          columnB={p.columnB}
-          rows={p.table}
-        />
+        <>
+          <ComparisonTable
+            criterionLabel={seo.criterionLabel}
+            columnA={p.columnA}
+            columnB={p.columnB}
+            rows={p.table}
+          />
+          <p className="mt-4 font-assistant text-xs font-light text-muted">{p.tableSource}</p>
+        </>
       ),
     },
     { title: p.choosePA.title, body: <ItemGrid items={p.choosePA.items} /> },

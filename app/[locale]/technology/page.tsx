@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { ogBase } from "@/lib/seo-meta";
 import TechnologyClient from "./TechnologyClient";
+import { getDictionary, type Locale } from "@/content";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { faqPageNode } from "@/lib/schema";
 
 const meta = {
   en: {
@@ -41,5 +44,12 @@ export async function generateMetadata(
 
 export default async function Page(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
-  return <TechnologyClient params={params} />;
+  const locale = (params.locale === "en" ? "en" : "he") as Locale;
+  const p = getDictionary(locale).pages.technology;
+  return (
+    <>
+      <JsonLd id="faq-schema" data={faqPageNode(p.faq.items)} />
+      <TechnologyClient params={params} />
+    </>
+  );
 }
