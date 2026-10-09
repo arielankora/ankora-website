@@ -169,11 +169,23 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   {total > 0 && (
                     <span className="mb-1 text-[10px] font-medium text-appNavy/55">{formatHours(total)}</span>
                   )}
+                  {/* A running day or week keeps its colors and gets a thin
+                      dashed cap instead: "still growing". It used to be
+                      drawn at half opacity, which changed every color in
+                      it - Hadas turned grey, Ariel light blue - so the bar
+                      no longer matched the legend and seemed to show other
+                      people (9.10.2026). The label and dates under the bar
+                      already say the period is not over. */}
+                  {bucket.partial && total > 0 && (
+                    <div
+                      aria-hidden
+                      data-partial-cap
+                      className="mb-[3px] w-full max-w-[30px] border-t-2 border-dashed border-appNavy/45"
+                    />
+                  )}
                   <div
                     className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
-                    // A running day or week is drawn lighter: its total is
-                    // still growing and should not read as a slow period.
-                    style={{ height: `${barHeightPct}%`, opacity: bucket.partial ? 0.5 : 1 }}
+                    style={{ height: `${barHeightPct}%` }}
                   >
                     {bucket.segments
                       .filter((s) => s.hours > 0)
