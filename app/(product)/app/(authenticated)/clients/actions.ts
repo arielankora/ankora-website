@@ -70,6 +70,9 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       preferenceContact: String(formData.get("preferenceContact") || "") || null,
       preferenceMatters: String(formData.get("preferenceMatters") || "") || null,
       preferenceNever: String(formData.get("preferenceNever") || "") || null,
+      // A checkbox sends nothing when unchecked, and it is always on the
+      // form, so absent means "not internal".
+      isInternal: formData.get("isInternal") === "on",
     });
   } catch (err) {
     return { error: friendlyError(err) };

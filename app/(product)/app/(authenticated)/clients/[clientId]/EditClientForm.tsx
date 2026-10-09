@@ -77,6 +77,21 @@ export function EditClientForm({
         </select>
       </div>
 
+      <label className="flex items-start gap-3 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="isInternal"
+          defaultChecked={client.isInternal}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-appNavy"
+        />
+        <span>
+          <span className="block text-sm text-appNavy">לקוח פנימי</span>
+          <span className="block text-[11px] text-appNavy/45">
+            עבודה של Ankora עצמה. השעות נרשמות ומופיעות בדוחות, אבל לא בגרף השעות במסך הבית.
+          </span>
+        </span>
+      </label>
+
       {/* Portal phase 2. Three fields that only matter because of the
           portal, grouped so they read as one subject rather than as more
           client settings. */}

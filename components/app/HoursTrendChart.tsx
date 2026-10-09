@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
-import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain/overview-trend";
+import type { HoursTrendData, TrendBasis, TrendDimension, TrendUnit } from "@/lib/app-domain/overview-trend";
 
 /// Overview home-page widget (Ariel's request, redesign direction A
 /// follow-up). Design direction A of three proposed mockups, approved by
@@ -68,10 +68,11 @@ function SegToggle<T extends string>({
 export function HoursTrendChart({ data }: { data: HoursTrendData }) {
   const [unit, setUnit] = useState<TrendUnit>("day");
   const [dimension, setDimension] = useState<TrendDimension>("employee");
+  const [basis, setBasis] = useState<TrendBasis>("actual");
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const tooltipBaseId = useId();
 
-  const series = data[unit][dimension];
+  const series = data[basis][unit][dimension];
 
   const totalsPerBucket = useMemo(
     () => series.buckets.map((b) => b.segments.reduce((sum, s) => sum + s.hours, 0)),
@@ -86,13 +87,22 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-appNavy/60">
-            שעות מדווחות · {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים"}
+            {basis === "actual" ? "שעות בפועל" : "שעות לחיוב"} ·{" "}
+            {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים, כולל השבוע"}
           </p>
           <p className="mt-1 text-3xl font-medium text-appNavy">
             {formatHours(grandTotal)} <span className="text-base font-normal text-appNavy/50">שעות</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <SegToggle
+            value={basis}
+            onChange={setBasis}
+            options={[
+              { value: "actual", label: "בפועל" },
+              { value: "billable", label: "לחיוב" },
+            ]}
+          />
           <SegToggle
             value={unit}
             onChange={setUnit}
@@ -138,7 +148,10 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                       className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-appNavy px-3 py-2 text-xs text-cream shadow-lg"
                     >
                       <p className="font-medium">{bucket.label}</p>
-                      <p className="mb-1 text-cream/60">{bucket.range}</p>
+                      <p className="mb-1 text-cream/60">
+                        {bucket.range}
+                        {bucket.partial ? " · עד עכשיו" : ""}
+                      </p>
                       {bucket.segments
                         .filter((s) => s.hours > 0)
                         .map((s, si) => (
@@ -158,7 +171,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                   )}
                   <div
                     className="flex w-full max-w-[30px] flex-col-reverse overflow-hidden rounded-t-[5px]"
-                    style={{ height: `${barHeightPct}%` }}
+                    // A running day or week is drawn lighter: its total is
+                    // still growing and should not read as a slow period.
+                    style={{ height: `${barHeightPct}%`, opacity: bucket.partial ? 0.5 : 1 }}
                   >
                     {bucket.segments
                       .filter((s) => s.hours > 0)

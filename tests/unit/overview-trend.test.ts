@@ -30,31 +30,31 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
     expect(dayWindows[13].label).toContain("רביעי"); // Wednesday
   });
 
-  it("builds 7 COMPLETE Sun-Sat week windows, excluding the current in-progress week", () => {
-    // 2026-03-04 is a Wednesday - "this week" (Sun 2026-03-01 - Sat
-    // 2026-03-07) is still in progress and must NOT appear as a bucket.
+  it("builds 6 complete Sun-Sat weeks and the current week, marked partial", () => {
+    // 2026-03-04 is a Wednesday: "this week" (Sun 2026-03-01 to Sat
+    // 2026-03-07) is in progress and is the last bucket.
     const now = new Date("2026-03-04T10:00:00Z");
     const { weekWindows } = computeTrendWindows(now);
 
     expect(weekWindows).toHaveLength(7);
-    // Most recent bucket = last week = Sun 2026-02-22 - Sun 2026-03-01 (exclusive end).
-    expect(localDateKey(weekWindows[6].from)).toBe("2026-02-22");
-    expect(localDateKey(weekWindows[6].to)).toBe("2026-03-01");
-    expect(weekWindows[6].label).toBe("שבוע שעבר");
-    // Oldest bucket = 7 complete weeks back.
-    expect(localDateKey(weekWindows[0].from)).toBe("2026-01-11");
-    expect(localDateKey(weekWindows[0].to)).toBe("2026-01-18");
-    expect(weekWindows[0].label).toBe("לפני 7 שבועות");
+    expect(localDateKey(weekWindows[6].from)).toBe("2026-03-01");
+    expect(weekWindows[6].label).toBe("השבוע");
+    expect(weekWindows[6].partial).toBe(true);
+    expect(weekWindows[6].range).toBe("1.3 - 4.3");
+    // Last complete week = Sun 2026-02-22 to Sun 2026-03-01 (exclusive end).
+    expect(localDateKey(weekWindows[5].from)).toBe("2026-02-22");
+    expect(localDateKey(weekWindows[5].to)).toBe("2026-03-01");
+    expect(weekWindows[5].label).toBe("שבוע שעבר");
+    expect(weekWindows[5].partial).toBe(false);
+    // Oldest bucket = 6 weeks back.
+    expect(localDateKey(weekWindows[0].from)).toBe("2026-01-18");
+    expect(weekWindows[0].label).toBe("לפני 6 שבועות");
     // Every window is exactly 7 days and contiguous with the next.
     for (let i = 0; i < 7; i++) {
       expect(weekWindows[i].to.getTime() - weekWindows[i].from.getTime()).toBe(7 * 24 * 3600_000);
       if (i > 0) expect(weekWindows[i].from.getTime()).toBe(weekWindows[i - 1].to.getTime());
     }
-    // No week window extends into "this week" (Sun 2026-03-01 onward).
-    const startOfThisWeek = new Date(weekWindows[6].to);
-    for (const w of weekWindows) {
-      expect(w.to.getTime()).toBeLessThanOrEqual(startOfThisWeek.getTime());
-    }
+    expect(weekWindows.filter((w) => w.partial)).toHaveLength(1);
   });
 
   it("computes correct week windows when `now` falls exactly on a Sunday (Israel local)", () => {
@@ -63,8 +63,11 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
     // immediately before it.
     const now = new Date("2026-03-01T05:00:00Z");
     const { weekWindows } = computeTrendWindows(now);
-    expect(localDateKey(weekWindows[6].to)).toBe("2026-03-01");
-    expect(localDateKey(weekWindows[6].from)).toBe("2026-02-22");
+    expect(localDateKey(weekWindows[5].to)).toBe("2026-03-01");
+    expect(localDateKey(weekWindows[5].from)).toBe("2026-02-22");
+    // On a Sunday this week is one day long.
+    expect(localDateKey(weekWindows[6].from)).toBe("2026-03-01");
+    expect(weekWindows[6].range).toBe("1.3");
   });
 
   it("handles a UTC/local calendar-day disagreement correctly (late-night UTC, next day in Israel)", () => {
@@ -80,9 +83,10 @@ describe("computeTrendWindows() - date ranges under each bar", () => {
   it("gives each week its Sunday-to-Saturday dates", () => {
     // Friday 9.10.2026, Israel. Last week is Sun 27.9 to Sat 3.10.
     const { weekWindows } = computeTrendWindows(new Date("2026-10-09T09:00:00Z"));
-    expect(weekWindows[6].label).toBe("שבוע שעבר");
-    expect(weekWindows[6].range).toBe("27.9 - 3.10");
-    expect(weekWindows[0].range).toBe("16.8 - 22.8");
+    expect(weekWindows[5].label).toBe("שבוע שעבר");
+    expect(weekWindows[5].range).toBe("27.9 - 3.10");
+    expect(weekWindows[6].range).toBe("4.10 - 9.10");
+    expect(weekWindows[0].range).toBe("23.8 - 29.8");
   });
 
   it("gives each day its date", () => {
@@ -98,6 +102,7 @@ describe("topLegend() / buildSeries() - every hour is on the chart", () => {
     to: new Date("2026-10-04T00:00:00Z"),
     label: "שבוע שעבר",
     range: "27.9 - 3.10",
+    partial: false,
   };
   // Seven categories, the largest first: 7h, 6h, ... 1h.
   const entries: EntryRow[] = Array.from({ length: 7 }, (_, i) => ({
@@ -138,6 +143,7 @@ describe("buildSeries() - the total does not depend on how the bar is split", ()
       to: new Date("2026-10-04T00:00:00Z"),
       label: "שבוע שעבר",
       range: "27.9 - 3.10",
+      partial: false,
     };
     // Five entries of 1h 3m each (1.05h). Rounded per segment to 0.1 and
     // then summed: one segment gives 5.3, five segments give 5 x 1.1 = 5.5.
@@ -158,5 +164,40 @@ describe("buildSeries() - the total does not depend on how the bar is split", ()
     expect(totalFor("employee")).toBeCloseTo(5.25, 9);
     expect(totalFor("client")).toBeCloseTo(5.25, 9);
     expect(totalFor("category")).toBeCloseTo(5.25, 9);
+  });
+});
+
+describe("buildSeries() - actual vs billable", () => {
+  const window = {
+    from: new Date("2026-09-27T00:00:00Z"),
+    to: new Date("2026-10-04T00:00:00Z"),
+    label: "שבוע שעבר",
+    range: "27.9 - 3.10",
+    partial: false,
+  };
+  const base = {
+    startAt: new Date("2026-09-28T08:00:00Z"),
+    userId: "u1",
+    clientId: "c1",
+    categoryId: "cat1",
+    userName: "Hadas",
+    clientName: "Grantor",
+    categoryName: "גבייה",
+  };
+  // A 3-minute call billed as 15, and an older entry with no billable value.
+  const entries: EntryRow[] = [
+    { ...base, actualSeconds: 3 * 60, billableSeconds: 15 * 60 },
+    { ...base, actualSeconds: 45 * 60, billableSeconds: null },
+  ];
+  const total = (basis: "actual" | "billable") =>
+    buildSeries(entries, "employee", [window], topLegend(entries, "employee"), basis)
+      .buckets[0].segments.reduce((sum, s) => sum + s.hours, 0);
+
+  it("counts worked time for 'actual'", () => {
+    expect(total("actual")).toBeCloseTo(48 / 60, 9);
+  });
+
+  it("counts billed time for 'billable', falling back to actual when billable is missing", () => {
+    expect(total("billable")).toBeCloseTo(60 / 60, 9);
   });
 });
