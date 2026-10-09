@@ -6,7 +6,7 @@ import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain
 /// Overview home-page widget (Ariel's request, redesign direction A
 /// follow-up). Design direction A of three proposed mockups, approved by
 /// Ariel: "מינימלי אדיטוריאלי" - thin rounded-top bars, a muted
-/// dark-to-light navy ramp (gold reserved for the "אחר" bucket only), and
+/// navy/slate palette (gold reserved for the "אחר" bucket only), and
 /// a plain text-chip legend under the chart rather than a busy built-in
 /// legend widget. Both unit x dimension combinations are precomputed
 /// server-side (see getHoursTrend) and passed in as `data`, so toggling
@@ -19,12 +19,17 @@ import type { HoursTrendData, TrendDimension, TrendUnit } from "@/lib/app-domain
 /// comprehension of a trend, and every RTL analytics product (Similarweb,
 /// Wix Analytics, etc.) keeps this convention for the same reason.
 
-const NAVY_SHADES = ["#0F1B29", "#1B2A3D", "#3D5770", "#6E8FA3", "#A3BAC7"];
+// Five series colors that stay apart from each other, still inside the
+// navy/slate family of the app. The original ramp was five shades of one
+// navy, and its two darkest (#0F1B29, #1B2A3D) could not be told apart:
+// on "לפי עובד" Ariel and Hadas looked like a single block (9.10.2026).
+// Each step now changes hue as well as lightness.
+const SERIES_COLORS = ["#1B2A3D", "#4A78A6", "#7FA89C", "#A9BCCB", "#8E7FA6"];
 const OTHER_COLOR = "#B08D57";
 const OTHER_KEY = "__other__";
 
 function colorFor(key: string, index: number): string {
-  return key === OTHER_KEY ? OTHER_COLOR : NAVY_SHADES[index % NAVY_SHADES.length];
+  return key === OTHER_KEY ? OTHER_COLOR : SERIES_COLORS[index % SERIES_COLORS.length];
 }
 
 function formatHours(hours: number): string {
@@ -132,7 +137,8 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                       dir="rtl"
                       className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-appNavy px-3 py-2 text-xs text-cream shadow-lg"
                     >
-                      <p className="mb-1 font-medium">{bucket.label}</p>
+                      <p className="font-medium">{bucket.label}</p>
+                      <p className="mb-1 text-cream/60">{bucket.range}</p>
                       {bucket.segments
                         .filter((s) => s.hours > 0)
                         .map((s, si) => (
@@ -173,8 +179,9 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
           </div>
           <div dir="ltr" className="mt-2 flex gap-2 sm:gap-4 text-center">
             {series.buckets.map((bucket, i) => (
-              <span key={bucket.label + i} className="flex-1 truncate text-[11px] text-appNavy/45">
-                {bucket.label}
+              <span key={bucket.label + i} className="flex flex-1 flex-col truncate text-[11px] text-appNavy/45">
+                <span className="truncate">{bucket.label}</span>
+                <span className="truncate text-[10px] text-appNavy/35">{bucket.range}</span>
               </span>
             ))}
           </div>

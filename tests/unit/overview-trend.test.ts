@@ -7,7 +7,7 @@ import { localDateKey } from "@/lib/timezone";
 // import time here with "@prisma/client did not initialize yet." Verified
 // by direct calculation instead and will run for real in any environment
 // with network access to generate the Prisma client.
-import { computeTrendWindows } from "@/lib/app-domain/overview-trend";
+import { buildSeries, computeTrendWindows, topLegend, type EntryRow } from "@/lib/app-domain/overview-trend";
 
 describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
   it("builds 14 day windows ending today, chronologically ordered, with today labeled", () => {
@@ -73,5 +73,60 @@ describe("computeTrendWindows() - Overview hours-trend chart date math", () => {
     const now = new Date("2026-03-03T22:30:00Z");
     const { dayWindows } = computeTrendWindows(now);
     expect(localDateKey(dayWindows[13].from)).toBe("2026-03-04");
+  });
+});
+
+describe("computeTrendWindows() - date ranges under each bar", () => {
+  it("gives each week its Sunday-to-Saturday dates", () => {
+    // Friday 9.10.2026, Israel. Last week is Sun 27.9 to Sat 3.10.
+    const { weekWindows } = computeTrendWindows(new Date("2026-10-09T09:00:00Z"));
+    expect(weekWindows[6].label).toBe("שבוע שעבר");
+    expect(weekWindows[6].range).toBe("27.9 - 3.10");
+    expect(weekWindows[0].range).toBe("16.8 - 22.8");
+  });
+
+  it("gives each day its date", () => {
+    const { dayWindows } = computeTrendWindows(new Date("2026-10-09T09:00:00Z"));
+    expect(dayWindows[13].range).toBe("9.10");
+    expect(dayWindows[0].range).toBe("26.9");
+  });
+});
+
+describe("topLegend() / buildSeries() - every hour is on the chart", () => {
+  const window = {
+    from: new Date("2026-09-27T00:00:00Z"),
+    to: new Date("2026-10-04T00:00:00Z"),
+    label: "שבוע שעבר",
+    range: "27.9 - 3.10",
+  };
+  // Seven categories, the largest first: 7h, 6h, ... 1h.
+  const entries: EntryRow[] = Array.from({ length: 7 }, (_, i) => ({
+    startAt: new Date("2026-09-28T08:00:00Z"),
+    actualSeconds: (7 - i) * 3600,
+    userId: "u1",
+    clientId: "c1",
+    categoryId: `cat${i}`,
+    userName: "Hadas",
+    clientName: "Grantor",
+    categoryName: `קטגוריה ${i}`,
+  }));
+
+  it("keeps the top five and folds the rest into a sixth 'אחר' slot", () => {
+    const legend = topLegend(entries, "category");
+    expect(legend).toHaveLength(6);
+    expect(legend[5].name).toBe("אחר");
+  });
+
+  it("does not add 'אחר' when there are five or fewer series", () => {
+    expect(topLegend(entries.slice(0, 5), "category")).toHaveLength(5);
+  });
+
+  it("adds up to the same total as the entries themselves", () => {
+    // Regression: the remainder (2h + 1h here) was summed but never
+    // emitted, so the category view showed 76.7 of 130.1 hours.
+    const series = buildSeries(entries, "category", [window], topLegend(entries, "category"));
+    const total = series.buckets[0].segments.reduce((sum, s) => sum + s.hours, 0);
+    expect(total).toBe(28);
+    expect(series.buckets[0].segments.find((s) => s.name === "אחר")?.hours).toBe(3);
   });
 });

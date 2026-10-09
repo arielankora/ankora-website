@@ -36,6 +36,11 @@ export interface TrendSegment {
 
 export interface TrendBucket {
   label: string;
+  /// Calendar dates the bucket covers, "27.9 - 3.10" for a week and
+  /// "9.10" for a day. A relative label alone ("לפני 4 שבועות") made
+  /// people stop and count backwards to know which week they were
+  /// looking at.
+  range: string;
   segments: TrendSegment[];
 }
 
@@ -51,7 +56,7 @@ export interface HoursTrendData {
   week: Record<TrendDimension, TrendSeries>;
 }
 
-type EntryRow = {
+export type EntryRow = {
   startAt: Date;
   actualSeconds: number | null;
   userId: string;
@@ -82,15 +87,15 @@ function addDaysToDateKey(dateKey: string, days: number): string {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 }
 
-function buildSeries(
+export function buildSeries(
   entries: EntryRow[],
   dimension: TrendDimension,
-  windows: { from: Date; to: Date; label: string }[],
+  windows: TrendWindow[],
   legendKeys: { key: string; name: string }[]
 ): TrendSeries {
   const legendKeySet = new Set(legendKeys.map((l) => l.key));
 
-  const buckets = windows.map(({ from, to, label }) => {
+  const buckets = windows.map(({ from, to, label, range }) => {
     const totals = new Map<string, { name: string; seconds: number }>();
     for (const e of entries) {
       if (e.startAt < from || e.startAt >= to) continue;
@@ -105,7 +110,7 @@ function buildSeries(
       name,
       hours: Math.round(((totals.get(key)?.seconds ?? 0) / 3600) * 10) / 10,
     }));
-    return { label, segments };
+    return { label, range, segments };
   });
 
   return { legend: legendKeys, buckets };
@@ -116,7 +121,14 @@ function buildSeries(
 /// "אחר" bucket - an unbounded per-person legend would both overflow a
 /// compact home-page card and defeat the "readable at a glance" point of
 /// putting this on the Overview screen at all.
-function topLegend(entries: EntryRow[], dimension: TrendDimension): { key: string; name: string }[] {
+///
+/// The "אחר" slot is part of the legend itself. Until 9.10.2026 it was
+/// not: buildSeries summed the remainder under OTHER_KEY but only emitted
+/// segments for legend keys, so everything outside the top 5 silently
+/// vanished. On the category view that was 53 of 130 hours, and in one
+/// week the largest category of all was not on the chart. The three
+/// views must always add up to the same total.
+export function topLegend(entries: EntryRow[], dimension: TrendDimension): { key: string; name: string }[] {
   const totals = new Map<string, { name: string; seconds: number }>();
   for (const e of entries) {
     const { key, name } = keyAndName(dimension, e);
@@ -124,16 +136,24 @@ function topLegend(entries: EntryRow[], dimension: TrendDimension): { key: strin
     row.seconds += e.actualSeconds ?? 0;
     totals.set(key, row);
   }
-  return [...totals.entries()]
-    .sort((a, b) => b[1].seconds - a[1].seconds)
-    .slice(0, TOP_N)
-    .map(([key, v]) => ({ key, name: v.name }));
+  const ranked = [...totals.entries()].sort((a, b) => b[1].seconds - a[1].seconds);
+  const legend = ranked.slice(0, TOP_N).map(([key, v]) => ({ key, name: v.name }));
+  if (ranked.length > TOP_N) legend.push({ key: OTHER_KEY, name: OTHER_LABEL });
+  return legend;
 }
 
 export interface TrendWindow {
   from: Date;
   to: Date;
   label: string;
+  range: string;
+}
+
+/// "2026-10-03" -> "3.10". Day and month only, the Israeli way, with no
+/// leading zeros: the year is never in doubt on a 7-week chart.
+function shortDate(dateKey: string): string {
+  const [, m, d] = dateKey.split("-").map(Number);
+  return `${d}.${m}`;
 }
 
 /// Pure date-math core of this module, split out from `getHoursTrend` so
@@ -155,6 +175,7 @@ export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; wee
     from: localDateTimeToUtc(dateKey, "00:00", TIMEZONE),
     to: localDateTimeToUtc(addDaysToDateKey(dateKey, 1), "00:00", TIMEZONE),
     label: i === DAY_WINDOW_LENGTH - 1 ? `${WEEKDAY_LABELS[weekdayOf(dateKey)]} (היום)` : WEEKDAY_LABELS[weekdayOf(dateKey)],
+    range: shortDate(dateKey),
   }));
 
   // --- Week windows: last 7 COMPLETE Sun-Sat weeks, ending last week -
@@ -172,6 +193,8 @@ export function computeTrendWindows(now: Date): { dayWindows: TrendWindow[]; wee
       from: localDateTimeToUtc(startKey, "00:00", TIMEZONE),
       to: localDateTimeToUtc(endKey, "00:00", TIMEZONE),
       label,
+      // Sunday to Saturday, both inclusive, as the person reads it.
+      range: `${shortDate(startKey)} - ${shortDate(addDaysToDateKey(endKey, -1))}`,
     };
   });
 
@@ -195,7 +218,13 @@ export async function getHoursTrend(): Promise<HoursTrendData> {
   };
 
   const rawEntries: RawRow[] = await prisma.timeEntry.findMany({
-    where: { deletedAt: null, endAt: { not: null }, startAt: { gte: overallFrom, lt: overallTo } },
+    where: {
+      deletedAt: null,
+      endAt: { not: null },
+      startAt: { gte: overallFrom, lt: overallTo },
+      // Internal Ankora work is not client work. See Client.isInternal.
+      client: { isInternal: false },
+    },
     select: {
       startAt: true,
       actualSeconds: true,
