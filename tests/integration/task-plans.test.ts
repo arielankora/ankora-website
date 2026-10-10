@@ -162,3 +162,5 @@ describe("turning a plan into steps", () => {
     await expect(applyPlanSteps(actor, task.id)).rejects.toThrow(PLAN_NOT_APPROVED_MESSAGE);
   });
 });
+
+// QA control run, 10.10.2026: main as is, to compare e2e against PR #172. Not for merge.
