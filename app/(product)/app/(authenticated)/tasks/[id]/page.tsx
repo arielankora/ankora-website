@@ -20,6 +20,26 @@ import { TaskTimeSummary } from "./TaskTimeSummary";
 import { listCredentials } from "@/lib/app-domain/credentials";
 import { isVaultConfigured } from "@/lib/vault/keys";
 import { RevealCredential } from "@/components/app/vault/RevealCredential";
+import { getTaskPlans, type TaskPlanRow } from "@/lib/app-domain/task-plans";
+import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
+import { AdvanceWithClaude } from "./AdvanceWithClaude";
+import { TaskPlanPanel, type PlanView } from "./TaskPlanPanel";
+
+function planView(p: TaskPlanRow): PlanView {
+  return {
+    version: p.version,
+    status: p.status,
+    body: p.body,
+    steps: p.steps,
+    origin: p.origin,
+    changeNote: p.changeNote,
+    createdAt: p.createdAt.toISOString(),
+    createdByName: p.createdBy?.name ?? null,
+    approvedByName: p.approvedBy?.name ?? null,
+    approvedAt: p.approvedAt?.toISOString() ?? null,
+    stepsAppliedAt: p.stepsAppliedAt?.toISOString() ?? null,
+  };
+}
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -84,6 +104,17 @@ export default async function TaskDetailPage(props: {
     can(user.role, "credential.view") && isVaultConfigured()
       ? (await listCredentials(user, task.clientId).catch(() => [])).filter((c) => c.hasUsername || c.hasPassword || c.hasNotes)
       : [];
+
+  // "קדם עם קלוד" (10.10.2026). Plans live on tasks, not on steps: a step
+  // is one line, and its plan is the plan of the task above it.
+  const isStep = task.parentId !== null;
+  const isClosed = task.status === "DONE" || task.status === "ARCHIVED";
+  const plans = isStep ? null : await getTaskPlans(user, task.id);
+  const currentPlan = plans?.current ?? null;
+  // Built here, while the page renders, so the button copies inside the
+  // click (see AdvanceWithClaude). Not for a step, and not for a closed
+  // task: there is nothing left to advance.
+  const advancePrompt = isStep || isClosed ? null : await advancePromptFor(user, detail, currentPlan);
 
   const [composer, people, allCategories, activeTimers] = await Promise.all([
     messageComposerProps({
@@ -186,17 +217,30 @@ export default async function TaskDetailPage(props: {
           the record below them. Nothing here sends by itself: it opens a
           draft, and a person presses send. See
           claude/client-communication-rule-2026-09-25.md. */}
-      {composer && (
-        <div className="flex flex-wrap items-center gap-2">
-          <MessageClient
-            clientId={task.clientId}
-            taskId={task.id}
-            // Waiting on the client is the one situation where the
-            // product knows which draft is wanted, so it opens on it.
-            preselectKind={task.blockedOn === "CLIENT" ? "need_information" : undefined}
-            {...composer}
-          />
+      {(composer || advancePrompt) && (
+        <div className="flex flex-wrap items-start gap-2">
+          {composer && (
+            <MessageClient
+              clientId={task.clientId}
+              taskId={task.id}
+              // Waiting on the client is the one situation where the
+              // product knows which draft is wanted, so it opens on it.
+              preselectKind={task.blockedOn === "CLIENT" ? "need_information" : undefined}
+              {...composer}
+            />
+          )}
+          {advancePrompt && <AdvanceWithClaude prompt={advancePrompt} hasPlan={currentPlan !== null} />}
         </div>
+      )}
+
+      {currentPlan && plans && (
+        <TaskPlanPanel
+          taskId={task.id}
+          plan={planView(currentPlan)}
+          history={plans.versions.slice(1).map(planView)}
+          editable={!isClosed}
+          openStepCount={subtasks.filter((s) => s.status !== "DONE" && s.status !== "ARCHIVED").length}
+        />
       )}
 
       {/* Above the hours and the thread, and that placement is the

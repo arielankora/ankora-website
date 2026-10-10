@@ -351,6 +351,7 @@ erDiagram
 | 9 | `Notification` (+ `Task.status` added to the Phase 2 `Task` model) | Full spec re-audit gap-fix: Tasks/Profile/Notifications screens, long-timer email/notification, XLSX/PDF export |
 | 10 | `ImportantDate`, `ReminderRule`, `ReminderOccurrence`, `HolidayCalendarSubscription` (+ `Task.importantDateId` / `Task.importantDateOccurrenceKey` added to the Phase 2 `Task` model) | Important Dates (מועדים חשובים): per-client dated records, reminder rules, per-occurrence delivery log, and holiday-catalog subscriptions |
 | 12 | `User.notifyLongRunningTimerByEmail` (no new tables) | Profile screen's personal email-notification toggle |
+| Advance with Claude (10.10.2026) | `TaskPlan` (+ `TaskPlanStatus` enum) | A task's work plan, one row per version: written with Claude through MCP (`save_task_plan`) or edited on the task screen, approved by a person, and optionally copied into the task's steps |
 
 Phases 5, 7 and 11 (internal dashboards/reports/exports; PWA/mobile/
 performance/security hardening; the nightly Excel report + JSON backup

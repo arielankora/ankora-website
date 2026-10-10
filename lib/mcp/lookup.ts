@@ -6,6 +6,7 @@ import { listCategories } from "@/lib/app-domain/categories";
 import { listUsers } from "@/lib/app-domain/users";
 import { OPEN_STATUSES, assignableUsers, listTasks } from "@/lib/app-domain/tasks";
 import { describeResolveFailure, resolveByName, normalizeName } from "@/lib/mcp/resolve";
+import { prisma } from "@/lib/prisma";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
 // says into the ids the domain layer wants.
@@ -190,6 +191,29 @@ export async function lookupTask(
   const result = resolveByName(title, candidates);
   if (result.status === "ok") return { ok: true, value: result.match };
   return { ok: false, message: describeResolveFailure(result, "task", candidates) };
+}
+
+/// The same answer as lookupTask, from an exact id instead of a title.
+///
+/// "קדם עם קלוד" (10.10.2026). The prompt that button copies names its
+/// task by id, because two open tasks can share a title and a plan saved
+/// on the wrong one is worse than no plan. The id is never trusted for
+/// access: it resolves only inside the clients this actor may see, and a
+/// mistyped or foreign id gets the same "not found" as a missing one. A
+/// one-character slip in a cuid matches nothing, so it fails safe rather
+/// than landing on a neighbour.
+export async function lookupTaskById(actor: User, taskId: string): Promise<Lookup<TaskCandidate>> {
+  const id = taskId.trim();
+  const notFound = { ok: false as const, message: `No task with id "${id}" is available to this user. Check the id, or name the task by its title instead.` };
+  if (!id) return notFound;
+  const task = await prisma.task.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, title: true, clientId: true, client: { select: { name: true } } },
+  });
+  if (!task) return notFound;
+  const accessible = await listAccessibleClients(actor);
+  if (!accessible.some((c: Named) => c.id === task.clientId)) return notFound;
+  return { ok: true, value: { id: task.id, name: task.title, clientId: task.clientId, clientName: task.client?.name ?? null } };
 }
 
 /// The team roster for the admin-only list tool. Same permission, same

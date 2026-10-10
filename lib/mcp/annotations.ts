@@ -73,6 +73,14 @@ export const TOOL_ANNOTATIONS = {
   // logged against it (removeTaskSteps in lib/app-domain/tasks.ts), and
   // running it twice with the same list leaves the same steps.
   replace_task_steps: { ...WRITES, destructiveHint: true, idempotentHint: true },
+  // "קדם עם קלוד" (10.10.2026). Saving a plan adds a version and never
+  // overwrites one, and a second identical call is refused by the version
+  // check rather than applied twice, so it is a plain write.
+  get_task_plan: READ_ONLY,
+  save_task_plan: WRITES,
+  // The same replacement as replace_task_steps, from the plan's steps, so
+  // it carries the same warning: it removes open steps not in the plan.
+  apply_task_plan_steps: { ...WRITES, destructiveHint: true, idempotentHint: true },
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -95,6 +103,8 @@ export const WRITE_TOOLS = [
   "add_task_comment",
   "create_decision",
   "replace_task_steps",
+  "save_task_plan",
+  "apply_task_plan_steps",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

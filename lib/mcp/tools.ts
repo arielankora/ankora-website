@@ -20,6 +20,7 @@ import {
   lookupCategory,
   lookupClient,
   lookupTask,
+  lookupTaskById,
   lookupTeamMember,
   teamMembers,
   usableCategories,
@@ -922,7 +923,11 @@ export function registerAnkoraTools(server: McpServer): void {
       description:
         "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal.",
       inputSchema: z.object({
-        task: z.string().describe("The task's title, or enough of it to identify it."),
+        task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
+        taskId: z
+          .string()
+          .optional()
+          .describe("The task's exact id, when you have it (an Ankora prompt or an earlier tool result gives it). Preferred over the title: titles can repeat."),
         client: z.string().optional().describe("Client name, to disambiguate when several tasks share a title."),
         includeDone: z
           .boolean()
@@ -1003,7 +1008,8 @@ export function registerAnkoraTools(server: McpServer): void {
     },
     async (
       args: {
-        task: string;
+        task?: string;
+        taskId?: string;
         client?: string;
         includeDone?: boolean;
         status?: "OPEN" | "IN_PROGRESS" | "PENDING_APPROVAL" | "DONE" | "ARCHIVED";
@@ -1048,16 +1054,23 @@ export function registerAnkoraTools(server: McpServer): void {
         }
 
         let clientId: string | undefined;
-        if (args.client) {
+        if (args.client && !args.taskId) {
           const client = await lookupClient(actor, args.client);
           if (!client.ok) return toolText(client.message);
           clientId = client.value.id;
         }
 
-        const found = await lookupTask(actor, args.task, {
-          clientId,
-          includeClosed: args.includeDone,
-        });
+        // By exact id when the model has one ("קדם עם קלוד" prompts carry
+        // it), checked against client access exactly like a title.
+        if (!args.taskId?.trim() && !args.task?.trim()) {
+          return toolText("Say which task: pass its title in `task`, or its id in `taskId`.");
+        }
+        const found = args.taskId?.trim()
+          ? await lookupTaskById(actor, args.taskId)
+          : await lookupTask(actor, args.task as string, {
+              clientId,
+              includeClosed: args.includeDone,
+            });
         if (!found.ok) return toolText(found.message);
 
         // The task's OWN client, not the optional `client` argument: that

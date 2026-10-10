@@ -41,11 +41,14 @@ describe("the read/write split", () => {
     expect(declaredWrites).toEqual([...WRITE_TOOLS].sort());
   });
 
-  it("marks only replace_task_steps as destructive, because it is the only one that removes", () => {
+  it("marks only the two step-replacing tools as destructive, because they are the only ones that remove", () => {
+    // replace_task_steps, and apply_task_plan_steps ("קדם עם קלוד",
+    // 10.10.2026), which does the same replacement from a plan's steps.
     const destructive = Object.entries(TOOL_ANNOTATIONS)
       .filter(([, ann]) => ann.destructiveHint)
-      .map(([name]) => name);
-    expect(destructive).toEqual(["replace_task_steps"]);
+      .map(([name]) => name)
+      .sort();
+    expect(destructive).toEqual(["apply_task_plan_steps", "replace_task_steps"]);
   });
 
   it("does not claim create_time_entry is idempotent", () => {

@@ -205,6 +205,8 @@ model User {
   assignedTasks              Task[]                        @relation("TaskAssignee")
   supervisedTasks            Task[]                        @relation("TaskSupervisor")
   taskComments               TaskComment[]                 @relation("TaskCommentAuthor")
+  taskPlansWritten           TaskPlan[]                    @relation("TaskPlanAuthor")
+  taskPlansApproved          TaskPlan[]                    @relation("TaskPlanApprover")
   approvedTasks              Task[]                        @relation("TaskApprover")
   importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
   importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
@@ -910,6 +912,7 @@ model Task {
   decisions     Decision[]
   documents     ClientDocument[]
   comments      TaskComment[]
+  plans         TaskPlan[]
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([clientId])
@@ -982,6 +985,67 @@ model TaskComment {
 
   @@index([taskId, createdAt])
   @@map("task_comments")
+}
+
+/// "קדם עם קלוד" (10.10.2026): the work plan of a task, one row per version.
+///
+/// Not `Task.description` and not the steps, on purpose. The description is
+/// the brief a person wrote, and the plan is built FROM it: writing the plan
+/// over it would erase its own source. The steps are a checklist with a
+/// status, one line each and fifteen at most. A plan carries what a line
+/// cannot: why, in what order, who does each part, what could go wrong and
+/// what "done" means. The two meet in `steps` below, the one-line titles the
+/// plan proposes, which a person can turn into real steps with one click.
+///
+/// **Versions, never an edit in place.** Every save is a new row with the
+/// next number, so the history of how a plan changed is the table itself,
+/// and a save that was written against an older version than the one now
+/// stored is refused instead of overwriting it (saveTaskPlan). The current
+/// plan is simply the highest version; there is no "superseded" status to
+/// keep in sync by hand.
+///
+/// Internal, like the comment thread. Nothing here reaches the portal.
+model TaskPlan {
+  id      String @id @default(cuid())
+  taskId  String
+  /// 1, 2, 3... per task. Unique with taskId, which is also what stops two
+  /// saves that raced past the version check from both landing.
+  version Int
+
+  /// Markdown as plain text, rendered by lib/markdown-lite.ts like every
+  /// other text on a task. Nothing stores HTML.
+  body  String
+  /// The one-line step titles the plan proposes, in order. Empty when the
+  /// plan proposes none. Copied into real steps only on request.
+  steps String[] @default([])
+
+  status TaskPlanStatus @default(APPROVED)
+  /// Where it was written: through Claude (MCP) or on the task screen.
+  origin EntryOrigin    @default(APP)
+  /// What changed from the previous version, in one line. Optional.
+  changeNote String?
+
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+  /// Set when this version's steps were copied into the task's steps.
+  stepsAppliedAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  task       Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdBy  User? @relation("TaskPlanAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  approvedBy User? @relation("TaskPlanApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@unique([taskId, version])
+  @@map("task_plans")
+}
+
+enum TaskPlanStatus {
+  /// Written, not yet agreed. Claude saves one only when asked to.
+  DRAFT
+  /// Agreed by the person whose connection or session saved or approved it.
+  APPROVED
 }
 
 /// Spec section 5 + 6. A row with endAt = null is a currently-running
