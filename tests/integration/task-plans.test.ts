@@ -10,6 +10,7 @@ import {
   applyPlanSteps,
   approveTaskPlan,
   getTaskPlans,
+  advanceWithClaudeUsage,
   recordAdvancePromptCopied,
   saveTaskPlan,
 } from "@/lib/app-domain/task-plans";
@@ -224,5 +225,37 @@ describe("the prompt the button copies", () => {
     expect(prompt).toContain("**לקחים**");
     expect(prompt).toContain("includeDone: true");
     expect(prompt).not.toContain("save_task_plan");
+  });
+});
+
+describe("the usage card on the integrations screen", () => {
+  it("counts copies, plans by where they were written, and plans that became steps, per person", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const { user: admin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    await recordAdvancePromptCopied(actor, task.id, "plan");
+    await recordAdvancePromptCopied(actor, task.id, "lessons");
+    await saveTaskPlan(actor, task.id, { body: "x", steps: ["א"], approved: true, baseVersion: 0, origin: "MCP" });
+    await saveTaskPlan(actor, task.id, { body: "y", steps: ["א"], approved: true, baseVersion: 1, origin: "APP" });
+    await applyPlanSteps(actor, task.id);
+
+    const usage = await advanceWithClaudeUsage(admin);
+    expect(usage).toMatchObject({
+      copiesPlan: 1,
+      copiesLessons: 1,
+      plansViaClaude: 1,
+      plansInApp: 1,
+      plansApplied: 1,
+      tasksWithPlan: 1,
+    });
+    expect(usage!.people).toEqual([{ name: actor.name, copies: 2, plans: 2 }]);
+  });
+
+  it("is not available to an employee", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    expect(await advanceWithClaudeUsage(actor)).toBeNull();
   });
 });

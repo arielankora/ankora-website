@@ -173,3 +173,18 @@ describe("buildLessonsPrompt()", () => {
     expect(buildLessonsPrompt(closed)).not.toMatch(/[\u2013\u2014]/);
   });
 });
+
+describe("how Claude asks (11.10.2026)", () => {
+  it("every question comes with lettered choices, the recommended one first and marked, and room to write", () => {
+    for (const text of [buildAdvancePrompt(base), buildLessonsPrompt(base)]) {
+      expect(text).toContain("## איך שואלים אותי");
+      expect(text).toContain("ממוספרות באותיות (א, ב, ג, ד)");
+      expect(text).toContain('"(מומלץ)"');
+      expect(text).toContain('"או לכתוב תשובה אחרת"');
+    }
+  });
+
+  it("the clarifying questions on an empty task are asked the same way", () => {
+    expect(buildAdvancePrompt({ ...base, description: null, comments: [] })).toContain("כל אחת עם תשובות לבחירה");
+  });
+});

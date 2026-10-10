@@ -20,6 +20,13 @@ import { recordAdvancePromptCopiedAction } from "./actions";
 // selected, with a button that copies it the old way. Nobody is left with
 // a button that did nothing.
 //
+// Where it may be pasted (10.10.2026). The prompt carries the client's name
+// and the task's comments, and the privacy policy promises that client data
+// reaches AI providers only on a business plan whose terms forbid training
+// on it. Ankora's Claude is a Team workspace, which is that plan; a personal
+// account is not. The product cannot see which account a person pastes
+// into, so it says it, at the one moment it matters.
+//
 // On a closed task the same place offers "סיכום ולקחים עם קלוד": there is
 // nothing left to advance, and the end of a task is the cheapest moment
 // to write down what to do differently next time.
@@ -89,7 +96,7 @@ export function AdvanceWithClaude({
         </button>
         {state === "copied" && (
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-appNavy/65" role="status">
-            הפרומט הועתק. הדביקו אותו בשיחה חדשה בקלוד.
+            הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.
             <a
               href={CLAUDE_NEW_CHAT}
               target="_blank"
@@ -105,7 +112,7 @@ export function AdvanceWithClaude({
 
       {state === "manual" && (
         <div className="rounded-xl border border-lineDark bg-cream/40 p-3">
-          <p className="text-[12.5px] text-appNavy/70">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן.</p>
+          <p className="text-[12.5px] text-appNavy/70">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.</p>
           <textarea
             ref={boxRef}
             readOnly

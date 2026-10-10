@@ -3,6 +3,8 @@ import { can } from "@/lib/app-auth/permissions";
 import { getMyClaudeConnection, getClaudeOrgSummary } from "@/lib/app-domain/mcp-connections";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
+import { AdvanceUsageCard } from "@/components/app/AdvanceUsageCard";
+import { advanceWithClaudeUsage } from "@/lib/app-domain/task-plans";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -38,9 +40,12 @@ export default async function IntegrationsPage() {
     );
   }
 
-  const [claude, claudeOrg] = await Promise.all([
+  const [claude, claudeOrg, advanceUsage] = await Promise.all([
     getMyClaudeConnection(user),
     getClaudeOrgSummary(user),
+    // "קדם עם קלוד" (10.10.2026): the flow runs through this connection,
+    // so how it is used belongs beside it.
+    advanceWithClaudeUsage(user),
   ]);
 
   return (
@@ -54,6 +59,8 @@ export default async function IntegrationsPage() {
         </div>
 
         <ClaudeConnectionCard status={claude} orgSummary={claudeOrg} />
+
+        {advanceUsage && <AdvanceUsageCard usage={advanceUsage} />}
 
       </div>
     </>

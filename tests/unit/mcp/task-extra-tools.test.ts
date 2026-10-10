@@ -657,3 +657,47 @@ describe("apply_task_plan_steps", () => {
     expect(TOOL_ANNOTATIONS.get_task_plan.readOnlyHint).toBe(true);
   });
 });
+
+describe("create_decision linked by task id", () => {
+  const OPTIONS = [{ label: "כן" }, { label: "לא" }];
+
+  beforeEach(() => {
+    decisions.createDecision.mockResolvedValue({ question: "q", options: [{ label: "כן" }, { label: "לא" }] });
+  });
+
+  it("links the decision to the exact task, without a title search", async () => {
+    lookup.lookupTaskById.mockResolvedValue({
+      ok: true,
+      value: { id: "t-exact", name: "התאמה", clientId: "c-nux", clientName: "NUX" },
+    });
+    await call("create_decision", { client: "NUX", question: "q", options: OPTIONS, taskId: "t-exact" });
+    expect(lookup.lookupTask).not.toHaveBeenCalled();
+    expect(decisions.createDecision.mock.calls[0][1].taskId).toBe("t-exact");
+  });
+
+  it("refuses a task that belongs to another client, and creates nothing", async () => {
+    lookup.lookupTaskById.mockResolvedValue({
+      ok: true,
+      value: { id: "t-other", name: "משהו", clientId: "c-rimed", clientName: "RIMED" },
+    });
+    const out = await call("create_decision", { client: "NUX", question: "q", options: OPTIONS, taskId: "t-other" });
+    expect(out.text).toMatch(/RIMED/);
+    expect(decisions.createDecision).not.toHaveBeenCalled();
+  });
+
+  it("accepts markTaskWaiting with a task id alone", async () => {
+    lookup.lookupTaskById.mockResolvedValue({
+      ok: true,
+      value: { id: "t-exact", name: "התאמה", clientId: "c-nux", clientName: "NUX" },
+    });
+    const out = await call("create_decision", {
+      client: "NUX",
+      question: "q",
+      options: OPTIONS,
+      taskId: "t-exact",
+      markTaskWaiting: true,
+    });
+    expect(out.text ?? "").not.toMatch(/markTaskWaiting needs/);
+    expect(decisions.createDecision).toHaveBeenCalled();
+  });
+});

@@ -553,10 +553,14 @@ export function registerTaskExtraTools(server: McpServer): void {
         amount: z.number().nonnegative().optional().describe("The amount at stake overall, in shekels, when the decision is about money."),
         due: DATE.optional().describe("When an answer is needed, YYYY-MM-DD."),
         task: z.string().optional().describe("Title of an existing task on this client that this decision blocks."),
+        taskId: z
+          .string()
+          .optional()
+          .describe("The exact id of that task, when you have it (an Ankora prompt gives it). Preferred over `task`: titles can repeat."),
         markTaskWaiting: z
           .boolean()
           .optional()
-          .describe("With `task`: mark that task as waiting on the client. It clears by itself when the client answers."),
+          .describe("With `task` or `taskId`: mark that task as waiting on the client. It clears by itself when the client answers."),
       }),
       annotations: WRITES,
     },
@@ -569,6 +573,7 @@ export function registerTaskExtraTools(server: McpServer): void {
         amount?: number;
         due?: string;
         task?: string;
+        taskId?: string;
         markTaskWaiting?: boolean;
       },
       ctx: ServerContext
@@ -578,8 +583,8 @@ export function registerTaskExtraTools(server: McpServer): void {
         if (args.options.filter((o) => o.recommended).length > 1) {
           return toolText("Only one option can be marked as recommended.");
         }
-        if (args.markTaskWaiting && !args.task) {
-          return toolText("markTaskWaiting needs `task` - name the task this decision blocks.");
+        if (args.markTaskWaiting && !args.task && !args.taskId) {
+          return toolText("markTaskWaiting needs `task` or `taskId` - name the task this decision blocks.");
         }
 
         const client = await lookupClient(actor, args.client);
@@ -587,7 +592,19 @@ export function registerTaskExtraTools(server: McpServer): void {
 
         let taskId: string | null = null;
         let taskTitle: string | null = null;
-        if (args.task) {
+        if (args.taskId?.trim()) {
+          // By exact id ("קדם עם קלוד", 10.10.2026), checked against client
+          // access like a title, and against THIS client: a decision filed
+          // on one client's portal that blocks another client's task would
+          // pass every check on its own and still be wrong.
+          const task = await lookupTaskById(actor, args.taskId);
+          if (!task.ok) return toolText(task.message);
+          if (task.value.clientId !== client.value.id) {
+            return toolText(`That task belongs to ${task.value.clientName ?? "another client"}, not ${client.value.name}. Nothing was created.`);
+          }
+          taskId = task.value.id;
+          taskTitle = task.value.name;
+        } else if (args.task) {
           const task = await lookupTask(actor, args.task, { clientId: client.value.id });
           if (!task.ok) return toolText(task.message);
           taskId = task.value.id;
