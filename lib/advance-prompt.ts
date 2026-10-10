@@ -98,6 +98,21 @@ function quoteBlock(text: string): string {
     .join("\n");
 }
 
+/// How Claude asks (Ariel, 11.10.2026). An open question on a phone is a
+/// paragraph to type; a question with ready answers is one tap. Every
+/// question comes with choices, the recommended one first and marked, and
+/// room to answer in his own words.
+export const HOW_TO_ASK: readonly string[] = [
+  "## איך שואלים אותי",
+  "כל שאלה שאתה שואל, בכל שלב בשיחה, באה עם תשובות מוכנות לבחירה:",
+  "- 2 עד 4 תשובות לכל שאלה, ממוספרות באותיות (א, ב, ג, ד).",
+  "- התשובה שאתה ממליץ עליה ראשונה, מסומנת \"(מומלץ)\", עם חצי שורה למה.",
+  "- בסוף כל שאלה: \"או לכתוב תשובה אחרת\".",
+  "- אני יכול לענות בקיצור, למשל \"1א 2ג\", או לכתוב בעצמי.",
+  "- אם יש לך כלי לשאלות בחירה, תשתמש בו באותו מבנה.",
+  "",
+];
+
 /// No description and no comment: nothing a person wrote down.
 export function isEmptyBrief(input: Pick<AdvancePromptInput, "description" | "comments">): boolean {
   return !input.description?.trim() && input.comments.length === 0;
@@ -128,12 +143,12 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     // is a guess dressed as a plan, so the conversation starts with what
     // is missing.
     out.push(
-      "1. במשימה אין תיאור ואין הערות, אז אין עדיין ממה לתכנן. תתחיל בשאלות הבהרה ממוקדות (עד חמש), ותציג תוכנית רק אחרי שאענה.",
+      "1. במשימה אין תיאור ואין הערות, אז אין עדיין ממה לתכנן. תתחיל בשאלות הבהרה ממוקדות (עד חמש, כל אחת עם תשובות לבחירה), ותציג תוכנית רק אחרי שאענה.",
       "2. אם אני מתקן: תעדכן ותציג את התוכנית המלאה מחדש, עם שורה אחת על מה השתנה."
     );
   } else {
     out.push(
-      "1. תקרא את הנתונים. אם חסר מידע שבלעדיו אי אפשר לתכנן, תשאל עד שלוש שאלות ממוקדות לפני הכול. אחרת, תציג לי תוכנית עבודה במבנה שלמטה.",
+      "1. תקרא את הנתונים. אם חסר מידע שבלעדיו אי אפשר לתכנן, תשאל עד שלוש שאלות ממוקדות לפני הכול, כל אחת עם תשובות לבחירה. אחרת, תציג לי תוכנית עבודה במבנה שלמטה.",
       "2. אם אני מתקן: תעדכן ותציג את התוכנית המלאה מחדש, עם שורה אחת על מה השתנה."
     );
   }
@@ -143,6 +158,8 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "5. אם אבקש לבצע, תעבוד שלב אחרי שלב לפי התוכנית. כשמסתיים שלב: תסמן אותו עם set_task_step, ותוסיף הערה קצרה במשימה (add_task_comment) על מה נעשה ומה יצא, כדי שמי שיפתח את המשימה אחריי יבין איפה היא עומדת.",
     ""
   );
+
+  out.push(...HOW_TO_ASK);
 
   // ---- What may be done without asking -----------------------------------
   out.push(
@@ -288,6 +305,7 @@ export function buildLessonsPrompt(input: AdvancePromptInput): string {
     `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את הסיכום כהערה פנימית במשימה עם add_task_comment: taskId "${input.taskId}", includeDone: true. עד 4000 תווים. הערות לא מוצגות ללקוח.`,
     "4. אם עולה לקח שכדאי להפוך לנוהל או לשלבים קבועים במשימות דומות, תציע אותו בנפרד בסוף. אל תשנה שום דבר אחר במשימה, ואל תפתח אותה מחדש.",
     "",
+    ...HOW_TO_ASK,
     "## מבנה הסיכום",
     "בלי כותרות עם #. כותרת כל חלק מודגשת (**כך**), והתוכן ברשימות. העברית פשוטה, המשפטים קצרים, ובלי קו מפריד ארוך.",
     "- **מה היה צריך לקרות**: משפט אחד.",
