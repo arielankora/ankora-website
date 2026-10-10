@@ -73,7 +73,11 @@ export function ActiveTimerMiniRows({
       {rows.map((row) => (
         <MiniRow key={row.id} row={row} longTimerHours={longTimerHours} />
       ))}
-      {total > rows.length && <p className="mt-1 text-[11.5px] text-gold-dim">ועוד {total - rows.length} ←</p>}
+      {total > rows.length && (
+        <p className="mt-1 text-[11.5px] text-gold-dim">
+          {total - rows.length === 1 ? "ועוד טיימר אחד" : `ועוד ${total - rows.length} טיימרים`} ←
+        </p>
+      )}
     </div>
   );
 }

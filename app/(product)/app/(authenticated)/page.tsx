@@ -415,7 +415,10 @@ export default async function AppHomePage() {
                     ))}
                     {metrics.todayClientCount > metrics.todayTopClients.length && (
                       <p className="mt-1 text-[11.5px] text-gold-dim">
-                        ועוד {metrics.todayClientCount - metrics.todayTopClients.length} לקוחות ←
+                        {metrics.todayClientCount - metrics.todayTopClients.length === 1
+                          ? "ועוד לקוח אחד"
+                          : `ועוד ${metrics.todayClientCount - metrics.todayTopClients.length} לקוחות`}{" "}
+                        ←
                       </p>
                     )}
                   </div>
@@ -479,7 +482,12 @@ export default async function AppHomePage() {
                             </div>
                           ))}
                           {alerts.count > alerts.top.length && (
-                            <p className="mt-1 text-[11.5px] text-gold-dim">ועוד {alerts.count - alerts.top.length} ←</p>
+                            <p className="mt-1 text-[11.5px] text-gold-dim">
+                              {alerts.count - alerts.top.length === 1
+                                ? "ועוד התראה אחת"
+                                : `ועוד ${alerts.count - alerts.top.length} התראות`}{" "}
+                              ←
+                            </p>
                           )}
                         </>
                       ) : alerts.ruleCount > 0 ? (
