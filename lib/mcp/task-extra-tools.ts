@@ -4,7 +4,7 @@ import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import type { User } from "@prisma/client";
 import { actorFromAuthInfo } from "@/lib/mcp/auth";
 import { PortalUserOnStaffConnectorError, toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
-import { lookupClient, lookupTask } from "@/lib/mcp/lookup";
+import { lookupClient, lookupTask, lookupTaskById } from "@/lib/mcp/lookup";
 import { describeResolveFailure, resolveByName } from "@/lib/mcp/resolve";
 import { addTaskComment, createTask, getTaskDetail, removeTaskSteps, updateTask } from "@/lib/app-domain/tasks";
 import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisions";
@@ -12,6 +12,8 @@ import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
+import { PlanVersionConflictError, applyPlanSteps, getTaskPlans, saveTaskPlan, type TaskPlanRow } from "@/lib/app-domain/task-plans";
+import { MAX_PLAN_LENGTH, MAX_PLAN_STEPS, TaskPlanRuleError } from "@/lib/task-plan-rules";
 
 // MCP tasks, second pass (NUX handover, 3.10.2026).
 //
@@ -52,9 +54,17 @@ export function shekelsToMinor(amount: number | undefined | null): number | null
   return Math.round(amount * 100);
 }
 
-/// Finds the task a tool is about, by title, inside what this actor may
-/// see. The client name narrows the search when titles repeat.
-async function findTask(actor: User, args: { task: string; client?: string; includeDone?: boolean }) {
+/// Finds the task a tool is about, inside what this actor may see.
+///
+/// By exact id when the model has one (the "קדם עם קלוד" prompt carries
+/// it, because titles repeat), otherwise by title, with the client name
+/// narrowing the search. The id is checked against client access exactly
+/// like a title is, so it opens nothing a title would not.
+async function findTask(actor: User, args: { task?: string; taskId?: string; client?: string; includeDone?: boolean }) {
+  if (args.taskId?.trim()) return lookupTaskById(actor, args.taskId);
+  if (!args.task?.trim()) {
+    return { ok: false as const, message: "Say which task: pass its title in `task`, or its id in `taskId`." };
+  }
   let clientId: string | undefined;
   if (args.client) {
     const client = await lookupClient(actor, args.client);
@@ -65,9 +75,37 @@ async function findTask(actor: User, args: { task: string; client?: string; incl
 }
 
 const TASK_ARGS = {
-  task: z.string().describe("The task's title, or enough of it to identify it."),
+  task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
+  taskId: z
+    .string()
+    .optional()
+    .describe("The task's exact id, when you have it (an Ankora prompt or an earlier tool result gives it). Preferred over the title: titles can repeat."),
   client: z.string().optional().describe("Client name, to disambiguate when several tasks share a title."),
 };
+
+/// A plan as the model reads it. Dates as the user's calendar day.
+function serializePlan(p: TaskPlanRow, timeZone: string) {
+  return {
+    version: p.version,
+    status: p.status,
+    plan: p.body,
+    steps: p.steps,
+    writtenVia: p.origin === "MCP" ? "Claude" : "Ankora app",
+    savedBy: p.createdBy?.name ?? null,
+    savedOn: localDateKey(p.createdAt, timeZone),
+    approvedBy: p.approvedBy?.name ?? null,
+    approvedOn: p.approvedAt ? localDateKey(p.approvedAt, timeZone) : null,
+    changeNote: p.changeNote,
+    stepsCopiedToTask: p.stepsAppliedAt !== null,
+  };
+}
+
+/// A refusal the user should hear in the domain's own words. Anything else
+/// goes through toolFailure, which never echoes an unexpected error.
+function planRefusal(err: unknown) {
+  if (err instanceof TaskPlanRuleError) return { content: [{ type: "text" as const, text: err.message }], isError: true as const };
+  return null;
+}
 
 export function registerTaskExtraTools(server: McpServer): void {
   server.registerTool(
@@ -75,14 +113,14 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "Read one task in full",
       description:
-        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments and the time logged against it. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it).",
+        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments, the time logged against it, and its current work plan. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it).",
       inputSchema: z.object({
         ...TASK_ARGS,
         includeDone: z.boolean().optional().describe("Look among completed and archived tasks too."),
       }),
       annotations: READ_ONLY,
     },
-    async (args: { task: string; client?: string; includeDone?: boolean }, ctx: ServerContext) => {
+    async (args: { task?: string; taskId?: string; client?: string; includeDone?: boolean }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);
@@ -92,6 +130,7 @@ export function registerTaskExtraTools(server: McpServer): void {
         if (!detail) return toolText("That task is not available to this user.");
         const { task, subtasks, thread, time } = detail;
         const tz = actor.timezone;
+        const plans = task.parentId ? null : await getTaskPlans(actor, task.id);
 
         const comments = thread
           .filter((e) => e.kind === "comment")
@@ -128,6 +167,9 @@ export function registerTaskExtraTools(server: McpServer): void {
           stepsTotal: subtasks.filter((s) => s.status !== "ARCHIVED").length,
           comments,
           loggedMinutes: Math.round(time.totalSeconds / 60),
+          // "קדם עם קלוד": the current work plan, or null. Read and save
+          // it with get_task_plan and save_task_plan.
+          plan: plans?.current ? serializePlan(plans.current, tz) : null,
         });
       } catch (err) {
         console.error("[mcp] get_task failed", err);
@@ -148,7 +190,7 @@ export function registerTaskExtraTools(server: McpServer): void {
       }),
       annotations: WRITES,
     },
-    async (args: { task: string; client?: string; steps: string[] }, ctx: ServerContext) => {
+    async (args: { task?: string; taskId?: string; client?: string; steps: string[] }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);
@@ -192,7 +234,7 @@ export function registerTaskExtraTools(server: McpServer): void {
       }),
       annotations: TOOL_ANNOTATIONS.replace_task_steps,
     },
-    async (args: { task: string; client?: string; steps: string[] }, ctx: ServerContext) => {
+    async (args: { task?: string; taskId?: string; client?: string; steps: string[] }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);
@@ -244,6 +286,172 @@ export function registerTaskExtraTools(server: McpServer): void {
     }
   );
 
+  // "קדם עם קלוד" (10.10.2026): the task's work plan.
+  //
+  // The flow: a person copies a prompt from the task screen, Claude writes
+  // a plan with them, and saves it here only once they have agreed to it.
+  // Later Claude reads it back to revise it or carry it out. Versions are
+  // never overwritten: a save names the version it was written against,
+  // and is refused if somebody saved a newer one in between.
+  server.registerTool(
+    "get_task_plan",
+    {
+      title: "Read a task's work plan",
+      description:
+        "Reads the current work plan of an Ankora task, with its proposed steps and who approved it, plus how many earlier versions exist. Use it before revising or carrying out a plan, and pass its `version` as `baseVersion` when you save. Prefer `taskId` when you have it.",
+      inputSchema: z.object({
+        ...TASK_ARGS,
+        includeDone: z.boolean().optional().describe("Look among completed and archived tasks too."),
+        includeHistory: z.boolean().optional().describe("Also return the earlier versions, newest first."),
+      }),
+      annotations: READ_ONLY,
+    },
+    async (
+      args: { task?: string; taskId?: string; client?: string; includeDone?: boolean; includeHistory?: boolean },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await findTask(actor, args);
+        if (!found.ok) return toolText(found.message);
+        const plans = await getTaskPlans(actor, found.value.id);
+        if (!plans) return toolText("That task is not available to this user.");
+        const tz = actor.timezone;
+        return toolJson({
+          taskId: found.value.id,
+          task: found.value.name,
+          client: found.value.clientName,
+          url: taskUrl(appBaseUrl(), found.value.id),
+          plan: plans.current ? serializePlan(plans.current, tz) : null,
+          // What to pass as baseVersion on the next save.
+          baseVersion: plans.current?.version ?? 0,
+          versions: plans.versions.length,
+          ...(args.includeHistory ? { history: plans.versions.slice(1).map((p) => serializePlan(p, tz)) } : {}),
+        });
+      } catch (err) {
+        console.error("[mcp] get_task_plan failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "save_task_plan",
+    {
+      title: "Save a task's work plan",
+      description:
+        `Saves a new version of an Ankora task's work plan. Call it ONLY after the user has explicitly approved the plan in this conversation, and then with approved: true; save with approved: false only when the user asks to keep a draft. The approval is recorded in the signed-in user's name. Pass the full plan text in \`plan\` (light markdown: **bold** section labels and lists, no # headings, up to ${MAX_PLAN_LENGTH} characters) and one short imperative line per numbered step in \`steps\` (up to ${MAX_PLAN_STEPS}). \`baseVersion\` is the version you read: 0 when the task had no plan. If someone saved a newer version meanwhile, nothing is saved and the result says so; read it with get_task_plan, show the user the difference, and ask before saving again. Saving does not change the task's steps; offer apply_task_plan_steps for that. Internal: never shown to the client.`,
+      inputSchema: z.object({
+        ...TASK_ARGS,
+        plan: z.string().min(1).max(MAX_PLAN_LENGTH).describe("The full plan text."),
+        steps: z
+          .array(z.string().min(1))
+          .max(MAX_PLAN_STEPS)
+          .optional()
+          .describe("One short line per numbered step of the plan, in order."),
+        approved: z.boolean().describe("true only if the user explicitly approved this plan; false saves a draft."),
+        baseVersion: z.number().int().min(0).describe("The plan version you read before writing: 0 when there was none."),
+        changeNote: z.string().max(300).optional().describe("What changed from the previous version, in one line, in the user's language."),
+      }),
+      annotations: TOOL_ANNOTATIONS.save_task_plan,
+    },
+    async (
+      args: {
+        task?: string;
+        taskId?: string;
+        client?: string;
+        plan: string;
+        steps?: string[];
+        approved: boolean;
+        baseVersion: number;
+        changeNote?: string;
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await findTask(actor, args);
+        if (!found.ok) return toolText(found.message);
+        try {
+          const saved = await saveTaskPlan(actor, found.value.id, {
+            body: args.plan,
+            steps: args.steps,
+            approved: args.approved,
+            baseVersion: args.baseVersion,
+            changeNote: args.changeNote,
+            origin: "MCP",
+          });
+          return toolJson({
+            saved: true,
+            taskId: found.value.id,
+            task: found.value.name,
+            url: taskUrl(appBaseUrl(), found.value.id),
+            version: saved.version,
+            status: saved.status,
+            steps: saved.steps,
+            next: saved.steps.length > 0 && saved.status === "APPROVED"
+              ? "Ask the user whether to turn these steps into the task's steps (apply_task_plan_steps)."
+              : null,
+          });
+        } catch (err) {
+          if (err instanceof PlanVersionConflictError) {
+            return toolJson({
+              saved: false,
+              conflict: true,
+              latestVersion: err.latestVersion,
+              message: "A newer version of this plan was saved after the one you read. Nothing was saved. Read it with get_task_plan, show the user what differs, and ask before saving again with that version as baseVersion.",
+            });
+          }
+          const refusal = planRefusal(err);
+          if (refusal) return refusal;
+          throw err;
+        }
+      } catch (err) {
+        console.error("[mcp] save_task_plan failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "apply_task_plan_steps",
+    {
+      title: "Turn a plan into the task's steps",
+      description:
+        "Makes the steps of a task's current, approved work plan the task's checklist steps. Open steps that are not in the plan are removed; steps already done, and steps with time logged against them, are always kept and reported. Ask the user before calling it, and tell them that. Running it twice leaves the same steps.",
+      inputSchema: z.object({ ...TASK_ARGS }),
+      annotations: TOOL_ANNOTATIONS.apply_task_plan_steps,
+    },
+    async (args: { task?: string; taskId?: string; client?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const found = await findTask(actor, args);
+        if (!found.ok) return toolText(found.message);
+        try {
+          const result = await applyPlanSteps(actor, found.value.id);
+          return toolJson({
+            taskId: found.value.id,
+            task: found.value.name,
+            planVersion: result.version,
+            added: result.added,
+            removed: result.removed.map((s) => s.title),
+            kept: result.kept.map((s) => ({
+              title: s.title,
+              why: s.why === "done" ? "already done" : "has time logged against it",
+            })),
+          });
+        } catch (err) {
+          const refusal = planRefusal(err);
+          if (refusal) return refusal;
+          throw err;
+        }
+      } catch (err) {
+        console.error("[mcp] apply_task_plan_steps failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
   server.registerTool(
     "set_task_step",
     {
@@ -257,7 +465,7 @@ export function registerTaskExtraTools(server: McpServer): void {
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
-    async (args: { task: string; client?: string; step: string; done: boolean }, ctx: ServerContext) => {
+    async (args: { task?: string; taskId?: string; client?: string; step: string; done: boolean }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);
@@ -304,7 +512,7 @@ export function registerTaskExtraTools(server: McpServer): void {
       }),
       annotations: WRITES,
     },
-    async (args: { task: string; client?: string; includeDone?: boolean; text: string }, ctx: ServerContext) => {
+    async (args: { task?: string; taskId?: string; client?: string; includeDone?: boolean; text: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const found = await findTask(actor, args);

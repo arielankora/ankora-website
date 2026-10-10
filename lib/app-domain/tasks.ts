@@ -1446,6 +1446,11 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.comment": "נוספה הערה",
   "task.comment_delete": "הערה נמחקה",
   "task.steps_removed": "שלבים הוסרו מהמשימה",
+  // "קדם עם קלוד" (10.10.2026). Lines in the thread on purpose: "who
+  // agreed to this plan, and when" is exactly what the thread is for.
+  "task.plan_saved": "תוכנית העבודה עודכנה",
+  "task.plan_approved": "תוכנית העבודה אושרה",
+  "task.plan_steps_applied": "תוכנית העבודה הפכה לשלבים",
 };
 
 /// Audit actions the thread deliberately drops, because the thing they

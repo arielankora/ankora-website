@@ -37,6 +37,7 @@ const lookup = vi.hoisted(() => ({
   lookupTeamMember: vi.fn(),
   lookupAssignee: vi.fn(),
   lookupTask: vi.fn(),
+  lookupTaskById: vi.fn(),
   usableCategories: vi.fn(),
   teamMembers: vi.fn(),
   canSeeOthersTime: vi.fn(() => false),
@@ -44,11 +45,29 @@ const lookup = vi.hoisted(() => ({
 
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
+// "קדם עם קלוד" (10.10.2026). The real error classes, so the tools'
+// instanceof checks are exercised as they run in production.
+const plans = vi.hoisted(() => {
+  class PlanVersionConflictError extends Error {
+    constructor(public readonly latestVersion: number) {
+      super("conflict");
+      this.name = "PlanVersionConflictError";
+    }
+  }
+  return {
+    PlanVersionConflictError,
+    getTaskPlans: vi.fn(async () => ({ current: null, versions: [] }) as unknown),
+    saveTaskPlan: vi.fn(),
+    applyPlanSteps: vi.fn(),
+  };
+});
+
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/app-domain/decisions", () => decisions);
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
+vi.mock("@/lib/app-domain/task-plans", () => plans);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
 vi.mock("@/lib/app-auth/permissions", () => ({ assertCan: vi.fn() }));
 
@@ -468,5 +487,173 @@ describe("replace_task_steps", () => {
   it("is the one write marked destructive", () => {
     expect(TOOL_ANNOTATIONS.replace_task_steps.destructiveHint).toBe(true);
     expect(WRITE_TOOLS as readonly string[]).toContain("replace_task_steps");
+  });
+});
+
+// "קדם עם קלוד" (10.10.2026): the work plan of a task, through Claude.
+//
+// What matters here: a plan is found by exact id when the prompt gave one,
+// it is saved as approved only when the model says the user approved it,
+// a save written against an old version saves nothing and says what to do,
+// and a refusal from the plan rules reaches the user in its own words
+// rather than as "unexpected server error".
+const PLAN_ROW = {
+  id: "p2",
+  version: 2,
+  body: "**מטרה**\nלסגור את ההתאמה.",
+  steps: ["לבקש דוח", "להתאים"],
+  status: "APPROVED",
+  origin: "MCP",
+  changeNote: null,
+  createdAt: new Date("2026-10-10T08:00:00Z"),
+  approvedAt: new Date("2026-10-10T08:00:00Z"),
+  stepsAppliedAt: null,
+  createdBy: { id: "u-ariel", name: "Ariel" },
+  approvedBy: { id: "u-ariel", name: "Ariel" },
+};
+
+describe("finding a task by id", () => {
+  it("uses the exact id when given, and never the title search", async () => {
+    lookup.lookupTaskById.mockResolvedValue({
+      ok: true,
+      value: { id: "t-exact", name: "התאמה", clientId: "c-nux", clientName: "NUX" },
+    });
+    plans.getTaskPlans.mockResolvedValue({ current: null, versions: [] });
+    const out = await call("get_task_plan", { taskId: "t-exact" });
+    expect(lookup.lookupTaskById).toHaveBeenCalledWith(ACTOR, "t-exact");
+    expect(lookup.lookupTask).not.toHaveBeenCalled();
+    expect(out.taskId).toBe("t-exact");
+    expect(out.plan).toBeNull();
+    expect(out.baseVersion).toBe(0);
+  });
+
+  it("asks which task when neither a title nor an id was given", async () => {
+    const out = await call("get_task_plan", {});
+    expect(out.text).toMatch(/taskId/);
+    expect(plans.getTaskPlans).not.toHaveBeenCalled();
+  });
+
+  it("passes a foreign or mistyped id's refusal through, and reads nothing", async () => {
+    lookup.lookupTaskById.mockResolvedValue({ ok: false, message: 'No task with id "nope" is available to this user.' });
+    const out = await call("save_task_plan", { taskId: "nope", plan: "x", approved: true, baseVersion: 0 });
+    expect(out.text).toMatch(/No task with id/);
+    expect(plans.saveTaskPlan).not.toHaveBeenCalled();
+  });
+
+  it("update_task accepts the id too", async () => {
+    lookup.lookupTaskById.mockResolvedValue({
+      ok: true,
+      value: { id: "t1", name: "x", clientId: "c-nux", clientName: "NUX" },
+    });
+    tasks.updateTask.mockResolvedValue({ id: "t1", title: "x", status: "IN_PROGRESS" });
+    await call("update_task", { taskId: "t1", priority: "HIGH" });
+    expect(lookup.lookupTask).not.toHaveBeenCalled();
+    expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", expect.objectContaining({ priority: "HIGH" }));
+  });
+});
+
+describe("get_task_plan and get_task", () => {
+  it("returns the current plan and the version to save against", async () => {
+    plans.getTaskPlans.mockResolvedValue({ current: PLAN_ROW, versions: [PLAN_ROW, { ...PLAN_ROW, version: 1 }] });
+    const out = await call("get_task_plan", { task: "התאמת" });
+    expect(out.plan.version).toBe(2);
+    expect(out.plan.plan).toBe(PLAN_ROW.body);
+    expect(out.plan.steps).toEqual(PLAN_ROW.steps);
+    expect(out.plan.writtenVia).toBe("Claude");
+    expect(out.baseVersion).toBe(2);
+    expect(out.versions).toBe(2);
+    expect(out).not.toHaveProperty("history");
+  });
+
+  it("includes the earlier versions only when asked", async () => {
+    plans.getTaskPlans.mockResolvedValue({ current: PLAN_ROW, versions: [PLAN_ROW, { ...PLAN_ROW, version: 1 }] });
+    const out = await call("get_task_plan", { task: "התאמת", includeHistory: true });
+    expect(out.history.map((h: { version: number }) => h.version)).toEqual([1]);
+  });
+
+  it("get_task carries the current plan", async () => {
+    tasks.getTaskDetail.mockResolvedValue(DETAIL);
+    plans.getTaskPlans.mockResolvedValue({ current: PLAN_ROW, versions: [PLAN_ROW] });
+    const out = await call("get_task", { task: "התאמת" });
+    expect(out.plan.version).toBe(2);
+  });
+});
+
+describe("save_task_plan", () => {
+  it("saves an approved plan from Claude, with its steps and the version it was written against", async () => {
+    plans.saveTaskPlan.mockResolvedValue({ ...PLAN_ROW, version: 3 });
+    const out = await call("save_task_plan", {
+      task: "התאמת",
+      plan: "**מטרה**\nלסגור.",
+      steps: ["לבקש דוח", "להתאים"],
+      approved: true,
+      baseVersion: 2,
+      changeNote: "נוסף שלב",
+    });
+    expect(plans.saveTaskPlan).toHaveBeenCalledWith(ACTOR, "t1", {
+      body: "**מטרה**\nלסגור.",
+      steps: ["לבקש דוח", "להתאים"],
+      approved: true,
+      baseVersion: 2,
+      changeNote: "נוסף שלב",
+      origin: "MCP",
+    });
+    expect(out.saved).toBe(true);
+    expect(out.version).toBe(3);
+    expect(out.next).toMatch(/apply_task_plan_steps/);
+  });
+
+  it("passes approved: false through as a draft, and does not offer to copy steps", async () => {
+    plans.saveTaskPlan.mockResolvedValue({ ...PLAN_ROW, status: "DRAFT", version: 1 });
+    const out = await call("save_task_plan", { task: "התאמת", plan: "x", approved: false, baseVersion: 0 });
+    expect(plans.saveTaskPlan.mock.calls[0][2].approved).toBe(false);
+    expect(out.next).toBeNull();
+  });
+
+  it("on a newer version, saves nothing and tells the model to read and ask", async () => {
+    plans.saveTaskPlan.mockRejectedValue(new plans.PlanVersionConflictError(4));
+    const out = await call("save_task_plan", { task: "התאמת", plan: "x", approved: true, baseVersion: 2 });
+    expect(out.saved).toBe(false);
+    expect(out.conflict).toBe(true);
+    expect(out.latestVersion).toBe(4);
+    expect(out.message).toMatch(/get_task_plan/);
+  });
+
+  it("relays a plan rule refusal in its own words", async () => {
+    const { TaskPlanRuleError, PLAN_TOO_LONG_MESSAGE } = await import("@/lib/task-plan-rules");
+    plans.saveTaskPlan.mockRejectedValue(new TaskPlanRuleError(PLAN_TOO_LONG_MESSAGE));
+    const result = await tools.get("save_task_plan")!.handler(
+      { task: "התאמת", plan: "x", approved: true, baseVersion: 0 },
+      CTX
+    );
+    expect(result.content[0].text).toBe(PLAN_TOO_LONG_MESSAGE);
+    expect((result as { isError?: boolean }).isError).toBe(true);
+  });
+
+  it("says in its description to save only after explicit approval", () => {
+    const description = String(tools.get("save_task_plan")!.config.description);
+    expect(description).toMatch(/ONLY after the user has explicitly approved/);
+  });
+});
+
+describe("apply_task_plan_steps", () => {
+  it("reports what was added, removed and kept", async () => {
+    plans.applyPlanSteps.mockResolvedValue({
+      version: 2,
+      added: ["להתאים"],
+      removed: [{ id: "s1", title: "ישן" }],
+      kept: [{ id: "s2", title: "לבקש דוח", why: "done" }],
+    });
+    const out = await call("apply_task_plan_steps", { task: "התאמת" });
+    expect(out.added).toEqual(["להתאים"]);
+    expect(out.removed).toEqual(["ישן"]);
+    expect(out.kept).toEqual([{ title: "לבקש דוח", why: "already done" }]);
+  });
+
+  it("is registered as a destructive write", () => {
+    expect(TOOL_ANNOTATIONS.apply_task_plan_steps.destructiveHint).toBe(true);
+    expect(WRITE_TOOLS as readonly string[]).toContain("apply_task_plan_steps");
+    expect(WRITE_TOOLS as readonly string[]).toContain("save_task_plan");
+    expect(TOOL_ANNOTATIONS.get_task_plan.readOnlyHint).toBe(true);
   });
 });

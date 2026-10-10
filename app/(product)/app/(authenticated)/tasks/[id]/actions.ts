@@ -13,6 +13,7 @@ import {
   NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
+import { applyPlanSteps, approveTaskPlan, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -305,6 +306,59 @@ export async function applyTaskTemplateAction(input: { taskId: string; templateI
     revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath("/app/tasks");
     return { ok: true as const, created };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// "קדם עם קלוד" (10.10.2026): a person edits the plan on the screen.
+///
+/// Always a new, approved version: the person pressing save is the one
+/// agreeing to it. `baseVersion` is the version the editor was opened on,
+/// so an edit made while Claude saved a newer one is refused, not applied
+/// over it (lib/app-domain/task-plans.ts).
+export async function saveTaskPlanAction(input: {
+  taskId: string;
+  body: string;
+  steps: string[];
+  baseVersion: number;
+}) {
+  const user = await requireUser();
+  try {
+    const saved = await saveTaskPlan(user, input.taskId, {
+      body: input.body,
+      steps: input.steps,
+      approved: true,
+      baseVersion: input.baseVersion,
+      origin: "APP",
+    });
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    return { ok: true as const, version: saved.version };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Agrees to a draft Claude saved without approval.
+export async function approveTaskPlanAction(input: { taskId: string; version: number }) {
+  const user = await requireUser();
+  try {
+    await approveTaskPlan(user, input.taskId, input.version);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Makes the plan's proposed steps the task's steps.
+export async function applyPlanStepsAction(input: { taskId: string }) {
+  const user = await requireUser();
+  try {
+    const result = await applyPlanSteps(user, input.taskId);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/tasks");
+    return { ok: true as const, added: result.added.length, kept: result.kept.length, removed: result.removed.length };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }
