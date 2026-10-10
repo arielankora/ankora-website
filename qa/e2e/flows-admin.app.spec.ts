@@ -73,7 +73,16 @@ test.describe("clients/actions", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="name"]').fill(name);
+    // Wait for the server to acknowledge the write before reloading, the same
+    // way the categories test below does. 10.10.2026: creating a client now
+    // also writes its two default alert rules, the write takes longer, and a
+    // reload issued while the POST is open aborted it before the row was
+    // committed ("POST /app/clients net::ERR_ABORTED (WHILE NAVIGATING)",
+    // reported as minor on every run for weeks; reproduced locally as a
+    // failure of this test).
+    const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
     await dialog.getByRole("button", { name: "הוספת לקוח" }).click();
+    await written;
 
     // The drawer closes itself on success, so its disappearance is the first
     // signal, and the row is the one that matters.

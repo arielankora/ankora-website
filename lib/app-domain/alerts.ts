@@ -64,26 +64,32 @@ export async function ensureDefaultAlertRules(actor: Pick<User, "id">, clientId:
   const missing = DEFAULT_ALERT_RULES.filter(
     (d) => !existing.some((e) => e.type === d.type && e.thresholdValue === d.thresholdValue)
   );
-  for (const d of missing) {
-    const rule = await prisma.alertRule.create({
-      data: {
-        clientId,
-        type: d.type,
-        thresholdValue: d.thresholdValue,
-        recipientsAnkora: [...DEFAULT_ALERT_RECIPIENTS_ANKORA],
-        recipientsClient: [],
-        notifyAccountManager: true,
-      },
-    });
-    await recordAudit({
-      actorId: actor.id,
-      action: "alert_rule.create_default",
-      entityType: "AlertRule",
-      entityId: rule.id,
+  if (missing.length === 0) return;
+  // One round trip for the rules, and the audit rows in parallel: this runs
+  // inside createClient, and every extra await there is time the person
+  // who pressed "הוספת לקוח" spends waiting.
+  const rules = await prisma.alertRule.createManyAndReturn({
+    data: missing.map((d) => ({
       clientId,
-      after: rule,
-    });
-  }
+      type: d.type,
+      thresholdValue: d.thresholdValue,
+      recipientsAnkora: [...DEFAULT_ALERT_RECIPIENTS_ANKORA],
+      recipientsClient: [],
+      notifyAccountManager: true,
+    })),
+  });
+  await Promise.all(
+    rules.map((rule: AlertRule) =>
+      recordAudit({
+        actorId: actor.id,
+        action: "alert_rule.create_default",
+        entityType: "AlertRule",
+        entityId: rule.id,
+        clientId,
+        after: rule,
+      })
+    )
+  );
 }
 
 /// What the alerts are actually watching: enabled rules on clients that
