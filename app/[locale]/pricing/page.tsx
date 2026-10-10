@@ -1,6 +1,10 @@
 import type { Metadata } from "next";
 import { ogBase } from "@/lib/seo-meta";
 import PricingClient from "./PricingClient";
+import { getDictionary, type Locale } from "@/content";
+import { JsonLd } from "@/components/seo/JsonLd";
+import { faqPageNode, orgRef } from "@/lib/schema";
+import { SITE_URL } from "@/lib/site";
 
 const meta = {
   en: {
@@ -41,5 +45,49 @@ export async function generateMetadata(
 
 export default async function Page(props: { params: Promise<{ locale: string }> }) {
   const params = await props.params;
-  return <PricingClient params={params} />;
+  const locale = (params.locale === "en" ? "en" : "he") as Locale;
+  const p = getDictionary(locale).pages.pricing;
+  const url = `${SITE_URL}/${locale}/pricing`;
+  // Offers built from the same tier items the page shows. price is the monthly
+  // package total; the UnitPriceSpecification carries the hourly rate.
+  const offersSchema = {
+    "@context": "https://schema.org",
+    "@type": "Service",
+    serviceType: "Personal Operations Management",
+    name: p.title,
+    provider: orgRef,
+    areaServed: "IL",
+    url,
+    hasOfferCatalog: {
+      "@type": "OfferCatalog",
+      name: p.tiers.title,
+      itemListElement: p.tiers.items.map((tier) => ({
+        "@type": "Offer",
+        name: tier.name,
+        description: `${tier.hours}. ${tier.blurb}`,
+        price: tier.hoursPerMonth * tier.hourlyRate,
+        priceCurrency: "ILS",
+        url,
+        priceSpecification: {
+          "@type": "UnitPriceSpecification",
+          price: tier.hourlyRate,
+          priceCurrency: "ILS",
+          unitCode: "HUR",
+          referenceQuantity: {
+            "@type": "QuantitativeValue",
+            value: 1,
+            unitCode: "HUR",
+          },
+          valueAddedTaxIncluded: false,
+        },
+      })),
+    },
+  };
+  return (
+    <>
+      <JsonLd id="faq-schema" data={faqPageNode(p.faq.items)} />
+      <JsonLd id="offers-schema" data={offersSchema} />
+      <PricingClient params={params} />
+    </>
+  );
 }

@@ -259,6 +259,14 @@ export interface SegmentBridge {
   faqTitle: string;
 }
 
+/** A visible FAQ block on an inner page. The FAQPage JSON-LD for that page is
+ *  built from these same items, so the schema can never drift from what is shown. */
+export interface PageFaqBlock {
+  label: string;
+  title: string;
+  items: { q: string; a: string }[];
+}
+
 export interface SimplePageContent {
   eyebrow: string;
   title: string;
@@ -275,6 +283,7 @@ export interface PagesContent {
       // label (morning / midday / afternoon / evening), not a clock reading.
       items: { time: string; title: string; note: string }[];
     };
+    faq: PageFaqBlock;
   };
   technology: SimplePageContent & {
     // The four-layer diagram above the technology cards. `side` is the one thing
@@ -288,6 +297,7 @@ export interface PagesContent {
     persistenceNote: string;
     // Only this page overrides the shared closing CTA heading.
     ctaTitle: string;
+    faq: PageFaqBlock;
   };
   about: SimplePageContent & {
     entityDefinition: string;
@@ -414,7 +424,17 @@ export interface PagesContent {
       label: string;
       title: string;
       sub: string;
-      items: { name: string; hours: string; rate: string; blurb: string; highlighted: boolean }[];
+      // hoursPerMonth and hourlyRate are the numbers behind `hours` and `rate`,
+      // used for the Offer JSON-LD on the pricing page.
+      items: {
+        name: string;
+        hours: string;
+        rate: string;
+        hoursPerMonth: number;
+        hourlyRate: number;
+        blurb: string;
+        highlighted: boolean;
+      }[];
       footnote: string;
     };
     // secondaryCta: optional /he addition -- links to the ROI calculator alongside
@@ -422,6 +442,7 @@ export interface PagesContent {
     // ("how much time does this actually save?") directly. Optional so /en (unchanged
     // this round) doesn't need it.
     closing: { title: string; body: string; cta: string; secondaryCta?: string };
+    faq: PageFaqBlock;
   };
   contact: {
     eyebrow: string;
@@ -598,6 +619,8 @@ export interface PagesContent {
     columnA: string;
     columnB: string;
     table: { dimension: string; a: string; b: string }[];
+    /** Source line shown under the comparison table. */
+    tableSource: string;
     choosePA: { title: string; items: string[] };
     chooseAnkora: { title: string; items: string[] };
     whereAnkoraFits: { title: string; body: string };

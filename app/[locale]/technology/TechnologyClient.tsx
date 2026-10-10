@@ -5,6 +5,7 @@ import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { InnerCTA } from "@/components/sections/InnerCTA";
+import { PageFaqSection } from "@/components/sections/PageFaqSection";
 import { SectionShell } from "@/components/ui/SectionShell";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 import { HairlineGrid, HairlineGridCell } from "@/components/ui/HairlineGrid";
@@ -116,6 +117,8 @@ export default function TechnologyClient({ params }: { params: { locale: string 
           </HairlineGrid>
         </RevealStagger>
       </SectionShell>
+
+      <PageFaqSection faq={p.faq} />
 
       <InnerCTA dict={dict} locale={locale} title={p.ctaTitle} />
     </>

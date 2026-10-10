@@ -166,3 +166,19 @@ export function authorNode(name: string, locale: Locale) {
   if (f) return founderNode(f, locale);
   return { "@type": "Person", name, worksFor: orgRef };
 }
+
+/**
+ * FAQPage for an inner page. Always pass the same items the page renders, so the
+ * structured data can never say something the visitor cannot see.
+ */
+export function faqPageNode(items: { q: string; a: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: items.map((item) => ({
+      "@type": "Question",
+      name: item.q,
+      acceptedAnswer: { "@type": "Answer", text: item.a },
+    })),
+  };
+}

@@ -5,6 +5,7 @@ import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
 import { InnerCTA } from "@/components/sections/InnerCTA";
+import { PageFaqSection } from "@/components/sections/PageFaqSection";
 import { SectionShell } from "@/components/ui/SectionShell";
 import { MonoLabel } from "@/components/ui/MonoLabel";
 import { Reveal, RevealStagger, staggerItem } from "@/components/motion/Reveal";
@@ -102,6 +103,8 @@ export default function HowItWorksClient({ params }: { params: { locale: string 
           ))}
         </RevealStagger>
       </SectionShell>
+
+      <PageFaqSection faq={p.faq} />
 
       <InnerCTA dict={dict} locale={locale} />
     </>

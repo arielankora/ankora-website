@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { getDictionary, type Locale } from "@/content";
 import { PageHero } from "@/components/sections/PageHero";
 import { Breadcrumbs } from "@/components/sections/Breadcrumbs";
+import { PageFaqSection } from "@/components/sections/PageFaqSection";
 import { SectionShell } from "@/components/ui/SectionShell";
 import { WideContainer } from "@/components/ui/WideContainer";
 import { Eyebrow } from "@/components/ui/Eyebrow";
@@ -175,6 +176,8 @@ export default function PricingClient({ params }: { params: { locale: string } }
           </p>
         </Reveal>
       </SectionShell>
+
+      <PageFaqSection faq={p.faq} />
 
       {/* This page's own closing, not the shared InnerCTA: it carries a second link to
           the ROI calculator, which answers its heading's question directly. */}
