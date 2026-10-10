@@ -24,7 +24,10 @@ export type OpenAlertRow = {
 //     decorative, not functional.
 // Both are still open only via lib/app-domain/alerts.ts's real
 // resolveAlertEvent/unresolveAlertEvent pair.
-export function OpenAlertsPanel({ alerts }: { alerts: OpenAlertRow[] }) {
+// 9.10.2026: an empty feed says so, and says what is being watched.
+// It used to render nothing, which left the screen blank until a client
+// was picked and made "0 open alerts" on the home screen look like a bug.
+export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[]; emptyText: string }) {
   const { showToast } = useToast();
   const [hidden, setHidden] = useState<Set<string>>(new Set());
 
@@ -52,7 +55,14 @@ export function OpenAlertsPanel({ alerts }: { alerts: OpenAlertRow[] }) {
   }
 
   const visible = alerts.filter((a) => !hidden.has(a.id));
-  if (visible.length === 0) return null;
+  if (visible.length === 0) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-2xl border border-lineDark bg-white px-5 py-4">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden="true" />
+        <p className="text-sm text-appNavy/70">{emptyText}</p>
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">

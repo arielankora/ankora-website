@@ -1265,6 +1265,12 @@ model AlertRule {
   /// rule.allow_retrigger=true."
   allowRetrigger Boolean @default(false)
 
+  /// 9.10.2026: also mail the client's account manager (Client.accountManagerId),
+  /// resolved when the alert fires rather than copied into recipientsAnkora,
+  /// so a change of account manager is followed without editing rules. On for
+  /// the default rules (DEFAULT_ALERT_RULES in lib/app-domain/alerts.ts).
+  notifyAccountManager Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

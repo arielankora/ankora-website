@@ -98,6 +98,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "hour_bank.adjustment.create": "התאמה ידנית לבנק שעות",
   // Phase 4 (spec 9/16.1: "Alert rule change").
   "alert_rule.create": "יצירת כלל התראה",
+  "alert_rule.create_default": "יצירת כלל התראה (ברירת מחדל)",
   "alert_rule.update": "עדכון כלל התראה",
   "alert_rule.delete": "מחיקת כלל התראה",
   "email_delivery.retry": "ניסיון שליחה חוזר להתראה",

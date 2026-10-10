@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User, ClientStatus } from "@prisma/client";
+import { ensureDefaultAlertRules } from "@/lib/app-domain/alerts";
 
 export async function listClients() {
   return prisma.client.findMany({
@@ -59,6 +60,8 @@ export async function createClient(
     clientId: client.id,
     after: client,
   });
+  // Watched from the first minute: see DEFAULT_ALERT_RULES.
+  await ensureDefaultAlertRules(actor, client.id);
   return client;
 }
 
