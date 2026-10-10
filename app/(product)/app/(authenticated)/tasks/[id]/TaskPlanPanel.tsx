@@ -300,3 +300,96 @@ export function TaskPlanPanel({
     </section>
   );
 }
+
+/// A plan written by hand, when the task has none yet.
+///
+/// Most plans start in Claude, but not every task needs a conversation
+/// to plan, and a person who already knows the five steps should not have
+/// to open another app to write them down. A small link rather than an
+/// empty card: until there is a plan, the button beside it is the main
+/// way in, and an empty box on every task would be one more thing to read
+/// past. Saved as version 1, approved, in the writer's name.
+export function NewPlanEditor({ taskId }: { taskId: string }) {
+  const { showToast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [body, setBody] = useState("");
+  const [steps, setSteps] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const r = await saveTaskPlanAction({ taskId, body, steps: steps.split("\n"), baseVersion: 0 });
+    setBusy(false);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    setOpen(false);
+    showToast({ tone: "success", title: "תוכנית העבודה נשמרה" });
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="self-center text-[12.5px] text-appNavy/50 transition-colors hover:text-appNavy"
+      >
+        או לכתוב תוכנית ידנית
+      </button>
+    );
+  }
+
+  return (
+    <section className="w-full rounded-2xl border border-lineDark bg-white p-5" data-testid="task-plan-new">
+      <h2 className="text-sm font-medium text-appNavy/70">תוכנית עבודה חדשה</h2>
+      <p className="mt-1 text-[12px] text-appNavy/55">
+        מודגש עם **כוכביות**, רשימות עם מקף או מספר. נשמרת כגרסה 1, מאושרת על שמכם.
+      </p>
+      <label className="mt-3 block">
+        <span className="text-[12px] text-appNavy/60">התוכנית</span>
+        <textarea
+          value={body}
+          onChange={(e) => setBody(e.target.value)}
+          rows={10}
+          dir="rtl"
+          placeholder={"**מטרה**\n...\n\n**שלבים**\n1. ...\n2. ..."}
+          className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] leading-relaxed text-appNavy outline-none placeholder:text-appNavy/30 focus:border-appNavy"
+        />
+      </label>
+      <label className="mt-3 block">
+        <span className="text-[12px] text-appNavy/60">שלבים מוצעים, שורה לכל שלב (לא חובה)</span>
+        <textarea
+          value={steps}
+          onChange={(e) => setSteps(e.target.value)}
+          rows={5}
+          dir="rtl"
+          className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] text-appNavy outline-none focus:border-appNavy"
+        />
+      </label>
+      <div className="mt-3 flex gap-2">
+        <button
+          type="button"
+          disabled={busy || !body.trim()}
+          onClick={save}
+          className="rounded-full bg-gold-gradient px-4 py-1.5 text-[13px] font-medium text-navy disabled:opacity-40"
+        >
+          {busy ? "שומר..." : "שמירה"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setOpen(false);
+            setError(null);
+          }}
+          className="rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/60"
+        >
+          ביטול
+        </button>
+      </div>
+      {error && <p className="mt-2 text-[12px] text-error">{error}</p>}
+    </section>
+  );
+}

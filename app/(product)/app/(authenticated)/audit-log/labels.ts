@@ -128,6 +128,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.plan_saved": "שמירת תוכנית עבודה",
   "task.plan_approved": "אישור תוכנית עבודה",
   "task.plan_steps_applied": "הפיכת תוכנית עבודה לשלבים",
+  "task.advance_prompt_copied": "העתקת פרומט \"קדם עם קלוד\"",
   // 25.9.2026, Ariel's rule: nothing reaches a client unless a person
   // sent it. This line is the other half of that rule - a message a
   // person sent is a message the product can account for later.

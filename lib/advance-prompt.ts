@@ -50,6 +50,9 @@ export type AdvancePromptInput = {
   requiresApproval: boolean;
   dueLabel: string | null;
   createdLabel: string;
+  /// When it closed. Only for a finished task, and only the lessons prompt
+  /// reads it.
+  completedLabel?: string | null;
   description: string | null;
   clientVisible: boolean;
   clientTitle: string | null;
@@ -95,6 +98,11 @@ function quoteBlock(text: string): string {
     .join("\n");
 }
 
+/// No description and no comment: nothing a person wrote down.
+export function isEmptyBrief(input: Pick<AdvancePromptInput, "description" | "comments">): boolean {
+  return !input.description?.trim() && input.comments.length === 0;
+}
+
 export function buildAdvancePrompt(input: AdvancePromptInput): string {
   const hasPlan = input.plan !== null;
   const baseVersion = input.plan?.version ?? 0;
@@ -115,6 +123,14 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
       `1. למשימה כבר יש תוכנית עבודה ${input.plan!.approved ? "מאושרת" : "בטיוטה"} (גרסה ${baseVersion}), והיא מופיעה למטה. תציג לי אותה בקצרה ותשאל אם לעדכן אותה או להתחיל לבצע.`,
       "2. אם אני מבקש לעדכן: תציג את התוכנית המעודכנת כולה, לא רק את השינוי, ותכתוב בשורה אחת מה השתנה."
     );
+  } else if (isEmptyBrief(input)) {
+    // Nothing written on the task at all. A plan built from a title alone
+    // is a guess dressed as a plan, so the conversation starts with what
+    // is missing.
+    out.push(
+      "1. במשימה אין תיאור ואין הערות, אז אין עדיין ממה לתכנן. תתחיל בשאלות הבהרה ממוקדות (עד חמש), ותציג תוכנית רק אחרי שאענה.",
+      "2. אם אני מתקן: תעדכן ותציג את התוכנית המלאה מחדש, עם שורה אחת על מה השתנה."
+    );
   } else {
     out.push(
       "1. תקרא את הנתונים. אם חסר מידע שבלעדיו אי אפשר לתכנן, תשאל עד שלוש שאלות ממוקדות לפני הכול. אחרת, תציג לי תוכנית עבודה במבנה שלמטה.",
@@ -124,7 +140,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
   out.push(
     `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את התוכנית במערכת עם save_task_plan: taskId "${input.taskId}", הטקסט המלא ב-plan, כותרות השלבים ב-steps, approved: true, ו-baseVersion: ${baseVersion}. אם אני מבקש לשמור בלי לאשר, approved: false.`,
     "4. אחרי השמירה, תשאל אם להפוך את השלבים לשלבים במשימה (apply_task_plan_steps). תגיד לי שזה מחליף את השלבים הפתוחים, ושלבים שבוצעו או שדווח עליהם זמן נשארים.",
-    "5. אם אבקש לבצע, תעבוד שלב אחרי שלב לפי התוכנית, ותסמן כל שלב שהסתיים עם set_task_step.",
+    "5. אם אבקש לבצע, תעבוד שלב אחרי שלב לפי התוכנית. כשמסתיים שלב: תסמן אותו עם set_task_step, ותוסיף הערה קצרה במשימה (add_task_comment) על מה נעשה ומה יצא, כדי שמי שיפתח את המשימה אחריי יבין איפה היא עומדת.",
     ""
   );
 
@@ -133,6 +149,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "## מה מותר בלי לשאול, ומה לא",
     "- בלי לשאול: לקרוא נתונים, לחקור, לנסח טיוטות, להוסיף הערה פנימית במשימה (add_task_comment) ולסמן שלב שהסתיים.",
     "- רק אחרי אישור שלי: לסגור את המשימה, לשנות אחראי, תאריך יעד או עדיפות, לדווח זמן, לפתוח החלטה ללקוח, וכל דבר שהלקוח רואה.",
+    "- החלטה שהלקוח צריך לקבל: אחרי אישור שלי, אפשר לפתוח אותה בפורטל שלו עם create_decision ולקשר אותה למשימה. הלקוח לא מקבל הודעה אוטומטית, אז תזכיר לי לעדכן אותו.",
     "- אף פעם: לשלוח משהו ללקוח או לספק בעצמך. אתה מנסח, אני שולח.",
     "- אם התוכנית משתנה תוך כדי ביצוע, תציע גרסה חדשה ותשמור אותה רק אחרי אישור. לא משנים תוכנית בשקט.",
     `- אם save_task_plan מחזיר שנשמרה גרסה חדשה יותר, תקרא אותה עם get_task_plan, תראה לי מה שונה ותשאל לפני שאתה שומר.`,
@@ -163,7 +180,15 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     ""
   );
 
-  // ---- The data ------------------------------------------------------------
+  out.push(...taskDataSection(input));
+
+  out.push(hasPlan ? "תתחיל בהצגת התוכנית הקיימת בקצרה." : "תתחיל.");
+  return out.join("\n");
+}
+
+/// "נתוני המשימה": everything the screen knows, the same for both prompts.
+function taskDataSection(input: AdvancePromptInput): string[] {
+  const out: string[] = [];
   out.push(
     "## נתוני המשימה",
     `נכון ל-${input.todayLabel}.`,
@@ -178,6 +203,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     ...line("מפקח", input.supervisor ? `${input.supervisor}${input.requiresApproval ? " (נדרש אישור שלו לסגירה)" : ""}` : null),
     ...line("תאריך יעד", input.dueLabel),
     `- נפתחה: ${input.createdLabel}`,
+    ...line("נסגרה", input.completedLabel),
     ...line("זמן שדווח", input.loggedLabel),
     ...(input.waiting
       ? [
@@ -237,6 +263,46 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     out.push("");
   }
 
-  out.push(hasPlan ? "תתחיל בהצגת התוכנית הקיימת בקצרה." : "תתחיל.");
+  return out;
+}
+
+/// The prompt for a task that is already closed: not a plan, a short
+/// summary of what happened and what to learn from it.
+///
+/// "Advance" makes no sense on finished work, but the same button has a
+/// job there. A closed task is the cheapest moment to write down why it
+/// took three weeks instead of three days, and the most common moment for
+/// nobody to. The summary is saved as an internal comment, after the
+/// person approves it, so it stays on the task and never reaches the
+/// client.
+export function buildLessonsPrompt(input: AdvancePromptInput): string {
+  const out: string[] = [];
+  out.push(
+    `אני ${input.requestedBy} מצוות אנקורה. המשימה "${input.title}" של הלקוח ${input.clientName} נסגרה (${input.statusLabel}), ואני רוצה לסכם אותה ולהפיק ממנה לקחים.`,
+    "",
+    "כל נתוני המשימה מופיעים בסוף ההודעה. אל תכתוב למערכת לפני שאני מאשר במפורש.",
+    "",
+    "## איך עובדים",
+    "1. תכתוב סיכום קצר במבנה שלמטה, מתוך הנתונים בלבד. מה שלא מופיע בנתונים, לא להמציא: לכתוב שזה לא ידוע.",
+    "2. אם אני מתקן, תעדכן ותציג את הסיכום המלא מחדש.",
+    `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את הסיכום כהערה פנימית במשימה עם add_task_comment: taskId "${input.taskId}", includeDone: true. עד 4000 תווים. הערות לא מוצגות ללקוח.`,
+    "4. אם עולה לקח שכדאי להפוך לנוהל או לשלבים קבועים במשימות דומות, תציע אותו בנפרד בסוף. אל תשנה שום דבר אחר במשימה, ואל תפתח אותה מחדש.",
+    "",
+    "## מבנה הסיכום",
+    "בלי כותרות עם #. כותרת כל חלק מודגשת (**כך**), והתוכן ברשימות. העברית פשוטה, המשפטים קצרים, ובלי קו מפריד ארוך.",
+    "- **מה היה צריך לקרות**: משפט אחד.",
+    "- **מה קרה בפועל**: התוצאה, ומה הלקוח קיבל.",
+    "- **זמן ומאמץ**: מהפתיחה ועד הסגירה, והזמן שדווח.",
+    "- **מה עבד**",
+    "- **מה התעכב או לא עבד**: ולמה, לפי מה שכתוב בנתונים.",
+    "- **לקחים**: עד שלושה, כל אחד משפט אחד שאפשר לפעול לפיו בפעם הבאה.",
+    "",
+    "## החיבור למערכת",
+    `הנתונים והכתיבה עוברים דרך החיבור של אנקורה (Ankora MCP). תזהה את המשימה תמיד לפי taskId "${input.taskId}" ולא לפי הכותרת.`,
+    "אם החיבור לא זמין בשיחה הזו, תגיד לי לחבר אותו ואל תמציא נתונים.",
+    ""
+  );
+  out.push(...taskDataSection(input));
+  out.push("תתחיל.");
   return out.join("\n");
 }

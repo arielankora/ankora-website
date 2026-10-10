@@ -13,7 +13,7 @@ import {
   NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
-import { applyPlanSteps, approveTaskPlan, saveTaskPlan } from "@/lib/app-domain/task-plans";
+import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -337,6 +337,18 @@ export async function saveTaskPlanAction(input: {
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }
+}
+
+/// A measurement: somebody copied the "קדם עם קלוד" prompt. Never fails
+/// loudly; the copy already happened and that is what the person wanted.
+export async function recordAdvancePromptCopiedAction(input: { taskId: string; mode: "plan" | "lessons" }) {
+  try {
+    const user = await requireUser();
+    await recordAdvancePromptCopied(user, input.taskId, input.mode === "lessons" ? "lessons" : "plan");
+  } catch (err) {
+    console.error("[advance-with-claude] could not record the copy", err);
+  }
+  return { ok: true as const };
 }
 
 /// Agrees to a draft Claude saved without approval.

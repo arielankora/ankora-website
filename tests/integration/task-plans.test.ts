@@ -10,6 +10,7 @@ import {
   applyPlanSteps,
   approveTaskPlan,
   getTaskPlans,
+  recordAdvancePromptCopied,
   saveTaskPlan,
 } from "@/lib/app-domain/task-plans";
 
@@ -160,5 +161,33 @@ describe("turning a plan into steps", () => {
     const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
     await saveTaskPlan(actor, task.id, { body: "x", steps: ["א"], approved: false, baseVersion: 0, origin: "MCP" });
     await expect(applyPlanSteps(actor, task.id)).rejects.toThrow(PLAN_NOT_APPROVED_MESSAGE);
+  });
+});
+
+describe("measuring the button", () => {
+  it("records a copy in the audit log and keeps it out of the thread", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    await recordAdvancePromptCopied(actor, task.id, "plan");
+
+    const rows = await prisma.auditEvent.count({
+      where: { entityType: "Task", entityId: task.id, action: "task.advance_prompt_copied" },
+    });
+    expect(rows).toBe(1);
+    const detail = await getTaskDetail(actor, task.id);
+    expect(detail!.thread.some((e) => e.kind === "event" && e.label === "הועתק פרומט לקלוד")).toBe(false);
+  });
+
+  it("ignores a task out of reach, without throwing", async () => {
+    const client = await createTestClient();
+    const other = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const outsider = await employeeOn(other.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    await expect(recordAdvancePromptCopied(outsider, task.id, "plan")).resolves.toBeUndefined();
+    expect(await prisma.auditEvent.count({ where: { action: "task.advance_prompt_copied" } })).toBe(0);
   });
 });

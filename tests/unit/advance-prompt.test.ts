@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildAdvancePrompt, MAX_COMMENT_CHARS, type AdvancePromptInput } from "@/lib/advance-prompt";
+import { buildAdvancePrompt, buildLessonsPrompt, isEmptyBrief, MAX_COMMENT_CHARS, type AdvancePromptInput } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026). The prompt the task screen copies. Pure, so
 // it runs in the sandbox like client-activity-prompt.test.ts.
@@ -120,5 +120,56 @@ describe("buildAdvancePrompt()", () => {
       clientVisible: true,
     });
     expect(text).not.toMatch(/[\u2013\u2014]/);
+  });
+});
+
+describe("the edge cases in the spec", () => {
+  it("on a task with no description and no comments, starts with questions, not a plan", () => {
+    const empty = { ...base, description: null, comments: [] };
+    expect(isEmptyBrief(empty)).toBe(true);
+    expect(buildAdvancePrompt(empty)).toContain("תתחיל בשאלות הבהרה");
+    expect(buildAdvancePrompt(base)).not.toContain("תתחיל בשאלות הבהרה");
+  });
+
+  it("a comment alone is a brief", () => {
+    expect(isEmptyBrief({ description: "  ", comments: [{ atLabel: "x", by: "הדס", body: "פרטים" }] })).toBe(false);
+  });
+
+  it("asks for a short comment on the task after every finished step", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("תסמן אותו עם set_task_step, ותוסיף הערה קצרה במשימה (add_task_comment)");
+  });
+
+  it("allows opening a client decision only after approval, and says the client is not notified", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("create_decision");
+    expect(text).toContain("הלקוח לא מקבל הודעה אוטומטית");
+  });
+});
+
+describe("buildLessonsPrompt()", () => {
+  const closed = { ...base, statusLabel: "הושלמה", completedLabel: "09.10.2026", loggedLabel: "4.00 שעות" };
+
+  it("asks for a summary and lessons, saved as an internal comment on the closed task", () => {
+    const text = buildLessonsPrompt(closed);
+    expect(text).toContain("נסגרה (הושלמה)");
+    expect(text).toContain('add_task_comment: taskId "cmg1abc", includeDone: true');
+    expect(text).toContain("**לקחים**");
+    expect(text).not.toContain("save_task_plan");
+  });
+
+  it("carries when it opened and when it closed, and the hours", () => {
+    const text = buildLessonsPrompt(closed);
+    expect(text).toContain("- נפתחה: 01.10.2026");
+    expect(text).toContain("- נסגרה: 09.10.2026");
+    expect(text).toContain("- זמן שדווח: 4.00 שעות");
+  });
+
+  it("forbids reopening or changing the task", () => {
+    expect(buildLessonsPrompt(closed)).toContain("אל תשנה שום דבר אחר במשימה, ואל תפתח אותה מחדש");
+  });
+
+  it("contains no em-dash or en-dash", () => {
+    expect(buildLessonsPrompt(closed)).not.toMatch(/[\u2013\u2014]/);
   });
 });

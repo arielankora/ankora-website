@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
+import { recordAdvancePromptCopiedAction } from "./actions";
 
 // "קדם עם קלוד" (10.10.2026): one press copies a prompt that carries the
 // whole task, and the conversation it starts in Claude ends with a work
@@ -18,18 +19,46 @@ import { Check, Copy, ExternalLink, Sparkles } from "lucide-react";
 // permission, an old browser), the prompt is shown in a box, already
 // selected, with a button that copies it the old way. Nobody is left with
 // a button that did nothing.
+//
+// On a closed task the same place offers "סיכום ולקחים עם קלוד": there is
+// nothing left to advance, and the end of a task is the cheapest moment
+// to write down what to do differently next time.
 
 const CLAUDE_NEW_CHAT = "https://claude.ai/new";
 
-export function AdvanceWithClaude({ prompt, hasPlan }: { prompt: string; hasPlan: boolean }) {
+export function AdvanceWithClaude({
+  taskId,
+  prompt,
+  hasPlan,
+  mode = "plan",
+}: {
+  taskId: string;
+  prompt: string;
+  hasPlan: boolean;
+  mode?: "plan" | "lessons";
+}) {
   const [state, setState] = useState<"idle" | "copied" | "manual">("idle");
   const boxRef = useRef<HTMLTextAreaElement>(null);
+
+  // Fire and forget: the measurement must never delay or undo the copy.
+  function copied() {
+    setState("copied");
+    void recordAdvancePromptCopiedAction({ taskId, mode });
+  }
+
+  const label = mode === "lessons" ? "סיכום ולקחים עם קלוד" : "קדם עם קלוד";
+  const hint =
+    mode === "lessons"
+      ? "מעתיק פרומט עם נתוני המשימה הסגורה. קלוד כותב איתכם סיכום ולקחים ושומר אותם כהערה פנימית"
+      : hasPlan
+        ? "מעתיק פרומט עם נתוני המשימה והתוכנית הקיימת, כדי לעדכן אותה או לבצע אותה בקלוד"
+        : "מעתיק פרומט עם כל נתוני המשימה. קלוד בונה איתכם תוכנית עבודה ושומר אותה כאן";
 
   async function copy() {
     try {
       if (!navigator.clipboard?.writeText) throw new Error("no clipboard");
       await navigator.clipboard.writeText(prompt);
-      setState("copied");
+      copied();
     } catch {
       setState("manual");
       // Next frame: the box exists only after this render.
@@ -43,7 +72,7 @@ export function AdvanceWithClaude({ prompt, hasPlan }: { prompt: string; hasPlan
     box.select();
     // The legacy path, used only when the modern one already failed.
     const ok = document.execCommand("copy");
-    if (ok) setState("copied");
+    if (ok) copied();
   }
 
   return (
@@ -52,15 +81,11 @@ export function AdvanceWithClaude({ prompt, hasPlan }: { prompt: string; hasPlan
         <button
           type="button"
           onClick={copy}
-          title={
-            hasPlan
-              ? "מעתיק פרומט עם נתוני המשימה והתוכנית הקיימת, כדי לעדכן אותה או לבצע אותה בקלוד"
-              : "מעתיק פרומט עם כל נתוני המשימה. קלוד בונה איתכם תוכנית עבודה ושומר אותה כאן"
-          }
+          title={hint}
           className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold"
         >
           {state === "copied" ? <Check size={14} className="text-gold-dim" /> : <Sparkles size={14} className="text-gold-dim" />}
-          קדם עם קלוד
+          {label}
         </button>
         {state === "copied" && (
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-appNavy/65" role="status">

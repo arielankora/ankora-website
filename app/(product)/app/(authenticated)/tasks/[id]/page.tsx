@@ -23,7 +23,7 @@ import { RevealCredential } from "@/components/app/vault/RevealCredential";
 import { getTaskPlans, type TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import { AdvanceWithClaude } from "./AdvanceWithClaude";
-import { TaskPlanPanel, type PlanView } from "./TaskPlanPanel";
+import { NewPlanEditor, TaskPlanPanel, type PlanView } from "./TaskPlanPanel";
 
 function planView(p: TaskPlanRow): PlanView {
   return {
@@ -112,9 +112,11 @@ export default async function TaskDetailPage(props: {
   const plans = isStep ? null : await getTaskPlans(user, task.id);
   const currentPlan = plans?.current ?? null;
   // Built here, while the page renders, so the button copies inside the
-  // click (see AdvanceWithClaude). Not for a step, and not for a closed
-  // task: there is nothing left to advance.
-  const advancePrompt = isStep || isClosed ? null : await advancePromptFor(user, detail, currentPlan);
+  // click (see AdvanceWithClaude). Not for a step. On a closed task there
+  // is nothing left to advance, so the same button writes a summary and
+  // lessons instead.
+  const advanceMode = isClosed ? ("lessons" as const) : ("plan" as const);
+  const advancePrompt = isStep ? null : await advancePromptFor(user, detail, currentPlan, advanceMode);
 
   const [composer, people, allCategories, activeTimers] = await Promise.all([
     messageComposerProps({
@@ -229,7 +231,10 @@ export default async function TaskDetailPage(props: {
               {...composer}
             />
           )}
-          {advancePrompt && <AdvanceWithClaude prompt={advancePrompt} hasPlan={currentPlan !== null} />}
+          {advancePrompt && (
+            <AdvanceWithClaude taskId={task.id} prompt={advancePrompt} hasPlan={currentPlan !== null} mode={advanceMode} />
+          )}
+          {!isStep && !isClosed && !currentPlan && <NewPlanEditor taskId={task.id} />}
         </div>
       )}
 

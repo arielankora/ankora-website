@@ -7,7 +7,7 @@ import type { TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
-import { buildAdvancePrompt } from "@/lib/advance-prompt";
+import { buildAdvancePrompt, buildLessonsPrompt } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
 // into the prompt. One extra read, the decisions filed against the task;
@@ -24,7 +24,15 @@ const MAX_PROMPT_COMMENTS = 30;
 
 type Detail = NonNullable<Awaited<ReturnType<typeof getTaskDetail>>>;
 
-export async function advancePromptFor(actor: User, detail: Detail, plan: TaskPlanRow | null): Promise<string> {
+/// "plan" on open work, "lessons" on a closed task (see buildLessonsPrompt).
+export type AdvancePromptMode = "plan" | "lessons";
+
+export async function advancePromptFor(
+  actor: User,
+  detail: Detail,
+  plan: TaskPlanRow | null,
+  mode: AdvancePromptMode = "plan"
+): Promise<string> {
   const { task, subtasks, thread, time } = detail;
   const tz = actor.timezone || "Asia/Jerusalem";
   const day = new Intl.DateTimeFormat("he-IL", { timeZone: tz, day: "2-digit", month: "2-digit", year: "numeric" });
@@ -52,7 +60,8 @@ export async function advancePromptFor(actor: User, detail: Detail, plan: TaskPl
 
   const loggedMinutes = Math.round(time.totalSeconds / 60);
 
-  return buildAdvancePrompt({
+  const build = mode === "lessons" ? buildLessonsPrompt : buildAdvancePrompt;
+  return build({
     taskId: task.id,
     url: taskUrl(appBaseUrl(), task.id),
     title: task.title,
@@ -65,6 +74,7 @@ export async function advancePromptFor(actor: User, detail: Detail, plan: TaskPl
     requiresApproval: task.requiresApproval,
     dueLabel: task.dueDate ? day.format(task.dueDate) : null,
     createdLabel: day.format(task.createdAt),
+    completedLabel: task.completedAt ? day.format(task.completedAt) : null,
     description: task.description,
     clientVisible: task.clientVisible,
     clientTitle: task.clientTitle,
