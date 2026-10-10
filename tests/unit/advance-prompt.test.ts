@@ -175,11 +175,13 @@ describe("buildLessonsPrompt()", () => {
 });
 
 describe("how Claude asks (11.10.2026)", () => {
-  it("every question comes with lettered choices, the recommended one first and marked, and room to write", () => {
+  it("asks through the app's question cards first, and falls back to lettered text choices", () => {
     for (const text of [buildAdvancePrompt(base), buildLessonsPrompt(base)]) {
       expect(text).toContain("## איך שואלים אותי");
-      expect(text).toContain("ממוספרות באותיות (א, ב, ג, ד)");
+      expect(text).toContain("ask_user_input");
+      expect(text).toContain("ואל תכתוב את אותן שאלות גם בטקסט");
       expect(text).toContain('"(מומלץ)"');
+      expect(text).toContain("רק אם אין לך כלי כזה בשיחה");
       expect(text).toContain('"או לכתוב תשובה אחרת"');
     }
   });
