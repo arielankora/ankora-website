@@ -8,6 +8,7 @@ import {
   elapsedMinutes,
   serializeClient,
   serializeTask,
+  taskUrl,
   serializeTeamTimeEntry,
   serializeTimeEntry,
   type SerializedTimeEntry,
@@ -46,6 +47,7 @@ import { localDateTimeToUtc } from "@/lib/timezone";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
+import { appBaseUrl } from "@/lib/email-templates";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
@@ -606,7 +608,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List tasks",
       description:
-        "Lists Ankora tasks on the clients the signed-in employee works with. Defaults to unfinished tasks (open and in progress) assigned to nobody in particular - pass `mine: true` for the user's own plate, or `overdue: true` for anything past its due date. Answers 'what do I need to do today', 'what's overdue', 'what's open on this client'.",
+        "Lists Ankora tasks on the clients the signed-in employee works with. Defaults to unfinished tasks (open and in progress) assigned to nobody in particular - pass `mine: true` for the user's own plate, or `overdue: true` for anything past its due date. Answers 'what do I need to do today', 'what's overdue', 'what's open on this client'. Each task carries a `url` that opens it in the Ankora app; use it when the user wants to point someone at the task (an email, a message, a summary). It is for Ankora staff: it needs an app sign-in and clients cannot open it.",
       inputSchema: z.object({
         client: z.string().optional().describe("Client name, as the user said it. Omit for all clients."),
         mine: z.boolean().optional().describe("Only tasks assigned to the signed-in employee."),
@@ -681,6 +683,7 @@ export function registerAnkoraTools(server: McpServer): void {
         }
 
         const now = new Date();
+        const baseUrl = appBaseUrl();
         // `overdue` and `dueBy` are the same filter with a different
         // cutoff; when both arrive, the tighter one wins rather than
         // silently dropping one of the user's two conditions.
@@ -710,7 +713,7 @@ export function registerAnkoraTools(server: McpServer): void {
           truncated: tasks.length > page.length,
           totalMatching: tasks.length,
           userTimezone: actor.timezone,
-          tasks: page.map((t: TaskLike) => serializeTask(t, { timeZone: actor.timezone, now })),
+          tasks: page.map((t: TaskLike) => serializeTask(t, { timeZone: actor.timezone, now, baseUrl })),
         });
       } catch (err) {
         console.error("[mcp] list_tasks failed", err);
@@ -749,7 +752,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Open a task",
       description:
-        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying.",
+        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying. The result includes the new task's `url` in the Ankora app (staff sign-in required, not for clients); quote it exactly when the user asks for a link to what was opened.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
@@ -891,6 +894,7 @@ export function registerAnkoraTools(server: McpServer): void {
         return toolJson({
           created: true,
           taskId: task.id,
+          url: taskUrl(appBaseUrl(), task.id),
           title: task.title,
           client: client.value.name,
           category: categoryName,
@@ -1120,6 +1124,7 @@ export function registerAnkoraTools(server: McpServer): void {
         return toolJson({
           updated: true,
           taskId: updated.id,
+          url: taskUrl(appBaseUrl(), updated.id),
           title: updated.title,
           status: updated.status,
           client: found.value.clientName,

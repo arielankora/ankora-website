@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { serializeTask, type TaskLike } from "@/lib/mcp/serialize";
+import { serializeTask, taskUrl, type TaskLike } from "@/lib/mcp/serialize";
 
 // Phase 16 (MCP tasks, docs/adr/0005).
 //
@@ -115,6 +115,7 @@ describe("the payload", () => {
         "status",
         "supervisor",
         "title",
+        "url",
         "waitingOn",
       ].sort()
     );
@@ -158,5 +159,21 @@ describe("the payload", () => {
     // TASK_STATUS_LABELS belongs on the screen. A model comparing
     // statuses needs the enum.
     expect(serializeTask(task({ status: "IN_PROGRESS" }), { timeZone: IL }).status).toBe("IN_PROGRESS");
+  });
+});
+
+describe("the task's link in the app", () => {
+  it("points at the task's own screen on the given origin", () => {
+    const out = serializeTask(task(), { timeZone: IL, baseUrl: "https://www.ankora.co.il" });
+    expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t1");
+  });
+
+  it("does not double the slash when the origin ends with one", () => {
+    expect(taskUrl("https://www.ankora.co.il/", "t1")).toBe("https://www.ankora.co.il/app/tasks/t1");
+  });
+
+  it("is null, not missing, when no origin was given", () => {
+    const out = serializeTask(task(), { timeZone: IL });
+    expect(out).toHaveProperty("url", null);
   });
 });
