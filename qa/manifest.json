@@ -1250,8 +1250,24 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-10-06"
+    },
+    "domain:advance-prompt-input": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-10",
+      "riskReason": "Builds the text a person pastes outside the product; must carry only what the screen already shows"
+    },
+    "domain:task-plans": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-10",
+      "riskReason": "Written by Claude through MCP; versioning guards against overwrite, and applying a plan removes open steps"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-06"
+  "lastScan": "2026-10-10"
 }

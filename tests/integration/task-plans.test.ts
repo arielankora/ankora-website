@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { createTask, getTaskDetail, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, createTask, getTaskDetail, updateTask } from "@/lib/app-domain/tasks";
 import {
   PLAN_NOT_APPROVED_MESSAGE,
   PLAN_ON_CLOSED_MESSAGE,
@@ -13,6 +13,7 @@ import {
   recordAdvancePromptCopied,
   saveTaskPlan,
 } from "@/lib/app-domain/task-plans";
+import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 
 // "קדם עם קלוד" (10.10.2026): the work plan of a task, against a real
 // database. What only shows up here:
@@ -189,5 +190,39 @@ describe("measuring the button", () => {
 
     await expect(recordAdvancePromptCopied(outsider, task.id, "plan")).resolves.toBeUndefined();
     expect(await prisma.auditEvent.count({ where: { action: "task.advance_prompt_copied" } })).toBe(0);
+  });
+});
+
+describe("the prompt the button copies", () => {
+  it("is built from the task, its comments and its current plan, and names the task by id", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה", description: "להתאים את ספטמבר." });
+    await addTaskComment(actor, task.id, "ביקשתי את הדוח מהבנק.");
+    await saveTaskPlan(actor, task.id, { body: PLAN, steps: ["לבקש דוח"], approved: true, baseVersion: 0, origin: "MCP" });
+
+    const detail = await getTaskDetail(actor, task.id);
+    const plans = await getTaskPlans(actor, task.id);
+    const prompt = await advancePromptFor(actor, detail!, plans!.current);
+
+    expect(prompt).toContain(`taskId "${task.id}"`);
+    expect(prompt).toContain("להתאים את ספטמבר.");
+    expect(prompt).toContain("> ביקשתי את הדוח מהבנק.");
+    expect(prompt).toContain("baseVersion: 1");
+    expect(prompt).toContain("save_task_plan");
+  });
+
+  it("on a closed task, asks for a summary and lessons instead of a plan", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה", description: "x" });
+    await updateTask(actor, task.id, { status: "DONE" });
+
+    const detail = await getTaskDetail(actor, task.id);
+    const prompt = await advancePromptFor(actor, detail!, null, "lessons");
+
+    expect(prompt).toContain("**לקחים**");
+    expect(prompt).toContain("includeDone: true");
+    expect(prompt).not.toContain("save_task_plan");
   });
 });
