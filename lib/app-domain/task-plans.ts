@@ -1,7 +1,7 @@
 import "server-only";
 import { Prisma, type EntryOrigin, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
+import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { createTask, removeTaskSteps } from "@/lib/app-domain/tasks";
@@ -288,4 +288,79 @@ export async function recordAdvancePromptCopied(actor: User, taskId: string, mod
     clientId: task.clientId,
     after: { mode },
   });
+}
+
+/// How "קדם עם קלוד" is used, for the integrations screen.
+///
+/// Three numbers that together say whether the flow works, not just
+/// whether the button is pressed: prompts copied, plans that came back
+/// through Claude, and plans that became steps. Copies with no plans
+/// behind them mean people start the conversation and drop it; plans with
+/// no steps mean the plan is written and then not worked from. Per person
+/// as well, because adoption in a team of four is a question about names.
+///
+/// Admins only, like the rest of that screen: it reads every client.
+export const USAGE_WINDOW_DAYS = 30;
+
+export type AdvanceUsage = {
+  days: number;
+  copiesPlan: number;
+  copiesLessons: number;
+  plansViaClaude: number;
+  plansInApp: number;
+  plansApplied: number;
+  tasksWithPlan: number;
+  people: { name: string; copies: number; plans: number }[];
+};
+
+export async function advanceWithClaudeUsage(actor: User, now: Date = new Date()): Promise<AdvanceUsage | null> {
+  if (!can(actor.role, "integration.manage")) return null;
+  const since = new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+
+  const [copies, plans] = await Promise.all([
+    prisma.auditEvent.findMany({
+      where: { action: "task.advance_prompt_copied", createdAt: { gte: since } },
+      select: { afterJson: true, actor: { select: { id: true, name: true } } },
+    }),
+    prisma.taskPlan.findMany({
+      where: { createdAt: { gte: since } },
+      select: {
+        taskId: true,
+        origin: true,
+        stepsAppliedAt: true,
+        createdBy: { select: { id: true, name: true } },
+      },
+    }),
+  ]);
+
+  const people = new Map<string, { name: string; copies: number; plans: number }>();
+  const person = (p: { id: string; name: string } | null) => {
+    if (!p) return null;
+    const found = people.get(p.id) ?? { name: p.name, copies: 0, plans: 0 };
+    people.set(p.id, found);
+    return found;
+  };
+
+  let copiesLessons = 0;
+  for (const c of copies) {
+    const mode = (c.afterJson as Record<string, unknown> | null)?.mode;
+    if (mode === "lessons") copiesLessons++;
+    const p = person(c.actor);
+    if (p) p.copies++;
+  }
+  for (const pl of plans) {
+    const p = person(pl.createdBy);
+    if (p) p.plans++;
+  }
+
+  return {
+    days: USAGE_WINDOW_DAYS,
+    copiesPlan: copies.length - copiesLessons,
+    copiesLessons,
+    plansViaClaude: plans.filter((p) => p.origin === "MCP").length,
+    plansInApp: plans.filter((p) => p.origin === "APP").length,
+    plansApplied: plans.filter((p) => p.stepsAppliedAt !== null).length,
+    tasksWithPlan: new Set(plans.map((p) => p.taskId)).size,
+    people: [...people.values()].sort((a, b) => b.copies + b.plans - (a.copies + a.plans)),
+  };
 }
