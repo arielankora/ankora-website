@@ -1451,11 +1451,14 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.plan_saved": "תוכנית העבודה עודכנה",
   "task.plan_approved": "תוכנית העבודה אושרה",
   "task.plan_steps_applied": "תוכנית העבודה הפכה לשלבים",
+  "task.advance_prompt_copied": "הועתק פרומט לקלוד",
 };
 
 /// Audit actions the thread deliberately drops, because the thing they
 /// record already appears in it as itself.
-const THREAD_SUPPRESSED_ACTIONS = new Set(["task.comment", "task.comment_delete"]);
+/// "task.advance_prompt_copied" is a usage measurement ("קדם עם קלוד"), not
+/// a change to the task, and a line for every copy would bury the thread.
+const THREAD_SUPPRESSED_ACTIONS = new Set(["task.comment", "task.comment_delete", "task.advance_prompt_copied"]);
 
 /// One line of a task's thread, already in the words a person reads.
 ///

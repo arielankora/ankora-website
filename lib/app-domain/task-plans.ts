@@ -266,3 +266,26 @@ export async function applyPlanSteps(actor: User, taskId: string) {
   });
   return { version: plan.version, removed: result.removed, kept: result.kept, added };
 }
+
+/// Records that somebody copied a "קדם עם קלוד" prompt.
+///
+/// The one signal the product has that the button is used: the copy
+/// happens in the browser and the conversation happens in Claude, so
+/// without this line nobody could tell a feature in daily use from one
+/// nobody found. Kept out of the task's thread (THREAD_SUPPRESSED_ACTIONS
+/// in tasks.ts): it is a measurement, not something that happened to the
+/// task. A task out of reach is ignored silently, because a refused
+/// measurement is not worth an error on somebody's screen.
+export async function recordAdvancePromptCopied(actor: User, taskId: string, mode: "plan" | "lessons") {
+  assertCan(actor.role, "time_entry.create_self");
+  const task = await reachableTask(actor, taskId);
+  if (!task) return;
+  await recordAudit({
+    actorId: actor.id,
+    action: "task.advance_prompt_copied",
+    entityType: "Task",
+    entityId: task.id,
+    clientId: task.clientId,
+    after: { mode },
+  });
+}
