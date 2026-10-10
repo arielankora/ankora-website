@@ -99,17 +99,19 @@ function quoteBlock(text: string): string {
 }
 
 /// How Claude asks (Ariel, 11.10.2026). An open question on a phone is a
-/// paragraph to type; a question with ready answers is one tap. Every
+/// paragraph to type; a question with ready answers is one tap. The Claude
+/// apps can show a question as a card with answer buttons; asked only "if
+/// you have such a tool", Claude wrote the questions as text instead, so
+/// the tool comes first and by name, and text is the fallback. Every
 /// question comes with choices, the recommended one first and marked, and
 /// room to answer in his own words.
 export const HOW_TO_ASK: readonly string[] = [
   "## איך שואלים אותי",
-  "כל שאלה שאתה שואל, בכל שלב בשיחה, באה עם תשובות מוכנות לבחירה:",
-  "- 2 עד 4 תשובות לכל שאלה, ממוספרות באותיות (א, ב, ג, ד).",
-  "- התשובה שאתה ממליץ עליה ראשונה, מסומנת \"(מומלץ)\", עם חצי שורה למה.",
-  "- בסוף כל שאלה: \"או לכתוב תשובה אחרת\".",
-  "- אני יכול לענות בקיצור, למשל \"1א 2ג\", או לכתוב בעצמי.",
-  "- אם יש לך כלי לשאלות בחירה, תשתמש בו באותו מבנה.",
+  "כל שאלה שאתה שואל, בכל שלב בשיחה, באה עם תשובות מוכנות שאני בוחר בלחיצה.",
+  "- **קודם כול, כלי השאלות של האפליקציה.** אם יש לך כלי שמציג לי שאלה עם כפתורי תשובה (למשל ask_user_input), תשתמש בו לכל שאלה, ואל תכתוב את אותן שאלות גם בטקסט. שאלה אחת לכל כרטיס, עד שלוש שאלות בכל פעם, ותחכה לתשובות לפני שאתה ממשיך.",
+  "- בכל שאלה 2 עד 4 תשובות קצרות. התשובה שאתה ממליץ עליה ראשונה, ובסוף שלה \"(מומלץ)\". אם צריך נימוק, משפט אחד מעל הכרטיס.",
+  "- תמיד אפשר לענות אחרת: אם בכלי אין אפשרות לטקסט חופשי, תכתוב שורה אחת שאפשר גם פשוט לכתוב לך תשובה.",
+  "- רק אם אין לך כלי כזה בשיחה: אותו מבנה בטקסט. תשובות ממוספרות באותיות (א, ב, ג, ד), המומלצת ראשונה ומסומנת, בסוף כל שאלה \"או לכתוב תשובה אחרת\", ואפשר לענות בקיצור כמו \"1א 2ג\".",
   "",
 ];
 
