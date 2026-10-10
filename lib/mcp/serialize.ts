@@ -147,8 +147,27 @@ export type SerializedTask = {
   /// Who the task is waiting on (CLIENT, SUPPLIER, INTERNAL, OTHER), or
   /// null when it is not blocked.
   waitingOn: string | null;
+  /// Where the task opens in the Ankora app, for a model that is writing
+  /// a summary, an email or a message and wants to point a colleague at
+  /// it. Null only when the caller did not pass a base URL.
+  url: string | null;
   createdAt: string;
 };
+
+/// The address of one task's screen in the Ankora app.
+///
+/// Staff-only: /app/tasks/<id> sits behind the app login and the client
+/// portal has no per-task page, so this is a link for Ankora people, not
+/// for clients. Someone who is signed out lands on the login screen and is
+/// returned to the task afterwards (callbackUrl), which is why a link in
+/// an email is safe to send even though it redirects when opened cold.
+///
+/// Built here rather than by the model: an id typed into a URL by hand is
+/// exactly the kind of string a model gets one character wrong, and a
+/// guessed host (a *.vercel.app deployment) is a Vercel sign-in wall.
+export function taskUrl(baseUrl: string, taskId: string): string {
+  return `${baseUrl.replace(/\/+$/, "")}/app/tasks/${encodeURIComponent(taskId)}`;
+}
 
 /// The same one-liner as localDateKey() in lib/timezone.ts, which this
 /// module cannot import: that file is `server-only`, and this one is kept
@@ -171,7 +190,7 @@ function dateKey(date: Date, timeZone: string): string {
 /// time.
 export function serializeTask(
   task: TaskLike,
-  opts: { timeZone: string; now?: Date }
+  opts: { timeZone: string; now?: Date; baseUrl?: string }
 ): SerializedTask {
   const now = opts.now ?? new Date();
   const isClosed = task.status === "DONE" || task.status === "ARCHIVED";
@@ -190,6 +209,7 @@ export function serializeTask(
     requiresApproval: task.requiresApproval ?? false,
     clientVisible: task.clientVisible ?? false,
     waitingOn: task.blockedOn ?? null,
+    url: opts.baseUrl ? taskUrl(opts.baseUrl, task.id) : null,
     createdAt: task.createdAt.toISOString(),
   };
 }

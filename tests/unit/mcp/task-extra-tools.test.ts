@@ -138,6 +138,7 @@ describe("create_task with steps, supervision and visibility", () => {
     });
 
     expect(out.created).toBe(true);
+    expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t-new");
     expect(out.steps).toEqual(["היקף וטריגר", "נוהל", "הרשאות"]);
     const [first, ...rest] = tasks.createTask.mock.calls;
     expect(first[1]).toMatchObject({
@@ -192,6 +193,11 @@ describe("update_task: portal visibility and waiting", () => {
     tasks.updateTask.mockResolvedValue({ id: "t1", title: "x", status: "IN_PROGRESS" });
   });
 
+  it("returns the task's link alongside the change", async () => {
+    const out = await call("update_task", { task: "x", priority: "HIGH" });
+    expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t1");
+  });
+
   it("marks a task as waiting on the client, with the reason", async () => {
     await call("update_task", { task: "x", waitingOn: "CLIENT", waitingReason: "אישור ספי הוצאה" });
     expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", {
@@ -222,6 +228,7 @@ describe("update_task: portal visibility and waiting", () => {
 
 const DETAIL = {
   task: {
+    id: "t-detail",
     title: "התאמת עסקאות כרטיסי אשראי",
     client: { name: "NUX" },
     status: "IN_PROGRESS",
@@ -262,6 +269,16 @@ describe("get_task", () => {
     expect(out.comments).toEqual([{ by: "Hadas", at: "2026-10-05T08:00:00.000Z", text: "גיא הראה את התהליך" }]);
     expect(out.dueDate).toBe("2026-10-08");
     expect(out.loggedMinutes).toBe(90);
+  });
+
+  it("returns the task's id and its link in the app, so a summary can point at it", async () => {
+    // The request that produced this: an email to a colleague listing the
+    // tasks opened in a meeting, each with its link. Before this the model
+    // had no id and no address, and had to say it could not link.
+    tasks.getTaskDetail.mockResolvedValue(DETAIL);
+    const out = await call("get_task", { task: "התאמת" });
+    expect(out.id).toBe(DETAIL.task.id);
+    expect(out.url).toBe(`https://www.ankora.co.il/app/tasks/${DETAIL.task.id}`);
   });
 
   it("says so when the task is not available, rather than inventing one", async () => {

@@ -10,6 +10,8 @@ import { addTaskComment, createTask, getTaskDetail, removeTaskSteps, updateTask 
 import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisions";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
+import { taskUrl } from "@/lib/mcp/serialize";
+import { appBaseUrl } from "@/lib/email-templates";
 
 // MCP tasks, second pass (NUX handover, 3.10.2026).
 //
@@ -73,7 +75,7 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "Read one task in full",
       description:
-        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments and the time logged against it. Use it to answer 'where does X stand'. Identify the task by its title.",
+        "Reads one Ankora task with everything on it: details, owner, supervisor and approval, portal visibility and outcome, what it is waiting on, its steps with their status, recent comments and the time logged against it. Use it to answer 'where does X stand'. Identify the task by its title. The result includes `url`, the task's address in the Ankora app: quote it exactly when the user wants a link (it needs an Ankora staff sign-in; clients cannot open it).",
       inputSchema: z.object({
         ...TASK_ARGS,
         includeDone: z.boolean().optional().describe("Look among completed and archived tasks too."),
@@ -101,6 +103,8 @@ export function registerTaskExtraTools(server: McpServer): void {
           }));
 
         return toolJson({
+          id: task.id,
+          url: taskUrl(appBaseUrl(), task.id),
           title: task.title,
           client: task.client.name,
           status: task.status,
