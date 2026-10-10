@@ -457,7 +457,9 @@ export default async function AppHomePage() {
                     )}
                     {metrics.clientsNearLimitCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] font-medium text-error">
-                        {metrics.clientsNearLimitCount} לקוחות מעל 90% ניצול
+                        {metrics.clientsNearLimitCount === 1
+                          ? "לקוח אחד מעל 90% ניצול"
+                          : `${metrics.clientsNearLimitCount} לקוחות מעל 90% ניצול`}
                       </p>
                     )}
                   </div>
@@ -492,7 +494,12 @@ export default async function AppHomePage() {
                         </>
                       ) : alerts.ruleCount > 0 ? (
                         <p className="py-1.5 text-[12px] text-appNavy/60">
-                          הכל תקין · <span className="font-jbmono">{alerts.ruleCount}</span> כללים על{" "}
+                          {/* 10.10.2026: not "הכל תקין". An alert someone marked as
+                              handled is closed even while the client is still past
+                              the threshold (RIMED at 107% on the day this shipped),
+                              so zero open alerts is a fact about alerts, not a
+                              verdict on the clients. */}
+                          אין התראות פתוחות · <span className="font-jbmono">{alerts.ruleCount}</span> כללים על{" "}
                           <span className="font-jbmono">{alerts.clientCount}</span> לקוחות
                         </p>
                       ) : (
