@@ -1,0 +1,58 @@
+<!doctype html><html><head><meta charset="utf-8">
+<!--
+  Blog cover template (approved 11.10.2026). Rendered by render-cover.mjs.
+  A: site hero, no title. Inputs scatter and resolve into one gold line.
+  B: dot grid with gold structure and title (kept for reference, not used).
+  C: LinkedIn share image, the title is the image.
+  1600x840 = 1.91:1, LinkedIn's link image. The site hero (16:7) crops
+  70px top and bottom, so nothing important sits there.
+  Every shape is seeded from the slug: same post, same cover; new post, new cover.
+-->
+<style>
+@font-face{font-family:Heebo;src:url(../../public/fonts/heebo-hebrew-var-v5.woff2);font-weight:100 900;unicode-range:U+0590-05FF,U+200C-2010,U+FB1D-FB4F}
+@font-face{font-family:Heebo;src:url(../../public/fonts/heebo-latin-var-v5.woff2);font-weight:100 900}
+@font-face{font-family:Mono;src:url(../../public/fonts/jetbrains-mono-latin-var-v5.woff2);font-weight:100 800}
+html,body{margin:0;background:#0B1B33}
+#c{position:relative;width:1600px;height:840px;overflow:hidden;background:radial-gradient(1200px 700px at 78% 40%,#12284A 0%,#0B1B33 55%,#08182D 100%)}
+svg{position:absolute;inset:0}
+.mono{position:absolute;font-family:Mono;font-size:15px;letter-spacing:.18em;color:#A9B8C9;text-transform:uppercase}
+.title{position:absolute;font-family:Heebo;font-weight:200;color:#F8F4EC;letter-spacing:-.02em;line-height:1.18}
+.gold{color:#B08D57}
+</style></head><body><div id="c"></div>
+<script>
+const P=JSON.parse(decodeURIComponent(location.search.slice(3)));
+function rng(s){let h=2166136261;for(const ch of s)h=Math.imul(h^ch.charCodeAt(0),16777619);return()=>{h^=h<<13;h^=h>>>17;h^=h<<5;return((h>>>0)%100000)/100000}}
+const r=rng(P.seed),W=1600,H=840,c=document.getElementById('c');
+const ns='http://www.w3.org/2000/svg';const svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 '+W+' '+H);svg.setAttribute('width',W);svg.setAttribute('height',H);c.appendChild(svg);
+function el(t,a){const e=document.createElementNS(ns,t);for(const k in a)e.setAttribute(k,a[k]);svg.appendChild(e);return e}
+const rtl=P.locale==='he';
+const mx=x=>rtl?W-x:x;
+if(P.concept==='A'){
+ // Complexity converging into one clear line. Inputs scatter on one side, resolve into a gold line.
+ const fx=mx(1040),fy=420,n=38;
+ for(let i=0;i<n;i++){const sy=190+r()*560,sx=mx(60+r()*260),c1=mx(420+r()*260),c2=mx(760+r()*140);
+  el('path',{d:'M'+sx+' '+sy+' C '+c1+' '+(sy+(r()-.5)*260)+', '+c2+' '+(fy+(r()-.5)*60)+', '+fx+' '+fy,fill:'none',stroke:'rgba(248,244,236,'+(0.06+r()*0.16)+')','stroke-width':0.8+r()*0.8});
+  el('circle',{cx:sx,cy:sy,r:1.6+r()*1.6,fill:'rgba(169,184,201,.55)'});}
+ el('line',{x1:fx,y1:fy,x2:mx(1540),y2:fy,stroke:'#B08D57','stroke-width':2.2});
+ el('circle',{cx:fx,cy:fy,r:7,fill:'#B08D57'});el('circle',{cx:fx,cy:fy,r:22,fill:'none',stroke:'rgba(176,141,87,.45)'});
+ el('circle',{cx:fx,cy:fy,r:46,fill:'none',stroke:'rgba(176,141,87,.18)'});
+}
+if(P.concept==='B'){
+ // A calm field: a dot grid where one seeded region is resolved into gold structure.
+ const step=40,cx0=rtl?380:1220,cy0=420;
+ const lit=[];
+ for(let x=20;x<W;x+=step)for(let y=20;y<H;y+=step){const d=Math.hypot(x-cx0,y-cy0);const inR=d<210+r()*40&&r()>0.35;
+  el('circle',{cx:x,cy:y,r:inR?2.6:1.2,fill:inR?'#B08D57':'rgba(248,244,236,'+(0.08+Math.max(0,0.16-d/5000))+')'});if(inR)lit.push([x,y]);}
+ const key=(x,y)=>x+','+y,set=new Set(lit.map(p=>key(p[0],p[1])));
+ for(const [x,y] of lit){for(const [dx,dy] of [[step,0],[0,step]]){if(set.has(key(x+dx,y+dy))&&r()>0.45)el('line',{x1:x,y1:y,x2:x+dx,y2:y+dy,stroke:'rgba(176,141,87,.55)','stroke-width':1.2});}}
+ const t=document.createElement('div');t.className='title';t.style.cssText=(rtl?'right':'left')+':110px;top:300px;width:720px;font-size:56px;direction:'+(rtl?'rtl':'ltr');t.textContent=P.title;c.appendChild(t);
+}
+if(P.concept==='C'){
+ // Editorial: the title is the image. Contour lines as the only ornament.
+ const ox=mx(1350),oy=420;
+ for(let i=1;i<=14;i++){const rr=40+i*34+r()*8;el('ellipse',{cx:ox,cy:oy,rx:rr*1.15,ry:rr,fill:'none',stroke:i===5?'rgba(176,141,87,.7)':'rgba(248,244,236,'+(0.04+0.05*(i%3===0))+')','stroke-width':i===5?1.6:1,transform:'rotate('+(r()*20-10)+' '+ox+' '+oy+')'});}
+ el('line',{x1:mx(110),y1:250,x2:mx(170),y2:250,stroke:'#B08D57','stroke-width':2});
+ const t=document.createElement('div');t.className='title';t.style.cssText=(rtl?'right':'left')+':110px;top:285px;width:930px;font-size:66px;direction:'+(rtl?'rtl':'ltr');t.textContent=P.title;c.appendChild(t);
+}
+const l=document.createElement('div');l.className='mono';l.style.cssText=(rtl?'right':'left')+':110px;top:118px';l.innerHTML='ANKORA <span class="gold">/</span> '+P.category;c.appendChild(l);
+</script></body></html>

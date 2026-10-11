@@ -49,14 +49,13 @@ export async function POST(request: Request) {
   const refusal = agentWriteRefusal(writer, { requestedDraft: draft });
   if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
 
-  // The counterpart has to exist already (a draft is fine): the pair is what
-  // hreflang and the language toggle are built from.
+  // The counterpart is NOT required to exist yet. The agent writes both
+  // languages within seconds, and this server only sees a post after the
+  // deploy its commit triggers. getBlogTranslationPairs() ignores a pair
+  // until both posts exist and are published, so a dangling name is harmless.
   const translationOf = cleanTranslationOf(body.translationOf);
   if (body.translationOf && !translationOf) {
     return NextResponse.json({ error: "translationOf must be a slug." }, { status: 400 });
-  }
-  if (translationOf && !getPostBySlug(locale === "he" ? "en" : "he", translationOf)) {
-    return NextResponse.json({ error: `No ${locale === "he" ? "en" : "he"} post "${translationOf}" to pair with.` }, { status: 400 });
   }
 
   const category = (BLOG_CATEGORY_SLUGS as readonly string[]).includes(body.category)
