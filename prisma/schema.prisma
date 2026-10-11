@@ -2292,3 +2292,70 @@ model WebAuthnChallenge {
   @@index([userId, purpose])
   @@map("webauthn_challenges")
 }
+
+// --- Marketing site: contact requests (11.10.2026) ------------------------
+//
+/// One row per contact request accepted by /api/contact, with how the
+/// person reached the site (lib/attribution.ts).
+///
+/// Until 11.10.2026 a request existed only as an email to info@, without
+/// any attribution, and nothing could say where a lead came from: see
+/// claude/lead-attribution-gap-2026-10-11.md. The email is still sent and
+/// is still the alert; this row is the record that can be counted.
+///
+/// Not linked to Client: a lead is a person who has not become a client,
+/// and most never will. No soft delete either: a person who asks to be
+/// forgotten is deleted (privacy policy section 10), not hidden.
+model WebsiteLead {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  name    String
+  email   String
+  phone   String?
+  areas   String[]
+  message String?
+  company String?
+  /// "he" or "en": which version of the site the form was sent from.
+  locale  String?
+
+  /// "source / medium" of the visit that sent the form, and of the first
+  /// visit this browser recorded, in GA4's vocabulary (describeSource).
+  source         String?
+  firstSource    String?
+  landingPage    String?
+  referrer       String?
+  utmSource      String?
+  utmMedium      String?
+  utmCampaign    String?
+  utmTerm        String?
+  utmContent     String?
+  gclid          String?
+  /// 1 for a first visit.
+  visitNumber    Int?
+  firstSeenAt    DateTime?
+  visitStartedAt DateTime?
+  /// To find the same person in GA4's User explorer.
+  gaClientId     String?
+  gaSessionId    String?
+
+  /// From Vercel's IP geolocation headers.
+  country    String?
+  region     String?
+  city       String?
+  deviceType String?
+  os         String?
+  browser    String?
+  userAgent  String?
+
+  /// The full, server-sanitised attribution, pages of the visit included.
+  attribution Json?
+
+  /// PENDING until Resend answers, then SENT or FAILED. A FAILED row is a
+  /// lead nobody was told about: the reason this table writes first.
+  emailStatus String @default("PENDING")
+
+  @@index([createdAt])
+  @@index([email])
+  @@map("website_leads")
+}

@@ -202,6 +202,15 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   AlertEvent: { decision: "DUMP", table: "alert_events", reason: "Which alerts fired; also what suppresses a duplicate alert after a restore." },
   ReportRun: { decision: "DUMP", table: "report_runs", reason: "Which scheduled report ran, and what it contained." },
 
+  // ---- Marketing site ------------------------------------------------------
+  WebsiteLead: {
+    decision: "DUMP",
+    table: "website_leads",
+    // The email to info@ carries the same request, but a mailbox is not a
+    // record anyone can count, and attribution exists nowhere else.
+    reason: "Every contact request from the site and how the person arrived. The only countable record of where leads come from.",
+  },
+
   // ---- Credentials: deliberately not in the backup -------------------------
   // Every one of these holds a hash or a short-lived grant. Restoring
   // them adds risk to a file that leaves the database boundary and buys

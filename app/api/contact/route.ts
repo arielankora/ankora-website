@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { rateLimitResponse } from "@/lib/rate-limit";
+import { afterResponse } from "@/lib/after-response";
+import { attributionEmailLines, normalizeAttribution, serverContextFrom } from "@/lib/attribution";
+import { markLeadEmail, saveWebsiteLead } from "@/lib/website-leads";
 
 // Security review (OWASP API4:2023 - Unrestricted Resource Consumption).
 // This endpoint is unauthenticated and every successful call sends a real
@@ -66,11 +69,26 @@ export async function POST(request: Request) {
     // passed on as typed, and only a plausible one gets a WhatsApp link.
     const phoneValid = phone !== "" && PHONE_RE.test(phone) && digitCount(phone) >= 9 && digitCount(phone) <= 15;
 
+    // 11.10.2026: how the person reached the site, sent by the form
+    // (lib/attribution.ts). Re-sanitised here; a missing or malformed value
+    // never refuses a lead, it is only left out.
+    const attribution = normalizeAttribution(body.attribution);
+    const ctx = serverContextFrom(request.headers, new Date());
+    const locale = body.locale === "he" || body.locale === "en" ? body.locale : "";
+
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
       console.error("RESEND_API_KEY is not set");
       return NextResponse.json({ error: "Server not configured" }, { status: 500 });
     }
+
+    // On record before the email is attempted: a request whose email fails is
+    // then a FAILED row somebody can find, not a lead that never existed.
+    const leadId = await saveWebsiteLead(
+      { name, email, phone, areas, message, company, locale },
+      attribution,
+      ctx
+    );
 
     const emailRes = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -93,6 +111,7 @@ export async function POST(request: Request) {
           "",
           "Message:",
           message || "-",
+          ...attributionEmailLines(attribution, ctx),
         ].join("\n"),
       }),
     });
@@ -100,9 +119,11 @@ export async function POST(request: Request) {
     if (!emailRes.ok) {
       const errText = await emailRes.text();
       console.error("Resend API error:", emailRes.status, errText);
+      await afterResponse("website lead email status", () => markLeadEmail(leadId, "FAILED"));
       return NextResponse.json({ error: "Failed to send email" }, { status: 502 });
     }
 
+    await afterResponse("website lead email status", () => markLeadEmail(leadId, "SENT"));
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error("Contact form error:", err);
