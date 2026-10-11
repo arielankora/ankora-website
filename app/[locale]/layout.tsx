@@ -11,6 +11,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { CtaTracking } from "@/components/analytics/CtaTracking";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { siteGraph } from "@/lib/schema";
+import { getBlogTranslationPairs } from "@/lib/blog";
 import { ogBase } from "@/lib/seo-meta";
 
 function isLocale(value: string): value is Locale {
@@ -112,7 +113,7 @@ export default async function LocaleLayout(
       </head>
       <body className="font-sans antialiased">
         <PageShell>
-          <Header dict={dict} locale={locale} />
+          <Header dict={dict} locale={locale} blogPairs={getBlogTranslationPairs()} />
           <main>{children}</main>
           <Footer dict={dict} locale={locale} />
         </PageShell>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { resolveBlogWriter, agentWriteRefusal, authorFor } from "@/lib/blog-agent-auth";
-import { getAllPosts, getPostBySlug, postFilePath, serializePost, slugify } from "@/lib/blog";
+import { cleanFaq, cleanTranslationOf, getAllPosts, getPostBySlug, postFilePath, serializePost, slugify } from "@/lib/blog";
 import { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS } from "@/lib/blog-shared";
 import { putFile, isGithubConfigured } from "@/lib/github";
 import type { Locale } from "@/content";
@@ -49,6 +49,16 @@ export async function POST(request: Request) {
   const refusal = agentWriteRefusal(writer, { requestedDraft: draft });
   if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
 
+  // The counterpart has to exist already (a draft is fine): the pair is what
+  // hreflang and the language toggle are built from.
+  const translationOf = cleanTranslationOf(body.translationOf);
+  if (body.translationOf && !translationOf) {
+    return NextResponse.json({ error: "translationOf must be a slug." }, { status: 400 });
+  }
+  if (translationOf && !getPostBySlug(locale === "he" ? "en" : "he", translationOf)) {
+    return NextResponse.json({ error: `No ${locale === "he" ? "en" : "he"} post "${translationOf}" to pair with.` }, { status: 400 });
+  }
+
   const category = (BLOG_CATEGORY_SLUGS as readonly string[]).includes(body.category)
     ? body.category
     : "company-insights";
@@ -72,6 +82,8 @@ export async function POST(request: Request) {
       publishedAt,
       updatedAt: null,
       draft,
+      translationOf,
+      faq: cleanFaq(body.faq),
     },
     content
   );

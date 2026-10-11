@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { MDXRemote } from "next-mdx-remote-client/rsc";
 import { getDictionary, type Locale } from "@/content";
 import { SITE_URL } from "@/lib/site";
-import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass } from "@/lib/blog";
+import { getPostBySlug, getAllPostSlugs, getRelatedPosts, coverPositionClass, getBlogTranslationPairs } from "@/lib/blog";
 import { withLocale } from "@/lib/nav";
 import { WideContainer } from "@/components/ui/WideContainer";
 import { MonoLabel } from "@/components/ui/MonoLabel";
@@ -14,8 +14,8 @@ import { BlogCard } from "@/components/sections/BlogCard";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 import { Reveal } from "@/components/motion/Reveal";
 import { JsonLd } from "@/components/seo/JsonLd";
-import { getTranslatedBlogSlug } from "@/lib/blog-translations";
-import { authorNode, orgRef, WEBSITE_ID } from "@/lib/schema";
+import { PageFAQ } from "@/components/sections/PageFAQ";
+import { authorNode, faqPageNode, orgRef, WEBSITE_ID } from "@/lib/schema";
 
 export async function generateStaticParams({ params }: { params: { locale: string } }) {
   const locale = params.locale === "en" ? "en" : "he";
@@ -32,7 +32,7 @@ export async function generateMetadata(
   const post = getPostBySlug(locale as Locale, params.slug);
   if (!post) return {};
   const other = locale === "he" ? "en" : "he";
-  const translated = getTranslatedBlogSlug(locale as Locale, post.slug);
+  const translated = getBlogTranslationPairs()[`${locale}/${post.slug}`] ?? null;
 
   return {
     title: `${post.title} | Ankora Blog`,
@@ -40,7 +40,7 @@ export async function generateMetadata(
     alternates: {
       canonical: `/${locale}/blog/${post.slug}`,
       // hreflang only when the other language really has this post; slugs differ
-      // per locale, so the pair comes from lib/blog-translations.ts.
+      // per locale, so the pair comes from the posts' translationOf (lib/blog.ts).
       ...(translated
         ? {
             languages: {
@@ -144,6 +144,8 @@ export default async function BlogPostPage(
   return (
     <>
       <JsonLd id="blogpost-schema" data={articleSchema} />
+      {/* Built from the same items the page renders below, never from anything else. */}
+      {post.faq.length > 0 && <JsonLd id="faq-schema" data={faqPageNode(post.faq)} />}
 
       <section className="relative overflow-hidden pb-10 pt-40 md:pt-48">
         <WideContainer className="relative z-[1]">
@@ -210,6 +212,18 @@ export default async function BlogPostPage(
           <div className="longform mt-[clamp(28px,4vw,44px)]">
             <MDXRemote source={stripDuplicateTitle(post.content, post.title)} components={MDX_COMPONENTS} />
           </div>
+
+          {post.faq.length > 0 && (
+            <section className="mt-[clamp(40px,5vw,64px)]" aria-labelledby="post-faq">
+              <h2
+                id="post-faq"
+                className="text-[clamp(1.5rem,2.6vw,2.1rem)] font-extralight leading-[1.25] tracking-[-0.02em] text-cream"
+              >
+                {dict.blog.faqTitle}
+              </h2>
+              <PageFAQ items={post.faq} />
+            </section>
+          )}
 
           <div className="mt-[clamp(40px,5vw,64px)] border-t border-[rgba(243,234,219,0.12)] pt-6">
             <Link

@@ -31,7 +31,15 @@ function navLinks(dict: Dictionary) {
   ];
 }
 
-export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
+export function Header({
+  dict,
+  locale,
+  blogPairs,
+}: {
+  dict: Dictionary;
+  locale: Locale;
+  blogPairs?: Record<string, string>;
+}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -122,7 +130,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
               ))}
             </nav>
             <div className="mt-auto flex flex-col gap-5">
-              <LanguageToggle locale={locale} />
+              <LanguageToggle locale={locale} blogPairs={blogPairs} />
               <Link
                 href={withLocale(locale, "/contact")}
                 onClick={() => setMobileOpen(false)}
@@ -178,7 +186,7 @@ export function Header({ dict, locale }: { dict: Dictionary; locale: Locale }) {
           </nav>
 
           <div className="ms-auto hidden items-center gap-[18px] lg:flex">
-            <LanguageToggle locale={locale} />
+            <LanguageToggle locale={locale} blogPairs={blogPairs} />
             <Link
               href={withLocale(locale, "/contact")}
               className="whitespace-nowrap border border-[rgba(176,141,87,0.5)] bg-[rgba(176,141,87,0.08)] px-[22px] py-[11px] text-[14.5px] font-medium text-cream transition-colors duration-300 hover:border-gold hover:bg-gold hover:text-navy"
