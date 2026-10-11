@@ -50,4 +50,5 @@ One per person, minted with `node scripts/blog-agent-token.mjs <ariel|hadas> dra
 - The server reads posts from the deployed build. A post written through the API exists for the API and the admin only after the deploy its commit triggers, about 1 to 2 minutes. `publish.mjs` keeps its own `state.json` for that reason.
 - On a computer that reaches the internet through a proxy (the shell Claude uses there does), `publish.mjs` re-runs itself with `NODE_USE_ENV_PROXY=1`, because Node's fetch ignores `HTTPS_PROXY` otherwise. Needs Node 22.21 or newer.
 - `check-post.mjs` refuses a Hebrew line that opens with a Latin word: most renderers then lay it out left to right.
+- LinkedIn: Claude can fill the post text in the runner's own Chrome, but the Chrome extension cannot upload a file from the computer. The runner drags `linkedin-he.png` into the composer.
 - Each saved post and each cover is one commit, so one post pair is four commits and four deploys.

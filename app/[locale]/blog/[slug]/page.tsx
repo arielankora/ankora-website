@@ -175,9 +175,10 @@ export default async function BlogPostPage(
 
             <Reveal delay={0.18}>
               <div className="mt-6 flex flex-wrap items-center gap-2.5">
-                {/* The author is Latin in both dictionaries and keeps its tracking; the
-                    date follows the page language and drops it. */}
-                <MonoLabel script="latin" className="text-muted">
+                {/* Tracking is a property of the string. A Latin name keeps it on both
+                    pages; a Hebrew name ("אריאל אוטניק", set by the blog agent) drops it,
+                    or its letters are pulled apart. The date follows the page language. */}
+                <MonoLabel script={/[\u0590-\u05FF]/.test(post.author) ? "content" : "latin"} className="text-muted">
                   {post.author}
                 </MonoLabel>
                 <MonoLabel aria-hidden className="text-line">·</MonoLabel>
