@@ -190,3 +190,20 @@ describe("how Claude asks (11.10.2026)", () => {
     expect(buildAdvancePrompt({ ...base, description: null, comments: [] })).toContain("כל אחת עם תשובות לבחירה");
   });
 });
+
+describe("turning the plan into steps (11.10.2026)", () => {
+  it("on a task with no steps, tells Claude the steps are added on save and not to ask", () => {
+    const text = buildAdvancePrompt({ ...base, steps: [] });
+    expect(text).toContain("השלבים שלה נוספים למשימה אוטומטית. אל תשאל על זה");
+    expect(text).not.toContain("תשאל אם להחליף את השלבים הפתוחים");
+  });
+
+  it("on a task that already has steps, asks before replacing the open ones", () => {
+    const text = buildAdvancePrompt({
+      ...base,
+      steps: [{ title: "s", statusLabel: "פתוחה", assignedTo: null, dueLabel: null }],
+    });
+    expect(text).toContain("תשאל אם להחליף את השלבים הפתוחים בשלבי התוכנית");
+    expect(text).not.toContain("נוספים למשימה אוטומטית");
+  });
+});

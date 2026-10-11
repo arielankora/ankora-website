@@ -111,7 +111,11 @@ export function TaskPlanPanel({
       return;
     }
     setEditing(false);
-    showToast({ tone: "success", title: `נשמרה גרסה ${r.version}` });
+    showToast({
+      tone: "success",
+      title: `נשמרה גרסה ${r.version}`,
+      description: r.stepsAdded ? "למשימה לא היו שלבים, אז שלבי התוכנית נוספו אליה." : undefined,
+    });
   }
 
   return (
@@ -327,7 +331,11 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
       return;
     }
     setOpen(false);
-    showToast({ tone: "success", title: "תוכנית העבודה נשמרה" });
+    showToast({
+      tone: "success",
+      title: "תוכנית העבודה נשמרה",
+      description: r.stepsAdded ? "שלבי התוכנית נוספו למשימה." : undefined,
+    });
   }
 
   if (!open) {

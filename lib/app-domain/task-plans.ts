@@ -184,7 +184,30 @@ export async function saveTaskPlan(
     clientId: task.clientId,
     after: { planVersion: saved.version, planStatus: saved.status, origin: saved.origin, stepCount: steps.length },
   });
-  return saved;
+  return applyStepsIfTaskHasNone(actor, task.id, saved);
+}
+
+/// When a task has no steps at all, an approved plan's steps become its
+/// steps on their own (Ariel, 11.10.2026).
+///
+/// Asking "replace the existing steps?" about a task that has none is a
+/// question with one possible answer, and it was being asked every time.
+/// Nothing is replaced here, so there is nothing to agree to: the approval
+/// of the plan is the approval of its steps. Any step at all, open, done
+/// or archived, means a person already shaped this task's checklist, and
+/// then copying stays a separate, explicit choice.
+///
+/// Returns the plan as stored afterwards, so `stepsAppliedAt` says whether
+/// it happened.
+async function applyStepsIfTaskHasNone(actor: User, taskId: string, plan: TaskPlanRow): Promise<TaskPlanRow> {
+  if (plan.status !== "APPROVED" || plan.steps.length === 0) return plan;
+  // subtasks-included: does-this-task-have-any-steps. A count of one
+  // parent's steps, read only to decide whether copying replaces anything.
+  const existing = await prisma.task.count({ where: { parentId: taskId, deletedAt: null } });
+  if (existing > 0) return plan;
+  await applyPlanSteps(actor, taskId);
+  const after = await prisma.taskPlan.findUnique({ where: { id: plan.id }, select: PLAN_SELECT });
+  return after ?? plan;
 }
 
 /// Agrees to a draft. Only the latest version can be approved: approving
@@ -214,7 +237,7 @@ export async function approveTaskPlan(actor: User, taskId: string, version: numb
     clientId: task.clientId,
     after: { planVersion: approved.version },
   });
-  return approved;
+  return applyStepsIfTaskHasNone(actor, task.id, approved);
 }
 
 /// Makes the current plan's proposed steps the task's steps.

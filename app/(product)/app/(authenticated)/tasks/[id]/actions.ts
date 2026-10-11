@@ -333,7 +333,9 @@ export async function saveTaskPlanAction(input: {
       origin: "APP",
     });
     revalidatePath(`/app/tasks/${input.taskId}`);
-    return { ok: true as const, version: saved.version };
+    // A task with no steps gets the plan's steps on save.
+    if (saved.stepsAppliedAt) revalidatePath("/app/tasks");
+    return { ok: true as const, version: saved.version, stepsAdded: saved.stepsAppliedAt !== null };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

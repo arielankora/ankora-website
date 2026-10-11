@@ -340,7 +340,7 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "Save a task's work plan",
       description:
-        `Saves a new version of an Ankora task's work plan. Call it ONLY after the user has explicitly approved the plan in this conversation, and then with approved: true; save with approved: false only when the user asks to keep a draft. The approval is recorded in the signed-in user's name. Pass the full plan text in \`plan\` (light markdown: **bold** section labels and lists, no # headings, up to ${MAX_PLAN_LENGTH} characters) and one short imperative line per numbered step in \`steps\` (up to ${MAX_PLAN_STEPS}). \`baseVersion\` is the version you read: 0 when the task had no plan. If someone saved a newer version meanwhile, nothing is saved and the result says so; read it with get_task_plan, show the user the difference, and ask before saving again. Saving does not change the task's steps; offer apply_task_plan_steps for that. Internal: never shown to the client.`,
+        `Saves a new version of an Ankora task's work plan. Call it ONLY after the user has explicitly approved the plan in this conversation, and then with approved: true; save with approved: false only when the user asks to keep a draft. The approval is recorded in the signed-in user's name. Pass the full plan text in \`plan\` (light markdown: **bold** section labels and lists, no # headings, up to ${MAX_PLAN_LENGTH} characters) and one short imperative line per numbered step in \`steps\` (up to ${MAX_PLAN_STEPS}). \`baseVersion\` is the version you read: 0 when the task had no plan. If someone saved a newer version meanwhile, nothing is saved and the result says so; read it with get_task_plan, show the user the difference, and ask before saving again. If the task has no steps at all, an approved plan's steps are added to it automatically on save (the result says so); only when it already has steps, ask before apply_task_plan_steps. Internal: never shown to the client.`,
       inputSchema: z.object({
         ...TASK_ARGS,
         plan: z.string().min(1).max(MAX_PLAN_LENGTH).describe("The full plan text."),
@@ -389,9 +389,15 @@ export function registerTaskExtraTools(server: McpServer): void {
             version: saved.version,
             status: saved.status,
             steps: saved.steps,
-            next: saved.steps.length > 0 && saved.status === "APPROVED"
-              ? "Ask the user whether to turn these steps into the task's steps (apply_task_plan_steps)."
-              : null,
+            // The task had no steps, so the plan's steps were added to it
+            // on save: there was nothing to replace and nothing to ask.
+            stepsAddedToTask: saved.stepsAppliedAt !== null,
+            next:
+              saved.stepsAppliedAt !== null
+                ? "The task had no steps, so the plan's steps were added to it automatically. Tell the user; do not ask about it."
+                : saved.steps.length > 0 && saved.status === "APPROVED"
+                  ? "The task already has steps. Ask the user whether to replace its open steps with the plan's (apply_task_plan_steps)."
+                  : null,
           });
         } catch (err) {
           if (err instanceof PlanVersionConflictError) {
