@@ -122,7 +122,9 @@ export default async function LocaleLayout(
         <CtaTracking />
         {/* How a visitor arrived, sent with a contact request (lib/attribution.ts). */}
         <AttributionTracker />
-        <VercelAnalytics />
+        {/* Only where Vercel serves /_vercel/insights. `next start` in CI and
+            locally has no such route, and the script would 404 on every page. */}
+        {process.env.VERCEL ? <VercelAnalytics /> : null}
         {/* Ankora as one entity, on every page (lib/schema.ts). */}
         <JsonLd id="site-graph" data={siteGraph(locale)} />
       </body>
