@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { track } from "@/lib/analytics";
+import { readAttribution } from "@/lib/attribution-client";
 import { BOOKING_EMBED_URL, WHATSAPP_URL } from "@/lib/contact-links";
 import type { Dictionary, Locale } from "@/content";
 
@@ -130,6 +131,10 @@ export function ContactForm({
           phone,
           areas: chosenAreas,
           message: data.get("message"),
+          locale,
+          // How this browser arrived and what it read (lib/attribution.ts), so
+          // the email to info@ and the lead record can answer "where from".
+          attribution: readAttribution(),
         }),
       });
 

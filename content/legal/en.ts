@@ -100,7 +100,7 @@ const legal: LegalContent = {
           id: "what-information-we-receive",
           title: "2. What information we receive",
           body: [
-            "**From site visitors.** Details submitted through the contact form: name, phone, email and the content of the enquiry. In addition, technical usage data and IP address.",
+            "**From site visitors.** Details submitted through the contact form: name, phone, email and the content of the enquiry. In addition, technical usage data and IP address. With an enquiry we also keep how you reached the site: the site or campaign that referred you, the first page and the pages viewed during that visit, country and city derived from the IP address, and the type of device and browser.",
             "**From clients.** Contact and billing details, portal user details, time entries and task descriptions, and any operational material required to carry out the task: correspondence, calendar, documents, supplier details and personal preferences.",
             "**From systems the client opens to us.** When a client grants us access to their mailbox, calendar, accounting system, CRM or office computer, we are exposed to the information held there. We access only what the task requires.",
             "**From calls and meetings.** See section 5.",
@@ -154,7 +154,7 @@ const legal: LegalContent = {
           table: {
             head: ["Provider", "Purpose of processing", "Type of information", "Country"],
             rows: [
-              ["Vercel", "Hosting the site and the client area", "Technical usage data", "United States"],
+              ["Vercel", "Hosting the site and the client area, and cookie-free usage measurement on the marketing site", "Technical usage data", "United States"],
               ["Neon", "Database of the operations system", "Operational client data", "United States"],
               ["Upstash", "Protection against abuse of the system", "Technical usage data", "United States"],
               ["Resend", "Sending messages from the system", "Contact details and message content", "United States"],
@@ -202,6 +202,7 @@ const legal: LegalContent = {
           title: "12. Cookies",
           body: [
             "The marketing site uses essential cookies and Google Analytics measurement cookies. They can be blocked through the browser without impairing use of the site.",
+            "Your browser also keeps a short record of how you reached the site and which pages you viewed. It is not sent anywhere, except together with an enquiry you choose to send. It can be cleared through the browser settings.",
             "The client area contains no third-party resources and no tracking cookies. Only the session cookie.",
           ],
         },

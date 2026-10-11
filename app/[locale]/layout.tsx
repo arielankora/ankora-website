@@ -9,6 +9,8 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { PageShell } from "@/components/layout/PageShell";
 import { CtaTracking } from "@/components/analytics/CtaTracking";
+import { AttributionTracker } from "@/components/analytics/AttributionTracker";
+import { VercelAnalytics } from "@/components/analytics/VercelAnalytics";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { siteGraph } from "@/lib/schema";
 import { getBlogTranslationPairs } from "@/lib/blog";
@@ -118,6 +120,9 @@ export default async function LocaleLayout(
           <Footer dict={dict} locale={locale} />
         </PageShell>
         <CtaTracking />
+        {/* How a visitor arrived, sent with a contact request (lib/attribution.ts). */}
+        <AttributionTracker />
+        <VercelAnalytics />
         {/* Ankora as one entity, on every page (lib/schema.ts). */}
         <JsonLd id="site-graph" data={siteGraph(locale)} />
       </body>
