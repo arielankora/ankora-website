@@ -46,6 +46,17 @@ const warn = (where, msg) => findings.push({ level: "warning", where, msg });
 const prose = (s) => String(s || "").replace(/\]\([^)]*\)/g, "]");
 const words = (s) => prose(s).replace(/[#>*_`\-[\]()]/g, " ").split(/\s+/).filter(Boolean).length;
 
+// A Hebrew paragraph whose first letter is Latin ("AI טוב ב...") is laid out
+// left to right by most renderers: Markdown previews, LinkedIn, email. The
+// text reads scrambled. Every Hebrew line has to open with a Hebrew word.
+const LEADING_MARKUP = /^[\s#>*_\-[(\d.)]+/;
+function latinFirstLines(text) {
+  return String(text || "")
+    .split("\n")
+    .map((l) => l.replace(LEADING_MARKUP, ""))
+    .filter((l) => /^[A-Za-z]/.test(l));
+}
+
 function checkLocale(locale, p, allowComparison) {
   const at = (field) => `${locale}.${field}`;
   if (!p.title) err(at("title"), "missing");
@@ -88,6 +99,10 @@ function checkLocale(locale, p, allowComparison) {
   if ((prose(body).match(/!(?!\[)/g) || []).length) warn(at("content"), "exclamation marks in the body");
 
   const faq = Array.isArray(p.faq) ? p.faq : [];
+  if (locale === "he") {
+    const bad = [p.title, p.excerpt, body, ...faq.flatMap((f) => [f?.q, f?.a])].flatMap(latinFirstLines);
+    for (const l of bad) err(at("rtl"), `starts with a Latin word, so it renders left to right: "${l.slice(0, 40)}..."`);
+  }
   if (faq.length < 3) err(at("faq"), `${faq.length} items, at least 3`);
   if (faq.length > 5) warn(at("faq"), `${faq.length} items, aim for 3 to 5`);
   faq.forEach((f, i) => {
@@ -108,6 +123,7 @@ function checkLinkedIn(locale, text) {
   if (!text) return;
   const at = `linkedin.${locale}`;
   if (DASH.test(text)) err(at, "em dash or en dash");
+  if (locale === "he") for (const l of latinFirstLines(text)) err(at, `line starts with a Latin word: "${l.slice(0, 40)}..."`);
   if ((text.match(/\p{Extended_Pictographic}/gu) || []).length > 1) err(at, "at most one emoji");
   if (/!/.test(text)) warn(at, "exclamation marks");
   if (text.length < 700 || text.length > 1500) warn(at, `${text.length} characters, aim for 700 to 1,300`);
