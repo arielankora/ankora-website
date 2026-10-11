@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
-import { isRequestAuthorized } from "@/lib/adminAuth";
-import { getAllPosts, postFilePath, serializePost, slugify } from "@/lib/blog";
+import { resolveBlogWriter, agentWriteRefusal, authorFor } from "@/lib/blog-agent-auth";
+import { getAllPosts, getPostBySlug, postFilePath, serializePost, slugify } from "@/lib/blog";
 import { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS } from "@/lib/blog-shared";
 import { putFile, isGithubConfigured } from "@/lib/github";
 import type { Locale } from "@/content";
 
-export async function GET() {
-  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(request: Request) {
+  const writer = await resolveBlogWriter(request);
+  if (writer instanceof Response) return writer;
 
   const posts = [
     ...getAllPosts("he", { includeDrafts: true }),
@@ -17,7 +18,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const writer = await resolveBlogWriter(request);
+  if (writer instanceof Response) return writer;
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },
@@ -34,6 +36,18 @@ export async function POST(request: Request) {
 
   const slug = slugify(body.slug || title);
   if (!slug) return NextResponse.json({ error: "Couldn't derive a valid slug from the title." }, { status: 400 });
+
+  // Creating over an existing file silently replaced it. The editor never
+  // does that on purpose; an agent picking a slug that is already taken must
+  // hear about it rather than overwrite someone's post.
+  if (writer.kind === "agent" && getPostBySlug(locale, slug)) {
+    return NextResponse.json({ error: `A ${locale} post with the slug "${slug}" already exists.` }, { status: 409 });
+  }
+
+  // The editor sends draft explicitly. An agent that leaves it out gets a draft.
+  const draft = writer.kind === "agent" ? body.draft !== false : !!body.draft;
+  const refusal = agentWriteRefusal(writer, { requestedDraft: draft });
+  if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
 
   const category = (BLOG_CATEGORY_SLUGS as readonly string[]).includes(body.category)
     ? body.category
@@ -54,10 +68,10 @@ export async function POST(request: Request) {
       tags: Array.isArray(body.tags) ? body.tags : [],
       coverImage: body.coverImage || null,
       coverImagePosition,
-      author: String(body.author || "Ankora"),
+      author: authorFor(writer, locale, String(body.author || "Ankora")),
       publishedAt,
       updatedAt: null,
-      draft: !!body.draft,
+      draft,
     },
     content
   );

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isRequestAuthorized } from "@/lib/adminAuth";
+import { resolveBlogWriter, agentWriteRefusal, authorFor } from "@/lib/blog-agent-auth";
 import { getPostBySlug, postFilePath, serializePost } from "@/lib/blog";
 import { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS } from "@/lib/blog-shared";
 import { putFile, deleteFile, isGithubConfigured } from "@/lib/github";
@@ -47,7 +48,8 @@ export async function GET(
   props: { params: Promise<{ locale: string; slug: string }> }
 ) {
   const params = await props.params;
-  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const writer = await resolveBlogWriter(request);
+  if (writer instanceof Response) return writer;
   if (!isSafeSlug(params.slug)) return rejectUnsafeSlug();
   const post = getPostBySlug(parseLocale(params.locale), params.slug);
   if (!post) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -59,7 +61,8 @@ export async function PUT(
   props: { params: Promise<{ locale: string; slug: string }> }
 ) {
   const params = await props.params;
-  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const writer = await resolveBlogWriter(request);
+  if (writer instanceof Response) return writer;
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },
@@ -75,6 +78,10 @@ export async function PUT(
 
   const body = await request.json().catch(() => null);
   if (!body) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+
+  const draft = typeof body.draft === "boolean" ? body.draft : existing.draft;
+  const refusal = agentWriteRefusal(writer, { requestedDraft: draft, existingDraft: existing.draft });
+  if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
 
   const title = String(body.title || existing.title).trim();
   const category = (BLOG_CATEGORY_SLUGS as readonly string[]).includes(body.category)
@@ -94,10 +101,10 @@ export async function PUT(
       tags: Array.isArray(body.tags) ? body.tags : existing.tags,
       coverImage: body.coverImage ?? existing.coverImage,
       coverImagePosition,
-      author: String(body.author ?? existing.author),
+      author: authorFor(writer, locale, String(body.author ?? existing.author)),
       publishedAt: body.publishedAt || existing.publishedAt,
       updatedAt: new Date().toISOString().slice(0, 10),
-      draft: typeof body.draft === "boolean" ? body.draft : existing.draft,
+      draft,
     },
     content
   );
@@ -111,6 +118,7 @@ export async function PUT(
   return NextResponse.json({ ok: true });
 }
 
+// DELETE stays on the admin session only. An agent token never deletes.
 export async function DELETE(
   request: Request,
   props: { params: Promise<{ locale: string; slug: string }> }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isRequestAuthorized } from "@/lib/adminAuth";
+import { resolveBlogWriter } from "@/lib/blog-agent-auth";
 import { putFile, isGithubConfigured } from "@/lib/github";
 import { slugify } from "@/lib/blog-shared";
 
@@ -10,7 +10,8 @@ const ALLOWED_EXT: Record<string, string> = {
 };
 
 export async function POST(request: Request) {
-  if (!(await isRequestAuthorized())) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const writer = await resolveBlogWriter(request);
+  if (writer instanceof Response) return writer;
   if (!isGithubConfigured()) {
     return NextResponse.json(
       { error: "Publishing isn't configured yet (missing GITHUB_TOKEN / GITHUB_OWNER / GITHUB_REPO)." },
