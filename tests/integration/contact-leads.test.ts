@@ -140,3 +140,20 @@ describe("POST /api/contact", () => {
     expect(JSON.stringify(row.attribution)).not.toContain("email=");
   });
 });
+
+describe("retention: 24 months, then gone", () => {
+  it("deletes requests older than 24 months and keeps the rest", async () => {
+    const { purgeExpiredWebsiteLeads } = await import("@/lib/website-leads");
+    const now = new Date("2026-10-11T05:00:00Z");
+    await prisma.websiteLead.createMany({
+      data: [
+        { name: "old", email: "old@example.com", createdAt: new Date("2024-10-10T23:00:00Z") },
+        { name: "edge", email: "edge@example.com", createdAt: new Date("2024-10-11T06:00:00Z") },
+        { name: "new", email: "new@example.com", createdAt: new Date("2026-10-01T00:00:00Z") },
+      ],
+    });
+    expect(await purgeExpiredWebsiteLeads(now)).toEqual({ deleted: 1 });
+    const left = (await prisma.websiteLead.findMany({ orderBy: { name: "asc" } })).map((r) => r.name);
+    expect(left).toEqual(["edge", "new"]);
+  });
+});

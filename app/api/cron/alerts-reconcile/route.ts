@@ -3,6 +3,7 @@ import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileAllClientAlerts, retryFailedEmailDeliveries } from "@/lib/app-domain/alerts";
 import { notifyLongRunningTimers } from "@/lib/app-domain/notifications";
 import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
+import { purgeExpiredWebsiteLeads } from "@/lib/website-leads";
 import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers, importantDates, digest] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates, digest, leadRetention] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
@@ -42,6 +43,9 @@ export async function GET(request: Request) {
       // is early rather than wrong - the email waits in an inbox, it
       // does not ring. See lib/app-domain/task-digest.ts.
       sendDailyTaskDigest(),
+      // Contact requests from the site are kept 24 months (privacy policy,
+      // section 9; Ariel 11.10.2026). See lib/website-leads.ts.
+      purgeExpiredWebsiteLeads(),
     ]);
 
     return NextResponse.json({
@@ -51,6 +55,7 @@ export async function GET(request: Request) {
       longTimersNotified: longTimers.notified,
       importantDates,
       digest,
+      leadRetention,
     });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);

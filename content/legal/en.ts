@@ -178,6 +178,7 @@ const legal: LegalContent = {
           title: "9. Retention and deletion",
           body: [
             "Operational information is retained for as long as the engagement is active. Within thirty days of the end of the engagement the client may receive a full export of their data.",
+            "An enquiry sent through the site, together with the information on how you reached the site, is kept for 24 months and then deleted automatically. Earlier deletion can be requested at any time, as described in section 10.",
           ],
         },
         {

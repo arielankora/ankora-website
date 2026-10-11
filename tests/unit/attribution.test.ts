@@ -184,3 +184,11 @@ describe("the email to info@", () => {
     expect(text).toContain("Location (from IP): -");
   });
 });
+
+describe("lead retention", () => {
+  it("is 24 months to the day", async () => {
+    const { leadRetentionCutoff, LEAD_RETENTION_MONTHS } = await import("@/lib/website-leads");
+    expect(LEAD_RETENTION_MONTHS).toBe(24);
+    expect(leadRetentionCutoff(new Date("2026-10-11T05:00:00Z")).toISOString()).toBe("2024-10-11T05:00:00.000Z");
+  });
+});
