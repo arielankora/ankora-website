@@ -247,7 +247,9 @@ describe("the usage card on the integrations screen", () => {
       copiesLessons: 1,
       plansViaClaude: 1,
       plansInApp: 1,
-      plansApplied: 1,
+      // Version 1 got its steps on save (the task had none), and version 2
+      // by the explicit copy above.
+      plansApplied: 2,
       tasksWithPlan: 1,
     });
     expect(usage!.people).toEqual([{ name: actor.name, copies: 2, plans: 2 }]);
@@ -257,5 +259,52 @@ describe("the usage card on the integrations screen", () => {
     const client = await createTestClient();
     const actor = await employeeOn(client.id);
     expect(await advanceWithClaudeUsage(actor)).toBeNull();
+  });
+});
+
+describe("a task with no steps (11.10.2026)", () => {
+  it("gets the approved plan's steps on save, without being asked", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    const saved = await saveTaskPlan(actor, task.id, {
+      body: "x",
+      steps: ["לבקש דוח", "להתאים"],
+      approved: true,
+      baseVersion: 0,
+      origin: "MCP",
+    });
+
+    expect(saved.stepsAppliedAt).not.toBeNull();
+    const detail = await getTaskDetail(actor, task.id);
+    expect(detail!.subtasks.map((s) => s.title)).toEqual(["לבקש דוח", "להתאים"]);
+  });
+
+  it("does not touch a task that already has steps", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+    await createTask(actor, { clientId: client.id, title: "שלב קיים", parentId: task.id });
+
+    const saved = await saveTaskPlan(actor, task.id, { body: "x", steps: ["חדש"], approved: true, baseVersion: 0, origin: "MCP" });
+
+    expect(saved.stepsAppliedAt).toBeNull();
+    const detail = await getTaskDetail(actor, task.id);
+    expect(detail!.subtasks.map((s) => s.title)).toEqual(["שלב קיים"]);
+  });
+
+  it("does not add the steps of a draft, and adds them when the draft is approved", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    const draft = await saveTaskPlan(actor, task.id, { body: "x", steps: ["א"], approved: false, baseVersion: 0, origin: "MCP" });
+    expect(draft.stepsAppliedAt).toBeNull();
+    expect((await getTaskDetail(actor, task.id))!.subtasks).toHaveLength(0);
+
+    const approved = await approveTaskPlan(actor, task.id, 1);
+    expect(approved.stepsAppliedAt).not.toBeNull();
+    expect((await getTaskDetail(actor, task.id))!.subtasks.map((s) => s.title)).toEqual(["א"]);
   });
 });

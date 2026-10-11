@@ -600,7 +600,16 @@ describe("save_task_plan", () => {
     });
     expect(out.saved).toBe(true);
     expect(out.version).toBe(3);
+    expect(out.stepsAddedToTask).toBe(false);
     expect(out.next).toMatch(/apply_task_plan_steps/);
+  });
+
+  it("says the steps were added, and not to ask, when the task had none", async () => {
+    plans.saveTaskPlan.mockResolvedValue({ ...PLAN_ROW, version: 1, stepsAppliedAt: new Date() });
+    const out = await call("save_task_plan", { task: "התאמת", plan: "x", steps: ["א"], approved: true, baseVersion: 0 });
+    expect(out.stepsAddedToTask).toBe(true);
+    expect(out.next).toMatch(/do not ask/);
+    expect(out.next).not.toMatch(/apply_task_plan_steps/);
   });
 
   it("passes approved: false through as a draft, and does not offer to copy steps", async () => {
