@@ -57,6 +57,15 @@ function latinFirstLines(text) {
     .filter((l) => /^[A-Za-z]/.test(l));
 }
 
+// Latin acronyms in Hebrew prose make the reader translate mid-sentence and
+// break the reading direction. These have no Hebrew equivalent a reader knows,
+// so they stay; anything else is reported (style guide, section 6).
+const ACRONYMS_OK = new Set(["AI", "SEO", "GEO", "AIO", "FAQ", "ESTA", "ROI", "API", "UTM", "PDF", "URL", "NIS"]);
+function latinAcronyms(text) {
+  const found = prose(text).match(/\b[A-Z]{2,5}s?\b/g) || [];
+  return [...new Set(found.map((a) => a.replace(/s$/, "")).filter((a) => !ACRONYMS_OK.has(a)))];
+}
+
 function checkLocale(locale, p, allowComparison) {
   const at = (field) => `${locale}.${field}`;
   if (!p.title) err(at("title"), "missing");
@@ -102,6 +111,8 @@ function checkLocale(locale, p, allowComparison) {
   if (locale === "he") {
     const bad = [p.title, p.excerpt, body, ...faq.flatMap((f) => [f?.q, f?.a])].flatMap(latinFirstLines);
     for (const l of bad) err(at("rtl"), `starts with a Latin word, so it renders left to right: "${l.slice(0, 40)}..."`);
+    const acr = latinAcronyms([p.title, p.excerpt, body, ...faq.flatMap((f) => [f?.q, f?.a])].join("\n"));
+    if (acr.length) warn(at("terms"), `Latin acronyms in Hebrew text: ${acr.join(", ")}. Use the Hebrew term where one is common (VA: עוזר וירטואלי, EA: מנהלת לשכה)`);
   }
   if (faq.length < 3) err(at("faq"), `${faq.length} items, at least 3`);
   if (faq.length > 5) warn(at("faq"), `${faq.length} items, aim for 3 to 5`);
@@ -124,6 +135,10 @@ function checkLinkedIn(locale, text) {
   const at = `linkedin.${locale}`;
   if (DASH.test(text)) err(at, "em dash or en dash");
   if (locale === "he") for (const l of latinFirstLines(text)) err(at, `line starts with a Latin word: "${l.slice(0, 40)}..."`);
+  if (locale === "he") {
+    const acr = latinAcronyms(text);
+    if (acr.length) warn(at, `Latin acronyms: ${acr.join(", ")}. Use the Hebrew term where one is common`);
+  }
   if ((text.match(/\p{Extended_Pictographic}/gu) || []).length > 1) err(at, "at most one emoji");
   if (/!/.test(text)) warn(at, "exclamation marks");
   if (text.length < 700 || text.length > 1500) warn(at, `${text.length} characters, aim for 700 to 1,300`);
