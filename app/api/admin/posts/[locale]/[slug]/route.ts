@@ -85,10 +85,9 @@ export async function PUT(
 
   // Absent means "keep". The editor has no inputs for these yet, so it never
   // sends them, and a save from the admin must not drop them.
+  // As on create, the counterpart may not be deployed yet. Pairs are only
+  // honoured once both posts exist and are published.
   const translationOf = "translationOf" in body ? cleanTranslationOf(body.translationOf) : existing.translationOf;
-  if (translationOf && translationOf !== existing.translationOf && !getPostBySlug(locale === "he" ? "en" : "he", translationOf)) {
-    return NextResponse.json({ error: `No post "${translationOf}" in the other language to pair with.` }, { status: 400 });
-  }
   const faq = Array.isArray(body.faq) ? cleanFaq(body.faq) : existing.faq;
 
   const title = String(body.title || existing.title).trim();
