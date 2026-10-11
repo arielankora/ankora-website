@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { Locale } from "@/content";
 import { cn } from "@/lib/utils";
-import { getTranslatedBlogSlug } from "@/lib/blog-translations";
 
 const LABELS: Record<Locale, string> = { he: "עברית", en: "EN" };
 const LOCALES: Locale[] = ["he", "en"];
@@ -20,7 +19,14 @@ const LOCALES: Locale[] = ["he", "en"];
  * The current locale renders as a span rather than a link — there is nowhere for it to
  * go, and a link to the page you are already on is noise for anyone tabbing through.
  */
-export function LanguageToggle({ locale }: { locale: Locale }) {
+export function LanguageToggle({
+  locale,
+  blogPairs = {},
+}: {
+  locale: Locale;
+  /** "locale/slug" to the other language's slug, from getBlogTranslationPairs(). */
+  blogPairs?: Record<string, string>;
+}) {
   const pathname = usePathname();
   const segments = pathname.split("/").slice(2); // drop the leading "" and the current locale
   const rest = segments.join("/");
@@ -28,11 +34,11 @@ export function LanguageToggle({ locale }: { locale: Locale }) {
   function hrefFor(target: Locale) {
     if (segments[0] === "blog" && segments[1]) {
       // Blog article: slugs are chosen independently per locale and do not generally
-      // match across /he and /en (see lib/blog-translations.ts), so naively swapping
-      // the locale segment can point at a slug that doesn't exist in the other
-      // language. Use the curated translation map, and fall back to the blog index
-      // (always a valid page) rather than a guessed, possibly-broken URL.
-      const translatedSlug = getTranslatedBlogSlug(locale, segments[1]);
+      // match across /he and /en, so naively swapping the locale segment can point
+      // at a slug that doesn't exist in the other language (docs/adr/0002). Use the
+      // pairs the posts declare (translationOf, read on the server), and fall back
+      // to the blog index (always a valid page) rather than a guessed URL.
+      const translatedSlug = blogPairs[`${locale}/${segments[1]}`] ?? null;
       return translatedSlug ? `/${target}/blog/${translatedSlug}` : `/${target}/blog`;
     }
     return `/${target}${rest ? `/${rest}` : ""}`;

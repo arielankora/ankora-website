@@ -38,7 +38,43 @@ export interface BlogPostMeta {
   publishedAt: string;
   updatedAt: string | null;
   draft: boolean;
+  /** Slug of the same post in the other language, when there is one. */
+  translationOf: string | null;
+  /** Rendered under the post and published as FAQPage. */
+  faq: BlogFaqItem[];
   readingMinutes: number;
+}
+
+export type BlogFaqItem = { q: string; a: string };
+
+const SAFE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** A slug the routes would accept, or null. */
+export function cleanTranslationOf(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const v = value.trim();
+  return v.length > 0 && v.length <= 120 && SAFE_SLUG.test(v) ? v : null;
+}
+
+// Answer engines quote FAQ answers whole, so they stay short. The limits are
+// generous for a person and stop a runaway agent from writing an essay.
+export const FAQ_MAX_ITEMS = 8;
+const FAQ_MAX_Q = 200;
+const FAQ_MAX_A = 1200;
+
+/** Only complete question/answer pairs survive; nothing is truncated silently. */
+export function cleanFaq(value: unknown): BlogFaqItem[] {
+  if (!Array.isArray(value)) return [];
+  const out: BlogFaqItem[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const q = typeof (item as any).q === "string" ? (item as any).q.trim() : "";
+    const a = typeof (item as any).a === "string" ? (item as any).a.trim() : "";
+    if (!q || !a || q.length > FAQ_MAX_Q || a.length > FAQ_MAX_A) continue;
+    out.push({ q, a });
+    if (out.length === FAQ_MAX_ITEMS) break;
+  }
+  return out;
 }
 
 export interface BlogPost extends BlogPostMeta {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isRequestAuthorized } from "@/lib/adminAuth";
 import { resolveBlogWriter, agentWriteRefusal, authorFor } from "@/lib/blog-agent-auth";
-import { getPostBySlug, postFilePath, serializePost } from "@/lib/blog";
+import { cleanFaq, cleanTranslationOf, getPostBySlug, postFilePath, serializePost } from "@/lib/blog";
 import { BLOG_CATEGORY_SLUGS, COVER_IMAGE_POSITIONS } from "@/lib/blog-shared";
 import { putFile, deleteFile, isGithubConfigured } from "@/lib/github";
 import type { Locale } from "@/content";
@@ -83,6 +83,14 @@ export async function PUT(
   const refusal = agentWriteRefusal(writer, { requestedDraft: draft, existingDraft: existing.draft });
   if (refusal) return NextResponse.json({ error: refusal }, { status: 403 });
 
+  // Absent means "keep". The editor has no inputs for these yet, so it never
+  // sends them, and a save from the admin must not drop them.
+  const translationOf = "translationOf" in body ? cleanTranslationOf(body.translationOf) : existing.translationOf;
+  if (translationOf && translationOf !== existing.translationOf && !getPostBySlug(locale === "he" ? "en" : "he", translationOf)) {
+    return NextResponse.json({ error: `No post "${translationOf}" in the other language to pair with.` }, { status: 400 });
+  }
+  const faq = Array.isArray(body.faq) ? cleanFaq(body.faq) : existing.faq;
+
   const title = String(body.title || existing.title).trim();
   const category = (BLOG_CATEGORY_SLUGS as readonly string[]).includes(body.category)
     ? body.category
@@ -105,6 +113,8 @@ export async function PUT(
       publishedAt: body.publishedAt || existing.publishedAt,
       updatedAt: new Date().toISOString().slice(0, 10),
       draft,
+      translationOf,
+      faq,
     },
     content
   );

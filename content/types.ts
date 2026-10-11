@@ -167,6 +167,7 @@ export interface Dictionary {
     minRead: string;
     allCategories: string;
     relatedTitle: string;
+    faqTitle: string;
     backToBlog: string;
     categories: Record<string, string>;
   };

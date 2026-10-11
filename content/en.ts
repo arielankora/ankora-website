@@ -246,6 +246,7 @@ const en: Dictionary = {
     minRead: "min read",
     allCategories: "All",
     relatedTitle: "Related reading",
+    faqTitle: "Frequently asked questions",
     backToBlog: "Back to all articles",
     categories: {
       "personal-operations": "Personal Operations",

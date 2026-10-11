@@ -241,6 +241,7 @@ const he: Dictionary = {
     minRead: "דקות קריאה",
     allCategories: "הכל",
     relatedTitle: "מידע קשור",
+    faqTitle: "שאלות נפוצות",
     backToBlog: "חזרה לכל הכתבות",
     categories: {
       "personal-operations": "ניהול תפעול אישי",
