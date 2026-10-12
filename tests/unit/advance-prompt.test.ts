@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildAdvancePrompt, buildLessonsPrompt, isEmptyBrief, MAX_COMMENT_CHARS, type AdvancePromptInput } from "@/lib/advance-prompt";
+import {
+  buildAdvancePrompt,
+  buildLessonsPrompt,
+  fileSizeLabel,
+  fileTypeLabel,
+  isEmptyBrief,
+  MAX_COMMENT_CHARS,
+  type AdvancePromptInput,
+} from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026). The prompt the task screen copies. Pure, so
 // it runs in the sandbox like client-activity-prompt.test.ts.
@@ -27,7 +35,7 @@ const base: AdvancePromptInput = {
   comments: [],
   commentsOmitted: 0,
   decisions: [],
-  fileTitles: [],
+  files: [],
   loggedLabel: null,
   plan: null,
   requestedBy: "אריאל",
@@ -116,7 +124,7 @@ describe("buildAdvancePrompt()", () => {
       plan: { version: 1, approved: false, body: "x", steps: [] },
       steps: [{ title: "s", statusLabel: "פתוחה", assignedTo: "הדס", dueLabel: "1.1" }],
       decisions: [{ question: "q", statusLabel: "ממתינה", dueLabel: null }],
-      fileTitles: ["f.pdf"],
+      files: [{ documentId: "d1", title: "f.pdf", typeLabel: "PDF", sizeLabel: "12KB", atLabel: "1.1", by: "הדס", clientVisible: false }],
       clientVisible: true,
     });
     expect(text).not.toMatch(/[\u2013\u2014]/);
@@ -205,5 +213,52 @@ describe("turning the plan into steps (11.10.2026)", () => {
     });
     expect(text).toContain("תשאל אם להחליף את השלבים הפתוחים בשלבי התוכנית");
     expect(text).not.toContain("נוספים למשימה אוטומטית");
+  });
+});
+
+describe("files on the task (12.10.2026)", () => {
+  const withFiles: AdvancePromptInput = {
+    ...base,
+    files: [
+      { documentId: "doc-1", title: "טופס 101 חתום", typeLabel: "PDF", sizeLabel: "320KB", atLabel: "05.10.2026", by: "הדס", clientVisible: false },
+      { documentId: "doc-2", title: "הצעת מחיר", typeLabel: "Excel", sizeLabel: null, atLabel: "06.10.2026", by: null, clientVisible: true },
+    ],
+  };
+
+  it("lists each file with the id read_document takes", () => {
+    const text = buildAdvancePrompt(withFiles);
+    expect(text).toContain("- טופס 101 חתום (PDF, 320KB, 05.10.2026, הדס, פנימי). documentId: doc-1");
+    expect(text).toContain("- הצעת מחיר (Excel, 06.10.2026, גלוי ללקוח). documentId: doc-2");
+  });
+
+  it("tells Claude to read the relevant files before planning or asking", () => {
+    const text = buildAdvancePrompt(withFiles);
+    expect(text).toContain("למשימה מצורפים 2 קבצים");
+    expect(text.indexOf("read_document")).toBeLessThan(text.indexOf("## נתוני המשימה"));
+  });
+
+  it("says nothing about reading files when there are none", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).not.toContain("למשימה מצורפים");
+    expect(text).not.toContain("### קבצים מצורפים");
+  });
+
+  it("explains how to file a document, hidden from the client by default", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("start_document_upload");
+    expect(text).toContain("מוסתר מהלקוח");
+  });
+
+  it("lets the lessons prompt read files too", () => {
+    expect(buildLessonsPrompt(withFiles)).toContain("read_document");
+  });
+
+  it("names file types and sizes in a word", () => {
+    expect(fileTypeLabel("application/pdf")).toBe("PDF");
+    expect(fileTypeLabel("application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe("Word");
+    expect(fileTypeLabel("image/png")).toBe("תמונה");
+    expect(fileSizeLabel(320 * 1024)).toBe("320KB");
+    expect(fileSizeLabel(1.4 * 1024 * 1024)).toBe("1.4MB");
+    expect(fileSizeLabel(null)).toBeNull();
   });
 });

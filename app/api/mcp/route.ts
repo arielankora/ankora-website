@@ -87,6 +87,7 @@ const handler = createMcpHandler(registerAnkoraTools, {
     "Never invent an Ankora id. Pass client, category, task and person names as the user said them - the tools match them for you. Only call a list tool when a name comes back as unrecognised or ambiguous, or when the user actually asks what exists; do not list first as a matter of course.",
     "Reading another person's time needs a manager or admin role. If a team tool is refused, say so plainly instead of retrying.",
     "Writes create real records that colleagues and clients see. Confirm the client, category and times with the user before calling a write tool, and never call create_time_entry twice for the same work - it makes two entries.",
+    "Documents in a client's file can be listed (list_documents), read (read_document) and filed (start_document_upload when you can run curl, upload_document otherwise). Read a task's documents when they matter to the work.",
   ].join(" "),
   verboseLogs: !isProductionBuild(),
 });

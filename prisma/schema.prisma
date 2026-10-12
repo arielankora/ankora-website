@@ -2123,6 +2123,57 @@ model ClientDocument {
   @@map("client_documents")
 }
 
+/// A short-lived address through which Claude moves a document's bytes
+/// without passing them through the model (MCP, 12.10.2026).
+///
+/// Two purposes, one shape:
+///   * "upload": start_document_upload. A bare PUT of the file to
+///     /api/mcp/files/<ticket> files ONE document. Where it goes (client,
+///     task, title, kind, visibility) is fixed here at issue time, through
+///     the signed-in staff connector; the request brings only bytes.
+///   * "download": read_document. A GET of the same address returns the
+///     bytes of one existing document, for a Claude that reads the file in
+///     its own environment (a scanned PDF, a spreadsheet).
+///
+/// No foreign keys, on purpose: every id is checked again at redemption
+/// against the same access rules the screens use, so a person who lost a
+/// client in those 15 minutes is refused then. Rows are short-lived and
+/// harmless once used or expired.
+model McpFileTicket {
+  id        String @id @default(cuid())
+  /// SHA-256 of the raw ticket. The raw value exists only in the tool result.
+  tokenHash String @unique
+  /// "upload" or "download".
+  purpose   String
+  userId    String
+  /// User.tokenVersion when issued. "Log out everywhere" kills the address.
+  tokenVersion Int @default(0)
+
+  clientId   String
+  /// Download: the document. Upload: the document it created, once used.
+  documentId String?
+
+  // Upload only.
+  taskId        String?
+  title         String?
+  kind          ClientDocumentKind?
+  fileName      String?
+  /// Null when the model did not say; the upload's Content-Type, then the
+  /// file name's extension, decide.
+  mimeType      String?
+  clientVisible Boolean             @default(false)
+
+  expiresAt DateTime
+  /// Upload: set atomically when a request claims the ticket, cleared again
+  /// if that upload fails, so a network error does not burn the address.
+  /// Download: the first fetch. A download may be repeated until it expires.
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([expiresAt])
+  @@map("mcp_file_tickets")
+}
+
 /// The monthly summary, as a record with a signature on it.
 ///
 /// Two rules from the spec live in these columns rather than in a comment

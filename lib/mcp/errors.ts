@@ -88,6 +88,12 @@ const KNOWN: Record<string, McpToolError> = {
       "The entry ends in the future, which Ankora does not accept. Check the date and time with the user and call again.",
     recoverable: true,
   },
+  // Documents (12.10.2026): the client file's Drive folder is not set up.
+  DriveNotConfiguredError: {
+    message:
+      "Ankora's document storage is not connected yet, so documents cannot be filed or read. Do not retry. Tell the user an Ankora admin needs to connect the client documents folder.",
+    recoverable: false,
+  },
   ConflictError: {
     message:
       "This record changed since it was read. Re-read it with the matching list or get tool and retry once with fresh values.",

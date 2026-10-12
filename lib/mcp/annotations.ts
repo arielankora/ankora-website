@@ -81,6 +81,16 @@ export const TOOL_ANNOTATIONS = {
   // The same replacement as replace_task_steps, from the plan's steps, so
   // it carries the same warning: it removes open steps not in the plan.
   apply_task_plan_steps: { ...WRITES, destructiveHint: true, idempotentHint: true },
+  // Documents (lib/mcp/document-tools.ts, 12.10.2026). read_document leaves
+  // an audit row and a short-lived download address behind, neither of
+  // which changes anything a person sees, so it is a read.
+  list_documents: READ_ONLY,
+  read_document: READ_ONLY,
+  // Each call files another document.
+  upload_document: WRITES,
+  // Issues an address; the filing happens when bytes arrive there. A second
+  // call issues a second address and, used, a second document.
+  start_document_upload: WRITES,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -105,6 +115,8 @@ export const WRITE_TOOLS = [
   "replace_task_steps",
   "save_task_plan",
   "apply_task_plan_steps",
+  "upload_document",
+  "start_document_upload",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

@@ -43,6 +43,7 @@
     "exceljs": "^4.4.0",
     "framer-motion": "11.3.19",
     "gray-matter": "^4.0.3",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.383.0",
     "lunar-javascript": "^1.7.7",
     "mcp-handler": "^2.2.0",
@@ -56,6 +57,7 @@
     "reading-time": "^1.5.0",
     "server-only": "^0.0.1",
     "turndown": "^7.2.4",
+    "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

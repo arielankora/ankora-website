@@ -1266,8 +1266,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-10",
       "riskReason": "Written by Claude through MCP; versioning guards against overwrite, and applying a plan removes open steps"
+    },
+    "api:/api/mcp/files/[ticket]": {
+      "kind": "api",
+      "area": "mcp",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-12",
+      "riskReason": "A credential in a URL: files a document into a client's file or hands out its bytes, for 15 minutes, re-checked against the issuing person on every use"
+    },
+    "domain:mcp-files": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-12",
+      "riskReason": "Claude files and reads client documents; filed documents stay hidden from the client unless asked, and every read is audited"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-10"
+  "lastScan": "2026-10-12"
 }

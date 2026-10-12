@@ -22,6 +22,13 @@ const nextConfig = {
     serverActions: { bodySizeLimit: '5mb' },
   },
 
+  // read_document (MCP, 12.10.2026) extracts a PDF's text with unpdf, which
+  // carries its own build of pdf.js. Loaded by Node from node_modules as
+  // published, not re-bundled by webpack: pdf.js is the kind of package
+  // whose dynamic internals a bundler gets wrong, and the unit test runs it
+  // exactly this way.
+  serverExternalPackages: ['unpdf'],
+
   // Security review (information disclosure). Next.js sends
   // `X-Powered-By: Next.js` on every response by default, handing a
   // scanner the framework to look up advisories for before it has probed

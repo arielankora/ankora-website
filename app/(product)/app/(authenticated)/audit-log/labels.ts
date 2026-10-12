@@ -69,6 +69,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",
+  "client_document.read": "קריאת מסמך מתיק הלקוח דרך קלוד",
   "portal_summary.generate": "הפקת טיוטת סיכום חודשי",
   "portal_summary.approve": "אישור סיכום חודשי ללקוח",
   "portal_summary.discard": "ביטול טיוטת סיכום חודשי",
