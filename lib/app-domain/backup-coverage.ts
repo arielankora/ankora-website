@@ -189,6 +189,12 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     reason: "Single-use challenges that expire in five minutes.",
     recovery: "The next prompt issues a new one.",
   },
+  McpFileTicket: {
+    decision: "SKIP",
+    table: "mcp_file_tickets",
+    reason: "Fifteen-minute upload and download addresses for Claude, stored as hashes. Expired long before any restore.",
+    recovery: "Claude asks for a new address on its next upload or read.",
+  },
   StepUpGrant: {
     decision: "SKIP",
     table: "step_up_grants",

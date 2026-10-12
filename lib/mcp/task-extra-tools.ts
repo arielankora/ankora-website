@@ -39,7 +39,7 @@ const MAX_OPTIONS = 3;
 
 const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 
-function actorOf(ctx: ServerContext): User {
+export function actorOf(ctx: ServerContext): User {
   const actor = actorFromAuthInfo(ctx.http?.authInfo);
   // A portal user on the staff connector gets pointed at their own one
   // rather than a run of generic refusals (see lib/mcp/portal-tools.ts).
@@ -60,7 +60,7 @@ export function shekelsToMinor(amount: number | undefined | null): number | null
 /// it, because titles repeat), otherwise by title, with the client name
 /// narrowing the search. The id is checked against client access exactly
 /// like a title is, so it opens nothing a title would not.
-async function findTask(actor: User, args: { task?: string; taskId?: string; client?: string; includeDone?: boolean }) {
+export async function findTask(actor: User, args: { task?: string; taskId?: string; client?: string; includeDone?: boolean }) {
   if (args.taskId?.trim()) return lookupTaskById(actor, args.taskId);
   if (!args.task?.trim()) {
     return { ok: false as const, message: "Say which task: pass its title in `task`, or its id in `taskId`." };
@@ -74,7 +74,7 @@ async function findTask(actor: User, args: { task?: string; taskId?: string; cli
   return lookupTask(actor, args.task, { clientId, includeClosed: args.includeDone });
 }
 
-const TASK_ARGS = {
+export const TASK_ARGS = {
   task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
   taskId: z
     .string()

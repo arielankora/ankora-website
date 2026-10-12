@@ -7,7 +7,7 @@ import type { TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
-import { buildAdvancePrompt, buildLessonsPrompt } from "@/lib/advance-prompt";
+import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
 // into the prompt. One extra read, the decisions filed against the task;
@@ -56,7 +56,20 @@ export async function advancePromptFor(
   // the most recent ones are kept and then put back in time order.
   const allComments = thread.filter((e) => e.kind === "comment");
   const recent = allComments.slice(0, MAX_PROMPT_COMMENTS).reverse();
-  const fileTitles = thread.filter((e) => e.kind === "file").map((e) => ("title" in e ? e.title : ""));
+  // Files with their ids, oldest first, so Claude can read them with
+  // read_document (MCP, 12.10.2026) instead of only knowing they exist.
+  const files = thread
+    .flatMap((e) => (e.kind === "file" ? [e] : []))
+    .reverse()
+    .map((f) => ({
+      documentId: f.id,
+      title: f.title,
+      typeLabel: fileTypeLabel(f.mimeType),
+      sizeLabel: fileSizeLabel(f.sizeBytes),
+      atLabel: day.format(f.at),
+      by: f.actorName,
+      clientVisible: f.clientVisible,
+    }));
 
   const loggedMinutes = Math.round(time.totalSeconds / 60);
 
@@ -106,7 +119,7 @@ export async function advancePromptFor(
       statusLabel: d.status === "OPEN" ? "ממתינה לתשובת הלקוח" : "הלקוח ענה",
       dueLabel: d.dueAt ? day.format(d.dueAt) : null,
     })),
-    fileTitles,
+    files,
     loggedLabel: loggedMinutes > 0 ? `${formatDecimalHours(loggedMinutes)} שעות` : null,
     plan: plan
       ? { version: plan.version, approved: plan.status === "APPROVED", body: plan.body, steps: plan.steps }

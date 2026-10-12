@@ -30,6 +30,39 @@ export type AdvancePromptComment = { atLabel: string; by: string | null; body: s
 
 export type AdvancePromptDecision = { question: string; statusLabel: string; dueLabel: string | null };
 
+/// A document filed on the task. The id is what read_document takes; the
+/// prompt carries it because a title is ambiguous and Claude would
+/// otherwise have to list before it could read.
+export type AdvancePromptFile = {
+  documentId: string;
+  title: string;
+  /// "PDF", "Word", "תמונה": what the file is, in a word.
+  typeLabel: string;
+  sizeLabel: string | null;
+  atLabel: string;
+  by: string | null;
+  clientVisible: boolean;
+};
+
+/// What a file is, in a word, from its MIME type.
+export function fileTypeLabel(mimeType: string): string {
+  const t = mimeType.toLowerCase();
+  if (t === "application/pdf") return "PDF";
+  if (t.includes("wordprocessingml") || t === "application/msword") return "Word";
+  if (t.includes("spreadsheetml") || t === "application/vnd.ms-excel" || t === "text/csv") return "Excel";
+  if (t.includes("presentationml") || t === "application/vnd.ms-powerpoint") return "PowerPoint";
+  if (t.startsWith("image/")) return "תמונה";
+  if (t.startsWith("text/")) return "טקסט";
+  return "קובץ";
+}
+
+/// "320KB", "1.4MB".
+export function fileSizeLabel(bytes: number | null): string | null {
+  if (bytes === null || bytes <= 0) return null;
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
+}
+
 export type AdvancePromptPlan = {
   version: number;
   approved: boolean;
@@ -65,7 +98,7 @@ export type AdvancePromptInput = {
   /// How many older comments were left out to keep the prompt readable.
   commentsOmitted: number;
   decisions: AdvancePromptDecision[];
-  fileTitles: string[];
+  files: AdvancePromptFile[];
   loggedLabel: string | null;
   plan: AdvancePromptPlan | null;
   requestedBy: string;
@@ -135,6 +168,13 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
 
   // ---- The flow -----------------------------------------------------------
   out.push("## איך עובדים");
+  if (input.files.length > 0) {
+    // Files are part of the brief. A signed form or a quote often answers
+    // the question Claude would otherwise ask, so they are read first.
+    out.push(
+      `לפני הכול: למשימה מצורפים ${input.files.length === 1 ? "קובץ אחד" : `${input.files.length} קבצים`} (הרשימה בסוף). תקרא עם read_document את אלה שנראים רלוונטיים, לפני שאתה מתכנן או שואל. אם קובץ לא נקרא (למשל סריקה בלי טקסט), תגיד לי במשפט אחד.`
+    );
+  }
   if (hasPlan) {
     out.push(
       `1. למשימה כבר יש תוכנית עבודה ${input.plan!.approved ? "מאושרת" : "בטיוטה"} (גרסה ${baseVersion}), והיא מופיעה למטה. תציג לי אותה בקצרה ותשאל אם לעדכן אותה או להתחיל לבצע.`,
@@ -171,6 +211,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "- בלי לשאול: לקרוא נתונים, לחקור, לנסח טיוטות, להוסיף הערה פנימית במשימה (add_task_comment) ולסמן שלב שהסתיים.",
     "- רק אחרי אישור שלי: לסגור את המשימה, לשנות אחראי, תאריך יעד או עדיפות, לדווח זמן, לפתוח החלטה ללקוח, וכל דבר שהלקוח רואה.",
     "- החלטה שהלקוח צריך לקבל: אחרי אישור שלי, אפשר לפתוח אותה בפורטל שלו עם create_decision ולקשר אותה למשימה עם taskId. הלקוח לא מקבל הודעה אוטומטית, אז תזכיר לי לעדכן אותו.",
+    `- מסמך שנוצר או נחתם במהלך העבודה: אחרי אישור שלי, לתייק אותו בתיק הלקוח ולקשר למשימה (taskId "${input.taskId}"). אם אתה יכול להריץ פקודות, עם start_document_upload ו-curl. אחרת עם upload_document, עד 1MB. מסמך שתויק מוסתר מהלקוח, אלא אם ביקשתי במפורש שיראה אותו.`,
     "- אף פעם: לשלוח משהו ללקוח או לספק בעצמך. אתה מנסח, אני שולח.",
     "- אם התוכנית משתנה תוך כדי ביצוע, תציע גרסה חדשה ותשמור אותה רק אחרי אישור. לא משנים תוכנית בשקט.",
     `- אם save_task_plan מחזיר שנשמרה גרסה חדשה יותר, תקרא אותה עם get_task_plan, תראה לי מה שונה ותשאל לפני שאתה שומר.`,
@@ -198,6 +239,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "## החיבור למערכת",
     `הנתונים והכתיבה עוברים דרך החיבור של אנקורה (Ankora MCP). תזהה את המשימה תמיד לפי taskId "${input.taskId}" ולא לפי הכותרת.`,
     "אם החיבור לא זמין בשיחה הזו, תגיד לי לחבר אותו ואל תמציא נתונים. את התוכנית אפשר לבנות גם בלעדיו, רק לא לשמור אותה.",
+    `מסמכים נוספים בתיק הלקוח, שלא צורפו למשימה: list_documents עם client "${input.clientName}".`,
     ""
   );
 
@@ -268,9 +310,13 @@ function taskDataSection(input: AdvancePromptInput): string[] {
     out.push("");
   }
 
-  if (input.fileTitles.length > 0) {
+  if (input.files.length > 0) {
     out.push("### קבצים מצורפים");
-    for (const f of input.fileTitles) out.push(`- ${f}`);
+    out.push("התוכן שלהם לא כלול כאן. לקריאה: read_document עם ה-documentId.");
+    for (const f of input.files) {
+      const meta = [f.typeLabel, f.sizeLabel, f.atLabel, f.by, f.clientVisible ? "גלוי ללקוח" : "פנימי"].filter(Boolean).join(", ");
+      out.push(`- ${f.title} (${meta}). documentId: ${f.documentId}`);
+    }
     out.push("");
   }
 
@@ -307,6 +353,7 @@ export function buildLessonsPrompt(input: AdvancePromptInput): string {
     "1. תכתוב סיכום קצר במבנה שלמטה, מתוך הנתונים בלבד. מה שלא מופיע בנתונים, לא להמציא: לכתוב שזה לא ידוע.",
     "2. אם אני מתקן, תעדכן ותציג את הסיכום המלא מחדש.",
     `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את הסיכום כהערה פנימית במשימה עם add_task_comment: taskId "${input.taskId}", includeDone: true. עד 4000 תווים. הערות לא מוצגות ללקוח.`,
+    ...(input.files.length > 0 ? ["אם קובץ מצורף רלוונטי לסיכום, אפשר לקרוא אותו עם read_document."] : []),
     "4. אם עולה לקח שכדאי להפוך לנוהל או לשלבים קבועים במשימות דומות, תציע אותו בנפרד בסוף. אל תשנה שום דבר אחר במשימה, ואל תפתח אותה מחדש.",
     "",
     ...HOW_TO_ASK,
