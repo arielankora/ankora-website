@@ -65,3 +65,13 @@ export function formatClockMinutes(minutes: number): string {
   const abs = Math.abs(Math.round(minutes));
   return `${sign}${Math.floor(abs / 60)}:${String(abs % 60).padStart(2, "0")}`;
 }
+
+/// A prepaid package as the client thinks of it (12.10.2026): its size is
+/// the hours bought in this load, "used" is how much of that is gone, and
+/// what is left is the real balance. A balance carried in from the previous
+/// package is used first; an overrun carried in counts as already used. The
+/// same arithmetic as prepaidUtilizationPct, so the tiles and the
+/// percentage beside them always agree.
+export function packageFigures(purchasedMinutes: number, remainingMinutes: number): BankFigures {
+  return bankFigures(purchasedMinutes, purchasedMinutes - remainingMinutes);
+}

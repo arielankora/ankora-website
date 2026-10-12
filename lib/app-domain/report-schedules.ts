@@ -5,6 +5,8 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { toCsv } from "@/lib/csv";
 import { getClient } from "@/lib/app-domain/clients";
+import { getHourBankSnapshot } from "@/lib/app-domain/hour-banks";
+import { computeConsumedMinutesForRange } from "@/lib/app-domain/billing";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import type { User, ReportSchedule, ClientReportType, ReportFrequency } from "@prisma/client";
 
@@ -255,7 +257,12 @@ async function buildSnapshot(clientId: string, reportType: ClientReportType, fro
         where: { clientId, deletedAt: null, cycleStart: { lte: to }, cycleEnd: { gt: from } },
         orderBy: { cycleStart: "desc" },
       });
-      return { reportType, client: client?.name, cycle: snapshot };
+      // 12.10.2026: live figures and the hours used in this period, so the
+      // email can read as a statement (what was loaded, what this period
+      // used, what is left) rather than the cached consumedMinutes column.
+      const live = snapshot ? { ...(await getHourBankSnapshot(snapshot)).utilization } : null;
+      const periodConsumedMinutes = await computeConsumedMinutesForRange(clientId, { from, to });
+      return { reportType, client: client?.name, cycle: snapshot, live, periodConsumedMinutes };
     }
     case "WEEKLY_ACTIVITY": {
       const client = await getClient(clientId);
@@ -343,7 +350,31 @@ function renderEmailBody(
   if (summary) lines.push(summary, "");
   if (reportType === "HOUR_BANK_STATUS") {
     const cycle = snapshot.cycle;
-    if (cycle) {
+    const live = snapshot.live;
+    const hours = (m: number) => (Math.abs(m) / 60).toFixed(2);
+    if (cycle && cycle.kind === "PREPAID" && live) {
+      lines.push(
+        `חבילת שעות שנטענה ב-${localDateKey(new Date(cycle.cycleStart))}: ${hours(cycle.purchasedMinutes)} שעות`,
+        ...(cycle.rolloverInMinutes < 0
+          ? [`קוזזה חריגה מהחבילה הקודמת: ${hours(cycle.rolloverInMinutes)} שעות`]
+          : cycle.rolloverInMinutes > 0
+            ? [`עברה יתרה מהחבילה הקודמת: ${hours(cycle.rolloverInMinutes)} שעות`]
+            : []),
+        `נוצלו בתקופה: ${hours(snapshot.periodConsumedMinutes ?? 0)} שעות`,
+        `נוצלו מהחבילה: ${live.utilizationPct}%`,
+        live.remainingMinutes < 0
+          ? `חריגה: ${hours(live.remainingMinutes)} שעות, תקוזז מהטעינה הבאה`
+          : `נותרו: ${hours(live.remainingMinutes)} שעות`
+      );
+    } else if (cycle && live) {
+      lines.push(
+        `סה"כ במחזור: ${hours(live.totalMinutes)} שעות`,
+        `נוצלו בתקופה: ${hours(snapshot.periodConsumedMinutes ?? 0)} שעות`,
+        `נוצלו במחזור: ${hours(live.consumedMinutes)} שעות (${live.utilizationPct}%)`,
+        live.remainingMinutes < 0 ? `חריגה: ${hours(live.remainingMinutes)} שעות` : `נותרו: ${hours(live.remainingMinutes)} שעות`
+      );
+    } else if (cycle) {
+      // A run frozen before 12.10.2026 has only the row.
       lines.push(`נרכשו: ${cycle.purchasedMinutes} דקות`, `נוצל (מטמון): ${cycle.consumedMinutes} דקות`, `סטטוס מחזור: ${cycle.status}`);
     } else {
       lines.push("אין מחזור פעיל בתקופה זו.");

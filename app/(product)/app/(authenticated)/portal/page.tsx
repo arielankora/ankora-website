@@ -7,7 +7,8 @@ import { whatsappHref } from "@/lib/whatsapp";
 import { PortalTabs } from "./PortalTabs";
 import { PromiseList } from "./PromiseList";
 import { portalHeadline } from "@/lib/app-domain/portal-labels";
-import { bankFigures } from "@/lib/hours-format";
+import { bankFigures, packageFigures } from "@/lib/hours-format";
+import { forecastCell } from "@/lib/prepaid-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -146,8 +147,20 @@ export default async function PortalHomePage() {
           <span className="text-[12.5px] text-appNavy/60">
             {/* A bank reads in decimal hours everywhere (3.10.2026), the same
                 figures the client sees on the hours screen one click away. */}
-            מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
-            <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
+            {cycle.kind === "PREPAID" ? (
+              <>
+                חבילת השעות: נוצלו{" "}
+                <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed}</bdi> מתוך{" "}
+                <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total}</bdi> שעות
+                {cycle.forecast?.status === "projected" && ` · צפויה להספיק עד ${forecastCell(cycle.forecast, client.timezone)}`}
+                {cycle.forecast?.status === "depleted" && " · החבילה נוצלה"}
+              </>
+            ) : (
+              <>
+                מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
+                <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
+              </>
+            )}
             {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
           </span>
           <Link href="/app/portal/hours" className="text-xs text-gold-dim hover:underline">

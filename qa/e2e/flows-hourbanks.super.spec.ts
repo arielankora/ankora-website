@@ -187,3 +187,31 @@ test.describe("recording an adjustment", () => {
     await expect(page.locator('input[name="hours"]').first()).toBeVisible();
   });
 });
+
+// 12.10.2026 (RIMED): prepaid packages. What a form adds over the domain
+// tests: the purchase date and hours a person types arrive as a package,
+// and the sum shown before saving is there to be read.
+test.describe("loading a prepaid package", () => {
+  test("the form shows the sum before saving, and the screen then shows a package", async ({ page }) => {
+    const clientName = tag("[E2E] חבילה");
+    await createClientAndOpenItsBank(page, clientName);
+
+    await page.getByRole("button", { name: "טעינת חבילה" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="purchaseDate"]').fill(isoDay(-1));
+    await dialog.locator('input[name="purchasedHours"]').fill("30");
+    // The preview comes from the server; a first package says so.
+    await expect(dialog.getByText("זו החבילה הראשונה של הלקוח")).toBeVisible({ timeout: 15_000 });
+    await expect(dialog.getByText("30.00", { exact: false }).first()).toBeVisible();
+    await dialog.getByRole("button", { name: "טעינת חבילה" }).last().click();
+
+    await page.waitForLoadState("networkidle");
+    await page.reload();
+    const body = await page.locator("body").innerText();
+    expect(body).not.toMatch(/Application error|Internal Server Error/);
+    await expect(page.getByText("חבילה נוכחית"), "no package card after loading").toBeVisible({ timeout: 15_000 });
+    // A package client is not offered a cycle next to it.
+    await expect(page.getByRole("button", { name: "פתיחת מחזור חדש" })).toHaveCount(0);
+  });
+});

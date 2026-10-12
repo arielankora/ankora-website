@@ -4,7 +4,8 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
-import { bankFigures, formatDecimalHours } from "@/lib/hours-format";
+import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
+import { describeForecast } from "@/lib/prepaid-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -64,11 +65,18 @@ export default async function PortalHoursPage() {
     throw err;
   }
 
-  const { client, snapshot, daysUntilCycleEnd } = dashboard;
+  const { client, snapshot, daysUntilCycleEnd, forecast } = dashboard;
   const totalCategoryMinutes = categorySummary.rows.reduce((s, r) => s + r.minutes, 0);
+  // 12.10.2026: a prepaid package reads as its size, how much of it is
+  // used, and what is left, the same arithmetic as its percentage.
+  const isPrepaid = snapshot?.bank.kind === "PREPAID";
   const figures = snapshot
-    ? bankFigures(snapshot.utilization.totalMinutes, snapshot.utilization.consumedMinutes)
+    ? isPrepaid
+      ? packageFigures(snapshot.bank.purchasedMinutes, snapshot.utilization.remainingMinutes)
+      : bankFigures(snapshot.utilization.totalMinutes, snapshot.utilization.consumedMinutes)
     : null;
+  const forecastText = describeForecast(forecast, client.timezone);
+  const carry = snapshot?.bank.rolloverInMinutes ?? 0;
 
   return (
     <div className="space-y-4">
@@ -76,7 +84,15 @@ export default async function PortalHoursPage() {
 
       <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
         <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
-        {snapshot ? (
+        {snapshot && isPrepaid ? (
+          <div className="mt-1.5 space-y-1 text-[13.5px] text-appNavy/60">
+            <p>
+              חבילת שעות שנטענה ב-{formatDate(snapshot.bank.cycleStart)} · בתוקף עד {formatDate(snapshot.bank.cycleEnd)}
+              {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום התוקף`}
+            </p>
+            {forecastText && <p className="text-appNavy/75">{forecastText}</p>}
+          </div>
+        ) : snapshot ? (
           <p className="mt-1.5 text-[13.5px] text-appNavy/60">
             מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} עד {formatDate(snapshot.bank.cycleEnd)}
             {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
@@ -89,7 +105,7 @@ export default async function PortalHoursPage() {
           <>
             <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">סה&quot;כ בבנק</span>
+                <span className="text-xs text-appNavy/55">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ בבנק</>}</span>
                 <p className="mt-2 font-jbmono text-2xl text-appNavy">{figures.total}</p>
               </div>
               <div className="rounded-[14px] border border-lineDark bg-white p-4">
@@ -121,6 +137,13 @@ export default async function PortalHoursPage() {
                 style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
               />
             </div>
+            {isPrepaid && carry !== 0 && (
+              <p className="mt-3 text-[12px] text-appNavy/55">
+                {carry < 0 ? "כולל קיזוז של " : "כולל יתרה של "}
+                <bdi dir="ltr">{formatDecimalHours(Math.abs(carry))}</bdi>
+                {carry < 0 ? " שעות שנוצלו מעבר לחבילה הקודמת." : " שעות שעברו מהחבילה הקודמת ומנוצלות ראשונות."}
+              </p>
+            )}
             <p className="mt-3 text-[11.5px] text-appNavy/45">בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.</p>
           </>
         )}

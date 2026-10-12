@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
-import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
+import { getCurrentHourBank, getPrepaidForecast } from "@/lib/app-domain/hour-banks";
+import { forecastCell } from "@/lib/prepaid-format";
 import { listClients } from "@/lib/app-domain/clients";
 import { listAlertRulesForClient } from "@/lib/app-domain/alerts";
 import { localDateKey } from "@/lib/timezone";
@@ -220,6 +221,10 @@ async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
         if (!snapshot) return null;
         return {
           client: client.name,
+          // 12.10.2026: a prepaid package's percentage is of the package
+          // size, and the question that matters is when it runs out.
+          kind: snapshot.bank.kind === "PREPAID" ? "חבילה" : "מחזור",
+          forecast: forecastCell(await getPrepaidForecast(snapshot)),
           totalMinutes: snapshot.utilization.totalMinutes,
           usedMinutes: snapshot.utilization.consumedMinutes,
           remainingMinutes: snapshot.utilization.remainingMinutes,
@@ -237,6 +242,8 @@ async function hoursByClient(filters: ReportFilters): Promise<ReportResult> {
       { key: "usedMinutes", label: "נוצל", type: "bankHours" },
       { key: "remainingMinutes", label: "נותר", type: "bankHours" },
       { key: "utilizationPct", label: "אחוז ניצול", type: "percent" },
+      { key: "kind", label: "מודל" },
+      { key: "forecast", label: "צפי מיצוי" },
     ],
     rows,
   };
