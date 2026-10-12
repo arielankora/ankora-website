@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { test, expect } from "./fixtures";
 import { clearRunningTimers, runningTimerNotes } from "./timers";
 
@@ -66,6 +67,25 @@ function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: strin
   if (start < 0) return null;
   const fmt = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
   return { start: fmt(start), end: fmt(end) };
+}
+
+/** One entry on /app/my-time: the innermost block holding its note and its controls. */
+function entryRowNamed(page: Page, note: string) {
+  return page
+    .locator("div")
+    .filter({ has: page.getByText(note, { exact: true }) })
+    .filter({ has: page.getByRole("button", { name: "עריכה", exact: true }) })
+    .last();
+}
+
+/** Deletes an entry from its own row and proves it stays gone. */
+async function deleteEntryNamed(page: Page, note: string) {
+  await entryRowNamed(page, note).getByRole("button", { name: "מחיקה", exact: true }).click();
+  await expect(page.getByText(note, { exact: true }), "the deleted entry is still listed").toHaveCount(0, {
+    timeout: 15_000,
+  });
+  await page.reload();
+  await expect(page.getByText(note, { exact: true }), "the deleted entry came back after a reload").toHaveCount(0);
 }
 
 // Serial within this file. Every test here writes time entries for the SAME
@@ -168,7 +188,7 @@ test.describe("timer/actions - start and stop", () => {
 });
 
 test.describe("my-time/actions - manual entry", () => {
-  test("a manual entry is created, edited and deleted from the employee's own screen", async ({ page }) => {
+  test("a manual entry is created from the employee's own screen", async ({ page }) => {
     // Shifted by the attempt number. A retry runs against the same database,
     // so a fixed window collides with the entry the previous attempt already
     // wrote - for the SAME client, which is the one collision this product
@@ -178,7 +198,6 @@ test.describe("my-time/actions - manual entry", () => {
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
     const note = tag("e2e-manual");
-    const edited = `${note}-edited`;
 
     await page.goto("/app/my-time");
 
@@ -199,17 +218,63 @@ test.describe("my-time/actions - manual entry", () => {
     const row = page.getByText(note, { exact: false }).first();
     await expect(row, "the saved entry is not on the week's list").toBeVisible({ timeout: 15_000 });
 
-    // Edit it. The row's own edit control opens the inline form.
-    await row.click();
-    const noteField = page.locator('form input[name="note"]').last();
-    if (await noteField.count()) {
-      await noteField.fill(edited);
-      const save = page.getByRole("button", { name: /שמירה|עדכון/ }).last();
-      if (await save.count()) {
-        await save.click();
-        await expect(page.getByText(edited, { exact: false }).first()).toBeVisible({ timeout: 15_000 });
-      }
-    }
+    // 12.10.2026: this test was called "created, edited and deleted" and
+    // did neither of the last two. It clicked the note text (which opens
+    // nothing), then looked for `form input[name="note"]`, found the ADD
+    // form's field at the top of the screen, typed into it, and looked for
+    // a "שמירה" button that only an open edit form has. `count()` samples
+    // once and does not wait, found none, and the rest was skipped in
+    // silence. Editing and deleting now have their own test, below.
+  });
+
+  // Split out on 12.10.2026, the first time these steps actually ran, and
+  // parked on the same day. Both writes land (the action answers ok, and
+  // the re-rendered screen it sends back already has the change), but the
+  // browser does not always apply that answer: an edit can stay on
+  // "שומר..." and a deleted entry can stay listed until a reload. Measured
+  // locally at between one attempt in six and one in three. The stuck edit
+  // was reproduced without this suite's own fetch probe as well, so it is
+  // the screen and not the rig. Fixing it means changing product code,
+  // which waits for a decision:
+  // claude/e2e-silent-and-racing-2026-10-12.md.
+  test("a manual entry can be edited, then deleted, from the employee's own screen", async ({ page }) => {
+    test.fixme(true, "my-time sometimes does not apply a saved edit or delete until reload (12.10.2026), see the project doc");
+
+    const window = windowEarlierToday(30, 110 + 60 * test.info().retry);
+    test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
+    const { start, end } = window!;
+    const note = tag("e2e-edit");
+    const edited = `${note}-edited`;
+
+    await page.goto("/app/my-time");
+    await page.locator('input[name="date"]').fill(todayKey());
+    await page.locator('input[name="startTime"]').fill(start);
+    await page.locator('input[name="endTime"]').fill(end);
+    await page.locator('select[name="clientId"]').selectOption({ index: 1 });
+    await page.locator('select[name="categoryId"]').selectOption({ index: 1 });
+    await page.locator('input[name="note"]').fill(note);
+    await page.getByRole("button", { name: "הוספת דיווח" }).click();
+    await expect(page.getByText("הדיווח נשמר"), "the entry to edit was refused").toBeVisible({ timeout: 20_000 });
+    await page.reload();
+
+    await entryRowNamed(page, note).getByRole("button", { name: "עריכה", exact: true }).click();
+
+    // Editing turns the row into its own form. Every row's delete button is
+    // a form carrying the entry's id too, so the edit form is told apart by
+    // the field only it has: the version it was opened against.
+    const editForm = page.locator("form").filter({ has: page.locator('input[name="expectedUpdatedAt"]') });
+    await expect(editForm, "the row's edit control did not open its form").toHaveCount(1);
+    await editForm.locator('input[name="note"]').fill(edited);
+    await editForm.getByRole("button", { name: "שמירה", exact: true }).click();
+
+    // Done when the form has gone and the row reads the new note. Not when
+    // the button stops saying "שמירה": while saving it says "שומר...".
+    await expect(editForm, "the edit form never closed after saving").toHaveCount(0, { timeout: 15_000 });
+    const editedRow = entryRowNamed(page, edited);
+    await expect(editedRow, "the edited note is not on the list").toBeVisible({ timeout: 15_000 });
+    await expect(editedRow.getByText("נערך", { exact: true }), "an edited entry should say so").toBeVisible();
+
+    await deleteEntryNamed(page, edited);
   });
 
   test("an entry whose time range collides with another client is offered as confirmable", async ({ page }) => {
@@ -289,10 +354,27 @@ test.describe("tasks/actions - create and complete", () => {
     );
     await expect(toggle).toHaveAttribute("aria-checked", "false");
 
-    await toggle.click();
-    await expect(toggle, "marking the task done did not stick").toHaveAttribute("aria-checked", "true", {
-      timeout: 15_000,
+    const closed = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/tasks"), {
+      timeout: 30_000,
     });
+    await toggle.click();
+
+    // 12.10.2026: ticked, or already gone. This list is the default
+    // "פעילות" view, and a DONE task does not belong in it: the row ticks
+    // at once, and the action's response re-renders the list without it.
+    // Reading the tick after that response had won the race found no row
+    // at all, and failed on a screen doing what it should. Where a closed
+    // task lives is checked after the write has answered.
+    await expect(async () => {
+      if ((await toggle.count()) === 0) return;
+      await expect(toggle).toHaveAttribute("aria-checked", "true", { timeout: 1_000 });
+    }, "the task is still open after marking it done").toPass({ timeout: 15_000 });
+    expect((await closed).status(), "marking done was not accepted").toBe(200);
+
+    await page.goto("/app/tasks?status=DONE&mine=0");
+    const doneRow = page.locator("[data-task]").filter({ hasText: title });
+    await expect(doneRow, "marking the task done did not stick").toBeVisible({ timeout: 15_000 });
+    await expect(doneRow.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
   });
 });
 

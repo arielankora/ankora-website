@@ -180,13 +180,35 @@ test("a promise the client can see cannot be closed without a sentence for them"
 
   const outcome = "בדקנו מול שני ספקים וסגרנו עם הזול מביניהם.";
   await page.getByPlaceholder("משפט אחד, בשפה שלו").fill(outcome);
+  const closed = page.waitForResponse((r) => r.request().method() === "POST" && r.url().includes("/app/tasks"), {
+    timeout: 30_000,
+  });
   await page.getByRole("button", { name: "סיום", exact: true }).click();
 
-  // No reload. The sentence has to appear on the row on its own, because
-  // that is what it means for the write to have landed anywhere the
-  // client will read it.
-  await expect(page.getByText(outcome).first()).toBeVisible({ timeout: 30_000 });
-  await expect(row.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+  // No reload: the row answers the click on its own, ticked.
+  //
+  // 12.10.2026: but only for a moment, and that is correct. This list is
+  // "פעילות", and a DONE task does not belong in it. The row ticks at
+  // once, the action's response re-renders the list without it, and the
+  // row leaves. The old assertion read the tick AFTER waiting for the
+  // sentence, so whenever the response won that race (about 25ms in the
+  // trace that caught it) there was no row left to read, and the test
+  // failed on a screen doing exactly what it should.
+  //
+  // So: the row is ticked or already gone, never still open. And the
+  // proof that the close landed with its sentence is read where a closed
+  // task lives, after the write has answered rather than racing it.
+  await expect(async () => {
+    if ((await row.count()) === 0) return;
+    await expect(row.getByRole("checkbox")).toHaveAttribute("aria-checked", "true", { timeout: 1_000 });
+  }, "the row is still open after closing it").toPass({ timeout: 15_000 });
+  expect((await closed).status(), "the close was not accepted").toBe(200);
+
+  await page.goto(`${TASKS}?status=DONE&mine=0`, { waitUntil: "domcontentloaded" });
+  const doneRow = page.locator("[data-task]").filter({ hasText: title });
+  await expect(doneRow, "the closed task is not under הושלמו").toBeVisible({ timeout: 15_000 });
+  await expect(doneRow.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+  await expect(doneRow.getByText(outcome), "the sentence for the client did not stay with the task").toBeVisible();
 });
 
 test("stopping the timer asks what stage the promise is at", async ({ page }) => {
