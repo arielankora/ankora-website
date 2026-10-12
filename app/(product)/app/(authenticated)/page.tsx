@@ -17,7 +17,7 @@ import { KpiCard } from "@/components/app/KpiCard";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { listClients } from "@/lib/app-domain/clients";
-import { cycleElapsedShare, getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
+import { cycleElapsedShare, getCurrentHourBanksForClients, getPrepaidForecastsForClients } from "@/lib/app-domain/hour-banks";
 import { getAlertCoverage, listOpenAlertEvents } from "@/lib/app-domain/alerts";
 import { LONG_TIMER_HOURS } from "@/lib/app-domain/reports";
 import { getHoursTrend } from "@/lib/app-domain/overview-trend";
@@ -95,10 +95,26 @@ async function loadOperationalMetrics() {
   // renews on the 15th.
   const bankTotalMinutes = bankSnapshots.reduce((sum, s) => sum + Math.max(0, s.utilization.totalMinutes), 0);
   const bankConsumedMinutes = bankSnapshots.reduce((sum, s) => sum + s.utilization.consumedMinutes, 0);
+  // A prepaid package (12.10.2026) has no pace to be ahead of or behind:
+  // it is bought to be used until it runs out, and its "cycle" is a year
+  // of validity. It counts as on pace, expected = used, so it moves the
+  // hours but not the verdict. Its own question is when it runs out,
+  // answered by packagesEndingSoon below.
   const expectedMinutes = bankSnapshots.reduce(
-    (sum, s) => sum + Math.max(0, s.utilization.totalMinutes) * cycleElapsedShare(s.bank.cycleStart, s.bank.cycleEnd, now),
+    (sum, s) =>
+      sum +
+      (s.bank.kind === "PREPAID"
+        ? Math.min(s.utilization.consumedMinutes, Math.max(0, s.utilization.totalMinutes))
+        : Math.max(0, s.utilization.totalMinutes) * cycleElapsedShare(s.bank.cycleStart, s.bank.cycleEnd, now)),
     0
   );
+  const forecasts = await getPrepaidForecastsForClients(
+    bankSnapshots.map((s) => ({ clientId: s.bank.clientId, kind: s.bank.kind, remainingMinutes: s.utilization.remainingMinutes })),
+    now
+  );
+  const packagesEndingSoon = [...forecasts.values()].filter(
+    (f) => f.status === "projected" && f.daysLeft <= PACKAGE_ENDING_SOON_DAYS
+  ).length;
   const avgUtilizationPct = bankTotalMinutes > 0 ? Math.round((bankConsumedMinutes / bankTotalMinutes) * 100) : null;
   const expectedUtilizationPct = bankTotalMinutes > 0 ? Math.round((expectedMinutes / bankTotalMinutes) * 100) : null;
   const clientsNearLimitCount = bankSnapshots.filter((s) => s.utilization.utilizationPct >= 90).length;
@@ -132,8 +148,13 @@ async function loadOperationalMetrics() {
     bankTotalMinutes,
     bankConsumedMinutes,
     clientsNearLimitCount,
+    packagesEndingSoon,
   };
 }
+
+/// A prepaid package projected to run out within this many days is named
+/// on the bank card: the time to talk about the next load.
+const PACKAGE_ENDING_SOON_DAYS = 14;
 
 /// Whole hours for the card: "55 מתוך 100 שעות". A bank is sold in
 /// hours, and minutes on a summary card are precision nobody asked for.
@@ -453,6 +474,13 @@ export default async function AppHomePage() {
                           : metrics.avgUtilizationPct < metrics.expectedUtilizationPct - 5
                             ? " · מתחת לקצב"
                             : " · בקצב"}
+                      </p>
+                    )}
+                    {metrics.packagesEndingSoon > 0 && (
+                      <p className="mt-1.5 text-[11.5px] font-medium text-warning">
+                        {metrics.packagesEndingSoon === 1
+                          ? `חבילת שעות אחת צפויה להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`
+                          : `${metrics.packagesEndingSoon} חבילות שעות צפויות להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`}
                       </p>
                     )}
                     {metrics.clientsNearLimitCount > 0 && (

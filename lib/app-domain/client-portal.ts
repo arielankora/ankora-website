@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import { assertCan, can, ForbiddenError } from "@/lib/app-auth/permissions";
-import { getCurrentHourBank, listHourBanksForClient } from "@/lib/app-domain/hour-banks";
+import { getCurrentHourBank, getPrepaidForecast, listHourBanksForClient, type PrepaidForecast } from "@/lib/app-domain/hour-banks";
 import { getClient } from "@/lib/app-domain/clients";
 import { normalizeEmails } from "@/lib/app-domain/report-schedules";
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
@@ -237,15 +237,27 @@ export async function getPortalDashboard(actor: User) {
   const { client } = await resolvePortalClient(actor);
   const snapshot = await getCurrentHourBank(client.id);
 
-  const daysUntilCycleEnd = snapshot
-    ? Math.max(0, Math.ceil((snapshot.bank.cycleEnd.getTime() - Date.now()) / 86_400_000))
-    : null;
+  const daysUntilCycleEnd = daysLeftToShow(snapshot);
 
   return {
     client: { name: client.name, timezone: client.timezone },
     snapshot,
     daysUntilCycleEnd,
+    /// Prepaid packages only (12.10.2026): when the hours are expected to
+    /// run out at the pace of the last four weeks. The client sees it
+    /// (Ariel, 12.10.2026).
+    forecast: await getPrepaidForecast(snapshot),
   };
+}
+
+/// Days to the end of the cycle, for the "X ימים לסיום" line. A prepaid
+/// package's end is its expiry, a year out: counting down 300 days would
+/// say the wrong thing, so it is shown only in the last 30 days.
+function daysLeftToShow(snapshot: { bank: { cycleEnd: Date; kind: string } } | null): number | null {
+  if (!snapshot) return null;
+  const days = Math.max(0, Math.ceil((snapshot.bank.cycleEnd.getTime() - Date.now()) / 86_400_000));
+  if (snapshot.bank.kind === "PREPAID" && days > 30) return null;
+  return days;
 }
 
 interface PortalEntryRow {
@@ -441,6 +453,9 @@ export async function getPortalHistory(actor: User) {
     cycles: cycles.map((c) => ({
       cycleStart: c.bank.cycleStart,
       cycleEnd: c.bank.cycleEnd,
+      kind: c.bank.kind,
+      purchasedMinutes: c.bank.purchasedMinutes,
+      remainingMinutes: c.utilization.remainingMinutes,
       status: c.bank.status,
       utilizationPct: c.utilization.utilizationPct,
       consumedMinutes: c.utilization.consumedMinutes,
@@ -671,7 +686,17 @@ export interface PortalHome {
   recentlyDone: PortalPromise[];
   /// The quiet line at the bottom of the screen, and the only number on
   /// it. Null when no cycle has been set up yet.
-  cycle: { usedMinutes: number; totalMinutes: number; pct: number; daysLeft: number | null } | null;
+  cycle: {
+    usedMinutes: number;
+    totalMinutes: number;
+    pct: number;
+    daysLeft: number | null;
+    /// 12.10.2026: a prepaid package reads as "X of the Y hours loaded".
+    kind: "CYCLE" | "PREPAID";
+    purchasedMinutes: number;
+    remainingMinutes: number;
+    forecast: PrepaidForecast | null;
+  } | null;
 }
 
 const RECENTLY_DONE_TAKE = 5;
@@ -695,9 +720,8 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
   const promises = tasks.map(toPromise);
   const done = promises.filter((p) => p.stage === "DONE");
 
-  const daysUntilCycleEnd = snapshot
-    ? Math.max(0, Math.ceil((snapshot.bank.cycleEnd.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
-    : null;
+  const daysUntilCycleEnd = daysLeftToShow(snapshot);
+  const forecast = await getPrepaidForecast(snapshot);
 
   return {
     client,
@@ -716,6 +740,10 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
           totalMinutes: snapshot.utilization.totalMinutes,
           pct: snapshot.utilization.utilizationPct,
           daysLeft: daysUntilCycleEnd,
+          kind: snapshot.bank.kind,
+          purchasedMinutes: snapshot.bank.purchasedMinutes,
+          remainingMinutes: snapshot.utilization.remainingMinutes,
+          forecast,
         }
       : null,
   };

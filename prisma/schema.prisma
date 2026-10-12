@@ -1166,6 +1166,12 @@ enum RolloverMode {
   MANUAL
 }
 
+/// 12.10.2026 (RIMED): see HourBank.kind.
+enum HourBankKind {
+  CYCLE
+  PREPAID
+}
+
 /// Spec 8.2: a cycle is normally OPEN (current), becomes CLOSED once
 /// cycle_end passes, and flips to RECALCULATED if a backdated edit lands
 /// inside an already-CLOSED cycle's date range ("המערכת מחשבת מחדש
@@ -1227,6 +1233,17 @@ model HourBank {
   id       String @id @default(cuid())
   clientId String
 
+  /// 12.10.2026 (RIMED): CYCLE is a fixed window that renews (the
+  /// original model). PREPAID is a package of hours bought up front and
+  /// used until it runs out; it stays open until the next package is
+  /// loaded or it expires, and its whole balance, an overrun included,
+  /// carries into the next one. See loadPrepaidPackage.
+  kind HourBankKind @default(CYCLE)
+
+  /// For a PREPAID package cycleEnd is the expiry (one year from purchase
+  /// by default). Loading the next package moves it back to the moment of
+  /// the load, so the two packages meet and no minute is counted twice or
+  /// not at all.
   cycleStart DateTime
   cycleEnd   DateTime
 

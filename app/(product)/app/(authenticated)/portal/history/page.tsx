@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { RecipientsForm } from "../RecipientsForm";
 import { PortalTabs } from "../PortalTabs";
 import { israelMonthOffset } from "@/lib/period-offset";
-import { bankFigures } from "@/lib/hours-format";
+import { bankFigures, packageFigures } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -70,17 +70,17 @@ export default async function PortalHistoryPage() {
 
         <div>
           <h1 className="text-xl font-medium text-appNavy">היסטוריה</h1>
-          <p className="mt-1 text-sm text-appNavy/60">מחזורי בנק שעות קודמים ודוחות שנשלחו.</p>
+          <p className="mt-1 text-sm text-appNavy/60">מחזורים וחבילות שעות קודמים, ודוחות שנשלחו.</p>
         </div>
 
         <section className="space-y-3">
-          <h2 className="text-sm font-medium text-appNavy/70">מחזורים קודמים</h2>
+          <h2 className="text-sm font-medium text-appNavy/70">מחזורים וחבילות</h2>
           <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
             <table className="w-full min-w-[560px] text-start text-sm">
               <thead>
                 <tr className="border-b border-lineDark text-xs text-appNavy/50">
-                  <th className="px-5 py-3 font-medium">תחילת מחזור</th>
-                  <th className="px-5 py-3 font-medium">סוף מחזור</th>
+                  <th className="px-5 py-3 font-medium">התחלה</th>
+                  <th className="px-5 py-3 font-medium">סיום</th>
                   <th className="px-5 py-3 font-medium">סטטוס</th>
                   <th className="px-5 py-3 font-medium">ניצול</th>
                 </tr>
@@ -89,22 +89,31 @@ export default async function PortalHistoryPage() {
                 {history.cycles.length === 0 && (
                   <tr>
                     <td colSpan={4} className="px-5 py-8 text-center text-appNavy/50">
-                      אין עדיין מחזורים.
+                      אין עדיין מחזורים או חבילות.
                     </td>
                   </tr>
                 )}
                 {history.cycles.map((c, i) => {
                   const status = STATUS_LABEL[c.status] ?? STATUS_LABEL.OPEN;
+                  // A package reads as its size and how much of it went,
+                  // like the hours screen (12.10.2026).
+                  const f =
+                    c.kind === "PREPAID"
+                      ? packageFigures(c.purchasedMinutes, c.remainingMinutes)
+                      : bankFigures(c.totalMinutes, c.consumedMinutes);
                   return (
                     <tr key={i} className="border-b border-lineDark last:border-0">
-                      <td className="px-5 py-3 text-appNavy/70">{formatDate(c.cycleStart)}</td>
+                      <td className="px-5 py-3 text-appNavy/70">
+                        <span className="block text-[11px] text-appNavy/45">{c.kind === "PREPAID" ? "חבילה" : "מחזור"}</span>
+                        {formatDate(c.cycleStart)}
+                      </td>
                       <td className="px-5 py-3 text-appNavy/70">{formatDate(c.cycleEnd)}</td>
                       <td className="px-5 py-3">
                         <StatusBadge label={status.label} tone={status.tone} />
                       </td>
                       <td className="px-5 py-3 text-appNavy/70">
                         <bdi dir="ltr">
-                          {bankFigures(c.totalMinutes, c.consumedMinutes).consumed} / {bankFigures(c.totalMinutes, c.consumedMinutes).total}
+                          {f.consumed} / {f.total}
                         </bdi>{" "}
                         ({Math.round(c.utilizationPct)}%)
                       </td>

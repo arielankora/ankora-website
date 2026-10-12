@@ -3,7 +3,14 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { upsertBillingPolicy } from "@/lib/app-domain/billing";
-import { openHourBankCycle, recordHourBankAdjustment } from "@/lib/app-domain/hour-banks";
+import {
+  openHourBankCycle,
+  recordHourBankAdjustment,
+  loadPrepaidPackage,
+  previewPrepaidLoad,
+} from "@/lib/app-domain/hour-banks";
+import { can } from "@/lib/app-auth/permissions";
+import { dayStartInZone } from "@/lib/timezone";
 import type { RoundingMode, BillingAggregationScope, RolloverMode } from "@prisma/client";
 import { parseHoursInput } from "@/lib/hours-input";
 
@@ -98,5 +105,69 @@ export async function recordAdjustmentAction(_prev: FormState | undefined, formD
   }
 
   revalidatePath("/app/hour-banks");
+  return { ok: true };
+}
+
+/// A purchase date is an Israeli day: the package starts at midnight
+/// Israel time on that day. Today means now, so the hours logged earlier
+/// today stay with the package they were logged against.
+function purchaseInstant(value: FormDataEntryValue | null): Date | null {
+  const start = dayStartInZone(value ? String(value) : null);
+  if (!start) return null;
+  const now = new Date();
+  return start.getTime() <= now.getTime() && now.getTime() - start.getTime() < 86_400_000 ? now : start;
+}
+
+export type LoadPreviewState = {
+  error?: string;
+  previous?: { kind: "CYCLE" | "PREPAID"; balanceMinutes: number; stillValid: boolean } | null;
+  carryInMinutes?: number;
+};
+
+export async function previewPrepaidLoadAction(clientId: string, purchaseDate: string): Promise<LoadPreviewState> {
+  const user = await requireUser();
+  if (!can(user.role, "hour_bank.manage")) return { error: "אין לך הרשאה לבצע פעולה זו." };
+  const startAt = purchaseInstant(purchaseDate);
+  if (!startAt) return { error: "יש לבחור תאריך רכישה." };
+  try {
+    const preview = await previewPrepaidLoad(clientId, startAt);
+    return {
+      previous: preview.previous && {
+        kind: preview.previous.kind,
+        balanceMinutes: preview.previous.balanceMinutes,
+        stillValid: preview.previous.stillValid,
+      },
+      carryInMinutes: preview.carryInMinutes,
+    };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+}
+
+export async function loadPrepaidPackageAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") || "");
+  if (!clientId) return { error: "יש לבחור לקוח." };
+
+  const startAt = purchaseInstant(formData.get("purchaseDate"));
+  if (!startAt) return { error: "יש להזין תאריך רכישה תקין." };
+  const purchasedMinutes = parseHoursInput(formData.get("purchasedHours"));
+  if (!purchasedMinutes) return { error: "יש להזין כמה שעות נרכשו, למשל 30 או 12.5." };
+  const expiresRaw = String(formData.get("expiresAt") || "").trim();
+  const expiresAt = expiresRaw ? dayStartInZone(expiresRaw) : undefined;
+  if (expiresRaw && !expiresAt) return { error: "תאריך התוקף אינו תקין." };
+
+  try {
+    await loadPrepaidPackage(user, clientId, {
+      startAt,
+      purchasedMinutes,
+      expiresAt,
+    });
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+
+  revalidatePath("/app/hour-banks");
+  revalidatePath("/app");
   return { ok: true };
 }

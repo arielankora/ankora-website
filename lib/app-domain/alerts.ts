@@ -92,6 +92,35 @@ export async function ensureDefaultAlertRules(actor: Pick<User, "id">, clientId:
   );
 }
 
+/// What the client reads when a prepaid package crosses a threshold. A
+/// package is not a bank with a month, so the words are about the package:
+/// how much is left, and at 100%, that further hours come off the next
+/// one (Ariel, 12.10.2026). Pure, for the tests.
+export function isFullPackageRule(rule: Pick<AlertRule, "type" | "thresholdValue">): boolean {
+  return (rule.type === "UTILIZATION_PCT" && rule.thresholdValue >= 100) || rule.type === "OVERAGE";
+}
+
+export function prepaidClientAlertLines(
+  rule: Pick<AlertRule, "type" | "thresholdValue">,
+  utilization: Pick<UtilizationSnapshotForAlerts, "utilizationPct" | "remainingMinutes">
+): string[] {
+  const hours = (m: number) => (Math.abs(m) / 60).toFixed(2);
+  const depleted = utilization.remainingMinutes <= 0;
+  if (depleted || isFullPackageRule(rule)) {
+    return [
+      "חבילת השעות שלכם נוצלה במלואה.",
+      utilization.remainingMinutes < 0
+        ? `שעות מעבר לחבילה עד עכשיו: ${hours(utilization.remainingMinutes)}.`
+        : "לא נותרו שעות בחבילה.",
+      "מעכשיו השעות נרשמות כחריגה ויקוזזו מהטעינה הבאה.",
+    ];
+  }
+  return [
+    `נוצלו ${Math.round(utilization.utilizationPct)}% מחבילת השעות האחרונה שלכם.`,
+    `נותרו ${hours(utilization.remainingMinutes)} שעות.`,
+  ];
+}
+
 /// What the alerts are actually watching: enabled rules on clients that
 /// are not archived. The number that makes a zero mean something - "no
 /// open alerts, 24 rules on 12 clients" is a fact; "0" alone is not.
@@ -423,17 +452,22 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
   const am = client.accountManager;
   const accountManagerEmail = am && am.status === "ACTIVE" && !am.deletedAt ? am.email : null;
 
+  // When one entry takes a package past both 80% and 100%, the client is
+  // told once, by the 100% rule, rather than twice that it ran out.
+  const hasFullRule = rules.some(isFullPackageRule);
+
   for (const rule of rules) {
-    await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail);
+    await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule);
   }
 }
 
 async function evaluateSingleRule(
   rule: AlertRule,
-  bank: Pick<HourBank, "id">,
+  bank: Pick<HourBank, "id"> & Partial<Pick<HourBank, "kind" | "purchasedMinutes">>,
   utilization: UtilizationSnapshotForAlerts,
   clientName: string,
-  accountManagerEmail: string | null = null
+  accountManagerEmail: string | null = null,
+  hasFullRule = false
 ): Promise<void> {
   const currentValue = currentValueForThreshold(rule.type, utilization);
   const breached = isThresholdBreached(rule.type, rule.thresholdValue, currentValue);
@@ -459,18 +493,28 @@ async function evaluateSingleRule(
 
   const label = formatThresholdLabel(rule.type);
   const subjectAnkora = `[Ankora] התראת בנק שעות - ${clientName}`;
+  const isPrepaid = bank.kind === "PREPAID";
   const textAnkora = [
     `לקוח: ${clientName}`,
     `סוג התראה: ${label}`,
     `סף: ${rule.thresholdValue}`,
     `ערך נוכחי: ${Math.round(currentValue)}`,
-    `ניצול: ${utilization.utilizationPct}% (${utilization.consumedMinutes}/${utilization.totalMinutes} דקות)`,
+    isPrepaid
+      ? `חבילה: נוצלו ${utilization.utilizationPct}% מ-${((bank.purchasedMinutes ?? 0) / 60).toFixed(2)} השעות שנטענו. ${
+          utilization.remainingMinutes < 0
+            ? `חריגה: ${(-utilization.remainingMinutes / 60).toFixed(2)} שעות, תקוזז מהטעינה הבאה.`
+            : `נותרו ${(utilization.remainingMinutes / 60).toFixed(2)} שעות.`
+        }`
+      : `ניצול: ${utilization.utilizationPct}% (${utilization.consumedMinutes}/${utilization.totalMinutes} דקות)`,
   ].join("\n");
 
-  const subjectClient = `עדכון ניצול שעות - ${clientName}`;
+  const skipClientCopy = isPrepaid && hasFullRule && !isFullPackageRule(rule) && utilization.remainingMinutes <= 0;
+  const subjectClient = isPrepaid ? `עדכון חבילת שעות - ${clientName}` : `עדכון ניצול שעות - ${clientName}`;
   // Deliberately omits a "link to portal" line (spec 9.2) - no Client
   // Portal exists yet (ADR 11.5 / Phase 6 gap).
-  const textClient = [
+  const textClient = isPrepaid
+    ? [`שלום,`, ``, ...prepaidClientAlertLines(rule, utilization), ``, `בברכה,`, `צוות Ankora`].join("\n")
+    : [
     `שלום,`,
     ``,
     `זהו עדכון אוטומטי על ניצול בנק השעות שלכם אצל Ankora.`,
@@ -492,7 +536,13 @@ async function evaluateSingleRule(
       subjectAnkora,
       textAnkora
     ),
-    deliverAlertEmail(event.id, "client_facing", rule.recipientsClient, subjectClient, textClient),
+    deliverAlertEmail(
+      event.id,
+      "client_facing",
+      skipClientCopy ? [] : rule.recipientsClient,
+      subjectClient,
+      textClient
+    ),
   ]);
 }
 

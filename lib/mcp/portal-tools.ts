@@ -134,6 +134,18 @@ export function registerPortalTools(server: McpServer): void {
                 totalHours: minutesToHours(home.cycle.totalMinutes),
                 percentUsed: home.cycle.pct,
                 daysLeftInCycle: home.cycle.daysLeft,
+                // 12.10.2026: a prepaid package's percentage is of the
+                // hours loaded; projectedDepletionDate is when they run out
+                // at the last four weeks' pace.
+                model: home.cycle.kind === "PREPAID" ? "prepaid_package" : "cycle",
+                ...(home.cycle.kind === "PREPAID"
+                  ? {
+                      packageHours: minutesToHours(home.cycle.purchasedMinutes),
+                      remainingHours: minutesToHours(home.cycle.remainingMinutes),
+                      projectedDepletionDate:
+                        home.cycle.forecast?.status === "projected" ? day(home.cycle.forecast.depletionDate, tz) : null,
+                    }
+                  : {}),
               }
             : null,
           accountManager: home.contact.managerName,
@@ -367,9 +379,21 @@ export function registerPortalTools(server: McpServer): void {
                 remainingHours: minutesToHours(u.remainingMinutes),
                 percentUsed: u.utilizationPct,
                 daysLeft: dash.daysUntilCycleEnd,
+                model: dash.snapshot!.bank.kind === "PREPAID" ? "prepaid_package" : "cycle",
+                ...(dash.snapshot!.bank.kind === "PREPAID"
+                  ? {
+                      packageHours: minutesToHours(dash.snapshot!.bank.purchasedMinutes),
+                      carriedInHours: minutesToHours(dash.snapshot!.bank.rolloverInMinutes),
+                      weeklyPaceHours:
+                        dash.forecast && dash.forecast.weeklyMinutes !== null ? minutesToHours(dash.forecast.weeklyMinutes) : null,
+                      projectedDepletionDate:
+                        dash.forecast?.status === "projected" ? day(dash.forecast.depletionDate, tz) : null,
+                    }
+                  : {}),
               }
             : null,
           pastCycles: history.cycles.map((c) => ({
+            model: c.kind === "PREPAID" ? "prepaid_package" : "cycle",
             cycleStart: day(c.cycleStart, tz),
             cycleEnd: day(c.cycleEnd, tz),
             status: c.status,

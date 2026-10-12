@@ -2,15 +2,17 @@ import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listClients } from "@/lib/app-domain/clients";
 import { getBillingPolicy } from "@/lib/app-domain/billing";
-import { listHourBanksForClient, getCurrentHourBank } from "@/lib/app-domain/hour-banks";
+import { listHourBanksForClient, getCurrentHourBank, getPrepaidForecast } from "@/lib/app-domain/hour-banks";
+import { describeForecast } from "@/lib/prepaid-format";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { Drawer } from "@/components/app/Drawer";
 import { HbClientPicker } from "./HbClientPicker";
 import { BillingPolicyForm } from "./BillingPolicyForm";
 import { OpenCycleForm } from "./OpenCycleForm";
+import { LoadPackageForm } from "./LoadPackageForm";
 import { AdjustmentForm } from "./AdjustmentForm";
-import { bankFigures, formatDecimalHours } from "@/lib/hours-format";
+import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -56,8 +58,14 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
   const [policy, banks, current] = clientId
     ? await Promise.all([getBillingPolicy(clientId), listHourBanksForClient(clientId), getCurrentHourBank(clientId)])
     : [null, [], null];
+  const isPrepaid = current?.bank.kind === "PREPAID";
+  const forecastText = describeForecast(await getPrepaidForecast(current));
+  // A prepaid package's tiles are its size, how much of it is gone and what
+  // is left: the same arithmetic as its percentage (packageFigures).
   const currentFigures = current
-    ? bankFigures(current.utilization.totalMinutes, current.utilization.consumedMinutes)
+    ? isPrepaid
+      ? packageFigures(current.bank.purchasedMinutes, current.utilization.remainingMinutes)
+      : bankFigures(current.utilization.totalMinutes, current.utilization.consumedMinutes)
     : null;
 
   return (
@@ -65,7 +73,9 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
       <div className="space-y-6">
         <div>
           <h1 className="text-xl font-medium text-appNavy">בנק שעות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">מדיניות חיוב, מחזורים והתאמות ידניות לכל לקוח (ספירה 8).</p>
+          <p className="mt-1 text-sm text-appNavy/60">
+            מדיניות חיוב, מחזורים או חבילות שעות, והתאמות ידניות לכל לקוח. מחזור מתחדש בתאריך קבוע. חבילה נרכשת מראש ונספרת עד שהיא נגמרת.
+          </p>
         </div>
 
         <HbClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
@@ -87,9 +97,14 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-sm font-medium text-appNavy">{selectedClient.name}</h2>
               <span className="flex-1" />
-              <Drawer triggerLabel="פתיחת מחזור חדש" title={`פתיחת מחזור חדש - ${selectedClient.name}`}>
-                <OpenCycleForm clientId={selectedClient.id} />
+              <Drawer triggerLabel="טעינת חבילה" title={`טעינת חבילת שעות - ${selectedClient.name}`}>
+                <LoadPackageForm clientId={selectedClient.id} />
               </Drawer>
+              {!isPrepaid && (
+                <Drawer triggerLabel="פתיחת מחזור חדש" title={`פתיחת מחזור חדש - ${selectedClient.name}`}>
+                  <OpenCycleForm clientId={selectedClient.id} />
+                </Drawer>
+              )}
             </div>
 
             {/* App redesign (handoff README, screen 10 "בנק שעות"): the
@@ -103,7 +118,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
               {current && currentFigures ? (
                 <div className="rounded-[18px] bg-navy p-6 text-cream-warm">
                   <div className="flex items-baseline justify-between gap-2.5">
-                    <span className="text-xs text-cream-warm/60">מחזור נוכחי</span>
+                    <span className="text-xs text-cream-warm/60">{isPrepaid ? "חבילה נוכחית" : "מחזור נוכחי"}</span>
                     <span
                       className={`font-jbmono text-[40px] font-medium leading-none ${
                         current.utilization.utilizationPct > 100 ? "text-error" : "text-cream-warm"
@@ -123,7 +138,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-3">
                     <div>
-                      <span className="block text-[11px] text-cream-warm/50">סה&quot;כ</span>
+                      <span className="block text-[11px] text-cream-warm/50">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ</>}</span>
                       <span className="mt-1 block font-jbmono text-[16px]">
                         <Hours>{currentFigures.total}</Hours>
                       </span>
@@ -145,13 +160,29 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                       </span>
                     </div>
                   </div>
+                  {isPrepaid && (
+                    <div className="mt-4 space-y-1 border-t border-cream-warm/10 pt-3 text-[12px] leading-relaxed text-cream-warm/75">
+                      <p>
+                        נטענו <Hours>{formatDecimalHours(current.bank.purchasedMinutes)}</Hours> שעות ב-
+                        {formatDate(current.bank.cycleStart)}
+                        {current.bank.rolloverInMinutes !== 0 && (
+                          <>
+                            {current.bank.rolloverInMinutes < 0 ? ", פחות חריגה של " : ", ועוד יתרה של "}
+                            <Hours>{formatDecimalHours(Math.abs(current.bank.rolloverInMinutes))}</Hours> מהחבילה הקודמת
+                          </>
+                        )}
+                        . האחוז מחושב מגודל החבילה. בתוקף עד {formatDate(current.bank.cycleEnd)}.
+                      </p>
+                      {forecastText && <p>{forecastText}</p>}
+                    </div>
+                  )}
                   <p className="mt-4 border-t border-cream-warm/10 pt-3 text-[11px] leading-relaxed text-cream-warm/45">
                     בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.
                   </p>
                 </div>
               ) : (
                 <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-appNavy/50">
-                  אין עדיין מחזור פתוח ללקוח זה. פתחו מחזור למעלה.
+                  אין עדיין מחזור או חבילה ללקוח זה. טענו חבילה או פתחו מחזור למעלה.
                 </div>
               )}
 
@@ -183,10 +214,10 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
               <table className="w-full min-w-[900px] text-start text-sm">
                 <thead>
                   <tr className="border-b border-lineDark text-xs text-appNavy/50">
-                    <th className="px-5 py-3 font-medium">מחזור</th>
+                    <th className="px-5 py-3 font-medium">תקופה</th>
                     <th className="px-5 py-3 font-medium">סטטוס</th>
                     <th className="px-5 py-3 font-medium">נרכש</th>
-                    <th className="px-5 py-3 font-medium">Rollover</th>
+                    <th className="px-5 py-3 font-medium">יתרה נכנסת</th>
                     <th className="px-5 py-3 font-medium">נוצל</th>
                     <th className="px-5 py-3 font-medium">נותר</th>
                     <th className="px-5 py-3 font-medium">ניצול</th>
@@ -197,7 +228,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   {banks.length === 0 && (
                     <tr>
                       <td colSpan={8} className="px-5 py-8 text-center text-appNavy/50">
-                        עדיין אין מחזורי בנק שעות ללקוח זה. פתחו מחזור ראשון למעלה.
+                        עדיין אין מחזורים או חבילות ללקוח זה.
                       </td>
                     </tr>
                   )}
@@ -207,7 +238,8 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                     return (
                       <tr key={bank.id} className="border-b border-lineDark align-top last:border-0">
                         <td className="px-5 py-3 text-appNavy/80">
-                          {formatDate(bank.cycleStart)} - {formatDate(bank.cycleEnd)}
+                          <span className="block text-[11px] text-appNavy/45">{bank.kind === "PREPAID" ? "חבילה" : "מחזור"}</span>
+                          {formatDate(bank.cycleStart)} עד {formatDate(bank.cycleEnd)}
                         </td>
                         <td className="px-5 py-3">
                           <StatusBadge label={status.label} tone={status.tone} />
@@ -218,7 +250,9 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                         <td className="px-5 py-3 font-jbmono text-appNavy/70">
                           <Hours>{formatDecimalHours(bank.purchasedMinutes)}</Hours>
                         </td>
-                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                        <td
+                          className={`px-5 py-3 font-jbmono ${bank.rolloverInMinutes < 0 ? "text-error" : "text-appNavy/70"}`}
+                        >
                           <Hours>{formatDecimalHours(bank.rolloverInMinutes)}</Hours>
                         </td>
                         <td className="px-5 py-3 font-jbmono text-appNavy/70">

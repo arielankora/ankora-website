@@ -117,7 +117,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     // silently produces invoices that differ from the ones already sent.
     reason: "Rounding, minimum and increment per client. Restored time entries without it bill differently than they originally did.",
   },
-  HourBank: { decision: "DUMP", table: "hour_banks", reason: "Purchased and consumed minutes per cycle." },
+  HourBank: { decision: "DUMP", table: "hour_banks", reason: "Purchased and consumed minutes per cycle or prepaid package (kind)." },
   HourBankAdjustment: {
     decision: "DUMP",
     table: "hour_bank_adjustments",

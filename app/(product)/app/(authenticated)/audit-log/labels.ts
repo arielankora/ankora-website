@@ -96,6 +96,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "billing_policy.create": "יצירת מדיניות חיוב",
   "billing_policy.update": "עדכון מדיניות חיוב",
   "hour_bank.open_cycle": "פתיחת מחזור בנק שעות",
+  "hour_bank.load_package": "טעינת חבילת שעות",
   "hour_bank.adjustment.create": "התאמה ידנית לבנק שעות",
   // Phase 4 (spec 9/16.1: "Alert rule change").
   "alert_rule.create": "יצירת כלל התראה",

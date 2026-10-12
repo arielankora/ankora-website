@@ -8,6 +8,7 @@ import {
   consumedMinutesFromEntries,
   type ConsumableEntry,
 } from "@/lib/app-domain/billing";
+import { addDaysToKey, localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import type { User, HourBank, HourBankStatus, RolloverMode } from "@prisma/client";
 
 // Phase 3 domain service: spec section 8 ("לקוחות ובנק שעות"). Owns cycle
@@ -36,13 +37,18 @@ export interface HourBankUtilization {
 /// already-fetched numbers so it's unit-testable without touching the
 /// database.
 export function computeUtilization(
-  bank: Pick<HourBank, "purchasedMinutes" | "rolloverInMinutes">,
+  bank: Pick<HourBank, "purchasedMinutes" | "rolloverInMinutes"> & Partial<Pick<HourBank, "kind">>,
   adjustmentMinutes: number,
   consumedMinutes: number
 ): HourBankUtilization {
   const totalMinutes = bank.purchasedMinutes + bank.rolloverInMinutes + adjustmentMinutes;
   const remainingMinutes = totalMinutes - consumedMinutes;
-  const utilizationPct = totalMinutes > 0 ? Math.round((consumedMinutes / totalMinutes) * 1000) / 10 : 0;
+  const utilizationPct =
+    bank.kind === "PREPAID"
+      ? prepaidUtilizationPct(bank.purchasedMinutes, remainingMinutes)
+      : totalMinutes > 0
+        ? Math.round((consumedMinutes / totalMinutes) * 1000) / 10
+        : 0;
   return {
     purchasedMinutes: bank.purchasedMinutes,
     rolloverInMinutes: bank.rolloverInMinutes,
@@ -52,6 +58,16 @@ export function computeUtilization(
     remainingMinutes,
     utilizationPct,
   };
+}
+
+/// A prepaid package's utilization: how much of the hours bought in this
+/// load is gone, (purchased - remaining) / purchased. A balance carried
+/// in is used first, so it never shows below 0%; an overrun carried in
+/// counts as used. See the prepaid section below.
+export function prepaidUtilizationPct(purchasedMinutes: number, remainingMinutes: number): number {
+  if (purchasedMinutes <= 0) return remainingMinutes < 0 ? 100 : 0;
+  const used = purchasedMinutes - remainingMinutes;
+  return Math.max(0, Math.round((used / purchasedMinutes) * 1000) / 10);
 }
 
 /// How far through its cycle a bank is, from 0 (just started) to 1
@@ -401,7 +417,19 @@ export async function openHourBankCycle(
   // same client would make getCurrentHourBank's "cycle covering now"
   // lookup ambiguous.
   if (previous && previous.status === "OPEN") {
-    await prisma.hourBank.update({ where: { id: previous.id }, data: { status: "CLOSED" } });
+    await prisma.hourBank.update({
+      where: { id: previous.id },
+      data: {
+        status: "CLOSED",
+        // A prepaid package runs to its expiry, a year out. Left as it is,
+        // it would still cover "now" next to the new cycle, and the
+        // "cycle covering now" lookup would have two answers. Cycles are
+        // left alone: their end is the date someone typed.
+        ...(previous.kind === "PREPAID" && previous.cycleEnd > input.cycleStart
+          ? { cycleEnd: input.cycleStart }
+          : {}),
+      },
+    });
   }
 
   await recordAudit({
@@ -522,4 +550,263 @@ export async function flagAffectedCyclesRecalculated(clientId: string, affectedD
       })
     )
   );
+}
+
+// ---------------------------------------------------------------------------
+// Prepaid packages (12.10.2026, RIMED)
+// ---------------------------------------------------------------------------
+//
+// A client on a prepaid package buys a block of hours and uses it until it
+// runs out; there is no month. The package is still an HourBank row, kind
+// PREPAID, so every screen, report, alert, export and backup that reads a
+// bank keeps working on it. What differs:
+//
+//   - It stays open until the next package is loaded, or until it expires
+//     (cycleEnd, one year from purchase by default).
+//   - Loading the next package ends this one at that moment and starts the
+//     new one at the same instant: no minute falls between the two, and
+//     none is counted twice.
+//   - The whole balance moves across, an overrun included, so hours worked
+//     past the end of a package come off the next one (Ariel, 12.10.2026).
+//     Hours left in a package that has already expired do not move; an
+//     overrun always does.
+//   - Utilization is measured against the size of the package, the hours
+//     bought in this load (Ariel, 12.10.2026): "80%" means 80% of the 30
+//     hours bought. Hours carried in from the previous package are used
+//     first; an overrun carried in counts as already used. In one formula:
+//     (purchased - remaining) / purchased. 100% is the moment nothing is
+//     left.
+//   - Alerts are per package (AlertEvent.hourBankId), so the 80% and 100%
+//     emails fire again for every package, once each.
+
+/// How many days back the pace of use is measured over.
+export const BURN_WINDOW_DAYS = 28;
+/// Fewer entries than this in the window is not a pace, it is an anecdote.
+export const BURN_MIN_ENTRIES = 4;
+
+export type PrepaidForecast =
+  | { status: "depleted"; weeklyMinutes: number | null }
+  | { status: "insufficient_data"; weeklyMinutes: null }
+  | { status: "projected"; weeklyMinutes: number; depletionDate: Date; daysLeft: number };
+
+/// When the remaining hours will run out at the pace of the last four
+/// weeks. Pure, so it is tested without a database.
+export function projectDepletion(input: {
+  remainingMinutes: number;
+  consumedInWindowMinutes: number;
+  entriesInWindow: number;
+  now: Date;
+}): PrepaidForecast {
+  const weekly =
+    input.entriesInWindow >= BURN_MIN_ENTRIES && input.consumedInWindowMinutes > 0
+      ? input.consumedInWindowMinutes / (BURN_WINDOW_DAYS / 7)
+      : null;
+  if (input.remainingMinutes <= 0) {
+    return { status: "depleted", weeklyMinutes: weekly === null ? null : Math.round(weekly) };
+  }
+  if (weekly === null) return { status: "insufficient_data", weeklyMinutes: null };
+  const days = (input.remainingMinutes / weekly) * 7;
+  return {
+    status: "projected",
+    weeklyMinutes: Math.round(weekly),
+    depletionDate: new Date(input.now.getTime() + days * 86_400_000),
+    daysLeft: Math.max(0, Math.floor(days)),
+  };
+}
+
+type ForecastSubject = { clientId: string; kind: HourBank["kind"]; remainingMinutes: number };
+
+/// Forecasts for many clients in three queries, whatever the count. Only
+/// prepaid packages get one: a cycle renews on a date, it does not run
+/// out. Read-only, like getCurrentHourBanksForClients.
+export async function getPrepaidForecastsForClients(
+  subjects: ForecastSubject[],
+  now: Date = new Date()
+): Promise<Map<string, PrepaidForecast>> {
+  const out = new Map<string, PrepaidForecast>();
+  const prepaid = subjects.filter((s) => s.kind === "PREPAID");
+  if (prepaid.length === 0) return out;
+
+  const clientIds = prepaid.map((s) => s.clientId);
+  const from = new Date(now.getTime() - BURN_WINDOW_DAYS * 86_400_000);
+  const [policies, entries] = await Promise.all([
+    prisma.billingPolicy.findMany({ where: { clientId: { in: clientIds } } }),
+    prisma.timeEntry.findMany({
+      where: { clientId: { in: clientIds }, deletedAt: null, endAt: { not: null }, startAt: { gte: from, lt: now } },
+      select: { clientId: true, actualSeconds: true, billableSeconds: true, taskId: true, startAt: true },
+    }),
+  ]);
+  const policyByClient = new Map(policies.map((p) => [p.clientId, p]));
+  const entriesByClient = new Map<string, ConsumableEntry[]>();
+  for (const e of entries) {
+    const list = entriesByClient.get(e.clientId);
+    if (list) list.push(e);
+    else entriesByClient.set(e.clientId, [e]);
+  }
+
+  for (const s of prepaid) {
+    const mine = entriesByClient.get(s.clientId) ?? [];
+    out.set(
+      s.clientId,
+      projectDepletion({
+        remainingMinutes: s.remainingMinutes,
+        consumedInWindowMinutes: consumedMinutesFromEntries(mine, policyByClient.get(s.clientId) ?? null),
+        entriesInWindow: mine.length,
+        now,
+      })
+    );
+  }
+  return out;
+}
+
+/// One client's forecast, or null for a client whose bank is a cycle.
+export async function getPrepaidForecast(
+  snapshot: { bank: Pick<HourBank, "clientId" | "kind">; utilization: Pick<HourBankUtilization, "remainingMinutes"> } | null,
+  now: Date = new Date()
+): Promise<PrepaidForecast | null> {
+  if (!snapshot || snapshot.bank.kind !== "PREPAID") return null;
+  const map = await getPrepaidForecastsForClients(
+    [{ clientId: snapshot.bank.clientId, kind: snapshot.bank.kind, remainingMinutes: snapshot.utilization.remainingMinutes }],
+    now
+  );
+  return map.get(snapshot.bank.clientId) ?? null;
+}
+
+/// What moves from the package (or cycle) that is ending into the new
+/// package. Pure. `stillValid` is whether the previous one still covered
+/// the moment of the load: unused hours of an expired package or an
+/// ended cycle stay behind, an overrun always comes along.
+export function prepaidCarryInMinutes(previousBalanceMinutes: number, stillValid: boolean): number {
+  const carried = stillValid ? previousBalanceMinutes : Math.min(0, previousBalanceMinutes);
+  return Math.round(carried);
+}
+
+/// Default expiry: the same calendar day one year later, Israel midnight.
+export function defaultPackageExpiry(start: Date): Date {
+  const [y, m, d] = localDateKey(start).split("-").map(Number);
+  // 29.2 has no twin a year later; addDaysToKey rolls it to 1.3.
+  const key = addDaysToKey(`${y + 1}-${String(m).padStart(2, "0")}-01`, d - 1);
+  return localDateTimeToUtc(key, "00:00");
+}
+
+export interface PrepaidLoadPreview {
+  previous: {
+    id: string;
+    kind: HourBank["kind"];
+    cycleStart: Date;
+    /// Where the previous one will end after the load.
+    endsAt: Date;
+    totalMinutes: number;
+    consumedMinutes: number;
+    balanceMinutes: number;
+    stillValid: boolean;
+  } | null;
+  carryInMinutes: number;
+}
+
+/// The arithmetic of a load, without writing anything. Used by the form to
+/// show the sum before it is confirmed, and by loadPrepaidPackage itself,
+/// so what is shown is what is saved.
+export async function previewPrepaidLoad(clientId: string, startAt: Date): Promise<PrepaidLoadPreview> {
+  const previous = await prisma.hourBank.findFirst({
+    where: { clientId, deletedAt: null },
+    orderBy: { cycleStart: "desc" },
+  });
+  if (!previous) return { previous: null, carryInMinutes: 0 };
+  if (startAt.getTime() <= previous.cycleStart.getTime()) {
+    throw new Error("תאריך הרכישה חייב להיות אחרי תחילת החבילה או המחזור הקודמים.");
+  }
+
+  const stillValid = previous.cycleEnd.getTime() > startAt.getTime();
+  const endsAt = stillValid ? startAt : previous.cycleEnd;
+  const [adjustmentMinutes, consumedMinutes] = await Promise.all([
+    sumAdjustments(previous.id),
+    computeConsumedMinutesForRange(clientId, { from: previous.cycleStart, to: endsAt }),
+  ]);
+  const totalMinutes = previous.purchasedMinutes + previous.rolloverInMinutes + adjustmentMinutes;
+  const balanceMinutes = totalMinutes - consumedMinutes;
+
+  return {
+    previous: {
+      id: previous.id,
+      kind: previous.kind,
+      cycleStart: previous.cycleStart,
+      endsAt,
+      totalMinutes,
+      consumedMinutes,
+      balanceMinutes,
+      stillValid,
+    },
+    carryInMinutes: prepaidCarryInMinutes(balanceMinutes, stillValid),
+  };
+}
+
+/// Loads a prepaid package: the first one, or the next one. Ends the
+/// previous package or cycle at `startAt` and opens the new package from
+/// that same instant, carrying the balance across (see above).
+export async function loadPrepaidPackage(
+  actor: User,
+  clientId: string,
+  input: {
+    startAt: Date;
+    purchasedMinutes: number;
+    /// Defaults to one year after startAt.
+    expiresAt?: Date;
+  }
+) {
+  assertCan(actor.role, "hour_bank.manage");
+
+  const purchasedMinutes = Math.round(input.purchasedMinutes);
+  if (!(purchasedMinutes > 0)) throw new Error("יש להזין כמה שעות נרכשו.");
+  if (input.startAt.getTime() > Date.now()) throw new Error("תאריך הרכישה לא יכול להיות בעתיד.");
+  const expiresAt = input.expiresAt ?? defaultPackageExpiry(input.startAt);
+  if (expiresAt.getTime() <= input.startAt.getTime()) throw new Error("התוקף חייב להיות אחרי תאריך הרכישה.");
+
+  const preview = await previewPrepaidLoad(clientId, input.startAt);
+
+  const bank = await prisma.$transaction(async (tx) => {
+    if (preview.previous) {
+      await tx.hourBank.update({
+        where: { id: preview.previous.id },
+        data: { status: "CLOSED", cycleEnd: preview.previous.endsAt },
+      });
+    }
+    return tx.hourBank.create({
+      data: {
+        clientId,
+        kind: "PREPAID",
+        cycleStart: input.startAt,
+        cycleEnd: expiresAt,
+        purchasedMinutes,
+        rolloverInMinutes: preview.carryInMinutes,
+        rolloverMode: "FULL",
+        rolloverCapMinutes: null,
+      },
+    });
+  });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "hour_bank.load_package",
+    entityType: "HourBank",
+    entityId: bank.id,
+    clientId,
+    before: preview.previous
+      ? { previousId: preview.previous.id, previousEndsAt: preview.previous.endsAt, previousBalanceMinutes: preview.previous.balanceMinutes }
+      : undefined,
+    after: bank,
+  });
+
+  // The two default rules are the whole alert story of a package: 80% of
+  // the package, then all of it. Make sure they exist. They go to Ankora
+  // and the account manager, not to the client (Ariel, 12.10.2026).
+  // Dynamic import: alerts.ts imports this file.
+  const alerts = await import("@/lib/app-domain/alerts");
+  await alerts.ensureDefaultAlertRules(actor, clientId);
+
+  await afterResponse("evaluateAlertsForClient", async () => {
+    await alerts.evaluateAlertsForClient(clientId);
+  });
+
+  return { bank, preview };
 }

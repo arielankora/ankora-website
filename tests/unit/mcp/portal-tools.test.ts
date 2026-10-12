@@ -170,7 +170,7 @@ describe("get_status", () => {
       waitingOnClient: [promise("ספי אישור", "WAITING_ON_CLIENT", { waitingSince: new Date("2026-10-04T08:00:00Z") })],
       inProgress: [promise("Payroll", "IN_PROGRESS")],
       recentlyDone: [promise("Slack", "DONE", { outcome: "אנקורה צורפה ל-Slack" })],
-      cycle: { usedMinutes: 600, totalMinutes: 2400, pct: 25, daysLeft: 20 },
+      cycle: { usedMinutes: 600, totalMinutes: 2400, pct: 25, daysLeft: 20, kind: "CYCLE", purchasedMinutes: 2400, remainingMinutes: 1800, forecast: null },
     });
     // The counts come from their own uncapped query, not from any list.
     portal.getPortalProgress.mockResolvedValue({ total: 5, DONE: 2, IN_PROGRESS: 1, WAITING_ON_CLIENT: 1, RECEIVED: 1 });
@@ -184,7 +184,39 @@ describe("get_status", () => {
     expect(out.decisionsWaitingForYou).toBe(2);
     expect(out.waitingForYou[0]).toMatchObject({ title: "ספי אישור", stageLabel: "מחכה לך", waitingForYouSince: "2026-10-04" });
     expect(out.recentlyDone[0].outcome).toBe("אנקורה צורפה ל-Slack");
-    expect(out.hourBank).toEqual({ usedHours: 10, totalHours: 40, percentUsed: 25, daysLeftInCycle: 20 });
+    expect(out.hourBank).toEqual({ usedHours: 10, totalHours: 40, percentUsed: 25, daysLeftInCycle: 20, model: "cycle" });
+  });
+
+  it("a prepaid package says its size, what is left and when it runs out (12.10.2026)", async () => {
+    portal.getPortalHome.mockResolvedValue({
+      client: { name: "RIMED" },
+      openDecisions: 0,
+      contact: { managerName: "Hadas", whatsappNumber: null },
+      waitingOnClient: [],
+      inProgress: [],
+      recentlyDone: [],
+      cycle: {
+        usedMinutes: 1314,
+        totalMinutes: 1674,
+        pct: 80,
+        daysLeft: null,
+        kind: "PREPAID",
+        purchasedMinutes: 1800,
+        remainingMinutes: 360,
+        forecast: { status: "projected", weeklyMinutes: 600, depletionDate: new Date("2026-10-15T09:00:00Z"), daysLeft: 3 },
+      },
+    });
+    portal.getPortalProgress.mockResolvedValue({ total: 0, DONE: 0, IN_PROGRESS: 0, WAITING_ON_CLIENT: 0, RECEIVED: 0 });
+
+    const out = await call("get_status");
+
+    expect(out.hourBank).toMatchObject({
+      model: "prepaid_package",
+      percentUsed: 80,
+      packageHours: 30,
+      remainingHours: 6,
+      projectedDepletionDate: "2026-10-15",
+    });
   });
 
   it("reports 0% rather than NaN for a client with nothing visible yet", () => {
