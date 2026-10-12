@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test";
 import { test, expect } from "./fixtures";
+import { clearRunningTimers } from "./timers";
 
 // Team adoption ("אימוץ בצוות"), from the side of the person who has to
 // do it - which is the only side that decides whether it happens.
@@ -23,7 +24,6 @@ test.describe.configure({ timeout: 90_000 });
 
 const HOME = "/app";
 const TASKS = "/app/tasks";
-const TIMER = "/app/timer";
 
 // The seeded promise assigned to the employee this project signs in as.
 const MY_PROMISE = "בדיקת שלושה ספקים והשוואה";
@@ -190,23 +190,10 @@ test("a promise the client can see cannot be closed without a sentence for them"
 });
 
 test("stopping the timer asks what stage the promise is at", async ({ page }) => {
-  await page.goto(TIMER, { waitUntil: "domcontentloaded" });
-
   // Leave no timer of a previous spec running: a second start asks
   // first, and a question here would read as a broken mechanism. Up to
-  // two can be running, so stop every one.
-  const runningStops = page.getByRole("button", { name: /עצירה ושמירה/ });
-  const runningNotes = page.getByPlaceholder("על מה עובדים עכשיו?");
-  for (let i = 0; i < 3 && (await runningStops.first().isVisible().catch(() => false)); i++) {
-    const before = await runningStops.count();
-    // 7.10.2026: a timer on no task cannot be stopped without a note.
-    // The fixture does not care what it says, only that the stop goes
-    // through; a timer that is on a task keeps whatever it carries.
-    if (!(await runningNotes.first().inputValue())) await runningNotes.first().fill("e2e: ניקוי טיימר");
-    await runningStops.first().click();
-    await expect(runningStops).toHaveCount(before - 1, { timeout: 20_000 });
-  }
-  await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
+  // two can be running; the shared helper clears every one (timers.ts).
+  await clearRunningTimers(page);
 
   await selectByText(page.locator("select").first(), CLIENT);
   // Category, then the promise: the third select only exists once a
