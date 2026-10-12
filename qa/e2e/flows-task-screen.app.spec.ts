@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { clearRunningTimers } from "./timers";
 
 // The task screen, from the side of somebody actually working on a task.
 //
@@ -35,33 +36,10 @@ test.describe.configure({ timeout: 90_000 });
 // Everybody's tasks, not only mine: "שלי" is on by default since
 // 26.9.2026, and the fixtures this file reads are nobody's in particular.
 const TASKS = "/app/tasks?mine=0";
-const TIMER = "/app/timer";
 
 // This file's own task. Matched loosely: every seeded name carries a
 // "[DEMO]" prefix, and an exact string would bake that into the test.
 const FIXTURE = /תיאום מול ועד הבית/;
-
-/// Leave no timer of an earlier spec running.
-///
-/// A person can run two timers, and the second only after a question, so
-/// a timer left behind by another file would make the start below ask
-/// instead of start - and read as a broken mechanism rather than as
-/// untidy fixtures. Stops every one, not just the first.
-async function clearRunningTimer(page: import("@playwright/test").Page) {
-  await page.goto(TIMER, { waitUntil: "domcontentloaded" });
-  const stops = page.getByRole("button", { name: /עצירה ושמירה/ });
-  const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
-  for (let i = 0; i < 3 && (await stops.first().isVisible().catch(() => false)); i++) {
-    const before = await stops.count();
-    // 7.10.2026: a timer on no task cannot be stopped without a note.
-    // The fixture does not care what it says, only that the stop goes
-    // through; a timer that is on a task keeps whatever it carries.
-    if (!(await notes.first().inputValue())) await notes.first().fill("e2e: ניקוי טיימר");
-    await stops.first().click();
-    await expect(stops).toHaveCount(before - 1, { timeout: 20_000 });
-  }
-  await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
-}
 
 // The seed gives this task a fixed id, so every test after the first can
 // go straight to it.
@@ -144,7 +122,10 @@ test.describe.serial("one task, from opening it to closing it", () => {
   });
 
   test("the clock starts from the work, and the minutes land on this task", async ({ page }) => {
-    await clearRunningTimer(page);
+    // Leave no timer of an earlier spec running: a second start asks
+    // first, and a question here would read as a broken mechanism
+    // rather than as untidy fixtures. See timers.ts.
+    await clearRunningTimers(page);
     await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
     // Before: nothing has been reported against it.

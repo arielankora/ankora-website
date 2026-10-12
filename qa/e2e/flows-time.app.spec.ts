@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { clearRunningTimers, runningTimerNotes } from "./timers";
 
 // Flows that WRITE, for the four Server Actions behind the time-tracking
 // screens. Everything else in qa/e2e renders a page and checks it did not
@@ -75,23 +76,12 @@ function windowEarlierToday(lengthMinutes = 30, gapMinutes = 20): { start: strin
 test.describe.configure({ mode: "serial", timeout: 90_000 });
 
 test.describe("timer/actions - start and stop", () => {
-  // 7.10.2026, PR #163. Stopping a timer on no task now needs a note, and
-  // this file had no cleanup of its own: it trusted the specs before it to
-  // leave nothing running. When the first test failed once, the retry
-  // found that test's own timer still going, the start fields folded
-  // away under it, and every test after it timed out on a field that was
-  // not on the screen. Same loop as flows-task-screen and flows-adoption.
+  // 7.10.2026, PR #163: this file had no cleanup of its own and trusted
+  // the specs before it to leave nothing running. 12.10.2026: the cleanup
+  // it then got could not clear the state it was written for; the shared
+  // helper says why.
   test.beforeEach(async ({ page }) => {
-    await page.goto("/app/timer", { waitUntil: "domcontentloaded" });
-    const stops = page.getByRole("button", { name: /עצירה ושמירה/ });
-    const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
-    for (let i = 0; i < 3 && (await stops.first().isVisible().catch(() => false)); i++) {
-      const before = await stops.count();
-      if (!(await notes.first().inputValue())) await notes.first().fill("e2e: ניקוי טיימר");
-      await stops.first().click();
-      await expect(stops).toHaveCount(before - 1, { timeout: 20_000 });
-    }
-    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 20_000 });
+    await clearRunningTimers(page);
   });
 
   test("starting a timer, then stopping it, leaves a finished entry", async ({ page }) => {
@@ -153,14 +143,27 @@ test.describe("timer/actions - start and stop", () => {
     await expect(page.getByText(/רצים 2 טיימרים/)).toBeVisible();
 
     // Both were started on no task, so each needs a note to stop.
-    const notes = page.getByPlaceholder("על מה עובדים עכשיו?");
-    await notes.first().fill(tag("e2e-parallel-a"));
+    //
+    // Counted by the note fields, one per running card, and NOT by the
+    // "עצירה ושמירה" buttons. A stop in flight relabels its own button
+    // "עוצר...", so the button count fell to one the instant the first
+    // click landed, with both cards still on screen. The next fill then
+    // went into the first card's field (still mounted, still stopping),
+    // the click went to the second card's button with its own note empty,
+    // the screen rightly refused it, and "אין טיימר פעיל" never came.
+    // That was #172, #182, #184 and #185. A card's note field leaves the
+    // DOM only once the server has said the stop happened.
+    const running = runningTimerNotes(page);
+    await expect(running).toHaveCount(2);
+    await running.first().fill(tag("e2e-parallel-a"));
     await stops.first().click();
-    await expect(stops, "stopping one should leave the other running").toHaveCount(1, { timeout: 15_000 });
+    await expect(running, "stopping one should leave the other running").toHaveCount(1, { timeout: 15_000 });
+    await expect(stops).toHaveCount(1);
 
-    await notes.first().fill(tag("e2e-parallel-b"));
+    await running.first().fill(tag("e2e-parallel-b"));
     await stops.first().click();
-    await expect(page.getByText("אין טיימר פעיל")).toBeVisible({ timeout: 15_000 });
+    await expect(running, "the second timer did not stop").toHaveCount(0, { timeout: 15_000 });
+    await expect(page.getByText("אין טיימר פעיל")).toBeVisible();
   });
 });
 
