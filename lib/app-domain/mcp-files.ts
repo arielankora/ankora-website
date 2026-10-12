@@ -154,7 +154,7 @@ export async function redeemUploadTicket(raw: string, content: Buffer, contentTy
     return {
       ok: true,
       status: 201,
-      json: { filed: true, documentId: doc.id, title: doc.title, sizeBytes: doc.sizeBytes, clientVisible: doc.clientVisible },
+      json: { filed: true, documentId: doc.id, title: doc.title, sizeKB: doc.sizeBytes === null ? null : Math.max(1, Math.round(doc.sizeBytes / 1024)), clientVisible: doc.clientVisible },
     };
   } catch (err) {
     await prisma.mcpFileTicket.update({ where: { id: row.id }, data: { usedAt: null } });

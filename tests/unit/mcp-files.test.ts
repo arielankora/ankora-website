@@ -88,6 +88,9 @@ describe("redeemUploadTicket", () => {
     db.ticket.findUnique.mockResolvedValue(uploadRow());
     const out = await redeemUploadTicket(ticket, PDF, "application/octet-stream", LATER);
     expect(out).toMatchObject({ ok: true, status: 201 });
+    // Same field and unit as upload_document and list_documents (sizeKB).
+    expect(out.ok && "json" in out && out.json).toMatchObject({ filed: true, documentId: "doc-new", sizeKB: 1 });
+    expect(out.ok && "json" in out && out.json).not.toHaveProperty("sizeBytes");
     expect(docs.addClientDocument).toHaveBeenCalledWith(USER, expect.objectContaining({
       clientId: "c-nux",
       taskId: "t1",
