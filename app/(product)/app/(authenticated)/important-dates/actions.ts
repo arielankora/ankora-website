@@ -31,6 +31,10 @@ function parseImportantDateFormData(formData: FormData) {
   const customIntervalDaysRaw = String(formData.get("customIntervalDays") || "").trim();
   const onceDateRaw = String(formData.get("onceDate") || "").trim();
   const autoTaskLeadDaysRaw = String(formData.get("autoTaskLeadDays") || "").trim();
+  const weekdayRaw = String(formData.get("weekday") ?? "").trim();
+  const intervalMonthsRaw = String(formData.get("intervalMonths") || "").trim();
+  const leadUnitRaw = String(formData.get("leadUnit") || "");
+  const rollConventionRaw = String(formData.get("rollConvention") || "");
 
   return {
     clientId: String(formData.get("clientId") || ""),
@@ -58,6 +62,20 @@ function parseImportantDateFormData(formData: FormData) {
     createAutoTask: formData.get("createAutoTask") === "on",
     autoTaskLeadDays: autoTaskLeadDaysRaw ? Number(autoTaskLeadDaysRaw) : null,
     autoTaskCategoryId: String(formData.get("autoTaskCategoryId") || "") || null,
+    // Org-brain spec 3.10 (13.10.2026). Absent fields stay undefined, so an
+    // edit from a form that does not render them changes nothing.
+    weekday: weekdayRaw !== "" ? Number(weekdayRaw) : null,
+    intervalMonths: intervalMonthsRaw ? Number(intervalMonthsRaw) : null,
+    leadUnit: (leadUnitRaw === "BUSINESS_DAYS" || leadUnitRaw === "CALENDAR_DAYS" ? leadUnitRaw : undefined) as
+      | "BUSINESS_DAYS"
+      | "CALENDAR_DAYS"
+      | undefined,
+    rollConvention: (rollConventionRaw === "NONE" ||
+    rollConventionRaw === "PREVIOUS_BUSINESS_DAY" ||
+    rollConventionRaw === "NEXT_BUSINESS_DAY"
+      ? rollConventionRaw
+      : undefined) as "NONE" | "PREVIOUS_BUSINESS_DAY" | "NEXT_BUSINESS_DAY" | undefined,
+    businessCalendar: String(formData.get("businessCalendar") || "") || undefined,
     // Same fix as the document visibility toggle, and the same bug: an
     // unchecked box is absent from the form data, so `!== "off"` read
     // every unticked "add the default reminders" as a yes. Older than

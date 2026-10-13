@@ -102,6 +102,11 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
                   createAutoTask: date.createAutoTask,
                   autoTaskLeadDays: date.autoTaskLeadDays,
                   autoTaskCategoryId: date.autoTaskCategoryId,
+                  weekday: date.weekday,
+                  intervalMonths: date.intervalMonths,
+                  leadUnit: date.leadUnit,
+                  rollConvention: date.rollConvention,
+                  businessCalendar: date.businessCalendar,
                   updatedAt: date.updatedAt,
                 }}
               />

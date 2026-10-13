@@ -1690,6 +1690,26 @@ enum RecurrenceType {
   ANNUAL
   MONTHLY
   CUSTOM_INTERVAL
+  /// 13.10.2026 (org-brain spec 3.10): every week on `weekday`. "Every
+  /// Thursday" is a weekday, and CUSTOM_INTERVAL of 7 days only matches it
+  /// if somebody picked the right start date.
+  WEEKLY
+}
+
+/// 13.10.2026 (org-brain spec 3.10). How `autoTaskLeadDays` is counted.
+/// "Three working days before the 10th" is not "three days before".
+enum LeadUnit {
+  CALENDAR_DAYS
+  BUSINESS_DAYS
+}
+
+/// 13.10.2026 (org-brain spec 3.10). Where an occurrence that falls on a
+/// non-business day moves: a payment due on a Saturday is made on the
+/// Thursday before it.
+enum RollConvention {
+  NONE
+  PREVIOUS_BUSINESS_DAY
+  NEXT_BUSINESS_DAY
 }
 
 /// Spec's explicit status list, used verbatim: פעיל / דורש טיפול / בטיפול
@@ -1760,6 +1780,25 @@ model ImportantDate {
   recurrence RecurrenceType @default(ANNUAL)
   /// Only meaningful when recurrence = CUSTOM_INTERVAL.
   customIntervalDays Int?
+  /// Only meaningful when recurrence = WEEKLY: 0 = Sunday ... 6 = Saturday.
+  weekday Int?
+  /// Gregorian MONTHLY only: every N months, N in {1, 2, 3, 4, 6}, counted
+  /// from `month`. Null is every month. Divisors of 12 only, so the cycle
+  /// never needs an anchor year (lib/app-domain/important-dates-recurrence.ts).
+  intervalMonths Int?
+  /// How autoTaskLeadDays is counted. Default keeps every existing date's
+  /// meaning.
+  leadUnit LeadUnit @default(CALENDAR_DAYS)
+  /// Where an occurrence on a non-business day moves. Applied to the
+  /// occurrence itself, so reminders, the auto-task and the list all see
+  /// the moved day.
+  rollConvention RollConvention @default(NONE)
+  /// Which business days: "IL" (Sunday to Thursday, Israeli rest days) or
+  /// "US" (Monday to Friday, federal holidays). A free string, like `type`:
+  /// a new calendar is an entry in lib/business-calendar.ts, never a
+  /// migration. The org-brain spec makes the entity's country the default
+  /// once entities exist; until then a person picks it.
+  businessCalendar String @default("IL")
   /// Only meaningful when recurrence = ONCE - the exact one-time date;
   /// month/day/calendarType above are ignored for ONCE dates.
   onceDate DateTime?

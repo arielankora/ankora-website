@@ -121,11 +121,12 @@ export function buildReminderIdempotencyKey(params: {
 /// and ONCE keep the year, so rows written before this change still match
 /// and nothing already sent is sent again.
 export function occurrenceKeyFor(
-  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL",
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY",
   occurrenceYear: number,
   occurrenceLocalDate: string
 ): string | number {
-  return recurrence === "MONTHLY" || recurrence === "CUSTOM_INTERVAL" ? occurrenceLocalDate : occurrenceYear;
+  // WEEKLY (13.10.2026) has many occurrences a year, like MONTHLY.
+  return recurrence === "ANNUAL" || recurrence === "ONCE" ? occurrenceYear : occurrenceLocalDate;
 }
 
 /// Builds Task.importantDateOccurrenceKey for an auto-created task (spec:

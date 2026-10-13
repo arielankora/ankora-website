@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { canManageClients } from "@/lib/app-auth/permissions";
-import { computeNextOccurrence } from "@/lib/app-domain/important-dates-recurrence";
+import { computeNextOccurrence, computeLeadDate, recurrenceInputFromRow } from "@/lib/app-domain/important-dates-recurrence";
 import { computeHolidayOccurrencesForYear, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import {
   buildReminderIdempotencyKey,
@@ -247,21 +247,7 @@ export async function recomputeOccurrences(now = new Date()): Promise<{ updated:
     // never silently recomputed into some other date.
     if (date.recurrence === "ONCE") continue;
 
-    const next = computeNextOccurrence(
-      {
-        calendarType: date.calendarType,
-        month: date.month,
-        day: date.day,
-        recurrence: date.recurrence,
-        onceDate: date.onceDate,
-        customIntervalDays: date.customIntervalDays,
-        originYear: date.originYear,
-        leapDayUseMarchFirst: date.leapDayUseMarchFirst,
-        hebrewAdarTwoInLeapYear: date.hebrewAdarTwoInLeapYear,
-        timezone: date.timezone,
-      },
-      now
-    );
+    const next = computeNextOccurrence(recurrenceInputFromRow(date), now);
     if (!next || next.getTime() === date.nextOccurrenceAt?.getTime()) continue;
 
     // Spec: "לאחר מעבר למופע הבא, המועד חוזר למצב פעיל" - a
@@ -450,8 +436,16 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
   let created = 0;
   for (const date of dates) {
     if (!date.nextOccurrenceAt) continue;
-    const leadDays = date.autoTaskLeadDays ?? 0;
-    const dueAt = new Date(date.nextOccurrenceAt.getTime() - leadDays * 86_400_000);
+    // Org-brain spec 3.10: the lead can be counted in business days of the
+    // date's calendar. In calendar days this is the same day as the
+    // millisecond subtraction it replaces, without its DST hour.
+    const dueAt = computeLeadDate(
+      date.nextOccurrenceAt,
+      date.autoTaskLeadDays ?? 0,
+      date.leadUnit,
+      date.businessCalendar,
+      date.timezone
+    );
     if (dueAt.getTime() > now.getTime()) continue;
 
     const occurrenceYear = date.nextOccurrenceAt.getUTCFullYear();

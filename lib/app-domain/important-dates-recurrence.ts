@@ -38,9 +38,16 @@
 import "server-only";
 import { HDate, months as HebrewMonth } from "@hebcal/core";
 import { localDateTimeToUtc, localDateKey, TIMEZONE } from "@/lib/timezone";
+import { addDaysToKey, rollToBusinessDay, subtractBusinessDays, weekdayOfKey, isBusinessCalendarKey, type RollConventionLike } from "@/lib/business-calendar";
 
 export type CalendarTypeLike = "GREGORIAN" | "HEBREW";
-export type RecurrenceTypeLike = "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL";
+export type RecurrenceTypeLike = "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY";
+export type { RollConventionLike };
+
+/// Every N months for a Gregorian MONTHLY date. Only divisors of 12, so the
+/// cycle lines up with the year and needs no anchor year: "quarterly" is 3,
+/// and a quarterly date set in January also falls in April, July, October.
+export const ALLOWED_INTERVAL_MONTHS: readonly number[] = [1, 2, 3, 4, 6] as const;
 
 export interface RecurrenceInput {
   calendarType: CalendarTypeLike;
@@ -58,6 +65,14 @@ export interface RecurrenceInput {
   leapDayUseMarchFirst?: boolean;
   hebrewAdarTwoInLeapYear?: boolean;
   timezone?: string;
+  /** WEEKLY only: 0 = Sunday ... 6 = Saturday. */
+  weekday?: number | null;
+  /** Gregorian MONTHLY only: every N months, N in ALLOWED_INTERVAL_MONTHS. `month` is the anchor month. Null or 1 is every month. */
+  intervalMonths?: number | null;
+  /** Where an occurrence that falls on a non-business day moves. Null or NONE: it stays. */
+  rollConvention?: RollConventionLike | null;
+  /** "IL" or "US". Unknown values fall back to "IL". Only read when rollConvention moves dates. */
+  businessCalendar?: string | null;
 }
 
 const DAYS_IN_GREGORIAN_MONTH = (year: number, month1to12: number): number =>
@@ -124,13 +139,17 @@ function nextAnnualGregorian(
   return toUtcMidnight(fromYear + 2, resolved.month, resolved.day, timezone);
 }
 
-function nextMonthlyGregorian(day: number, fromDate: Date, timezone: string): Date {
+function nextMonthlyGregorian(day: number, fromDate: Date, timezone: string, anchorMonth = 1, intervalMonths = 1): Date {
   const { year: fromYear, month: fromMonth } = todayLocalYmd(fromDate, timezone);
   const fromKey = localDateKey(fromDate, timezone);
+  const interval = ALLOWED_INTERVAL_MONTHS.includes(intervalMonths) ? intervalMonths : 1;
   for (let i = 0; i <= 12; i++) {
     const totalMonth = fromMonth - 1 + i; // 0-based
     const year = fromYear + Math.floor(totalMonth / 12);
     const month = (totalMonth % 12) + 1;
+    // Every N months, counted from the anchor month. N divides 12, so the
+    // year never matters.
+    if (interval > 1 && (((month - anchorMonth) % interval) + interval) % interval !== 0) continue;
     const lastDay = DAYS_IN_GREGORIAN_MONTH(year, month);
     const resolvedDay = Math.min(day, lastDay);
     const candidate = toUtcMidnight(year, month, resolvedDay, timezone);
@@ -138,6 +157,18 @@ function nextMonthlyGregorian(day: number, fromDate: Date, timezone: string): Da
   }
   // Fallback - should not be reached given the loop covers a full year.
   return toUtcMidnight(fromYear + 1, fromMonth, Math.min(day, DAYS_IN_GREGORIAN_MONTH(fromYear + 1, fromMonth)), timezone);
+}
+
+/// WEEKLY: the next given weekday on or after `fromDate`'s calendar day.
+/// Org-brain spec 3.10: "every Thursday" anchored to the weekday, which
+/// CUSTOM_INTERVAL of 7 days cannot promise (it depends on the start date).
+function nextWeeklyGregorian(weekday: number, fromDate: Date, timezone: string): Date | null {
+  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) return null;
+  const fromKey = localDateKey(fromDate, timezone);
+  const offset = (weekday - weekdayOfKey(fromKey) + 7) % 7;
+  const key = addDaysToKey(fromKey, offset);
+  const [year, month, day] = key.split("-").map(Number);
+  return toUtcMidnight(year, month, day, timezone);
 }
 
 /// Adds `days` to a `YYYY-MM-DD` calendar date using pure calendar (UTC)
@@ -268,11 +299,48 @@ function nextMonthlyHebrew(storedDay: number, fromDate: Date, timezone: string):
 /// stays pure and does not know about ImportantDateStatus.
 export function computeNextOccurrence(input: RecurrenceInput, fromDate: Date): Date | null {
   const timezone = input.timezone || TIMEZONE;
+  const convention = input.rollConvention ?? "NONE";
+  if (convention === "NONE") return computeRawNextOccurrence(input, fromDate);
+
+  // Org-brain spec 3.10: an occurrence on a non-business day moves to the
+  // business day before or after it. A date rolled BACK can land before
+  // `fromDate` (the 10th is a Saturday, it is observed on Thursday the 8th,
+  // and today is Friday the 9th). That occurrence is over, so the search
+  // continues from the day after the raw one. Three rounds are plenty: a
+  // roll moves a few days at most, and every recurrence is longer than that.
+  const calendar = isBusinessCalendarKey(input.businessCalendar) ? input.businessCalendar : "IL";
+  const fromKey = localDateKey(fromDate, timezone);
+  let searchFrom = fromDate;
+  for (let round = 0; round < 3; round++) {
+    const raw = computeRawNextOccurrence(input, searchFrom);
+    if (!raw) return null;
+    const rawKey = localDateKey(raw, timezone);
+    const rolledKey = rollToBusinessDay(rawKey, calendar, convention);
+    if (rolledKey >= fromKey) {
+      if (rolledKey === rawKey) return raw;
+      const [y, m, d] = rolledKey.split("-").map(Number);
+      return toUtcMidnight(y, m, d, timezone);
+    }
+    const [y, m, d] = addDaysToKey(rawKey, 1).split("-").map(Number);
+    searchFrom = toUtcMidnight(y, m, d, timezone);
+  }
+  return null;
+}
+
+/// The next occurrence before any business-day roll. Exported for the
+/// tests; callers want computeNextOccurrence.
+export function computeRawNextOccurrence(input: RecurrenceInput, fromDate: Date): Date | null {
+  const timezone = input.timezone || TIMEZONE;
 
   if (input.recurrence === "ONCE") {
     if (!input.onceDate) return null;
     const onceKey = localDateKey(input.onceDate, timezone);
     return onceKey >= localDateKey(fromDate, timezone) ? input.onceDate : null;
+  }
+
+  if (input.recurrence === "WEEKLY") {
+    // Gregorian only by definition: a week is a week in either calendar.
+    return nextWeeklyGregorian(input.weekday ?? -1, fromDate, timezone);
   }
 
   if (input.recurrence === "CUSTOM_INTERVAL") {
@@ -296,10 +364,78 @@ export function computeNextOccurrence(input: RecurrenceInput, fromDate: Date): D
 
   // GREGORIAN
   if (input.recurrence === "MONTHLY") {
-    return nextMonthlyGregorian(input.day, fromDate, timezone);
+    return nextMonthlyGregorian(input.day, fromDate, timezone, input.month, input.intervalMonths ?? 1);
   }
   // ANNUAL (default).
   return nextAnnualGregorian(input.month, input.day, fromDate, input.leapDayUseMarchFirst ?? false, timezone);
+}
+
+/// The recurrence fields of an ImportantDate row, as computeNextOccurrence
+/// wants them. One place to build this, so a field added to the engine is
+/// not silently dropped by one of its three callers (create, update, and
+/// the daily job), which is what happened to nothing yet and is cheap to
+/// keep that way.
+export type RecurrenceRowLike = {
+  calendarType: CalendarTypeLike;
+  month: number;
+  day: number;
+  recurrence: RecurrenceTypeLike;
+  onceDate: Date | null;
+  customIntervalDays: number | null;
+  originYear: number | null;
+  leapDayUseMarchFirst: boolean;
+  hebrewAdarTwoInLeapYear: boolean;
+  timezone: string;
+  weekday: number | null;
+  intervalMonths: number | null;
+  rollConvention: RollConventionLike;
+  businessCalendar: string;
+};
+
+export function recurrenceInputFromRow(row: RecurrenceRowLike): RecurrenceInput {
+  return {
+    calendarType: row.calendarType,
+    month: row.month,
+    day: row.day,
+    recurrence: row.recurrence,
+    onceDate: row.onceDate,
+    customIntervalDays: row.customIntervalDays,
+    originYear: row.originYear,
+    leapDayUseMarchFirst: row.leapDayUseMarchFirst,
+    hebrewAdarTwoInLeapYear: row.hebrewAdarTwoInLeapYear,
+    timezone: row.timezone,
+    weekday: row.weekday,
+    intervalMonths: row.intervalMonths,
+    rollConvention: row.rollConvention,
+    businessCalendar: row.businessCalendar,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Lead time ("open the task N days before")
+// ---------------------------------------------------------------------------
+
+export type LeadUnitLike = "CALENDAR_DAYS" | "BUSINESS_DAYS";
+
+/// The day an auto-task for `occurrence` opens: `leadDays` before it, in
+/// calendar days (the behavior since phase 10) or in business days of the
+/// date's calendar (org-brain spec 3.10). Returned as local midnight of
+/// that day, so "is it due" compares a day with a day.
+export function computeLeadDate(
+  occurrence: Date,
+  leadDays: number,
+  leadUnit: LeadUnitLike,
+  businessCalendar: string | null | undefined,
+  timezone: string = TIMEZONE
+): Date {
+  const occurrenceKey = localDateKey(occurrence, timezone);
+  const days = Math.max(0, Math.floor(leadDays));
+  const key =
+    leadUnit === "BUSINESS_DAYS"
+      ? subtractBusinessDays(occurrenceKey, days, isBusinessCalendarKey(businessCalendar) ? businessCalendar : "IL")
+      : addDaysToKey(occurrenceKey, -days);
+  const [y, m, d] = key.split("-").map(Number);
+  return toUtcMidnight(y, m, d, timezone);
 }
 
 // ---------------------------------------------------------------------------

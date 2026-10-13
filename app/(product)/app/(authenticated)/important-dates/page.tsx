@@ -26,6 +26,7 @@ const RECURRENCE_LABEL: Record<RecurrenceType, string> = {
   ANNUAL: "חוזר שנתי",
   MONTHLY: "חוזר חודשי",
   CUSTOM_INTERVAL: "חוזר במרווח קבוע",
+  WEEKLY: "חוזר שבועי",
 };
 
 const STATUS_TONE: Record<ImportantDateStatus, DateRow["tone"]> = {
