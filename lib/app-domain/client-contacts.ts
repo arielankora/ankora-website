@@ -1,10 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
+import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
 import { canSeeKnowledgeItem, parseFieldStatus, type FieldStatusMap } from "@/lib/knowledge";
+import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
+import { assertClientAccess, resolveItemSources } from "@/lib/app-domain/client-sources";
 import type {
   User,
   ContactRelationship,
@@ -31,12 +33,6 @@ import type {
 // to reach the client. Within it, each item's audience decides
 // (lib/knowledge.ts).
 
-async function assertClientAccess(actor: User, clientId: string) {
-  const accessible = await listAccessibleClients(actor);
-  if (!accessible.some((c) => c.id === clientId)) {
-    throw new ForbiddenError("You are not assigned to this client.");
-  }
-}
 
 export interface KnowledgeInput {
   knowledgeStatus?: KnowledgeStatus;
@@ -47,6 +43,9 @@ export interface KnowledgeInput {
   audienceUserIds?: string[];
   doNotDisclose?: string | null;
   sensitivity?: KnowledgeSensitivity;
+  /// Codes in the client's source register (spec 3.2). Required unless
+  /// the item is "missing".
+  sources?: SourceRef[];
 }
 
 function knowledgeData(input: KnowledgeInput) {
@@ -59,6 +58,28 @@ function knowledgeData(input: KnowledgeInput) {
     audienceUserIds: input.audienceUserIds ?? undefined,
     doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose?.trim() || null : undefined,
     sensitivity: input.sensitivity ?? undefined,
+  };
+}
+
+/// The source rules (lib/knowledge-sources.ts) for an item about to be
+/// written, merged with what is already stored. Returns the fields to
+/// write: sources, and status and toResolve as the rules leave them.
+async function sourcedFields(
+  clientId: string,
+  input: KnowledgeInput,
+  texts: (string | null | undefined)[],
+  before?: { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null }
+) {
+  const resolved = await resolveItemSources(clientId, {
+    status: input.knowledgeStatus ?? before?.knowledgeStatus ?? "CONFIRMED",
+    refs: input.sources ?? readSourceRefs(before?.sources),
+    toResolve: input.toResolve !== undefined ? input.toResolve?.trim() || null : before?.toResolve ?? null,
+    texts,
+  });
+  return {
+    sources: resolved.sources as Prisma.InputJsonValue,
+    knowledgeStatus: resolved.knowledgeStatus,
+    toResolve: resolved.toResolve,
   };
 }
 
@@ -151,6 +172,9 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
     throw new Error("עלות חודשית לא תקינה.");
   }
 
+  // Checked before anything is written: a refused source must not leave
+  // a new organization behind.
+  const sourced = await sourcedFields(input.clientId, input, [input.notes]);
   const organization = await findOrCreateOrganization(input.name, input.domains ?? []);
   const existing = await prisma.clientOrganization.findUnique({
     where: { clientId_organizationId: { clientId: input.clientId, organizationId: organization.id } },
@@ -164,6 +188,7 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
     currency: input.currency?.trim() || null,
     notes: input.notes?.trim() || null,
     ...knowledgeData(input),
+    ...sourced,
   };
   // A link removed earlier comes back, with its history, rather than
   // tripping over the unique constraint.
@@ -263,6 +288,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   // nobody anyone can find again.
   if (!name && !role) throw new Error("צריך שם או תפקיד.");
 
+  const sourced = await sourcedFields(input.clientId, input, [input.context]);
   const emails = cleanList(input.emails, normalizeEmail);
   const phones = cleanList(input.phones, normalizePhone);
   const organization = input.organizationName?.trim() ? await findOrCreateOrganization(input.organizationName, []) : null;
@@ -283,6 +309,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
     isDecisionMaker: input.isDecisionMaker ?? false,
     clientSideAddress: input.clientSideAddress?.trim() || null,
     ...knowledgeData(input),
+    ...sourced,
   };
   const contact = existing
     ? await prisma.clientContact.update({ where: { id: existing.id }, data: { ...data, deletedAt: null } })
@@ -316,6 +343,8 @@ export async function updateClientContact(actor: User, id: string, input: Partia
   await assertClientAccess(actor, before.clientId);
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
 
+  const sourced = await sourcedFields(before.clientId, input, [input.context !== undefined ? input.context : before.context], before);
+
   // The person's own details are shared across clients (decision 8). An
   // address that already belongs to somebody else is refused rather than
   // silently merging two people.
@@ -344,6 +373,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
       isDecisionMaker: input.isDecisionMaker ?? undefined,
       clientSideAddress: input.clientSideAddress !== undefined ? input.clientSideAddress?.trim() || null : undefined,
       ...knowledgeData(input),
+      ...sourced,
     },
   });
   if (updated.isPrimary && !before.isPrimary) {

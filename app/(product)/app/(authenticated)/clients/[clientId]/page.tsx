@@ -23,6 +23,9 @@ import { TasksPanel } from "./TasksPanel";
 import { PeoplePanel } from "./PeoplePanel";
 import { listClientPeople, listOrganizationNames } from "@/lib/app-domain/client-contacts";
 import { effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
+import { SourcesPanel } from "./SourcesPanel";
+import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
+import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
 import { MessageClient } from "@/components/app/MessageClient";
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
@@ -64,7 +67,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -83,6 +86,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // Org brain, phase 2 (spec 3.5): the file's people and organizations.
     listClientPeople(user, client.id),
     listOrganizationNames(user, client.id),
+    // Spec 3.2: the source register every item cites, and the domains.
+    listClientSources(user, client.id),
+    listClientDomains(user, client.id),
   ]);
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
@@ -125,6 +131,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <PeoplePanel
           clientId={client.id}
           organizationNames={organizationNames}
+          sourceOptions={sources.map((s) => ({ code: s.code, title: s.title }))}
           contacts={people.contacts.map((c) => ({
             id: c.id,
             name: c.person.name,
@@ -144,6 +151,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             audience: c.audience,
             doNotDisclose: c.doNotDisclose,
             sensitive: c.sensitivity === "SENSITIVE",
+            sources: readSourceRefs(c.sources).map(formatSourceRef),
           }))}
           organizations={people.organizations.map((o) => ({
             id: o.id,
@@ -156,6 +164,28 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             notes: o.notes,
             status: effectiveStatus(o.knowledgeStatus, parseFieldStatus(o.fieldStatus)),
             toResolve: o.toResolve,
+            sources: readSourceRefs(o.sources).map(formatSourceRef),
+          }))}
+        />
+
+        <SourcesPanel
+          clientId={client.id}
+          sources={sources.map((s) => ({
+            id: s.id,
+            code: s.code,
+            kind: s.kind,
+            weight: s.weight,
+            title: s.title,
+            occurredAt: s.occurredAt ? s.occurredAt.toISOString() : null,
+            participants: s.participants,
+            topicsOnly: s.restriction === "TOPICS_ONLY",
+            notes: s.notes,
+          }))}
+          domains={domains.map((d) => ({
+            id: d.id,
+            domain: d.domain,
+            kind: d.kind,
+            organizationName: d.organization?.name ?? null,
           }))}
         />
 

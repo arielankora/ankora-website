@@ -1298,6 +1298,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "One person shared by several clients; what one client knows must never reach another"
+    },
+    "action:(product)/app/(authenticated)/clients/source-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's source register and domains: what every item in the file cites, and which domains map mail to which client"
+    },
+    "domain:client-sources": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Source rules (no item without a source, R14, R17) and cross-client domain isolation"
     }
   },
   "waivers": {},

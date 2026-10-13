@@ -10,6 +10,7 @@ import {
   removeClientContact,
   updateClientContact,
 } from "@/lib/app-domain/client-contacts";
+import { addClientSource } from "@/lib/app-domain/client-sources";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 3.5, decision 8).
 //
@@ -19,9 +20,17 @@ import {
 
 async function employeeOn(...clientIds: string[]) {
   const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
-  for (const clientId of clientIds) await prisma.userClientAccess.create({ data: { userId: user.id, clientId } });
+  for (const clientId of clientIds) {
+    await prisma.userClientAccess.create({ data: { userId: user.id, clientId } });
+    // Every item needs a source (spec 3.2). S1 in each client's register.
+    if ((await prisma.clientSource.count({ where: { clientId } })) === 0) {
+      await addClientSource(user, { clientId, kind: "TRANSCRIPT", title: "פגישת היכרות" });
+    }
+  }
   return user;
 }
+
+const S1 = [{ code: "S1" }];
 
 describe("client contacts: one person, many clients", () => {
   it("the same email in two clients' files is one person, with a context per client", async () => {
@@ -31,6 +40,7 @@ describe("client contacts: one person, many clients", () => {
 
     await addClientContact(user, {
       clientId: nux.id,
+      sources: S1,
       name: "שני הלוי",
       role: "VP Finance",
       relationship: "PROVIDER",
@@ -40,6 +50,7 @@ describe("client contacts: one person, many clients", () => {
     });
     await addClientContact(user, {
       clientId: other.id,
+      sources: S1,
       name: "שני",
       relationship: "PROVIDER",
       emails: ["shani.halevi@nextage.co.il"],
@@ -65,7 +76,7 @@ describe("client contacts: one person, many clients", () => {
     const onNux = await employeeOn(nux.id);
     const onOther = await employeeOn(other.id);
 
-    await addClientContact(onOther, { clientId: other.id, name: "עו״ד פרטי", relationship: "ADVISOR", organizationName: "משרד עורכי דין פרטי" });
+    await addClientContact(onOther, { clientId: other.id, sources: S1, name: "עו״ד פרטי", relationship: "ADVISOR", organizationName: "משרד עורכי דין פרטי" });
 
     await expect(listClientPeople(onNux, other.id)).rejects.toBeInstanceOf(ForbiddenError);
     // The organization picker does not list a firm that only another
@@ -77,12 +88,13 @@ describe("client contacts: one person, many clients", () => {
   it("refuses a contact with neither name nor role, and a non-confirmed one without what would close it", async () => {
     const client = await createTestClient();
     const user = await employeeOn(client.id);
-    await expect(addClientContact(user, { clientId: client.id, emails: ["x@y.com"] })).rejects.toThrow("שם או תפקיד");
+    await expect(addClientContact(user, { clientId: client.id, sources: S1, emails: ["x@y.com"] })).rejects.toThrow("שם או תפקיד");
     await expect(
-      addClientContact(user, { clientId: client.id, name: "דורון", knowledgeStatus: "UNCERTAIN" })
+      addClientContact(user, { clientId: client.id, sources: S1, name: "דורון", knowledgeStatus: "UNCERTAIN" })
     ).rejects.toThrow("מה יסגור");
     const ok = await addClientContact(user, {
       clientId: client.id,
+      sources: S1,
       role: "מנקה",
       relationship: "SUPPLIER",
       knowledgeStatus: "MISSING",
@@ -94,8 +106,8 @@ describe("client contacts: one person, many clients", () => {
   it("keeps one primary contact per client", async () => {
     const client = await createTestClient();
     const user = await employeeOn(client.id);
-    const a = await addClientContact(user, { clientId: client.id, name: "גיא", isPrimary: true });
-    const b = await addClientContact(user, { clientId: client.id, name: "אורן", isPrimary: true });
+    const a = await addClientContact(user, { clientId: client.id, sources: S1, name: "גיא", isPrimary: true });
+    const b = await addClientContact(user, { clientId: client.id, sources: S1, name: "אורן", isPrimary: true });
     expect((await prisma.clientContact.findUniqueOrThrow({ where: { id: a.id } })).isPrimary).toBe(false);
     expect((await prisma.clientContact.findUniqueOrThrow({ where: { id: b.id } })).isPrimary).toBe(true);
   });
@@ -103,8 +115,8 @@ describe("client contacts: one person, many clients", () => {
   it("an edit that would give a person another person's email is refused", async () => {
     const client = await createTestClient();
     const user = await employeeOn(client.id);
-    await addClientContact(user, { clientId: client.id, name: "אורן", emails: ["oren@nux.ai"] });
-    const guy = await addClientContact(user, { clientId: client.id, name: "גיא", emails: ["guy@nux.ai"] });
+    await addClientContact(user, { clientId: client.id, sources: S1, name: "אורן", emails: ["oren@nux.ai"] });
+    const guy = await addClientContact(user, { clientId: client.id, sources: S1, name: "גיא", emails: ["guy@nux.ai"] });
     await expect(updateClientContact(user, guy.id, { emails: ["oren@nux.ai"] })).rejects.toThrow("כבר שייכת");
   });
 
@@ -114,6 +126,7 @@ describe("client contacts: one person, many clients", () => {
     const notNamed = await employeeOn(client.id);
     const contact = await addClientContact(named, {
       clientId: client.id,
+      sources: S1,
       name: "גיא",
       audience: "RESTRICTED",
       audienceUserIds: [named.id],
@@ -134,10 +147,10 @@ describe("client organizations: one firm, linked per client", () => {
     const a = await createTestClient({ name: "A" });
     const b = await createTestClient({ name: "B" });
     const user = await employeeOn(a.id, b.id);
-    await addClientOrganization(user, { clientId: a.id, name: "Nextage", domains: ["nextage.co.il"], role: "הנהלת חשבונות", monthlyCostMinor: 2_200_000 });
-    await addClientOrganization(user, { clientId: b.id, name: "נקסטאייג׳", domains: ["https://www.nextage.co.il"] });
+    await addClientOrganization(user, { clientId: a.id, sources: S1, name: "Nextage", domains: ["nextage.co.il"], role: "הנהלת חשבונות", monthlyCostMinor: 2_200_000 });
+    await addClientOrganization(user, { clientId: b.id, sources: S1, name: "נקסטאייג׳", domains: ["https://www.nextage.co.il"] });
     expect(await prisma.organization.count()).toBe(1);
     expect((await listClientPeople(user, a.id)).organizations[0].monthlyCostMinor).toBe(2_200_000);
-    await expect(addClientOrganization(user, { clientId: a.id, name: "Nextage" })).rejects.toThrow("כבר בתיק");
+    await expect(addClientOrganization(user, { clientId: a.id, sources: S1, name: "Nextage" })).rejects.toThrow("כבר בתיק");
   });
 });

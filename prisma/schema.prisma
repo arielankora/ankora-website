@@ -530,6 +530,8 @@ model Client {
   // Org brain, phase 2 (spec 3.5).
   contacts      ClientContact[]
   organizations ClientOrganization[]
+  sources       ClientSource[]
+  domains       ClientDomain[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -2567,8 +2569,9 @@ model Organization {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  people  Person[]
-  clients ClientOrganization[]
+  people        Person[]
+  clients       ClientOrganization[]
+  clientDomains ClientDomain[]
 
   @@index([name])
   @@index([domains], type: Gin)
@@ -2709,4 +2712,95 @@ model ClientOrganization {
   @@unique([clientId, organizationId])
   @@index([clientId, deletedAt])
   @@map("client_organizations")
+}
+
+/// What a source is (spec 3.2).
+enum SourceKind {
+  /// A recorded meeting. One source may be several recordings of the
+  /// same meeting.
+  TRANSCRIPT
+  /// A document of the client's, or of a supplier of theirs.
+  CLIENT_DOCUMENT
+  TASK
+  /// Somebody told us, outside a recording.
+  PERSON
+  /// A document Ankora wrote (Hadas's KI, HMP, TE).
+  ANKORA_DOCUMENT
+}
+
+enum SourceWeight {
+  /// The client or a supplier of theirs.
+  PRIMARY
+  /// Ankora's own writing. An item whose sources are all secondary is
+  /// never "confirmed" (rule R14).
+  SECONDARY
+}
+
+enum SourceRestriction {
+  NONE
+  /// Topics only: no quotes, no details (a NUX board meeting).
+  TOPICS_ONLY
+}
+
+/// The client's source register (spec 3.2): S1, S2... per client, in the
+/// order they were added. Every item in the file points here.
+model ClientSource {
+  id       String @id @default(cuid())
+  clientId String
+  /// 1, 2, 3... per client. `code` is "S" + seq, stored so a reader never
+  /// has to compute it.
+  seq      Int
+  code     String
+
+  kind         SourceKind
+  weight       SourceWeight      @default(PRIMARY)
+  title        String
+  /// The day, stored as UTC midnight like every other date-only field.
+  occurredAt   DateTime?
+  participants String[]          @default([])
+  /// [{ "system": "FIREFLIES" | "DOCUMENT" | "TASK" | "OTHER", "id": "..." }]
+  externalRefs Json              @default("[]")
+  restriction  SourceRestriction @default(NONE)
+  notes        String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, seq])
+  @@unique([clientId, code])
+  @@map("client_sources")
+}
+
+enum ClientDomainKind {
+  /// The client's own (nux.ai).
+  CLIENT
+  /// A partner's (nextage.co.il). May appear in several clients' files.
+  PARTNER
+}
+
+/// Email domains that belong to a client's world (spec 3.5). Lets mail
+/// and recordings be matched to the right client.
+model ClientDomain {
+  id             String           @id @default(cuid())
+  clientId       String
+  domain         String
+  kind           ClientDomainKind
+  /// For a partner domain: whose it is.
+  organizationId String?
+  notes          String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, domain])
+  @@index([domain])
+  @@map("client_domains")
 }

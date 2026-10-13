@@ -59,6 +59,8 @@ export type PanelContact = {
   audience: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
   doNotDisclose: string | null;
   sensitive: boolean;
+  /// Formatted refs: ["S1 08:13", "S3"].
+  sources: string[];
 };
 
 export type PanelOrganization = {
@@ -72,7 +74,10 @@ export type PanelOrganization = {
   notes: string | null;
   status: KnowledgeStatusLike;
   toResolve: string | null;
+  sources: string[];
 };
+
+export type SourceOption = { code: string; title: string };
 
 const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
 const LABEL = "block text-xs font-medium text-appNavy/60";
@@ -86,7 +91,56 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function ContactForm({ clientId, organizationNames, existing }: { clientId: string; organizationNames: string[]; existing?: PanelContact }) {
+/// The item's sources, as typed codes, with the register right under the
+/// field so nobody has to remember what S4 was.
+function SourcesField({ options, defaultValue, status }: { options: SourceOption[]; defaultValue?: string; status: KnowledgeStatusLike }) {
+  return (
+    <div>
+      <Field label={status === "MISSING" ? "מקורות" : "מקורות *"}>
+        <input name="sources" dir="ltr" defaultValue={defaultValue ?? ""} placeholder="S1 08:13, S3" className={INPUT} />
+      </Field>
+      {options.length === 0 ? (
+        <p className="mt-1 text-[11px] text-appNavy/40">אין עדיין מקורות במרשם. מוסיפים אותם ב&quot;מרשם מקורות&quot; במסך הלקוח.</p>
+      ) : (
+        // The most recent ones: a long register is read in its own panel.
+        <p className="mt-1 text-[11px] text-appNavy/40">
+          {options
+            .slice(-8)
+            .map((o) => `${o.code} ${o.title}`)
+            .join(" · ")}
+          {options.length > 8 && " · ..."}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function SourceCodes({ sources, options }: { sources: string[]; options: SourceOption[] }) {
+  if (sources.length === 0) return null;
+  const titles = new Map(options.map((o) => [o.code, o.title]));
+  return (
+    <p className="mt-1 text-[11px] text-appNavy/45" dir="ltr">
+      {sources.map((s, i) => (
+        <span key={s} title={titles.get(s.split(" ")[0])}>
+          {i > 0 && ", "}
+          {s}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function ContactForm({
+  clientId,
+  organizationNames,
+  sourceOptions,
+  existing,
+}: {
+  clientId: string;
+  organizationNames: string[];
+  sourceOptions: SourceOption[];
+  existing?: PanelContact;
+}) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateClientContactAction : addClientContactAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
@@ -189,6 +243,7 @@ function ContactForm({ clientId, organizationNames, existing }: { clientId: stri
           </select>
         </Field>
       </div>
+      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} placeholder="לבקש מגיא את המייל" className={INPUT} />
@@ -206,7 +261,15 @@ function ContactForm({ clientId, organizationNames, existing }: { clientId: stri
   );
 }
 
-function OrganizationForm({ clientId, organizationNames }: { clientId: string; organizationNames: string[] }) {
+function OrganizationForm({
+  clientId,
+  organizationNames,
+  sourceOptions,
+}: {
+  clientId: string;
+  organizationNames: string[];
+  sourceOptions: SourceOption[];
+}) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(addClientOrganizationAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>("CONFIRMED");
@@ -258,6 +321,7 @@ function OrganizationForm({ clientId, organizationNames }: { clientId: string; o
           <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
         </select>
       </Field>
+      <SourcesField options={sourceOptions} status={status} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required className={INPUT} />
@@ -286,11 +350,13 @@ export function PeoplePanel({
   contacts,
   organizations,
   organizationNames,
+  sourceOptions,
 }: {
   clientId: string;
   contacts: PanelContact[];
   organizations: PanelOrganization[];
   organizationNames: string[];
+  sourceOptions: SourceOption[];
 }) {
   const { showToast } = useToast();
 
@@ -311,7 +377,7 @@ export function PeoplePanel({
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <h2 className="text-sm font-medium text-appNavy">אנשים ויחסים ({contacts.length})</h2>
           <Drawer triggerLabel="+ איש קשר" title="איש קשר בתיק" variant="link">
-            <ContactForm clientId={clientId} organizationNames={organizationNames} />
+            <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} />
           </Drawer>
         </div>
         {contacts.length === 0 ? (
@@ -339,10 +405,11 @@ export function PeoplePanel({
                     {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-appNavy/50">ערוצים: {c.channelOrder.join(", ")}</p>}
                     {c.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {c.doNotDisclose}</p>}
                     <StatusLine status={c.status} toResolve={c.toResolve} />
+                    <SourceCodes sources={c.sources} options={sourceOptions} />
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-xs">
                     <Drawer triggerLabel="עריכה" title="עריכת איש קשר" variant="link">
-                      <ContactForm clientId={clientId} organizationNames={organizationNames} existing={c} />
+                      <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} existing={c} />
                     </Drawer>
                     <button type="button" onClick={() => removeContact(c)} className="text-appNavy/50 hover:text-red-600">
                       הסרה
@@ -359,7 +426,7 @@ export function PeoplePanel({
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <h2 className="text-sm font-medium text-appNavy">ספקים ונותני שירות ({organizations.length})</h2>
           <Drawer triggerLabel="+ ארגון" title="ארגון בתיק" variant="link">
-            <OrganizationForm clientId={clientId} organizationNames={organizationNames} />
+            <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} />
           </Drawer>
         </div>
         {organizations.length === 0 ? (
@@ -380,6 +447,7 @@ export function PeoplePanel({
                   )}
                   {o.notes && <p className="mt-1 text-xs text-appNavy/70">{o.notes}</p>}
                   <StatusLine status={o.status} toResolve={o.toResolve} />
+                  <SourceCodes sources={o.sources} options={sourceOptions} />
                 </div>
                 <button type="button" onClick={() => removeOrganization(o)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">
                   הסרה

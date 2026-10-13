@@ -137,6 +137,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Person: { decision: "DUMP", table: "persons", reason: "Names, emails and phones of the people in client files. Typed by people; exists nowhere else." },
   ClientContact: { decision: "DUMP", table: "client_contacts", reason: "Who each person is to each client, and what is known about them. The client file itself." },
   ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
+  ClientSource: { decision: "DUMP", table: "client_sources", reason: "The source register every item in the client file cites. Without it the codes mean nothing." },
+  ClientDomain: { decision: "DUMP", table: "client_domains", reason: "Which email domains belong to which client. Typed by people, not derivable." },
   ReminderRule: { decision: "DUMP", table: "reminder_rules", reason: "Configuration attached to an important date." },
   ReminderOccurrence: {
     decision: "DUMP",

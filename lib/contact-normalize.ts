@@ -74,3 +74,31 @@ export function parseList(
   }
   return { values, invalid };
 }
+
+/// Mail providers everyone uses. Such a domain says nothing about which
+/// client a message belongs to, so it can never be registered as one.
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "msn.com",
+  "yahoo.com",
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  "aol.com",
+  "proton.me",
+  "protonmail.com",
+  "walla.co.il",
+  "walla.com",
+  "012.net.il",
+  "bezeqint.net",
+  "netvision.net.il",
+  "zahav.net.il",
+]);
+
+export function isPublicEmailDomain(domain: string): boolean {
+  return PUBLIC_EMAIL_DOMAINS.has(domain.toLowerCase());
+}

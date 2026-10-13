@@ -49,6 +49,8 @@ export const ENTITY_TYPES = [
   "ClientDocument",
   "ClientContact",
   "ClientOrganization",
+  "ClientSource",
+  "ClientDomain",
   "PortalSummary",
 ];
 
@@ -73,6 +75,11 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_contact.remove": "הסרת איש קשר מתיק הלקוח",
   "client_organization.add": "הוספת ארגון לתיק הלקוח",
   "client_organization.remove": "הסרת ארגון מתיק הלקוח",
+  "client_source.add": "הוספת מקור למרשם המקורות",
+  "client_source.update": "עדכון מקור במרשם המקורות",
+  "client_source.remove": "הסרת מקור ממרשם המקורות",
+  "client_domain.add": "הוספת דומיין ללקוח",
+  "client_domain.remove": "הסרת דומיין מהלקוח",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",

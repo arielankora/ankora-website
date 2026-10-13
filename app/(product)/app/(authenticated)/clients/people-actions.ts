@@ -11,6 +11,7 @@ import {
   removeClientOrganization,
 } from "@/lib/app-domain/client-contacts";
 import { normalizeEmail, normalizePhone, parseList } from "@/lib/contact-normalize";
+import { parseSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import type { ContactRelationship, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
 
 // Org brain, phase 2: the people and organizations panel on the client
@@ -37,6 +38,14 @@ function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
+/// "S1 08:13, S3" from the sources field. Unreadable entries are refused
+/// by name; whether the codes exist is the domain's to say.
+function parseSources(formData: FormData): { error?: string; refs?: SourceRef[] } {
+  const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
+  if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
+  return { refs };
+}
+
 /// Emails and phones arrive as one field each. An entry that is not an
 /// address or a number is refused by name, rather than dropped quietly.
 function parseContactFields(formData: FormData): { error?: string; value?: Parameters<typeof addClientContact>[1] } {
@@ -44,6 +53,8 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
   if (emails.invalid.length) return { error: `כתובת מייל לא תקינה: ${emails.invalid.join(", ")}` };
   const phones = parseList(String(formData.get("phones") ?? ""), normalizePhone);
   if (phones.invalid.length) return { error: `מספר טלפון לא תקין: ${phones.invalid.join(", ")}` };
+  const sources = parseSources(formData);
+  if (sources.error) return { error: sources.error };
   return {
     value: {
       clientId: String(formData.get("clientId") ?? ""),
@@ -67,6 +78,7 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
       audience: pick(formData.get("audience"), AUDIENCES),
       doNotDisclose: text(formData, "doNotDisclose"),
       sensitivity: formData.get("sensitive") === "on" ? "SENSITIVE" : "NORMAL",
+      sources: sources.refs,
     },
   };
 }
@@ -121,6 +133,8 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
     monthlyCostMinor = shekelsToMinor(costRaw);
     if (monthlyCostMinor === null) return { error: "עלות חודשית לא תקינה." };
   }
+  const sources = parseSources(formData);
+  if (sources.error) return { error: sources.error };
   try {
     await addClientOrganization(user, {
       clientId,
@@ -135,6 +149,7 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
       notes: text(formData, "notes"),
       knowledgeStatus: pick(formData.get("knowledgeStatus"), STATUSES),
       toResolve: text(formData, "toResolve"),
+      sources: sources.refs,
     });
   } catch (err) {
     return { error: friendlyError(err) };
