@@ -1696,6 +1696,18 @@ enum RecurrenceType {
   WEEKLY
 }
 
+/// 13.10.2026 (org-brain spec 3.10). How well we know when a date falls.
+/// A client file is full of "the 8th or the 9th" and "yearly, date
+/// unknown". Forcing those into an exact day invents a fact; leaving them
+/// out loses the obligation.
+enum DatePrecision {
+  EXACT
+  /// One of `dayAlternatives`. Scheduled on the earliest, shown as all.
+  APPROXIMATE
+  /// Known to recur, day not known. Never scheduled; shown as a gap.
+  UNKNOWN
+}
+
 /// 13.10.2026 (org-brain spec 3.10). How `autoTaskLeadDays` is counted.
 /// "Three working days before the 10th" is not "three days before".
 enum LeadUnit {
@@ -1799,6 +1811,20 @@ model ImportantDate {
   /// migration. The org-brain spec makes the entity's country the default
   /// once entities exist; until then a person picks it.
   businessCalendar String @default("IL")
+  /// How well the day is known. EXACT keeps every existing date's meaning.
+  precision DatePrecision @default(EXACT)
+  /// APPROXIMATE only: the possible days of the month ("8 or 9"). `day`
+  /// holds the earliest, so scheduling errs early.
+  dayAlternatives Int[] @default([])
+  /// A date that applies only if something is true ("quarterly, only if
+  /// the vulnerability SLA was missed"). Such a date never opens a task:
+  /// the responsible person is asked whether the condition holds, because
+  /// a task for work that may not exist is noise somebody learns to ignore.
+  conditionText String?
+  /// A recurrence that only runs inside a period (a SOC 2 cycle, 1.9.2026
+  /// to 31.8.2027). Both optional; no occurrence falls outside them.
+  rangeStart DateTime?
+  rangeEnd   DateTime?
   /// Only meaningful when recurrence = ONCE - the exact one-time date;
   /// month/day/calendarType above are ignored for ONCE dates.
   onceDate DateTime?

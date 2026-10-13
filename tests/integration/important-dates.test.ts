@@ -58,6 +58,82 @@ describe("important-dates: client scoping (same precedent as tasks.ts)", () => {
   });
 });
 
+// Org-brain spec 3.10 (13.10.2026): how well a date is known.
+describe("important-dates: approximate, unknown and bounded dates", () => {
+  it("stores the earliest alternative as the day of an approximate date", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    const date = await createImportantDate(admin, {
+      clientId: client.id,
+      title: "ימי חופש לשכר",
+      type: "שכר",
+      category: "BUSINESS_FINANCE",
+      recurrence: "MONTHLY",
+      month: 1,
+      day: 1,
+      precision: "APPROXIMATE",
+      dayAlternatives: [9, 8],
+      responsibleUserId: admin.id,
+    });
+    expect(date.day).toBe(8);
+    expect(date.dayAlternatives).toEqual([8, 9]);
+    expect(date.nextOccurrenceAt).not.toBeNull();
+  });
+
+  it("refuses an approximate date with a single day", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    await expect(
+      createImportantDate(admin, {
+        clientId: client.id,
+        title: "x",
+        type: "x",
+        category: "GENERAL",
+        recurrence: "MONTHLY",
+        month: 1,
+        day: 1,
+        precision: "APPROXIMATE",
+        dayAlternatives: [8],
+        responsibleUserId: admin.id,
+      })
+    ).rejects.toThrow("לפחות שני ימים");
+  });
+
+  it("never schedules a date whose day is unknown", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    const date = await createImportantDate(admin, {
+      clientId: client.id,
+      title: "חידוש ביטוח בריאות ארה\"ב",
+      type: "ביטוח",
+      category: "BUSINESS_FINANCE",
+      month: 1,
+      day: 1,
+      precision: "UNKNOWN",
+      responsibleUserId: admin.id,
+    });
+    expect(date.nextOccurrenceAt).toBeNull();
+  });
+
+  it("refuses a range that ends before it starts", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    await expect(
+      createImportantDate(admin, {
+        clientId: client.id,
+        title: "x",
+        type: "x",
+        category: "GENERAL",
+        month: 1,
+        day: 1,
+        rangeStart: new Date("2027-09-01T00:00:00Z"),
+        rangeEnd: new Date("2026-09-01T00:00:00Z"),
+        responsibleUserId: admin.id,
+      })
+    ).rejects.toThrow("סוף התקופה");
+  });
+});
+
 describe("important-dates: default reminders per category", () => {
   it("creates ReminderRule rows from DEFAULT_REMINDER_OFFSETS_BY_CATEGORY when useDefaultReminders is not disabled", async () => {
     const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });

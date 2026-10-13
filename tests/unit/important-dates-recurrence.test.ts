@@ -7,6 +7,7 @@ import {
   formatElapsedYearsHebrew,
   computeLeadDate,
   recurrenceInputFromRow,
+  formatDayAlternatives,
 } from "@/lib/app-domain/important-dates-recurrence";
 import { localDateKey } from "@/lib/timezone";
 
@@ -295,7 +296,40 @@ describe("recurrenceInputFromRow()", () => {
       intervalMonths: 3,
       rollConvention: "PREVIOUS_BUSINESS_DAY",
       businessCalendar: "US",
+      precision: "EXACT",
+      rangeStart: null,
+      rangeEnd: null,
     });
     expect(input).toMatchObject({ intervalMonths: 3, rollConvention: "PREVIOUS_BUSINESS_DAY", businessCalendar: "US" });
+  });
+});
+
+describe("computeNextOccurrence() - precision and range (org-brain spec 3.10)", () => {
+  const monthly = { calendarType: "GREGORIAN" as const, month: 1, day: 8, recurrence: "MONTHLY" as const };
+  it("an unknown day is never scheduled", () => {
+    expect(computeNextOccurrence({ ...monthly, precision: "UNKNOWN" }, at("2026-10-13"))).toBeNull();
+  });
+  it("an approximate day schedules on the stored (earliest) day", () => {
+    expect(keyOf(computeNextOccurrence({ ...monthly, precision: "APPROXIMATE" }, at("2026-10-01")))).toBe("2026-10-08");
+  });
+  it("a range that has not started searches from its start", () => {
+    const r = computeNextOccurrence({ ...monthly, rangeStart: new Date("2027-03-01T00:00:00Z") }, at("2026-10-13"));
+    expect(keyOf(r)).toBe("2027-03-08");
+  });
+  it("nothing after the end of the range", () => {
+    const input = { ...monthly, rangeEnd: new Date("2026-11-30T00:00:00Z") };
+    expect(keyOf(computeNextOccurrence(input, at("2026-11-01")))).toBe("2026-11-08");
+    expect(computeNextOccurrence(input, at("2026-11-09"))).toBeNull();
+  });
+  it("the end day itself still counts", () => {
+    const input = { ...monthly, rangeEnd: new Date("2026-11-08T00:00:00Z") };
+    expect(keyOf(computeNextOccurrence(input, at("2026-11-01")))).toBe("2026-11-08");
+  });
+});
+
+describe("formatDayAlternatives()", () => {
+  it("joins with 'או'", () => {
+    expect(formatDayAlternatives([9, 8])).toBe("8 או 9");
+    expect(formatDayAlternatives([8, 9, 10])).toBe("8, 9 או 10");
   });
 });

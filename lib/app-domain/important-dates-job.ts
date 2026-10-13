@@ -428,12 +428,13 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
 // 6. Auto-created tasks
 // ---------------------------------------------------------------------------
 
-export async function createDueAutoTasks(now = new Date()): Promise<{ created: number }> {
+export async function createDueAutoTasks(now = new Date()): Promise<{ created: number; asked: number }> {
   const dates = await prisma.importantDate.findMany({
     where: { deletedAt: null, createAutoTask: true, status: { notIn: ["ARCHIVED", "PAUSED"] }, nextOccurrenceAt: { not: null } },
   });
 
   let created = 0;
+  let asked = 0;
   for (const date of dates) {
     if (!date.nextOccurrenceAt) continue;
     // Org-brain spec 3.10: the lead can be counted in business days of the
@@ -447,6 +448,30 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
       date.timezone
     );
     if (dueAt.getTime() > now.getTime()) continue;
+
+    // Org-brain spec 3.10: a conditional date ("quarterly, only if the SLA
+    // was missed") asks the responsible person instead of opening a task
+    // for work that may not exist. Once per occurrence: a question created
+    // since this occurrence's lead day is the same question.
+    if (date.conditionText) {
+      const alreadyAsked = await prisma.notification.findFirst({
+        where: { type: "important_date.condition_check", entityId: date.id, createdAt: { gte: dueAt } },
+        select: { id: true },
+      });
+      if (alreadyAsked) continue;
+      await prisma.notification.create({
+        data: {
+          userId: date.responsibleUserId,
+          type: "important_date.condition_check",
+          title: date.title,
+          body: `מועד מותנה ב-${localDateKey(date.nextOccurrenceAt, TIMEZONE).split("-").reverse().join("/")}. האם התנאי מתקיים: ${date.conditionText}? אם כן, צריך לפתוח משימה.`,
+          entityType: "ImportantDate",
+          entityId: date.id,
+        },
+      });
+      asked++;
+      continue;
+    }
 
     const occurrenceYear = date.nextOccurrenceAt.getUTCFullYear();
     const occurrenceKey = buildAutoTaskOccurrenceKey(
@@ -485,7 +510,7 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     }
   }
 
-  return { created };
+  return { created, asked };
 }
 
 // ---------------------------------------------------------------------------
@@ -585,6 +610,7 @@ export async function reconcileImportantDates(now = new Date()) {
     remindersSent: 0,
     remindersFailed: 0,
     autoTasksCreated: 0,
+    conditionChecksAsked: 0,
     escalated: 0,
     errors: [] as string[],
   };
@@ -602,7 +628,14 @@ export async function reconcileImportantDates(now = new Date()) {
       results.remindersSent = r.sent;
       results.remindersFailed = r.failed;
     }],
-    ["createDueAutoTasks", async () => { results.autoTasksCreated = (await createDueAutoTasks(now)).created; }],
+    [
+      "createDueAutoTasks",
+      async () => {
+        const r = await createDueAutoTasks(now);
+        results.autoTasksCreated = r.created;
+        results.conditionChecksAsked = r.asked;
+      },
+    ],
     ["escalateUnhandledReminders", async () => { results.escalated = (await escalateUnhandledReminders(now)).escalated; }],
   ];
 

@@ -9,6 +9,7 @@ import {
   ALLOWED_INTERVAL_MONTHS,
   type LeadUnitLike,
   type RollConventionLike,
+  type DatePrecisionLike,
 } from "@/lib/app-domain/important-dates-recurrence";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { DEFAULT_REMINDER_OFFSETS_BY_CATEGORY } from "@/lib/app-domain/important-dates-reminders";
@@ -147,6 +148,11 @@ export interface ImportantDateInput {
   leadUnit?: LeadUnitLike;
   rollConvention?: RollConventionLike;
   businessCalendar?: string;
+  precision?: DatePrecisionLike;
+  dayAlternatives?: number[];
+  conditionText?: string | null;
+  rangeStart?: Date | null;
+  rangeEnd?: Date | null;
   /// When provided (and truthy), no explicit ReminderRule list needs to
   /// be passed - defaults are created from DEFAULT_REMINDER_OFFSETS_BY_CATEGORY.
   useDefaultReminders?: boolean;
@@ -179,6 +185,32 @@ export function assertValidSchedule(s: {
     }
   }
   if (!isBusinessCalendarKey(s.businessCalendar)) throw new Error("לוח ימי העבודה לא מוכר.");
+}
+
+/// Precision, its alternatives and the stored day, settled together.
+/// APPROXIMATE keeps the earliest alternative in `day`, so everything that
+/// reads `day` (the engine, the list, an export) errs early rather than
+/// late. UNKNOWN keeps whatever day was there and is never scheduled.
+export function resolvePrecision(s: {
+  precision: DatePrecisionLike;
+  dayAlternatives: number[];
+  day: number;
+  recurrence: RecurrenceType;
+}): { precision: DatePrecisionLike; dayAlternatives: number[]; day: number } {
+  if (s.precision !== "APPROXIMATE") return { precision: s.precision, dayAlternatives: [], day: s.day };
+  if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "CUSTOM_INTERVAL") {
+    throw new Error("מועד משוער אפשרי רק במועד שנתי או חודשי.");
+  }
+  const days = Array.from(new Set(s.dayAlternatives.filter((d) => Number.isInteger(d)))).sort((a, b) => a - b);
+  if (days.length < 2) throw new Error('במועד משוער צריך לפחות שני ימים אפשריים, למשל "8, 9".');
+  if (days.some((d) => d < 1 || d > 31)) throw new Error("ימים אפשריים צריכים להיות בין 1 ל-31.");
+  return { precision: "APPROXIMATE", dayAlternatives: days, day: days[0] };
+}
+
+export function assertValidRange(rangeStart: Date | null, rangeEnd: Date | null): void {
+  if (rangeStart && rangeEnd && rangeEnd.getTime() < rangeStart.getTime()) {
+    throw new Error("סוף התקופה לא יכול להיות לפני תחילתה.");
+  }
 }
 
 function normalizeStringArray(values: string[] | undefined): string[] {
@@ -260,12 +292,22 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
   const rollConvention = input.rollConvention ?? "NONE";
   const businessCalendar = input.businessCalendar || "IL";
   assertValidSchedule({ calendarType, recurrence, weekday, intervalMonths, businessCalendar });
+  const { precision, dayAlternatives, day } = resolvePrecision({
+    precision: input.precision ?? "EXACT",
+    dayAlternatives: input.dayAlternatives ?? [],
+    day: input.day,
+    recurrence,
+  });
+  const conditionText = input.conditionText?.trim() || null;
+  const rangeStart = input.rangeStart ?? null;
+  const rangeEnd = input.rangeEnd ?? null;
+  assertValidRange(rangeStart, rangeEnd);
 
   const nextOccurrenceAt = computeNextOccurrence(
     {
       calendarType,
       month: input.month,
-      day: input.day,
+      day,
       recurrence,
       onceDate: input.onceDate ?? null,
       customIntervalDays: input.customIntervalDays ?? null,
@@ -277,6 +319,9 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       intervalMonths,
       rollConvention,
       businessCalendar,
+      precision,
+      rangeStart,
+      rangeEnd,
     },
     new Date()
   );
@@ -292,7 +337,7 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       relationToClient: input.relationToClient || null,
       calendarType,
       month: input.month,
-      day: input.day,
+      day,
       originYear: input.originYear ?? null,
       recurrence,
       customIntervalDays: input.customIntervalDays ?? null,
@@ -313,6 +358,11 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       leadUnit,
       rollConvention,
       businessCalendar,
+      precision,
+      dayAlternatives,
+      conditionText,
+      rangeStart,
+      rangeEnd,
       nextOccurrenceAt,
       source: "MANUAL",
       createdById: actor.id,
@@ -378,12 +428,22 @@ export async function updateImportantDate(
   const rollConvention = input.rollConvention ?? before.rollConvention;
   const businessCalendar = input.businessCalendar || before.businessCalendar;
   assertValidSchedule({ calendarType, recurrence, weekday, intervalMonths, businessCalendar });
+  const resolved = resolvePrecision({
+    precision: input.precision ?? before.precision,
+    dayAlternatives: input.dayAlternatives ?? before.dayAlternatives,
+    day: input.day ?? before.day,
+    recurrence,
+  });
+  const conditionText = input.conditionText !== undefined ? input.conditionText?.trim() || null : before.conditionText;
+  const rangeStart = input.rangeStart !== undefined ? input.rangeStart : before.rangeStart;
+  const rangeEnd = input.rangeEnd !== undefined ? input.rangeEnd : before.rangeEnd;
+  assertValidRange(rangeStart, rangeEnd);
 
   const nextOccurrenceAt = computeNextOccurrence(
     {
       calendarType,
       month,
-      day,
+      day: resolved.day,
       recurrence,
       onceDate: input.onceDate !== undefined ? input.onceDate : before.onceDate,
       customIntervalDays: input.customIntervalDays !== undefined ? input.customIntervalDays : before.customIntervalDays,
@@ -395,6 +455,9 @@ export async function updateImportantDate(
       intervalMonths,
       rollConvention,
       businessCalendar,
+      precision: resolved.precision,
+      rangeStart,
+      rangeEnd,
     },
     new Date()
   );
@@ -410,7 +473,7 @@ export async function updateImportantDate(
       relationToClient: input.relationToClient !== undefined ? input.relationToClient || null : undefined,
       calendarType: input.calendarType ?? undefined,
       month: input.month ?? undefined,
-      day: input.day ?? undefined,
+      day: resolved.day,
       originYear: input.originYear !== undefined ? input.originYear : undefined,
       recurrence: input.recurrence ?? undefined,
       customIntervalDays: input.customIntervalDays !== undefined ? input.customIntervalDays : undefined,
@@ -431,6 +494,11 @@ export async function updateImportantDate(
       leadUnit,
       rollConvention,
       businessCalendar,
+      precision: resolved.precision,
+      dayAlternatives: resolved.dayAlternatives,
+      conditionText,
+      rangeStart,
+      rangeEnd,
       nextOccurrenceAt,
     },
   });

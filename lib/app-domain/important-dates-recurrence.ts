@@ -73,7 +73,15 @@ export interface RecurrenceInput {
   rollConvention?: RollConventionLike | null;
   /** "IL" or "US". Unknown values fall back to "IL". Only read when rollConvention moves dates. */
   businessCalendar?: string | null;
+  /** UNKNOWN: never scheduled. APPROXIMATE and EXACT schedule on `day`. */
+  precision?: DatePrecisionLike | null;
+  /** No occurrence before this calendar day. */
+  rangeStart?: Date | null;
+  /** No occurrence after this calendar day. */
+  rangeEnd?: Date | null;
 }
+
+export type DatePrecisionLike = "EXACT" | "APPROXIMATE" | "UNKNOWN";
 
 const DAYS_IN_GREGORIAN_MONTH = (year: number, month1to12: number): number =>
   new Date(Date.UTC(year, month1to12, 0)).getUTCDate();
@@ -298,6 +306,20 @@ function nextMonthlyHebrew(storedDay: number, fromDate: Date, timezone: string):
 /// responsible for moving such a date to a terminal status; this function
 /// stays pure and does not know about ImportantDateStatus.
 export function computeNextOccurrence(input: RecurrenceInput, fromDate: Date): Date | null {
+  // Org-brain spec 3.10: a date whose day is unknown is a gap, not a
+  // schedule. Nothing is computed for it, so nothing fires.
+  if (input.precision === "UNKNOWN") return null;
+  const timezone = input.timezone || TIMEZONE;
+  // A bounded recurrence: search from the start of the period when it has
+  // not begun yet, and stop at its end.
+  let from = fromDate;
+  if (input.rangeStart && localDateKey(input.rangeStart, timezone) > localDateKey(fromDate, timezone)) from = input.rangeStart;
+  const next = computeRolledOccurrence(input, from);
+  if (next && input.rangeEnd && localDateKey(next, timezone) > localDateKey(input.rangeEnd, timezone)) return null;
+  return next;
+}
+
+function computeRolledOccurrence(input: RecurrenceInput, fromDate: Date): Date | null {
   const timezone = input.timezone || TIMEZONE;
   const convention = input.rollConvention ?? "NONE";
   if (convention === "NONE") return computeRawNextOccurrence(input, fromDate);
@@ -390,6 +412,9 @@ export type RecurrenceRowLike = {
   intervalMonths: number | null;
   rollConvention: RollConventionLike;
   businessCalendar: string;
+  precision: DatePrecisionLike;
+  rangeStart: Date | null;
+  rangeEnd: Date | null;
 };
 
 export function recurrenceInputFromRow(row: RecurrenceRowLike): RecurrenceInput {
@@ -408,7 +433,18 @@ export function recurrenceInputFromRow(row: RecurrenceRowLike): RecurrenceInput 
     intervalMonths: row.intervalMonths,
     rollConvention: row.rollConvention,
     businessCalendar: row.businessCalendar,
+    precision: row.precision,
+    rangeStart: row.rangeStart,
+    rangeEnd: row.rangeEnd,
   };
+}
+
+/// "8 או 9", "8, 9 או 10". For APPROXIMATE dates in lists and on the date
+/// screen.
+export function formatDayAlternatives(days: number[]): string {
+  const sorted = Array.from(new Set(days)).sort((a, b) => a - b);
+  if (sorted.length <= 1) return sorted.join("");
+  return `${sorted.slice(0, -1).join(", ")} או ${sorted[sorted.length - 1]}`;
 }
 
 // ---------------------------------------------------------------------------

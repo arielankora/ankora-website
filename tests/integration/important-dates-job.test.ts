@@ -433,6 +433,34 @@ describe("reminders after the 7.10.2026 fixes - postponed, not lost, and never t
   // the business day before it, and the task opens three Israeli business
   // days before that. 10.11.2026 is a Tuesday: the task opens on Thursday
   // 5.11, not on Saturday 7.11 as three calendar days would.
+  // Org-brain spec 3.10: a conditional date asks instead of opening a task,
+  // once per occurrence.
+  it("a conditional date asks the responsible person once, and opens no task", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({
+      clientId: client.id,
+      responsibleUserId: owner.id,
+      recurrence: "MONTHLY",
+      day: 15,
+      month: 10,
+      nextOccurrenceAt: new Date("2026-10-14T21:00:00Z"),
+      rules: [],
+    });
+    await prisma.importantDate.update({
+      where: { id: date.id },
+      data: { createAutoTask: true, autoTaskLeadDays: 2, conditionText: "לא עמדנו ב-SLA של החולשות" },
+    });
+
+    await reconcileImportantDates(cronAt("2026-10-13"));
+    await reconcileImportantDates(cronAt("2026-10-14"));
+
+    expect(await prisma.task.count({ where: { importantDateId: date.id } })).toBe(0);
+    const asked = await prisma.notification.findMany({ where: { type: "important_date.condition_check", entityId: date.id } });
+    expect(asked).toHaveLength(1);
+    expect(asked[0].userId).toBe(owner.id);
+    expect(asked[0].body).toContain("לא עמדנו ב-SLA של החולשות");
+  });
+
   it("opens the auto-task three business days before, not three calendar days", async () => {
     const { owner, client } = await setup();
     const date = await createDate({
