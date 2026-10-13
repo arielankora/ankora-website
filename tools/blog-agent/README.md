@@ -7,7 +7,7 @@ Used by the `ankora-blog-post` Claude skill. Ariel or Hadas gives Claude raw con
 | `style-guide.md` | Structure, SEO/AIO/GEO, tone, banned words, discretion. Approved 11.10.2026 | read by Claude |
 | `linkedin-guide.md` | Personal-profile LinkedIn post. Approved 11.10.2026 | read by Claude |
 | `check-post.mjs` | Enforces the style guide. Errors stop the save | cloud workspace |
-| `cover-template.html`, `render-cover.mjs` | Covers: template A on the site, C on LinkedIn | cloud workspace (needs Chromium) |
+| `cover-template.html`, `render-cover.mjs` | Covers: 2 or 3 light options per post for the site (style guide section 11), C on LinkedIn | cloud workspace (needs Chromium) |
 | `publish.mjs` | Uploads covers, creates both drafts, pairs them | the runner's computer (needs only Node 18+) |
 
 ## The bundle
@@ -16,8 +16,9 @@ One folder per post, `<connected folder>/.blog-agent/<he-slug>/`:
 
 ```
 post.json        the post, below
-cover-he.png     site cover, Hebrew (template A)
-cover-en.png     site cover, English (template A)
+option-N-he.png  cover options, with preview.png to choose from
+cover-he.png     site cover, Hebrew (the chosen option)
+cover-en.png     site cover, English (the chosen option)
 linkedin-he.png  LinkedIn image (template C)
 linkedin.txt     LinkedIn text, ready to paste
 publish.mjs      copied in, so the computer needs no checkout
@@ -33,7 +34,8 @@ state.json       written by publish.mjs: what is already done
   "linkedinEnglish": false,
   "he": { "title": "", "slug": "", "excerpt": "", "category": "", "tags": [], "content": "", "faq": [{ "q": "", "a": "" }] },
   "en": { "title": "", "slug": "", "excerpt": "", "category": "", "tags": [], "content": "", "faq": [] },
-  "linkedin": { "he": "", "en": "" }
+  "linkedin": { "he": "", "en": "" },
+  "cover": { "options": [{ "concept": "cards", "he": {}, "en": {} }], "chosen": 1 }
 }
 ```
 
@@ -51,4 +53,5 @@ One per person, minted with `node scripts/blog-agent-token.mjs <ariel|hadas> dra
 - On a computer that reaches the internet through a proxy (the shell Claude uses there does), `publish.mjs` re-runs itself with `NODE_USE_ENV_PROXY=1`, because Node's fetch ignores `HTTPS_PROXY` otherwise. Needs Node 22.21 or newer.
 - `check-post.mjs` refuses a Hebrew line that opens with a Latin word: most renderers then lay it out left to right.
 - LinkedIn: Claude can fill the post text in the runner's own Chrome, but the Chrome extension cannot upload a file from the computer. The runner drags `linkedin-he.png` into the composer.
+- Covers: Claude designs 2 or 3 options in `cover.options`, `render-cover.mjs <bundle>` writes them and `preview.png`, the runner picks, then `render-cover.mjs <bundle> --pick N` writes the final images. Rules in the style guide, section 11.
 - Each saved post and each cover is one commit, so one post pair is four commits and four deploys.
