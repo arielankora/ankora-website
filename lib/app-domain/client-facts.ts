@@ -8,7 +8,7 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import { createTask } from "@/lib/app-domain/tasks";
 import type { SourceRef } from "@/lib/knowledge-sources";
-import type { User, ClientFact, FactKind, FactTopic } from "@prisma/client";
+import type { User, ClientFact, FactKind, FactTopic, Prisma } from "@prisma/client";
 
 // Org brain, phase 2: the facts in a client's file
 // (claude/org-brain-spec-2026-10-12.md, 3.4; sections 2, 4, 5, 7.3, 8,
@@ -169,6 +169,44 @@ export async function confirmClientFact(actor: User, id: string, sources: Source
   await recordAudit({
     actorId: actor.id,
     action: "client_fact.confirm",
+    entityType: "ClientFact",
+    entityId: id,
+    clientId: fact.clientId,
+    before: fact,
+    after: updated,
+  });
+  return updated;
+}
+
+/// Somebody said something else (spec 5.2). Nothing is overwritten: the
+/// other version joins the fact's alternatives, with its source, and the
+/// fact becomes uncertain until somebody settles it. The bank in Israel is
+/// "Leumi" according to S8 and S10 and "Bank Hapoalim" according to S11;
+/// the file says exactly that, and asks.
+export async function recordContradiction(actor: User, id: string, input: { value: string; sources: SourceRef[] }) {
+  assertCan(actor.role, "time_entry.create_self");
+  const fact = await findLive(id);
+  await assertClientAccess(actor, fact.clientId);
+  assertCurrent(fact);
+  const value = input.value.trim();
+  if (!value) throw new Error("צריך לכתוב מה נאמר אחרת.");
+  // The other version must cite the register like anything else.
+  const checked = await sourcedFields(fact.clientId, { knowledgeStatus: "UNCERTAIN", sources: input.sources, toResolve: "x" }, [value]);
+  const alternatives = [
+    ...(Array.isArray(fact.alternatives) ? (fact.alternatives as unknown[]) : []),
+    { value, sources: checked.sources, at: new Date().toISOString(), byId: actor.id },
+  ];
+  const updated = await prisma.clientFact.update({
+    where: { id },
+    data: {
+      alternatives: alternatives as Prisma.InputJsonValue,
+      knowledgeStatus: fact.knowledgeStatus === "MISSING" ? "MISSING" : "UNCERTAIN",
+      toResolve: fact.toResolve ?? "יש גרסאות סותרות. לברר מול הלקוח איזו נכונה.",
+    },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_fact.contradict",
     entityType: "ClientFact",
     entityId: id,
     clientId: fact.clientId,

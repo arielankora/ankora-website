@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // always handed the "ai" version of the file, never the staff one.
 
 const view = vi.hoisted(() => ({ buildClientFile: vi.fn() }));
+const proposals = vi.hoisted(() => ({ proposeKnowledge: vi.fn() }));
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
@@ -21,6 +22,7 @@ const lookup = vi.hoisted(() => ({
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
 vi.mock("@/lib/app-domain/client-file-view", () => view);
+vi.mock("@/lib/app-domain/knowledge-proposals", () => proposals);
 vi.mock("@/lib/app-domain/mcp-files", () => ({}));
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: [] }));
@@ -86,3 +88,39 @@ describe("get_client_file", () => {
     expect(view.buildClientFile).not.toHaveBeenCalled();
   });
 });
+
+describe("propose_knowledge", () => {
+  const call = (args: unknown) => tools.get("propose_knowledge")!.handler(args, CTX);
+  const ITEM = { target: "FACT", payload: { kind: "NOTE", body: "x" } };
+
+  beforeEach(() => {
+    proposals.proposeKnowledge.mockResolvedValue({ batchId: "b1", sourceCode: "S4", proposed: 1, dropped: [], secretTaskId: null });
+  });
+
+  it("is a write, and says plainly that nothing is in the file yet", async () => {
+    expect(TOOL_ANNOTATIONS.propose_knowledge.readOnlyHint).toBe(false);
+    const r = await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "Nextage", date: "2026-10-12", firefliesId: "ff-1" }, items: [ITEM] });
+    const body = JSON.parse(r.content[0].text!);
+    expect(body.sourceCode).toBe("S4");
+    expect(body.next).toContain("Nothing is in the file yet");
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(
+      ACTOR,
+      expect.objectContaining({
+        clientId: "c-nux",
+        via: "MCP",
+        source: expect.objectContaining({ kind: "TRANSCRIPT", externalIds: ["ff-1"], restriction: "NONE", occurredAt: new Date("2026-10-12T00:00:00Z") }),
+      })
+    );
+  });
+
+  it("needs a source, and a date it can read, before anything is sent", async () => {
+    expect((await call({ client: "nux", items: [ITEM] })).content[0].text).toContain("sourceCode");
+    expect((await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "x", date: "12.10.2026" }, items: [ITEM] })).content[0].text).toContain("YYYY-MM-DD");
+    expect(proposals.proposeKnowledge).not.toHaveBeenCalled();
+  });
+
+  it("there is no tool that approves", () => {
+    expect([...tools.keys()].some((n) => /approve/.test(n))).toBe(false);
+  });
+});
+

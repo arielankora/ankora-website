@@ -1,12 +1,13 @@
 import "server-only";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
-import { toolFailure, toolText } from "@/lib/mcp/errors";
+import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import { lookupClient } from "@/lib/mcp/lookup";
 import { actorOf } from "@/lib/mcp/task-extra-tools";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
+import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.3 and 8): the
 // client file, for Claude.
@@ -40,6 +41,101 @@ export function registerClientFileTools(server: McpServer): void {
         return toolText(toMarkdown(doc));
       } catch (err) {
         console.error("[mcp] get_client_file failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "propose_knowledge",
+    {
+      title: "Propose knowledge for a client file",
+      description: [
+        "Sends a batch of proposed items for a client's file, from ONE source (a meeting or a document). Nothing enters the file until a person approves each item on Ankora's review screen; there is no tool that approves.",
+        "Source: pass `sourceCode` (\"S3\") if the source is already in the client's register (get_client_file lists it), or `newSource` to register it. A recording is found again by its `firefliesId`, so sending the same meeting twice does not create a second source.",
+        "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence), and optionally `quote` (short; never from a topics-only source).",
+        "FACT payload: kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE), body, and as relevant topic, referTo, validUntil or validUntilEvent (TEMPORARY needs one), decidedAt (ONE_OFF_DECISION needs it), decidedBy.",
+        "CONTACT payload: name and/or role, relationship (CLIENT_STAFF, PROVIDER, ADVISOR, INVESTOR, SUPPLIER), emails, phones, organizationName, context, channelOrder, isPrimary, isDecisionMaker.",
+        "ORGANIZATION payload: name, domains, role, relationship, monthlyCostMinor (agorot or cents), currency, notes. SYSTEM payload: systemName, purpose, url, accountUsed, ourPermission, accessStatus, blocker, clientAdmin, notes.",
+        "Every payload may carry knowledgeStatus (CONFIRMED only if the client or their supplier said or showed it explicitly; UNCERTAIN with toResolve otherwise) and sensitivity.",
+        "To change an existing fact, set action SUPERSEDE (the client changed it) or CONTRADICT (someone said otherwise; nothing is overwritten) with `targetId` from the file.",
+        "Never include passwords, keys or card numbers: such items are dropped and a task to change the secret is opened. Leave out small talk, momentary technical issues, guesses, and Ankora's own commercial terms.",
+      ].join(" "),
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        sourceCode: z.string().optional().describe("An existing source code in the client's register, e.g. S3."),
+        newSource: z
+          .object({
+            kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT"]),
+            title: z.string(),
+            date: z.string().optional().describe("YYYY-MM-DD"),
+            participants: z.array(z.string()).optional(),
+            firefliesId: z.string().optional(),
+            documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
+            topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
+          })
+          .optional(),
+        note: z.string().optional().describe("One line: what was read, what was left out."),
+        items: z
+          .array(
+            z.object({
+              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM"]),
+              action: z.enum(["CREATE", "SUPERSEDE", "CONTRADICT"]).optional(),
+              targetId: z.string().optional(),
+              payload: z.record(z.string(), z.unknown()),
+              at: z.string().optional(),
+              alsoSources: z.array(z.string()).optional(),
+              reason: z.string().optional(),
+              quote: z.string().optional(),
+            })
+          )
+          .min(1)
+          .max(60),
+      }),
+      annotations: TOOL_ANNOTATIONS.propose_knowledge,
+    },
+    async (
+      args: {
+        client: string;
+        sourceCode?: string;
+        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT"; title: string; date?: string; participants?: string[]; firefliesId?: string; documentId?: string; topicsOnly?: boolean };
+        note?: string;
+        items: ProposalItemInput[];
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        if (!args.sourceCode && !args.newSource) return toolText("Say where this comes from: pass `sourceCode` for a source already in the register, or `newSource`.");
+        const ns = args.newSource;
+        if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
+        const result = await proposeKnowledge(actor, {
+          clientId: client.value.id,
+          source: args.sourceCode
+            ? { code: args.sourceCode }
+            : {
+                kind: ns!.kind,
+                title: ns!.title,
+                occurredAt: ns!.date ? new Date(`${ns!.date}T00:00:00Z`) : null,
+                participants: ns!.participants,
+                externalIds: [ns!.firefliesId, ns!.documentId].filter((v): v is string => !!v),
+                restriction: ns!.topicsOnly ? "TOPICS_ONLY" : "NONE",
+              },
+          note: args.note,
+          via: "MCP",
+          items: args.items,
+        });
+        return toolJson({
+          ...result,
+          next:
+            result.proposed > 0
+              ? `${result.proposed} proposals are waiting for a person to approve them on Ankora's review screen (/app/knowledge). Nothing is in the file yet.`
+              : "Nothing was proposed.",
+        });
+      } catch (err) {
+        console.error("[mcp] propose_knowledge failed", err);
         return toolFailure(err);
       }
     }

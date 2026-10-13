@@ -138,6 +138,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ClientContact: { decision: "DUMP", table: "client_contacts", reason: "Who each person is to each client, and what is known about them. The client file itself." },
   ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
   ClientSource: { decision: "DUMP", table: "client_sources", reason: "The source register every item in the client file cites. Without it the codes mean nothing." },
+  KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
+  KnowledgeProposal: { decision: "DUMP", table: "knowledge_proposals", reason: "Proposals to client files and who decided them: the review history decision 1 is measured on." },
   ClientEntity: { decision: "DUMP", table: "client_entities", reason: "The client's legal entities and their registration details. People and systems point at them." },
   ClientFact: { decision: "DUMP", table: "client_facts", reason: "The client file's facts and their history: preferences, scope, decisions, open questions. Typed by people." },
   SystemAccess: { decision: "DUMP", table: "system_access", reason: "The client's system map: accounts, access status and blockers. Typed by people; no secrets (those are in the vault)." },

@@ -1402,6 +1402,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Daily cron: who is told about stale client-file items, at most weekly per person and client"
+    },
+    "action:(product)/app/(authenticated)/knowledge/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "The only way a proposal from Claude enters a client file: approve, edit and approve, reject"
+    },
+    "domain:knowledge-proposals": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Proposal rules: source required, secrets dropped with a task, topics-only quotes dropped, contradictions never overwrite, no approval without a person"
+    },
+    "screen:/app/knowledge": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Review screen for proposals to client files"
     }
   },
   "waivers": {},

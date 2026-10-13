@@ -19,6 +19,7 @@ import {
   User,
   ShieldCheck,
   KeyRound,
+  Inbox,
   type LucideIcon,
 } from "lucide-react";
 
@@ -33,6 +34,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/my-time": History,
   "/app/tasks": ListChecks,
   "/app/supervising": ShieldCheck,
+  "/app/knowledge": Inbox,
   "/app/credentials": KeyRound,
   "/app/clients": Users,
   "/app/categories": Tag,

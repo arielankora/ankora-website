@@ -37,7 +37,7 @@ const RELATIONSHIP: Record<string, string> = {
 };
 
 /// The entity types whose changes make up section 16.
-const FILE_ENTITY_TYPES = ["ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity"];
+const FILE_ENTITY_TYPES = ["ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -94,6 +94,9 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       f.kind === "TEMPORARY" && isPastValidity(f, now) ? "עבר התוקף, לבדוק שעדיין נכון" : null,
       f.kind === "ONE_OFF_DECISION" ? [day(f.decidedAt), f.decidedBy].filter(Boolean).join(", ") : null,
       f.answer ? `תשובה: ${f.answer}` : null,
+      ...(Array.isArray(f.alternatives) ? (f.alternatives as { value?: unknown; sources?: unknown }[]) : [])
+        .filter((a) => typeof a?.value === "string")
+        .map((a) => `גרסה אחרת: ${a.value as string}${readSourceRefs(a.sources).length ? ` [${readSourceRefs(a.sources).map(formatSourceRef).join(", ")}]` : ""}`),
       f.importance === "LOW" ? "לא קריטי" : null,
     ],
     ...knowledge(f),

@@ -30,6 +30,7 @@ import { SystemsPanel } from "./SystemsPanel";
 import { FactsPanel, type PanelFact } from "./FactsPanel";
 import { EntitiesPanel } from "./EntitiesPanel";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
+import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listCredentials } from "@/lib/app-domain/credentials";
@@ -74,7 +75,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -104,6 +105,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     listClientFacts(user, client.id),
     // Spec 3.3: the legal entities people and systems belong to.
     listClientEntities(user, client.id),
+    // Spec 5.2: what Claude proposed for this file and nobody approved yet.
+    countPendingProposals(user, client.id),
   ]);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
@@ -144,6 +147,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
       doNotDisclose: f.doNotDisclose,
       sources: readSourceRefs(f.sources).map(formatSourceRef),
       supersededAt: iso(f.supersededAt),
+      alternatives: (Array.isArray(f.alternatives) ? (f.alternatives as { value?: unknown; sources?: unknown }[]) : [])
+        .filter((a) => typeof a?.value === "string")
+        .map((a) => ({ value: a.value as string, sources: readSourceRefs(a.sources).map(formatSourceRef) })),
     };
   };
   const taskCategories = allCategories
@@ -178,6 +184,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 claude/client-communication-rule-2026-09-25.md. */}
             <div className="flex flex-wrap items-center gap-3">
               {/* The file to read, top to bottom, and to download. */}
+              {pendingProposals > 0 && (
+                <Link href={`/app/knowledge?clientId=${client.id}`} className="text-sm text-warning hover:underline">
+                  {pendingProposals === 1 ? "הצעה אחת ממתינה לאישור" : `${pendingProposals} הצעות ממתינות לאישור`}
+                </Link>
+              )}
               <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-gold-dim hover:underline">
                 תיק הלקוח לקריאה
               </Link>

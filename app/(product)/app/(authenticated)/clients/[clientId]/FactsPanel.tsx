@@ -59,6 +59,8 @@ export type PanelFact = {
   doNotDisclose: string | null;
   sources: string[];
   supersededAt: string | null;
+  /// Other versions somebody said, each with its sources (spec 5.2).
+  alternatives: { value: string; sources: string[] }[];
 };
 
 type Option = { value: string; label: string };
@@ -309,6 +311,12 @@ function FactRow({
             </p>
           )}
           {closed && <p className="mt-1 text-xs text-appNavy/50">נסגר ב-{dateLabel(fact.closedAt)}</p>}
+          {fact.alternatives.map((a, i) => (
+            <p key={i} className="mt-1 text-xs text-warning">
+              גרסה אחרת: {a.value}
+              {a.sources.length > 0 && <span dir="ltr"> [{a.sources.join(", ")}]</span>}
+            </p>
+          ))}
           {pastValidity && (
             <div className="mt-1.5">
               <StatusBadge label="עבר התוקף. עדיין נכון?" tone="amber" />

@@ -535,6 +535,7 @@ model Client {
   systems       SystemAccess[]
   facts         ClientFact[]
   entities      ClientEntity[]
+  knowledgeBatches KnowledgeBatch[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -3057,4 +3058,99 @@ model ClientEntity {
 
   @@index([clientId, deletedAt])
   @@map("client_entities")
+}
+
+/// Where a batch of proposals came from (spec 5.1).
+enum KnowledgeBatchVia {
+  /// propose_knowledge, from Claude.
+  MCP
+  SCREEN
+}
+
+enum ProposalTarget {
+  FACT
+  CONTACT
+  ORGANIZATION
+  SYSTEM
+}
+
+/// What approving a proposal does.
+enum ProposalAction {
+  /// A new item in the file.
+  CREATE
+  /// A new version of an existing fact; the old one is kept as superseded.
+  SUPERSEDE
+  /// A contradiction of an existing fact. Nothing is overwritten: the
+  /// claim joins the fact's alternatives, and the fact becomes uncertain.
+  CONTRADICT
+}
+
+enum ProposalState {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// One delivery of proposals: usually one meeting or one document (spec
+/// 5.1, 5.2). Shown as one card in "ממתין לאישור".
+model KnowledgeBatch {
+  id       String            @id @default(cuid())
+  clientId String
+  /// The source in the client's register. Created, or found by its
+  /// recording, when the batch arrives.
+  sourceId String?
+  via      KnowledgeBatchVia @default(MCP)
+  /// A line from whoever sent it: what was read, what was left out.
+  note     String?
+  /// Items that never became proposals, and why: secrets (never stored,
+  /// only counted) and quotes from a topics-only source.
+  dropped  Json              @default("[]")
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  closedAt    DateTime?
+
+  client    Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  proposals KnowledgeProposal[]
+
+  @@index([clientId, closedAt])
+  @@map("knowledge_batches")
+}
+
+/// One proposed item (spec 5.2). Nothing reaches the file until a person
+/// approves it on the screen (decision 1): there is no tool that approves.
+model KnowledgeProposal {
+  id       String         @id @default(cuid())
+  batchId  String
+  clientId String
+  target   ProposalTarget
+  action   ProposalAction @default(CREATE)
+  /// For SUPERSEDE and CONTRADICT: the fact it is about.
+  targetId String?
+  /// The item as it would be written: the same fields the screens send.
+  payload  Json
+  /// Why Claude thinks so, in a sentence.
+  reason   String?
+  /// A short quote from the source, when the source allows quotes.
+  quote    String?
+  /// Rule flags found when the proposal arrived: [{ code, message }].
+  flags    Json           @default("[]")
+
+  state        ProposalState @default(PENDING)
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+  /// Whether the person changed it before approving (decision 1 measures
+  /// this: under 10% after a month opens approval in conversation).
+  edited       Boolean       @default(false)
+  /// The item approving it created or changed.
+  resultId     String?
+
+  createdAt DateTime @default(now())
+
+  batch KnowledgeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, state])
+  @@index([batchId])
+  @@map("knowledge_proposals")
 }
