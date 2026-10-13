@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
-import { updateMyEntryAction, deleteMyEntryAction } from "./actions";
+import { startTransition, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { updateMyEntryAction, deleteMyEntryAction, type SavedEntry } from "./actions";
+import { useActionForm } from "@/components/app/useActionForm";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatClockMinutes } from "@/lib/hours-format";
 
@@ -36,19 +37,6 @@ type Entry = {
   updatedAt: string;
 };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
-    >
-      {pending ? "שומר..." : "שמירה"}
-    </button>
-  );
-}
-
 function timeKey(iso: string): string {
   return new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit",
@@ -76,42 +64,85 @@ function formatDuration(seconds: number | null): string {
 /// instead of `error` - shown inline with a "שמירה בכל זאת" choice that
 /// resubmits the same edit plus a confirmation flag. A same-client
 /// conflict is still the existing hard `error`.
-export function EntryRow({ entry }: { entry: Entry }) {
-  const [state, formAction] = useFormState(updateMyEntryAction, {});
+export function EntryRow({ entry: fromServer }: { entry: Entry }) {
+  // 13.10.2026: the edit and the delete answer from the action itself.
+  //
+  // Both used to be `<form action>`, the edit through `useFormState`. That
+  // ties the form's pending state to the re-render `revalidatePath` sends
+  // back inside the action's response, and in about one write in four the
+  // browser never applied it: the edit sat on "שומר..." forever and a
+  // deleted entry stayed listed, both already done in the database. Found
+  // the first time the browser suite actually ran these two steps
+  // (claude/e2e-silent-and-racing-2026-10-12.md). useActionForm is the fix
+  // this app already settled on for the same coupling; see its header.
+  //
+  // And because the re-render is the part that went missing, the row does
+  // not wait for it either. An accepted edit shows what the server says it
+  // wrote, and an accepted delete takes the row off the screen. The server
+  // still decides: the moment it sends this entry again with a newer
+  // version, that is what shows.
+  const [saved, setSaved] = useState<SavedEntry | null>(null);
+  const [removed, setRemoved] = useState(false);
+  const entry: Entry =
+    saved && saved.id === fromServer.id && saved.updatedAt > fromServer.updatedAt ? { ...fromServer, ...saved } : fromServer;
+
   const [editing, setEditing] = useState(false);
   const [warningDismissed, setWarningDismissed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
 
-  // Bug fix (docs/adr/0001 section 19.12, live report from Ariel: "clicking
-  // save gives no indication anything happened"). updateMyEntryAction
-  // always returned { ok: true } on success, but this component never
-  // read state.ok - only state.error was rendered, so a successful save
-  // left the edit form open with its original (now stale) defaultValue
-  // inputs and no visible change at all. Closing the form on success is
-  // the fix: revalidatePath() has already refreshed the server-rendered
-  // entry, so collapsing back to the display view immediately shows the
-  // new saved values - an unambiguous, honest signal that the save
-  // worked, instead of a toast that could lie if the save silently failed
-  // to persist for some other reason.
+  // Spec 19.12 (live report from Ariel: "clicking save gives no indication
+  // anything happened"): an accepted save closes the form, so the row
+  // itself, now showing the saved values, is the signal.
+  const { onSubmit, pending, result, error } = useActionForm(updateMyEntryAction, (answer) => {
+    if (answer.entry) setSaved(answer.entry);
+    setEditing(false);
+  });
+
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const router = useRouter();
+  async function remove() {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      const answer = await deleteMyEntryAction(entry.id);
+      if (answer.ok) setRemoved(true);
+      else setDeleteError(answer.error ?? "המחיקה נכשלה.");
+    } catch {
+      setDeleteError("אירעה שגיאה. נסו שוב.");
+    } finally {
+      setDeleting(false);
+    }
+  }
+  // The day and week totals around this row are the server's, so it is
+  // still asked to re-read the screen, from an effect, after the row has
+  // gone: the same rule useActionForm follows for a form that stays put.
   useEffect(() => {
-    if (state?.ok) setEditing(false);
-    if (state?.overlapWarning) setWarningDismissed(false);
+    if (!removed) return;
+    startTransition(() => router.refresh());
+  }, [removed, router]);
+
+  useEffect(() => {
+    if (result?.overlapWarning) setWarningDismissed(false);
     // A confirmation belongs to the submission it was given for. The flag lives
     // in a ref, so it survives a re-submit; clear it whenever the server comes
     // back with a plain error, or the next attempt would carry a consent the
     // person was never asked for again.
-    if (state?.error && confirmOverlapRef.current) confirmOverlapRef.current.value = "false";
-  }, [state]);
+    if (result?.error && confirmOverlapRef.current) confirmOverlapRef.current.value = "false";
+  }, [result]);
 
   function saveAnyway() {
     if (confirmOverlapRef.current) confirmOverlapRef.current.value = "true";
     formRef.current?.requestSubmit();
   }
 
+  if (removed) return null;
+
   if (editing) {
     return (
-      <form ref={formRef} action={formAction} className="space-y-3 px-5 py-4">
+      <form ref={formRef} onSubmit={onSubmit} className="space-y-3 px-5 py-4">
         <input type="hidden" name="timeEntryId" value={entry.id} />
         <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
         <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
@@ -163,11 +194,11 @@ export function EntryRow({ entry }: { entry: Entry }) {
             className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold sm:w-1/2"
           />
         </div>
-        {state?.overlapWarning && !warningDismissed && (
+        {result?.overlapWarning && !warningDismissed && (
           <div className="rounded-[10px] border border-warning/35 bg-warning-soft px-3 py-2.5 text-xs text-warning">
             <p>
-              קיים כבר דיווח בשעה זו עבור {state.overlapWarning.clientName} (
-              {formatTimeRange(state.overlapWarning.startAt, state.overlapWarning.endAt)}). דיווח מקביל אפשרי
+              קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
+              {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
               רק כשמדובר בלקוחות שונים - אם אכן כך, אפשר לשמור בכל זאת.
             </p>
             <div className="mt-2 flex items-center gap-3">
@@ -189,11 +220,17 @@ export function EntryRow({ entry }: { entry: Entry }) {
           </div>
         )}
         <div className="flex items-center gap-3">
-          <SubmitButton />
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
+          >
+            {pending ? "שומר..." : "שמירה"}
+          </button>
           <button type="button" onClick={() => setEditing(false)} className="text-xs text-appNavy/60 hover:text-appNavy">
             ביטול
           </button>
-          {state?.error && <p className="text-xs text-red-600">{state.error}</p>}
+          {error && <p className="text-xs text-red-600">{error}</p>}
         </div>
       </form>
     );
@@ -226,13 +263,16 @@ export function EntryRow({ entry }: { entry: Entry }) {
         >
           עריכה
         </button>
-        <form action={deleteMyEntryAction}>
-          <input type="hidden" name="timeEntryId" value={entry.id} />
-          <button type="submit" className="text-xs text-appNavy/50 hover:text-error">
-            מחיקה
-          </button>
-        </form>
+        <button
+          type="button"
+          onClick={() => void remove()}
+          disabled={deleting}
+          className="text-xs text-appNavy/50 hover:text-error disabled:opacity-50"
+        >
+          {deleting ? "מוחק..." : "מחיקה"}
+        </button>
       </div>
+      {deleteError && <p className="w-full text-xs text-red-600">{deleteError}</p>}
     </div>
   );
 }
