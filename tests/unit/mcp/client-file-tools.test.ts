@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const view = vi.hoisted(() => ({ buildClientFile: vi.fn() }));
 const proposals = vi.hoisted(() => ({ proposeKnowledge: vi.fn() }));
+const contacts = vi.hoisted(() => ({ lookupContact: vi.fn() }));
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
@@ -23,6 +24,7 @@ const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
 vi.mock("@/lib/app-domain/client-file-view", () => view);
 vi.mock("@/lib/app-domain/knowledge-proposals", () => proposals);
+vi.mock("@/lib/app-domain/client-contacts", () => contacts);
 vi.mock("@/lib/app-domain/mcp-files", () => ({}));
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: [] }));
@@ -121,6 +123,16 @@ describe("propose_knowledge", () => {
 
   it("there is no tool that approves", () => {
     expect([...tools.keys()].some((n) => /approve/.test(n))).toBe(false);
+  });
+});
+
+describe("lookup_contact", () => {
+  it("is a read, and returns what the domain allows, nothing more", async () => {
+    expect(TOOL_ANNOTATIONS.lookup_contact.readOnlyHint).toBe(true);
+    contacts.lookupContact.mockResolvedValue([{ name: "שני הלוי", client: "NUX", role: "VP Finance", relationship: "PROVIDER", organization: "Nextage", isPrimary: false, isDecisionMaker: false }]);
+    const r = await tools.get("lookup_contact")!.handler({ query: "shani@nextage.co.il" }, CTX);
+    expect(contacts.lookupContact).toHaveBeenCalledWith(ACTOR, "shani@nextage.co.il");
+    expect(JSON.parse(r.content[0].text!)).toEqual({ count: 1, matches: [expect.objectContaining({ name: "שני הלוי", client: "NUX" })] });
   });
 });
 

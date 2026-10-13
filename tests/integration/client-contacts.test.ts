@@ -154,3 +154,23 @@ describe("client organizations: one firm, linked per client", () => {
     await expect(addClientOrganization(user, { clientId: a.id, sources: S1, name: "Nextage" })).rejects.toThrow("כבר בתיק");
   });
 });
+
+describe("lookup_contact", () => {
+  it("finds the person by address or number, only in clients this person can reach, never what the audience hides", async () => {
+    const { lookupContact } = await import("@/lib/app-domain/client-contacts");
+    const nux = await createTestClient({ name: "NUX" });
+    const other = await createTestClient({ name: "Other" });
+    const both = await employeeOn(nux.id, other.id);
+    const onlyNux = await employeeOn(nux.id);
+
+    await addClientContact(both, { clientId: nux.id, name: "שני הלוי", role: "VP Finance", relationship: "PROVIDER", emails: ["shani@nextage.co.il"], phones: ["054-1234567"], organizationName: "Nextage", sources: S1 });
+    await addClientContact(both, { clientId: other.id, name: "שני", role: "רו״ח", emails: ["shani@nextage.co.il"], sources: S1 });
+
+    expect((await lookupContact(both, "SHANI@nextage.co.il")).map((m) => m.client).sort()).toEqual(["NUX", "Other"]);
+    const fromNux = await lookupContact(onlyNux, "+972 54-123-4567");
+    expect(fromNux).toEqual([expect.objectContaining({ name: "שני הלוי", client: "NUX", role: "VP Finance", organization: "Nextage" })]);
+    expect(JSON.stringify(fromNux)).not.toContain("@");
+    expect(await lookupContact(onlyNux, "nobody@nowhere.com")).toEqual([]);
+    await expect(lookupContact(onlyNux, "not an address")).rejects.toThrow("מייל או מספר");
+  });
+});

@@ -8,6 +8,7 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
 import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
+import { lookupContact } from "@/lib/app-domain/client-contacts";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.3 and 8): the
 // client file, for Claude.
@@ -136,6 +137,27 @@ export function registerClientFileTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] propose_knowledge failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "lookup_contact",
+    {
+      title: "Look up a contact",
+      description:
+        "Who is behind one email address or phone number: their name, and for each of the user's clients whose file has them, their role there, relationship (client staff, provider, advisor...) and organization. Use it to know who wrote a message or who is on a call. It returns no other contact details and never a client the user cannot reach; an empty list means nobody in the user's clients' files has that address or number.",
+      inputSchema: z.object({ query: z.string().describe("One email address or one phone number.") }),
+      annotations: TOOL_ANNOTATIONS.lookup_contact,
+    },
+    async (args: { query: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const matches = await lookupContact(actor, args.query);
+        return toolJson({ count: matches.length, matches });
+      } catch (err) {
+        console.error("[mcp] lookup_contact failed", err);
         return toolFailure(err);
       }
     }

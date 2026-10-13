@@ -394,3 +394,43 @@ export async function listClientPeople(actor: User, clientId: string) {
 
   return { contacts: visibleContacts, organizations: visibleOrganizations };
 }
+
+// ---------------------------------------------------------------------------
+// Who is this? (spec 8, lookup_contact)
+// ---------------------------------------------------------------------------
+
+/// One address or number in, who it is out: for each client this person
+/// can reach and whose file has them, the name, role, relationship and
+/// organization. Never the other details, never a client the person
+/// cannot reach, and never an item its audience hides or that is marked
+/// sensitive. This is how Claude knows who wrote an email without anybody
+/// handing it the list of all contacts (spec 6.3).
+export async function lookupContact(actor: User, query: string) {
+  assertCan(actor.role, "time_entry.create_self");
+  const email = normalizeEmail(query);
+  const phone = email ? null : normalizePhone(query);
+  if (!email && !phone) throw new Error("צריך כתובת מייל או מספר טלפון.");
+  const person = await prisma.person.findFirst({
+    where: { deletedAt: null, ...(email ? { emails: { has: email } } : { phones: { has: phone! } }) },
+    include: { organization: { select: { name: true } } },
+  });
+  if (!person) return [];
+  const accessible = await listAccessibleClients(actor);
+  const managerOf = new Map(accessible.map((c) => [c.id, c.accountManagerId]));
+  const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
+  const links = await prisma.clientContact.findMany({
+    where: { personId: person.id, deletedAt: null, clientId: { in: accessible.map((c) => c.id) }, sensitivity: "NORMAL" },
+    include: { client: { select: { name: true } } },
+  });
+  return links
+    .filter((l) => canSeeKnowledgeItem(l, viewer, managerOf.get(l.clientId) ?? null))
+    .map((l) => ({
+      name: person.name,
+      client: l.client.name,
+      role: l.role,
+      relationship: l.relationship,
+      organization: person.organization?.name ?? null,
+      isPrimary: l.isPrimary,
+      isDecisionMaker: l.isDecisionMaker,
+    }));
+}

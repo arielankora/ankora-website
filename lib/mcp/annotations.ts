@@ -97,6 +97,8 @@ export const TOOL_ANNOTATIONS = {
   // Each call adds a batch of proposals (and may register a source). It
   // writes nothing into the file itself: a person approves on the screen.
   propose_knowledge: WRITES,
+  // One address or number in, who it is out (spec 8).
+  lookup_contact: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
