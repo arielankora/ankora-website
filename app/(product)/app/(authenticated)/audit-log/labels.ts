@@ -56,6 +56,8 @@ export const ENTITY_TYPES = [
   "ClientEntity",
   "KnowledgeBatch",
   "KnowledgeProposal",
+  "RequestType",
+  "ClientNarrative",
   "PortalSummary",
 ];
 
@@ -102,6 +104,10 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge_batch.propose": "הצעות חדשות לתיק הלקוח מ-Claude",
   "knowledge_proposal.approve": "אישור הצעה לתיק הלקוח",
   "knowledge_proposal.reject": "דחיית הצעה לתיק הלקוח",
+  "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
+  "request_type.update": "עדכון סוג פנייה בתיק הלקוח",
+  "request_type.remove": "הסרת סוג פנייה מתיק הלקוח",
+  "client_narrative.save": "גרסה חדשה לטקסט בתיק הלקוח",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",

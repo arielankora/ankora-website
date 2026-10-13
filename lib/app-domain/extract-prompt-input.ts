@@ -7,6 +7,7 @@ import { listClientSources, listClientDomains } from "@/lib/app-domain/client-so
 import { listClientPeople } from "@/lib/app-domain/client-contacts";
 import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
+import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { prisma } from "@/lib/prisma";
 
 // The input to "חלץ ידע עם קלוד" (lib/extract-prompt.ts). Gathered through
@@ -15,13 +16,14 @@ import { prisma } from "@/lib/prisma";
 // sensitive (spec 6.3). A pasted prompt leaves the product.
 
 export async function extractPromptFor(actor: User, clientId: string): Promise<string> {
-  const [client, facts, people, systems, sources, domains] = await Promise.all([
+  const [client, facts, people, systems, sources, domains, requestTypes] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true } }),
     listClientFacts(actor, clientId),
     listClientPeople(actor, clientId),
     listSystemMap(actor, clientId),
     listClientSources(actor, clientId),
     listClientDomains(actor, clientId),
+    listRequestTypes(actor, clientId),
   ]);
   const shown = <T extends { sensitivity: string }>(rows: T[]) => rows.filter((r) => r.sensitivity !== "SENSITIVE");
   const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -36,6 +38,7 @@ export async function extractPromptFor(actor: User, clientId: string): Promise<s
     people: shown(people.contacts).map((c) => [c.person.name, c.role].filter(Boolean).join(", ")),
     organizations: shown(people.organizations).map((o) => o.organization.name),
     systems: shown(systems).map((s) => s.systemName),
+    requestTypes: shown(requestTypes).map((r) => r.title),
     sources: sources.map((s) => ({
       code: s.code,
       title: s.title,

@@ -165,6 +165,14 @@ export async function countSourceUses(clientId: string, code: string): Promise<n
       +
       (SELECT count(*) FROM "client_entities"
         WHERE "clientId" = ${clientId} AND "deletedAt" IS NULL AND "sources" @> ${needle}::jsonb)
+      +
+      (SELECT count(*) FROM "request_types"
+        WHERE "clientId" = ${clientId} AND "deletedAt" IS NULL
+          AND ("sources" @> ${needle}::jsonb OR "handling" ~* ${cited}))
+      +
+      (SELECT count(*) FROM "client_narratives" n
+        WHERE n."clientId" = ${clientId} AND n."body" ~* ${cited}
+          AND n."version" = (SELECT max(m."version") FROM "client_narratives" m WHERE m."clientId" = n."clientId" AND m."kind" = n."kind"))
       AS n`;
   return Number(rows[0]?.n ?? 0);
 }

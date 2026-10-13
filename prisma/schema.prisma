@@ -536,6 +536,8 @@ model Client {
   facts         ClientFact[]
   entities      ClientEntity[]
   knowledgeBatches KnowledgeBatch[]
+  requestTypes     RequestType[]
+  narratives       ClientNarrative[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -3055,6 +3057,7 @@ model ClientEntity {
   subsidiaries ClientEntity[]  @relation("EntityParent")
   contacts     ClientContact[]
   systems      SystemAccess[]
+  requestTypes RequestType[]
 
   @@index([clientId, deletedAt])
   @@map("client_entities")
@@ -3153,4 +3156,84 @@ model KnowledgeProposal {
   @@index([clientId, state])
   @@index([batchId])
   @@map("knowledge_proposals")
+}
+
+/// What comes in from whom, and how it is answered (spec 3.7, section 7.5
+/// of Hadas's file): "an Inc invoice from a supplier, to billing-us,
+/// forwarded to Shani and Jenan, not to Ayala". Probably the most useful
+/// thing in the file for a new Operations Manager's first day.
+model RequestType {
+  id       String @id @default(cuid())
+  clientId String
+
+  title      String
+  /// Supplier, employee, Nextage, a system.
+  fromWho    String?
+  /// billing-us, WhatsApp, Slack, office@.
+  arrivesVia String?
+  /// How it is answered and where it goes.
+  handling   String
+  /// Who it is routed to: contacts in this client's file.
+  routeToContactIds String[] @default([])
+  /// When it belongs to one entity (an Inc invoice).
+  entityId   String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, deletedAt])
+  @@map("request_types")
+}
+
+enum NarrativeKind {
+  /// Who the client is, in a paragraph.
+  OVERVIEW
+  /// How we got here.
+  BACKGROUND
+  /// What Ankora does for them.
+  OUR_ROLE
+}
+
+/// The file's free text (spec 3.3, section 2 of Hadas's file), versioned
+/// like a task plan: every save is a new row, so nothing is overwritten
+/// and any version can be read again.
+model ClientNarrative {
+  id       String        @id @default(cuid())
+  clientId String
+  kind     NarrativeKind
+  version  Int
+  /// Markdown, the product's small subset (lib/markdown-lite.ts). Source
+  /// codes cited in it ("[S1 08:13]") must exist in the register.
+  body     String
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, kind, version])
+  @@map("client_narratives")
 }

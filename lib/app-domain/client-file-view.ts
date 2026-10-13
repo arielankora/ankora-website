@@ -13,6 +13,8 @@ import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { listImportantDates } from "@/lib/app-domain/important-dates";
+import { listRequestTypes } from "@/lib/app-domain/request-types";
+import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 
@@ -37,7 +39,7 @@ const RELATIONSHIP: Record<string, string> = {
 };
 
 /// The entity types whose changes make up section 16.
-const FILE_ENTITY_TYPES = ["ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
+const FILE_ENTITY_TYPES = ["RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -58,7 +60,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity }) => !ai || r.sensitivity !== "SENSITIVE";
 
-  const [client, entities, people, facts, systems, sources, dates, audit] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -72,7 +74,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       take: 20,
       select: { action: true, createdAt: true, actor: { select: { name: true } } },
     }),
+    listRequestTypes(actor, clientId),
+    listNarratives(actor, clientId),
   ]);
+  const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
   const contacts = people.contacts.filter(shown);
@@ -124,9 +129,16 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     },
     {
       number: "2",
-      title: "תחום האחריות שלנו",
+      title: "סקירה, רקע ותפקידנו",
       empty: "עוד לא נכתב מה בתחום ומה מחוץ לו.",
       items: [
+        ...[
+          ["OVERVIEW", "סקירה"],
+          ["BACKGROUND", "רקע"],
+          ["OUR_ROLE", "התפקיד שלנו"],
+        ]
+          .filter(([k]) => narrative(k))
+          .map(([k, label]) => ({ text: `${label}: ${narrative(k)}` })),
         ...of("SCOPE_IN").map((f) => ({ ...factItem(f), group: "בתחום" })),
         ...of("SCOPE_OUT").map((f) => ({ ...factItem(f), group: "מחוץ לתחום" })),
       ],
@@ -189,6 +201,16 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       })),
     },
     { number: "7.3", title: "מקורות ידע ומיקומים", empty: "עוד לא נכתב איפה נמצא הידע.", items: of("LOCATION").map(factItem) },
+    {
+      number: "7.5",
+      title: "סוגי פניות ודרכי מענה",
+      empty: "עוד לא נכתב מה מגיע, ממי ואיך עונים.",
+      items: requestTypes.filter(shown).map((r) => ({
+        text: r.title,
+        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, r.routeToNames.length ? `מפנים ל: ${r.routeToNames.join(", ")}` : null],
+        ...knowledge(r),
+      })),
+    },
     { number: "8", title: "כספים", empty: "אין עדיין עובדות כספיות.", items: of("FINANCE").map(factItem) },
     {
       number: "9",

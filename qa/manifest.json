@@ -1434,6 +1434,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Builds the extraction prompt that leaves the product: names only, no contact details, nothing sensitive"
+    },
+    "action:(product)/app/(authenticated)/clients/file-text-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes request types and the client file's versioned free text"
+    },
+    "domain:client-narratives": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Versioned free text: conflict on stale save, cited source codes must exist"
+    },
+    "domain:request-types": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Request types route only to contacts in the same client's file"
     }
   },
   "waivers": {},

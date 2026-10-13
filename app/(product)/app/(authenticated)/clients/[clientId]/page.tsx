@@ -31,6 +31,11 @@ import { FactsPanel, type PanelFact } from "./FactsPanel";
 import { EntitiesPanel } from "./EntitiesPanel";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
+import { RequestTypesPanel } from "./RequestTypesPanel";
+import { NarrativesPanel } from "./NarrativesPanel";
+import { listRequestTypes } from "@/lib/app-domain/request-types";
+import { listNarratives } from "@/lib/app-domain/client-narratives";
+import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listCredentials } from "@/lib/app-domain/credentials";
@@ -75,7 +80,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -107,7 +112,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     listClientEntities(user, client.id),
     // Spec 5.2: what Claude proposed for this file and nobody approved yet.
     countPendingProposals(user, client.id),
+    // Spec 3.7 and 3.3: request types, and the file's free text.
+    listRequestTypes(user, client.id),
+    listNarratives(user, client.id),
   ]);
+  const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
   const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title }));
@@ -201,6 +210,22 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           <EditClientForm client={client} staff={staff} />
         </div>
 
+        <NarrativesPanel
+          clientId={client.id}
+          narratives={narratives.map((n) => ({
+            kind: n.kind,
+            version: n.current?.version ?? 0,
+            body: n.current?.body ?? "",
+            html: n.current ? renderMarkdownLite(n.current.body) : "",
+            meta: n.current ? `גרסה ${n.current.version}, ${shortDate(n.current.createdAt)}${n.current.createdByName ? `, ${n.current.createdByName}` : ""}` : null,
+            history: n.history.map((h) => ({
+              version: h.version,
+              meta: `גרסה ${h.version}, ${shortDate(h.createdAt)}${h.createdByName ? `, ${h.createdByName}` : ""}`,
+              html: renderMarkdownLite(h.body),
+            })),
+          }))}
+        />
+
         <EntitiesPanel
           clientId={client.id}
           sourceOptions={sourceOptions}
@@ -277,6 +302,27 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           subjects={subjects}
           facts={facts.current.map(toPanelFact)}
           history={facts.superseded.map(toPanelFact)}
+        />
+
+        <RequestTypesPanel
+          clientId={client.id}
+          sourceOptions={sourceOptions}
+          entities={entityOptions}
+          contacts={people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" }))}
+          requestTypes={requestTypes.map((r) => ({
+            id: r.id,
+            title: r.title,
+            fromWho: r.fromWho,
+            arrivesVia: r.arrivesVia,
+            handling: r.handling,
+            routeToContactIds: r.routeToContactIds,
+            routeToNames: r.routeToNames,
+            entityId: r.entityId,
+            entityName: r.entity?.name ?? null,
+            status: effectiveStatus(r.knowledgeStatus, parseFieldStatus(r.fieldStatus)),
+            toResolve: r.toResolve,
+            sources: readSourceRefs(r.sources).map(formatSourceRef),
+          }))}
         />
 
         <SystemsPanel

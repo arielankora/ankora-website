@@ -45,6 +45,8 @@ const TABLES = [
   // otherwise survive every reset.
   "client_contacts",
   "client_organizations",
+  "request_types",
+  "client_narratives",
   "knowledge_proposals",
   "knowledge_batches",
   "client_facts",

@@ -34,6 +34,7 @@ export type ExtractPromptInput = {
   people: string[];
   organizations: string[];
   systems: string[];
+  requestTypes?: string[];
   sources: ExtractPromptSource[];
   domains: string[];
   /// A meeting or document the person already chose, if any.
@@ -87,6 +88,7 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
     if (input.people.length) out.push(`אנשים: ${input.people.join(", ")}`);
     if (input.organizations.length) out.push(`ספקים ונותני שירות: ${input.organizations.join(", ")}`);
     if (input.systems.length) out.push(`מערכות: ${input.systems.join(", ")}`);
+    if (input.requestTypes?.length) out.push(`סוגי פניות: ${input.requestTypes.join(", ")}`);
   }
   out.push("");
 
