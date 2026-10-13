@@ -27,6 +27,8 @@ import { SourcesPanel } from "./SourcesPanel";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { SystemsPanel } from "./SystemsPanel";
+import { FactsPanel, type PanelFact } from "./FactsPanel";
+import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listCredentials } from "@/lib/app-domain/credentials";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
@@ -70,7 +72,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -96,8 +98,48 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // (names only, and only for people who may open the vault).
     listSystemMap(user, client.id),
     can(user.role, "credential.view") ? listCredentials(user, client.id) : Promise.resolve(null),
+    // Spec 3.4: the facts, current and superseded.
+    listClientFacts(user, client.id),
   ]);
   const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title }));
+  // Whose preference a fact is: someone already in this client's file.
+  const subjects = [
+    ...people.contacts.map((c) => ({ value: `contact:${c.id}`, label: c.person.name ?? c.role ?? "" })),
+    ...people.organizations.map((o) => ({ value: `org:${o.id}`, label: o.organization.name })),
+  ];
+  const subjectLabel = new Map(subjects.map((s) => [s.value, s.label]));
+  const staffName = new Map(staff.map((s) => [s.id, s.name]));
+  const renderedAt = Date.now();
+  const iso = (d: Date | null) => (d ? d.toISOString() : null);
+  const toPanelFact = (f: (typeof facts.current)[number]): PanelFact => {
+    const subjectKey = f.subjectContactId ? `contact:${f.subjectContactId}` : f.subjectOrgId ? `org:${f.subjectOrgId}` : "";
+    return {
+      id: f.id,
+      kind: f.kind,
+      topic: f.topic,
+      body: f.body,
+      subject: subjectKey ? subjectLabel.get(subjectKey) ?? null : null,
+      subjectKey,
+      referTo: f.referTo,
+      validUntil: iso(f.validUntil),
+      validUntilEvent: f.validUntilEvent,
+      closedAt: iso(f.closedAt),
+      decidedAt: iso(f.decidedAt),
+      decidedBy: f.decidedBy,
+      assigneeId: f.assigneeId,
+      assigneeName: f.assigneeId ? staffName.get(f.assigneeId) ?? null : null,
+      answer: f.answer,
+      answeredAt: iso(f.answeredAt),
+      taskId: f.taskId,
+      status: effectiveStatus(f.knowledgeStatus, parseFieldStatus(f.fieldStatus)),
+      toResolve: f.toResolve,
+      lowImportance: f.importance === "LOW",
+      audience: f.audience,
+      doNotDisclose: f.doNotDisclose,
+      sources: readSourceRefs(f.sources).map(formatSourceRef),
+      supersededAt: iso(f.supersededAt),
+    };
+  };
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
     .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }));
@@ -174,6 +216,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             toResolve: o.toResolve,
             sources: readSourceRefs(o.sources).map(formatSourceRef),
           }))}
+        />
+
+        <FactsPanel
+          clientId={client.id}
+          now={renderedAt}
+          sourceOptions={sourceOptions}
+          staff={staff.map((s) => ({ value: s.id, label: s.name }))}
+          subjects={subjects}
+          facts={facts.current.map(toPanelFact)}
+          history={facts.superseded.map(toPanelFact)}
         />
 
         <SystemsPanel

@@ -533,6 +533,7 @@ model Client {
   sources       ClientSource[]
   domains       ClientDomain[]
   systems       SystemAccess[]
+  facts         ClientFact[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -2896,4 +2897,107 @@ model SystemAccess {
 
   @@index([clientId, deletedAt])
   @@map("system_access")
+}
+
+/// What a fact in the client file is (spec 3.4). Each kind is a section of
+/// Hadas's file.
+enum FactKind {
+  /// In scope for Ankora (section 2).
+  SCOPE_IN
+  /// Out of scope, and who handles it instead (section 2).
+  SCOPE_OUT
+  /// A preference, of the client or of one of their people (section 4).
+  PREFERENCE
+  /// A standing requirement of the client (section 5).
+  REQUIREMENT
+  /// Where knowledge lives: a drive, a channel, a mailbox (section 7.3).
+  LOCATION
+  /// A financial fact: a transfer limit, a payroll day (section 8).
+  FINANCE
+  /// True for now, with an end: a date or an event (section 11).
+  TEMPORARY
+  /// A decision taken once, with when and by whom (section 12).
+  ONE_OFF_DECISION
+  /// An open question, with who chases it (section 13).
+  QUESTION
+  NOTE
+}
+
+enum FactTopic {
+  COMMUNICATION
+  REPORTING
+  DOCUMENTS
+  AUTOMATION
+  ADMINS
+  PAYMENTS
+  SUPPLIERS
+  OTHER
+}
+
+/// Everything in the client file without a structure of its own
+/// (spec 3.4). A changed fact is never edited in place: the new one is
+/// added and the old one is marked SUPERSEDED, pointing at it.
+model ClientFact {
+  id       String   @id @default(cuid())
+  clientId String
+  kind     FactKind
+  topic    FactTopic?
+
+  /// The fact itself, in a sentence or two.
+  body             String
+  /// Whose preference: a contact or an organization in this client's
+  /// file. Neither means the client's own.
+  subjectContactId String?
+  subjectOrgId     String?
+  /// SCOPE_OUT: who handles it instead ("Nextage", "H-F, Ankora
+  /// coordinates").
+  referTo          String?
+
+  /// TEMPORARY: until a date, or until an event ("until the account joins
+  /// the organization"). At least one.
+  validUntil      DateTime?
+  validUntilEvent String?
+  /// A temporary fact found to be over. Kept, as history.
+  closedAt        DateTime?
+
+  /// ONE_OFF_DECISION: when, and who decided.
+  decidedAt DateTime?
+  decidedBy String?
+
+  /// QUESTION: who chases it, and the answer once there is one.
+  assigneeId String?
+  answeredAt DateTime?
+  answer     String?
+
+  /// Work that came out of this fact: a question turned into a task, or
+  /// the open issue behind a temporary fact.
+  taskId String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, kind, deletedAt])
+  @@map("client_facts")
 }

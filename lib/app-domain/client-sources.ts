@@ -158,6 +158,10 @@ export async function countSourceUses(clientId: string, code: string): Promise<n
       (SELECT count(*) FROM "system_access"
         WHERE "clientId" = ${clientId} AND "deletedAt" IS NULL
           AND ("sources" @> ${needle}::jsonb OR "notes" ~* ${cited}))
+      +
+      (SELECT count(*) FROM "client_facts"
+        WHERE "clientId" = ${clientId} AND "deletedAt" IS NULL
+          AND ("sources" @> ${needle}::jsonb OR "body" ~* ${cited} OR "answer" ~* ${cited}))
       AS n`;
   return Number(rows[0]?.n ?? 0);
 }

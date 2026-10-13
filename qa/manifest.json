@@ -1338,6 +1338,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "System map rules: no secrets stored, vault links same-client only and named only to vault viewers"
+    },
+    "action:(product)/app/(authenticated)/clients/fact-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client file's facts: supersede instead of overwrite, answers, question to task"
+    },
+    "domain:client-facts": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Fact rules: never overwritten, questions missing until answered with a source, subjects same-client only"
     }
   },
   "waivers": {},
