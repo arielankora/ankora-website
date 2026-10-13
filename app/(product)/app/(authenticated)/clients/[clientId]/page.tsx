@@ -176,7 +176,13 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 opens when they want to write to a client without a task
                 in mind. Nothing here sends by itself. See
                 claude/client-communication-rule-2026-09-25.md. */}
-            {composer && <MessageClient clientId={client.id} {...composer} />}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* The file to read, top to bottom, and to download. */}
+              <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-gold-dim hover:underline">
+                תיק הלקוח לקריאה
+              </Link>
+              {composer && <MessageClient clientId={client.id} {...composer} />}
+            </div>
           </div>
         </div>
 

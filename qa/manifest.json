@@ -1370,6 +1370,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Entity rules: per-field missing status, same-client links only, no cycles, no removal while in use"
+    },
+    "api:/api/clients/[clientId]/client-file": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Exports a whole client file as Markdown; must 404 for anyone not assigned"
+    },
+    "domain:client-file-view": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items"
+    },
+    "screen:/app/clients/[clientId]/client-file": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Read-only view of the client file"
     }
   },
   "waivers": {},

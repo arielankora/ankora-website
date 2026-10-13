@@ -49,6 +49,7 @@ import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
+import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
 import { appBaseUrl } from "@/lib/email-templates";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
@@ -1154,6 +1155,7 @@ export function registerAnkoraTools(server: McpServer): void {
   // Steps, comments, a full read of one task, and the portal's decisions.
   registerTaskExtraTools(server);
   registerDocumentTools(server);
+  registerClientFileTools(server);
 }
 
 export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";

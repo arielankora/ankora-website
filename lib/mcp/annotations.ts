@@ -91,6 +91,9 @@ export const TOOL_ANNOTATIONS = {
   // Issues an address; the filing happens when bytes arrive there. A second
   // call issues a second address and, used, a second document.
   start_document_upload: WRITES,
+  // The client file as one document (lib/mcp/client-file-tools.ts,
+  // 14.10.2026). Assembled on each call; nothing is written.
+  get_client_file: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
