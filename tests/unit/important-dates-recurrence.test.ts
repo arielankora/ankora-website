@@ -5,7 +5,10 @@ import {
   resolveHebrewMonthForYear,
   computeElapsedYears,
   formatElapsedYearsHebrew,
+  computeLeadDate,
+  recurrenceInputFromRow,
 } from "@/lib/app-domain/important-dates-recurrence";
+import { localDateKey } from "@/lib/timezone";
 
 // Phase 10 ("מועדים חשובים"). Unlike every other lib/app-domain/*.ts test
 // file in this suite, this one CAN and DOES run in this sandbox: the
@@ -190,5 +193,109 @@ describe("formatElapsedYearsHebrew()", () => {
 
   it("uses the plural numeric form for 3+ years", () => {
     expect(formatElapsedYearsHebrew(50)).toBe("50 שנים");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Org-brain spec 3.10 (13.10.2026): weekly, every N months, business-day
+// roll and business-day lead.
+// ---------------------------------------------------------------------------
+
+
+const TZ = "Asia/Jerusalem";
+const at = (key: string) => new Date(`${key}T09:00:00Z`); // noon-ish in Israel
+const keyOf = (d: Date | null) => (d ? localDateKey(d, TZ) : null);
+
+describe("computeNextOccurrence() - WEEKLY", () => {
+  it("every Thursday, from a Tuesday", () => {
+    const r = computeNextOccurrence({ calendarType: "GREGORIAN", month: 1, day: 1, recurrence: "WEEKLY", weekday: 4 }, at("2026-10-13"));
+    expect(keyOf(r)).toBe("2026-10-15");
+  });
+  it("today counts when today is the weekday", () => {
+    const r = computeNextOccurrence({ calendarType: "GREGORIAN", month: 1, day: 1, recurrence: "WEEKLY", weekday: 2 }, at("2026-10-13"));
+    expect(keyOf(r)).toBe("2026-10-13");
+  });
+  it("no weekday, no occurrence", () => {
+    const r = computeNextOccurrence({ calendarType: "GREGORIAN", month: 1, day: 1, recurrence: "WEEKLY", weekday: null }, at("2026-10-13"));
+    expect(r).toBeNull();
+  });
+});
+
+describe("computeNextOccurrence() - MONTHLY every N months", () => {
+  it("quarterly from January lands in January, April, July, October", () => {
+    const input = { calendarType: "GREGORIAN" as const, month: 1, day: 15, recurrence: "MONTHLY" as const, intervalMonths: 3 };
+    expect(keyOf(computeNextOccurrence(input, at("2026-10-13")))).toBe("2026-10-15");
+    expect(keyOf(computeNextOccurrence(input, at("2026-10-16")))).toBe("2027-01-15");
+  });
+  it("every 6 months from March: March and September", () => {
+    const input = { calendarType: "GREGORIAN" as const, month: 3, day: 1, recurrence: "MONTHLY" as const, intervalMonths: 6 };
+    expect(keyOf(computeNextOccurrence(input, at("2026-04-02")))).toBe("2026-09-01");
+  });
+  it("an interval of 1 or null is every month, as before", () => {
+    const input = { calendarType: "GREGORIAN" as const, month: 7, day: 25, recurrence: "MONTHLY" as const };
+    expect(keyOf(computeNextOccurrence(input, at("2026-10-13")))).toBe("2026-10-25");
+    expect(keyOf(computeNextOccurrence({ ...input, intervalMonths: 1 }, at("2026-10-13")))).toBe("2026-10-25");
+  });
+});
+
+describe("computeNextOccurrence() - roll to a business day", () => {
+  // NUX supplier payments: the 10th, or the business day before it.
+  const payments = {
+    calendarType: "GREGORIAN" as const,
+    month: 1,
+    day: 10,
+    recurrence: "MONTHLY" as const,
+    rollConvention: "PREVIOUS_BUSINESS_DAY" as const,
+    businessCalendar: "IL",
+  };
+  it("Saturday 10.10.2026 moves to Thursday 8.10", () => {
+    expect(keyOf(computeNextOccurrence(payments, at("2026-10-01")))).toBe("2026-10-08");
+  });
+  it("on Friday 9.10 that occurrence is over, and the next is 10.11", () => {
+    expect(keyOf(computeNextOccurrence(payments, at("2026-10-09")))).toBe("2026-11-10");
+  });
+  it("NEXT_BUSINESS_DAY moves forward instead", () => {
+    expect(keyOf(computeNextOccurrence({ ...payments, rollConvention: "NEXT_BUSINESS_DAY" }, at("2026-10-01")))).toBe("2026-10-11");
+  });
+  it("the US calendar rolls a Saturday back to Friday", () => {
+    expect(keyOf(computeNextOccurrence({ ...payments, businessCalendar: "US" }, at("2026-10-01")))).toBe("2026-10-09");
+  });
+  it("no roll keeps the exact behavior from before", () => {
+    expect(keyOf(computeNextOccurrence({ ...payments, rollConvention: "NONE" }, at("2026-10-01")))).toBe("2026-10-10");
+  });
+});
+
+describe("computeLeadDate()", () => {
+  const occurrence = new Date("2026-11-09T22:00:00Z"); // midnight 10.11.2026 in Israel
+  it("three business days before Tuesday 10.11 is Thursday 5.11", () => {
+    expect(keyOf(computeLeadDate(occurrence, 3, "BUSINESS_DAYS", "IL", TZ))).toBe("2026-11-05");
+  });
+  it("three calendar days before is Saturday 7.11, as before", () => {
+    expect(keyOf(computeLeadDate(occurrence, 3, "CALENDAR_DAYS", "IL", TZ))).toBe("2026-11-07");
+  });
+  it("an unknown calendar falls back to Israel", () => {
+    expect(keyOf(computeLeadDate(occurrence, 3, "BUSINESS_DAYS", "XX", TZ))).toBe("2026-11-05");
+  });
+});
+
+describe("recurrenceInputFromRow()", () => {
+  it("carries every field the engine reads", () => {
+    const input = recurrenceInputFromRow({
+      calendarType: "GREGORIAN",
+      month: 1,
+      day: 10,
+      recurrence: "MONTHLY",
+      onceDate: null,
+      customIntervalDays: null,
+      originYear: null,
+      leapDayUseMarchFirst: false,
+      hebrewAdarTwoInLeapYear: true,
+      timezone: TZ,
+      weekday: null,
+      intervalMonths: 3,
+      rollConvention: "PREVIOUS_BUSINESS_DAY",
+      businessCalendar: "US",
+    });
+    expect(input).toMatchObject({ intervalMonths: 3, rollConvention: "PREVIOUS_BUSINESS_DAY", businessCalendar: "US" });
   });
 });

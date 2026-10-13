@@ -428,6 +428,33 @@ describe("reminders after the 7.10.2026 fixes - postponed, not lost, and never t
     const tasks = await prisma.task.findMany({ where: { importantDateId: date.id }, orderBy: { dueDate: "asc" } });
     expect(tasks.map((t) => t.dueDate?.toISOString())).toEqual(["2026-10-14T21:00:00.000Z", "2026-11-14T22:00:00.000Z"]);
   });
+
+  // Org-brain spec 3.10 (13.10.2026). NUX supplier payments: the 10th, or
+  // the business day before it, and the task opens three Israeli business
+  // days before that. 10.11.2026 is a Tuesday: the task opens on Thursday
+  // 5.11, not on Saturday 7.11 as three calendar days would.
+  it("opens the auto-task three business days before, not three calendar days", async () => {
+    const { owner, client } = await setup();
+    const date = await createDate({
+      clientId: client.id,
+      responsibleUserId: owner.id,
+      recurrence: "MONTHLY",
+      day: 10,
+      month: 1,
+      nextOccurrenceAt: new Date("2026-11-09T22:00:00Z"), // midnight 10.11 in Israel
+      rules: [],
+    });
+    await prisma.importantDate.update({
+      where: { id: date.id },
+      data: { createAutoTask: true, autoTaskLeadDays: 3, leadUnit: "BUSINESS_DAYS", rollConvention: "PREVIOUS_BUSINESS_DAY", businessCalendar: "IL" },
+    });
+
+    await reconcileImportantDates(cronAt("2026-11-04"));
+    expect(await prisma.task.count({ where: { importantDateId: date.id } })).toBe(0);
+
+    await reconcileImportantDates(cronAt("2026-11-05"));
+    expect(await prisma.task.count({ where: { importantDateId: date.id } })).toBe(1);
+  });
 });
 
 describe("escalateUnhandledReminders() - only after the configured delay, only to Ankora admins, once", () => {

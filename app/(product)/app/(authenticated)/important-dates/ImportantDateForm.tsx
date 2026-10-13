@@ -22,7 +22,7 @@ export interface ExistingImportantDate {
   month: number;
   day: number;
   originYear: number | null;
-  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL";
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY";
   customIntervalDays: number | null;
   onceDate: Date | null;
   responsibleUserId: string;
@@ -32,8 +32,25 @@ export interface ExistingImportantDate {
   createAutoTask: boolean;
   autoTaskLeadDays: number | null;
   autoTaskCategoryId: string | null;
+  weekday: number | null;
+  intervalMonths: number | null;
+  leadUnit: "CALENDAR_DAYS" | "BUSINESS_DAYS";
+  rollConvention: "NONE" | "PREVIOUS_BUSINESS_DAY" | "NEXT_BUSINESS_DAY";
+  businessCalendar: string;
   updatedAt: Date;
 }
+
+// Org-brain spec 3.10 (13.10.2026). Labels live here and not in
+// lib/business-calendar.ts, because that module loads the Hebrew calendar
+// library and this is a client component.
+const WEEKDAY_OPTIONS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+const INTERVAL_MONTH_OPTIONS: { value: number; label: string }[] = [
+  { value: 1, label: "כל חודש" },
+  { value: 2, label: "כל חודשיים" },
+  { value: 3, label: "כל שלושה חודשים (רבעוני)" },
+  { value: 4, label: "כל ארבעה חודשים" },
+  { value: 6, label: "כל חצי שנה" },
+];
 
 function SubmitButton({ label, pendingLabel, pending }: { label: string; pendingLabel: string; pending: boolean }) {
   return (
@@ -185,12 +202,33 @@ export function ImportantDateForm({
             <option value="ANNUAL">שנתי</option>
             <option value="MONTHLY">חודשי</option>
             <option value="ONCE">חד-פעמי</option>
+            <option value="WEEKLY">שבועי</option>
             <option value="CUSTOM_INTERVAL">מרווח מותאם (ימים)</option>
           </select>
         </div>
       </div>
 
-      {recurrence === "ONCE" ? (
+      {recurrence === "WEEKLY" ? (
+        <div>
+          {/* month/day are NOT NULL and ignored for a weekly date, like ONCE. */}
+          <input type="hidden" name="month" value="1" />
+          <input type="hidden" name="day" value="1" />
+          <label className="block text-xs font-medium text-appNavy/60">יום בשבוע *</label>
+          <select
+            name="weekday"
+            required
+            defaultValue={existing?.weekday ?? 4}
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          >
+            {WEEKDAY_OPTIONS.map((label, i) => (
+              <option key={i} value={i}>
+                {label}
+              </option>
+            ))}
+          </select>
+          {calendarType === "HEBREW" && <p className="mt-1 text-[11px] text-red-600">מועד שבועי נקבע לפי הלוח הלועזי.</p>}
+        </div>
+      ) : recurrence === "ONCE" ? (
         <div>
           <label className="block text-xs font-medium text-appNavy/60">תאריך *</label>
           <input
@@ -232,7 +270,23 @@ export function ImportantDateForm({
               className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
             />
           </div>
-          {recurrence === "CUSTOM_INTERVAL" ? (
+          {recurrence === "MONTHLY" && calendarType === "GREGORIAN" ? (
+            <div>
+              <label className="block text-xs font-medium text-appNavy/60">כל כמה חודשים</label>
+              <select
+                name="intervalMonths"
+                defaultValue={existing?.intervalMonths ?? 1}
+                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              >
+                {INTERVAL_MONTH_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-1 text-[11px] text-appNavy/40">החודש שבשדה &quot;חודש&quot; הוא נקודת ההתחלה.</p>
+            </div>
+          ) : recurrence === "CUSTOM_INTERVAL" ? (
             <div>
               <label className="block text-xs font-medium text-appNavy/60">כל כמה ימים</label>
               <input
@@ -257,6 +311,24 @@ export function ImportantDateForm({
           )}
         </div>
       )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs font-medium text-appNavy/60">ימי עבודה לפי</label>
+          <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? "IL"} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold">
+            <option value="IL">ישראל (ראשון עד חמישי)</option>
+            <option value="US">ארה&quot;ב (שני עד שישי)</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-appNavy/60">מועד שנופל ביום שאינו יום עבודה</label>
+          <select name="rollConvention" defaultValue={existing?.rollConvention ?? "NONE"} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold">
+            <option value="NONE">נשאר כמו שהוא</option>
+            <option value="PREVIOUS_BUSINESS_DAY">מוקדם ליום העבודה הקודם</option>
+            <option value="NEXT_BUSINESS_DAY">נדחה ליום העבודה הבא</option>
+          </select>
+        </div>
+      </div>
 
       <div>
         <label className="block text-xs font-medium text-appNavy/60">אחראי *</label>
@@ -317,13 +389,24 @@ export function ImportantDateForm({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="block text-xs font-medium text-appNavy/60">כמה ימים לפני</label>
-            <input
-              type="number"
-              name="autoTaskLeadDays"
-              min={0}
-              defaultValue={existing?.autoTaskLeadDays ?? 7}
-              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
-            />
+            <div className="mt-1.5 flex gap-2">
+              <input
+                type="number"
+                name="autoTaskLeadDays"
+                min={0}
+                defaultValue={existing?.autoTaskLeadDays ?? 7}
+                className="w-20 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              />
+              <select
+                name="leadUnit"
+                aria-label="סוג הימים"
+                defaultValue={existing?.leadUnit ?? "CALENDAR_DAYS"}
+                className="flex-1 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              >
+                <option value="CALENDAR_DAYS">ימים</option>
+                <option value="BUSINESS_DAYS">ימי עבודה</option>
+              </select>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-appNavy/60">קטגוריית המשימה</label>

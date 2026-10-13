@@ -4,7 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { computeNextOccurrence } from "@/lib/app-domain/important-dates-recurrence";
+import {
+  computeNextOccurrence,
+  ALLOWED_INTERVAL_MONTHS,
+  type LeadUnitLike,
+  type RollConventionLike,
+} from "@/lib/app-domain/important-dates-recurrence";
+import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { DEFAULT_REMINDER_OFFSETS_BY_CATEGORY } from "@/lib/app-domain/important-dates-reminders";
 import { HOLIDAY_CATALOG, HOLIDAY_CALENDAR_LABELS, type HolidayCalendarKey } from "@/lib/app-domain/important-dates-holidays";
 import { seedHolidayOccurrences } from "@/lib/app-domain/important-dates-job";
@@ -134,10 +140,45 @@ export interface ImportantDateInput {
   createAutoTask?: boolean;
   autoTaskLeadDays?: number | null;
   autoTaskCategoryId?: string | null;
+  /// Org-brain spec 3.10 (13.10.2026). All optional; omitted keeps the
+  /// phase-10 meaning (calendar days, no roll, Israeli calendar).
+  weekday?: number | null;
+  intervalMonths?: number | null;
+  leadUnit?: LeadUnitLike;
+  rollConvention?: RollConventionLike;
+  businessCalendar?: string;
   /// When provided (and truthy), no explicit ReminderRule list needs to
   /// be passed - defaults are created from DEFAULT_REMINDER_OFFSETS_BY_CATEGORY.
   useDefaultReminders?: boolean;
   reminderRules?: ReminderRuleCreateInput[];
+}
+
+/// The schedule fields only make sense in combination, and a bad one would
+/// not fail loudly: a WEEKLY date with no weekday simply never occurs. So
+/// the combination is checked here, in the one place both create and update
+/// pass through, in words a person can act on.
+export function assertValidSchedule(s: {
+  calendarType: CalendarType;
+  recurrence: RecurrenceType;
+  weekday: number | null;
+  intervalMonths: number | null;
+  businessCalendar: string;
+}): void {
+  if (s.recurrence === "WEEKLY") {
+    if (s.calendarType !== "GREGORIAN") throw new Error("מועד שבועי נקבע לפי הלוח הלועזי.");
+    if (s.weekday === null || !Number.isInteger(s.weekday) || s.weekday < 0 || s.weekday > 6) {
+      throw new Error("במועד שבועי צריך לבחור יום בשבוע.");
+    }
+  }
+  if (s.intervalMonths !== null && s.intervalMonths !== 1) {
+    if (s.recurrence !== "MONTHLY" || s.calendarType !== "GREGORIAN") {
+      throw new Error('"כל כמה חודשים" רלוונטי רק למועד חודשי בלוח הלועזי.');
+    }
+    if (!ALLOWED_INTERVAL_MONTHS.includes(s.intervalMonths)) {
+      throw new Error("אפשר לבחור כל חודש, חודשיים, שלושה, ארבעה או שישה חודשים.");
+    }
+  }
+  if (!isBusinessCalendarKey(s.businessCalendar)) throw new Error("לוח ימי העבודה לא מוכר.");
 }
 
 function normalizeStringArray(values: string[] | undefined): string[] {
@@ -213,6 +254,12 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
   const calendarType = input.calendarType ?? "GREGORIAN";
   const recurrence = input.recurrence ?? "ANNUAL";
   const sensitivity = resolveSensitivityDefault(input.category, input.sensitivity);
+  const weekday = recurrence === "WEEKLY" ? input.weekday ?? null : null;
+  const intervalMonths = recurrence === "MONTHLY" ? input.intervalMonths ?? null : null;
+  const leadUnit = input.leadUnit ?? "CALENDAR_DAYS";
+  const rollConvention = input.rollConvention ?? "NONE";
+  const businessCalendar = input.businessCalendar || "IL";
+  assertValidSchedule({ calendarType, recurrence, weekday, intervalMonths, businessCalendar });
 
   const nextOccurrenceAt = computeNextOccurrence(
     {
@@ -226,6 +273,10 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       leapDayUseMarchFirst: input.leapDayUseMarchFirst,
       hebrewAdarTwoInLeapYear: input.hebrewAdarTwoInLeapYear,
       timezone: input.timezone,
+      weekday,
+      intervalMonths,
+      rollConvention,
+      businessCalendar,
     },
     new Date()
   );
@@ -257,6 +308,11 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       createAutoTask: input.createAutoTask ?? false,
       autoTaskLeadDays: input.autoTaskLeadDays ?? null,
       autoTaskCategoryId: input.autoTaskCategoryId || null,
+      weekday,
+      intervalMonths,
+      leadUnit,
+      rollConvention,
+      businessCalendar,
       nextOccurrenceAt,
       source: "MANUAL",
       createdById: actor.id,
@@ -313,6 +369,15 @@ export async function updateImportantDate(
   const recurrence = input.recurrence ?? before.recurrence;
   const month = input.month ?? before.month;
   const day = input.day ?? before.day;
+  // A field that stops applying (a weekday on a date that is no longer
+  // weekly) is cleared rather than left behind to confuse the next edit.
+  const weekday = recurrence === "WEEKLY" ? (input.weekday !== undefined ? input.weekday : before.weekday) : null;
+  const intervalMonths =
+    recurrence === "MONTHLY" ? (input.intervalMonths !== undefined ? input.intervalMonths : before.intervalMonths) : null;
+  const leadUnit = input.leadUnit ?? before.leadUnit;
+  const rollConvention = input.rollConvention ?? before.rollConvention;
+  const businessCalendar = input.businessCalendar || before.businessCalendar;
+  assertValidSchedule({ calendarType, recurrence, weekday, intervalMonths, businessCalendar });
 
   const nextOccurrenceAt = computeNextOccurrence(
     {
@@ -326,6 +391,10 @@ export async function updateImportantDate(
       leapDayUseMarchFirst: input.leapDayUseMarchFirst ?? before.leapDayUseMarchFirst,
       hebrewAdarTwoInLeapYear: input.hebrewAdarTwoInLeapYear ?? before.hebrewAdarTwoInLeapYear,
       timezone: input.timezone ?? before.timezone,
+      weekday,
+      intervalMonths,
+      rollConvention,
+      businessCalendar,
     },
     new Date()
   );
@@ -357,6 +426,11 @@ export async function updateImportantDate(
       createAutoTask: input.createAutoTask ?? undefined,
       autoTaskLeadDays: input.autoTaskLeadDays !== undefined ? input.autoTaskLeadDays : undefined,
       autoTaskCategoryId: input.autoTaskCategoryId !== undefined ? input.autoTaskCategoryId || null : undefined,
+      weekday,
+      intervalMonths,
+      leadUnit,
+      rollConvention,
+      businessCalendar,
       nextOccurrenceAt,
     },
   });
