@@ -74,3 +74,18 @@ describe("client file document", () => {
     await expect(buildClientFile(stranger, client.id, { audience: "ai" })).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
+
+describe("extraction prompt", () => {
+  it("carries names and ids, never contact details or sensitive items", async () => {
+    const { extractPromptFor } = await import("@/lib/app-domain/extract-prompt-input");
+    const { client, user } = await setup();
+    await addClientContact(user, { clientId: client.id, name: "שני הלוי", emails: ["shani@nextage.co.il"], sources: S1 });
+    const fact = await addClientFact(user, { clientId: client.id, kind: "PREFERENCE", body: "WhatsApp קודם", sources: S1 });
+    await addClientFact(user, { clientId: client.id, kind: "NOTE", body: "פרט רפואי", sensitivity: "SENSITIVE", sources: S1 });
+    const prompt = await extractPromptFor(user, client.id);
+    expect(prompt).toContain("שני הלוי");
+    expect(prompt).toContain(`(${fact.id})`);
+    expect(prompt).not.toContain("shani@nextage.co.il");
+    expect(prompt).not.toContain("פרט רפואי");
+  });
+});

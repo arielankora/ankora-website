@@ -5,6 +5,8 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { HOW_TO_READ, type DocItem } from "@/lib/client-file-document";
 import { KNOWLEDGE_STATUS_LABELS } from "@/lib/knowledge";
+import { extractPromptFor } from "@/lib/app-domain/extract-prompt-input";
+import { ExtractWithClaude } from "../ExtractWithClaude";
 
 // Org brain, phase 2: the client file to read, top to bottom, in the order
 // of Hadas's file (claude/org-brain-spec-2026-10-12.md, 6.1). The client
@@ -40,8 +42,9 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
   const { clientId } = await props.params;
   const user = await requireUser();
   let doc;
+  let extractPrompt: string;
   try {
-    doc = await buildClientFile(user, clientId, { audience: "staff" });
+    [doc, extractPrompt] = await Promise.all([buildClientFile(user, clientId, { audience: "staff" }), extractPromptFor(user, clientId)]);
   } catch (err) {
     if (err instanceof ForbiddenError) notFound();
     throw err;
@@ -60,6 +63,9 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
           </a>
         </div>
         <p className="mt-2 text-xs leading-relaxed text-appNavy/60">{HOW_TO_READ}</p>
+        <div className="mt-3">
+          <ExtractWithClaude prompt={extractPrompt} />
+        </div>
       </div>
 
       {doc.sections.map((s) => {

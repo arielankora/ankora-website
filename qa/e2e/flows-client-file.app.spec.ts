@@ -15,6 +15,8 @@ test.describe("client file, to read", () => {
     await page.getByRole("link", { name: "תיק הלקוח לקריאה" }).click();
     await expect(page).toHaveURL(new RegExp(`/app/clients/${CLIENT}/client-file$`));
     await expect(page.getByRole("heading", { level: 1 })).toContainText("תיק לקוח:");
+    // The way into extraction: one press, a prompt in the clipboard.
+    await expect(page.getByRole("button", { name: "חלץ ידע עם קלוד" })).toBeVisible();
 
     const headings = await page.locator("article h2").allInnerTexts();
     const at = (t: string) => headings.findIndex((h) => h.includes(t));

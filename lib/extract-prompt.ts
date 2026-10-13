@@ -1,0 +1,103 @@
+// "חלץ ידע עם קלוד" (claude/org-brain-spec-2026-10-12.md, 4 and 5.1): the
+// prompt behind the button on the client screen.
+//
+// Pure and free of project imports, the same convention as
+// lib/advance-prompt.ts. The page gathers what the person pressing the
+// button may see, in the version for Claude (no contact details, nothing
+// sensitive), and hands it here.
+//
+// The extraction rules are written here, once, for every client (decision
+// 3 splits them: what the server enforces stays in code, what guides
+// Claude lives in the prompt). The server still refuses what it must:
+// a missing source, a secret, a quote from a topics-only source.
+//
+// Written in Hebrew because the conversation it starts is in Hebrew. Tool
+// names, ids and field values stay as they are.
+
+export type ExtractPromptItem = { id: string; label: string; text: string };
+
+export type ExtractPromptSource = {
+  code: string;
+  title: string;
+  dateLabel: string | null;
+  kindLabel: string;
+  firefliesId: string | null;
+  topicsOnly: boolean;
+};
+
+export type ExtractPromptInput = {
+  requestedBy: string;
+  clientName: string;
+  /// Facts in the file, with ids, so a change can name what it changes.
+  facts: ExtractPromptItem[];
+  /// People, organizations and systems, by name only.
+  people: string[];
+  organizations: string[];
+  systems: string[];
+  sources: ExtractPromptSource[];
+  domains: string[];
+  /// A meeting or document the person already chose, if any.
+  focus?: string | null;
+};
+
+const RULES = [
+  "פריט נכנס רק אם (1) הלקוח או ספק שלו אמר או הראה אותו במפורש, (2) הוא רלוונטי לעבודה עתידית, ו-(3) הוא עוד לא בתיק. כל השאר לא נכנס.",
+  'מידע לא ודאי, סותר, או הנחה שלנו: knowledgeStatus "UNCERTAIN", עם toResolve שאומר מה יסגור אותו. "CONFIRMED" רק כשהלקוח או ספק שלו אמר במפורש.',
+  "מידע זמני הוא TEMPORARY, עם validUntil (YYYY-MM-DD) או validUntilEvent. החלטה שהתקבלה פעם אחת היא ONE_OFF_DECISION, עם decidedAt ומי החליט.",
+  "שאלה שעלתה ולא נענתה היא QUESTION. היא לא משימה.",
+  "לא נכנסים: שיחת חולין, תקלות טכניות רגעיות, ניחושים, ותנאי ההתקשרות של אנקורה (תעריף, בנק שעות, חוזה).",
+  "סיסמה, מפתח, טוקן או מספר כרטיס שנאמרו: לא לכתוב אותם בשום שדה. רק לציין לי שנאמר סוד, כדי שנחליף אותו. השרת מוחק פריט כזה בכל מקרה.",
+  'מקור שמסומן "נושאים בלבד": רק הנושאים שעלו, בלי ציטוטים ובלי פרטים.',
+  "לא דורסים. אם הלקוח שינה משהו שכבר בתיק: action SUPERSEDE עם targetId. אם מישהו אמר אחרת ולא ברור מה נכון: action CONTRADICT עם targetId.",
+  "לכל פריט: at (הדקה בהקלטה, 08:13), ו-reason במשפט אחד. quote קצר רק כשהוא באמת עוזר.",
+];
+
+export function buildExtractPrompt(input: ExtractPromptInput): string {
+  const out: string[] = [];
+  out.push(
+    `אני ${input.requestedBy} מצוות אנקורה. אני רוצה לעדכן את תיק הלקוח של ${input.clientName} ממקור אחד: פגישה מוקלטת או מסמך.`,
+    "",
+    "אל תכתוב שום דבר למערכת לפני אישור מפורש שלי לטיוטה. גם אחרי שתשלח, שום דבר לא נכנס לתיק עד שמישהו מאשר אותו במסך \"ממתין לאישור\" באנקורה.",
+    "",
+    "## איך עובדים",
+    "",
+    input.focus
+      ? `1. המקור: ${input.focus}. קרא אותו (Fireflies להקלטה, read_document למסמך בתיק).`
+      : "1. שאל אותי מה המקור. אם זו הקלטה, חפש אותה ב-Fireflies לפי התאריך והכותרת והראה לי מה מצאת לפני שאתה קורא. אם זה מסמך, list_documents ו-read_document.",
+    "2. קרא את התיק הנוכחי עם get_client_file, כדי לא להציע מה שכבר שם.",
+    "3. הכן טיוטה: טבלה עם סוג הפריט, הטקסט, הסטטוס המוצע, הדקה והסיבה. סמן מה סותר או מחליף פריט קיים.",
+    "4. אחרי ההערות שלי, אתה מעדכן את הטיוטה.",
+    `5. אחרי אישור שלי: propose_knowledge עם client "${input.clientName}", והמקור (sourceCode אם הוא כבר במרשם, אחרת newSource עם firefliesId או documentId).`,
+    "6. תגיד לי כמה הצעות נשלחו ומה נשמט, ושהן מחכות לאישור במסך.",
+    "",
+    "## כללי החילוץ של אנקורה",
+    "",
+    ...RULES.map((r) => `- ${r}`),
+    ""
+  );
+
+  out.push("## מה כבר בתיק", "");
+  if (input.facts.length === 0 && input.people.length === 0 && input.organizations.length === 0 && input.systems.length === 0) {
+    out.push("התיק עדיין ריק.");
+  } else {
+    if (input.facts.length) {
+      out.push("עובדות (המזהה בסוגריים, ל-targetId):");
+      for (const f of input.facts) out.push(`- ${f.label}: ${f.text} (${f.id})`);
+    }
+    if (input.people.length) out.push(`אנשים: ${input.people.join(", ")}`);
+    if (input.organizations.length) out.push(`ספקים ונותני שירות: ${input.organizations.join(", ")}`);
+    if (input.systems.length) out.push(`מערכות: ${input.systems.join(", ")}`);
+  }
+  out.push("");
+
+  out.push("## מרשם המקורות", "");
+  if (input.sources.length === 0) out.push("ריק. המקור שנקרא יירשם כ-S1.");
+  for (const s of input.sources) {
+    out.push(
+      `- ${s.code}: ${s.title} (${[s.kindLabel, s.dateLabel, s.firefliesId ? `Fireflies ${s.firefliesId}` : null, s.topicsOnly ? "נושאים בלבד" : null].filter(Boolean).join(", ")})`
+    );
+  }
+  if (input.domains.length) out.push("", `דומיינים של הלקוח ושותפיו: ${input.domains.join(", ")}`);
+  out.push("");
+  return out.join("\n");
+}

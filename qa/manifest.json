@@ -1426,6 +1426,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Review screen for proposals to client files"
+    },
+    "domain:extract-prompt-input": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Builds the extraction prompt that leaves the product: names only, no contact details, nothing sensitive"
     }
   },
   "waivers": {},
