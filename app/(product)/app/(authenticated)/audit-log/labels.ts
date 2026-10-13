@@ -47,6 +47,8 @@ export const ENTITY_TYPES = [
   // Portal phase 2.
   "Decision",
   "ClientDocument",
+  "ClientContact",
+  "ClientOrganization",
   "PortalSummary",
 ];
 
@@ -66,6 +68,11 @@ export const ACTION_LABEL: Record<string, string> = {
   // Portal phase 3.
   "portal.preferences.update": "עדכון העדפות שירות בפורטל",
   "portal.digest.update": "שינוי תדירות עדכונים בפורטל",
+  "client_contact.add": "הוספת איש קשר לתיק הלקוח",
+  "client_contact.update": "עדכון איש קשר בתיק הלקוח",
+  "client_contact.remove": "הסרת איש קשר מתיק הלקוח",
+  "client_organization.add": "הוספת ארגון לתיק הלקוח",
+  "client_organization.remove": "הסרת ארגון מתיק הלקוח",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",

@@ -132,6 +132,11 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   AlertRule: { decision: "DUMP", table: "alert_rules", reason: "Configuration a human wrote; nothing regenerates it." },
   ReportSchedule: { decision: "DUMP", table: "report_schedules", reason: "Configuration a human wrote; nothing regenerates it." },
   ImportantDate: { decision: "DUMP", table: "important_dates", reason: "Commitments to clients, the product's own promise surface." },
+  // Org brain, phase 2 (13.10.2026): the client file's people.
+  Organization: { decision: "DUMP", table: "organizations", reason: "The firms around each client, written once for all of them. Typed by people; exists nowhere else." },
+  Person: { decision: "DUMP", table: "persons", reason: "Names, emails and phones of the people in client files. Typed by people; exists nowhere else." },
+  ClientContact: { decision: "DUMP", table: "client_contacts", reason: "Who each person is to each client, and what is known about them. The client file itself." },
+  ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
   ReminderRule: { decision: "DUMP", table: "reminder_rules", reason: "Configuration attached to an important date." },
   ReminderOccurrence: {
     decision: "DUMP",

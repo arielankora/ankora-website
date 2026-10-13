@@ -527,6 +527,10 @@ model Client {
   credentials          ClientCredential[]
   portalSummaries      PortalSummary[]
 
+  // Org brain, phase 2 (spec 3.5).
+  contacts      ClientContact[]
+  organizations ClientOrganization[]
+
   @@index([status])
   @@index([accountManagerId])
   @@map("clients")
@@ -2491,4 +2495,218 @@ model WebsiteLead {
   @@index([createdAt])
   @@index([email])
   @@map("website_leads")
+}
+
+// ---------------------------------------------------------------------------
+// Org brain, phase 2: the client file's people and organizations
+// (claude/org-brain-spec-2026-10-12.md, sections 3.1, 3.5, decisions 2, 8).
+// ---------------------------------------------------------------------------
+
+/// How much we trust a piece of client knowledge (spec 3.1). The order is
+/// the order of strength: an item is as strong as its weakest field.
+enum KnowledgeStatus {
+  /// The client, or a supplier of theirs, said or showed it explicitly.
+  CONFIRMED
+  /// A garbled transcript, a loose phrasing, or an assumption of ours.
+  UNCERTAIN
+  /// Known to be needed, not received.
+  MISSING
+  /// Replaced by a newer item. The row stays: nothing is overwritten.
+  SUPERSEDED
+}
+
+enum KnowledgeAudience {
+  /// Everyone assigned to the client.
+  ALL_STAFF
+  /// The account manager, managers, and `audienceUserIds`.
+  ACCOUNT_TEAM
+  /// Only `audienceUserIds` (and managers).
+  RESTRICTED
+}
+
+enum KnowledgeSensitivity {
+  NORMAL
+  /// Never leaves the product through MCP.
+  SENSITIVE
+}
+
+enum KnowledgeImportance {
+  NORMAL
+  /// "Not critical" in Hadas's file: an open item nobody needs to chase.
+  LOW
+}
+
+/// Who a person is to the client (spec 3.5).
+enum ContactRelationship {
+  CLIENT_STAFF
+  /// A firm that runs part of the client's operation (Nextage).
+  PROVIDER
+  /// Lawyer, accountant, consultant.
+  ADVISOR
+  INVESTOR
+  /// Everyday suppliers (the cleaner, Dell).
+  SUPPLIER
+  /// Ankora's own people on this client.
+  ANKORA
+}
+
+/// An organization, once for all of Ankora (decision 8). Nextage can serve
+/// several of our clients; its name and domain are written once, and what
+/// it is to each client lives on ClientOrganization.
+model Organization {
+  id      String   @id @default(cuid())
+  name    String
+  /// Email domains, lower case, without "@". A partner's domain assigns a
+  /// conversation to a client only together with another participant
+  /// (spec 5.1), because the same firm may work for several clients.
+  domains String[] @default([])
+  website String?
+  notes   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  people  Person[]
+  clients ClientOrganization[]
+
+  @@index([name])
+  @@index([domains], type: Gin)
+  @@map("organizations")
+}
+
+/// A person, once for all of Ankora (decision 8). Email and phone are
+/// facts about the person and are shared: correcting Shani's address for
+/// one client corrects it for every client she works with. Everything that
+/// depends on the client (role, context, who may see it) is on
+/// ClientContact, and never crosses from one client to another.
+model Person {
+  id             String   @id @default(cuid())
+  /// Optional: "the cleaner" is a person whose name nobody wrote down
+  /// (mapping gap 14). A ClientContact without a name carries a role.
+  name           String?
+  /// Lower case, trimmed (lib/contact-normalize.ts).
+  emails         String[] @default([])
+  /// E.164 where it could be inferred, digits and "+" otherwise.
+  phones         String[] @default([])
+  organizationId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  contacts     ClientContact[]
+
+  @@index([emails], type: Gin)
+  @@index([phones], type: Gin)
+  @@map("persons")
+}
+
+/// A person in one client's file (spec 3.5): who they are to this client
+/// and what you need to know to work with them. Carries the knowledge
+/// fields of spec 3.1, like every item in the client file.
+model ClientContact {
+  id       String @id @default(cuid())
+  clientId String
+  personId String
+
+  role            String?
+  relationship    ContactRelationship @default(CLIENT_STAFF)
+  /// Which of the client's legal entities this person belongs to, in
+  /// words, until ClientEntity exists ("Inc", "LTD").
+  entityLabel     String?
+  /// What you need to know to work with them. "פונים אליה בכל ספק של Inc."
+  context         String?
+  /// Channels in order of preference: ["WhatsApp", "Slack", "מייל"].
+  channelOrder    String[] @default([])
+  isPrimary       Boolean  @default(false)
+  isDecisionMaker Boolean  @default(false)
+  /// Ankora people only: the user, and the address they use on the
+  /// client's side (Hadas, office@nux.ai).
+  userId            String?
+  clientSideAddress String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  /// { "<field>": { "status": "MISSING" | "UNCERTAIN", "toResolve"?: string, "sources"?: [...] } }
+  fieldStatus     Json                 @default("{}")
+  /// [{ "code": "S11", "at": "05:02" }] once the source register exists.
+  sources         Json                 @default("[]")
+  /// [{ "system": "RAID", "id": "RAID-002" }]
+  externalRefs    Json                 @default("[]")
+  /// Conflicting versions, each with a value and a source.
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  /// Plain ids, no foreign key, like the audit trail: an owner who leaves
+  /// must not take the item with them.
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+
+  @@unique([clientId, personId])
+  @@index([clientId, deletedAt])
+  @@map("client_contacts")
+}
+
+/// An organization in one client's file: what it does for them and what it
+/// costs (decision 2). Replaces the VENDOR fact of spec v2, so Nextage is
+/// stored once, as an organization, and linked.
+model ClientOrganization {
+  id             String @id @default(cuid())
+  clientId       String
+  organizationId String
+
+  /// What they are to this client: "הנהלת חשבונות ושכר", "נאמן אופציות".
+  role             String?
+  relationship     ContactRelationship @default(PROVIDER)
+  /// Agorot (or cents), with the currency, when a recurring cost is known.
+  monthlyCostMinor Int?
+  currency         String?
+  notes            String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([clientId, organizationId])
+  @@index([clientId, deletedAt])
+  @@map("client_organizations")
 }

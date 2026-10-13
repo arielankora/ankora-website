@@ -1282,8 +1282,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-12",
       "riskReason": "Claude files and reads client documents; filed documents stay hidden from the client unless asked, and every read is audited"
+    },
+    "action:(product)/app/(authenticated)/clients/people-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client file's people: shared person records across clients, and per-client audience rules"
+    },
+    "domain:client-contacts": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "One person shared by several clients; what one client knows must never reach another"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-12"
+  "lastScan": "2026-10-13"
 }

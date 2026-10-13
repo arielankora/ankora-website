@@ -20,6 +20,9 @@ import { DecisionsPanel } from "./DecisionsPanel";
 import { DocumentsPanel, SummaryPanel } from "./FilePanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import { TasksPanel } from "./TasksPanel";
+import { PeoplePanel } from "./PeoplePanel";
+import { listClientPeople, listOrganizationNames } from "@/lib/app-domain/client-contacts";
+import { effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
 import { MessageClient } from "@/components/app/MessageClient";
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
@@ -61,7 +64,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -77,6 +80,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
       fromName: user.name,
       portalUrl: `${appBaseUrl()}/app/portal`,
     }),
+    // Org brain, phase 2 (spec 3.5): the file's people and organizations.
+    listClientPeople(user, client.id),
+    listOrganizationNames(user, client.id),
   ]);
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
@@ -115,6 +121,43 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <EditClientForm client={client} staff={staff} />
         </div>
+
+        <PeoplePanel
+          clientId={client.id}
+          organizationNames={organizationNames}
+          contacts={people.contacts.map((c) => ({
+            id: c.id,
+            name: c.person.name,
+            role: c.role,
+            relationship: c.relationship,
+            organizationName: c.person.organization?.name ?? null,
+            entityLabel: c.entityLabel,
+            emails: c.person.emails,
+            phones: c.person.phones,
+            context: c.context,
+            channelOrder: c.channelOrder,
+            isPrimary: c.isPrimary,
+            isDecisionMaker: c.isDecisionMaker,
+            clientSideAddress: c.clientSideAddress,
+            status: effectiveStatus(c.knowledgeStatus, parseFieldStatus(c.fieldStatus)),
+            toResolve: c.toResolve,
+            audience: c.audience,
+            doNotDisclose: c.doNotDisclose,
+            sensitive: c.sensitivity === "SENSITIVE",
+          }))}
+          organizations={people.organizations.map((o) => ({
+            id: o.id,
+            name: o.organization.name,
+            domains: o.organization.domains,
+            role: o.role,
+            relationship: o.relationship,
+            monthlyCostMinor: o.monthlyCostMinor,
+            currency: o.currency,
+            notes: o.notes,
+            status: effectiveStatus(o.knowledgeStatus, parseFieldStatus(o.fieldStatus)),
+            toResolve: o.toResolve,
+          }))}
+        />
 
         <TasksPanel
           clientId={client.id}
