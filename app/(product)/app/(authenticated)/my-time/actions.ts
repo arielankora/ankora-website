@@ -31,6 +31,27 @@ type OverlapWarning = {
 
 type FormState = { error?: string; ok?: boolean; overlapWarning?: OverlapWarning };
 
+/// What an accepted edit wrote, as the row shows it.
+///
+/// 13.10.2026: the row puts this on screen itself rather than waiting for
+/// the re-render `revalidatePath` sends back. That re-render arrives inside
+/// the action's response, and in about one save in four the browser did not
+/// apply it: the form sat on "שומר..." with the edit already in the
+/// database (claude/e2e-silent-and-racing-2026-10-12.md). The server's own
+/// answer about what it wrote cannot be lost that way.
+export type SavedEntry = {
+  id: string;
+  startAt: string;
+  endAt: string | null;
+  actualSeconds: number | null;
+  note: string | null;
+  isEdited: boolean;
+  isOverlapConfirmed: boolean;
+  updatedAt: string;
+};
+
+type UpdateState = FormState & { entry?: SavedEntry };
+
 function friendlyError(err: unknown): string {
   if (err instanceof OverlapError)
     return `טווח הזמן חופף לדיווח קיים אצל אותו לקוח: ${describeOverlapConflict(err.conflicting)}.`;
@@ -90,7 +111,7 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
   return { ok: true };
 }
 
-export async function updateMyEntryAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+export async function updateMyEntryAction(_prev: UpdateState | undefined, formData: FormData): Promise<UpdateState> {
   const user = await requireUser();
   const timeEntryId = String(formData.get("timeEntryId") || "");
   const date = String(formData.get("date") || "");
@@ -103,8 +124,9 @@ export async function updateMyEntryAction(_prev: FormState | undefined, formData
   const expectedUpdatedAtRaw = String(formData.get("expectedUpdatedAt") || "");
   const confirmOverlap = formData.get("confirmOverlap") === "true";
 
+  let updated;
   try {
-    await updateTimeEntry(user, timeEntryId, {
+    updated = await updateTimeEntry(user, timeEntryId, {
       startAt: combineWallClockTime(date, startTime),
       endAt: combineWallClockTime(date, endTime),
       note: String(formData.get("note") || ""),
@@ -120,13 +142,33 @@ export async function updateMyEntryAction(_prev: FormState | undefined, formData
   }
 
   revalidatePath("/app/my-time");
-  return { ok: true };
+  return {
+    ok: true,
+    entry: {
+      id: updated.id,
+      startAt: updated.startAt.toISOString(),
+      endAt: updated.endAt?.toISOString() ?? null,
+      actualSeconds: updated.actualSeconds,
+      note: updated.note,
+      isEdited: updated.isEdited,
+      isOverlapConfirmed: updated.isOverlapConfirmed,
+      updatedAt: updated.updatedAt.toISOString(),
+    },
+  };
 }
 
-export async function deleteMyEntryAction(formData: FormData) {
+/// 13.10.2026: answers now, so the row can leave the list on the server's
+/// word instead of on a re-render that did not always arrive (see
+/// SavedEntry above). It used to return nothing at all, which also meant a
+/// refused delete looked exactly like a slow one.
+export async function deleteMyEntryAction(timeEntryId: string): Promise<FormState> {
   const user = await requireUser();
-  const timeEntryId = String(formData.get("timeEntryId") || "");
-  if (!timeEntryId) return;
-  await deleteTimeEntry(user, timeEntryId);
+  if (!timeEntryId) return { error: "נתונים חסרים." };
+  try {
+    await deleteTimeEntry(user, timeEntryId);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
   revalidatePath("/app/my-time");
+  return { ok: true };
 }

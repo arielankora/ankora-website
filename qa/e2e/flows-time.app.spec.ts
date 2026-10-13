@@ -227,19 +227,13 @@ test.describe("my-time/actions - manual entry", () => {
     // silence. Editing and deleting now have their own test, below.
   });
 
-  // Split out on 12.10.2026, the first time these steps actually ran, and
-  // parked on the same day. Both writes land (the action answers ok, and
-  // the re-rendered screen it sends back already has the change), but the
-  // browser does not always apply that answer: an edit can stay on
-  // "שומר..." and a deleted entry can stay listed until a reload. Measured
-  // locally at between one attempt in six and one in three. The stuck edit
-  // was reproduced without this suite's own fetch probe as well, so it is
-  // the screen and not the rig. Fixing it means changing product code,
-  // which waits for a decision:
-  // claude/e2e-silent-and-racing-2026-10-12.md.
+  // Split out on 12.10.2026, the first time these steps actually ran. Both
+  // writes landed, but the browser did not always apply the answer: an edit
+  // sat on "שומר..." and a deleted entry stayed listed until a reload,
+  // between one attempt in six and one in three. Fixed in the row on
+  // 13.10.2026 (my-time/EntryRow.tsx answers from the action itself); this
+  // is what proves it. claude/e2e-silent-and-racing-2026-10-12.md.
   test("a manual entry can be edited, then deleted, from the employee's own screen", async ({ page }) => {
-    test.fixme(true, "my-time sometimes does not apply a saved edit or delete until reload (12.10.2026), see the project doc");
-
     const window = windowEarlierToday(30, 110 + 60 * test.info().retry);
     test.skip(window === null, "no finished window fits inside today yet (runs just after local midnight)");
     const { start, end } = window!;
