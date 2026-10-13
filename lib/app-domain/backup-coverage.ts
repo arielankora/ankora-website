@@ -138,6 +138,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ClientContact: { decision: "DUMP", table: "client_contacts", reason: "Who each person is to each client, and what is known about them. The client file itself." },
   ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
   ClientSource: { decision: "DUMP", table: "client_sources", reason: "The source register every item in the client file cites. Without it the codes mean nothing." },
+  SystemAccess: { decision: "DUMP", table: "system_access", reason: "The client's system map: accounts, access status and blockers. Typed by people; no secrets (those are in the vault)." },
   ClientDomain: { decision: "DUMP", table: "client_domains", reason: "Which email domains belong to which client. Typed by people, not derivable." },
   ReminderRule: { decision: "DUMP", table: "reminder_rules", reason: "Configuration attached to an important date." },
   ReminderOccurrence: {
@@ -255,6 +256,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "important_dates.holidayKey": "A public holiday identifier.",
   "reminder_occurrences.idempotencyKey": "A de-duplication key. Losing it re-sends reminders; it grants nothing.",
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
+  "system_access.credentialId": "The id of a vault row, a pointer. The secret stays encrypted in client_credentials.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.
   "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by a key that is not in the backup.",

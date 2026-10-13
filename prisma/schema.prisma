@@ -532,6 +532,7 @@ model Client {
   organizations ClientOrganization[]
   sources       ClientSource[]
   domains       ClientDomain[]
+  systems       SystemAccess[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -2359,6 +2360,8 @@ model ClientCredential {
   updatedBy      User   @relation("CredentialUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
   lastRevealedBy User?  @relation("CredentialLastRevealer", fields: [lastRevealedById], references: [id], onDelete: SetNull)
 
+  systems SystemAccess[]
+
   @@index([clientId, deletedAt])
   @@map("client_credentials")
 }
@@ -2803,4 +2806,94 @@ model ClientDomain {
   @@unique([clientId, domain])
   @@index([domain])
   @@map("client_domains")
+}
+
+/// What Ankora may do in a client's system (spec 3.6).
+enum SystemPermission {
+  NONE
+  VIEWER
+  USER
+  BILLING
+  ADMIN
+  OWNER
+}
+
+enum SystemAccessStatus {
+  HAS_ACCESS
+  /// Asked for, not granted yet.
+  PENDING
+  NO_ACCESS
+  /// The client keeps it; we do not need in.
+  NOT_NEEDED
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+  OTHER
+}
+
+/// The client's system map (spec 3.6, section 7.1 of Hadas's file). The
+/// vault holds secrets; this holds everything else about a system,
+/// including systems we have no access to. Every system that is not
+/// HAS_ACCESS or NOT_NEEDED is a handover gap, with no separate list to
+/// keep.
+model SystemAccess {
+  id       String @id @default(cuid())
+  clientId String
+
+  systemName    String
+  purpose       String?
+  /// Which legal entity, in words, until ClientEntity exists ("Inc").
+  entityLabel   String?
+  url           String?
+  /// The account we use: "office@nux.ai", or "the CEO's private mail".
+  accountUsed   String?
+  ourPermission SystemPermission   @default(NONE)
+  accessStatus  SystemAccessStatus @default(NO_ACCESS)
+  /// What is in the way: "MFA on the CEO's phone".
+  blocker       String?
+  /// Who manages it on the client's side.
+  clientAdmin   String?
+  /// The vault entry, when there is one. Same client only.
+  credentialId  String?
+
+  // A SaaS bill, kept with the system so the supplier is stored once.
+  billingCycle     BillingCycle?
+  billingCostMinor Int?
+  billingCurrency  String?
+  /// Last four digits of the card it is charged to. Never more.
+  cardLast4        String?
+  /// Where the invoice arrives: "billing-us@nux.ai".
+  invoiceTo        String?
+  notes            String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  credential ClientCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, deletedAt])
+  @@map("system_access")
 }

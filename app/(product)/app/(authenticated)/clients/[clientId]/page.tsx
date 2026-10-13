@@ -26,6 +26,9 @@ import { effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
 import { SourcesPanel } from "./SourcesPanel";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
+import { SystemsPanel } from "./SystemsPanel";
+import { listSystemMap } from "@/lib/app-domain/system-map";
+import { listCredentials } from "@/lib/app-domain/credentials";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
 import { MessageClient } from "@/components/app/MessageClient";
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
@@ -67,7 +70,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -89,7 +92,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // Spec 3.2: the source register every item cites, and the domains.
     listClientSources(user, client.id),
     listClientDomains(user, client.id),
+    // Spec 3.6: the system map, and the vault's entry names for linking
+    // (names only, and only for people who may open the vault).
+    listSystemMap(user, client.id),
+    can(user.role, "credential.view") ? listCredentials(user, client.id) : Promise.resolve(null),
   ]);
+  const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title }));
   const taskCategories = allCategories
     .filter((cat) => cat.active && (cat.visibility === "GLOBAL" || cat.clientId === client.id))
     .map((cat) => ({ id: cat.id, name: cat.name, clientId: cat.clientId }));
@@ -131,7 +139,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <PeoplePanel
           clientId={client.id}
           organizationNames={organizationNames}
-          sourceOptions={sources.map((s) => ({ code: s.code, title: s.title }))}
+          sourceOptions={sourceOptions}
           contacts={people.contacts.map((c) => ({
             id: c.id,
             name: c.person.name,
@@ -165,6 +173,36 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             status: effectiveStatus(o.knowledgeStatus, parseFieldStatus(o.fieldStatus)),
             toResolve: o.toResolve,
             sources: readSourceRefs(o.sources).map(formatSourceRef),
+          }))}
+        />
+
+        <SystemsPanel
+          clientId={client.id}
+          sourceOptions={sourceOptions}
+          vault={vault ? vault.map((v) => ({ id: v.id, systemName: v.systemName })) : null}
+          systems={systems.map((s) => ({
+            id: s.id,
+            systemName: s.systemName,
+            purpose: s.purpose,
+            entityLabel: s.entityLabel,
+            url: s.url,
+            accountUsed: s.accountUsed,
+            ourPermission: s.ourPermission,
+            accessStatus: s.accessStatus,
+            blocker: s.blocker,
+            clientAdmin: s.clientAdmin,
+            credential: s.credential,
+            billingCycle: s.billingCycle,
+            billingCostMinor: s.billingCostMinor,
+            billingCurrency: s.billingCurrency,
+            cardLast4: s.cardLast4,
+            invoiceTo: s.invoiceTo,
+            notes: s.notes,
+            status: effectiveStatus(s.knowledgeStatus, parseFieldStatus(s.fieldStatus)),
+            toResolve: s.toResolve,
+            audience: s.audience,
+            doNotDisclose: s.doNotDisclose,
+            sources: readSourceRefs(s.sources).map(formatSourceRef),
           }))}
         />
 

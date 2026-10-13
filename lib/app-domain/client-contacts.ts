@@ -4,17 +4,12 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
-import { canSeeKnowledgeItem, parseFieldStatus, type FieldStatusMap } from "@/lib/knowledge";
-import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
-import { assertClientAccess, resolveItemSources } from "@/lib/app-domain/client-sources";
+import { canSeeKnowledgeItem } from "@/lib/knowledge";
+import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type {
   User,
   ContactRelationship,
-  KnowledgeStatus,
-  KnowledgeAudience,
-  KnowledgeSensitivity,
-  KnowledgeImportance,
-  Prisma,
 } from "@prisma/client";
 
 // Org brain, phase 2: the people and organizations in a client's file
@@ -33,63 +28,6 @@ import type {
 // to reach the client. Within it, each item's audience decides
 // (lib/knowledge.ts).
 
-
-export interface KnowledgeInput {
-  knowledgeStatus?: KnowledgeStatus;
-  fieldStatus?: FieldStatusMap;
-  toResolve?: string | null;
-  importance?: KnowledgeImportance;
-  audience?: KnowledgeAudience;
-  audienceUserIds?: string[];
-  doNotDisclose?: string | null;
-  sensitivity?: KnowledgeSensitivity;
-  /// Codes in the client's source register (spec 3.2). Required unless
-  /// the item is "missing".
-  sources?: SourceRef[];
-}
-
-function knowledgeData(input: KnowledgeInput) {
-  return {
-    knowledgeStatus: input.knowledgeStatus ?? undefined,
-    fieldStatus: input.fieldStatus !== undefined ? (parseFieldStatus(input.fieldStatus) as Prisma.InputJsonValue) : undefined,
-    toResolve: input.toResolve !== undefined ? input.toResolve?.trim() || null : undefined,
-    importance: input.importance ?? undefined,
-    audience: input.audience ?? undefined,
-    audienceUserIds: input.audienceUserIds ?? undefined,
-    doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose?.trim() || null : undefined,
-    sensitivity: input.sensitivity ?? undefined,
-  };
-}
-
-/// The source rules (lib/knowledge-sources.ts) for an item about to be
-/// written, merged with what is already stored. Returns the fields to
-/// write: sources, and status and toResolve as the rules leave them.
-async function sourcedFields(
-  clientId: string,
-  input: KnowledgeInput,
-  texts: (string | null | undefined)[],
-  before?: { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null }
-) {
-  const resolved = await resolveItemSources(clientId, {
-    status: input.knowledgeStatus ?? before?.knowledgeStatus ?? "CONFIRMED",
-    refs: input.sources ?? readSourceRefs(before?.sources),
-    toResolve: input.toResolve !== undefined ? input.toResolve?.trim() || null : before?.toResolve ?? null,
-    texts,
-  });
-  return {
-    sources: resolved.sources as Prisma.InputJsonValue,
-    knowledgeStatus: resolved.knowledgeStatus,
-    toResolve: resolved.toResolve,
-  };
-}
-
-/// A status other than "confirmed" has to say what would confirm it. That
-/// sentence is what turns a question mark into somebody's next step.
-function assertResolvable(status: KnowledgeStatus | undefined, toResolve: string | null | undefined) {
-  if ((status === "UNCERTAIN" || status === "MISSING") && !toResolve?.trim()) {
-    throw new Error('בפריט "לא ודאי" או "חסר" צריך לכתוב מה יסגור אותו.');
-  }
-}
 
 function cleanList(values: string[] | undefined, normalize: (v: string) => string | null): string[] {
   const out: string[] = [];

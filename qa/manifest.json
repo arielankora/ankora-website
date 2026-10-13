@@ -1314,6 +1314,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Source rules (no item without a source, R14, R17) and cross-client domain isolation"
+    },
+    "action:(product)/app/(authenticated)/clients/system-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's system map: access status, accounts and billing, linked to the vault"
+    },
+    "domain:knowledge-items": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the knowledge fields of every client-file item: source rules, R14 lowering, toResolve"
+    },
+    "domain:system-map": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "System map rules: no secrets stored, vault links same-client only and named only to vault viewers"
     }
   },
   "waivers": {},
