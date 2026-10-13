@@ -3237,3 +3237,31 @@ model ClientNarrative {
   @@unique([clientId, kind, version])
   @@map("client_narratives")
 }
+
+enum GuideState {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+/// Ankora's guidance to Claude for extraction, in versions (decision 3).
+/// What the server enforces stays in code; this is the part that guides:
+/// what counts as relevant, what is left out, how to phrase. Anybody on
+/// the team may propose a version; an admin approves it, and the latest
+/// approved version is the one every extraction prompt carries.
+model ExtractionGuide {
+  id      String     @id @default(cuid())
+  version Int        @unique
+  body    String
+  /// What changed, and why, in a line.
+  note    String?
+  state   GuideState @default(DRAFT)
+
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+
+  @@map("extraction_guides")
+}

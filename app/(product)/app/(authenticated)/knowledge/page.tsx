@@ -26,7 +26,10 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
       <div>
         <h1 className="text-xl font-medium text-appNavy">ממתין לאישור</h1>
         <p className="mt-1 text-sm text-appNavy/60">
-          מה ש-Claude הציע לתיקי הלקוחות. שום דבר לא נכנס לתיק לפני שמישהו מאשר אותו כאן.
+          מה ש-Claude הציע לתיקי הלקוחות. שום דבר לא נכנס לתיק לפני שמישהו מאשר אותו כאן.{" "}
+          <Link href="/app/extraction-guide" className="text-gold-dim hover:underline">
+            הנחיות החילוץ
+          </Link>
           {clientId && (
             <>
               {" "}

@@ -58,6 +58,7 @@ export const ENTITY_TYPES = [
   "KnowledgeProposal",
   "RequestType",
   "ClientNarrative",
+  "ExtractionGuide",
   "PortalSummary",
 ];
 
@@ -108,6 +109,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",
   "request_type.remove": "הסרת סוג פנייה מתיק הלקוח",
   "client_narrative.save": "גרסה חדשה לטקסט בתיק הלקוח",
+  "extraction_guide.propose": "הצעת גרסה להנחיות החילוץ",
+  "extraction_guide.approve": "אישור גרסה של הנחיות החילוץ",
+  "extraction_guide.reject": "דחיית גרסה של הנחיות החילוץ",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",

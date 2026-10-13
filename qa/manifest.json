@@ -1458,6 +1458,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Request types route only to contacts in the same client's file"
+    },
+    "action:(product)/app/(authenticated)/extraction-guide/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Proposes and decides versions of the guidance every extraction prompt carries"
+    },
+    "domain:extraction-guide": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Guidance versions: admin-only approval, no rollback by an older draft, no secrets"
+    },
+    "screen:/app/extraction-guide": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "The extraction guidance and its versions"
     }
   },
   "waivers": {},

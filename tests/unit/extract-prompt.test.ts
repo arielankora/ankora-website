@@ -36,3 +36,14 @@ describe("buildExtractPrompt", () => {
     expect(empty).toContain("יירשם כ-S1");
   });
 });
+
+describe("approved guidance", () => {
+  it("replaces the shipped guidance, one line per rule, and says which version", async () => {
+    const { guideLines } = await import("@/lib/extract-prompt");
+    expect(guideLines("- כלל אחד\n\n* כלל שני\n• כלל שלישי\n")).toEqual(["כלל אחד", "כלל שני", "כלל שלישי"]);
+    const p = buildExtractPrompt({ ...BASE, guide: { version: 3, body: "רק מה שהלקוח אמר\nבלי שמועות" } });
+    expect(p).toContain("- רק מה שהלקוח אמר\n- בלי שמועות");
+    expect(p).toContain("(הנחיות גרסה 3)");
+    expect(p).not.toContain("שיחת חולין");
+  });
+});

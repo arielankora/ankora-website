@@ -39,9 +39,25 @@ export type ExtractPromptInput = {
   domains: string[];
   /// A meeting or document the person already chose, if any.
   focus?: string | null;
+  /// The approved guidance, when there is one (decision 3).
+  guide?: { version: number; body: string } | null;
 };
 
-const RULES = [
+/// A stored guide is one rule per line; bullets typed by habit are
+/// dropped so the prompt does not get "- - ".
+export function guideLines(body: string): string[] {
+  return body
+    .split("\n")
+    .map((l) => l.replace(/^\s*[-*•]\s*/, "").trim())
+    .filter(Boolean);
+}
+
+export const DEFAULT_EXTRACTION_GUIDE = (): string => DEFAULT_EXTRACTION_GUIDE_LINES.join("\n");
+
+/// Ankora's extraction guidance as it shipped. The guidance in use is the
+/// latest version approved on the "הנחיות החילוץ" screen (decision 3);
+/// until one is approved, this is it.
+export const DEFAULT_EXTRACTION_GUIDE_LINES = [
   "פריט נכנס רק אם (1) הלקוח או ספק שלו אמר או הראה אותו במפורש, (2) הוא רלוונטי לעבודה עתידית, ו-(3) הוא עוד לא בתיק. כל השאר לא נכנס.",
   'מידע לא ודאי, סותר, או הנחה שלנו: knowledgeStatus "UNCERTAIN", עם toResolve שאומר מה יסגור אותו. "CONFIRMED" רק כשהלקוח או ספק שלו אמר במפורש.',
   "מידע זמני הוא TEMPORARY, עם validUntil (YYYY-MM-DD) או validUntilEvent. החלטה שהתקבלה פעם אחת היא ONE_OFF_DECISION, עם decidedAt ומי החליט.",
@@ -73,7 +89,8 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
     "",
     "## כללי החילוץ של אנקורה",
     "",
-    ...RULES.map((r) => `- ${r}`),
+    ...(input.guide ? guideLines(input.guide.body) : DEFAULT_EXTRACTION_GUIDE_LINES).map((r) => `- ${r}`),
+    input.guide ? `(הנחיות גרסה ${input.guide.version})` : "",
     ""
   );
 
