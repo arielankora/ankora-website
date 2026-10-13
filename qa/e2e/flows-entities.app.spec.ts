@@ -33,7 +33,7 @@ test.describe("clients/entity-actions", () => {
   test("an entity with a missing registration number says so, until it is filled", async ({ page }) => {
     const name = tag("[E2E] ישות");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ ישות", exact: true }).click();
     let dialog = page.getByRole("dialog");

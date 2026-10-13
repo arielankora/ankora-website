@@ -18,7 +18,7 @@ test.describe("clients/source-actions", () => {
   test("a source added to the register gets the next code, and an unused one can be removed", async ({ page }) => {
     const title = tag("[E2E] פגישה");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     await page.getByRole("button", { name: "+ מקור", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -48,7 +48,7 @@ test.describe("clients/source-actions", () => {
   test("a client domain is stored normalized, and can be removed", async ({ page }) => {
     const domain = `${tag("e2e").toLowerCase()}.example`;
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     await page.getByRole("button", { name: "+ דומיין", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();

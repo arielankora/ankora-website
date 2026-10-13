@@ -17,7 +17,7 @@ function tag(prefix: string) {
 test.describe("clients/file-text-actions", () => {
   test("a request type is added with how it is answered, and removed", async ({ page }) => {
     const title = tag("[E2E] סוג פנייה");
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     await page.getByRole("button", { name: "+ סוג פנייה", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -47,7 +47,7 @@ test.describe("clients/file-text-actions", () => {
   test("the overview saved as a new version shows, and the earlier one stays in the history", async ({ page }) => {
     const first = tag("[E2E] סקירה");
     const second = tag("[E2E] סקירה מעודכנת");
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
 
     const overview = page.locator("section", { has: page.getByRole("heading", { name: /סקירת הלקוח/ }) });
     for (const body of [first, second]) {

@@ -32,6 +32,16 @@ test.describe("client file, to read", () => {
     expect(await response.text()).toContain("## מקרא מקורות");
   });
 
+  test("the client screen splits day-to-day work from the file", async ({ page }) => {
+    await page.goto(`/app/clients/${CLIENT}`);
+    await expect(page.getByRole("link", { name: "עבודה שוטפת" })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: /מרשם מקורות/ })).toHaveCount(0);
+    await page.getByRole("link", { name: "תיק הלקוח", exact: true }).click();
+    await expect(page).toHaveURL(/\?tab=file$/);
+    await expect(page.getByRole("heading", { name: /מרשם מקורות/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /אנשים ויחסים/ })).toBeVisible();
+  });
+
   test("a client that does not exist is a 404, not an error", async ({ page }) => {
     const response = await page.request.get(`/api/clients/no-such-client/client-file`);
     expect(response.status()).toBe(404);

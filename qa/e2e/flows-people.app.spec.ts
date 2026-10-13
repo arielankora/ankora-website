@@ -43,7 +43,7 @@ test.describe("clients/people-actions", () => {
     // reused the number would find the first attempt's person.
     const local = `05${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ איש קשר", exact: true }).click();
     const dialog = page.getByRole("dialog");
@@ -75,7 +75,7 @@ test.describe("clients/people-actions", () => {
   test("an organization added from the panel shows its role and monthly cost", async ({ page }) => {
     const name = tag("[E2E] ארגון");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ ארגון", exact: true }).click();
     const dialog = page.getByRole("dialog");

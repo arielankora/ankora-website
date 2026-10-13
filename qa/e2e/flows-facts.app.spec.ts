@@ -42,7 +42,7 @@ test.describe("clients/fact-actions", () => {
     const first = tag("[E2E] העדפה");
     const second = tag("[E2E] העדפה חדשה");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ פריט", exact: true }).click();
     let dialog = page.getByRole("dialog");
@@ -70,7 +70,7 @@ test.describe("clients/fact-actions", () => {
   test("an open question answered with a source shows its answer", async ({ page }) => {
     const question = tag("[E2E] שאלה");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ פריט", exact: true }).click();
     let dialog = page.getByRole("dialog");

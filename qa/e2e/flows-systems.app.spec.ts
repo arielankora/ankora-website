@@ -33,7 +33,7 @@ test.describe("clients/system-actions", () => {
   test("a system without access shows as a gap with its blocker, can be edited to granted, and removed", async ({ page }) => {
     const name = tag("[E2E] מערכת");
 
-    await page.goto(`/app/clients/${CLIENT}`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
     const code = await addSource(page);
     await page.getByRole("button", { name: "+ מערכת", exact: true }).click();
     const dialog = page.getByRole("dialog");
