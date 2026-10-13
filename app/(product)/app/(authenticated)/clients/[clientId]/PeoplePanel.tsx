@@ -5,7 +5,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { formatMinor } from "@/lib/money";
 import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
 import {
   addClientContactAction,
   updateClientContactAction,
@@ -41,7 +41,8 @@ export type PanelContact = {
   role: string | null;
   relationship: Relationship;
   organizationName: string | null;
-  entityLabel: string | null;
+  entityId: string | null;
+  entityName: string | null;
   emails: string[];
   phones: string[];
   context: string | null;
@@ -76,11 +77,13 @@ function ContactForm({
   clientId,
   organizationNames,
   sourceOptions,
+  entities,
   existing,
 }: {
   clientId: string;
   organizationNames: string[];
   sourceOptions: SourceOption[];
+  entities: EntityOption[];
   existing?: PanelContact;
 }) {
   const close = useDrawerClose();
@@ -121,17 +124,8 @@ function ContactForm({
             </datalist>
           </Field>
         )}
-        {existing && (
-          <Field label="ישות">
-            <input name="entityLabel" defaultValue={existing.entityLabel ?? ""} placeholder="Inc / LTD" className={INPUT} />
-          </Field>
-        )}
       </div>
-      {!existing && (
-        <Field label="ישות">
-          <input name="entityLabel" placeholder="Inc / LTD" className={INPUT} />
-        </Field>
-      )}
+      <EntitySelect entities={entities} defaultValue={existing?.entityId} />
       <Field label="מיילים">
         <input name="emails" dir="ltr" defaultValue={existing?.emails.join(", ") ?? ""} placeholder="name@company.com" className={INPUT} />
       </Field>
@@ -283,12 +277,14 @@ export function PeoplePanel({
   organizations,
   organizationNames,
   sourceOptions,
+  entities,
 }: {
   clientId: string;
   contacts: PanelContact[];
   organizations: PanelOrganization[];
   organizationNames: string[];
   sourceOptions: SourceOption[];
+  entities: EntityOption[];
 }) {
   const { showToast } = useToast();
 
@@ -309,7 +305,7 @@ export function PeoplePanel({
         <div className="flex flex-wrap items-center justify-between gap-2.5">
           <h2 className="text-sm font-medium text-appNavy">אנשים ויחסים ({contacts.length})</h2>
           <Drawer triggerLabel="+ איש קשר" title="איש קשר בתיק" variant="link">
-            <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} />
+            <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} />
           </Drawer>
         </div>
         {contacts.length === 0 ? (
@@ -326,7 +322,7 @@ export function PeoplePanel({
                       {c.isDecisionMaker && <span className="ms-2 text-xs font-normal text-gold-dim">מקבל החלטות</span>}
                     </p>
                     <p className="text-xs text-appNavy/60">
-                      {[c.name ? c.role : null, RELATIONSHIP_LABELS[c.relationship], c.organizationName, c.entityLabel].filter(Boolean).join(" · ")}
+                      {[c.name ? c.role : null, RELATIONSHIP_LABELS[c.relationship], c.organizationName, c.entityName].filter(Boolean).join(" · ")}
                     </p>
                     {(c.emails.length > 0 || c.phones.length > 0 || c.clientSideAddress) && (
                       <p className="mt-1 text-xs text-appNavy/70" dir="ltr">
@@ -341,7 +337,7 @@ export function PeoplePanel({
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-xs">
                     <Drawer triggerLabel="עריכה" title="עריכת איש קשר" variant="link">
-                      <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} existing={c} />
+                      <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} existing={c} />
                     </Drawer>
                     <button type="button" onClick={() => removeContact(c)} className="text-appNavy/50 hover:text-red-600">
                       הסרה

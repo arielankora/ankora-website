@@ -534,6 +534,7 @@ model Client {
   domains       ClientDomain[]
   systems       SystemAccess[]
   facts         ClientFact[]
+  entities      ClientEntity[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -2620,9 +2621,9 @@ model ClientContact {
 
   role            String?
   relationship    ContactRelationship @default(CLIENT_STAFF)
-  /// Which of the client's legal entities this person belongs to, in
-  /// words, until ClientEntity exists ("Inc", "LTD").
-  entityLabel     String?
+  /// Which of the client's legal entities this person works with (Shani:
+  /// Inc). Same client only.
+  entityId        String?
   /// What you need to know to work with them. "פונים אליה בכל ספק של Inc."
   context         String?
   /// Channels in order of preference: ["WhatsApp", "Slack", "מייל"].
@@ -2665,6 +2666,7 @@ model ClientContact {
 
   client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
   person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
 
   @@unique([clientId, personId])
   @@index([clientId, deletedAt])
@@ -2845,8 +2847,8 @@ model SystemAccess {
 
   systemName    String
   purpose       String?
-  /// Which legal entity, in words, until ClientEntity exists ("Inc").
-  entityLabel   String?
+  /// Which of the client's legal entities it belongs to (Mercury: Inc).
+  entityId      String?
   url           String?
   /// The account we use: "office@nux.ai", or "the CEO's private mail".
   accountUsed   String?
@@ -2894,6 +2896,7 @@ model SystemAccess {
 
   client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   credential ClientCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  entity     ClientEntity?     @relation(fields: [entityId], references: [id], onDelete: SetNull)
 
   @@index([clientId, deletedAt])
   @@map("system_access")
@@ -3000,4 +3003,58 @@ model ClientFact {
 
   @@index([clientId, kind, deletedAt])
   @@map("client_facts")
+}
+
+/// A legal entity of the client (spec 3.3): NUX Inc and NUX.AI Ltd. Money
+/// and people are attached to an entity, because paying Inc's invoice from
+/// Ltd is the kind of mistake the file exists to prevent.
+model ClientEntity {
+  id       String @id @default(cuid())
+  clientId String
+
+  /// Short, as people say it: "Inc", "LTD".
+  name               String
+  legalName          String?
+  /// ח.פ., EIN, or whatever the country uses.
+  registrationNumber String?
+  /// ISO 3166 alpha-2: "IL", "US".
+  country            String?
+  /// ISO 4217: "ILS", "USD".
+  currency           String?
+  billingAddress     String?
+  /// The parent, for a subsidiary (Ltd is Inc's).
+  parentId           String?
+
+  // Knowledge fields (spec 3.1). fieldStatus matters most here: an entity
+  // can be confirmed while its registration number is still missing.
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent       ClientEntity?   @relation("EntityParent", fields: [parentId], references: [id], onDelete: SetNull)
+  subsidiaries ClientEntity[]  @relation("EntityParent")
+  contacts     ClientContact[]
+  systems      SystemAccess[]
+
+  @@index([clientId, deletedAt])
+  @@map("client_entities")
 }

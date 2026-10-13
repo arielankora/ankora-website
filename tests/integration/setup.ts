@@ -46,6 +46,7 @@ const TABLES = [
   "client_contacts",
   "client_organizations",
   "client_facts",
+  "client_entities",
   "system_access",
   "client_sources",
   "client_domains",

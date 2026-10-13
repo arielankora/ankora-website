@@ -28,6 +28,8 @@ import { listClientSources, listClientDomains } from "@/lib/app-domain/client-so
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { SystemsPanel } from "./SystemsPanel";
 import { FactsPanel, type PanelFact } from "./FactsPanel";
+import { EntitiesPanel } from "./EntitiesPanel";
+import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listCredentials } from "@/lib/app-domain/credentials";
@@ -72,7 +74,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -100,7 +102,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     can(user.role, "credential.view") ? listCredentials(user, client.id) : Promise.resolve(null),
     // Spec 3.4: the facts, current and superseded.
     listClientFacts(user, client.id),
+    // Spec 3.3: the legal entities people and systems belong to.
+    listClientEntities(user, client.id),
   ]);
+  const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
+  const entityName = new Map(entities.map((e) => [e.id, e.name]));
   const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title }));
   // Whose preference a fact is: someone already in this client's file.
   const subjects = [
@@ -178,17 +184,45 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           <EditClientForm client={client} staff={staff} />
         </div>
 
+        <EntitiesPanel
+          clientId={client.id}
+          sourceOptions={sourceOptions}
+          entities={entities.map((e) => {
+            const fields = parseFieldStatus(e.fieldStatus);
+            const missing = Object.entries(fields).filter(([, v]) => v.status === "MISSING");
+            return {
+              id: e.id,
+              name: e.name,
+              legalName: e.legalName,
+              registrationNumber: e.registrationNumber,
+              country: e.country,
+              currency: e.currency,
+              billingAddress: e.billingAddress,
+              parentId: e.parentId,
+              parentName: e.parent?.name ?? null,
+              missingFields: missing.map(([k]) => k),
+              missingToResolve: missing[0]?.[1].toResolve ?? null,
+              status: effectiveStatus(e.knowledgeStatus, fields),
+              ownStatus: e.knowledgeStatus,
+              toResolve: e.toResolve,
+              sources: readSourceRefs(e.sources).map(formatSourceRef),
+            };
+          })}
+        />
+
         <PeoplePanel
           clientId={client.id}
           organizationNames={organizationNames}
           sourceOptions={sourceOptions}
+          entities={entityOptions}
           contacts={people.contacts.map((c) => ({
             id: c.id,
             name: c.person.name,
             role: c.role,
             relationship: c.relationship,
             organizationName: c.person.organization?.name ?? null,
-            entityLabel: c.entityLabel,
+            entityId: c.entityId,
+            entityName: c.entityId ? entityName.get(c.entityId) ?? null : null,
             emails: c.person.emails,
             phones: c.person.phones,
             context: c.context,
@@ -232,11 +266,13 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           clientId={client.id}
           sourceOptions={sourceOptions}
           vault={vault ? vault.map((v) => ({ id: v.id, systemName: v.systemName })) : null}
+          entities={entityOptions}
           systems={systems.map((s) => ({
             id: s.id,
             systemName: s.systemName,
             purpose: s.purpose,
-            entityLabel: s.entityLabel,
+            entityId: s.entityId,
+            entityName: s.entityId ? entityName.get(s.entityId) ?? null : null,
             url: s.url,
             accountUsed: s.accountUsed,
             ourPermission: s.ourPermission,

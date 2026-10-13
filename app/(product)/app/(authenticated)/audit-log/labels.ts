@@ -53,6 +53,7 @@ export const ENTITY_TYPES = [
   "ClientDomain",
   "SystemAccess",
   "ClientFact",
+  "ClientEntity",
   "PortalSummary",
 ];
 
@@ -92,6 +93,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_fact.to_task": "פתיחת משימה משאלה פתוחה",
   "client_fact.close": "סגירת מידע זמני בתיק הלקוח",
   "client_fact.remove": "הסרת פריט מתיק הלקוח",
+  "client_entity.add": "הוספת ישות משפטית ללקוח",
+  "client_entity.update": "עדכון ישות משפטית של הלקוח",
+  "client_entity.remove": "הסרת ישות משפטית של הלקוח",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",

@@ -1354,6 +1354,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Fact rules: never overwritten, questions missing until answered with a source, subjects same-client only"
+    },
+    "action:(product)/app/(authenticated)/clients/entity-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's legal entities, which people and systems point at"
+    },
+    "domain:client-entities": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Entity rules: per-field missing status, same-client links only, no cycles, no removal while in use"
     }
   },
   "waivers": {},

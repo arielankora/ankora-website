@@ -7,6 +7,7 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 // Shared so people, organizations and systems cannot drift apart.
 
 export type SourceOption = { code: string; title: string };
+export type EntityOption = { id: string; name: string };
 
 export const STATUS_TONE: Record<KnowledgeStatusLike, "green" | "amber" | "gray" | "red"> = {
   CONFIRMED: "green",
@@ -73,5 +74,23 @@ export function StatusLine({ status, toResolve }: { status: KnowledgeStatusLike;
       <StatusBadge label={KNOWLEDGE_STATUS_LABELS[status]} tone={STATUS_TONE[status]} />
       {toResolve && <span>{toResolve}</span>}
     </div>
+  );
+}
+
+/// Which of the client's legal entities. Shown only once the client has
+/// entities: before that there is nothing to choose.
+export function EntitySelect({ entities, defaultValue }: { entities: EntityOption[]; defaultValue?: string | null }) {
+  if (entities.length === 0) return null;
+  return (
+    <Field label="ישות">
+      <select name="entityId" defaultValue={defaultValue ?? ""} className={INPUT}>
+        <option value="">לא משויך לישות</option>
+        {entities.map((e) => (
+          <option key={e.id} value={e.id}>
+            {e.name}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }

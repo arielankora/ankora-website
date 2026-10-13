@@ -18,7 +18,7 @@ import {
   type SystemPermissionLike,
 } from "@/lib/system-map";
 import { addSystemAccessAction, updateSystemAccessAction, removeSystemAccessAction } from "../system-actions";
-import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 2: the system map, section 7.1 of the client file
 // (claude/org-brain-spec-2026-10-12.md, 3.6).
@@ -32,7 +32,8 @@ export type PanelSystem = {
   id: string;
   systemName: string;
   purpose: string | null;
-  entityLabel: string | null;
+  entityId: string | null;
+  entityName: string | null;
   url: string | null;
   accountUsed: string | null;
   ourPermission: SystemPermissionLike;
@@ -63,12 +64,14 @@ function SystemForm({
   clientId,
   sourceOptions,
   vault,
+  entities,
   existing,
 }: {
   clientId: string;
   sourceOptions: SourceOption[];
   /// Null when this person may not open the vault: no picker at all.
   vault: VaultOption[] | null;
+  entities: EntityOption[];
   existing?: PanelSystem;
 }) {
   const close = useDrawerClose();
@@ -80,14 +83,10 @@ function SystemForm({
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="מערכת *">
-          <input name="systemName" required defaultValue={existing?.systemName ?? ""} placeholder="Mercury" className={INPUT} />
-        </Field>
-        <Field label="ישות">
-          <input name="entityLabel" defaultValue={existing?.entityLabel ?? ""} placeholder="Inc / LTD" className={INPUT} />
-        </Field>
-      </div>
+      <Field label="מערכת *">
+        <input name="systemName" required defaultValue={existing?.systemName ?? ""} placeholder="Mercury" className={INPUT} />
+      </Field>
+      <EntitySelect entities={entities} defaultValue={existing?.entityId} />
       <Field label="למה היא משמשת">
         <input name="purpose" defaultValue={existing?.purpose ?? ""} placeholder="בנק של Inc" className={INPUT} />
       </Field>
@@ -215,11 +214,13 @@ export function SystemsPanel({
   systems,
   sourceOptions,
   vault,
+  entities,
 }: {
   clientId: string;
   systems: PanelSystem[];
   sourceOptions: SourceOption[];
   vault: VaultOption[] | null;
+  entities: EntityOption[];
 }) {
   const { showToast } = useToast();
   const gaps = systems.filter((s) => isAccessGap(s.accessStatus)).length;
@@ -238,7 +239,7 @@ export function SystemsPanel({
           {gaps > 0 && <span className="ms-2 text-xs font-normal text-warning">{gaps} בלי גישה עדיין</span>}
         </h2>
         <Drawer triggerLabel="+ מערכת" title="מערכת במפה" variant="link">
-          <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} />
+          <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} />
         </Drawer>
       </div>
       {systems.length === 0 ? (
@@ -254,7 +255,7 @@ export function SystemsPanel({
                     <StatusBadge label={SYSTEM_ACCESS_STATUS_LABELS[s.accessStatus]} tone={SYSTEM_ACCESS_STATUS_TONE[s.accessStatus]} />
                   </div>
                   <p className="text-xs text-appNavy/60">
-                    {[s.purpose, s.entityLabel, s.ourPermission !== "NONE" ? `הרשאה: ${SYSTEM_PERMISSION_LABELS[s.ourPermission]}` : null]
+                    {[s.purpose, s.entityName, s.ourPermission !== "NONE" ? `הרשאה: ${SYSTEM_PERMISSION_LABELS[s.ourPermission]}` : null]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
@@ -291,7 +292,7 @@ export function SystemsPanel({
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs">
                   <Drawer triggerLabel="עריכה" title="עריכת מערכת" variant="link">
-                    <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} existing={s} />
+                    <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} existing={s} />
                   </Drawer>
                   <button type="button" onClick={() => remove(s)} className="text-appNavy/50 hover:text-red-600">
                     הסרה

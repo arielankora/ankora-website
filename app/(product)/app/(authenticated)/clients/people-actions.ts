@@ -64,7 +64,7 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
       phones: phones.values,
       organizationName: text(formData, "organizationName"),
       relationship: pick(formData.get("relationship"), RELATIONSHIPS),
-      entityLabel: text(formData, "entityLabel"),
+      entityId: text(formData, "entityId"),
       context: text(formData, "context"),
       channelOrder: String(formData.get("channelOrder") ?? "")
         .split(/[,،\n]+/)

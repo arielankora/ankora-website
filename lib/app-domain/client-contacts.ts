@@ -6,6 +6,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type {
   User,
@@ -207,7 +208,7 @@ export interface ClientContactInput extends KnowledgeInput {
   organizationName?: string | null;
   role?: string | null;
   relationship?: ContactRelationship;
-  entityLabel?: string | null;
+  entityId?: string | null;
   context?: string | null;
   channelOrder?: string[];
   isPrimary?: boolean;
@@ -227,6 +228,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   if (!name && !role) throw new Error("צריך שם או תפקיד.");
 
   const sourced = await sourcedFields(input.clientId, input, [input.context]);
+  await assertEntityBelongs(input.clientId, input.entityId);
   const emails = cleanList(input.emails, normalizeEmail);
   const phones = cleanList(input.phones, normalizePhone);
   const organization = input.organizationName?.trim() ? await findOrCreateOrganization(input.organizationName, []) : null;
@@ -240,7 +242,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
   const data = {
     role,
     relationship: input.relationship ?? "CLIENT_STAFF",
-    entityLabel: input.entityLabel?.trim() || null,
+    entityId: input.entityId || null,
     context: input.context?.trim() || null,
     channelOrder: (input.channelOrder ?? []).map((c) => c.trim()).filter(Boolean),
     isPrimary: input.isPrimary ?? false,
@@ -282,6 +284,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
 
   const sourced = await sourcedFields(before.clientId, input, [input.context !== undefined ? input.context : before.context], before);
+  if (input.entityId !== undefined) await assertEntityBelongs(before.clientId, input.entityId);
 
   // The person's own details are shared across clients (decision 8). An
   // address that already belongs to somebody else is refused rather than
@@ -304,7 +307,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
     data: {
       role: input.role !== undefined ? input.role?.trim() || null : undefined,
       relationship: input.relationship ?? undefined,
-      entityLabel: input.entityLabel !== undefined ? input.entityLabel?.trim() || null : undefined,
+      entityId: input.entityId !== undefined ? input.entityId || null : undefined,
       context: input.context !== undefined ? input.context?.trim() || null : undefined,
       channelOrder: input.channelOrder !== undefined ? input.channelOrder.map((c) => c.trim()).filter(Boolean) : undefined,
       isPrimary: input.isPrimary ?? undefined,

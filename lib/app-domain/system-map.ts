@@ -4,6 +4,7 @@ import { assertCan, can, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type { User, BillingCycle, SystemAccessStatus, SystemPermission } from "@prisma/client";
 
@@ -23,7 +24,7 @@ export interface SystemAccessInput extends KnowledgeInput {
   clientId: string;
   systemName: string;
   purpose?: string | null;
-  entityLabel?: string | null;
+  entityId?: string | null;
   url?: string | null;
   accountUsed?: string | null;
   ourPermission?: SystemPermission;
@@ -92,7 +93,7 @@ function systemData(input: Partial<SystemAccessInput>) {
   return {
     systemName: has("systemName") ? clean(input.systemName) ?? undefined : undefined,
     purpose: has("purpose") ? clean(input.purpose) : undefined,
-    entityLabel: has("entityLabel") ? clean(input.entityLabel) : undefined,
+    entityId: has("entityId") ? input.entityId || null : undefined,
     url: has("url") ? cleanUrl(input.url) : undefined,
     accountUsed: has("accountUsed") ? clean(input.accountUsed) : undefined,
     ourPermission: input.ourPermission ?? undefined,
@@ -117,6 +118,7 @@ export async function addSystemAccess(actor: User, input: SystemAccessInput) {
   assertResolvable(input.knowledgeStatus, input.toResolve);
   assertNoSecret(input.accountUsed, input.notes, input.blocker);
   await assertCredentialBelongs(input.clientId, input.credentialId);
+  await assertEntityBelongs(input.clientId, input.entityId);
 
   // The same system twice is usually the same system typed twice. Two
   // accounts in one system are two rows, so the account is part of it.
@@ -162,6 +164,7 @@ export async function updateSystemAccess(actor: User, id: string, input: Partial
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   assertNoSecret(input.accountUsed, input.notes, input.blocker);
   if (input.credentialId !== undefined) await assertCredentialBelongs(before.clientId, input.credentialId);
+  if (input.entityId !== undefined) await assertEntityBelongs(before.clientId, input.entityId);
   const sourced = await sourcedFields(before.clientId, input, [input.notes !== undefined ? input.notes : before.notes], before);
 
   const updated = await prisma.systemAccess.update({

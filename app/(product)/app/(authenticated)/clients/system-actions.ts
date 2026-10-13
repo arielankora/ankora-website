@@ -84,7 +84,7 @@ function parseSystem(formData: FormData): {
   const value: Omit<SystemAccessInput, "clientId"> = {
     systemName: String(formData.get("systemName") ?? ""),
     purpose: text(formData, "purpose"),
-    entityLabel: text(formData, "entityLabel"),
+    entityId: text(formData, "entityId"),
     url: text(formData, "url"),
     accountUsed: text(formData, "accountUsed"),
     ourPermission: pick(formData.get("ourPermission"), PERMISSIONS),
