@@ -1394,6 +1394,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "Read-only view of the client file"
+    },
+    "domain:client-file-attention": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Daily cron: who is told about stale client-file items, at most weekly per person and client"
     }
   },
   "waivers": {},

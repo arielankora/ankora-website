@@ -57,6 +57,11 @@ export default async function NotificationsPage() {
                     <Link href={`/app/tasks/${n.entityId}`} className="font-medium text-appNavy hover:text-gold-dim">
                       {n.title}
                     </Link>
+                  ) : n.entityType === "Client" && n.entityId ? (
+                    // The client file's weekly look: straight to the file.
+                    <Link href={`/app/clients/${n.entityId}/client-file`} className="font-medium text-appNavy hover:text-gold-dim">
+                      {n.title}
+                    </Link>
                   ) : (
                     <p className="font-medium text-appNavy">{n.title}</p>
                   )}
