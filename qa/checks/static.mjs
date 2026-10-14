@@ -14,15 +14,24 @@ export async function types() {
 }
 
 export async function lint() {
-  const r = await sh("npx", ["next", "lint", "--max-warnings", "9999"], { timeoutMs: 6 * 60_000 });
-  const warnings = (r.all.match(/Warning:/g) ?? []).length;
-  const errors = (r.all.match(/Error:/g) ?? []).length;
+  // 13.10.2026: Next 16 removed `next lint`, so ESLint runs directly with the
+  // flat config in eslint.config.mjs. Its stylish output ends with one line,
+  // "N problems (E errors, W warnings)", which is what is read here; the
+  // old per-line "Warning:" / "Error:" prefixes belonged to `next lint`.
+  const r = await sh("npx", ["eslint", ".", "--max-warnings", "9999"], { timeoutMs: 6 * 60_000 });
+  const summary = r.all.match(/(\d+) errors?, (\d+) warnings?/);
+  const errors = summary ? Number(summary[1]) : r.code === 0 ? 0 : 1;
+  const warnings = summary ? Number(summary[2]) : 0;
   const out = [];
-  // The repo carries two baseline warnings (documented in the redesign
-  // notes). Anything above that is new and worth a look, but lint noise
-  // is never a reason to block a deploy.
+  // The baseline is 30, all of them on the day of the Next 16 upgrade
+  // (13.10.2026): the two that `next lint` always carried, about twenty
+  // React Compiler rules that eslint-plugin-react-hooks 7 added and
+  // eslint.config.mjs keeps at "warn" until they are cleaned up, and
+  // directives that now disable nothing. Anything above that is new and
+  // worth a look, but lint noise is never a reason to block a deploy.
+  const BASELINE = 30;
   if (errors) out.push(finding("major", `${errors} lint error(s)`, tail(r.all, 20)));
-  if (warnings > 2) out.push(finding("minor", `${warnings} lint warnings (baseline is 2)`, tail(r.all, 20)));
+  if (warnings > BASELINE) out.push(finding("minor", `${warnings} lint warnings (baseline is ${BASELINE})`, tail(r.all, 20)));
   return out;
 }
 
