@@ -154,3 +154,44 @@ describe("knowledge proposals", () => {
     await expect(approveProposal(stranger, pid)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
+
+describe("request types and the extraction brief", () => {
+  it("a proposed request type enters the file when approved", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [{ target: "REQUEST_TYPE", payload: { title: "חשבונית Inc", arrivesVia: "billing-us", handling: "לשני ולג'נן, לא לאיילה" }, at: "14:20" }],
+    });
+    const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
+    const approved = await approveProposal(user, p.id);
+    const rt = await prisma.requestType.findUniqueOrThrow({ where: { id: approved.resultId! } });
+    expect(rt.handling).toBe("לשני ולג'נן, לא לאיילה");
+    expect(rt.sources).toEqual([{ code: "S1", at: "14:20" }]);
+  });
+
+  it("lists the user's clients with their domains, and the recordings already proposed", async () => {
+    const { extractionBrief } = await import("@/lib/app-domain/extraction-brief");
+    const { addClientDomain } = await import("@/lib/app-domain/client-sources");
+    const { client, user } = await setup();
+    const other = await createTestClient({ name: "Not mine" });
+    await addClientDomain(user, { clientId: client.id, domain: "nux.ai", kind: "CLIENT" });
+    await addClientDomain(user, { clientId: client.id, domain: "nextage.co.il", kind: "PARTNER", organizationName: "Nextage" });
+    await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] });
+
+    const b = await extractionBrief(user);
+    expect(b.guide.version).toBeNull();
+    expect(b.guide.rules.length).toBeGreaterThan(3);
+    expect(b.clients).toEqual([
+      {
+        name: "NUX",
+        domains: expect.arrayContaining([
+          { domain: "nux.ai", kind: "CLIENT", organization: null },
+          { domain: "nextage.co.il", kind: "PARTNER", organization: "Nextage" },
+        ]),
+      },
+    ]);
+    expect(b.clients.map((c) => c.name)).not.toContain(other.name);
+    expect(b.processedRecordings).toEqual([{ firefliesId: "ff-123", client: "NUX", sourceCode: "S1", title: "Nextage & Ankora" }]);
+  });
+});

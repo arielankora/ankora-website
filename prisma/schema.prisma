@@ -3075,6 +3075,7 @@ enum ProposalTarget {
   CONTACT
   ORGANIZATION
   SYSTEM
+  REQUEST_TYPE
 }
 
 /// What approving a proposal does.

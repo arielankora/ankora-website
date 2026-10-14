@@ -99,6 +99,9 @@ export const TOOL_ANNOTATIONS = {
   propose_knowledge: WRITES,
   // One address or number in, who it is out (spec 8).
   lookup_contact: READ_ONLY,
+  // The guidance, the clients' domains and what was already proposed, for
+  // the daily extraction (spec 5.1). Reads only.
+  get_extraction_brief: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
