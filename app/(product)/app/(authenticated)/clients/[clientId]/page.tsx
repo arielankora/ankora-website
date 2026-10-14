@@ -57,6 +57,13 @@ const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red
 
 export const metadata = { robots: { index: false, follow: false } };
 
+/// The one clock reading for this render, taken outside the component so
+/// React Compiler's purity rule sees a call, not a hidden input: the facts
+/// panel and its first paint must agree on what has expired.
+function serverNow(): number {
+  return Date.now();
+}
+
 export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
@@ -131,7 +138,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   ];
   const subjectLabel = new Map(subjects.map((s) => [s.value, s.label]));
   const staffName = new Map(staff.map((s) => [s.id, s.name]));
-  const renderedAt = Date.now();
+  const renderedAt = serverNow();
   const iso = (d: Date | null) => (d ? d.toISOString() : null);
   const toPanelFact = (f: (typeof facts.current)[number]): PanelFact => {
     const subjectKey = f.subjectContactId ? `contact:${f.subjectContactId}` : f.subjectOrgId ? `org:${f.subjectOrgId}` : "";
