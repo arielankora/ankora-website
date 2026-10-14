@@ -32,11 +32,11 @@ afterEach(() => {
   vi.resetModules();
 });
 
-async function withEnv<T>(env: Partial<Record<EnvKey, string>>, use: () => Promise<T>): Promise<T> {
+async function withEnv<T>(env: Partial<Record<EnvKey, string>>, run: () => Promise<T>): Promise<T> {
   for (const key of ENV_KEYS) delete process.env[key];
   Object.assign(process.env, env);
   vi.resetModules();
-  return use();
+  return run();
 }
 
 const env = () => import("@/lib/env");

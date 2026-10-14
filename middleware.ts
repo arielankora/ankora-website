@@ -7,7 +7,8 @@ import { authConfig } from "./auth.config";
 // lib/app-auth/session.ts on every protected page/route, because Prisma
 // with a direct Postgres connection cannot run on the Edge runtime that
 // middleware uses. See auth.config.ts for why this file has no providers.
-export const { auth: middleware } = NextAuth(authConfig);
+const { auth } = NextAuth(authConfig);
+export default auth;
 
 export const config = {
   matcher: ["/app/:path*"],

@@ -26,7 +26,17 @@ test.describe("public pages", () => {
         // Analytics and other third-party beacons are blocked by CSP or
         // by the runner's own network, and their failure says nothing
         // about this page.
-        if (new URL(req.url()).origin === new URL(page.url() || "http://x").origin) {
+        //
+        // And a link prefetch the router itself called off. Next fetches the
+        // RSC payload of links on screen ahead of a click, and cancels one it
+        // no longer wants; Chromium reports that as ERR_ABORTED on a `_rsc`
+        // URL. It is the router changing its mind, not a resource the page
+        // failed to load. Seen once in three full runs right after the move
+        // to Next 16 (13.10.2026), on /en/ankora-vs-personal-assistant's
+        // prefetch of /en/blog.
+        const url = new URL(req.url());
+        if (url.searchParams.has("_rsc") && req.failure()?.errorText === "net::ERR_ABORTED") return;
+        if (url.origin === new URL(page.url() || "http://x").origin) {
           failedRequests.push(`${req.url()} — ${req.failure()?.errorText ?? "failed"}`);
         }
       });
