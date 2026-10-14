@@ -10,6 +10,7 @@ import { Drawer } from "@/components/app/Drawer";
 import { ImportantDateForm } from "./ImportantDateForm";
 import { ImportantDateRow, type DateRow } from "./ImportantDateRow";
 import type { ImportantDateStatus, RecurrenceType } from "@prisma/client";
+import { formatDayAlternatives } from "@/lib/app-domain/important-dates-recurrence";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -101,9 +102,19 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
     return {
       id: d.id,
       title: d.title,
-      day: new Intl.DateTimeFormat("he-IL", { day: "2-digit", timeZone: "Asia/Jerusalem" }).format(occurrence),
-      month: new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(occurrence),
-      meta: `${d.client.name} · ${RECURRENCE_LABEL[d.recurrence]}`,
+      // Org-brain spec 3.10: a date with an unknown day is a gap, and the
+      // list says so instead of showing the day it was created.
+      day: d.precision === "UNKNOWN" ? "?" : new Intl.DateTimeFormat("he-IL", { day: "2-digit", timeZone: "Asia/Jerusalem" }).format(occurrence),
+      month: d.precision === "UNKNOWN" ? "חסר" : new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(occurrence),
+      meta: [
+        d.client.name,
+        RECURRENCE_LABEL[d.recurrence],
+        d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1 ? `משוער: ${formatDayAlternatives(d.dayAlternatives)}` : null,
+        d.precision === "UNKNOWN" ? "מועד חסר" : null,
+        d.conditionText ? "מותנה" : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       tag: STATUS_LABEL[d.status],
       tone: STATUS_TONE[d.status],
       remind: formatReminders(d.reminderRules),

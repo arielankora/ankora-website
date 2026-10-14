@@ -7,6 +7,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listUsers } from "@/lib/app-domain/users";
 import { listCategories } from "@/lib/app-domain/categories";
 import { IMPORTANT_DATE_CATEGORY_LABELS } from "@/lib/app-domain/important-dates-reminders";
+import { formatDayAlternatives } from "@/lib/app-domain/important-dates-recurrence";
 import { IMPORTANT_DATE_STATUS_LABELS } from "@/lib/app-domain/important-dates";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -107,6 +108,11 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
                   leadUnit: date.leadUnit,
                   rollConvention: date.rollConvention,
                   businessCalendar: date.businessCalendar,
+                  precision: date.precision,
+                  dayAlternatives: date.dayAlternatives,
+                  conditionText: date.conditionText,
+                  rangeStart: date.rangeStart,
+                  rangeEnd: date.rangeEnd,
                   updatedAt: date.updatedAt,
                 }}
               />
@@ -124,8 +130,27 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
               <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
                 <div>
                   <dt className="text-xs text-appNavy/50">מופע הבא</dt>
-                  <dd className="text-appNavy">{formatDate(date.nextOccurrenceAt)}</dd>
+                  <dd className="text-appNavy">
+                    {date.precision === "UNKNOWN" ? "מועד חסר" : formatDate(date.nextOccurrenceAt)}
+                    {date.precision === "APPROXIMATE" && date.dayAlternatives.length > 1 && (
+                      <span className="text-appNavy/50"> (משוער: {formatDayAlternatives(date.dayAlternatives)} לחודש)</span>
+                    )}
+                  </dd>
                 </div>
+                {date.conditionText && (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-appNavy/50">בתנאי ש</dt>
+                    <dd className="text-appNavy">{date.conditionText}</dd>
+                  </div>
+                )}
+                {(date.rangeStart || date.rangeEnd) && (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-appNavy/50">תקופה</dt>
+                    <dd className="text-appNavy">
+                      {date.rangeStart ? formatDate(date.rangeStart) : "מההתחלה"} עד {date.rangeEnd ? formatDate(date.rangeEnd) : "ללא סוף"}
+                    </dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-xs text-appNavy/50">אחראי</dt>
                   <dd className="text-appNavy">{date.responsibleUser.name}</dd>

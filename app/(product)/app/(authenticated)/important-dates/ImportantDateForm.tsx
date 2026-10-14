@@ -37,6 +37,11 @@ export interface ExistingImportantDate {
   leadUnit: "CALENDAR_DAYS" | "BUSINESS_DAYS";
   rollConvention: "NONE" | "PREVIOUS_BUSINESS_DAY" | "NEXT_BUSINESS_DAY";
   businessCalendar: string;
+  precision: "EXACT" | "APPROXIMATE" | "UNKNOWN";
+  dayAlternatives: number[];
+  conditionText: string | null;
+  rangeStart: Date | null;
+  rangeEnd: Date | null;
   updatedAt: Date;
 }
 
@@ -97,6 +102,11 @@ export function ImportantDateForm({
   const [category, setCategory] = useState<ImportantDateCategoryLike | "">(existing?.category ?? "");
   const [calendarType, setCalendarType] = useState(existing?.calendarType ?? "GREGORIAN");
   const [recurrence, setRecurrence] = useState(existing?.recurrence ?? "ANNUAL");
+  const [precision, setPrecision] = useState(existing?.precision ?? "EXACT");
+  // Org-brain spec 3.10: an approximate or unknown day only makes sense for
+  // a date that repeats by the calendar.
+  const precisionApplies = recurrence === "ANNUAL" || recurrence === "MONTHLY";
+  const effectivePrecision = precisionApplies ? precision : "EXACT";
   const [createAutoTask, setCreateAutoTask] = useState(existing?.createAutoTask ?? false);
 
   const typeExamples = useMemo(() => (category ? IMPORTANT_DATE_TYPE_EXAMPLES[category] : []), [category]);
@@ -208,7 +218,31 @@ export function ImportantDateForm({
         </div>
       </div>
 
-      {recurrence === "WEEKLY" ? (
+      {precisionApplies && (
+        <div>
+          <label className="block text-xs font-medium text-appNavy/60">כמה המועד ידוע</label>
+          <select
+            name="precision"
+            value={precision}
+            onChange={(e) => setPrecision(e.target.value as typeof precision)}
+            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          >
+            <option value="EXACT">יום מדויק</option>
+            <option value="APPROXIMATE">משוער (אחד מכמה ימים)</option>
+            <option value="UNKNOWN">חוזר, אבל היום לא ידוע</option>
+          </select>
+        </div>
+      )}
+      {!precisionApplies && <input type="hidden" name="precision" value="EXACT" />}
+
+      {effectivePrecision === "UNKNOWN" ? (
+        <div className="rounded-lg border border-dashed border-lineDark px-3 py-2 text-xs text-appNavy/60">
+          {/* month/day are NOT NULL and ignored for an unknown date. */}
+          <input type="hidden" name="month" value={existing?.month ?? 1} />
+          <input type="hidden" name="day" value={existing?.day ?? 1} />
+          המועד יופיע ברשימה כ&quot;מועד חסר&quot;, בלי תזכורות ובלי משימה, עד שיתברר היום.
+        </div>
+      ) : recurrence === "WEEKLY" ? (
         <div>
           {/* month/day are NOT NULL and ignored for a weekly date, like ONCE. */}
           <input type="hidden" name="month" value="1" />
@@ -258,18 +292,35 @@ export function ImportantDateForm({
               <p className="mt-1 text-[11px] text-appNavy/40">1=ניסן ... 7=תשרי ... 12=אדר (א׳) ... 13=אדר ב׳</p>
             )}
           </div>
-          <div>
-            <label className="block text-xs font-medium text-appNavy/60">יום</label>
-            <input
-              type="number"
-              name="day"
-              min={1}
-              max={31}
-              required
-              defaultValue={existing?.day}
-              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
-            />
-          </div>
+          {effectivePrecision === "APPROXIMATE" ? (
+            <div>
+              {/* The domain stores the earliest alternative as `day`. */}
+              <input type="hidden" name="day" value="1" />
+              <label className="block text-xs font-medium text-appNavy/60">ימים אפשריים</label>
+              <input
+                type="text"
+                name="dayAlternatives"
+                required
+                inputMode="numeric"
+                placeholder="8, 9"
+                defaultValue={existing?.dayAlternatives?.join(", ") ?? ""}
+                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              />
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-medium text-appNavy/60">יום</label>
+              <input
+                type="number"
+                name="day"
+                min={1}
+                max={31}
+                required
+                defaultValue={existing?.day}
+                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              />
+            </div>
+          )}
           {recurrence === "MONTHLY" && calendarType === "GREGORIAN" ? (
             <div>
               <label className="block text-xs font-medium text-appNavy/60">כל כמה חודשים</label>
@@ -311,6 +362,33 @@ export function ImportantDateForm({
           )}
         </div>
       )}
+
+      <details className="rounded-lg border border-lineDark px-3 py-2" open={Boolean(existing?.conditionText || existing?.rangeStart || existing?.rangeEnd)}>
+        <summary className="cursor-pointer text-xs font-medium text-appNavy/60">תנאי ותקופה (לא חובה)</summary>
+        <div className="mt-3 flex flex-col gap-3">
+          <div>
+            <label className="block text-xs font-medium text-appNavy/60">רק אם</label>
+            <input
+              type="text"
+              name="conditionText"
+              defaultValue={existing?.conditionText ?? ""}
+              placeholder="למשל: לא עמדנו ב-SLA של החולשות ברבעון"
+              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            />
+            <p className="mt-1 text-[11px] text-appNavy/40">במועד מותנה לא נפתחת משימה. האחראי מקבל שאלה אם התנאי מתקיים.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-appNavy/60">בתוקף מ</label>
+              <input type="date" name="rangeStart" defaultValue={toDateInputValue(existing?.rangeStart ?? null)} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-appNavy/60">עד</label>
+              <input type="date" name="rangeEnd" defaultValue={toDateInputValue(existing?.rangeEnd ?? null)} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold" />
+            </div>
+          </div>
+        </div>
+      </details>
 
       <div className="grid grid-cols-2 gap-3">
         <div>

@@ -35,6 +35,9 @@ function parseImportantDateFormData(formData: FormData) {
   const intervalMonthsRaw = String(formData.get("intervalMonths") || "").trim();
   const leadUnitRaw = String(formData.get("leadUnit") || "");
   const rollConventionRaw = String(formData.get("rollConvention") || "");
+  const precisionRaw = String(formData.get("precision") || "");
+  const rangeStartRaw = String(formData.get("rangeStart") || "").trim();
+  const rangeEndRaw = String(formData.get("rangeEnd") || "").trim();
 
   return {
     clientId: String(formData.get("clientId") || ""),
@@ -76,6 +79,19 @@ function parseImportantDateFormData(formData: FormData) {
       ? rollConventionRaw
       : undefined) as "NONE" | "PREVIOUS_BUSINESS_DAY" | "NEXT_BUSINESS_DAY" | undefined,
     businessCalendar: String(formData.get("businessCalendar") || "") || undefined,
+    precision: (precisionRaw === "EXACT" || precisionRaw === "APPROXIMATE" || precisionRaw === "UNKNOWN" ? precisionRaw : undefined) as
+      | "EXACT"
+      | "APPROXIMATE"
+      | "UNKNOWN"
+      | undefined,
+    // "8, 9" or "8 או 9": any non-digit separates.
+    dayAlternatives: String(formData.get("dayAlternatives") || "")
+      .split(/[^0-9]+/)
+      .filter(Boolean)
+      .map(Number),
+    conditionText: formData.has("conditionText") ? String(formData.get("conditionText") || "").trim() || null : undefined,
+    rangeStart: formData.has("rangeStart") ? (rangeStartRaw ? new Date(`${rangeStartRaw}T00:00:00Z`) : null) : undefined,
+    rangeEnd: formData.has("rangeEnd") ? (rangeEndRaw ? new Date(`${rangeEndRaw}T00:00:00Z`) : null) : undefined,
     // Same fix as the document visibility toggle, and the same bug: an
     // unchecked box is absent from the form data, so `!== "off"` read
     // every unticked "add the default reminders" as a yes. Older than
