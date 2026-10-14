@@ -591,6 +591,29 @@ async function main() {
     });
   }
 
+  // Org brain (spec 5.2): proposals waiting on the review screen, so the
+  // browser suite can approve and reject real ones. Reset to pending on
+  // every Preview build: the suite decides them, and the next build puts
+  // them back. Six, so a retried test still finds two it has not decided.
+  const demoSource = await prisma.clientSource.upsert({
+    where: { clientId_seq: { clientId: clientB.id, seq: 9000 } },
+    update: { deletedAt: null },
+    create: { clientId: clientB.id, seq: 9000, code: "S9000", kind: "TRANSCRIPT", title: "[DEMO] פגישת היכרות", createdById: ankoraAdmin.id },
+  });
+  await prisma.knowledgeBatch.upsert({
+    where: { id: "demo-knowledge-batch" },
+    update: { closedAt: null },
+    create: { id: "demo-knowledge-batch", clientId: clientB.id, sourceId: demoSource.id, via: "MCP", note: "[DEMO] הצעות לדוגמה", createdById: ankoraAdmin.id },
+  });
+  for (let i = 1; i <= 6; i++) {
+    const payload = { kind: "NOTE", body: `[DEMO] הצעה ${i}`, sources: [{ code: "S9000", at: `0${i}:00` }] };
+    await prisma.knowledgeProposal.upsert({
+      where: { id: `demo-proposal-${i}` },
+      update: { state: "PENDING", decidedById: null, decidedAt: null, rejectReason: null, edited: false, resultId: null, payload },
+      create: { id: `demo-proposal-${i}`, batchId: "demo-knowledge-batch", clientId: clientB.id, target: "FACT", payload, reason: "[DEMO] לבדיקה" },
+    });
+  }
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);

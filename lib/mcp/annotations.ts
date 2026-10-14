@@ -91,6 +91,14 @@ export const TOOL_ANNOTATIONS = {
   // Issues an address; the filing happens when bytes arrive there. A second
   // call issues a second address and, used, a second document.
   start_document_upload: WRITES,
+  // The client file as one document (lib/mcp/client-file-tools.ts,
+  // 14.10.2026). Assembled on each call; nothing is written.
+  get_client_file: READ_ONLY,
+  // Each call adds a batch of proposals (and may register a source). It
+  // writes nothing into the file itself: a person approves on the screen.
+  propose_knowledge: WRITES,
+  // One address or number in, who it is out (spec 8).
+  lookup_contact: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -117,6 +125,7 @@ export const WRITE_TOOLS = [
   "apply_task_plan_steps",
   "upload_document",
   "start_document_upload",
+  "propose_knowledge",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

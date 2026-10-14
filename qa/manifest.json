@@ -1282,8 +1282,208 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-12",
       "riskReason": "Claude files and reads client documents; filed documents stay hidden from the client unless asked, and every read is audited"
+    },
+    "action:(product)/app/(authenticated)/clients/people-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client file's people: shared person records across clients, and per-client audience rules"
+    },
+    "domain:client-contacts": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "One person shared by several clients; what one client knows must never reach another"
+    },
+    "action:(product)/app/(authenticated)/clients/source-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's source register and domains: what every item in the file cites, and which domains map mail to which client"
+    },
+    "domain:client-sources": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Source rules (no item without a source, R14, R17) and cross-client domain isolation"
+    },
+    "action:(product)/app/(authenticated)/clients/system-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's system map: access status, accounts and billing, linked to the vault"
+    },
+    "domain:knowledge-items": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the knowledge fields of every client-file item: source rules, R14 lowering, toResolve"
+    },
+    "domain:system-map": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "System map rules: no secrets stored, vault links same-client only and named only to vault viewers"
+    },
+    "action:(product)/app/(authenticated)/clients/fact-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client file's facts: supersede instead of overwrite, answers, question to task"
+    },
+    "domain:client-facts": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Fact rules: never overwritten, questions missing until answered with a source, subjects same-client only"
+    },
+    "action:(product)/app/(authenticated)/clients/entity-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes the client's legal entities, which people and systems point at"
+    },
+    "domain:client-entities": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Entity rules: per-field missing status, same-client links only, no cycles, no removal while in use"
+    },
+    "api:/api/clients/[clientId]/client-file": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Exports a whole client file as Markdown; must 404 for anyone not assigned"
+    },
+    "domain:client-file-view": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items"
+    },
+    "screen:/app/clients/[clientId]/client-file": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Read-only view of the client file"
+    },
+    "domain:client-file-attention": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Daily cron: who is told about stale client-file items, at most weekly per person and client"
+    },
+    "action:(product)/app/(authenticated)/knowledge/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "The only way a proposal from Claude enters a client file: approve, edit and approve, reject"
+    },
+    "domain:knowledge-proposals": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Proposal rules: source required, secrets dropped with a task, topics-only quotes dropped, contradictions never overwrite, no approval without a person"
+    },
+    "screen:/app/knowledge": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Review screen for proposals to client files"
+    },
+    "domain:extract-prompt-input": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Builds the extraction prompt that leaves the product: names only, no contact details, nothing sensitive"
+    },
+    "action:(product)/app/(authenticated)/clients/file-text-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Writes request types and the client file's versioned free text"
+    },
+    "domain:client-narratives": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Versioned free text: conflict on stale save, cited source codes must exist"
+    },
+    "domain:request-types": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Request types route only to contacts in the same client's file"
+    },
+    "action:(product)/app/(authenticated)/extraction-guide/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Proposes and decides versions of the guidance every extraction prompt carries"
+    },
+    "domain:extraction-guide": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "Guidance versions: admin-only approval, no rollback by an older draft, no secrets"
+    },
+    "screen:/app/extraction-guide": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-13",
+      "riskReason": "The extraction guidance and its versions"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-12"
+  "lastScan": "2026-10-13"
 }

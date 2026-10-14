@@ -5,6 +5,7 @@ import { notifyLongRunningTimers } from "@/lib/app-domain/notifications";
 import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
 import { purgeExpiredWebsiteLeads } from "@/lib/website-leads";
 import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
+import { notifyClientFileAttention } from "@/lib/app-domain/client-file-attention";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers, importantDates, digest, leadRetention] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
@@ -46,6 +47,14 @@ export async function GET(request: Request) {
       // Contact requests from the site are kept 24 months (privacy policy,
       // section 9; Ariel 11.10.2026). See lib/website-leads.ts.
       purgeExpiredWebsiteLeads(),
+      // The client files' weekly "still true?" (org-brain spec 5.4): past
+      // temporary information, old uncertain items, unanswered questions.
+      // Isolated like the steps above: a failure here is reported, and
+      // never stops the rest of the morning.
+      notifyClientFileAttention().catch((err) => {
+        console.error("[cron] notifyClientFileAttention failed", err);
+        return { notified: 0, unowned: 0, error: String(err) };
+      }),
     ]);
 
     return NextResponse.json({
@@ -56,6 +65,7 @@ export async function GET(request: Request) {
       importantDates,
       digest,
       leadRetention,
+      clientFiles,
     });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);

@@ -40,6 +40,23 @@ const TABLES = [
   // (clients/users/categories) every one of these ultimately references.
   // CASCADE makes the exact order mostly academic, but kept logical for
   // readability, matching every other block's own comment above.
+  // Org brain, phase 2 (13.10.2026). The two link tables reference
+  // clients; persons and organizations reference nothing and would
+  // otherwise survive every reset.
+  "client_contacts",
+  "client_organizations",
+  "extraction_guides",
+  "request_types",
+  "client_narratives",
+  "knowledge_proposals",
+  "knowledge_batches",
+  "client_facts",
+  "client_entities",
+  "system_access",
+  "client_sources",
+  "client_domains",
+  "persons",
+  "organizations",
   "reminder_occurrences",
   "reminder_rules",
   "important_dates",

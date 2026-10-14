@@ -527,6 +527,18 @@ model Client {
   credentials          ClientCredential[]
   portalSummaries      PortalSummary[]
 
+  // Org brain, phase 2 (spec 3.5).
+  contacts      ClientContact[]
+  organizations ClientOrganization[]
+  sources       ClientSource[]
+  domains       ClientDomain[]
+  systems       SystemAccess[]
+  facts         ClientFact[]
+  entities      ClientEntity[]
+  knowledgeBatches KnowledgeBatch[]
+  requestTypes     RequestType[]
+  narratives       ClientNarrative[]
+
   @@index([status])
   @@index([accountManagerId])
   @@map("clients")
@@ -2353,6 +2365,8 @@ model ClientCredential {
   updatedBy      User   @relation("CredentialUpdater", fields: [updatedById], references: [id], onDelete: Restrict)
   lastRevealedBy User?  @relation("CredentialLastRevealer", fields: [lastRevealedById], references: [id], onDelete: SetNull)
 
+  systems SystemAccess[]
+
   @@index([clientId, deletedAt])
   @@map("client_credentials")
 }
@@ -2491,4 +2505,763 @@ model WebsiteLead {
   @@index([createdAt])
   @@index([email])
   @@map("website_leads")
+}
+
+// ---------------------------------------------------------------------------
+// Org brain, phase 2: the client file's people and organizations
+// (claude/org-brain-spec-2026-10-12.md, sections 3.1, 3.5, decisions 2, 8).
+// ---------------------------------------------------------------------------
+
+/// How much we trust a piece of client knowledge (spec 3.1). The order is
+/// the order of strength: an item is as strong as its weakest field.
+enum KnowledgeStatus {
+  /// The client, or a supplier of theirs, said or showed it explicitly.
+  CONFIRMED
+  /// A garbled transcript, a loose phrasing, or an assumption of ours.
+  UNCERTAIN
+  /// Known to be needed, not received.
+  MISSING
+  /// Replaced by a newer item. The row stays: nothing is overwritten.
+  SUPERSEDED
+}
+
+enum KnowledgeAudience {
+  /// Everyone assigned to the client.
+  ALL_STAFF
+  /// The account manager, managers, and `audienceUserIds`.
+  ACCOUNT_TEAM
+  /// Only `audienceUserIds` (and managers).
+  RESTRICTED
+}
+
+enum KnowledgeSensitivity {
+  NORMAL
+  /// Never leaves the product through MCP.
+  SENSITIVE
+}
+
+enum KnowledgeImportance {
+  NORMAL
+  /// "Not critical" in Hadas's file: an open item nobody needs to chase.
+  LOW
+}
+
+/// Who a person is to the client (spec 3.5).
+enum ContactRelationship {
+  CLIENT_STAFF
+  /// A firm that runs part of the client's operation (Nextage).
+  PROVIDER
+  /// Lawyer, accountant, consultant.
+  ADVISOR
+  INVESTOR
+  /// Everyday suppliers (the cleaner, Dell).
+  SUPPLIER
+  /// Ankora's own people on this client.
+  ANKORA
+}
+
+/// An organization, once for all of Ankora (decision 8). Nextage can serve
+/// several of our clients; its name and domain are written once, and what
+/// it is to each client lives on ClientOrganization.
+model Organization {
+  id      String   @id @default(cuid())
+  name    String
+  /// Email domains, lower case, without "@". A partner's domain assigns a
+  /// conversation to a client only together with another participant
+  /// (spec 5.1), because the same firm may work for several clients.
+  domains String[] @default([])
+  website String?
+  notes   String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  people        Person[]
+  clients       ClientOrganization[]
+  clientDomains ClientDomain[]
+
+  @@index([name])
+  @@index([domains], type: Gin)
+  @@map("organizations")
+}
+
+/// A person, once for all of Ankora (decision 8). Email and phone are
+/// facts about the person and are shared: correcting Shani's address for
+/// one client corrects it for every client she works with. Everything that
+/// depends on the client (role, context, who may see it) is on
+/// ClientContact, and never crosses from one client to another.
+model Person {
+  id             String   @id @default(cuid())
+  /// Optional: "the cleaner" is a person whose name nobody wrote down
+  /// (mapping gap 14). A ClientContact without a name carries a role.
+  name           String?
+  /// Lower case, trimmed (lib/contact-normalize.ts).
+  emails         String[] @default([])
+  /// E.164 where it could be inferred, digits and "+" otherwise.
+  phones         String[] @default([])
+  organizationId String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  organization Organization?   @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  contacts     ClientContact[]
+
+  @@index([emails], type: Gin)
+  @@index([phones], type: Gin)
+  @@map("persons")
+}
+
+/// A person in one client's file (spec 3.5): who they are to this client
+/// and what you need to know to work with them. Carries the knowledge
+/// fields of spec 3.1, like every item in the client file.
+model ClientContact {
+  id       String @id @default(cuid())
+  clientId String
+  personId String
+
+  role            String?
+  relationship    ContactRelationship @default(CLIENT_STAFF)
+  /// Which of the client's legal entities this person works with (Shani:
+  /// Inc). Same client only.
+  entityId        String?
+  /// What you need to know to work with them. "פונים אליה בכל ספק של Inc."
+  context         String?
+  /// Channels in order of preference: ["WhatsApp", "Slack", "מייל"].
+  channelOrder    String[] @default([])
+  isPrimary       Boolean  @default(false)
+  isDecisionMaker Boolean  @default(false)
+  /// Ankora people only: the user, and the address they use on the
+  /// client's side (Hadas, office@nux.ai).
+  userId            String?
+  clientSideAddress String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  /// { "<field>": { "status": "MISSING" | "UNCERTAIN", "toResolve"?: string, "sources"?: [...] } }
+  fieldStatus     Json                 @default("{}")
+  /// [{ "code": "S11", "at": "05:02" }] once the source register exists.
+  sources         Json                 @default("[]")
+  /// [{ "system": "RAID", "id": "RAID-002" }]
+  externalRefs    Json                 @default("[]")
+  /// Conflicting versions, each with a value and a source.
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  /// Plain ids, no foreign key, like the audit trail: an owner who leaves
+  /// must not take the item with them.
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  person Person @relation(fields: [personId], references: [id], onDelete: Restrict)
+  entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, personId])
+  @@index([clientId, deletedAt])
+  @@map("client_contacts")
+}
+
+/// An organization in one client's file: what it does for them and what it
+/// costs (decision 2). Replaces the VENDOR fact of spec v2, so Nextage is
+/// stored once, as an organization, and linked.
+model ClientOrganization {
+  id             String @id @default(cuid())
+  clientId       String
+  organizationId String
+
+  /// What they are to this client: "הנהלת חשבונות ושכר", "נאמן אופציות".
+  role             String?
+  relationship     ContactRelationship @default(PROVIDER)
+  /// Agorot (or cents), with the currency, when a recurring cost is known.
+  monthlyCostMinor Int?
+  currency         String?
+  notes            String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+
+  @@unique([clientId, organizationId])
+  @@index([clientId, deletedAt])
+  @@map("client_organizations")
+}
+
+/// What a source is (spec 3.2).
+enum SourceKind {
+  /// A recorded meeting. One source may be several recordings of the
+  /// same meeting.
+  TRANSCRIPT
+  /// A document of the client's, or of a supplier of theirs.
+  CLIENT_DOCUMENT
+  TASK
+  /// Somebody told us, outside a recording.
+  PERSON
+  /// A document Ankora wrote (Hadas's KI, HMP, TE).
+  ANKORA_DOCUMENT
+}
+
+enum SourceWeight {
+  /// The client or a supplier of theirs.
+  PRIMARY
+  /// Ankora's own writing. An item whose sources are all secondary is
+  /// never "confirmed" (rule R14).
+  SECONDARY
+}
+
+enum SourceRestriction {
+  NONE
+  /// Topics only: no quotes, no details (a NUX board meeting).
+  TOPICS_ONLY
+}
+
+/// The client's source register (spec 3.2): S1, S2... per client, in the
+/// order they were added. Every item in the file points here.
+model ClientSource {
+  id       String @id @default(cuid())
+  clientId String
+  /// 1, 2, 3... per client. `code` is "S" + seq, stored so a reader never
+  /// has to compute it.
+  seq      Int
+  code     String
+
+  kind         SourceKind
+  weight       SourceWeight      @default(PRIMARY)
+  title        String
+  /// The day, stored as UTC midnight like every other date-only field.
+  occurredAt   DateTime?
+  participants String[]          @default([])
+  /// [{ "system": "FIREFLIES" | "DOCUMENT" | "TASK" | "OTHER", "id": "..." }]
+  externalRefs Json              @default("[]")
+  restriction  SourceRestriction @default(NONE)
+  notes        String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, seq])
+  @@unique([clientId, code])
+  @@map("client_sources")
+}
+
+enum ClientDomainKind {
+  /// The client's own (nux.ai).
+  CLIENT
+  /// A partner's (nextage.co.il). May appear in several clients' files.
+  PARTNER
+}
+
+/// Email domains that belong to a client's world (spec 3.5). Lets mail
+/// and recordings be matched to the right client.
+model ClientDomain {
+  id             String           @id @default(cuid())
+  clientId       String
+  domain         String
+  kind           ClientDomainKind
+  /// For a partner domain: whose it is.
+  organizationId String?
+  notes          String?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, domain])
+  @@index([domain])
+  @@map("client_domains")
+}
+
+/// What Ankora may do in a client's system (spec 3.6).
+enum SystemPermission {
+  NONE
+  VIEWER
+  USER
+  BILLING
+  ADMIN
+  OWNER
+}
+
+enum SystemAccessStatus {
+  HAS_ACCESS
+  /// Asked for, not granted yet.
+  PENDING
+  NO_ACCESS
+  /// The client keeps it; we do not need in.
+  NOT_NEEDED
+}
+
+enum BillingCycle {
+  MONTHLY
+  ANNUAL
+  OTHER
+}
+
+/// The client's system map (spec 3.6, section 7.1 of Hadas's file). The
+/// vault holds secrets; this holds everything else about a system,
+/// including systems we have no access to. Every system that is not
+/// HAS_ACCESS or NOT_NEEDED is a handover gap, with no separate list to
+/// keep.
+model SystemAccess {
+  id       String @id @default(cuid())
+  clientId String
+
+  systemName    String
+  purpose       String?
+  /// Which of the client's legal entities it belongs to (Mercury: Inc).
+  entityId      String?
+  url           String?
+  /// The account we use: "office@nux.ai", or "the CEO's private mail".
+  accountUsed   String?
+  ourPermission SystemPermission   @default(NONE)
+  accessStatus  SystemAccessStatus @default(NO_ACCESS)
+  /// What is in the way: "MFA on the CEO's phone".
+  blocker       String?
+  /// Who manages it on the client's side.
+  clientAdmin   String?
+  /// The vault entry, when there is one. Same client only.
+  credentialId  String?
+
+  // A SaaS bill, kept with the system so the supplier is stored once.
+  billingCycle     BillingCycle?
+  billingCostMinor Int?
+  billingCurrency  String?
+  /// Last four digits of the card it is charged to. Never more.
+  cardLast4        String?
+  /// Where the invoice arrives: "billing-us@nux.ai".
+  invoiceTo        String?
+  notes            String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  credential ClientCredential? @relation(fields: [credentialId], references: [id], onDelete: SetNull)
+  entity     ClientEntity?     @relation(fields: [entityId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, deletedAt])
+  @@map("system_access")
+}
+
+/// What a fact in the client file is (spec 3.4). Each kind is a section of
+/// Hadas's file.
+enum FactKind {
+  /// In scope for Ankora (section 2).
+  SCOPE_IN
+  /// Out of scope, and who handles it instead (section 2).
+  SCOPE_OUT
+  /// A preference, of the client or of one of their people (section 4).
+  PREFERENCE
+  /// A standing requirement of the client (section 5).
+  REQUIREMENT
+  /// Where knowledge lives: a drive, a channel, a mailbox (section 7.3).
+  LOCATION
+  /// A financial fact: a transfer limit, a payroll day (section 8).
+  FINANCE
+  /// True for now, with an end: a date or an event (section 11).
+  TEMPORARY
+  /// A decision taken once, with when and by whom (section 12).
+  ONE_OFF_DECISION
+  /// An open question, with who chases it (section 13).
+  QUESTION
+  NOTE
+}
+
+enum FactTopic {
+  COMMUNICATION
+  REPORTING
+  DOCUMENTS
+  AUTOMATION
+  ADMINS
+  PAYMENTS
+  SUPPLIERS
+  OTHER
+}
+
+/// Everything in the client file without a structure of its own
+/// (spec 3.4). A changed fact is never edited in place: the new one is
+/// added and the old one is marked SUPERSEDED, pointing at it.
+model ClientFact {
+  id       String   @id @default(cuid())
+  clientId String
+  kind     FactKind
+  topic    FactTopic?
+
+  /// The fact itself, in a sentence or two.
+  body             String
+  /// Whose preference: a contact or an organization in this client's
+  /// file. Neither means the client's own.
+  subjectContactId String?
+  subjectOrgId     String?
+  /// SCOPE_OUT: who handles it instead ("Nextage", "H-F, Ankora
+  /// coordinates").
+  referTo          String?
+
+  /// TEMPORARY: until a date, or until an event ("until the account joins
+  /// the organization"). At least one.
+  validUntil      DateTime?
+  validUntilEvent String?
+  /// A temporary fact found to be over. Kept, as history.
+  closedAt        DateTime?
+
+  /// ONE_OFF_DECISION: when, and who decided.
+  decidedAt DateTime?
+  decidedBy String?
+
+  /// QUESTION: who chases it, and the answer once there is one.
+  assigneeId String?
+  answeredAt DateTime?
+  answer     String?
+
+  /// Work that came out of this fact: a question turned into a task, or
+  /// the open issue behind a temporary fact.
+  taskId String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, kind, deletedAt])
+  @@map("client_facts")
+}
+
+/// A legal entity of the client (spec 3.3): NUX Inc and NUX.AI Ltd. Money
+/// and people are attached to an entity, because paying Inc's invoice from
+/// Ltd is the kind of mistake the file exists to prevent.
+model ClientEntity {
+  id       String @id @default(cuid())
+  clientId String
+
+  /// Short, as people say it: "Inc", "LTD".
+  name               String
+  legalName          String?
+  /// ח.פ., EIN, or whatever the country uses.
+  registrationNumber String?
+  /// ISO 3166 alpha-2: "IL", "US".
+  country            String?
+  /// ISO 4217: "ILS", "USD".
+  currency           String?
+  billingAddress     String?
+  /// The parent, for a subsidiary (Ltd is Inc's).
+  parentId           String?
+
+  // Knowledge fields (spec 3.1). fieldStatus matters most here: an entity
+  // can be confirmed while its registration number is still missing.
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client       Client          @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent       ClientEntity?   @relation("EntityParent", fields: [parentId], references: [id], onDelete: SetNull)
+  subsidiaries ClientEntity[]  @relation("EntityParent")
+  contacts     ClientContact[]
+  systems      SystemAccess[]
+  requestTypes RequestType[]
+
+  @@index([clientId, deletedAt])
+  @@map("client_entities")
+}
+
+/// Where a batch of proposals came from (spec 5.1).
+enum KnowledgeBatchVia {
+  /// propose_knowledge, from Claude.
+  MCP
+  SCREEN
+}
+
+enum ProposalTarget {
+  FACT
+  CONTACT
+  ORGANIZATION
+  SYSTEM
+}
+
+/// What approving a proposal does.
+enum ProposalAction {
+  /// A new item in the file.
+  CREATE
+  /// A new version of an existing fact; the old one is kept as superseded.
+  SUPERSEDE
+  /// A contradiction of an existing fact. Nothing is overwritten: the
+  /// claim joins the fact's alternatives, and the fact becomes uncertain.
+  CONTRADICT
+}
+
+enum ProposalState {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// One delivery of proposals: usually one meeting or one document (spec
+/// 5.1, 5.2). Shown as one card in "ממתין לאישור".
+model KnowledgeBatch {
+  id       String            @id @default(cuid())
+  clientId String
+  /// The source in the client's register. Created, or found by its
+  /// recording, when the batch arrives.
+  sourceId String?
+  via      KnowledgeBatchVia @default(MCP)
+  /// A line from whoever sent it: what was read, what was left out.
+  note     String?
+  /// Items that never became proposals, and why: secrets (never stored,
+  /// only counted) and quotes from a topics-only source.
+  dropped  Json              @default("[]")
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  closedAt    DateTime?
+
+  client    Client              @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  proposals KnowledgeProposal[]
+
+  @@index([clientId, closedAt])
+  @@map("knowledge_batches")
+}
+
+/// One proposed item (spec 5.2). Nothing reaches the file until a person
+/// approves it on the screen (decision 1): there is no tool that approves.
+model KnowledgeProposal {
+  id       String         @id @default(cuid())
+  batchId  String
+  clientId String
+  target   ProposalTarget
+  action   ProposalAction @default(CREATE)
+  /// For SUPERSEDE and CONTRADICT: the fact it is about.
+  targetId String?
+  /// The item as it would be written: the same fields the screens send.
+  payload  Json
+  /// Why Claude thinks so, in a sentence.
+  reason   String?
+  /// A short quote from the source, when the source allows quotes.
+  quote    String?
+  /// Rule flags found when the proposal arrived: [{ code, message }].
+  flags    Json           @default("[]")
+
+  state        ProposalState @default(PENDING)
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+  /// Whether the person changed it before approving (decision 1 measures
+  /// this: under 10% after a month opens approval in conversation).
+  edited       Boolean       @default(false)
+  /// The item approving it created or changed.
+  resultId     String?
+
+  createdAt DateTime @default(now())
+
+  batch KnowledgeBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, state])
+  @@index([batchId])
+  @@map("knowledge_proposals")
+}
+
+/// What comes in from whom, and how it is answered (spec 3.7, section 7.5
+/// of Hadas's file): "an Inc invoice from a supplier, to billing-us,
+/// forwarded to Shani and Jenan, not to Ayala". Probably the most useful
+/// thing in the file for a new Operations Manager's first day.
+model RequestType {
+  id       String @id @default(cuid())
+  clientId String
+
+  title      String
+  /// Supplier, employee, Nextage, a system.
+  fromWho    String?
+  /// billing-us, WhatsApp, Slack, office@.
+  arrivesVia String?
+  /// How it is answered and where it goes.
+  handling   String
+  /// Who it is routed to: contacts in this client's file.
+  routeToContactIds String[] @default([])
+  /// When it belongs to one entity (an Inc invoice).
+  entityId   String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+
+  @@index([clientId, deletedAt])
+  @@map("request_types")
+}
+
+enum NarrativeKind {
+  /// Who the client is, in a paragraph.
+  OVERVIEW
+  /// How we got here.
+  BACKGROUND
+  /// What Ankora does for them.
+  OUR_ROLE
+}
+
+/// The file's free text (spec 3.3, section 2 of Hadas's file), versioned
+/// like a task plan: every save is a new row, so nothing is overwritten
+/// and any version can be read again.
+model ClientNarrative {
+  id       String        @id @default(cuid())
+  clientId String
+  kind     NarrativeKind
+  version  Int
+  /// Markdown, the product's small subset (lib/markdown-lite.ts). Source
+  /// codes cited in it ("[S1 08:13]") must exist in the register.
+  body     String
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@unique([clientId, kind, version])
+  @@map("client_narratives")
+}
+
+enum GuideState {
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+/// Ankora's guidance to Claude for extraction, in versions (decision 3).
+/// What the server enforces stays in code; this is the part that guides:
+/// what counts as relevant, what is left out, how to phrase. Anybody on
+/// the team may propose a version; an admin approves it, and the latest
+/// approved version is the one every extraction prompt carries.
+model ExtractionGuide {
+  id      String     @id @default(cuid())
+  version Int        @unique
+  body    String
+  /// What changed, and why, in a line.
+  note    String?
+  state   GuideState @default(DRAFT)
+
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  decidedById  String?
+  decidedAt    DateTime?
+  rejectReason String?
+
+  @@map("extraction_guides")
 }

@@ -132,6 +132,21 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   AlertRule: { decision: "DUMP", table: "alert_rules", reason: "Configuration a human wrote; nothing regenerates it." },
   ReportSchedule: { decision: "DUMP", table: "report_schedules", reason: "Configuration a human wrote; nothing regenerates it." },
   ImportantDate: { decision: "DUMP", table: "important_dates", reason: "Commitments to clients, the product's own promise surface." },
+  // Org brain, phase 2 (13.10.2026): the client file's people.
+  Organization: { decision: "DUMP", table: "organizations", reason: "The firms around each client, written once for all of them. Typed by people; exists nowhere else." },
+  Person: { decision: "DUMP", table: "persons", reason: "Names, emails and phones of the people in client files. Typed by people; exists nowhere else." },
+  ClientContact: { decision: "DUMP", table: "client_contacts", reason: "Who each person is to each client, and what is known about them. The client file itself." },
+  ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
+  ClientSource: { decision: "DUMP", table: "client_sources", reason: "The source register every item in the client file cites. Without it the codes mean nothing." },
+  RequestType: { decision: "DUMP", table: "request_types", reason: "What comes in from whom and how it is answered. Typed by people." },
+  ClientNarrative: { decision: "DUMP", table: "client_narratives", reason: "The client file's free text and every earlier version of it." },
+  ExtractionGuide: { decision: "DUMP", table: "extraction_guides", reason: "Every version of the extraction guidance, and who proposed and approved it." },
+  KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
+  KnowledgeProposal: { decision: "DUMP", table: "knowledge_proposals", reason: "Proposals to client files and who decided them: the review history decision 1 is measured on." },
+  ClientEntity: { decision: "DUMP", table: "client_entities", reason: "The client's legal entities and their registration details. People and systems point at them." },
+  ClientFact: { decision: "DUMP", table: "client_facts", reason: "The client file's facts and their history: preferences, scope, decisions, open questions. Typed by people." },
+  SystemAccess: { decision: "DUMP", table: "system_access", reason: "The client's system map: accounts, access status and blockers. Typed by people; no secrets (those are in the vault)." },
+  ClientDomain: { decision: "DUMP", table: "client_domains", reason: "Which email domains belong to which client. Typed by people, not derivable." },
   ReminderRule: { decision: "DUMP", table: "reminder_rules", reason: "Configuration attached to an important date." },
   ReminderOccurrence: {
     decision: "DUMP",
@@ -248,6 +263,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "important_dates.holidayKey": "A public holiday identifier.",
   "reminder_occurrences.idempotencyKey": "A de-duplication key. Losing it re-sends reminders; it grants nothing.",
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
+  "system_access.credentialId": "The id of a vault row, a pointer. The secret stays encrypted in client_credentials.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.
   "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by a key that is not in the backup.",

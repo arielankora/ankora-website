@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<User["role"], string> = {
   CLIENT_USER: "לקוח",
 };
 
-function navItemsFor(role: User["role"], supervises: boolean): NavItem[] {
+function navItemsFor(role: User["role"], supervises: boolean, proposals = 0): NavItem[] {
   // Phase 6 (spec 13 "Client Portal"): a CLIENT_USER gets an entirely
   // separate, deliberately short nav - the portal is meant to "feel part
   // of Ankora, not an internal tool exposed outward" (spec 13's own
@@ -65,6 +65,9 @@ function navItemsFor(role: User["role"], supervises: boolean): NavItem[] {
   // somebody names you supervisor and goes when the last of that work
   // closes.
   if (supervises) items.push({ href: "/app/supervising", label: "בפיקוח שלי", group: "העבודה שלי" });
+  // Org brain (spec 5.2): proposals to client files, from Claude. Same rule
+  // as supervision: the row is there only while something waits.
+  if (proposals > 0) items.push({ href: "/app/knowledge", label: "ממתין לאישור", group: "העבודה שלי" });
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "ניהול" });
   if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "ניהול" });
   if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "ניהול" });
@@ -138,6 +141,7 @@ export function AppShell({
   importantDatesCount,
   alertsCount,
   supervising,
+  proposals = 0,
   clients,
   children,
 }: {
@@ -150,10 +154,12 @@ export function AppShell({
   /// Tasks phase 2. `total` decides whether the nav row exists at all,
   /// `pending` is the number printed beside it.
   supervising: { total: number; pending: number };
+  /// Proposals to client files waiting for a person (spec 5.2).
+  proposals?: number;
   clients: { id: string; name: string }[];
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role, supervising.total > 0);
+  const items = navItemsFor(user.role, supervising.total > 0, proposals);
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
@@ -167,6 +173,7 @@ export function AppShell({
           importantDatesCount,
           alertsCount,
           supervisingCount: supervising.pending,
+          knowledgeCount: proposals,
         }}
       />
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
