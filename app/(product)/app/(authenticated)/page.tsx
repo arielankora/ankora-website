@@ -29,6 +29,7 @@ import { EmptyState } from "@/components/app/states/EmptyState";
 import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { formatClockMinutes } from "@/lib/hours-format";
+import { taskHref } from "./tasks/list-query";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -340,9 +341,12 @@ export default async function AppHomePage() {
             </div>
             <div className="divide-y divide-lineDark/60">
               {myTasks.map((t) => (
+                // Each row opens its own task. It used to open the list,
+                // and Ariel had to find the task again (15.10.2026). The
+                // way back from the task still leads to "my tasks".
                 <Link
                   key={t.id}
-                  href="/app/tasks?mine=1"
+                  href={taskHref(t.id, "mine=1")}
                   className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-appNavy/[0.02]"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
