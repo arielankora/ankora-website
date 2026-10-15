@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describePick, pickCategory, tokenize } from "@/lib/mcp/category-pick";
+import { describePick, pickCategory, tokenize, excludeDemoCategories, isDemoName } from "@/lib/mcp/category-pick";
 
 // 15.10.2026 (Ariel): choosing a category for a task nobody gave one.
 // The candidates are the real global categories on production.
@@ -80,5 +80,23 @@ describe("describePick", () => {
   it("says why, in one line", () => {
     expect(describePick({ id: "q", name: "הצעת מחיר", basis: "title" })).toContain("הצעת מחיר");
     expect(describePick({ id: "q", name: "x", basis: "similar", example: "y" })).toContain('"y"');
+  });
+});
+
+describe("demo categories", () => {
+  const cats = [{ name: "[DEMO] פגישות ותיאומים" }, { name: "גיוס וhr" }, { name: " [DEMO] מחקר" }];
+
+  it("are left out on a real client", () => {
+    expect(excludeDemoCategories(cats, "Ankora פנימי").map((c) => c.name)).toEqual(["גיוס וhr"]);
+    expect(excludeDemoCategories(cats, null).map((c) => c.name)).toEqual(["גיוס וhr"]);
+  });
+
+  it("stay available on a demo client", () => {
+    expect(excludeDemoCategories(cats, "[DEMO] קבוצת מרידיאן")).toHaveLength(3);
+  });
+
+  it("are recognised by their prefix", () => {
+    expect(isDemoName("[DEMO] x")).toBe(true);
+    expect(isDemoName("DEMO x")).toBe(false);
   });
 });

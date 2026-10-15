@@ -181,3 +181,20 @@ export function describePick(pick: CategoryPick): string {
       return `Chosen automatically: nothing pointed to a specific category, so it is the first one in the list.`;
   }
 }
+
+/// Seeded demo data is named with a "[DEMO]" prefix (prisma/seed.ts).
+export const DEMO_PREFIX = "[DEMO]";
+
+export function isDemoName(name: string): boolean {
+  return name.trim().startsWith(DEMO_PREFIX);
+}
+
+/// Demo categories are for demo clients. On a real client a demo category
+/// is never a fit, however well its words match: found on the preview of
+/// PR #212, where "[DEMO] פגישות ותיאומים" was picked for an onboarding
+/// task on the internal client. A demo client keeps every category, so
+/// the seeded flows behave as before.
+export function excludeDemoCategories<T extends { name: string }>(categories: T[], clientName: string | null): T[] {
+  if (clientName && isDemoName(clientName)) return categories;
+  return categories.filter((c) => !isDemoName(c.name));
+}

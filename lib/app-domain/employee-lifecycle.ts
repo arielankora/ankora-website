@@ -7,6 +7,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { CURRENT_AGREEMENTS, hasSignedCurrent } from "@/lib/agreements";
 import { OPEN_STATUSES, assignableUsers, completeStepAsSystem, createTask, updateTask } from "@/lib/app-domain/tasks";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
+import { isDemoName } from "@/lib/mcp/category-pick";
 import {
   ONBOARDING_SIGN_STEP,
   ONBOARDING_STEPS,
@@ -103,13 +104,33 @@ async function resolveOwner(actor: User, kind: EmployeeLifecycleKind, clientId: 
   return assignable.some((u) => u.id === owner.id) ? owner : actor;
 }
 
+const DEFAULT_LIFECYCLE_CATEGORY = "גיוס וhr";
+
+/// The category for both lifecycle tasks: named, not guessed. Guessing
+/// put an onboarding task under a seeded demo category on the preview of
+/// PR #212. The name comes from EMPLOYEE_LIFECYCLE_CATEGORY (case does not
+/// matter, since "HR" is typed both ways), and the row has to be usable
+/// on the internal client by createTask's own rule: global or that
+/// client's own, and active. Only when there is no such row does the
+/// automatic pick run, and even then never onto a demo category.
 async function pickCategoryId(actor: User, clientId: string, text: string): Promise<string | null> {
+  const name = (process.env.EMPLOYEE_LIFECYCLE_CATEGORY || DEFAULT_LIFECYCLE_CATEGORY).trim();
+  const named = await prisma.category.findFirst({
+    where: {
+      name: { equals: name, mode: "insensitive" },
+      active: true,
+      OR: [{ visibility: "GLOBAL" }, { visibility: "CLIENT", clientId }],
+    },
+    select: { id: true },
+  });
+  if (named) return named.id;
+
   try {
     // Dynamic: lib/mcp/lookup imports the users module, which calls into
     // this one, and a static import would close that loop at load time.
     const { autoPickCategory } = await import("@/lib/mcp/lookup");
     const pick = await autoPickCategory(actor, clientId, text);
-    return pick?.id ?? null;
+    return pick && !isDemoName(pick.name) ? pick.id : null;
   } catch {
     return null;
   }

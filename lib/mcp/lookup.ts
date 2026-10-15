@@ -7,7 +7,13 @@ import { listUsers } from "@/lib/app-domain/users";
 import { OPEN_STATUSES, assignableUsers, listTasks } from "@/lib/app-domain/tasks";
 import { describeResolveFailure, resolveByName, normalizeName } from "@/lib/mcp/resolve";
 import { prisma } from "@/lib/prisma";
-import { pickCategory, type CategoryPick, type PickCandidate, type PickHistory } from "@/lib/mcp/category-pick";
+import {
+  excludeDemoCategories,
+  pickCategory,
+  type CategoryPick,
+  type PickCandidate,
+  type PickHistory,
+} from "@/lib/mcp/category-pick";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
 // says into the ids the domain layer wants.
@@ -61,8 +67,14 @@ export async function lookupCategory(
   clientId: string,
   name: string
 ): Promise<Lookup<Named>> {
-  const all = await listCategories();
-  const usable = all.filter((c: CategoryRow) => c.active && (c.visibility === "GLOBAL" || c.clientId === clientId));
+  const [all, client] = await Promise.all([
+    listCategories(),
+    prisma.client.findUnique({ where: { id: clientId }, select: { name: true } }),
+  ]);
+  const usable = excludeDemoCategories(
+    all.filter((c: CategoryRow) => c.active && (c.visibility === "GLOBAL" || c.clientId === clientId)),
+    client?.name ?? null
+  );
   const candidates: Named[] = usable.map((c: CategoryRow) => ({ id: c.id, name: c.name }));
   const result = resolveByName(name, candidates);
   if (result.status === "ok") return { ok: true, value: result.match };

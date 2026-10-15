@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateUserRoleStatusAction } from "../actions";
 import type { User } from "@prisma/client";
@@ -31,6 +32,23 @@ export function EditRoleStatusForm({
 }) {
   const [state, formAction] = useFormState(updateUserRoleStatusAction, {});
 
+  // Controlled, not defaultValue. React 19 resets a form's uncontrolled
+  // fields when its action returns, back to the defaultValue they were
+  // first rendered with, so after a successful save the selects jumped
+  // back to the old role and status while the screen said "נשמר" (found
+  // on the preview of PR #212; the same on main). Controlled selects are
+  // left alone by that reset. The props are followed when the server
+  // sends a new row (after revalidatePath), so the screen always shows
+  // what is stored.
+  const [role, setRole] = useState(targetUser.role);
+  const [status, setStatus] = useState(targetUser.status);
+  const [seen, setSeen] = useState({ role: targetUser.role, status: targetUser.status });
+  if (seen.role !== targetUser.role || seen.status !== targetUser.status) {
+    setSeen({ role: targetUser.role, status: targetUser.status });
+    setRole(targetUser.role);
+    setStatus(targetUser.status);
+  }
+
   return (
     <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <input type="hidden" name="userId" value={targetUser.id} />
@@ -38,7 +56,8 @@ export function EditRoleStatusForm({
         <label className="block text-xs font-medium text-appNavy/60">תפקיד</label>
         <select
           name="role"
-          defaultValue={targetUser.role}
+          value={role}
+          onChange={(e) => setRole(e.target.value as typeof role)}
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
@@ -52,7 +71,8 @@ export function EditRoleStatusForm({
         <label className="block text-xs font-medium text-appNavy/60">סטטוס</label>
         <select
           name="status"
-          defaultValue={targetUser.status}
+          value={status}
+          onChange={(e) => setStatus(e.target.value as typeof status)}
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >

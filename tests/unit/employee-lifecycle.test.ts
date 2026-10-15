@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = {
   client: { findFirst: vi.fn() },
+  category: { findFirst: vi.fn() },
   user: { findFirst: vi.fn() },
   userClientAccess: { findMany: vi.fn() },
   task: { findMany: vi.fn(), findFirst: vi.fn() },
@@ -37,7 +38,8 @@ const revokeClaude = vi.fn();
 vi.mock("@/lib/app-domain/mcp-connections", () => ({
   revokeClaudeGrantsForUser: (...a: unknown[]) => revokeClaude(...a),
 }));
-vi.mock("@/lib/mcp/lookup", () => ({ autoPickCategory: async () => ({ id: "cat-1", name: "תפעול" }) }));
+const autoPickCategory = vi.fn();
+vi.mock("@/lib/mcp/lookup", () => ({ autoPickCategory: (...a: unknown[]) => autoPickCategory(...a) }));
 
 const lifecycle = await import("@/lib/app-domain/employee-lifecycle");
 const prompts = await import("@/lib/employee-lifecycle-prompts");
@@ -73,6 +75,8 @@ beforeEach(() => {
   db.stepUpGrant.deleteMany.mockResolvedValue({ count: 1 });
   db.agreementSignLink.updateMany.mockResolvedValue({ count: 0 });
   revokeClaude.mockResolvedValue({ ok: true, revoked: 3 });
+  db.category.findFirst.mockResolvedValue(null);
+  autoPickCategory.mockResolvedValue({ id: "cat-1", name: "תפעול" });
 });
 
 describe("prompts", () => {
@@ -311,5 +315,40 @@ describe("onPasskeyRegistered (onboarding step 4, second half)", () => {
     db.employeeAgreement.findFirst.mockRejectedValue(new Error("db down"));
     await expect(lifecycle.onPasskeyRegistered("emp")).resolves.toBeUndefined();
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "employee_lifecycle.trigger_failed" }));
+  });
+});
+
+describe("the lifecycle task's category", () => {
+  it("uses the named category when it is usable on the internal client", async () => {
+    db.category.findFirst.mockResolvedValue({ id: "hr" });
+    await lifecycle.openOnboardingTask(admin, person());
+    expect(createTask.mock.calls[0][1].categoryId).toBe("hr");
+    const where = db.category.findFirst.mock.calls[0][0].where;
+    expect(where.name).toEqual({ equals: "גיוס וhr", mode: "insensitive" });
+    expect(where.active).toBe(true);
+    expect(where.OR).toEqual([{ visibility: "GLOBAL" }, { visibility: "CLIENT", clientId: "internal" }]);
+    expect(autoPickCategory).not.toHaveBeenCalled();
+  });
+
+  it("reads the name from EMPLOYEE_LIFECYCLE_CATEGORY", async () => {
+    process.env.EMPLOYEE_LIFECYCLE_CATEGORY = "אנשים";
+    try {
+      await lifecycle.openOnboardingTask(admin, person());
+      expect(db.category.findFirst.mock.calls[0][0].where.name.equals).toBe("אנשים");
+    } finally {
+      delete process.env.EMPLOYEE_LIFECYCLE_CATEGORY;
+    }
+  });
+
+  it("falls back to the automatic pick, but never to a demo category", async () => {
+    await lifecycle.openOnboardingTask(admin, person());
+    expect(createTask.mock.calls[0][1].categoryId).toBe("cat-1");
+
+    vi.clearAllMocks();
+    db.category.findFirst.mockResolvedValue(null);
+    autoPickCategory.mockResolvedValue({ id: "demo", name: "[DEMO] פגישות ותיאומים" });
+    createTask.mockImplementation(async (_a: unknown, input: { clientId: string }) => ({ id: "t", clientId: input.clientId }));
+    await lifecycle.openOnboardingTask(admin, person());
+    expect(createTask.mock.calls[0][1].categoryId).toBeNull();
   });
 });
