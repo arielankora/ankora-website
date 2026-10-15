@@ -1626,6 +1626,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "Where the gate sends unsigned staff; must not loop and must let them sign out"
+    },
+    "domain:employee-lifecycle": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Opens onboarding/offboarding tasks and revokes passkeys, step-up and Claude grants on suspension; must never block an invite or a suspension"
     }
   },
   "waivers": {},

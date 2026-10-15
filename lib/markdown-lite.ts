@@ -15,6 +15,7 @@
 //   - bullet        1. numbered
 //   [text](https://…)
 //   blank line      paragraph break
+//   ```             a fenced block, shown exactly as written
 //
 // What is deliberately not: headings, tables, images, block quotes, raw
 // HTML. A person writing what happened with a supplier does not need a
@@ -141,8 +142,34 @@ export function renderMarkdownLite(source: string): string {
     listKind = null;
   }
 
+  // A fenced block, added for the employee lifecycle tasks (15.10.2026),
+  // whose description carries a prompt to copy into Claude whole. Inside
+  // a fence nothing is interpreted: its numbered lines are not a list and
+  // its asterisks are not emphasis, because a prompt that the renderer
+  // rewrote is no longer the prompt. The text is still the escaped text
+  // from step 1 above, so a fence cannot smuggle a tag in either. An
+  // unclosed fence runs to the end, which shows the text rather than
+  // losing it.
+  let fence: string[] | null = null;
+
   for (const line of lines) {
     const trimmed = line.trim();
+
+    if (fence) {
+      if (trimmed.startsWith("```")) {
+        out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-cream p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
+        fence = null;
+      } else {
+        fence.push(line);
+      }
+      continue;
+    }
+    if (trimmed.startsWith("```")) {
+      closeParagraph();
+      closeList();
+      fence = [];
+      continue;
+    }
 
     if (trimmed === "") {
       closeParagraph();
@@ -169,6 +196,7 @@ export function renderMarkdownLite(source: string): string {
     paragraph.push(trimmed);
   }
 
+  if (fence) out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-cream p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
   closeParagraph();
   closeList();
   return out.join("");
