@@ -1,5 +1,4 @@
 "use client";
-import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { updateUserRoleStatusAction } from "../actions";
 import type { User } from "@prisma/client";
@@ -32,22 +31,18 @@ export function EditRoleStatusForm({
 }) {
   const [state, formAction] = useFormState(updateUserRoleStatusAction, {});
 
-  // Controlled, not defaultValue. React 19 resets a form's uncontrolled
-  // fields when its action returns, back to the defaultValue they were
-  // first rendered with, so after a successful save the selects jumped
-  // back to the old role and status while the screen said "נשמר" (found
-  // on the preview of PR #212; the same on main). Controlled selects are
-  // left alone by that reset. The props are followed when the server
-  // sends a new row (after revalidatePath), so the screen always shows
-  // what is stored.
-  const [role, setRole] = useState(targetUser.role);
-  const [status, setStatus] = useState(targetUser.status);
-  const [seen, setSeen] = useState({ role: targetUser.role, status: targetUser.status });
-  if (seen.role !== targetUser.role || seen.status !== targetUser.status) {
-    setSeen({ role: targetUser.role, status: targetUser.status });
-    setRole(targetUser.role);
-    setStatus(targetUser.status);
-  }
+  // What the selects show: the action's own answer once there is one,
+  // the row the page was rendered with until then.
+  //
+  // React 19 resets the form when the action returns, and that reset
+  // reaches the DOM of a select whatever React thinks its value is. So
+  // the selects are uncontrolled, start from `shown`, and are keyed on
+  // it: a save that changed something remounts them with the saved values
+  // as their defaults, and the reset that follows can only reset them to
+  // those. Found on the preview of PR #212 (pre-existing on main): after
+  // saving, the screen said "נשמר" and the selects showed the old values.
+  const shown = state?.saved ?? { role: targetUser.role, status: targetUser.status };
+  const key = `${shown.role}|${shown.status}`;
 
   return (
     <form action={formAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -55,9 +50,9 @@ export function EditRoleStatusForm({
       <div>
         <label className="block text-xs font-medium text-appNavy/60">תפקיד</label>
         <select
+          key={`role|${key}`}
           name="role"
-          value={role}
-          onChange={(e) => setRole(e.target.value as typeof role)}
+          defaultValue={shown.role}
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >
@@ -70,9 +65,9 @@ export function EditRoleStatusForm({
       <div>
         <label className="block text-xs font-medium text-appNavy/60">סטטוס</label>
         <select
+          key={`status|${key}`}
           name="status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as typeof status)}
+          defaultValue={shown.status}
           disabled={isSelf}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
         >

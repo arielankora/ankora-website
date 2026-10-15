@@ -110,23 +110,35 @@ export async function resendInviteAction(
   }
 }
 
-export async function updateUserRoleStatusAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+/// Returns the role and status as saved, so the form can show them from
+/// the action's own answer. Waiting for the revalidated page to bring new
+/// props was not enough: React 19 resets the form after the action, and
+/// on the preview of PR #212 that reset left the selects on the values
+/// from before the save while the screen said "נשמר".
+type RoleStatusState = FormState & { saved?: { role: UserRole; status: UserStatus } };
+
+export async function updateUserRoleStatusAction(
+  _prev: RoleStatusState | undefined,
+  formData: FormData
+): Promise<RoleStatusState> {
   const actor = await requireUser();
   const userId = String(formData.get("userId") || "");
   if (!userId) return { error: "משתמש לא נמצא." };
 
+  let saved: { role: UserRole; status: UserStatus };
   try {
-    await updateUserRoleStatus(actor, userId, {
+    const user = await updateUserRoleStatus(actor, userId, {
       role: (String(formData.get("role") || "") as UserRole) || undefined,
       status: (String(formData.get("status") || "") as UserStatus) || undefined,
     });
+    saved = { role: user.role, status: user.status };
   } catch (err) {
     return { error: friendlyError(err) };
   }
 
   revalidatePath("/app/users");
   revalidatePath(`/app/users/${userId}`);
-  return { ok: true };
+  return { ok: true, saved };
 }
 
 export async function setUserClientAccessAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
