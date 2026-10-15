@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { getAllStories } from "@/lib/customer-stories";
+import { MCP_TOKEN_PREFIX } from "@/lib/mcp/token";
+import { FILE_TICKET_PREFIX } from "@/lib/mcp/file-ticket";
 
 // The list of pages to sweep is derived from qa/manifest.json, not typed
 // out here.
@@ -117,4 +119,60 @@ export const CREDENTIAL_PATTERNS: { pattern: RegExp; what: string }[] = [
   { pattern: /\$2[aby]\$\d\d\$/, what: "a bcrypt hash" },
   { pattern: /passwordHash/, what: "a passwordHash field" },
   { pattern: /tokenHash/, what: "a token hash field" },
+
+  // Added 2026-10-15, during the monthly security review.
+  //
+  // The three patterns above were written in September, when the only
+  // credential material in the database was a password hash. Since then
+  // the product grew two stores of far more sensitive material, and this
+  // sweep covered neither: a leak of either one would have passed.
+  //
+  // The structural mistake is unchanged - a database row handed whole to
+  // a client component is serialised into the RSC payload inside the page
+  // HTML - so the same sweep catches it, once it knows what to look for.
+
+  // The access vault. A Credential row keeps its username, password and
+  // notes in `secretCiphertext` under a per-row data key (`wrappedDek`).
+  // The encryption is sound, which is exactly why the field names are the
+  // right thing to match on: shipping the ciphertext, the IV, the tag and
+  // the wrapped key to the browser hands over everything except the master
+  // key, and it would look like harmless binary on screen.
+  { pattern: /secretCiphertext|secretIv|secretTag|wrappedDek/, what: "an encrypted vault column" },
+
+  // MCP bearer capabilities. Both prefixes exist so that secret scanners
+  // can match them (see lib/mcp/file-ticket.ts) - this is that scanner.
+  // Imported rather than typed out, so a change to either prefix cannot
+  // silently blind the test. The length floor means prose that merely
+  // mentions a prefix does not trip it; only a real token value does.
+  {
+    pattern: new RegExp(`\\b(?:${MCP_TOKEN_PREFIX}|${FILE_TICKET_PREFIX})[A-Za-z0-9_-]{20,}`),
+    what: "an MCP token or file ticket",
+  },
+
+  // Shapes that are never legitimate in a served document, whatever the
+  // screen. Narrow on purpose: see the note below.
+  { pattern: /-----BEGIN [A-Z ]*PRIVATE KEY-----/, what: "a private key" },
+  {
+    pattern: /\b(sk-[A-Za-z0-9_-]{16,}|sk_live_[A-Za-z0-9]{16,}|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{30,}|xox[abprs]-[A-Za-z0-9-]{10,})\b/,
+    what: "an API key",
+  },
 ];
+
+// Why this list is deliberately narrower than lib/secret-scan.ts.
+//
+// That module scans text a person typed, and asks "did someone paste a
+// secret into a note". It can afford fuzzy patterns - a password written
+// as "the password is hunter2", a card number, a JWT - because a false
+// positive there is a warning on one field.
+//
+// This list scans every served document on every app screen, and a false
+// positive here fails the build. Patterns that read natural language do
+// not survive that: a login form legitimately contains the word password,
+// an hours report legitimately contains long runs of digits, and `sk-`
+// appears inside ordinary kebab-case markup like "task-supervisor" unless
+// the word boundary is right. A sweep that cries wolf gets switched off,
+// and then it protects nothing.
+//
+// So the rule for adding to this list: match a shape that cannot occur by
+// accident in HTML, or a database column name that no UI should ever
+// render. Fuzzier detection belongs in secret-scan.ts.
