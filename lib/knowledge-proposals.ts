@@ -68,7 +68,21 @@ export const SystemPayload = z.object({
   ...knowledge,
 });
 
-export const PAYLOADS = { FACT: FactPayload, CONTACT: ContactPayload, ORGANIZATION: OrganizationPayload, SYSTEM: SystemPayload } as const;
+export const RequestTypePayload = z.object({
+  title: z.string().min(1).max(200),
+  fromWho: z.string().max(200).nullish(),
+  arrivesVia: z.string().max(200).nullish(),
+  handling: z.string().min(1).max(2000),
+  ...knowledge,
+});
+
+export const PAYLOADS = {
+  FACT: FactPayload,
+  CONTACT: ContactPayload,
+  ORGANIZATION: OrganizationPayload,
+  SYSTEM: SystemPayload,
+  REQUEST_TYPE: RequestTypePayload,
+} as const;
 export type ProposalTargetLike = keyof typeof PAYLOADS;
 export type ProposalActionLike = "CREATE" | "SUPERSEDE" | "CONTRADICT";
 
@@ -77,6 +91,7 @@ export const TARGET_LABELS: Record<ProposalTargetLike, string> = {
   CONTACT: "איש קשר",
   ORGANIZATION: "ספק או נותן שירות",
   SYSTEM: "מערכת",
+  REQUEST_TYPE: "סוג פנייה",
 };
 
 export const ACTION_LABELS: Record<ProposalActionLike, string> = {
@@ -97,6 +112,8 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
       return [s("name"), s("role")].filter(Boolean).join(", ");
     case "ORGANIZATION":
       return [s("name"), s("role")].filter(Boolean).join(", ");
+    case "REQUEST_TYPE":
+      return [s("title"), s("handling")].filter(Boolean).join(": ");
     case "SYSTEM":
       return [s("systemName"), s("purpose")].filter(Boolean).join(", ");
   }

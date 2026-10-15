@@ -9,6 +9,7 @@ import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
 import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
 import { lookupContact } from "@/lib/app-domain/client-contacts";
+import { extractionBrief } from "@/lib/app-domain/extraction-brief";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.3 and 8): the
 // client file, for Claude.
@@ -57,7 +58,7 @@ export function registerClientFileTools(server: McpServer): void {
         "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence), and optionally `quote` (short; never from a topics-only source).",
         "FACT payload: kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE), body, and as relevant topic, referTo, validUntil or validUntilEvent (TEMPORARY needs one), decidedAt (ONE_OFF_DECISION needs it), decidedBy.",
         "CONTACT payload: name and/or role, relationship (CLIENT_STAFF, PROVIDER, ADVISOR, INVESTOR, SUPPLIER), emails, phones, organizationName, context, channelOrder, isPrimary, isDecisionMaker.",
-        "ORGANIZATION payload: name, domains, role, relationship, monthlyCostMinor (agorot or cents), currency, notes. SYSTEM payload: systemName, purpose, url, accountUsed, ourPermission, accessStatus, blocker, clientAdmin, notes.",
+        "ORGANIZATION payload: name, domains, role, relationship, monthlyCostMinor (agorot or cents), currency, notes. SYSTEM payload: systemName, purpose, url, accountUsed, ourPermission, accessStatus, blocker, clientAdmin, notes. REQUEST_TYPE payload (what comes in, from whom, and how it is answered): title, fromWho, arrivesVia, handling.",
         "Every payload may carry knowledgeStatus (CONFIRMED only if the client or their supplier said or showed it explicitly; UNCERTAIN with toResolve otherwise) and sensitivity.",
         "To change an existing fact, set action SUPERSEDE (the client changed it) or CONTRADICT (someone said otherwise; nothing is overwritten) with `targetId` from the file.",
         "Never include passwords, keys or card numbers: such items are dropped and a task to change the secret is opened. Leave out small talk, momentary technical issues, guesses, and Ankora's own commercial terms.",
@@ -80,7 +81,7 @@ export function registerClientFileTools(server: McpServer): void {
         items: z
           .array(
             z.object({
-              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM"]),
+              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE"]),
               action: z.enum(["CREATE", "SUPERSEDE", "CONTRADICT"]).optional(),
               targetId: z.string().optional(),
               payload: z.record(z.string(), z.unknown()),
@@ -158,6 +159,28 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson({ count: matches.length, matches });
       } catch (err) {
         console.error("[mcp] lookup_contact failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_extraction_brief",
+    {
+      title: "Get the extraction brief",
+      description: [
+        "Everything an extraction run needs before reading a meeting: Ankora's approved extraction guidance (follow it), the user's clients with the email domains that identify their meetings, and the Fireflies recordings already turned into proposals in the last 30 days (skip those).",
+        "Matching a meeting to a client: a participant from a CLIENT domain decides it. A PARTNER domain decides it only when that partner appears under one client; if it appears under several, decide from the title and content and say why in the batch note. A meeting about several clients is split: each item goes to its own client's batch. A meeting with no client participant and no client named is internal: skip it.",
+      ].join(" "),
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.get_extraction_brief,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        return toolJson(await extractionBrief(actor));
+      } catch (err) {
+        console.error("[mcp] get_extraction_brief failed", err);
         return toolFailure(err);
       }
     }

@@ -1482,8 +1482,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
       "riskReason": "The extraction guidance and its versions"
+    },
+    "domain:extraction-brief": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-14",
+      "riskReason": "What the unattended daily extraction reads: guidance, clients' domains (never addresses), recordings already proposed"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-13"
+  "lastScan": "2026-10-14"
 }

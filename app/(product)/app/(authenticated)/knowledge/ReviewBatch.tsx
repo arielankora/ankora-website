@@ -48,6 +48,10 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
     { key: "role", label: "מה הוא ללקוח" },
     { key: "notes", label: "הערות", long: true },
   ],
+  REQUEST_TYPE: [
+    { key: "title", label: "סוג הפנייה" },
+    { key: "handling", label: "איך עונים ולאן מעבירים", long: true },
+  ],
   SYSTEM: [
     { key: "systemName", label: "מערכת" },
     { key: "purpose", label: "למה היא משמשת" },

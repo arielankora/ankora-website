@@ -13,6 +13,8 @@ type FormState = { error?: string; ok?: boolean };
 /// The fields a person may change before approving. Anything else on the
 /// form is ignored rather than trusted.
 const EDITABLE = new Set([
+  "title",
+  "handling",
   "body",
   "name",
   "role",

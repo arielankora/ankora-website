@@ -20,6 +20,7 @@ import { addClientSource, assertClientAccess } from "@/lib/app-domain/client-sou
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
 import { addClientFact, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
+import { addRequestType } from "@/lib/app-domain/request-types";
 import { createTask } from "@/lib/app-domain/tasks";
 
 // Org brain, phase 2: proposals to the client file
@@ -322,6 +323,7 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   }
   if (p.target === "CONTACT") return (await addClientContact(actor, { ...PAYLOADS.CONTACT.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "ORGANIZATION") return (await addClientOrganization(actor, { ...PAYLOADS.ORGANIZATION.parse(payload), sources, clientId: p.clientId })).id;
+  if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...PAYLOADS.REQUEST_TYPE.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...PAYLOADS.SYSTEM.parse(payload), sources, clientId: p.clientId })).id;
   throw new Error("סוג פריט לא מוכר.");
 }

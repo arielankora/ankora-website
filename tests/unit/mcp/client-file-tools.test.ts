@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const view = vi.hoisted(() => ({ buildClientFile: vi.fn() }));
 const proposals = vi.hoisted(() => ({ proposeKnowledge: vi.fn() }));
 const contacts = vi.hoisted(() => ({ lookupContact: vi.fn() }));
+const brief = vi.hoisted(() => ({ extractionBrief: vi.fn() }));
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
@@ -25,6 +26,7 @@ const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 vi.mock("@/lib/app-domain/client-file-view", () => view);
 vi.mock("@/lib/app-domain/knowledge-proposals", () => proposals);
 vi.mock("@/lib/app-domain/client-contacts", () => contacts);
+vi.mock("@/lib/app-domain/extraction-brief", () => brief);
 vi.mock("@/lib/app-domain/mcp-files", () => ({}));
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: [] }));
@@ -133,6 +135,16 @@ describe("lookup_contact", () => {
     const r = await tools.get("lookup_contact")!.handler({ query: "shani@nextage.co.il" }, CTX);
     expect(contacts.lookupContact).toHaveBeenCalledWith(ACTOR, "shani@nextage.co.il");
     expect(JSON.parse(r.content[0].text!)).toEqual({ count: 1, matches: [expect.objectContaining({ name: "שני הלוי", client: "NUX" })] });
+  });
+});
+
+describe("get_extraction_brief", () => {
+  it("is a read, and hands over what the domain gathered for this user", async () => {
+    expect(TOOL_ANNOTATIONS.get_extraction_brief.readOnlyHint).toBe(true);
+    brief.extractionBrief.mockResolvedValue({ guide: { version: 2, rules: ["x"] }, clients: [], processedRecordings: [], processedWindowDays: 30 });
+    const r = await tools.get("get_extraction_brief")!.handler({}, CTX);
+    expect(brief.extractionBrief).toHaveBeenCalledWith(ACTOR);
+    expect(JSON.parse(r.content[0].text!).guide.version).toBe(2);
   });
 });
 
