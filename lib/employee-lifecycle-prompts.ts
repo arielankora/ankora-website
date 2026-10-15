@@ -60,6 +60,10 @@ export const ONBOARDING_STEPS = [
 /// confidentiality undertaking is signed in the app.
 export const ONBOARDING_SIGN_STEP = 3;
 
+/// Index of the step closed when the signed confidentiality PDF is
+/// recorded and the in-app signature also exists.
+export const ONBOARDING_PDF_STEP = 4;
+
 export const OFFBOARDING_STEPS = [
   "השעיה באפליקציה: ניתוק התחברויות, הסרת passkeys וסגירת חלון האימות",
   "השעיה ב-Google Workspace והעברת בעלות על קבצים",

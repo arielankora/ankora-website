@@ -158,7 +158,18 @@ describe("list_team_members", () => {
     const out = payload(await tools.get("list_team_members")!.handler({}, CTX));
 
     expect(out.count).toBe(2);
-    expect(lookup.teamMembers).toHaveBeenCalledWith(ADMIN);
+    // Staff only and ACTIVE only unless asked otherwise.
+    expect(lookup.teamMembers).toHaveBeenCalledWith(ADMIN, { includeInactive: false, includeClients: false });
+  });
+
+  it("passes the two widening flags through when asked", async () => {
+    await tools.get("list_team_members")!.handler({ includeInactive: true, includeClients: true }, CTX);
+    expect(lookup.teamMembers).toHaveBeenCalledWith(ADMIN, { includeInactive: true, includeClients: true });
+  });
+
+  it("describes the fields an agent reads", () => {
+    const description = String(tools.get("list_team_members")!.config.description);
+    for (const field of ["status", "lastLoginAt", "daysSinceLogin", "includeInactive"]) expect(description).toContain(field);
   });
 
   it("refuses an employee, and never reads the roster", async () => {

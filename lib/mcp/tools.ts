@@ -53,6 +53,7 @@ import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
+import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { appBaseUrl } from "@/lib/email-templates";
 import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
 
@@ -311,17 +312,23 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List team members",
       description:
-        "Lists the active Ankora staff whose time the signed-in user is allowed to see. Only managers and admins may call this. Use it to get exact names before calling list_team_time_entries.",
-      inputSchema: z.object({}),
+        "Lists Ankora staff (never client portal users unless includeClients is true). Only managers and admins may call this. By default only ACTIVE people; set includeInactive to also see people still INVITED (not yet signed in) or SUSPENDED (leaving). Each member: id, name, email, role, status, lastLoginAt (ISO 8601, or null if they never signed in) and daysSinceLogin (whole calendar days in Israel time since that sign-in, 0 meaning today, or null). Use it to get exact names before list_team_time_entries or get_employee_status, and to spot people who stopped signing in.",
+      inputSchema: z.object({
+        includeInactive: z.boolean().optional().describe("Also list INVITED and SUSPENDED staff. Default false."),
+        includeClients: z.boolean().optional().describe("Also list client portal users. Default false; rarely needed."),
+      }),
       annotations: READ_ONLY,
     },
-    async (_args: unknown, ctx: ServerContext) => {
+    async (args: { includeInactive?: boolean; includeClients?: boolean }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         // Same permission the admin time-entries screen and the CSV export
         // route already gate this data on - see canSeeOthersTime.
         assertCan(actor.role, "time_entry.edit_others");
-        const members = await teamMembers(actor);
+        const members = await teamMembers(actor, {
+          includeInactive: args?.includeInactive === true,
+          includeClients: args?.includeClients === true,
+        });
         return toolJson({ count: members.length, members });
       } catch (err) {
         console.error("[mcp] list_team_members failed", err);
@@ -1275,6 +1282,7 @@ export function registerAnkoraTools(server: McpServer): void {
   registerTaskExtraTools(server);
   registerDocumentTools(server);
   registerClientFileTools(server);
+  registerEmployeeTools(server);
 }
 
 export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";

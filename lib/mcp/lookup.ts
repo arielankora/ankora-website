@@ -14,6 +14,7 @@ import {
   type PickCandidate,
   type PickHistory,
 } from "@/lib/mcp/category-pick";
+import { serializeTeamMember } from "@/lib/mcp/serialize";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
 // says into the ids the domain layer wants.
@@ -314,10 +315,54 @@ export async function lookupTaskById(actor: User, taskId: string): Promise<Looku
 
 /// The team roster for the admin-only list tool. Same permission, same
 /// reason.
-export async function teamMembers(actor: User) {
+/// The staff roster for list_team_members.
+///
+/// Employee lifecycle (15.10.2026): Ankora staff only by default. Client
+/// portal users used to appear here too (a client's own contacts, with
+/// their emails, handed to a model whose tool promised "Ankora staff";
+/// the open question in tests/integration/mcp-lookup.test.ts), and
+/// `includeClients` keeps them reachable for the one caller who means it.
+/// `includeInactive` adds people who are invited or suspended, which is
+/// what the onboarding and offboarding agents need to see; archived and
+/// deleted accounts never appear.
+export async function teamMembers(
+  actor: User,
+  opts: { includeClients?: boolean; includeInactive?: boolean } = {}
+) {
   assertCan(actor.role, "time_entry.edit_others");
+  const statuses = opts.includeInactive ? ["ACTIVE", "INVITED", "SUSPENDED"] : ["ACTIVE"];
   const users = await listUsers();
   return users
-    .filter((u: UserRow) => !u.deletedAt && u.status === "ACTIVE")
-    .map((u: UserRow) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
+    .filter((u: UserRow) => !u.deletedAt && statuses.includes(u.status))
+    .filter((u: UserRow) => opts.includeClients || u.role !== "CLIENT_USER")
+    .map((u: UserRow & { lastLoginAt?: Date | null }) =>
+      serializeTeamMember({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        role: u.role,
+        status: u.status,
+        lastLoginAt: u.lastLoginAt ?? null,
+      })
+    );
+}
+
+/// Resolves a staff member by name or email for the employee lifecycle
+/// tools, whatever their status short of archived: the person being
+/// onboarded is still INVITED and the person leaving is SUSPENDED, and
+/// lookupTeamMember (ACTIVE only, for hours) would refuse both. Never a
+/// client portal user. Same permission as the team tools.
+export async function lookupStaffMember(actor: User, nameOrEmail: string): Promise<Lookup<TeamMember>> {
+  assertCan(actor.role, "time_entry.edit_others");
+  const users = await listUsers();
+  const staff: UserRow[] = users.filter(
+    (u: UserRow) => !u.deletedAt && u.status !== "ARCHIVED" && u.role !== "CLIENT_USER"
+  );
+  const q = normalizeName(nameOrEmail);
+  const byEmail = staff.find((u: UserRow) => normalizeName(u.email) === q);
+  if (byEmail) return { ok: true, value: { id: byEmail.id, name: byEmail.name, email: byEmail.email } };
+  const candidates: TeamMember[] = staff.map((u: UserRow) => ({ id: u.id, name: u.name, email: u.email }));
+  const result = resolveByName(nameOrEmail, candidates);
+  if (result.status === "ok") return { ok: true, value: result.match };
+  return { ok: false, message: describeResolveFailure(result, "staff member", candidates) };
 }

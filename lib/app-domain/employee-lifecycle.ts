@@ -9,6 +9,7 @@ import { OPEN_STATUSES, assignableUsers, completeStepAsSystem, createTask, updat
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { isDemoName } from "@/lib/mcp/category-pick";
 import {
+  ONBOARDING_PDF_STEP,
   ONBOARDING_SIGN_STEP,
   ONBOARDING_STEPS,
   OFFBOARDING_STEPS,
@@ -449,6 +450,51 @@ export async function onPasskeyRegistered(userId: string): Promise<void> {
     }
   } catch (err) {
     await recordFailure(null, userId, "onboarding_passkey_hook", err);
+  }
+}
+
+/// Called after a signed PDF is recorded (the MCP tool record_pdf_signature).
+///
+/// Confidentiality: step 5 ("the signed PDF received, version checked,
+/// filed") closes once both channels exist on the current version. With
+/// only the PDF, the in-app approval is still missing and step 4 says so,
+/// so step 5 waits too rather than reading as the end of the signatures.
+/// Deletion declaration: a note on the open offboarding task, and nothing
+/// closed, exactly as for the link.
+export async function onPdfSignatureRecorded(
+  userId: string,
+  kind: "CONFIDENTIALITY" | "DELETION_DECLARATION",
+  agreementId: string
+): Promise<void> {
+  try {
+    if (kind === "DELETION_DECLARATION") {
+      const task = await openLifecycleTaskFor(userId, "OFFBOARDING");
+      if (!task) return;
+      await systemComment(
+        task.id,
+        task.clientId,
+        `הצהרת המחיקה (${CURRENT_AGREEMENTS.DELETION_DECLARATION}) התקבלה חתומה ב-PDF ונרשמה. מזהה החתימה: ${agreementId}.`,
+      );
+      return;
+    }
+
+    if (!(await hasSignedCurrent(userId, "CONFIDENTIALITY", "APP"))) return;
+    const task = await openLifecycleTaskFor(userId, "ONBOARDING");
+    if (!task) return;
+    const step = await prisma.task.findFirst({
+      where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_PDF_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
+      select: { id: true },
+    });
+    if (!step) return;
+    if (await completeStepAsSystem(step.id, "confidentiality_pdf_recorded")) {
+      await systemComment(
+        task.id,
+        task.clientId,
+        `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) חתומה בשני הערוצים: באפליקציה וב-PDF. השלב נסגר.`,
+      );
+    }
+  } catch (err) {
+    await recordFailure(null, userId, "pdf_signature_hook", err);
   }
 }
 

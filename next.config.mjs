@@ -80,6 +80,9 @@ const nextConfig = {
       './content/agreements/*.md',
       './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
     ],
+    // record_pdf_signature hashes the versioned agreement text, so the
+    // MCP route needs the texts too (no PDF is rendered there).
+    '/api/mcp': ['./content/agreements/*.md'],
     '/agreements/sign/[token]': [
       './content/agreements/*.md',
       './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',

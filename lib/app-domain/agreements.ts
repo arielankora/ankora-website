@@ -370,28 +370,113 @@ export async function recordPdfSignature(
   return row;
 }
 
+/// The latest signature in one channel, of any version.
+export interface SignatureRef {
+  version: string;
+  signedAt: Date;
+}
+
 export interface AgreementStatus {
   kind: AgreementKind;
   currentVersion: string;
+  /// Signed on the current version, per channel.
   app: boolean;
   emailPdf: boolean;
+  /// The most recent signature per channel, whatever its version, so an
+  /// agent can tell "signed an older version" from "never signed".
+  appLatest: SignatureRef | null;
+  emailPdfLatest: SignatureRef | null;
 }
 
-/// For each kind: the current version, and whether it is signed in each
-/// channel. Older versions do not count; a new version asks again.
+/// For each kind: the current version, whether it is signed in each
+/// channel, and the latest signature per channel. Older versions do not
+/// count as signed; a new version asks again.
 export async function getAgreementStatus(userId: string): Promise<AgreementStatus[]> {
   const rows = await prisma.employeeAgreement.findMany({
     where: { userId },
-    select: { kind: true, version: true, channel: true },
+    orderBy: { signedAt: "desc" },
+    select: { kind: true, version: true, channel: true, signedAt: true },
   });
   const signed = (kind: AgreementKind, channel: AgreementChannel) =>
     rows.some((r) => r.kind === kind && r.version === CURRENT_AGREEMENTS[kind] && r.channel === channel);
+  const latest = (kind: AgreementKind, channel: AgreementChannel): SignatureRef | null => {
+    const r = rows.find((x) => x.kind === kind && x.channel === channel);
+    return r ? { version: r.version, signedAt: r.signedAt } : null;
+  };
   return KINDS.map((kind) => ({
     kind,
     currentVersion: CURRENT_AGREEMENTS[kind],
     app: signed(kind, "APP"),
     emailPdf: signed(kind, "EMAIL_PDF"),
+    appLatest: latest(kind, "APP"),
+    emailPdfLatest: latest(kind, "EMAIL_PDF"),
   }));
+}
+
+/// The PDF channel, as the MCP tool record_pdf_signature calls it: the
+/// signed PDF has already been filed as a document on the internal client,
+/// and this records that it counts.
+///
+/// Stricter than recordPdfSignature on purpose, because the caller is an
+/// agent: only the CURRENT version may be recorded (the agent compares
+/// the version printed on the PDF with this one, and an older one means
+/// the person signed an outdated text), the document must be on the
+/// internal client (so a client's file is never the evidence), and a
+/// second call for the same person, kind and version returns the row
+/// already there instead of a duplicate.
+export async function recordPdfSignatureFromDocument(
+  actor: User,
+  input: {
+    userId: string;
+    kind: AgreementKind;
+    version: string;
+    signedName: string;
+    signedAt: Date;
+    documentId: string;
+  }
+): Promise<{ row: EmployeeAgreement; alreadyRecorded: boolean }> {
+  assertAgreementAdmin(actor.role);
+
+  const expected = CURRENT_AGREEMENTS[input.kind];
+  if (input.version.trim() !== expected) {
+    throw new AgreementError(
+      `The current version of ${input.kind} is "${expected}", not "${input.version}". Record only a PDF whose printed version is "${expected}"; a different version needs a person to decide.`
+    );
+  }
+
+  const { resolveInternalClient } = await import("@/lib/app-domain/employee-lifecycle");
+  const internal = await resolveInternalClient();
+  if (!internal) throw new AgreementError("The internal client (Ankora פנימי) was not found, so the PDF cannot be verified as filed there.");
+
+  const doc = await prisma.clientDocument.findFirst({
+    where: { id: input.documentId.trim(), deletedAt: null },
+    select: { id: true, clientId: true, driveFileId: true },
+  });
+  if (!doc) throw new AgreementError(`No document with id "${input.documentId}". File the signed PDF first, then pass its documentId.`);
+  if (doc.clientId !== internal.id) {
+    throw new AgreementError(`That document is not in the file of ${internal.name}. Signed agreements are filed there, never on a client.`);
+  }
+
+  const existing = await prisma.employeeAgreement.findFirst({
+    where: { userId: input.userId, kind: input.kind, version: expected, channel: "EMAIL_PDF" },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) return { row: existing, alreadyRecorded: true };
+
+  const row = await recordPdfSignature(actor, {
+    userId: input.userId,
+    kind: input.kind,
+    version: expected,
+    signedName: input.signedName,
+    signedAt: input.signedAt,
+    driveFileId: doc.driveFileId,
+  });
+
+  // The lifecycle task hears about it. Never throws.
+  const { onPdfSignatureRecorded } = await import("@/lib/app-domain/employee-lifecycle");
+  await onPdfSignatureRecorded(input.userId, input.kind, row.id);
+
+  return { row, alreadyRecorded: false };
 }
 
 export async function listAgreementsForUser(userId: string) {
