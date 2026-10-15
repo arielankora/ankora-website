@@ -7,6 +7,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { findSecrets } from "@/lib/secret-scan";
 import { ruleInForce } from "@/lib/client-policies";
+import { checkEveryError } from "@/lib/process-checks";
 import {
   MAX_PROCESS_STEPS,
   blockingChecks,
@@ -56,6 +57,9 @@ export interface ProcessInput extends KnowledgeInput {
   entityId?: string | null;
   executorText?: string | null;
   transitionStatus?: ProcessTransition;
+  /// An ongoing process only: a check every N days, and what is checked.
+  checkEveryDays?: number | null;
+  checkText?: string | null;
 }
 
 export class ProcessVersionConflictError extends Error {
@@ -108,11 +112,21 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     entityId: input.entityId !== undefined ? input.entityId || null : undefined,
     executorText: input.executorText !== undefined ? clean(input.executorText) : undefined,
     transitionStatus: input.transitionStatus ?? undefined,
+    checkEveryDays: input.checkEveryDays !== undefined ? input.checkEveryDays : undefined,
+    checkText: input.checkText !== undefined ? clean(input.checkText) : undefined,
   };
 }
 
+/// A check belongs to an ongoing process: a scheduled one has its dates,
+/// and a check on top of them would be a second clock nobody reads.
+function assertCheck(triggerKinds: ProcessTrigger[], checkEveryDays: number | null | undefined) {
+  const error = checkEveryError(checkEveryDays);
+  if (error) throw new Error(error);
+  if (checkEveryDays && !triggerKinds.includes("CONTINUOUS")) throw new Error("בדיקה תקופתית היא לתהליך שוטף.");
+}
+
 function assertNoSecrets(input: Partial<ProcessInput>) {
-  const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText]
+  const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText]
     .filter(Boolean)
     .join("\n");
   if (findSecrets(text).length) throw new Error("יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
@@ -130,6 +144,7 @@ export async function addProcess(actor: User, input: ProcessInput) {
   await assertClientAccess(actor, input.clientId);
   if (!input.title?.trim()) throw new Error("צריך שם לתהליך.");
   assertNoSecrets(input);
+  assertCheck(input.triggerKinds ?? [], input.checkEveryDays);
   assertResolvable(input.knowledgeStatus, input.toResolve);
   const ids = await assertIdsBelong(input.clientId, input);
   const sourced = await sourcedFields(input.clientId, input, [input.purpose, input.triggerText, input.exceptionPlaybook]);
@@ -164,6 +179,7 @@ export async function updateProcess(actor: User, id: string, input: Partial<Omit
   const before = await findProcess(actor, id);
   if (input.title !== undefined && !input.title.trim()) throw new Error("צריך שם לתהליך.");
   assertNoSecrets(input);
+  assertCheck(input.triggerKinds ?? before.triggerKinds, input.checkEveryDays !== undefined ? input.checkEveryDays : before.checkEveryDays);
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   const ids = await assertIdsBelong(before.clientId, input);
   const sourced = await sourcedFields(before.clientId, input, [input.purpose ?? before.purpose, input.triggerText ?? before.triggerText], before);

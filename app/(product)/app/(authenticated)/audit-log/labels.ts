@@ -132,6 +132,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.version_save": "שמירת טיוטה של נוהל",
   "process.version_approve": "אישור נוהל",
   "process.run_open": "פתיחת ריצה של תהליך",
+  "process.check": "בדיקה של תהליך שוטף",
   "client.rule_approvers": "שינוי מי מאשר חריגות ומידע רגיש אצל לקוח",
   "user.exception_approver": "שינוי הרשאת אישור חריגות ומידע רגיש",
   "client_narrative.save": "גרסה חדשה לטקסט בתיק הלקוח",

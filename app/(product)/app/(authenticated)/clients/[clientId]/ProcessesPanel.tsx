@@ -29,6 +29,8 @@ import {
   updateProcessAction,
 } from "../process-actions";
 import Link from "next/link";
+import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
+import { ProcessCheckForm } from "./ProcessCheckForm";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 1: processes and their procedures, section 7.4 of the
@@ -75,6 +77,13 @@ export type PanelProcess = {
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null } | null;
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: { code: string; message: string }[] } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
+  /// An ongoing process: its check, when the next one is due, and the last ones.
+  checkEveryDays: number | null;
+  checkEvery: string | null;
+  checkText: string | null;
+  checkDue: { key: string; state: CheckState } | null;
+  routine: boolean;
+  checks: { id: string; outcome: "OK" | "ISSUE"; note: string | null; createdAt: string; checkedByName: string | null; taskId: string | null }[];
 };
 
 const TONE: Record<TransitionLike, "green" | "amber" | "gray"> = { WITH_ANKORA: "green", IN_HANDOVER: "amber", WITH_CLIENT: "gray", NOT_PLANNED: "gray" };
@@ -189,6 +198,14 @@ function ProcessForm({
         <span className={LABEL}>ספי אישור</span>
         <Checks name="approvalPolicyIds" options={rules} selected={existing?.approvalPolicyIds ?? []} />
         <input name="approvalText" defaultValue={existing?.approvalText ?? ""} placeholder='ספק חדש: אישור רו"ח, או "אין"' className={INPUT} />
+      </div>
+      <div className="grid grid-cols-[7rem_1fr] gap-3">
+        <Field label="בדיקה כל (ימים)">
+          <input name="checkEveryDays" inputMode="numeric" defaultValue={existing?.checkEveryDays ?? ""} placeholder="7" className={INPUT} />
+        </Field>
+        <Field label="מה בודקים (לתהליך שוטף)">
+          <input name="checkText" defaultValue={existing?.checkText ?? ""} placeholder="שאין חשבוניות תקועות" className={INPUT} />
+        </Field>
       </div>
       <Field label="נוהל חריגים">
         <textarea name="exceptionPlaybook" rows={3} defaultValue={existing?.exceptionPlaybook ?? ""} placeholder="מה עושים כשמשהו חורג" className={INPUT} />
@@ -530,6 +547,38 @@ export function ProcessesPanel({
                     </p>
                   )}
 
+                  {p.checkEvery && (
+                    <p className="mt-1.5 text-xs text-appNavy/70">
+                      בדיקה {p.checkEvery}
+                      {p.checkText && `: ${p.checkText}`}
+                      {p.checkDue && (
+                        <span className={p.checkDue.state === "LATER" ? "text-appNavy/50" : "text-warning"}>
+                          {" · "}
+                          {p.checkDue.state === "LATER" ? `הבאה ב-${day(p.checkDue.key)}` : `${CHECK_STATE_LABELS[p.checkDue.state]}${p.checkDue.state === "OVERDUE" ? `, מ-${day(p.checkDue.key)}` : ""}`}
+                        </span>
+                      )}
+                    </p>
+                  )}
+                  {p.checks.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {p.checks.map((c) => (
+                        <li key={c.id} className={`text-xs ${c.outcome === "ISSUE" ? "text-warning" : "text-appNavy/60"}`}>
+                          {day(c.createdAt)}
+                          {c.checkedByName && `, ${c.checkedByName}`}: {c.outcome === "OK" ? "תקין" : "נמצאה בעיה"}
+                          {c.note && `. ${c.note}`}
+                          {c.taskId && (
+                            <>
+                              {" · "}
+                              <Link href={`/app/tasks/${c.taskId}`} className="text-gold-dim hover:underline">
+                                המשימה
+                              </Link>
+                            </>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
                   {p.draft && (
                     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
                       <p className="text-xs font-medium text-amber-900">
@@ -564,6 +613,11 @@ export function ProcessesPanel({
                   {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
                     <Drawer triggerLabel="פתיחת ריצה" title={`ריצה: ${p.code} ${p.title}`} variant="link">
                       <StartRunForm clientId={clientId} process={p} />
+                    </Drawer>
+                  )}
+                  {p.routine && (
+                    <Drawer triggerLabel="רישום בדיקה" title={`בדיקה: ${p.code} ${p.title}`} variant="link">
+                      <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={p.current?.steps.map((st) => st.title) ?? []} />
                     </Drawer>
                   )}
                   {p.triggerKinds.includes("SCHEDULED") && (

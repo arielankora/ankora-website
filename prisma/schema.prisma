@@ -3567,6 +3567,15 @@ model Process {
   lastRunAt      DateTime?
   needsReview    Boolean       @default(false)
 
+  /// An ongoing process (CONTINUOUS) opens no tasks. It can have a check
+  /// every N days instead ("once a week: no invoice is stuck"), which is
+  /// what its owner sees in their routine (spec 3.8). Not the procedure's
+  /// review (`reviewEveryDays`): that is about the document, this is about
+  /// the work.
+  checkEveryDays Int?
+  checkText      String?
+  lastCheckedAt  DateTime?
+
   // Knowledge fields (spec 3.1).
   knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
   fieldStatus     Json                 @default("{}")
@@ -3592,6 +3601,7 @@ model Process {
   client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   versions ProcessVersion[]
   dates    ImportantDate[]
+  checks   ProcessCheck[]
 
   @@unique([clientId, seq])
   @@unique([clientId, code])
@@ -3603,6 +3613,29 @@ model Process {
 /// place: a change is a new row saved against the version it started
 /// from, like a task plan. A manager approves; the checks that block
 /// (R1 to R4) are run then.
+enum ProcessCheckOutcome {
+  OK
+  ISSUE
+}
+
+/// One check of an ongoing process: who looked, what they found. An issue
+/// says what, and opens a task for it.
+model ProcessCheck {
+  id          String              @id @default(cuid())
+  processId   String
+  clientId    String
+  checkedById String?
+  outcome     ProcessCheckOutcome
+  note        String?
+  taskId      String?
+  createdAt   DateTime            @default(now())
+
+  process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId, createdAt])
+  @@map("process_checks")
+}
+
 model ProcessVersion {
   id        String               @id @default(cuid())
   processId String
