@@ -139,6 +139,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ClientOrganization: { decision: "DUMP", table: "client_organizations", reason: "What each firm does for each client and what it costs. The client file itself." },
   ClientSource: { decision: "DUMP", table: "client_sources", reason: "The source register every item in the client file cites. Without it the codes mean nothing." },
   RequestType: { decision: "DUMP", table: "request_types", reason: "What comes in from whom and how it is answered. Typed by people." },
+  Process: { decision: "DUMP", table: "processes", reason: "The client's recurring processes: owner, trigger, SLA, systems, approvals and handover status. Typed by people." },
+  ProcessVersion: { decision: "DUMP", table: "process_versions", reason: "Every version of every procedure, and who approved it. A run is opened from the approved one." },
   PolicyException: { decision: "DUMP", table: "policy_exceptions", reason: "Every exception to a client's rules: what, why, until when, who asked and who approved. The audit answer to 'why was the rule broken'." },
   ClientPolicy: { decision: "DUMP", table: "client_policies", reason: "The client's own rules, who approved them and every version's status. Typed by people; binds the work." },
   ClientNarrative: { decision: "DUMP", table: "client_narratives", reason: "The client file's free text and every earlier version of it." },

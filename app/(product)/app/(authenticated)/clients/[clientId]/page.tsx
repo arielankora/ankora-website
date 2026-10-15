@@ -35,6 +35,8 @@ import { RequestTypesPanel } from "./RequestTypesPanel";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
+import { listProcesses } from "@/lib/app-domain/processes";
+import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
 import { ruleInForce } from "@/lib/client-policies";
@@ -97,7 +99,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions, processes] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -138,6 +140,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     listOpenExceptions(user, client.id),
     ruleApproversFor(client.id),
     canApproveForClient(user, client.id),
+    // Phase 1, spec 3.8 and 3.9: processes and their procedures.
+    listProcesses(user, client.id),
   ]);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
@@ -347,6 +351,63 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               subjects={subjects}
               facts={facts.current.map(toPanelFact)}
               history={facts.superseded.map(toPanelFact)}
+            />
+
+            <ProcessesPanel
+              clientId={client.id}
+              canApprove={can(user.role, "client.manage")}
+              sourceOptions={sourceOptions}
+              entities={entityOptions}
+              staff={staff.map((u) => ({ id: u.id, name: u.name }))}
+              contacts={people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" }))}
+              systems={systems.map((x) => ({ id: x.id, name: x.systemName }))}
+              rules={policies
+                .filter((x) => x.status !== "RETIRED" && (x.kind === "THRESHOLD" || x.kind === "APPROVAL_REQUIRED"))
+                .map((x) => ({ id: x.id, name: x.title }))}
+              dates={clientDates.map((d) => ({ id: d.id, name: d.title }))}
+              processes={processes.map((p) => ({
+                id: p.id,
+                code: p.code,
+                title: p.title,
+                purpose: p.purpose,
+                status: p.status,
+                triggerKinds: p.triggerKinds,
+                triggerText: p.triggerText,
+                ownerId: p.ownerId,
+                backupOwnerId: p.backupOwnerId,
+                slaText: p.slaText,
+                slaBusinessDays: p.slaBusinessDays,
+                externalPartyContactIds: p.externalPartyContactIds,
+                externalPartyText: p.externalPartyText,
+                requiredSystemIds: p.requiredSystemIds,
+                approverText: p.approverText,
+                approvalPolicyIds: p.approvalPolicyIds,
+                approvalText: p.approvalText,
+                exceptionPlaybook: p.exceptionPlaybook,
+                entityId: p.entityId,
+                executorText: p.executorText,
+                transitionStatus: p.transitionStatus,
+                knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
+                toResolve: p.toResolve,
+                sources: readSourceRefs(p.sources).map(formatSourceRef),
+                score: p.completeness.score,
+                gaps: p.gaps,
+                nextDate: p.nextDate ? p.nextDate.toISOString() : null,
+                dateIds: p.dates.map((d) => d.id),
+                latestVersion: p.latestVersion,
+                current: p.current
+                  ? {
+                      version: p.current.version,
+                      steps: p.current.steps,
+                      highlights: p.current.highlights,
+                      outputs: p.current.outputs,
+                      approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
+                    }
+                  : null,
+                draft: p.draft
+                  ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
+                  : null,
+              }))}
             />
 
             <PoliciesPanel

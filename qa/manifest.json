@@ -1538,6 +1538,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "Who may approve exceptions and sensitive items: the client's own approvers override the per-user permission"
+    },
+    "action:(product)/app/(authenticated)/clients/process-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Writes processes and procedures; only a manager approves, and a procedure failing R1 to R4 is never approved"
+    },
+    "domain:processes": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 at approval; completeness and gaps"
     }
   },
   "waivers": {},

@@ -553,6 +553,7 @@ model Client {
   narratives       ClientNarrative[]
   policies         ClientPolicy[]
   policyExceptions PolicyException[]
+  processes        Process[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -1890,6 +1891,10 @@ model ImportantDate {
   autoTaskLeadDays   Int?
   autoTaskCategoryId String?
 
+  /// Org brain, phase 1 (spec 3.10): the process this date starts. A
+  /// process may have several dates (the 10th and the 25th).
+  processId String?
+
   /// Cached, recomputed on every write and by the daily job - the next
   /// Gregorian date this important date falls on. Powers list/calendar
   /// sort and the dashboard/KPI cards without recomputing recurrence on
@@ -1922,6 +1927,7 @@ model ImportantDate {
   responsibleUser  User              @relation("ImportantDateResponsible", fields: [responsibleUserId], references: [id])
   createdBy        User?             @relation("ImportantDateCreator", fields: [createdById], references: [id], onDelete: SetNull)
   autoTaskCategory Category?         @relation(fields: [autoTaskCategoryId], references: [id], onDelete: SetNull)
+  process          Process?          @relation(fields: [processId], references: [id], onDelete: SetNull)
   reminderRules    ReminderRule[]
   occurrences      ReminderOccurrence[]
   tasks            Task[]
@@ -3416,4 +3422,165 @@ model PolicyException {
   @@index([clientId, status])
   @@index([policyId])
   @@map("policy_exceptions")
+}
+
+// ---------------------------------------------------------------------------
+// Org brain, phase 1: processes and their procedures
+// (claude/org-brain-spec-2026-10-12.md, 3.8 and 3.9; reviewed by Hadas,
+// 15.10.2026).
+// ---------------------------------------------------------------------------
+
+enum ProcessTrigger {
+  /// By a date (ImportantDate.processId).
+  SCHEDULED
+  /// Something happens: a request, an employee's trip.
+  EVENT
+  /// Someone asks for it.
+  ON_DEMAND
+  /// Ongoing: no task per run, a periodic check instead.
+  CONTINUOUS
+}
+
+enum ProcessStatus {
+  /// Being written: no approved procedure yet.
+  DRAFT
+  ACTIVE
+  PAUSED
+  RETIRED
+}
+
+/// Where the process stands in a handover (spec 3.8).
+enum ProcessTransition {
+  /// The client or a supplier of theirs runs it.
+  WITH_CLIENT
+  IN_HANDOVER
+  WITH_ANKORA
+  /// Not meant to move to us.
+  NOT_PLANNED
+}
+
+enum ProcessVersionStatus {
+  DRAFT
+  APPROVED
+  /// An approved version a newer approved one replaced. Kept.
+  SUPERSEDED
+}
+
+/// Something that recurs at a client, with an owner, a trigger and a
+/// procedure (spec 3.8). The nine fields Oren asked for are what makes it
+/// complete; each empty one is a gap that shows.
+model Process {
+  id       String @id @default(cuid())
+  clientId String
+  /// 1, 2, 3... per client; `code` is "P" + seq, as in Hadas's file.
+  seq      Int
+  code     String
+
+  title   String
+  /// Why it exists, in a sentence.
+  purpose String?
+
+  triggerKinds ProcessTrigger[] @default([])
+  /// The trigger in words, always: "twice a month, on the 10th and 25th".
+  triggerText  String?
+
+  ownerId       String?
+  backupOwnerId String?
+
+  slaText         String?
+  slaBusinessDays Int?
+
+  /// Who outside the client takes part: contacts in this client's file,
+  /// and the same in words when they are not in it ("Nextage", "none").
+  externalPartyContactIds String[] @default([])
+  externalPartyText       String?
+
+  /// SystemAccess rows of this client the process needs.
+  requiredSystemIds String[] @default([])
+
+  /// Who approves: in words, and the contact when known.
+  approverText      String?
+  approverContactId String?
+  /// The approval thresholds that apply: client rules, and the same in
+  /// words ("new supplier: the accountant approves"; "none").
+  approvalPolicyIds String[] @default([])
+  approvalText      String?
+
+  /// What to do when something deviates. Markdown.
+  exceptionPlaybook String?
+
+  entityId String?
+
+  /// Who runs it today, in words ("Guy", "Nextage").
+  executorText     String?
+  transitionStatus ProcessTransition @default(WITH_CLIENT)
+
+  status         ProcessStatus @default(DRAFT)
+  categoryId     String?
+  reviewEveryDays Int?
+  lastReviewedAt DateTime?
+  lastRunAt      DateTime?
+  needsReview    Boolean       @default(false)
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  versions ProcessVersion[]
+  dates    ImportantDate[]
+
+  @@unique([clientId, seq])
+  @@unique([clientId, code])
+  @@index([clientId, deletedAt])
+  @@map("processes")
+}
+
+/// One version of a process's procedure (spec 3.9). Never edited in
+/// place: a change is a new row saved against the version it started
+/// from, like a task plan. A manager approves; the checks that block
+/// (R1 to R4) are run then.
+model ProcessVersion {
+  id        String               @id @default(cuid())
+  processId String
+  version   Int
+  status    ProcessVersionStatus @default(DRAFT)
+
+  /// [{ title, mode: MANUAL | ASSISTED | AUTOMATED, offsetBusinessDays,
+  ///    actionTags: [], systemIds: [], output, verification,
+  ///    requiresApproval }], at most 15 (lib/process-rules.ts).
+  steps      Json   @default("[]")
+  /// Hadas's "דגשים": what matters and is not a step.
+  highlights String?
+  /// What must exist for a run to count as done.
+  outputs    String?
+  changeNote String?
+
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  approvedById String?
+  approvedAt   DateTime?
+
+  process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@unique([processId, version])
+  @@map("process_versions")
 }
