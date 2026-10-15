@@ -105,6 +105,12 @@ export const TOOL_ANNOTATIONS = {
   // Opens a run of a process (spec 8): a task with the procedure's steps.
   // Each call opens another run, so it is not idempotent.
   start_process: WRITES,
+  // The ongoing processes the user owns or backs up, and when each check
+  // is due (spec 3.8). Reads only.
+  list_my_routines: READ_ONLY,
+  // A check of an ongoing process. An issue also opens a task, so a second
+  // call is a second check and possibly a second task.
+  record_process_check: WRITES,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -133,6 +139,7 @@ export const WRITE_TOOLS = [
   "start_document_upload",
   "propose_knowledge",
   "start_process",
+  "record_process_check",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

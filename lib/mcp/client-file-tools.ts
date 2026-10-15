@@ -11,8 +11,29 @@ import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowl
 import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
+import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/email-templates";
+
+/// A process of one client, by its code ("P3") or its title, the way the
+/// user says it. One match or a sentence saying why not.
+async function resolveProcess(client: { id: string; name: string }, query: string): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
+  const q = query.trim();
+  const candidates = await prisma.process.findMany({
+    where: { clientId: client.id, deletedAt: null, status: { not: "RETIRED" } },
+    select: { id: true, code: true, title: true },
+  });
+  const exact = candidates.filter((p) => p.code.toLowerCase() === q.toLowerCase() || p.title === q);
+  const loose = exact.length ? exact : candidates.filter((p) => p.title.includes(q));
+  if (loose.length === 1) return { ok: true, id: loose[0].id };
+  return {
+    ok: false,
+    message:
+      loose.length === 0
+        ? `No process "${q}" for ${client.name}. Processes: ${candidates.map((p) => `${p.code} ${p.title}`).join("; ") || "none yet"}.`
+        : `"${q}" matches several processes: ${loose.map((p) => `${p.code} ${p.title}`).join("; ")}. Ask which one.`,
+  };
+}
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.3 and 8): the
 // client file, for Claude.
@@ -187,24 +208,79 @@ export function registerClientFileTools(server: McpServer): void {
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) return toolText("date must be YYYY-MM-DD.");
-        const q = args.process.trim();
-        const candidates = await prisma.process.findMany({
-          where: { clientId: client.value.id, deletedAt: null, status: { not: "RETIRED" } },
-          select: { id: true, code: true, title: true },
-        });
-        const exact = candidates.filter((p) => p.code.toLowerCase() === q.toLowerCase() || p.title === q);
-        const loose = exact.length ? exact : candidates.filter((p) => p.title.includes(q));
-        if (loose.length !== 1) {
-          return toolText(
-            loose.length === 0
-              ? `No process "${q}" for ${client.value.name}. Processes: ${candidates.map((p) => `${p.code} ${p.title}`).join("; ") || "none yet"}.`
-              : `"${q}" matches several processes: ${loose.map((p) => `${p.code} ${p.title}`).join("; ")}. Ask which one.`
-          );
-        }
-        const run = await startProcessRun(actor, loose[0].id, new Date(`${args.date}T00:00:00Z`));
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const run = await startProcessRun(actor, process.id, new Date(`${args.date}T00:00:00Z`));
         return toolJson({ taskId: run.id, title: run.title, link: `${appBaseUrl()}/app/tasks/${run.id}` });
       } catch (err) {
         console.error("[mcp] start_process failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_my_routines",
+    {
+      title: "List my routine",
+      description:
+        "The ongoing processes the user owns or backs up, across their clients: what each one is, how often it is checked and what is checked, when the next check is due (OVERDUE, DUE today, or LATER), and the steps of its approved procedure. Ongoing processes open no tasks, so this is where that work is. Use it when the user asks what is on their routine, or before recording a check.",
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.list_my_routines,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const routines = await listMyRoutines(actor);
+        return toolJson({
+          count: routines.length,
+          routines: routines.map((r) => ({
+            client: r.clientName,
+            process: `${r.code} ${r.title}`,
+            check: r.checkEvery ? `${r.checkEvery}${r.checkText ? `: ${r.checkText}` : ""}` : null,
+            lastChecked: r.lastCheckedAt ? r.lastCheckedAt.toISOString().slice(0, 10) : null,
+            nextCheck: r.dueKey,
+            state: r.state,
+            asBackup: r.asBackup,
+            steps: r.steps,
+          })),
+        });
+      } catch (err) {
+        console.error("[mcp] list_my_routines failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "record_process_check",
+    {
+      title: "Record a check of an ongoing process",
+      description:
+        "Writes down that the user checked one of a client's ongoing processes, and what they found. outcome OK: a line in the process's history, nothing else. outcome ISSUE: say what was found in note (required); it also opens a task for the user, due today, with the note. Confirm the outcome and the note with the user first: every call is another check, and an issue is another task. Only an ongoing process that is not paused or retired can be checked.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P5") or its title.'),
+        outcome: z.enum(["OK", "ISSUE"]),
+        note: z.string().optional().describe("What was found. Required for ISSUE."),
+      }),
+      annotations: TOOL_ANNOTATIONS.record_process_check,
+    },
+    async (args: { client: string; process: string; outcome: "OK" | "ISSUE"; note?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const { check, task } = await recordProcessCheck(actor, process.id, { outcome: args.outcome, note: args.note ?? null });
+        return toolJson({
+          checkId: check.id,
+          outcome: check.outcome,
+          task: task ? { taskId: task.id, title: task.title, link: `${appBaseUrl()}/app/tasks/${task.id}` } : null,
+        });
+      } catch (err) {
+        console.error("[mcp] record_process_check failed", err);
         return toolFailure(err);
       }
     }

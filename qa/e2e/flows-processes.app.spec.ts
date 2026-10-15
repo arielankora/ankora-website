@@ -97,4 +97,49 @@ test.describe("clients/process-actions", () => {
     await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
   });
+
+  test("an ongoing process is in its owner's routine; a check that finds an issue opens a task", async ({ page }) => {
+    const title = tag("[E2E] שוטף");
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const code = await addSource(page);
+
+    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('input[name="triggerKinds"][value="CONTINUOUS"]').check();
+    // The seeded admin owns it, so it lands in this session's routine.
+    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
+    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
+    await dialog.locator('input[name="checkEveryDays"]').fill("7");
+    await dialog.locator('input[name="checkText"]').fill("שאין חשבוניות תקועות");
+    await dialog.locator('input[name="sources"]').fill(code);
+    await submit(page, "הוספה לתיק");
+
+    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    await expect(card()).toContainText("בדיקה פעם בשבוע: שאין חשבוניות תקועות");
+    await expect(card()).toContainText("היום");
+    await expect(card().getByRole("button", { name: "פתיחת ריצה" })).toHaveCount(0);
+
+    // The routine on the home screen, and the check from there.
+    await page.goto("/app");
+    const row = () => page.locator("li", { hasText: title }).first();
+    await expect(page.getByText("שגרה שוטפת")).toBeVisible({ timeout: 15_000 });
+    await expect(row()).toContainText("עוד לא נבדק");
+    await row().getByRole("button", { name: "רישום בדיקה" }).click();
+    const check = page.getByRole("dialog");
+    await expect(check).toBeVisible();
+    await check.getByLabel("נמצאה בעיה").check();
+    await check.locator('textarea[name="note"]').fill("חשבונית של Notion לא הגיעה");
+    await submit(page, "רישום הבדיקה");
+    await expect(row()).toContainText("הבאה ב-", { timeout: 15_000 });
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    await expect(card()).toContainText("נמצאה בעיה. חשבונית של Notion לא הגיעה", { timeout: 15_000 });
+    await card().getByRole("link", { name: "המשימה" }).click();
+    await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
+    await expect(page.getByText("חשבונית של Notion לא הגיעה").first()).toBeVisible({ timeout: 15_000 });
+  });
 });

@@ -19,6 +19,7 @@ import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
+import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
@@ -258,6 +259,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.executorText ? `מבצע היום: ${p.executorText}` : null,
           p.slaText ? `SLA: ${p.slaText}` : null,
           p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
+          p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
           `שלמות ${p.completeness.score} מתוך 9`,
           ...p.gaps,
           p.current

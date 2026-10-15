@@ -67,6 +67,11 @@ export default async function NotificationsPage() {
                     <Link href={`/app/clients/${n.entityId}?tab=file#rules`} className="font-medium text-appNavy hover:text-gold-dim">
                       {n.title}
                     </Link>
+                  ) : n.entityType === "ClientProcesses" && n.entityId ? (
+                    // A routine check that is due: to the client's processes.
+                    <Link href={`/app/clients/${n.entityId}?tab=file#processes`} className="font-medium text-appNavy hover:text-gold-dim">
+                      {n.title}
+                    </Link>
                   ) : n.entityType === "Knowledge" && n.entityId ? (
                     <Link href={`/app/knowledge?clientId=${n.entityId}`} className="font-medium text-appNavy hover:text-gold-dim">
                       {n.title}

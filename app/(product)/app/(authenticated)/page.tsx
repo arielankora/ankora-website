@@ -10,6 +10,7 @@ import {
   LayoutGrid,
   ListChecks,
   TriangleAlert,
+  Repeat,
 } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
@@ -30,6 +31,10 @@ import { listMyOpenTasks, stalledPromisesByClient, STALE_PROMISE_HOURS } from "@
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { formatClockMinutes } from "@/lib/hours-format";
 import { taskHref } from "./tasks/list-query";
+import { listMyRoutines } from "@/lib/app-domain/process-checks";
+import { CHECK_STATE_LABELS } from "@/lib/process-checks";
+import { Drawer } from "@/components/app/Drawer";
+import { ProcessCheckForm } from "./clients/[clientId]/ProcessCheckForm";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -264,7 +269,7 @@ export default async function AppHomePage() {
   const todayKey = localDateKey(new Date());
   const startOfToday = localDateTimeToUtc(todayKey, "00:00", TIMEZONE);
 
-  const [metrics, alerts, trend, upcomingDates, activeTimerRows, myTasks, stalled] = await timed(
+  const [metrics, alerts, trend, upcomingDates, activeTimerRows, myTasks, stalled, routines] = await timed(
     "screen.dashboard.load",
     () =>
     Promise.all([
@@ -284,6 +289,9 @@ export default async function AppHomePage() {
     // Mechanism four: a manager's number, so the same gate as the rest of
     // the operational metrics.
     canSeeReports ? stalledPromisesByClient(user, startOfToday) : null,
+    // Org brain: the ongoing processes this person owns or backs up. Same
+    // gate as their tasks: it is their own work.
+    canSeeImportantDates ? listMyRoutines(user) : null,
     ])
   );
 
@@ -308,7 +316,7 @@ export default async function AppHomePage() {
   // The counts row (clients, categories, users) was removed on 26.9.2026
   // at Ariel's request: numbers that change once a month, on the screen
   // people open every morning.
-  const hasAnyContent = !!metrics || (myTasks?.length ?? 0) > 0 || (upcomingDates?.length ?? 0) > 0;
+  const hasAnyContent = !!metrics || (myTasks?.length ?? 0) > 0 || (routines?.length ?? 0) > 0 || (upcomingDates?.length ?? 0) > 0;
 
   return (
     <>
@@ -379,6 +387,50 @@ export default async function AppHomePage() {
                 </Link>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Org brain (spec 3.8): the routine. An ongoing process opens no
+            tasks, so without this it would live only in the client's file,
+            where nobody looks on an ordinary morning. Under the tasks: a
+            task is a promise with a date, a routine is what keeps the
+            promises from being needed. */}
+        {routines && routines.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
+            <div className="flex items-center gap-2 border-b border-lineDark px-[18px] py-3.5 text-[13.5px] font-medium text-appNavy">
+              <Repeat size={15} strokeWidth={2} className="text-appNavy/45" />
+              שגרה שוטפת
+            </div>
+            <ul className="divide-y divide-lineDark/60">
+              {routines.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3">
+                  <span className="min-w-0">
+                    <Link href={`/app/clients/${r.clientId}?tab=file#processes`} className="text-[13.5px] text-appNavy hover:text-gold-dim">
+                      <span className="font-mono text-[11.5px] text-appNavy/50">{r.code}</span> {r.title}
+                    </Link>
+                    <span className="block text-[11.5px] text-appNavy/50">
+                      {[r.clientName, r.checkEvery && `בדיקה ${r.checkEvery}${r.checkText ? `: ${r.checkText}` : ""}`, r.asBackup && "כמחליף"].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-3 text-[11.5px]">
+                    {r.state && r.dueKey && (
+                      <span className={r.state === "LATER" ? "text-appNavy/50" : "font-medium text-warning"}>
+                        {r.state === "LATER"
+                          ? `הבאה ב-${r.dueKey.split("-").reverse().slice(0, 2).join(".")}`
+                          : r.lastCheckedAt
+                            ? CHECK_STATE_LABELS[r.state]
+                            : "עוד לא נבדק"}
+                      </span>
+                    )}
+                    {r.checkEveryDays && (
+                      <Drawer triggerLabel="רישום בדיקה" title={`בדיקה: ${r.code} ${r.title}`} variant="link">
+                        <ProcessCheckForm clientId={r.clientId} processId={r.id} checkText={r.checkText} steps={r.steps} from="home" />
+                      </Drawer>
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

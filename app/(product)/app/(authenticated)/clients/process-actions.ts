@@ -15,6 +15,7 @@ import {
   type ProcessInput,
 } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
+import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 
 // Org brain, phase 1: processes and their procedures on the client screen
@@ -43,6 +44,8 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
   const transition = String(f.get("transitionStatus") ?? "");
   const sla = text(f, "slaBusinessDays");
   if (sla !== null && !/^\d+$/.test(sla)) return { error: "ה-SLA בימי עסקים הוא מספר שלם." };
+  const every = text(f, "checkEveryDays");
+  if (every !== null && !/^\d+$/.test(every)) return { error: "הבדיקה היא כל מספר שלם של ימים." };
   return {
     value: {
       title: String(f.get("title") ?? ""),
@@ -65,6 +68,8 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
       transitionStatus: (TRANSITIONS as string[]).includes(transition) ? (transition as ProcessTransition) : undefined,
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(f, "toResolve"),
+      checkEveryDays: every === null ? null : Number(every),
+      checkText: text(f, "checkText"),
       sources: refs,
     },
   };
@@ -143,4 +148,21 @@ export async function startProcessRunAction(_prev: FormState | undefined, f: For
   const day = String(f.get("day") ?? "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "צריך תאריך לריצה." };
   return run(clientId, () => startProcessRun(user, String(f.get("processId") ?? ""), new Date(`${day}T00:00:00Z`)));
+}
+
+export async function recordProcessCheckAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(f.get("clientId") ?? "");
+  const outcome = String(f.get("outcome") ?? "");
+  if (outcome !== "OK" && outcome !== "ISSUE") return { error: "מה נמצא בבדיקה?" };
+  const from = String(f.get("from") ?? "");
+  try {
+    await recordProcessCheck(user, String(f.get("processId") ?? ""), { outcome, note: text(f, "note") });
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/clients/${clientId}`);
+  // From the home screen's routine, the home screen is what changed.
+  if (from === "home") revalidatePath("/app");
+  return { ok: true };
 }

@@ -192,3 +192,30 @@ export async function listProcessRuns(actor: User, processId: string, take = 5) 
     select: { id: true, title: true, status: true, dueDate: true },
   });
 }
+
+/// What a check of an ongoing process found wrong, as work: an OPEN task
+/// on the process, for the person who found it, due today. The same
+/// promise as a run: it creates, it never closes, and the client does not
+/// see it.
+export async function openCheckIssueTask(input: {
+  processId: string;
+  clientId: string;
+  code: string;
+  title: string;
+  note: string;
+  assigneeId: string;
+  categoryId: string | null;
+  day: Date;
+}) {
+  return prisma.task.create({
+    data: {
+      clientId: input.clientId,
+      categoryId: input.categoryId,
+      title: `${input.code} ${input.title}: ${input.note}`.slice(0, 200),
+      description: `נמצא בבדיקה השוטפת של ${input.code} ${input.title}.\n\n${input.note}`,
+      assignedToId: input.assigneeId,
+      dueDate: input.day,
+      processId: input.processId,
+    },
+  });
+}

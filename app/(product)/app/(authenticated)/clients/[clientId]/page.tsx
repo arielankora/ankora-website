@@ -37,6 +37,9 @@ import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { listProcessRuns } from "@/lib/app-domain/process-runs";
+import { listProcessChecks } from "@/lib/app-domain/process-checks";
+import { localDateKey, TIMEZONE } from "@/lib/timezone";
+import { checkDueKey, checkEveryText, checkState, isRoutine } from "@/lib/process-checks";
 import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
@@ -146,6 +149,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   ]);
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
+  // And of each ongoing one, its last checks.
+  const checksByProcess = new Map(
+    await Promise.all(processes.filter((p) => p.triggerKinds.includes("CONTINUOUS")).map(async (p) => [p.id, await listProcessChecks(user, p.id)] as const))
+  );
+  const todayKey = localDateKey(new Date(), TIMEZONE);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
@@ -408,6 +416,23 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                     }
                   : null,
                 runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
+                checkEveryDays: p.checkEveryDays,
+                checkEvery: p.checkEveryDays ? checkEveryText(p.checkEveryDays) : null,
+                checkText: p.checkText,
+                routine: isRoutine(p),
+                checkDue: (() => {
+                  if (!isRoutine(p)) return null;
+                  const key = checkDueKey({ checkEveryDays: p.checkEveryDays, lastCheckedKey: p.lastCheckedAt ? localDateKey(p.lastCheckedAt, TIMEZONE) : null }, todayKey);
+                  return key ? { key, state: checkState(key, todayKey) } : null;
+                })(),
+                checks: (checksByProcess.get(p.id) ?? []).map((c) => ({
+                  id: c.id,
+                  outcome: c.outcome,
+                  note: c.note,
+                  createdAt: c.createdAt.toISOString(),
+                  checkedByName: c.checkedByName,
+                  taskId: c.taskId,
+                })),
                 draft: p.draft
                   ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
                   : null,
