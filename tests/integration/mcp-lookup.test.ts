@@ -231,7 +231,25 @@ describe("lookupTeamMember() / teamMembers() - the admin-only roster", () => {
     expect(names).toEqual(expect.arrayContaining(["Ariel", "Hadas Cohen"]));
     expect(names).not.toContain("Dana Levi");
     expect(names).not.toContain("Gone Person");
-    expect(roster.find((m) => m.id === hadas.id)).toEqual({ id: hadas.id, name: "Hadas Cohen", email: hadas.email, role: "ANKORA_EMPLOYEE" });
+    // The full contract of one row, so a new field is a decision here
+    // rather than a silent addition. A test user who never signed in has
+    // no lastLoginAt and so no daysSinceLogin.
+    const row = roster.find((m) => m.id === hadas.id)!;
+    expect(row).toEqual({
+      id: hadas.id,
+      name: "Hadas Cohen",
+      email: hadas.email,
+      role: "ANKORA_EMPLOYEE",
+      status: "ACTIVE",
+      lastLoginAt: hadas.lastLoginAt ? hadas.lastLoginAt.toISOString() : null,
+      daysSinceLogin: hadas.lastLoginAt ? expect.any(Number) : null,
+    });
+    // ACTIVE is the default; the suspended person appears only when the
+    // caller asks for inactive staff, and the deleted one never does.
+    expect(roster.every((m) => m.status === "ACTIVE")).toBe(true);
+    const wider = (await teamMembers(ariel, { includeInactive: true })).map((m) => m.name);
+    expect(wider).toContain("Dana Levi");
+    expect(wider).not.toContain("Gone Person");
 
     expect((await lookupTeamMember(ariel, "Dana Levi")).ok).toBe(false);
     expect((await lookupTeamMember(ariel, "Gone Person")).ok).toBe(false);
