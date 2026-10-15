@@ -4,7 +4,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { addBusinessDays } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/email-templates";
-import { CURRENT_AGREEMENTS } from "@/lib/agreements";
+import { CURRENT_AGREEMENTS, hasSignedCurrent } from "@/lib/agreements";
 import { OPEN_STATUSES, assignableUsers, completeStepAsSystem, createTask, updateTask } from "@/lib/app-domain/tasks";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import {
@@ -380,8 +380,9 @@ async function openLifecycleTaskFor(userId: string, kind: EmployeeLifecycleKind)
 /// do not yet (the profile page where a passkey is added sits behind the
 /// very gate they just passed), so the step stays open with a comment
 /// saying which half is done, and the agent or the owner closes it once
-/// the passkey exists. Closing it on the signature alone would mark the
-/// passkey done when nobody set one.
+/// the passkey exists (onPasskeyRegistered below does exactly that).
+/// Closing it on the signature alone would mark the passkey done when
+/// nobody set one.
 export async function onConfidentialitySigned(userId: string): Promise<void> {
   try {
     const task = await openLifecycleTaskFor(userId, "ONBOARDING");
@@ -406,6 +407,27 @@ export async function onConfidentialitySigned(userId: string): Promise<void> {
     );
   } catch (err) {
     await recordFailure(null, userId, "onboarding_sign_hook", err);
+  }
+}
+
+/// Called after a passkey is registered: the other half of step 4. Closes
+/// the step only when the in-app signature on the current version is
+/// already there, so whichever half comes second closes it.
+export async function onPasskeyRegistered(userId: string): Promise<void> {
+  try {
+    if (!(await hasSignedCurrent(userId, "CONFIDENTIALITY", "APP"))) return;
+    const task = await openLifecycleTaskFor(userId, "ONBOARDING");
+    if (!task) return;
+    const step = await prisma.task.findFirst({
+      where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_SIGN_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
+      select: { id: true },
+    });
+    if (!step) return;
+    if (await completeStepAsSystem(step.id, "passkey_registered_after_signature")) {
+      await systemComment(task.id, task.clientId, "הוגדר passkey, וההתחייבות לסודיות כבר אושרה באפליקציה. השלב נסגר.");
+    }
+  } catch (err) {
+    await recordFailure(null, userId, "onboarding_passkey_hook", err);
   }
 }
 

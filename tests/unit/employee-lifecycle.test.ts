@@ -12,6 +12,7 @@ const db = {
   task: { findMany: vi.fn(), findFirst: vi.fn() },
   taskComment: { create: vi.fn() },
   passkey: { deleteMany: vi.fn(), count: vi.fn() },
+  employeeAgreement: { findFirst: vi.fn() },
   stepUpGrant: { deleteMany: vi.fn() },
   agreementSignLink: { updateMany: vi.fn() },
 };
@@ -285,5 +286,30 @@ describe("onDeletionDeclarationSigned", () => {
     expect(db.taskComment.create.mock.calls[0][0].data.body).toContain("agr-1");
     expect(completeStepAsSystem).not.toHaveBeenCalled();
     expect(updateTask).not.toHaveBeenCalled();
+  });
+});
+
+describe("onPasskeyRegistered (onboarding step 4, second half)", () => {
+  it("closes the step when the in-app signature is already there", async () => {
+    db.employeeAgreement.findFirst.mockResolvedValue({ id: "agr" });
+    db.task.findFirst.mockResolvedValueOnce({ id: "parent", clientId: "internal" }).mockResolvedValueOnce({ id: "step4" });
+    completeStepAsSystem.mockResolvedValue(true);
+    await lifecycle.onPasskeyRegistered("emp");
+    expect(db.employeeAgreement.findFirst.mock.calls[0][0].where).toMatchObject({ userId: "emp", kind: "CONFIDENTIALITY", channel: "APP" });
+    expect(completeStepAsSystem).toHaveBeenCalledWith("step4", expect.any(String));
+    expect(db.taskComment.create.mock.calls[0][0].data.body).toContain("השלב נסגר");
+  });
+
+  it("does nothing before the signature", async () => {
+    db.employeeAgreement.findFirst.mockResolvedValue(null);
+    await lifecycle.onPasskeyRegistered("emp");
+    expect(db.task.findFirst).not.toHaveBeenCalled();
+    expect(completeStepAsSystem).not.toHaveBeenCalled();
+  });
+
+  it("never throws", async () => {
+    db.employeeAgreement.findFirst.mockRejectedValue(new Error("db down"));
+    await expect(lifecycle.onPasskeyRegistered("emp")).resolves.toBeUndefined();
+    expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "employee_lifecycle.trigger_failed" }));
   });
 });
