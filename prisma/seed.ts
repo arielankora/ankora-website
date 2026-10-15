@@ -44,8 +44,11 @@ async function main() {
 
   const ankoraAdmin = await prisma.user.upsert({
     where: { email: "demo.admin@ankora.co.il" },
-    update: {},
+    // Decision 5: the demo admin approves exceptions and sensitive items,
+    // so the browser tests can exercise both.
+    update: { canApproveExceptions: true },
     create: {
+      canApproveExceptions: true,
       name: "[DEMO] מנהל Ankora",
       email: "demo.admin@ankora.co.il",
       username: "demo.admin",

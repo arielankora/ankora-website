@@ -123,3 +123,35 @@ export function changesSubstance(
     (after.interimStatement !== undefined && norm(after.interimStatement) !== norm(before.interimStatement))
   );
 }
+
+// ---------------------------------------------------------------------------
+// Exceptions (spec 3.11, PolicyException)
+// ---------------------------------------------------------------------------
+
+/// The longest an exception may run. Longer is a change to the rule.
+export const EXCEPTION_MAX_DAYS = 90;
+
+export const EXCEPTION_STATUS_LABELS: Record<"REQUESTED" | "APPROVED" | "REJECTED" | "WITHDRAWN", string> = {
+  REQUESTED: "ממתינה לאישור",
+  APPROVED: "אושרה",
+  REJECTED: "נדחתה",
+  WITHDRAWN: "נמשכה",
+};
+
+/// `validUntil` is the last day it holds (UTC midnight of that day).
+export function exceptionShapeError(e: { what?: string | null; reason?: string | null; validUntil?: Date | null }, now: Date): string | null {
+  if (!e.what?.trim()) return "צריך לכתוב מה עושים אחרת.";
+  if (!e.reason?.trim()) return "צריך לכתוב למה.";
+  if (!e.validUntil || Number.isNaN(e.validUntil.getTime())) return "חריגה צריכה תאריך סיום.";
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  if (e.validUntil.getTime() < today) return "תאריך הסיום כבר עבר.";
+  if (e.validUntil.getTime() > today + EXCEPTION_MAX_DAYS * 24 * 60 * 60 * 1000) {
+    return `חריגה היא עד ${EXCEPTION_MAX_DAYS} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.`;
+  }
+  return null;
+}
+
+/// Approved and its last day not yet over.
+export function isExceptionInForce(e: { status: string; validUntil: Date }, now: Date): boolean {
+  return e.status === "APPROVED" && e.validUntil.getTime() + 24 * 60 * 60 * 1000 > now.getTime();
+}

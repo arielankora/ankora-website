@@ -1506,6 +1506,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "A rule binds only once approved; changing an approved rule's text sends it back; data-handling rules reach every extraction"
+    },
+    "domain:policy-exceptions": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Exceptions to a client's rules: only the client's approvers decide; every exception ends; requester and approvers are notified"
+    },
+    "domain:rule-approvals": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Who may approve exceptions and sensitive items: the client's own approvers override the per-user permission"
     }
   },
   "waivers": {},

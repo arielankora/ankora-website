@@ -23,6 +23,7 @@ import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
+import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -90,6 +91,15 @@ export type ProposeResult = {
 
 const MAX_ITEMS = 60;
 
+/// Rule R6 (spec 7.2, decision 5): a proposal marked sensitive (medical,
+/// political, personal, or whatever the client's data-handling rules call
+/// sensitive) is read and decided only by the client's approvers.
+export function isSensitive(payload: unknown): boolean {
+  return !!payload && typeof payload === "object" && (payload as Record<string, unknown>).sensitivity === "SENSITIVE";
+}
+
+export const SENSITIVE_PROPOSED = "knowledge.sensitive_proposed";
+
 /// The batch's source: an existing code, the source already registered
 /// for the same recording, or a new one.
 async function resolveSource(actor: User, clientId: string, source: BatchSourceInput) {
@@ -143,6 +153,9 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
       where: { clientId, deletedAt: null, organization: { name: { equals: name, mode: "insensitive" } } },
     });
     if (known) flags.push({ code: "DUPLICATE", message: "הארגון כבר בתיק." });
+  }
+  if (isSensitive(item.payload)) {
+    flags.push({ code: "R6", message: "מידע רגיש: רק מי שמאשר מידע רגיש אצל הלקוח רואה את הפריט ומחליט עליו." });
   }
   if (item.target === "POLICY") {
     const title = normalizeForMatch(String(item.payload.title ?? ""));
@@ -248,6 +261,16 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
       },
     },
   });
+  const sensitive = accepted.filter(({ payload }) => isSensitive(payload)).length;
+  if (sensitive > 0) {
+    const client = await prisma.client.findUniqueOrThrow({ where: { id: input.clientId }, select: { name: true } });
+    await notifyRuleApprovers(input.clientId, actor.id, {
+      type: SENSITIVE_PROPOSED,
+      title: `${client.name}: מידע רגיש ממתין לאישור שלך`,
+      body: `${sensitive === 1 ? "פריט רגיש אחד" : `${sensitive} פריטים רגישים`} מ-${source.code} ${source.title}. רק מי שמאשר מידע רגיש אצל הלקוח רואה אותם.`.slice(0, 500),
+      entityType: "Knowledge",
+    });
+  }
   await recordAudit({
     actorId: actor.id,
     action: "knowledge_batch.propose",
@@ -291,11 +314,31 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     select: { id: true, body: true, knowledgeStatus: true, sources: true },
   });
   const targetById = new Map(targets.map((t) => [t.id, t]));
+  // R6: a sensitive proposal is shown to the client's approvers only.
+  // Everyone else sees that one is waiting, and for whom, not what it says.
+  const approverOf = new Map<string, boolean>();
+  const approverNames = new Map<string, string>();
+  for (const clientId of new Set(batches.filter((b) => b.proposals.some((p) => isSensitive(p.payload))).map((b) => b.clientId))) {
+    approverOf.set(clientId, await canApproveForClient(actor, clientId));
+    approverNames.set(clientId, (await ruleApproversFor(clientId)).map((u) => u.name).join(" או "));
+  }
   return batches.map((b) => ({
     ...b,
     source: b.sourceId ? sourceById.get(b.sourceId) ?? null : null,
     createdByName: b.createdById ? nameOf.get(b.createdById) ?? null : null,
-    proposals: b.proposals.map((p) => ({ ...p, existing: p.targetId ? targetById.get(p.targetId) ?? null : null })),
+    proposals: b.proposals.map((p) => {
+      const hidden = isSensitive(p.payload) && !approverOf.get(b.clientId);
+      return hidden
+        ? {
+            ...p,
+            payload: { sensitivity: "SENSITIVE", kind: (p.payload as Record<string, unknown>).kind ?? null } as Prisma.JsonValue,
+            reason: null,
+            quote: null,
+            existing: null,
+            hiddenFor: approverNames.get(b.clientId) || "מי שמאשר מידע רגיש",
+          }
+        : { ...p, existing: p.targetId ? targetById.get(p.targetId) ?? null : null, hiddenFor: null as string | null };
+    }),
   }));
 }
 
@@ -344,6 +387,7 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
 export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
+  if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
   const original = proposal.payload as Record<string, unknown>;
   const changed = Object.entries(edits).filter(([k, v]) => k !== "sources" && JSON.stringify(original[k] ?? null) !== JSON.stringify(v ?? null));
   const payload = { ...original, ...Object.fromEntries(changed) };
@@ -378,6 +422,7 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
 export async function rejectProposal(actor: User, id: string, reason: string) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
+  if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
   const why = reason.trim();
   // One line, so the next prompt can learn from it (spec 5.4).
   if (!why) throw new Error("צריך לכתוב בשורה אחת למה ההצעה נדחתה.");

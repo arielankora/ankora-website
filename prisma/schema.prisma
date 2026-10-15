@@ -151,6 +151,13 @@ model User {
   /// true preserves today's behavior for every existing row.
   notifyLongRunningTimerByEmail Boolean @default(true)
 
+  /// Org brain, phase 3 (spec decision 5): may approve exceptions to a
+  /// client's rules and sensitive information proposed for a client file.
+  /// Given to a person, not to a role: Ariel and Hadas, whatever their
+  /// roles are. A client that names its own approvers
+  /// (Client.ruleApproverIds) overrides it for that client.
+  canApproveExceptions Boolean @default(false)
+
   /// The morning digest, and the two columns behind it.
   ///
   /// Hadas, 25.9.2026: a task was opened on her and she did not notice.
@@ -457,6 +464,12 @@ model Client {
   /// had their mental load removed, only moved.
   accountManagerId String?
 
+  /// Org brain, phase 3 (spec decision 5): who approves exceptions to this
+  /// client's rules and sensitive information for its file, when the
+  /// client said who ("medical information only with Ariel's prior
+  /// approval"). Empty: anyone with User.canApproveExceptions.
+  ruleApproverIds String[] @default([])
+
   /// The dedicated WhatsApp line this client already talks to Ankora on.
   /// Stored per client (not per employee) because that is how it works
   /// today: the thread exists before the portal does, and the portal's
@@ -539,6 +552,7 @@ model Client {
   requestTypes     RequestType[]
   narratives       ClientNarrative[]
   policies         ClientPolicy[]
+  policyExceptions PolicyException[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -3356,8 +3370,50 @@ model ClientPolicy {
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  client     Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  exceptions PolicyException[]
 
   @@index([clientId, deletedAt])
   @@map("client_policies")
+}
+
+enum PolicyExceptionStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  /// Taken back by whoever asked, before a decision.
+  WITHDRAWN
+}
+
+/// A permitted deviation from one of the client's rules (spec 3.11, 7.2):
+/// what deviates, why, until when, who asked and who approved. An
+/// exception always ends: one with no end is a rule change, and is made
+/// by changing the rule.
+model PolicyException {
+  id       String @id @default(cuid())
+  clientId String
+  policyId String
+
+  /// What is done differently: "send this month's Inc invoices to Ayala".
+  what       String
+  reason     String
+  /// The last day it holds, as UTC midnight like every date-only field.
+  validUntil DateTime
+  status     PolicyExceptionStatus @default(REQUESTED)
+
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  /// Why it was refused, or a condition on the approval.
+  decisionNote  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  client Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  policy ClientPolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, status])
+  @@index([policyId])
+  @@map("policy_exceptions")
 }

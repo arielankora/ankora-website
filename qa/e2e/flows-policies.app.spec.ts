@@ -105,3 +105,42 @@ test.describe("clients/policy-actions", () => {
     await expect(page.getByText(title)).toHaveCount(0);
   });
 });
+
+test.describe("clients/policy-actions: exceptions", () => {
+  test("an exception to a rule is requested with an end date and approved by the client's approver", async ({ page }) => {
+    const title = tag("[E2E] הפרדה");
+    const what = tag("[E2E] לשלוח לאיילה");
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const code = await addSource(page);
+    await page.getByRole("button", { name: "+ כלל", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator('select[name="kind"]').selectOption("SEPARATION");
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('textarea[name="statement"]').fill("לא שולחים לאיילה שום דבר של Inc");
+    await dialog.locator('input[name="sources"]').fill(code);
+    await submit(page, "הוספה לתיק");
+
+    const row = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+    await expect(row(), "the rule was not added").toBeVisible({ timeout: 15_000 });
+    await row().getByRole("button", { name: "בקשת חריגה" }).click();
+    const ask = page.getByRole("dialog");
+    await expect(ask).toBeVisible();
+    await ask.locator('textarea[name="what"]').fill(what);
+    await ask.locator('input[name="reason"]').fill("שני בחופשה");
+    const inTenDays = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    await ask.locator('input[name="validUntil"]').fill(inTenDays);
+    await submit(page, "שליחת הבקשה");
+
+    await expect(row()).toContainText("בקשה לחריגה", { timeout: 15_000 });
+    await expect(row()).toContainText(what);
+
+    // The seeded admin approves exceptions (decision 5), its own included.
+    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await row().getByRole("button", { name: "אישור החריגה" }).click();
+    await approved;
+    await page.reload();
+    await expect(row()).toContainText("חריגה עד", { timeout: 15_000 });
+    await expect(row().getByRole("button", { name: "אישור החריגה" })).toHaveCount(0);
+  });
+});

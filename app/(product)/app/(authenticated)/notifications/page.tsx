@@ -62,6 +62,15 @@ export default async function NotificationsPage() {
                     <Link href={`/app/clients/${n.entityId}/client-file`} className="font-medium text-appNavy hover:text-gold-dim">
                       {n.title}
                     </Link>
+                  ) : n.entityType === "ClientRules" && n.entityId ? (
+                    // An exception to a rule: to the rules, where it is decided.
+                    <Link href={`/app/clients/${n.entityId}?tab=file#rules`} className="font-medium text-appNavy hover:text-gold-dim">
+                      {n.title}
+                    </Link>
+                  ) : n.entityType === "Knowledge" && n.entityId ? (
+                    <Link href={`/app/knowledge?clientId=${n.entityId}`} className="font-medium text-appNavy hover:text-gold-dim">
+                      {n.title}
+                    </Link>
                   ) : (
                     <p className="font-medium text-appNavy">{n.title}</p>
                   )}
