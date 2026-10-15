@@ -18,7 +18,7 @@ export const SECURITY_GATES = {
   /** Every team member has signed the personal confidentiality undertaking. */
   confidentiality: false,
   /** A written DPA with every vendor: Vercel Pro and the Google Workspace CDPA. */
-  vendorDpas: false,
+  vendorDpas: true,
   /** A completed security questionnaire ready to send on request. */
   questionnaire: false,
 } as const;
