@@ -55,6 +55,44 @@ export const AGREEMENT_CHANNEL_LABEL: Readonly<Record<AgreementChannel, string>>
   EMAIL_PDF: "PDF חתום במייל",
 };
 
+/// The Latin code of a version, printed in the footer of every page of
+/// every agreement PDF: "ANKORA-CONF-1.0", "ANKORA-DEL-1.0".
+///
+/// Why a second name for the same version: text extracted from a Hebrew
+/// PDF comes back with its runs reversed, so an agent reading a returned
+/// PDF cannot reliably find "סודיות-1.0" in it. A Latin code with digits
+/// extracts exactly as printed. Derived, never stored, so it cannot drift
+/// from the version it names: the kind's short code plus the version's
+/// number (the part after its last hyphen).
+const KIND_CODE: Readonly<Record<AgreementKind, string>> = {
+  CONFIDENTIALITY: "CONF",
+  DELETION_DECLARATION: "DEL",
+};
+
+export function agreementCode(kind: AgreementKind, version: string): string {
+  const number = version.slice(version.lastIndexOf("-") + 1);
+  return `ANKORA-${KIND_CODE[kind]}-${number}`;
+}
+
+/// A registered version by its Hebrew version string or its Latin code,
+/// for a caller (an agent reading a PDF) that may have either.
+export function findAgreementByVersionOrCode(kind: AgreementKind, value: string): AgreementVersion | null {
+  const v = value.trim();
+  return (
+    AGREEMENT_FILES.find((a) => a.kind === kind && (a.version === v || agreementCode(a.kind, a.version) === v.toUpperCase())) ??
+    null
+  );
+}
+
+/// An agreement kind from a URL segment or a short name, in the forms a
+/// person or a link would write it.
+export function kindFromParam(param: string): AgreementKind | null {
+  const p = param.trim().toLowerCase().replace(/_/g, "-");
+  if (p === "confidentiality" || p === "conf") return "CONFIDENTIALITY";
+  if (p === "deletion-declaration" || p === "del") return "DELETION_DECLARATION";
+  return null;
+}
+
 export function findAgreement(kind: AgreementKind, version: string): AgreementVersion | null {
   return AGREEMENT_FILES.find((a) => a.kind === kind && a.version === version) ?? null;
 }

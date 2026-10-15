@@ -83,6 +83,16 @@ const nextConfig = {
     // record_pdf_signature hashes the versioned agreement text, so the
     // MCP route needs the texts too (no PDF is rendered there).
     '/api/mcp': ['./content/agreements/*.md'],
+    // The blank form, rendered on request: by the user page's link, and
+    // behind the download address get_blank_agreement_pdf hands out.
+    '/app/agreements/blank/[kind]': [
+      './content/agreements/*.md',
+      './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
+    ],
+    '/api/mcp/files/[ticket]': [
+      './content/agreements/*.md',
+      './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
+    ],
     '/agreements/sign/[token]': [
       './content/agreements/*.md',
       './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',

@@ -7,7 +7,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 // block, from the real versioned text.
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-const { renderAgreementPdf } = await import("@/lib/agreement-pdf");
+const { renderAgreementPdf, renderBlankAgreementPdf } = await import("@/lib/agreement-pdf");
 const { visualSegments } = await import("@/lib/pdf");
 const { contentHash, currentAgreement, loadAgreementText } = await import("@/lib/agreements");
 
@@ -15,6 +15,7 @@ async function render() {
   const agreement = currentAgreement("CONFIDENTIALITY");
   const text = loadAgreementText(agreement);
   return renderAgreementPdf({
+    kind: "CONFIDENTIALITY",
     title: agreement.title,
     version: agreement.version,
     text,
@@ -80,5 +81,60 @@ describe("visualSegments", () => {
 
   it("leaves a Latin-only line in reading order", () => {
     expect(texts("203.0.113.7")).toEqual(["203.0.113.7"]);
+  });
+});
+
+/// Each page's text as pdf.js extracts it, joined per page.
+async function pageTexts(buf: Buffer): Promise<string[]> {
+  const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  const out: string[] = [];
+  for (let i = 1; i <= doc.numPages; i++) {
+    const content = await (await doc.getPage(i)).getTextContent();
+    out.push(content.items.map((it) => ("str" in it ? it.str : "")).join(""));
+  }
+  return out;
+}
+
+async function blank(kind: "CONFIDENTIALITY" | "DELETION_DECLARATION") {
+  const a = currentAgreement(kind);
+  return renderBlankAgreementPdf({ kind, title: a.title, version: a.version, text: loadAgreementText(a) });
+}
+
+// The footer code is the one thing an agent must be able to read back
+// out of a returned PDF exactly as printed. Checked with pdf.js here, and
+// with pdftotext by hand when this was built (both return it verbatim).
+describe("the Latin code on every page", () => {
+  it("is in the footer of every page of the signed PDF, with the page number", async () => {
+    const pages = await pageTexts(await render());
+    expect(pages.length).toBeGreaterThan(1);
+    pages.forEach((text, i) => expect(text).toContain(`ANKORA-CONF-1.0 · page ${i + 1}/${pages.length}`));
+  });
+
+  it("is in the footer of every page of both blank forms", async () => {
+    for (const [kind, code] of [
+      ["CONFIDENTIALITY", "ANKORA-CONF-1.0"],
+      ["DELETION_DECLARATION", "ANKORA-DEL-1.0"],
+    ] as const) {
+      const pages = await pageTexts(await blank(kind));
+      pages.forEach((text, i) => expect(text, kind).toContain(`${code} · page ${i + 1}/${pages.length}`));
+    }
+  });
+});
+
+describe("renderBlankAgreementPdf", () => {
+  it("returns a PDF with the fill-in lines and the tables of the source", async () => {
+    const buf = await blank("DELETION_DECLARATION");
+    expect(buf.subarray(0, 4).toString("latin1")).toBe("%PDF");
+    const text = (await pageTexts(buf)).join("\n");
+    // The fill-in underscores survive (unescaped), and Latin parts of the
+    // text extract as written.
+    expect(text).toMatch(/_{6,}/);
+    expect(text).toContain("security@ankora.co.il");
+    // The tables are drawn as grids: one rectangle per cell.
+    const doc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+    const ops = await (await doc.getPage(1)).getOperatorList();
+    const OPS = (pdfjsLib as unknown as { OPS: Record<string, number> }).OPS;
+    const rects = ops.fnArray.filter((f: number) => f === OPS.rectangle || f === OPS.constructPath).length;
+    expect(rects).toBeGreaterThan(10);
   });
 });

@@ -9,7 +9,7 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { localDateTimeToUtc } from "@/lib/timezone";
 import { EmployeeNotFoundError, getEmployeeStatus } from "@/lib/app-domain/employee-status";
-import { AgreementError, recordPdfSignatureFromDocument } from "@/lib/app-domain/agreements";
+import { AgreementError, issueBlankAgreementTicket, recordPdfSignatureFromDocument } from "@/lib/app-domain/agreements";
 
 // Employee lifecycle, for Claude (15.10.2026). The onboarding, weekly and
 // offboarding agents work only through this server, so these are their
@@ -17,6 +17,7 @@ import { AgreementError, recordPdfSignatureFromDocument } from "@/lib/app-domain
 //
 //   get_employee_status     one person's agreements, passkeys, last
 //                           sign-in and open onboarding/offboarding tasks
+//   get_blank_agreement_pdf the blank form to email for a PDF signature
 //   record_pdf_signature    a signed PDF came back and was filed: record it
 //
 // Both are for managers and admins only, behind the same permission as the
@@ -63,6 +64,41 @@ export function parseIsraelDateTime(value: string): Date | null {
 
 export function registerEmployeeTools(server: McpServer): void {
   server.registerTool(
+    "get_blank_agreement_pdf",
+    {
+      title: "Get a blank agreement form to send for signature",
+      description: [
+        "A download address for the blank form of the current version of an agreement: the confidentiality undertaking (CONFIDENTIALITY) for a new employee, or the deletion declaration (DELETION_DECLARATION) for someone leaving. Managers and admins only.",
+        "Fetch it with `curl -o <fileName> <downloadUrl>` within 15 minutes and attach that file to the email to the employee. Never forward the address itself; it is a credential.",
+        "Every page carries a code in its footer (returned as `code`, e.g. ANKORA-CONF-1.0). That code is how a returned, signed PDF is checked before record_pdf_signature.",
+      ].join(" "),
+      inputSchema: z.object({
+        kind: z.enum(["CONFIDENTIALITY", "DELETION_DECLARATION"]),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_blank_agreement_pdf,
+    },
+    async (args: { kind: AgreementKind }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        assertCan(actor.role, "time_entry.edit_others");
+        const t = await issueBlankAgreementTicket(actor, args.kind);
+        return toolJson({
+          kind: args.kind,
+          version: t.version,
+          code: t.code,
+          fileName: t.fileName,
+          downloadUrl: t.url,
+          expiresAt: t.expiresAt.toISOString(),
+        });
+      } catch (err) {
+        if (err instanceof AgreementError) return toolText(err.message);
+        console.error("[mcp] get_blank_agreement_pdf failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
     "get_employee_status",
     {
       title: "Get an employee's onboarding or offboarding status",
@@ -96,7 +132,7 @@ export function registerEmployeeTools(server: McpServer): void {
       description: [
         "Records that a staff member returned a signed agreement as a PDF: the confidentiality undertaking (CONFIDENTIALITY) or the deletion declaration (DELETION_DECLARATION). Managers and admins only.",
         "First file the PDF in the client file of \"Ankora פנימי\" with upload_document or start_document_upload, then pass its documentId here. A document on any other client is refused.",
-        "Record ONLY after opening the PDF and checking two things yourself: the version printed on it equals the current version (get_employee_status gives it; a different version is refused), and a signature is visibly there. If either is unclear, do not record: add a comment on the task asking a person to check, and stop.",
+        "Record ONLY after checking two things yourself. First, the code in the footer of every page: read the document's text with read_document and find the Latin code, e.g. ANKORA-CONF-1.0 or ANKORA-DEL-1.0, which must match the current version (get_employee_status gives the version; get_blank_agreement_pdf gives the code). Use the code, not the Hebrew version line, because Hebrew comes out of a PDF's text reversed. Second, that a signature is visibly there (open the file itself when the text cannot show it). If either is unclear, do not record: add a comment on the task asking a person to check, and stop.",
         "signedAt is the date on the signature, YYYY-MM-DD or YYYY-MM-DD HH:MM in Israel time. signedName is the name as written on the PDF.",
         "Safe to repeat: if this PDF channel is already recorded for the same person, kind and version, the existing record comes back with alreadyRecorded: true and nothing new is written.",
         "When the confidentiality undertaking is now signed both in the app and as a PDF, the onboarding task's PDF step closes by itself; for a deletion declaration a note is added to the offboarding task.",
@@ -104,7 +140,7 @@ export function registerEmployeeTools(server: McpServer): void {
       inputSchema: z.object({
         ...PERSON_ARGS,
         kind: z.enum(["CONFIDENTIALITY", "DELETION_DECLARATION"]),
-        version: z.string().describe("The version printed on the PDF, e.g. \"סודיות-1.0\". Must equal the current version."),
+        version: z.string().describe("The code in the PDF's footer, e.g. \"ANKORA-CONF-1.0\", or the Hebrew version, e.g. \"סודיות-1.0\". Must be the current version."),
         signedName: z.string().describe("The signer's name as written on the PDF."),
         signedAt: z.string().describe("Date of signature: YYYY-MM-DD or YYYY-MM-DD HH:MM, Israel time."),
         documentId: z.string().describe("The documentId of the signed PDF, already filed on the client \"Ankora פנימי\"."),

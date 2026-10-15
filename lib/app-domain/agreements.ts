@@ -1,18 +1,21 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { sendEmail } from "@/lib/email";
 import { appBaseUrl, renderDeletionDeclarationEmail } from "@/lib/email-templates";
 import { employeeAgreementsFolder, uploadFileToDriveFolder } from "@/lib/google-drive";
-import { renderAgreementPdf } from "@/lib/agreement-pdf";
+import { renderAgreementPdf, renderBlankAgreementPdf } from "@/lib/agreement-pdf";
+import { fileTicketExpiry, fileTicketUrl, generateFileTicket, hashFileTicket } from "@/lib/mcp/file-ticket";
 import {
   CURRENT_AGREEMENTS,
   SIGN_LINK_TTL_MS,
+  agreementCode,
   agreementFileName,
   contentHash,
   currentAgreement,
   findAgreement,
+  findAgreementByVersionOrCode,
   hashSignToken,
   loadAgreementText,
   namesMatch,
@@ -88,6 +91,7 @@ async function fileSignedPdf(row: EmployeeAgreement, agreement: AgreementVersion
   }
   try {
     const pdf = await renderAgreementPdf({
+      kind: row.kind,
       title: agreement.title,
       version: row.version,
       text,
@@ -437,10 +441,14 @@ export async function recordPdfSignatureFromDocument(
 ): Promise<{ row: EmployeeAgreement; alreadyRecorded: boolean }> {
   assertAgreementAdmin(actor.role);
 
+  // The version as printed in Hebrew, or the Latin code from the footer
+  // (which is what survives text extraction from a returned PDF).
   const expected = CURRENT_AGREEMENTS[input.kind];
-  if (input.version.trim() !== expected) {
+  const expectedCode = agreementCode(input.kind, expected);
+  const given = findAgreementByVersionOrCode(input.kind, input.version);
+  if (!given || given.version !== expected) {
     throw new AgreementError(
-      `The current version of ${input.kind} is "${expected}", not "${input.version}". Record only a PDF whose printed version is "${expected}"; a different version needs a person to decide.`
+      `The current version of ${input.kind} is "${expected}" (code ${expectedCode}), not "${input.version}". Record only a PDF whose footer code is ${expectedCode}; a different version needs a person to decide.`
     );
   }
 
@@ -485,4 +493,71 @@ export async function listAgreementsForUser(userId: string) {
     orderBy: { signedAt: "desc" },
     select: { id: true, kind: true, version: true, channel: true, signedAt: true, driveFileId: true },
   });
+}
+
+// --- The blank form, for the PDF channel -----------------------------------
+
+/// The blank form of the current version of one kind, ready to send for
+/// a signature on paper or in a PDF editor. Who may have it is the
+/// caller's question: the route and the MCP tool both ask it first.
+export async function blankAgreementPdf(kind: AgreementKind): Promise<{ pdf: Buffer; code: string; fileName: string }> {
+  const agreement = currentAgreement(kind);
+  const code = agreementCode(kind, agreement.version);
+  const pdf = await renderBlankAgreementPdf({
+    kind,
+    title: agreement.title,
+    version: agreement.version,
+    text: loadAgreementText(agreement),
+  });
+  return { pdf, code, fileName: `${code}.pdf` };
+}
+
+/// McpFileTicket.purpose for a blank form. The ticket carries the form's
+/// file name, which names kind and version through the code; nothing else
+/// about it needs storing.
+export const BLANK_AGREEMENT_TICKET = "agreement-blank";
+
+/// A short-lived download address for the blank form, the same kind of
+/// address read_document hands out (lib/mcp/file-ticket.ts): 15 minutes,
+/// stored only as a hash, tied to the person who asked and their sessions.
+/// The ticket table needs a client, and the form belongs to the internal
+/// one, where the signed copy will be filed.
+export async function issueBlankAgreementTicket(actor: User, kind: AgreementKind, now = new Date()) {
+  assertCan(actor.role, "time_entry.edit_others");
+  const { resolveInternalClient } = await import("@/lib/app-domain/employee-lifecycle");
+  const internal = await resolveInternalClient();
+  if (!internal) throw new AgreementError("The internal client (Ankora פנימי) was not found, so no download address can be issued.");
+
+  const agreement = currentAgreement(kind);
+  const code = agreementCode(kind, agreement.version);
+  const ticket = generateFileTicket();
+  const expiresAt = fileTicketExpiry(now);
+  await prisma.mcpFileTicket.create({
+    data: {
+      tokenHash: hashFileTicket(ticket),
+      purpose: BLANK_AGREEMENT_TICKET,
+      userId: actor.id,
+      tokenVersion: actor.tokenVersion,
+      clientId: internal.id,
+      fileName: `${code}.pdf`,
+      expiresAt,
+    },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "agreement.blank_issued",
+    entityType: "User",
+    entityId: actor.id,
+    after: { kind, version: agreement.version, code, via: "mcp" },
+  });
+  return { url: fileTicketUrl(appBaseUrl(), ticket), expiresAt, code, version: agreement.version, fileName: `${code}.pdf` };
+}
+
+/// The kind a blank-form ticket was issued for, from its file name.
+export function kindFromBlankFileName(fileName: string | null): AgreementKind | null {
+  if (!fileName) return null;
+  const kind = (["CONFIDENTIALITY", "DELETION_DECLARATION"] as const).find(
+    (k) => fileName === `${agreementCode(k, CURRENT_AGREEMENTS[k])}.pdf`
+  );
+  return kind ?? null;
 }

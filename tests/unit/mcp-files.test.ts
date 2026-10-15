@@ -42,8 +42,18 @@ vi.mock("@/lib/app-auth/permissions", () => {
       this.name = "ForbiddenError";
     }
   }
-  return { ForbiddenError, assertCan: vi.fn() };
+  return {
+    ForbiddenError,
+    assertCan: vi.fn(),
+    can: (role: string, permission: string) =>
+      permission === "time_entry.edit_others" ? ["SUPER_ADMIN", "ANKORA_ADMIN"].includes(role) : true,
+  };
 });
+const blank = vi.hoisted(() => ({
+  blankAgreementPdf: vi.fn(async () => ({ pdf: Buffer.from("%PDF-blank"), code: "ANKORA-CONF-1.0", fileName: "ANKORA-CONF-1.0.pdf" })),
+  kindFromBlankFileName: vi.fn((f: string | null) => (f === "ANKORA-CONF-1.0.pdf" ? "CONFIDENTIALITY" : null)),
+}));
+vi.mock("@/lib/app-domain/agreements", () => blank);
 
 const { redeemUploadTicket, redeemDownloadTicket, issueUploadTicket } = await import("@/lib/app-domain/mcp-files");
 const { generateFileTicket, hashFileTicket } = await import("@/lib/mcp/file-ticket");
@@ -204,5 +214,29 @@ describe("redeemDownloadTicket", () => {
     expect((await redeemDownloadTicket(ticket, LATER)).status).toBe(410);
     db.ticket.findUnique.mockResolvedValue(downloadRow({ expiresAt: NOW }));
     expect((await redeemDownloadTicket(ticket, LATER)).status).toBe(410);
+  });
+});
+
+describe("redeemDownloadTicket for a blank agreement form", () => {
+  const blankRow = (over: Record<string, unknown> = {}) =>
+    uploadRow({ purpose: "agreement-blank", documentId: null, fileName: "ANKORA-CONF-1.0.pdf", ...over });
+
+  it("renders the form for a manager or admin, as a PDF named by its code", async () => {
+    db.ticket.findUnique.mockResolvedValue(blankRow());
+    db.user.findUnique.mockResolvedValue({ ...USER, role: "ANKORA_ADMIN" });
+    const out = await redeemDownloadTicket(ticket, LATER);
+    expect(out).toMatchObject({ ok: true, status: 200, mimeType: "application/pdf", fileName: "ANKORA-CONF-1.0.pdf" });
+    expect(blank.blankAgreementPdf).toHaveBeenCalledWith("CONFIDENTIALITY");
+    expect(drive.downloadFileFromDrive).not.toHaveBeenCalled();
+  });
+
+  it("refuses when the person is no longer a manager or admin, or the ticket expired", async () => {
+    db.ticket.findUnique.mockResolvedValue(blankRow());
+    db.user.findUnique.mockResolvedValue({ ...USER, role: "ANKORA_EMPLOYEE" });
+    expect((await redeemDownloadTicket(ticket, LATER)).status).toBe(410);
+    db.ticket.findUnique.mockResolvedValue(blankRow({ expiresAt: NOW }));
+    db.user.findUnique.mockResolvedValue({ ...USER, role: "ANKORA_ADMIN" });
+    expect((await redeemDownloadTicket(ticket, LATER)).status).toBe(410);
+    expect(blank.blankAgreementPdf).not.toHaveBeenCalled();
   });
 });

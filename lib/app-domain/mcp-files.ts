@@ -2,7 +2,7 @@ import "server-only";
 import type { ClientDocumentKind, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
+import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { DriveNotConfiguredError, MAX_DOCUMENT_BYTES, addClientDocument } from "@/lib/app-domain/client-documents";
 import { clientDocumentsFolder, downloadFileFromDrive } from "@/lib/google-drive";
@@ -288,6 +288,20 @@ export async function issueDownloadTicket(actor: User, doc: McpDocument, now = n
 export async function redeemDownloadTicket(raw: string, now = new Date()): Promise<TicketOutcome> {
   if (!looksLikeFileTicket(raw)) return GONE;
   const row = await prisma.mcpFileTicket.findUnique({ where: { tokenHash: hashFileTicket(raw) } });
+  // Employee agreements: a blank form to send for signature, rendered on
+  // request rather than read from Drive. Same address shape and the same
+  // owner check, and still only for managers and admins at the moment of
+  // the download.
+  if (row && row.purpose === "agreement-blank" && row.expiresAt > now) {
+    const owner = await ticketOwner(row);
+    const { blankAgreementPdf, kindFromBlankFileName } = await import("@/lib/app-domain/agreements");
+    const kind = kindFromBlankFileName(row.fileName);
+    if (!owner || !kind || !can(owner.role, "time_entry.edit_others")) return GONE;
+    const { pdf, fileName } = await blankAgreementPdf(kind);
+    if (!row.usedAt) await prisma.mcpFileTicket.update({ where: { id: row.id }, data: { usedAt: now } });
+    const body = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
+    return { ok: true, status: 200, body, mimeType: "application/pdf", fileName };
+  }
   if (!row || row.purpose !== "download" || !row.documentId || row.expiresAt <= now) return GONE;
 
   const actor = await ticketOwner(row);
