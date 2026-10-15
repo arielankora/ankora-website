@@ -5,6 +5,7 @@ import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
+import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, TARGET_LABELS, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { approveProposalAction, approveEditedProposalAction, rejectProposalAction } from "./actions";
 
@@ -32,6 +33,14 @@ export type ReviewProposal = {
 const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
 
 /// The fields a reviewer may change, per kind of item.
+/// The kind of item, as the reviewer reads it: a fact by its kind, a rule
+/// by its kind, everything else by what it is.
+function targetLabel(p: { target: ProposalTargetLike; payload: Record<string, unknown> }): string {
+  if (p.target === "FACT" && p.payload.kind) return FACT_KIND_LABELS[p.payload.kind as FactKindLike];
+  if (p.target === "POLICY" && p.payload.kind) return `כלל: ${POLICY_KIND_LABELS[p.payload.kind as PolicyKindLike] ?? ""}`;
+  return TARGET_LABELS[p.target];
+}
+
 const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long?: boolean }[]> = {
   FACT: [
     { key: "body", label: "מה", long: true },
@@ -51,6 +60,11 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
   REQUEST_TYPE: [
     { key: "title", label: "סוג הפנייה" },
     { key: "handling", label: "איך עונים ולאן מעבירים", long: true },
+  ],
+  POLICY: [
+    { key: "title", label: "שם הכלל" },
+    { key: "statement", label: "הכלל", long: true },
+    { key: "interimStatement", label: "עד שיאושר", long: true },
   ],
   SYSTEM: [
     { key: "systemName", label: "מערכת" },
@@ -130,7 +144,7 @@ function RejectForm({ p }: { p: ReviewProposal }) {
 function ProposalRow({ p }: { p: ReviewProposal }) {
   const { showToast } = useToast();
   const status = (str(p.payload.knowledgeStatus) || (p.payload.kind === "QUESTION" ? "MISSING" : "CONFIRMED")) as KnowledgeStatusLike;
-  const kindLabel = p.target === "FACT" && p.payload.kind ? FACT_KIND_LABELS[p.payload.kind as FactKindLike] : TARGET_LABELS[p.target];
+  const kindLabel = targetLabel(p);
 
   async function approve() {
     const r = await approveProposalAction(p.id);
@@ -221,7 +235,7 @@ export function ReviewBatch({
   const pending = proposals.filter((p) => p.state === "PENDING");
   const counts = Object.entries(
     pending.reduce<Record<string, number>>((acc, p) => {
-      const k = p.target === "FACT" && p.payload.kind ? FACT_KIND_LABELS[p.payload.kind as FactKindLike] : TARGET_LABELS[p.target];
+      const k = targetLabel(p);
       acc[k] = (acc[k] ?? 0) + 1;
       return acc;
     }, {})

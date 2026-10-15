@@ -5,6 +5,8 @@ import { assertCan } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { currentGuide } from "@/lib/app-domain/extraction-guide";
 import { DEFAULT_EXTRACTION_GUIDE_LINES, guideLines } from "@/lib/extract-prompt";
+import { policiesInForce } from "@/lib/app-domain/client-policies";
+import { ruleLine } from "@/lib/client-policies";
 
 // Org brain, phase 2: what an unattended extraction needs before it reads
 // a single meeting (claude/org-brain-spec-2026-10-12.md, 5.1).
@@ -27,7 +29,7 @@ export async function extractionBrief(actor: User, now = new Date()) {
   const ids = clients.map((c) => c.id);
   const since = new Date(now.getTime() - PROCESSED_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const [guide, domains, sources] = await Promise.all([
+  const [guide, domains, sources, rules] = await Promise.all([
     currentGuide(),
     prisma.clientDomain.findMany({
       where: { clientId: { in: ids }, deletedAt: null },
@@ -37,6 +39,9 @@ export async function extractionBrief(actor: User, now = new Date()) {
       where: { clientId: { in: ids }, deletedAt: null, createdAt: { gte: since } },
       select: { clientId: true, code: true, title: true, externalRefs: true, createdAt: true },
     }),
+    // Each client's own rules about what may enter its file (spec 3.11,
+    // DATA_HANDLING): the run applies them to that client's meetings only.
+    policiesInForce(actor, clients, ["DATA_HANDLING"]),
   ]);
 
   const nameOf = new Map(clients.map((c) => [c.id, c.name]));
@@ -58,6 +63,10 @@ export async function extractionBrief(actor: User, now = new Date()) {
         domains: domains
           .filter((d) => d.clientId === c.id)
           .map((d) => ({ domain: d.domain, kind: d.kind, organization: d.organization?.name ?? null })),
+        dataHandlingRules: rules
+          .filter((r) => r.clientId === c.id)
+          .map(ruleLine)
+          .filter((l): l is string => !!l),
       })),
     processedRecordings: processed,
     processedWindowDays: PROCESSED_WINDOW_DAYS,

@@ -35,6 +35,11 @@ export type ExtractPromptInput = {
   organizations: string[];
   systems: string[];
   requestTypes?: string[];
+  /// The client's rules, by title.
+  policies?: string[];
+  /// The client's own rules about what may enter its file (spec 3.11).
+  /// They bind this extraction on top of Ankora's.
+  dataHandling?: string[];
   sources: ExtractPromptSource[];
   domains: string[];
   /// A meeting or document the person already chose, if any.
@@ -83,6 +88,7 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
       : "1. שאל אותי מה המקור. אם זו הקלטה, חפש אותה ב-Fireflies לפי התאריך והכותרת והראה לי מה מצאת לפני שאתה קורא. אם זה מסמך, list_documents ו-read_document.",
     "2. קרא את התיק הנוכחי עם get_client_file, כדי לא להציע מה שכבר שם.",
     "3. הכן טיוטה: טבלה עם סוג הפריט, הטקסט, הסטטוס המוצע, הדקה והסיבה. סמן מה סותר או מחליף פריט קיים.",
+    "   כלל שהלקוח קבע (מה מותר, מה אסור, מי מאשר, מה לא מספרים למי) הוא target POLICY. בכלל שמתיר משהו (סף, אישור) כתוב גם interimStatement: מה עושים עד שמנהל מאשר אותו.",
     "4. אחרי ההערות שלי, אתה מעדכן את הטיוטה.",
     `5. אחרי אישור שלי: propose_knowledge עם client "${input.clientName}", והמקור (sourceCode אם הוא כבר במרשם, אחרת newSource עם firefliesId או documentId).`,
     "6. תגיד לי כמה הצעות נשלחו ומה נשמט, ושהן מחכות לאישור במסך.",
@@ -93,6 +99,17 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
     input.guide ? `(הנחיות גרסה ${input.guide.version})` : "",
     ""
   );
+
+  if (input.dataHandling?.length) {
+    out.push(
+      `## כללי טיפול במידע של ${input.clientName}`,
+      "",
+      "הלקוח קבע אותם, והם גוברים על כל מה שלמעלה. מה שהם לא מתירים לא נכנס לטיוטה בכלל, גם לא כהערה.",
+      "",
+      ...input.dataHandling.map((r) => `- ${r}`),
+      ""
+    );
+  }
 
   out.push("## מה כבר בתיק", "");
   if (input.facts.length === 0 && input.people.length === 0 && input.organizations.length === 0 && input.systems.length === 0) {
@@ -106,6 +123,7 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
     if (input.organizations.length) out.push(`ספקים ונותני שירות: ${input.organizations.join(", ")}`);
     if (input.systems.length) out.push(`מערכות: ${input.systems.join(", ")}`);
     if (input.requestTypes?.length) out.push(`סוגי פניות: ${input.requestTypes.join(", ")}`);
+    if (input.policies?.length) out.push(`כללים של הלקוח: ${input.policies.join(", ")}`);
   }
   out.push("");
 

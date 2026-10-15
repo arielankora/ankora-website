@@ -9,6 +9,8 @@ import { listClientFacts } from "@/lib/app-domain/client-facts";
 import { listSystemMap } from "@/lib/app-domain/system-map";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { currentGuide } from "@/lib/app-domain/extraction-guide";
+import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { ruleLine } from "@/lib/client-policies";
 import { prisma } from "@/lib/prisma";
 
 // The input to "חלץ ידע עם קלוד" (lib/extract-prompt.ts). Gathered through
@@ -17,7 +19,7 @@ import { prisma } from "@/lib/prisma";
 // sensitive (spec 6.3). A pasted prompt leaves the product.
 
 export async function extractPromptFor(actor: User, clientId: string): Promise<string> {
-  const [client, facts, people, systems, sources, domains, requestTypes, guide] = await Promise.all([
+  const [client, facts, people, systems, sources, domains, requestTypes, guide, policies] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true } }),
     listClientFacts(actor, clientId),
     listClientPeople(actor, clientId),
@@ -26,6 +28,7 @@ export async function extractPromptFor(actor: User, clientId: string): Promise<s
     listClientDomains(actor, clientId),
     listRequestTypes(actor, clientId),
     currentGuide(),
+    listClientPolicies(actor, clientId),
   ]);
   const shown = <T extends { sensitivity: string }>(rows: T[]) => rows.filter((r) => r.sensitivity !== "SENSITIVE");
   const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
@@ -41,6 +44,12 @@ export async function extractPromptFor(actor: User, clientId: string): Promise<s
     organizations: shown(people.organizations).map((o) => o.organization.name),
     systems: shown(systems).map((s) => s.systemName),
     requestTypes: shown(requestTypes).map((r) => r.title),
+    // Rules a meeting may bring up again: by title, so a repeat is not proposed.
+    policies: shown(policies).filter((p) => p.status !== "RETIRED").map((p) => p.title),
+    dataHandling: policies
+      .filter((p) => p.kind === "DATA_HANDLING")
+      .map(ruleLine)
+      .filter((l): l is string => !!l),
     sources: sources.map((s) => ({
       code: s.code,
       title: s.title,

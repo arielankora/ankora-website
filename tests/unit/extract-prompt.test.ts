@@ -47,3 +47,15 @@ describe("approved guidance", () => {
     expect(p).not.toContain("שיחת חולין");
   });
 });
+
+describe("the client's data-handling rules (spec 3.11)", () => {
+  it("are given to Claude as binding, above Ankora's guidance, only when there are any", () => {
+    expect(buildExtractPrompt(BASE)).not.toContain("כללי טיפול במידע של");
+    const p = buildExtractPrompt({ ...BASE, dataHandling: ["פגישות הנהלה: נושאים בלבד"], policies: ["פגישות הנהלה"] });
+    expect(p).toContain("## כללי טיפול במידע של NUX");
+    expect(p).toContain("גוברים על כל מה שלמעלה");
+    expect(p).toContain("- פגישות הנהלה: נושאים בלבד");
+    expect(p).toContain("כללים של הלקוח: פגישות הנהלה");
+    expect(p).toContain("target POLICY");
+  });
+});
