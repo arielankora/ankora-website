@@ -194,3 +194,20 @@ export function subtractBusinessDays(key: string, count: number, calendar: Busin
   }
   return cursor;
 }
+
+/// `count` business days after `key` (before it, when negative), counting
+/// only days strictly after (before) it. 0 returns `key` itself. A step
+/// "two business days before the payment run" is -2.
+export function shiftBusinessDays(key: string, count: number, calendar: BusinessCalendarKey): string {
+  const n = Math.trunc(count);
+  if (n <= 0) return subtractBusinessDays(key, -n, calendar);
+  let cursor = key;
+  let remaining = n;
+  let guard = 0;
+  while (remaining > 0 && guard < 3660) {
+    cursor = addDaysToKey(cursor, 1);
+    if (isBusinessDay(cursor, calendar)) remaining--;
+    guard++;
+  }
+  return cursor;
+}

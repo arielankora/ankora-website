@@ -15,6 +15,9 @@ import {
   buildEscalationMessage,
 } from "@/lib/app-domain/important-dates-reminders";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
+import { openProcessRun } from "@/lib/app-domain/process-runs";
+import { readSteps } from "@/lib/process-rules";
+import { runLeadBusinessDays } from "@/lib/process-runs";
 import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
@@ -430,7 +433,15 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
 
 export async function createDueAutoTasks(now = new Date()): Promise<{ created: number; asked: number }> {
   const dates = await prisma.importantDate.findMany({
-    where: { deletedAt: null, createAutoTask: true, status: { notIn: ["ARCHIVED", "PAUSED"] }, nextOccurrenceAt: { not: null } },
+    where: {
+      deletedAt: null,
+      // Org-brain spec 5.3: a date that starts a process opens its run
+      // whether or not it was set to open a plain task.
+      OR: [{ createAutoTask: true }, { processId: { not: null } }],
+      status: { notIn: ["ARCHIVED", "PAUSED"] },
+      nextOccurrenceAt: { not: null },
+    },
+    include: { process: { select: { id: true, status: true, versions: { where: { status: "APPROVED" }, take: 1, select: { steps: true } } } } },
   });
 
   let created = 0;
@@ -440,13 +451,25 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     // Org-brain spec 3.10: the lead can be counted in business days of the
     // date's calendar. In calendar days this is the same day as the
     // millisecond subtraction it replaces, without its DST hour.
-    const dueAt = computeLeadDate(
+    // A process that can run: active, with an approved procedure. A
+    // paused one opens nothing at all, not even the plain task: pausing a
+    // process is how a manager stops its work.
+    const approvedSteps = date.process?.status === "ACTIVE" && date.process.versions[0] ? readSteps(date.process.versions[0].steps) : null;
+    if (date.process?.status === "PAUSED" || date.process?.status === "RETIRED") continue;
+    if (date.processId && !approvedSteps && !date.createAutoTask) continue;
+
+    let dueAt = computeLeadDate(
       date.nextOccurrenceAt,
       date.autoTaskLeadDays ?? 0,
       date.leadUnit,
       date.businessCalendar,
       date.timezone
     );
+    // A run opens early enough for its earliest step not to be late.
+    if (approvedSteps) {
+      const forSteps = computeLeadDate(date.nextOccurrenceAt, runLeadBusinessDays(approvedSteps), "BUSINESS_DAYS", date.businessCalendar, date.timezone);
+      if (forSteps.getTime() < dueAt.getTime()) dueAt = forSteps;
+    }
     if (dueAt.getTime() > now.getTime()) continue;
 
     // Org-brain spec 3.10: a conditional date ("quarterly, only if the SLA
@@ -484,6 +507,25 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
       select: { id: true },
     });
     if (sameOccurrence) continue;
+
+    if (approvedSteps) {
+      try {
+        const run = await openProcessRun({
+          processId: date.processId!,
+          occurrence: date.nextOccurrenceAt,
+          importantDateId: date.id,
+          occurrenceKey,
+          dateCalendar: date.businessCalendar,
+          fallbackAssigneeId: date.responsibleUserId,
+          fallbackCategoryId: date.autoTaskCategoryId,
+          actorId: null,
+        });
+        if (run) created++;
+      } catch {
+        // Unique (importantDateId, importantDateOccurrenceKey): already opened.
+      }
+      continue;
+    }
 
     try {
       const task = await prisma.task.create({

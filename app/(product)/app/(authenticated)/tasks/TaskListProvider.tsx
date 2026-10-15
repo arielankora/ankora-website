@@ -129,7 +129,17 @@ export function TaskListProvider({
   // Newest first, above everything the server sent. A task somebody just
   // created belongs at the top whatever the sort says: they are looking
   // for confirmation that it exists, not for where it ranks.
-  const all = useMemo(() => [...extra, ...rows], [extra, rows]);
+  //
+  // Filtered here as well as in the effect above, because the effect only
+  // runs when the server's rows change. When the revalidation lands BEFORE
+  // `addCreated` is called (the server action's refresh can beat the
+  // form's callback), the row is added to `extra` after the last change
+  // the effect will ever see, and without this filter it stays there,
+  // drawn twice for as long as the page is open. Seen in QA on 15.10.2026.
+  const all = useMemo(() => {
+    const known = new Set(rows.map((r) => r.id));
+    return [...extra.filter((r) => !known.has(r.id)), ...rows];
+  }, [extra, rows]);
 
   const value = useMemo<TaskListValue>(
     () => ({

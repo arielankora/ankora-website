@@ -1554,6 +1554,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 at approval; completeness and gaps"
+    },
+    "domain:process-runs": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Opens runs from dates and by hand: only an active process with an approved procedure, once per occurrence, steps on business days"
     }
   },
   "waivers": {},

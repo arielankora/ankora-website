@@ -32,10 +32,16 @@ const SEARCHED = ["app", "lib"];
 /// date comes round. It only ever creates OPEN work, so it cannot produce
 /// a finished promise with nothing to show for it. If it ever learns to
 /// close one, it belongs behind updateTask like everything else.
+///
+/// `lib/app-domain/process-runs.ts` opens a run of a process (org-brain
+/// spec 5.3) the same way, for the same job and for a person starting one:
+/// OPEN work and its OPEN steps, never visible to the client, never
+/// closed. The same promise holds: it creates, it does not close.
 const ALLOWED = new Set([
   "lib/app-domain/tasks.ts",
   "lib/app-domain/decisions.ts",
   "lib/app-domain/important-dates-job.ts",
+  "lib/app-domain/process-runs.ts",
 ]);
 
 const WRITE = /prisma\.task\.(update|updateMany|upsert|create|createMany)\b/;

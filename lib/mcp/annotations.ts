@@ -102,6 +102,9 @@ export const TOOL_ANNOTATIONS = {
   // The guidance, the clients' domains and what was already proposed, for
   // the daily extraction (spec 5.1). Reads only.
   get_extraction_brief: READ_ONLY,
+  // Opens a run of a process (spec 8): a task with the procedure's steps.
+  // Each call opens another run, so it is not idempotent.
+  start_process: WRITES,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -129,6 +132,7 @@ export const WRITE_TOOLS = [
   "upload_document",
   "start_document_upload",
   "propose_knowledge",
+  "start_process",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

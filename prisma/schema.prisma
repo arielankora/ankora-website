@@ -748,6 +748,14 @@ model Task {
   importantDateId            String?
   importantDateOccurrenceKey String?
 
+  /// Org brain, phase 1 (spec 3.12): a run of a process is a task. It
+  /// remembers which process and which approved version of the procedure
+  /// it was opened from, so a later version never rewrites a run already
+  /// under way. On a step of a run, `stepMode` is how that step is done.
+  processId        String?
+  processVersionId String?
+  stepMode         ProcessStepMode?
+
   // Portal phase 1 ("הבטחות"). Three fields, and deliberately not a
   // second status column.
   //
@@ -943,6 +951,7 @@ model Task {
   plans         TaskPlan[]
 
   @@unique([importantDateId, importantDateOccurrenceKey])
+  @@index([processId])
   @@index([clientId])
   @@index([assignedToId])
   // Portal phase 1: every portal screen reads this client's visible tasks.
@@ -3457,6 +3466,13 @@ enum ProcessTransition {
   WITH_ANKORA
   /// Not meant to move to us.
   NOT_PLANNED
+}
+
+/// How a step of a run is done (spec 3.9).
+enum ProcessStepMode {
+  MANUAL
+  ASSISTED
+  AUTOMATED
 }
 
 enum ProcessVersionStatus {

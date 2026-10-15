@@ -14,6 +14,7 @@ import {
   ProcessVersionConflictError,
   type ProcessInput,
 } from "@/lib/app-domain/processes";
+import { startProcessRun } from "@/lib/app-domain/process-runs";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 
 // Org brain, phase 1: processes and their procedures on the client screen
@@ -134,4 +135,12 @@ export async function linkProcessDatesAction(_prev: FormState | undefined, f: Fo
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
   return run(clientId, () => linkProcessDates(user, String(f.get("processId") ?? ""), list(f, "dateIds")));
+}
+
+export async function startProcessRunAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(f.get("clientId") ?? "");
+  const day = String(f.get("day") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return { error: "צריך תאריך לריצה." };
+  return run(clientId, () => startProcessRun(user, String(f.get("processId") ?? ""), new Date(`${day}T00:00:00Z`)));
 }
