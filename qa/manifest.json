@@ -223,6 +223,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
+    "api:/api/security-txt": {
+      "kind": "api",
+      "area": "api",
+      "risk": "low",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "public static text; the risk is staleness, guarded by the Expires test"
+    },
     "api:/api/mcp/oauth/metadata/authorization-server": {
       "kind": "api",
       "area": "mcp",

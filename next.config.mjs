@@ -94,6 +94,10 @@ const nextConfig = {
   // 404 that reads like a discovery bug rather than a routing one.
   async rewrites() {
     return [
+      // RFC 9116: where to report a vulnerability. The top-level path is
+      // the RFC's legacy fallback, still probed by some scanners.
+      { source: '/.well-known/security.txt', destination: '/api/security-txt' },
+      { source: '/security.txt', destination: '/api/security-txt' },
       {
         source: '/.well-known/oauth-authorization-server',
         destination: '/api/mcp/oauth/metadata/authorization-server',
