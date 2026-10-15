@@ -22,6 +22,8 @@ import {
   lookupTask,
   lookupTaskById,
   lookupTeamMember,
+  autoPickCategory,
+  taskCategoryInfo,
   teamMembers,
   usableCategories,
 } from "@/lib/mcp/lookup";
@@ -51,6 +53,7 @@ import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
 import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
 import { appBaseUrl } from "@/lib/email-templates";
+import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
@@ -755,11 +758,16 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Open a task",
       description:
-        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying. The result includes the new task's `url` in the Ankora app (staff sign-in required, not for clients); quote it exactly when the user asks for a link to what was opened.",
+        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying. Every task gets a category, because a timer cannot run on a task without one: when the user did not name a category, do not ask them for it - pass the one you judge fits best if you know this client's categories, or omit it and Ankora picks one from the task's wording and how similar work was filed. The result includes the new task's `url` in the Ankora app (staff sign-in required, not for clients). After creating, always tell the user which category the task got (say it was chosen automatically when `categoryAutoPicked` is true, so they know they can change it) and give them the `url`, quoted exactly.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
-        category: z.string().optional().describe("Category name. Omit unless the user named one."),
+        category: z
+          .string()
+          .optional()
+          .describe(
+            "Category name: the one the user named, or the one you judge fits best. Never ask the user for it. Omit it and Ankora chooses one automatically and says which in `category`."
+          ),
         assignTo: z
           .string()
           .optional()
@@ -832,11 +840,22 @@ export function registerAnkoraTools(server: McpServer): void {
 
         let categoryId: string | null = null;
         let categoryName: string | null = null;
+        let autoCategory: CategoryPick | null = null;
         if (args.category) {
           const category = await lookupCategory(actor, client.value.id, args.category);
           if (!category.ok) return toolText(category.message);
           categoryId = category.value.id;
           categoryName = category.value.name;
+        } else {
+          // 15.10.2026 (Ariel): never leave it empty. A task without a
+          // category cannot be timed, so the user would have to open the
+          // app and fill it in before starting work. Picked here, reported
+          // in the answer, and one click to change from the task's link.
+          autoCategory = await autoPickCategory(actor, client.value.id, [args.title, args.details ?? ""].join("\n"));
+          if (autoCategory) {
+            categoryId = autoCategory.id;
+            categoryName = autoCategory.name;
+          }
         }
 
         let assignedToId: string | null = null;
@@ -901,6 +920,8 @@ export function registerAnkoraTools(server: McpServer): void {
           title: task.title,
           client: client.value.name,
           category: categoryName,
+          categoryAutoPicked: autoCategory !== null,
+          ...(autoCategory ? { categoryNote: describePick(autoCategory) } : {}),
           assignedTo: assigneeName,
           supervisor: supervisorName,
           requiresApproval: task.requiresApproval,
@@ -923,7 +944,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update a task",
       description:
-        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal.",
+        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal. A task that still has no category gets one chosen automatically with any change (a timer cannot run without it); when `categoryAutoPicked` is true, tell the user which category was set. Always give the user the task's `url`, quoted exactly.",
       inputSchema: z.object({
         task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
         taskId: z
@@ -942,7 +963,10 @@ export function registerAnkoraTools(server: McpServer): void {
             "New status. PENDING_APPROVAL means the work is finished and waiting for the supervisor to sign it off; DONE means finished; ARCHIVED means dropped without being done. A task that requires approval reaches DONE only from PENDING_APPROVAL, and only its supervisor may make that move."
           ),
         title: z.string().min(1).optional().describe("New title, replacing the old one."),
-        category: z.string().optional().describe("New category for the task."),
+        category: z
+          .string()
+          .optional()
+          .describe("New category for the task. Omit to keep the current one; a task with none gets one chosen automatically."),
         assignTo: z.string().optional().describe("Colleague's name or email to hand it to."),
         clearAssignee: z.boolean().optional().describe("Remove the current owner, leaving it unassigned."),
         due: DATE.optional().describe("New due date, YYYY-MM-DD."),
@@ -1108,10 +1132,12 @@ export function registerAnkoraTools(server: McpServer): void {
         if (args.clearWaiting) patch.block = null;
         if (args.waitingOn) patch.block = { on: args.waitingOn, reason: args.waitingReason ?? null };
 
+        let categoryName: string | null = null;
         if (args.category !== undefined) {
           const category = await lookupCategory(actor, taskClientId, args.category);
           if (!category.ok) return toolText(category.message);
           patch.categoryId = category.value.id;
+          categoryName = category.value.name;
         }
         if (args.assignTo !== undefined) {
           const person = await lookupAssignee(actor, taskClientId, args.assignTo);
@@ -1135,6 +1161,24 @@ export function registerAnkoraTools(server: McpServer): void {
           );
         }
 
+        // 15.10.2026 (Ariel): a task that reached this point without a
+        // category - opened before create_task filled one in, or in the
+        // app - gets one now, alongside whatever else was asked. Only after
+        // the "nothing to change" check, so it never becomes a write of its
+        // own. Steps are checklist lines, not timed work, and keep none.
+        let autoCategory: CategoryPick | null = null;
+        if (args.category === undefined) {
+          const info = await taskCategoryInfo(found.value.id);
+          if (info && !info.categoryId && !info.parentId) {
+            const text = [args.title ?? info.title, args.details ?? info.description ?? ""].join("\n");
+            autoCategory = await autoPickCategory(actor, taskClientId, text);
+            if (autoCategory) {
+              patch.categoryId = autoCategory.id;
+              categoryName = autoCategory.name;
+            }
+          }
+        }
+
         const updated = await updateTask(actor, found.value.id, patch);
         return toolJson({
           updated: true,
@@ -1144,6 +1188,9 @@ export function registerAnkoraTools(server: McpServer): void {
           status: updated.status,
           client: found.value.clientName,
           changed: Object.keys(patch),
+          ...(categoryName ? { category: categoryName } : {}),
+          categoryAutoPicked: autoCategory !== null,
+          ...(autoCategory ? { categoryNote: describePick(autoCategory) } : {}),
         });
       } catch (err) {
         console.error("[mcp] update_task failed", err);

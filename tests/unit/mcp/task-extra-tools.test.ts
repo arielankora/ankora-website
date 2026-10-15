@@ -34,6 +34,8 @@ const decisions = vi.hoisted(() => ({
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
+  autoPickCategory: vi.fn(async (): Promise<unknown> => null),
+  taskCategoryInfo: vi.fn(async (): Promise<unknown> => null),
   lookupTeamMember: vi.fn(),
   lookupAssignee: vi.fn(),
   lookupTask: vi.fn(),
@@ -708,5 +710,93 @@ describe("create_decision linked by task id", () => {
     });
     expect(out.text ?? "").not.toMatch(/markTaskWaiting needs/);
     expect(decisions.createDecision).toHaveBeenCalled();
+  });
+});
+
+// 15.10.2026 (Ariel): a task opened through Claude without a category
+// could not be timed. Ankora now picks one, says which, and links the task.
+describe("a task always gets a category", () => {
+  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const };
+
+  it("create_task picks one when the user named none, and says it was automatic", async () => {
+    lookup.autoPickCategory.mockResolvedValueOnce(PICK);
+    const out = await call("create_task", { client: "NUX", title: "העברה בנקאית לספק", details: "חשבונית 112" });
+
+    expect(lookup.autoPickCategory).toHaveBeenCalledWith(ACTOR, "c-nux", "העברה בנקאית לספק\nחשבונית 112");
+    expect(tasks.createTask.mock.calls[0][1]).toMatchObject({ categoryId: "cat-bank" });
+    expect(out.category).toBe("בנקאות ותשלומים");
+    expect(out.categoryAutoPicked).toBe(true);
+    expect(out.categoryNote).toContain("Chosen automatically");
+    expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t-new");
+  });
+
+  it("create_task uses the named category and does not second-guess it", async () => {
+    lookup.lookupCategory.mockResolvedValueOnce({ ok: true, value: { id: "cat-hr", name: "גיוס וhr" } });
+    const out = await call("create_task", { client: "NUX", title: "x", category: "גיוס" });
+
+    expect(lookup.autoPickCategory).not.toHaveBeenCalled();
+    expect(out.category).toBe("גיוס וhr");
+    expect(out.categoryAutoPicked).toBe(false);
+    expect(out).not.toHaveProperty("categoryNote");
+  });
+
+  it("create_task still opens the task when the client has no category at all", async () => {
+    const out = await call("create_task", { client: "NUX", title: "x" });
+    expect(out.created).toBe(true);
+    expect(out.category).toBeNull();
+    expect(out.categoryAutoPicked).toBe(false);
+  });
+
+  it("the tool tells the model not to ask, and to report the category and the link", () => {
+    const description = tools.get("create_task")!.config.description as string;
+    expect(description).toContain("do not ask them for it");
+    expect(description).toContain("`url`");
+  });
+
+  describe("update_task", () => {
+    beforeEach(() => {
+      tasks.updateTask.mockResolvedValue({ id: "t1", title: "x", status: "IN_PROGRESS" });
+    });
+
+    it("fills a missing category alongside the requested change", async () => {
+      lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: null, parentId: null, title: "העברה בנקאית", description: null });
+      lookup.autoPickCategory.mockResolvedValueOnce(PICK);
+
+      const out = await call("update_task", { task: "x", priority: "HIGH" });
+
+      expect(lookup.autoPickCategory).toHaveBeenCalledWith(ACTOR, "c-nux", "העברה בנקאית\n");
+      expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { priority: "HIGH", categoryId: "cat-bank" });
+      expect(out.category).toBe("בנקאות ותשלומים");
+      expect(out.categoryAutoPicked).toBe(true);
+      expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t1");
+    });
+
+    it("picks by the new title when the same call renames the task", async () => {
+      lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: null, parentId: null, title: "old", description: "d" });
+      await call("update_task", { task: "x", title: "גבייה מלקוח" });
+      expect(lookup.autoPickCategory).toHaveBeenCalledWith(ACTOR, "c-nux", "גבייה מלקוח\nd");
+    });
+
+    it("leaves an existing category alone", async () => {
+      lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: "cat-x", parentId: null, title: "x", description: null });
+      const out = await call("update_task", { task: "x", priority: "HIGH" });
+      expect(lookup.autoPickCategory).not.toHaveBeenCalled();
+      expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { priority: "HIGH" });
+      expect(out.categoryAutoPicked).toBe(false);
+    });
+
+    it("does not file a step under a category", async () => {
+      lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: null, parentId: "t-parent", title: "x", description: null });
+      await call("update_task", { task: "x", priority: "HIGH" });
+      expect(lookup.autoPickCategory).not.toHaveBeenCalled();
+    });
+
+    it("never turns an empty call into a write of its own", async () => {
+      lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: null, parentId: null, title: "x", description: null });
+      const out = await call("update_task", { task: "x" });
+      expect(out.text).toContain("Nothing to change");
+      expect(tasks.updateTask).not.toHaveBeenCalled();
+      expect(lookup.taskCategoryInfo).not.toHaveBeenCalled();
+    });
   });
 });

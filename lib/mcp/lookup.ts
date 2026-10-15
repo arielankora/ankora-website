@@ -7,6 +7,7 @@ import { listUsers } from "@/lib/app-domain/users";
 import { OPEN_STATUSES, assignableUsers, listTasks } from "@/lib/app-domain/tasks";
 import { describeResolveFailure, resolveByName, normalizeName } from "@/lib/mcp/resolve";
 import { prisma } from "@/lib/prisma";
+import { pickCategory, type CategoryPick, type PickCandidate, type PickHistory } from "@/lib/mcp/category-pick";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
 // says into the ids the domain layer wants.
@@ -80,6 +81,78 @@ export async function usableCategories(clientId: string) {
       name: c.name,
       scope: c.visibility === "GLOBAL" ? "all clients" : "this client",
     }));
+}
+
+/// Picks a category for a task that has none (15.10.2026). See
+/// lib/mcp/category-pick.ts for why and how; this supplies the data.
+///
+/// Evidence is limited to what this actor may already see: earlier tasks
+/// on the clients they work with, and time-entry notes on this client.
+/// The pick can quote one of them back as its reason, so it must never
+/// reach across a client the actor has no access to.
+///
+/// Null only when the client has no usable category at all.
+export async function autoPickCategory(actor: User, clientId: string, text: string): Promise<CategoryPick | null> {
+  const all = await listCategories();
+  const usable = all.filter((c: CategoryRow) => c.active && (c.visibility === "GLOBAL" || c.clientId === clientId));
+  if (usable.length === 0) return null;
+  const candidates: PickCandidate[] = usable.map((c: CategoryRow & { description?: string | null }) => ({
+    id: c.id,
+    name: c.name,
+    description: c.description ?? null,
+  }));
+  const usableIds = candidates.map((c) => c.id);
+
+  const accessible: Named[] = await listAccessibleClients(actor);
+  const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
+
+  const [tasks, notes, usage] = await Promise.all([
+    prisma.task.findMany({
+      where: {
+        deletedAt: null,
+        parentId: null,
+        categoryId: { in: usableIds },
+        clientId: { in: accessible.map((c) => c.id) },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 400,
+      select: { categoryId: true, title: true },
+    }),
+    prisma.timeEntry.findMany({
+      where: { deletedAt: null, clientId, categoryId: { in: usableIds }, note: { not: null } },
+      orderBy: { startAt: "desc" },
+      take: 300,
+      select: { categoryId: true, note: true },
+    }),
+    prisma.timeEntry.groupBy({
+      by: ["categoryId"],
+      where: { deletedAt: null, clientId, startAt: { gte: since } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  const history: PickHistory[] = [
+    ...tasks.map((t: { categoryId: string | null; title: string }) => ({ categoryId: t.categoryId as string, text: t.title })),
+    ...notes.map((n: { categoryId: string; note: string | null }) => ({ categoryId: n.categoryId, text: n.note ?? "" })),
+  ];
+  const clientUsage = new Map<string, number>(
+    usage.map((u: { categoryId: string; _count: { _all: number } }) => [u.categoryId, u._count._all])
+  );
+
+  return pickCategory({ text, candidates, history, clientUsage });
+}
+
+/// What update_task needs to know to fill a missing category: whether the
+/// task has one, and the words to pick by. Called only after the task was
+/// resolved through lookupTask/lookupTaskById, which already checked the
+/// actor's access, so it reads by id alone.
+export async function taskCategoryInfo(
+  taskId: string
+): Promise<{ categoryId: string | null; parentId: string | null; title: string; description: string | null } | null> {
+  return prisma.task.findFirst({
+    where: { id: taskId, deletedAt: null },
+    select: { categoryId: true, parentId: true, title: true, description: true },
+  });
 }
 
 /// Whether this actor may see other people's time at all.
