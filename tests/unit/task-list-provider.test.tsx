@@ -79,7 +79,14 @@ function Rows() {
 
 function renderList(
   rows: ListRow[],
-  filters: { status?: string; clientId?: string; clientName?: string; involvedUserId?: string } = {},
+  filters: {
+    status?: string;
+    clientId?: string;
+    clientName?: string;
+    involvedUserId?: string;
+    assignedToId?: string;
+    supervisorId?: string;
+  } = {},
   created?: ListRow
 ) {
   return render(
@@ -174,6 +181,30 @@ describe("a row that does not belong is not shown", () => {
     renderList(
       [],
       { involvedUserId: "me" },
+      row({ id: "new", title: "חדשה", assignedToId: "someone-else", supervisorId: "me" })
+    );
+    expect(screen.getByText("חדשה")).toBeDefined();
+  });
+
+  // 15.10.2026: each half of "שלי" on its own.
+  it("drops one I only supervise under \"לביצוע\"", () => {
+    renderList(
+      [],
+      { assignedToId: "me" },
+      row({ id: "new", title: "חדשה", assignedToId: "someone-else", supervisorId: "me" })
+    );
+    expect(screen.queryByText("חדשה")).toBeNull();
+  });
+
+  it("drops one I only carry under \"בפיקוח\"", () => {
+    renderList([], { supervisorId: "me" }, row({ id: "new", title: "חדשה", assignedToId: "me" }));
+    expect(screen.queryByText("חדשה")).toBeNull();
+  });
+
+  it("keeps one I supervise under \"בפיקוח\"", () => {
+    renderList(
+      [],
+      { supervisorId: "me" },
       row({ id: "new", title: "חדשה", assignedToId: "someone-else", supervisorId: "me" })
     );
     expect(screen.getByText("חדשה")).toBeDefined();
