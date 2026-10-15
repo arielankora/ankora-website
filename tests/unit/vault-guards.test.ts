@@ -34,8 +34,14 @@ describe("credentials vault guards", () => {
     const touching = SOURCE.filter((f) => /secretCiphertext|wrappedDek/.test(read(f)));
     // backup-coverage.ts names them only to record why dumping the
     // ciphertext is safe; the dump copies rows without reading meaning
-    // into any column.
-    expect(touching.sort()).toEqual(["lib/app-domain/backup-coverage.ts", "lib/app-domain/credentials.ts"]);
+    // into any column. vault-rewrap.ts replaces the wrapped data key during
+    // a key rotation; it opens a secret only to prove the row is whole and
+    // never returns, logs or stores what it read.
+    expect(touching.sort()).toEqual([
+      "lib/app-domain/backup-coverage.ts",
+      "lib/app-domain/credentials.ts",
+      "lib/app-domain/vault-rewrap.ts",
+    ]);
   });
 
   it("gives Claude (MCP) no route to the vault at all", () => {

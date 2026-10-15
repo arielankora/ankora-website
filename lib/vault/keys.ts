@@ -159,13 +159,28 @@ interface KeyRing {
 
 /// Read at call time, not module load, so tests can switch environments.
 function keyRing(): KeyRing {
+  const candidates: [string | undefined, () => KeyProvider][] = [
+    [process.env.GCP_VAULT_KMS_KEY, () => kmsProvider(process.env.GCP_VAULT_KMS_KEY!)],
+    [process.env.VAULT_KEK_NEXT, () => envProvider(process.env.VAULT_KEK_NEXT!, "VAULT_KEK_NEXT")],
+    [process.env.VAULT_KEK, () => envProvider(process.env.VAULT_KEK!)],
+  ];
   const readers: KeyProvider[] = [];
-  const kmsKey = process.env.GCP_VAULT_KMS_KEY;
-  if (kmsKey) readers.push(kmsProvider(kmsKey));
-  const nextKey = process.env.VAULT_KEK_NEXT;
-  if (nextKey) readers.push(envProvider(nextKey, "VAULT_KEK_NEXT"));
-  const envKey = process.env.VAULT_KEK;
-  if (envKey) readers.push(envProvider(envKey));
+  for (const [value, build] of candidates) {
+    if (!value) continue;
+    if (readers.length === 0) {
+      // The writer must be valid: a bad key there is a refusal, not a
+      // fallback to an older key.
+      readers.push(build());
+      continue;
+    }
+    // An older key that does not build (say, the public CI value left in
+    // VAULT_KEK beside a production KMS key) simply opens nothing.
+    try {
+      readers.push(build());
+    } catch {
+      /* skipped on purpose */
+    }
+  }
   if (readers.length === 0) throw new VaultUnavailableError();
   return { writer: readers[0], readers };
 }

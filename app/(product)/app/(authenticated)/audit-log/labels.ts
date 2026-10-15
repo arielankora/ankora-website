@@ -240,6 +240,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "credential.reveal_denied": "ניסיון צפייה בפרטי גישה שנחסם",
   "credential.stepup_failed": "אימות זהות שנכשל",
   "credential.exposure_report": "הפקת דוח גישות שנצפו",
+  "vault.rewrap": "העברת הכספת למפתח חדש",
   "passkey.create": "הוספת passkey",
   "passkey.delete": "הסרת passkey",
 };
