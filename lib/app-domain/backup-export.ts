@@ -9,6 +9,12 @@ import { uploadFileToDriveFolder, DRIVE_FOLDER_EXCEL_REPORTS, DRIVE_FOLDER_DB_DU
 import { buildDump, prismaExecutor, totalRows, largestTables } from "@/lib/app-domain/backup-dump";
 import { DUMP_SIZE_WARN_BYTES, DUMP_EMAIL_ATTACH_MAX_BYTES } from "@/lib/app-domain/backup-coverage";
 import {
+  sweepBackupFolder,
+  NIGHTLY_EXCEL_NAME,
+  NIGHTLY_DUMP_NAME,
+  type RetentionSweepResult,
+} from "@/lib/app-domain/backup-retention";
+import {
   CLIENTS_SHEET_NAME,
   CLIENTS_SHEET_HEADERS,
   TIME_ENTRIES_SHEET_NAME,
@@ -95,6 +101,7 @@ interface NightlyExportResult {
     excel: { ok: boolean; fileId?: string; error?: string };
     dbDump: { ok: boolean; fileId?: string; error?: string };
   };
+  retention?: { excel: RetentionSweepResult; dbDump: RetentionSweepResult };
   dump?: {
     tables: number;
     rows: number;
@@ -255,6 +262,27 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
     if (!driveExcel.ok) console.error("Drive upload (Excel report) failed:", driveExcel.error);
     if (!driveDump.ok) console.error("Drive upload (DB dump) failed:", driveDump.error);
 
+    // Retention: Drive keeps 35 days of backups, not forever. See
+    // lib/app-domain/backup-retention.ts for the rules that keep this sweep
+    // from deleting the only backups there are. Runs after the uploads, so
+    // tonight's file is already counted among the ones it must keep.
+    const [retentionExcel, retentionDump] = await Promise.all([
+      sweepBackupFolder({
+        folderId: DRIVE_FOLDER_EXCEL_REPORTS,
+        namePattern: NIGHTLY_EXCEL_NAME,
+        uploadSucceededTonight: driveExcel.ok,
+        now,
+      }),
+      sweepBackupFolder({
+        folderId: DRIVE_FOLDER_DB_DUMPS,
+        namePattern: NIGHTLY_DUMP_NAME,
+        uploadSucceededTonight: driveDump.ok,
+        now,
+      }),
+    ]);
+    if (!retentionExcel.ok) console.error("Backup retention (Excel folder) failed:", retentionExcel.error);
+    if (!retentionDump.ok) console.error("Backup retention (dump folder) failed:", retentionDump.error);
+
     await prisma.emailDelivery.create({
       data: {
         // Neither an alert nor a per-client ReportRun (this is a whole-
@@ -279,6 +307,7 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
         ok: result.ok,
         counts,
         drive: { excel: driveExcel.ok, dbDump: driveDump.ok },
+        retention: { excel: retentionExcel, dbDump: retentionDump },
         dump: {
           tables: Object.keys(dump.tables).length,
           rows: totalRows(dump),
@@ -294,6 +323,7 @@ export async function sendNightlyDataExport(now: Date = new Date()): Promise<Nig
       counts,
       error: result.error,
       drive: { excel: driveExcel, dbDump: driveDump },
+      retention: { excel: retentionExcel, dbDump: retentionDump },
       dump: {
         tables: Object.keys(dump.tables).length,
         rows: totalRows(dump),

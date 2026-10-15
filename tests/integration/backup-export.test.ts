@@ -15,13 +15,15 @@ vi.mock("@/lib/email", () => ({ sendEmail: vi.fn() }));
 
 vi.mock("@/lib/google-drive", () => ({
   uploadFileToDriveFolder: vi.fn(),
+  listFilesInFolder: vi.fn(),
+  removeDriveFile: vi.fn(),
   DRIVE_FOLDER_EXCEL_REPORTS: "excel-folder",
   DRIVE_FOLDER_DB_DUMPS: "dump-folder",
 }));
 
 import { gunzipSync } from "node:zlib";
 import { sendEmail } from "@/lib/email";
-import { uploadFileToDriveFolder } from "@/lib/google-drive";
+import { uploadFileToDriveFolder, listFilesInFolder, removeDriveFile } from "@/lib/google-drive";
 import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
 import { dumpedTables, REDACTED_PASSWORD_HASH } from "@/lib/app-domain/backup-coverage";
 
@@ -41,6 +43,10 @@ beforeEach(() => {
   vi.mocked(sendEmail).mockResolvedValue({ ok: true, providerMessageId: "test-message-id" });
   vi.mocked(uploadFileToDriveFolder).mockReset();
   vi.mocked(uploadFileToDriveFolder).mockResolvedValue({ ok: true, fileId: "test-file-id" });
+  vi.mocked(listFilesInFolder).mockReset();
+  vi.mocked(listFilesInFolder).mockResolvedValue({ ok: true, files: [] });
+  vi.mocked(removeDriveFile).mockReset();
+  vi.mocked(removeDriveFile).mockResolvedValue({ ok: true, how: "deleted" });
 });
 
 async function seedOneOfEach() {
@@ -96,6 +102,23 @@ describe("sendNightlyDataExport()", () => {
     expect(result.ok).toBe(true);
     expect(result.drive?.excel.ok).toBe(false);
     expect(result.drive?.dbDump.ok).toBe(false);
+  });
+
+  it("sweeps both backup folders after a good night, and neither after a bad one", async () => {
+    await seedOneOfEach();
+
+    await sendNightlyDataExport(new Date("2026-03-15T02:00:00Z"));
+    expect(vi.mocked(listFilesInFolder).mock.calls.map((c) => c[0]).sort()).toEqual(["dump-folder", "excel-folder"]);
+
+    // Retention must never run on the night the upload failed: the old
+    // files may be the only backups there are.
+    vi.mocked(listFilesInFolder).mockClear();
+    vi.mocked(uploadFileToDriveFolder).mockResolvedValue({ ok: false, error: "drive is down" });
+    const result = await sendNightlyDataExport(new Date("2026-03-16T02:00:00Z"));
+    expect(listFilesInFolder).not.toHaveBeenCalled();
+    expect(removeDriveFile).not.toHaveBeenCalled();
+    expect(result.retention?.excel.skipped).toBeTruthy();
+    expect(result.retention?.dbDump.skipped).toBeTruthy();
   });
 
   it("dumps every table the coverage map claims, with nothing to report", async () => {

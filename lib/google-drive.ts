@@ -331,3 +331,97 @@ export async function downloadFileFromDrive(fileId: string): Promise<DriveDownlo
     return { ok: false, error: err instanceof Error ? err.message : "Unknown error downloading from Drive" };
   }
 }
+
+export interface DriveFileSummary {
+  id: string;
+  name: string;
+  createdTime: string;
+}
+
+export interface DriveListResult {
+  ok: boolean;
+  files?: DriveFileSummary[];
+  error?: string;
+}
+
+/// Every non-trashed file directly inside one folder, oldest first.
+///
+/// Used by the backup retention sweep (lib/app-domain/backup-retention.ts),
+/// which needs to see the whole folder to decide what is old enough to go.
+/// `corpora=allDrives` + `includeItemsFromAllDrives` are required for the
+/// same reason `supportsAllDrives` is on the upload: the backup folders sit
+/// in a Shared drive, and without them the listing comes back empty rather
+/// than failing, which would make the sweep silently do nothing.
+export async function listFilesInFolder(folderId: string): Promise<DriveListResult> {
+  const tokenResult = await getAccessToken();
+  if (!tokenResult.ok) return { ok: false, error: tokenResult.error };
+
+  const files: DriveFileSummary[] = [];
+  let pageToken: string | undefined;
+  try {
+    do {
+      const params = new URLSearchParams({
+        q: `'${folderId}' in parents and trashed = false`,
+        fields: "nextPageToken,files(id,name,createdTime)",
+        orderBy: "createdTime",
+        pageSize: "1000",
+        corpora: "allDrives",
+        includeItemsFromAllDrives: "true",
+        supportsAllDrives: "true",
+      });
+      if (pageToken) params.set("pageToken", pageToken);
+      const res = await fetch(`${DOWNLOAD_URL}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${tokenResult.token}` },
+      });
+      if (!res.ok) {
+        return { ok: false, error: `Drive list failed ${res.status}: ${await res.text()}` };
+      }
+      const page = (await res.json()) as { files?: DriveFileSummary[]; nextPageToken?: string };
+      files.push(...(page.files ?? []));
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    return { ok: true, files };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error listing Drive folder" };
+  }
+}
+
+export interface DriveRemoveResult {
+  ok: boolean;
+  /// "deleted" = gone for good. "trashed" = in the Shared drive's trash,
+  /// which Google empties on its own after 30 days.
+  how?: "deleted" | "trashed";
+  error?: string;
+}
+
+/// Removes one file, permanently if the service account is allowed to.
+///
+/// In a Shared drive only a Manager may delete outright; a Content manager
+/// may only move to trash. The service account is a Content manager today
+/// (see the header of this file), so the permanent delete is attempted
+/// first and a 403 falls back to trash. Either way the file stops being a
+/// live copy of client data, and the result says which happened so the
+/// audit log does not overstate it.
+export async function removeDriveFile(fileId: string): Promise<DriveRemoveResult> {
+  const tokenResult = await getAccessToken();
+  if (!tokenResult.ok) return { ok: false, error: tokenResult.error };
+  const url = `${DOWNLOAD_URL}/${encodeURIComponent(fileId)}?supportsAllDrives=true`;
+  const headers = { Authorization: `Bearer ${tokenResult.token}` };
+
+  try {
+    const del = await fetch(url, { method: "DELETE", headers });
+    if (del.ok) return { ok: true, how: "deleted" };
+    if (del.status !== 403) {
+      return { ok: false, error: `Drive delete failed ${del.status}: ${await del.text()}` };
+    }
+    const trash = await fetch(url, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ trashed: true }),
+    });
+    if (trash.ok) return { ok: true, how: "trashed" };
+    return { ok: false, error: `Drive trash failed ${trash.status}: ${await trash.text()}` };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error removing Drive file" };
+  }
+}

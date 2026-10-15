@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getVercelOidcToken } from "@vercel/oidc";
-import { uploadFileToDriveFolder, DRIVE_FOLDER_EXCEL_REPORTS, DRIVE_FOLDER_DB_DUMPS } from "@/lib/google-drive";
+import {
+  uploadFileToDriveFolder,
+  listFilesInFolder,
+  removeDriveFile,
+  DRIVE_FOLDER_EXCEL_REPORTS,
+  DRIVE_FOLDER_DB_DUMPS,
+} from "@/lib/google-drive";
 
 // Vercel hands the OIDC token to the running function through the request
 // context, which only exists inside a real invocation - so it is mocked
@@ -205,5 +211,95 @@ describe("google-drive", () => {
     expect(bodyText).toContain(DRIVE_FOLDER_DB_DUMPS);
     expect(bodyText).toContain("ankora-database-dump-2026-09-21.json.gz");
     expect(bodyText).toContain("gzipped-content-stand-in");
+  });
+});
+
+describe("google-drive retention helpers", () => {
+  const originalFetch = global.fetch;
+  const originalEnv = { ...process.env };
+
+  beforeEach(() => {
+    process.env.GCP_PROJECT_NUMBER = "1234567890";
+    process.env.GCP_WORKLOAD_IDENTITY_POOL_ID = "test-pool";
+    process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID = "test-provider";
+    process.env.GCP_SERVICE_ACCOUNT_EMAIL = "test@example.iam.gserviceaccount.com";
+    mockedGetToken.mockResolvedValue(FAKE_OIDC_TOKEN as any);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env = { ...originalEnv };
+    vi.mocked(getVercelOidcToken).mockReset();
+  });
+
+  /// Answers the two token calls, then hands Drive calls to `drive`.
+  function fakeGoogle(drive: (url: string, init: any) => Response) {
+    const calls: { url: string; init: any }[] = [];
+    global.fetch = vi.fn(async (url: any, init: any) => {
+      const u = String(url);
+      if (u.includes("sts.googleapis.com")) return new Response(JSON.stringify({ access_token: "f" }), { status: 200 });
+      if (u.includes("iamcredentials.googleapis.com")) {
+        return new Response(JSON.stringify({ accessToken: "sa" }), { status: 200 });
+      }
+      calls.push({ url: u, init });
+      return drive(u, init);
+    }) as any;
+    return calls;
+  }
+
+  it("lists a Shared-drive folder across every page", async () => {
+    const calls = fakeGoogle((url) => {
+      const page = new URL(url).searchParams.get("pageToken");
+      return page
+        ? new Response(JSON.stringify({ files: [{ id: "b", name: "b", createdTime: "2026-01-02T00:00:00Z" }] }), { status: 200 })
+        : new Response(
+            JSON.stringify({ files: [{ id: "a", name: "a", createdTime: "2026-01-01T00:00:00Z" }], nextPageToken: "p2" }),
+            { status: 200 },
+          );
+    });
+
+    const result = await listFilesInFolder(DRIVE_FOLDER_DB_DUMPS);
+
+    expect(result.ok).toBe(true);
+    expect(result.files?.map((f) => f.id)).toEqual(["a", "b"]);
+    const params = new URL(calls[0].url).searchParams;
+    // Without these, a Shared-drive folder lists as empty instead of failing.
+    expect(params.get("supportsAllDrives")).toBe("true");
+    expect(params.get("includeItemsFromAllDrives")).toBe("true");
+    expect(params.get("corpora")).toBe("allDrives");
+    expect(params.get("q")).toBe(`'${DRIVE_FOLDER_DB_DUMPS}' in parents and trashed = false`);
+  });
+
+  it("returns ok:false (never throws) when the listing fails", async () => {
+    fakeGoogle(() => new Response("nope", { status: 500 }));
+    const result = await listFilesInFolder(DRIVE_FOLDER_DB_DUMPS);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Drive list failed 500/);
+  });
+
+  it("deletes permanently when allowed", async () => {
+    const calls = fakeGoogle(() => new Response(null, { status: 204 }));
+    const result = await removeDriveFile("file-1");
+    expect(result).toEqual({ ok: true, how: "deleted" });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].init.method).toBe("DELETE");
+    expect(calls[0].url).toContain("supportsAllDrives=true");
+  });
+
+  it("falls back to trash when only a Content manager", async () => {
+    const calls = fakeGoogle((_url, init) =>
+      init.method === "DELETE" ? new Response("forbidden", { status: 403 }) : new Response("{}", { status: 200 }),
+    );
+    const result = await removeDriveFile("file-1");
+    expect(result).toEqual({ ok: true, how: "trashed" });
+    expect(calls.map((c) => c.init.method)).toEqual(["DELETE", "PATCH"]);
+    expect(JSON.parse(calls[1].init.body)).toEqual({ trashed: true });
+  });
+
+  it("does not try trash after a failure that is not a permission refusal", async () => {
+    const calls = fakeGoogle(() => new Response("gone", { status: 404 }));
+    const result = await removeDriveFile("file-1");
+    expect(result.ok).toBe(false);
+    expect(calls).toHaveLength(1);
   });
 });
