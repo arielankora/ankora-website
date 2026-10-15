@@ -13,6 +13,9 @@ const brief = vi.hoisted(() => ({ extractionBrief: vi.fn() }));
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
+  autoPickCategory: vi.fn(async (): Promise<unknown> => null),
+  taskCategoryInfo: vi.fn(async (): Promise<unknown> => null),
+  usableCategoryById: vi.fn(async (): Promise<unknown> => null),
   lookupTeamMember: vi.fn(),
   lookupAssignee: vi.fn(),
   lookupTask: vi.fn(),

@@ -40,6 +40,9 @@ const domain = vi.hoisted(() => ({
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
+  autoPickCategory: vi.fn(async (): Promise<unknown> => null),
+  taskCategoryInfo: vi.fn(async (): Promise<unknown> => null),
+  usableCategoryById: vi.fn(async (): Promise<unknown> => null),
   lookupTeamMember: vi.fn(),
   // Phase 16 (tasks). These two are separate from lookupTeamMember on
   // purpose - see lib/mcp/lookup.ts on why assigning work is gated more
@@ -643,5 +646,89 @@ describe("no tool tells the model to call another one first", () => {
     for (const name of ["list_my_clients", "list_categories", "list_assignable_people"]) {
       expect(tools.has(name), name).toBe(true);
     }
+  });
+});
+
+// 15.10.2026 (Ariel): a timer or an entry on a task takes the task's own
+// category, so "start a timer on X" needs nothing more.
+describe("time against a task takes the task's category", () => {
+  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const };
+  const start = (args: Record<string, unknown>) => tools.get("start_timer")!.handler(args, CTX).then(payload);
+
+  beforeEach(() => {
+    lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c1", name: "Globex" } });
+    lookup.lookupTask.mockResolvedValue({ ok: true, value: { id: "t1", name: "העברה לספק", clientId: "c1", clientName: "Globex" } });
+    domain.startTimer.mockResolvedValue({ id: "e1", startAt: new Date("2026-10-15T09:00:00Z") });
+  });
+
+  it("uses the task's category when none was named", async () => {
+    lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: "cat-x", parentId: null, title: "העברה לספק", description: null });
+    lookup.usableCategoryById.mockResolvedValueOnce({ id: "cat-x", name: "Development" });
+
+    const out = await start({ client: "Globex", task: "העברה לספק" });
+
+    expect(lookup.lookupCategory).not.toHaveBeenCalled();
+    expect(domain.startTimer).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ categoryId: "cat-x", taskId: "t1" }));
+    expect(out).toMatchObject({ started: true, category: "Development", categoryFrom: "task" });
+    expect(tasks.updateTask).not.toHaveBeenCalled();
+  });
+
+  it("a named category still wins over the task's", async () => {
+    lookup.lookupCategory.mockResolvedValueOnce({ ok: true, value: { id: "cat-named", name: "Named" } });
+    const out = await start({ client: "Globex", task: "העברה לספק", category: "Named" });
+    expect(lookup.taskCategoryInfo).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ category: "Named", categoryFrom: "named" });
+  });
+
+  it("picks one for a task that has none, and saves it on the task", async () => {
+    lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: null, parentId: null, title: "העברה לספק", description: "בנק" });
+    lookup.autoPickCategory.mockResolvedValueOnce(PICK);
+
+    const out = await start({ client: "Globex", task: "העברה לספק" });
+
+    expect(lookup.autoPickCategory).toHaveBeenCalledWith(ACTOR, "c1", "העברה לספק\nבנק");
+    expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { categoryId: "cat-bank" });
+    expect(domain.startTimer).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ categoryId: "cat-bank" }));
+    expect(out).toMatchObject({ category: "בנקאות ותשלומים", categoryFrom: "auto", taskCategorySet: true });
+    expect(out.categoryNote).toContain("Chosen automatically");
+  });
+
+  it("does not overwrite a retired category on the task, but still runs", async () => {
+    lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: "cat-old", parentId: null, title: "x", description: null });
+    lookup.autoPickCategory.mockResolvedValueOnce(PICK);
+
+    const out = await start({ client: "Globex", task: "העברה לספק" });
+
+    expect(tasks.updateTask).not.toHaveBeenCalled();
+    expect(out).toMatchObject({ started: true, categoryFrom: "auto" });
+    expect(out).not.toHaveProperty("taskCategorySet");
+  });
+
+  it("refuses time with neither a category nor a task, and writes nothing", async () => {
+    const out = await start({ client: "Globex" });
+    expect(domain.startTimer).not.toHaveBeenCalled();
+    expect(out.text).toContain("name the task");
+  });
+
+  it("create_time_entry follows the same rule", async () => {
+    lookup.taskCategoryInfo.mockResolvedValueOnce({ categoryId: "cat-x", parentId: null, title: "x", description: null });
+    lookup.usableCategoryById.mockResolvedValueOnce({ id: "cat-x", name: "Development" });
+    domain.createManualEntry.mockResolvedValueOnce({
+      id: "e9",
+      startAt: new Date("2026-10-15T06:00:00Z"),
+      endAt: new Date("2026-10-15T07:00:00Z"),
+      actualSeconds: 3600,
+      billableSeconds: 3600,
+    });
+
+    const out = payload(
+      await tools.get("create_time_entry")!.handler(
+        { client: "Globex", task: "העברה לספק", date: "2026-10-15", start: "09:00", end: "10:00" },
+        CTX,
+      ),
+    );
+
+    expect(domain.createManualEntry).toHaveBeenCalledWith(ACTOR, ACTOR.id, expect.objectContaining({ categoryId: "cat-x", taskId: "t1" }));
+    expect(out).toMatchObject({ created: true, category: "Development", categoryFrom: "task" });
   });
 });
