@@ -71,6 +71,9 @@ export const ENTITY_TYPES = [
 export const ACTION_LABEL: Record<string, string> = {
   "login.success": "התחברות מוצלחת",
   "login.failure": "ניסיון התחברות כושל",
+  "login.passkey": "אימות דו-שלבי בכניסה",
+  "login.passkey_failure": "אימות דו-שלבי שנכשל בכניסה",
+  "user.login_passkey_required": "שינוי אימות דו-שלבי בכניסה",
   "password_reset.requested": "בקשת איפוס סיסמה",
   "password_reset.completed": "איפוס סיסמה הושלם",
   // Portal phase 0.
@@ -259,6 +262,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "vault.rewrap": "העברת הכספת למפתח חדש",
   "passkey.create": "הוספת passkey",
   "passkey.delete": "הסרת passkey",
+  "passkey.reset": "איפוס passkeys בידי מנהל",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

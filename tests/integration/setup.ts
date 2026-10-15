@@ -70,6 +70,7 @@ const TABLES = [
   // Credentials vault (6.10.2026). Before clients and users, both of
   // which it references.
   "step_up_grants",
+  "pending_logins",
   "webauthn_challenges",
   "passkeys",
   "client_credentials",

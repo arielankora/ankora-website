@@ -76,7 +76,7 @@ export async function requestLoginLink(identifier: string): Promise<{ devToken?:
 /// Verifies a link and, on success, burns it. Mirrors
 /// authenticateWithPassword's contract (an AuthenticatedUser or null) so
 /// auth.ts can hand it to a Credentials provider unchanged.
-export async function consumeLoginLink(raw: string): Promise<AuthenticatedUser | null> {
+export async function consumeLoginLink(raw: string): Promise<(AuthenticatedUser & { loginPasskeyRequired: boolean }) | null> {
   if (!raw) return null;
 
   const token = await prisma.portalLoginToken.findUnique({
@@ -120,5 +120,6 @@ export async function consumeLoginLink(raw: string): Promise<AuthenticatedUser |
     email: user.email,
     role: user.role,
     tokenVersion: user.tokenVersion,
+    loginPasskeyRequired: user.loginPasskeyRequired,
   };
 }

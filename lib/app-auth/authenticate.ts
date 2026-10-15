@@ -29,8 +29,12 @@ export type AuthenticatedUser = {
 // plumbing. auth.ts's Credentials provider is a thin wrapper around this.
 export async function authenticateWithPassword(
   rawIdentifier: string,
-  rawPassword: string
-): Promise<AuthenticatedUser | null> {
+  rawPassword: string,
+  // The sign-in screen passes false: with two-step sign-in the password is
+  // only the first step, and "login.success" is written when the sign-in
+  // actually completes (lib/app-auth/second-factor.ts).
+  opts: { recordSuccess?: boolean } = {}
+): Promise<(AuthenticatedUser & { loginPasskeyRequired: boolean }) | null> {
   const identifier = rawIdentifier.trim().toLowerCase();
   const password = rawPassword;
   if (!identifier || !password) return null;
@@ -95,7 +99,9 @@ export async function authenticateWithPassword(
   }
 
   await clearFailedLogins(user.id);
-  await recordAudit({ actorId: user.id, action: "login.success", entityType: "User", entityId: user.id });
+  if (opts.recordSuccess !== false) {
+    await recordAudit({ actorId: user.id, action: "login.success", entityType: "User", entityId: user.id });
+  }
 
   return {
     id: user.id,
@@ -103,5 +109,6 @@ export async function authenticateWithPassword(
     email: user.email,
     role: user.role,
     tokenVersion: user.tokenVersion,
+    loginPasskeyRequired: user.loginPasskeyRequired,
   };
 }

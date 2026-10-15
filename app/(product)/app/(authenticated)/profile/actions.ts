@@ -102,3 +102,20 @@ export async function removePasskeyAction(id: string): Promise<FormState> {
   revalidatePath("/app/profile");
   return { ok: true };
 }
+
+/// A client's "ask for a passkey at every sign-in" (lib/app-auth/second-factor.ts).
+export async function setLoginPasskeyRequiredAction(enabled: boolean, password: string): Promise<FormState> {
+  const user = await requireUser();
+  const { setOwnLoginPasskeyRequired, SecondFactorError } = await import("@/lib/app-auth/second-factor");
+  const { StepUpFailedError, StepUpLockedError } = await import("@/lib/app-auth/step-up");
+  try {
+    await setOwnLoginPasskeyRequired(user, Boolean(enabled), String(password ?? ""));
+  } catch (err) {
+    if (err instanceof SecondFactorError || err instanceof StepUpFailedError || err instanceof StepUpLockedError) {
+      return { error: err.message };
+    }
+    return { error: "אירעה שגיאה. נסו שוב." };
+  }
+  revalidatePath("/app/profile");
+  return { ok: true };
+}

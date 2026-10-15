@@ -6,10 +6,10 @@ import { NameForm } from "./NameForm";
 import { DailyDigestPreferenceForm, NotificationPreferenceForm } from "./NotificationPreferenceForm";
 import { getMyClaudeConnection } from "@/lib/app-domain/mcp-connections";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
-import { can } from "@/lib/app-auth/permissions";
 import { listMyPasskeys } from "@/lib/app-auth/passkeys";
 import { passwordStepUpAllowed } from "@/lib/app-auth/step-up";
 import { PasskeysCard } from "./PasskeysCard";
+import { secondFactorRequired } from "@/lib/app-auth/second-factor";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -52,9 +52,10 @@ export default async function ProfilePage() {
   // connection to a client would be an invitation to a dead end.
   const showClaudeCard = user.role !== "CLIENT_USER";
 
-  // Passkeys exist for the credentials vault, so only people who can
-  // reveal a credential see the card.
-  const showPasskeys = can(user.role, "credential.reveal");
+  // Passkeys are everyone's since two-step sign-in (16.10.2026): the
+  // second step of signing in for staff, an opt-in for clients, and the
+  // vault's identity check on top of that for staff.
+  const showPasskeys = true;
 
   const [lastPasswordChangeAt, claude, passkeys] = await Promise.all([
     getLastPasswordChangeAt(user),
@@ -110,6 +111,8 @@ export default async function ProfilePage() {
 
           {showPasskeys && (
             <PasskeysCard
+              audience={user.role === "CLIENT_USER" ? "client" : "staff"}
+              loginRequired={user.role === "CLIENT_USER" ? user.loginPasskeyRequired : secondFactorRequired(user)}
               required={!passwordStepUpAllowed()}
               passkeys={passkeys.map((p) => ({
                 id: p.id,

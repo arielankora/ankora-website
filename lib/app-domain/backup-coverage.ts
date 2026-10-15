@@ -210,6 +210,12 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     reason: "Single-use challenges that expire in five minutes.",
     recovery: "The next prompt issues a new one.",
   },
+  PendingLogin: {
+    decision: "SKIP",
+    table: "pending_logins",
+    reason: "A sign-in halfway between the password and the passkey. Hashed, single use, five minutes.",
+    recovery: "The person types their password again.",
+  },
   McpFileTicket: {
     decision: "SKIP",
     table: "mcp_file_tickets",
@@ -265,6 +271,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
 /// Drive.
 export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = {
   "users.tokenVersion": "A revocation counter, not a credential. Restoring it too low would revive revoked sessions.",
+  "users.loginPasskeyRequired": "A client's yes/no choice to be asked for a passkey at sign-in. A setting, not a secret, and it must survive a restore.",
   "integration_connections.credentialsRef": "An opaque pointer into an external secret store (schema comment / spec 17.2), never the credential.",
   "holiday_calendar_subscriptions.calendarKey": "A public calendar identifier such as 'IL-jewish'.",
   "important_dates.holidayKey": "A public holiday identifier.",

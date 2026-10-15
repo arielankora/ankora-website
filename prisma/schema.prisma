@@ -199,6 +199,12 @@ model User {
   failedLoginAttempts Int       @default(0)
   lockedUntil         DateTime?
 
+  /// Two-step sign-in (16.10.2026). A client who turned on "ask for a
+  /// passkey at every sign-in". Ankora staff do not use this flag: for
+  /// them the passkey is required by role on every Vercel deployment
+  /// (lib/app-auth/second-factor.ts).
+  loginPasskeyRequired Boolean @default(false)
+
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -247,6 +253,7 @@ model User {
   stepUpGrants        StepUpGrant[]
   passkeys            Passkey[]
   webauthnChallenges  WebAuthnChallenge[]
+  pendingLogins       PendingLogin[]
 
   // Employee agreements.
   employeeAgreements EmployeeAgreement[]
@@ -2477,6 +2484,30 @@ model Passkey {
 
   @@index([userId])
   @@map("passkeys")
+}
+
+/// The half-finished sign-in between the first factor (password or
+/// emailed link) and the passkey. No session exists until it completes:
+/// the only provider Auth.js has accepts a pending login and nothing else.
+/// Five minutes, single use, stored hashed (lib/app-auth/second-factor.ts).
+model PendingLogin {
+  id         String    @id @default(cuid())
+  userId     String
+  tokenHash  String    @unique
+  /// "password" or "link": how the first factor was given.
+  method     String
+  /// Set when the sign-in may complete: at once when no second step was
+  /// needed, or when the passkey answered (or a first one was enrolled).
+  verifiedAt   DateTime?
+  /// "none" or "passkey": which of the two set verifiedAt.
+  secondFactor String?
+  expiresAt  DateTime
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("pending_logins")
 }
 
 /// One WebAuthn challenge, issued by the server and consumed once. Lives

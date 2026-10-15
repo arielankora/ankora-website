@@ -1,4 +1,3 @@
-import { can } from "@/lib/app-auth/permissions";
 import { beginPasskeyRegistration, relyingPartyFor } from "@/lib/app-auth/passkeys";
 import { StepUpFailedError, StepUpLockedError } from "@/lib/app-auth/step-up";
 import { json, openJsonRoute } from "@/lib/app-auth/json-route";
@@ -12,7 +11,9 @@ export async function POST(req: Request) {
   const opened = await openJsonRoute(req);
   if (!opened.ok) return opened.response;
   const { user, body } = opened;
-  if (!can(user.role, "credential.reveal")) return json({ error: "forbidden" }, 403);
+  // Every role since two-step sign-in (16.10.2026): a client may add a
+  // passkey to protect their own sign-in. Revealing a credential stays
+  // staff-only, on the step-up routes.
   if (typeof body.password !== "string" || body.password.length > 1024) return json({ error: "bad_request" }, 400);
   try {
     const options = await beginPasskeyRegistration(user, body.password, relyingPartyFor(req.headers));

@@ -10,7 +10,7 @@ import { ClientAccessForm } from "./ClientAccessForm";
 import { ExceptionApproverForm } from "./ExceptionApproverForm";
 import { ResendInviteForm } from "./ResendInviteForm";
 import { ExposureReport } from "./ExposureReport";
-import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
+import { logoutAllSessionsAction, resetPasskeysAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { listAgreementsForUser } from "@/lib/app-domain/agreements";
 import { AGREEMENT_CHANNEL_LABEL, AGREEMENT_KIND_LABEL } from "@/lib/agreements";
@@ -72,9 +72,10 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
   ]);
   if (!targetUser) notFound();
 
-  const [claudeGrantCount, agreements] = await Promise.all([
+  const [claudeGrantCount, agreements, passkeyCount] = await Promise.all([
     countClaudeGrantsForUser(user, targetUser.id),
     targetUser.role === "CLIENT_USER" ? Promise.resolve([]) : listAgreementsForUser(targetUser.id),
+    prisma.passkey.count({ where: { userId: targetUser.id } }),
   ]);
 
   const isSelf = targetUser.id === user.id;
@@ -244,6 +245,29 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                   className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-error hover:text-error"
                 >
                   ניתוק Claude
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Two-step sign-in (16.10.2026). The recovery path for a lost
+              device: clear the passkeys, end every session, and the person
+              enrols a new one at their next sign-in, after their password. */}
+          <div className="mt-5 border-t border-lineDark pt-5">
+            <p className="text-sm font-medium text-appNavy">Passkeys ואימות דו-שלבי</p>
+            <p className="mt-1 text-sm text-appNavy/60">
+              {passkeyCount > 0
+                ? `למשתמש רשומים ${passkeyCount} מכשירים. אם מכשיר אבד, איפוס מוחק את כולם ומנתק את כל ההתחברויות. בכניסה הבאה המשתמש ירשום מכשיר חדש אחרי הסיסמה.`
+                : "למשתמש אין passkey רשום. בכניסה הבאה הוא יתבקש לרשום מכשיר, אם האימות הדו-שלבי חל עליו."}
+            </p>
+            {passkeyCount > 0 && !isSelf && (
+              <form action={resetPasskeysAction} className="mt-3">
+                <input type="hidden" name="userId" value={targetUser.id} />
+                <button
+                  type="submit"
+                  className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-error hover:text-error"
+                >
+                  איפוס passkeys
                 </button>
               </form>
             )}

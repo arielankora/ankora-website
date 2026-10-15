@@ -1,39 +1,22 @@
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "./auth.config";
-import { authenticateWithPassword } from "@/lib/app-auth/authenticate";
-import { consumeLoginLink } from "@/lib/app-auth/login-link";
+import { completePendingLogin } from "@/lib/app-auth/second-factor";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
+  // One provider, and it takes nothing but a pending sign-in. The password
+  // and the emailed link are checked before it, in the sign-in actions,
+  // and only produce a PendingLogin; the passkey, where one is needed, is
+  // checked in between. So no request can turn a password alone into a
+  // session by posting to Auth.js directly. All the rules live in
+  // lib/app-auth/second-factor.ts, which is testable without NextAuth.
   providers: [
     Credentials({
-      credentials: {
-        identifier: { label: "Email or username" }, // spec 4.2: email/username + password
-        password: { label: "Password", type: "password" },
-      },
-      // Thin wrapper - all the actual login rules (generic failure
-      // message, suspended/lockout checks, audit recording) live in
-      // lib/app-auth/authenticate.ts, which is unit/integration-testable
-      // on its own without going through NextAuth's request plumbing.
+      id: "pending-login",
+      credentials: { token: { label: "Pending sign-in" } },
       async authorize(credentials) {
-        return authenticateWithPassword(
-          String(credentials?.identifier || ""),
-          String(credentials?.password || "")
-        );
-      },
-    }),
-    // Portal phase 0: the one-time sign-in link. A second provider rather
-    // than a magic `password` value inside the first one, so the two
-    // paths can never be confused for each other and the link flow gets
-    // its own audit action. All the rules (TTL, single use, CLIENT_USER
-    // only, re-checking status at consume time) live in
-    // lib/app-auth/login-link.ts, which is testable without NextAuth.
-    Credentials({
-      id: "login-link",
-      credentials: { token: { label: "One-time token" } },
-      async authorize(credentials) {
-        return consumeLoginLink(String(credentials?.token || ""));
+        return completePendingLogin(String(credentials?.token || ""));
       },
     }),
   ],
