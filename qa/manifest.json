@@ -1586,6 +1586,46 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "re-wraps every client credential's data key; a bug here can make passwords unreadable"
+    },
+    "action:(product)/agreements/sign/[token]/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "No session: a one-time token writes a signed deletion declaration and must burn exactly once"
+    },
+    "action:(product)/app/agreements/confidentiality/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "The confidentiality gate every staff member passes; writes the signature evidence"
+    },
+    "domain:agreements": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Signature rows, sign links and the PDF channel; append-only evidence"
+    },
+    "screen:/agreements/sign/[token]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Public page outside /app, reachable by token only; must reveal nothing about a bad token"
+    },
+    "screen:/app/agreements/confidentiality": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Where the gate sends unsigned staff; must not loop and must let them sign out"
     }
   },
   "waivers": {},

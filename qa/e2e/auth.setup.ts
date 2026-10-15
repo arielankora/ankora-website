@@ -1,5 +1,6 @@
 import { test as setup, expect } from "@playwright/test";
 import path from "node:path";
+import { signConfidentialityIfAsked } from "./agreements";
 
 // Signs in once and saves the session for every authenticated spec.
 //
@@ -22,12 +23,14 @@ const STATE = path.join("qa", "reports", ".auth", "employee.json");
 const SUPER_STATE = path.join("qa", "reports", ".auth", "superadmin.json");
 const CLIENT_STATE = path.join("qa", "reports", ".auth", "clientadmin.json");
 
+// `name` is the seeded display name (prisma/seed.ts). The confidentiality
+// gate asks the signer to type it, so it has to match exactly that.
 export const DEMO = {
-  superAdmin: { identifier: "demo.superadmin@ankora.co.il", password: "DemoPass!2026" },
-  admin: { identifier: "demo.admin@ankora.co.il", password: "DemoPass!2026" },
+  superAdmin: { identifier: "demo.superadmin@ankora.co.il", password: "DemoPass!2026", name: "[DEMO] מנהל-על" },
+  admin: { identifier: "demo.admin@ankora.co.il", password: "DemoPass!2026", name: "[DEMO] מנהל Ankora" },
   clientAdmin: { identifier: "demo.clientadmin@ankora.co.il", password: "DemoPass!2026" },
-  employee: { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026" },
-  suspended: { identifier: "demo.suspended@ankora.co.il", password: "DemoPass!2026" },
+  employee: { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026", name: "[DEMO] עובד Ankora - נועה" },
+  suspended: { identifier: "demo.suspended@ankora.co.il", password: "DemoPass!2026", name: "[DEMO] עובד מושהה" },
 };
 
 setup("sign in and store the session", async ({ page }) => {
@@ -45,6 +48,7 @@ setup("sign in and store the session", async ({ page }) => {
     timeout: 20_000,
   });
   await expect(page.locator('input[name="password"]')).toHaveCount(0);
+  await signConfidentialityIfAsked(page, DEMO.admin.name);
 
   await page.context().storageState({ path: STATE });
 });
@@ -64,6 +68,7 @@ setup("sign in as super admin and store that session too", async ({ page }) => {
     timeout: 20_000,
   });
   await expect(page.locator('input[name="password"]')).toHaveCount(0);
+  await signConfidentialityIfAsked(page, DEMO.superAdmin.name);
 
   await page.context().storageState({ path: SUPER_STATE });
 });
