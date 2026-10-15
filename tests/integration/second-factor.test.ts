@@ -236,7 +236,7 @@ describe("a client's own switch", () => {
 describe("an admin reset after a lost device", () => {
   it("clears the passkeys, ends every session, and lets the next sign-in enrol", async () => {
     production();
-    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const { user: admin } = await createTestUser({ role: "SUPER_ADMIN" });
     const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
     await withPasskey(user.id);
     expect(await resetPasskeysByAdmin(admin, user.id)).toBe(1);

@@ -56,7 +56,7 @@ export type LoginMethod = "password" | "link";
 /// passkey, or enrol the first one.
 export type SecondStep = "none" | "passkey" | "enroll";
 
-export function secondFactorRequired(user: Pick<User, "role" | "loginPasskeyRequired">): boolean {
+export function secondFactorRequired(user: { role: string; loginPasskeyRequired: boolean }): boolean {
   if (user.role === "CLIENT_USER") return user.loginPasskeyRequired;
   return isProductionDeployment();
 }
@@ -68,7 +68,7 @@ function hash(raw: string): string {
 /// Called once the first factor is proven. Returns the token the browser
 /// carries to the next step, and which step that is.
 export async function startPendingLogin(
-  user: Pick<User, "id" | "role" | "loginPasskeyRequired">,
+  user: { id: string; role: string; loginPasskeyRequired: boolean },
   method: LoginMethod,
 ): Promise<{ token: string; step: SecondStep }> {
   const raw = randomBytes(32).toString("base64url");
