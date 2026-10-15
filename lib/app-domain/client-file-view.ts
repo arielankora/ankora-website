@@ -17,6 +17,8 @@ import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
+import { listProcesses } from "@/lib/app-domain/processes";
+import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
@@ -42,7 +44,7 @@ const RELATIONSHIP: Record<string, string> = {
 };
 
 /// The entity types whose changes make up section 16.
-const FILE_ENTITY_TYPES = ["PolicyException", "ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
+const FILE_ENTITY_TYPES = ["Process", "PolicyException", "ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -63,7 +65,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity }) => !ai || r.sensitivity !== "SENSITIVE";
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -81,7 +83,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     listNarratives(actor, clientId),
     listClientPolicies(actor, clientId),
     listOpenExceptions(actor, clientId),
+    listProcesses(actor, clientId),
   ]);
+  const ownerIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
+  const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
@@ -235,6 +240,35 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       })),
     },
     { number: "7.3", title: "מקורות ידע ומיקומים", empty: "עוד לא נכתב איפה נמצא הידע.", items: of("LOCATION").map(factItem) },
+    {
+      number: "7.4",
+      title: "תהליכים",
+      empty: "עוד לא נכתבו תהליכים.",
+      // A process reads as one line with everything a person needs to run
+      // it: trigger, owner, where it stands, how complete, what is missing,
+      // and the steps of the approved procedure.
+      items: processes.filter(shown).map((p) => ({
+        text: `${p.code} ${p.title}`,
+        details: [
+          p.purpose,
+          [p.triggerKinds.map((t) => TRIGGER_LABELS[t]).join(", "), p.triggerText].filter(Boolean).join(": ") || null,
+          p.ownerId ? `בעלים: ${ownerName.get(p.ownerId) ?? ""}` : null,
+          p.backupOwnerId ? `מחליף: ${ownerName.get(p.backupOwnerId) ?? ""}` : null,
+          TRANSITION_LABELS[p.transitionStatus],
+          p.executorText ? `מבצע היום: ${p.executorText}` : null,
+          p.slaText ? `SLA: ${p.slaText}` : null,
+          p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
+          `שלמות ${p.completeness.score} מתוך 9`,
+          ...p.gaps,
+          p.current
+            ? `נוהל גרסה ${p.current.version}: ${p.current.steps.map((st, i) => `${i + 1}. ${st.title} (${STEP_MODE_LABELS[st.mode]}${st.requiresApproval ? ", דורש אישור" : ""})`).join(" ")}`
+            : "אין עדיין נוהל מאושר",
+          p.current?.highlights ? `דגשים: ${p.current.highlights}` : null,
+          p.exceptionPlaybook ? `נוהל חריגים: ${p.exceptionPlaybook}` : null,
+        ],
+        ...knowledge(p),
+      })),
+    },
     {
       number: "7.5",
       title: "סוגי פניות ודרכי מענה",

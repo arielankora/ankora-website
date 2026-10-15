@@ -123,6 +123,10 @@ export function fixtureValue(
 
   const labels = enums.get(col.udt);
   if (labels?.length) return labels[i % labels.length];
+  // An array of an enum (processes.triggerKinds): Postgres names its type
+  // with a leading underscore, as for "_text".
+  const elementLabels = col.udt.startsWith("_") ? enums.get(col.udt.slice(1)) : undefined;
+  if (elementLabels?.length) return [elementLabels[i % elementLabels.length]];
 
   switch (col.udt) {
     case "bool":

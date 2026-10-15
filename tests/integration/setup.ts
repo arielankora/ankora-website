@@ -47,6 +47,8 @@ const TABLES = [
   "client_organizations",
   "extraction_guides",
   "request_types",
+  "process_versions",
+  "processes",
   "policy_exceptions",
   "client_policies",
   "client_narratives",
