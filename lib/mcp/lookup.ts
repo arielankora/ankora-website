@@ -142,6 +142,17 @@ export async function autoPickCategory(actor: User, clientId: string, text: stri
   return pickCategory({ text, candidates, history, clientUsage });
 }
 
+/// A category by id, only if it is still usable for this client: active,
+/// and global or this client's own. A task can carry a category an admin
+/// has since retired, and a timer must not be started on it.
+export async function usableCategoryById(clientId: string, categoryId: string): Promise<Named | null> {
+  const all = await listCategories();
+  const found = all.find(
+    (c: CategoryRow) => c.id === categoryId && c.active && (c.visibility === "GLOBAL" || c.clientId === clientId)
+  );
+  return found ? { id: found.id, name: found.name } : null;
+}
+
 /// What update_task needs to know to fill a missing category: whether the
 /// task has one, and the words to pick by. Called only after the task was
 /// resolved through lookupTask/lookupTaskById, which already checked the
