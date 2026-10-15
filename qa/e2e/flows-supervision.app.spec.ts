@@ -21,10 +21,15 @@ import { test, expect } from "./fixtures";
 // line below is the declared exception.
 //
 // @covers screen:/app/supervising
+//
+// Since 15.10.2026 that screen is a redirect: the list of work waiting on
+// this person is the tasks screen under "בפיקוח" and "ממתינות לאישור",
+// and the count lives beside "בפיקוח" and beside "משימות" in the nav.
 
 test.describe.configure({ timeout: 90_000 });
 
-const SUPERVISING = "/app/supervising";
+const OLD_SUPERVISING = "/app/supervising";
+const WAITING = "/app/tasks?mine=supervising&status=PENDING_APPROVAL";
 
 // This file's own task, seeded with a fixed id and supervised by the
 // person this project signs in as. Read by nothing else, so its status
@@ -63,24 +68,27 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
   });
 
   test("the nav says something is waiting, and the screen says what", async ({ page }) => {
-    await page.goto(SUPERVISING, { waitUntil: "domcontentloaded" });
+    // The old address, from a bookmark or an old message, still lands on
+    // the work waiting for this person.
+    await page.goto(OLD_SUPERVISING, { waitUntil: "domcontentloaded" });
+    await expect(page).toHaveURL(/\/app\/tasks\?mine=supervising&status=PENDING_APPROVAL$/, { timeout: 30_000 });
 
-    // Asserted in this order on purpose, so a failure says which half
-    // broke. If the task is not here at all, the screen is showing the
-    // wrong person's work or none - which is what happens when the
-    // fixture names somebody other than the account this project signs
-    // in as. If it is here but not under the waiting heading, the send
-    // in the previous test did not land.
+    // If the task is not here at all, the list is showing the wrong
+    // person's work or none - which is what happens when the fixture
+    // names somebody other than the account this project signs in as -
+    // or the send in the previous test did not land.
     await expect(page.getByRole("link", { name: FIXTURE }).first()).toBeVisible({ timeout: 30_000 });
 
-    // The heading carries its own count, which is the number a person
-    // reads before deciding whether to open anything.
-    await expect(page.getByText(/ממתינות לאישור שלכם \(\d+\)/)).toBeVisible();
+    // The count beside "בפיקוח", which is the number a person reads
+    // before deciding whether to open anything.
+    await expect(page.getByTestId("supervising-pending")).toHaveText(/^\d+$/);
 
     // And the row is reachable from here, because a list of things
     // waiting for you that you cannot act on from is a list of chores.
     await page.getByRole("link", { name: FIXTURE }).first().click();
-    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}$`));
+    // From the tasks screen the link carries the list it came from
+    // (`?from=`), so only the path is asserted.
+    await expect(page).toHaveURL(new RegExp(`${FIXTURE_URL}(\\?|$)`));
   });
 
   test("the supervisor signs it, and the screen says who and when", async ({ page }) => {
@@ -98,7 +106,8 @@ test.describe.serial("one task, from sending it for approval to signing it", () 
   test("and it stops waiting once it is signed", async ({ page }) => {
     // The other half of the count. A number that only goes up is a badge
     // people learn to ignore.
-    await page.goto(SUPERVISING, { waitUntil: "domcontentloaded" });
-    await expect(page.getByText(/ממתינות לאישור שלכם/)).toHaveCount(0);
+    await page.goto(WAITING, { waitUntil: "domcontentloaded" });
+    await expect(page.getByTestId("mine-scope")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("link", { name: FIXTURE })).toHaveCount(0);
   });
 });

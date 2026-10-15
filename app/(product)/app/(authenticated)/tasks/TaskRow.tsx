@@ -88,7 +88,7 @@ export function TaskRow({
     clientOutcome: string | null;
   };
 }) {
-  // Outside the tasks screen (the supervising page) there is no provider
+  // Outside the tasks screen there is no provider
   // and this is empty, so the row links to the task plainly.
   const { listQuery } = useTaskList();
   const { showToast } = useToast();
