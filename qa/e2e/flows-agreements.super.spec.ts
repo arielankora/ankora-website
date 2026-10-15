@@ -57,7 +57,9 @@ test("a suspended employee signs the deletion declaration once through a link", 
     await signer.getByLabel("קראתי את ההצהרה, היא נכונה, ואני מאשר/ת אותה").check();
     await signer.locator('input[name="signedName"]').fill("מישהו אחר");
     await signer.getByRole("button", { name: "אישור וחתימה" }).click();
-    await expect(signer.getByRole("alert")).toContainText("אינו תואם", { timeout: 30_000 });
+    // Next.js mounts its own empty role="alert" route announcer, so match the
+    // form error by its text rather than by the role alone.
+    await expect(signer.getByRole("alert").filter({ hasText: "אינו תואם" })).toBeVisible({ timeout: 30_000 });
 
     // Spacing and case are not a different name.
     await signer.locator('input[name="signedName"]').fill(`  ${SUSPENDED.name.replace(" ", "  ")} `);
