@@ -1,4 +1,5 @@
 import { test, expect } from "./fixtures";
+import { signConfidentialityIfAsked } from "./agreements";
 
 // Vault phase 1a: Touch ID for "verify it's you", in a real browser.
 // Chromium's virtual authenticator (DevTools protocol, WebAuthn domain)
@@ -23,7 +24,7 @@ test.describe.configure({ timeout: 120_000 });
 test.use({ storageState: { cookies: [], origins: [] } });
 
 const ORIGIN = `http://localhost:${process.env.QA_PORT ?? 3100}`;
-const EMPLOYEE = { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026" };
+const EMPLOYEE = { identifier: "demo.employee1@ankora.co.il", password: "DemoPass!2026", name: "[DEMO] עובד Ankora - נועה" };
 
 function tag(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -64,6 +65,11 @@ test("enrol Touch ID, then reveal a credential with it", async ({ page }) => {
   // So the goto is retried until it lands on the profile page instead of
   // a login screen, rather than assuming the chain is over.
   const deviceName = tag("E2E Mac");
+  // The employee meets the confidentiality gate before any screen. Retried
+  // for the same redirect-chain reason as the goto below.
+  await expect(async () => {
+    await signConfidentialityIfAsked(page, EMPLOYEE.name, ORIGIN);
+  }).toPass({ timeout: 60_000 });
   await expect(async () => {
     await page.goto(`${ORIGIN}/app/profile`);
     await expect(page).not.toHaveURL(/\/login/);

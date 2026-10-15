@@ -141,3 +141,21 @@ export function renderActionEmail(input: ActionEmailInput): RenderedEmail {
 
   return { html, text };
 }
+
+/// Employee agreements: the one-time link to sign the deletion
+/// declaration. Goes to the person's private address, because by the time
+/// it is sent their work account is usually suspended. Says what the link
+/// is for and how long it lives, and nothing about the reasons for leaving.
+export function renderDeletionDeclarationEmail(input: { name: string; url: string }): RenderedEmail {
+  return renderActionEmail({
+    title: "הצהרת מחיקה בסיום העבודה עם Ankora",
+    body: [
+      `שלום ${input.name},`,
+      "בסיום העבודה אנחנו מבקשים מכל אחד מאנשי Ankora לאשר שהחזיר ציוד ומחק מידע של לקוחות, כמו שנקבע בהתחייבות לסודיות.",
+      "הקישור פותח את ההצהרה לקריאה ולאישור. הוא אישי, תקף לשבעה ימים ולשימוש אחד בלבד.",
+    ],
+    buttonLabel: "קריאה ואישור ההצהרה",
+    url: input.url,
+    footnote: "אם יש שאלה על ההצהרה, אפשר לפנות ל-ops@ankora.co.il לפני האישור.",
+  });
+}

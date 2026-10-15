@@ -74,6 +74,16 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/reports/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
     '/api/portal/export': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
+    // Employee agreements: both sign pages read the versioned text at
+    // runtime and render the signed PDF, so they need the texts and fonts.
+    '/app/agreements/confidentiality': [
+      './content/agreements/*.md',
+      './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
+    ],
+    '/agreements/sign/[token]': [
+      './content/agreements/*.md',
+      './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
+    ],
   },
   // Phase 7 security hardening (spec 16.2, ADR addendum section 14.3).
   // Applied to every response. A Content-Security-Policy is deliberately
@@ -330,7 +340,25 @@ const nextConfig = {
           },
         ],
       },
-    ];
+    ].flatMap((rule) =>
+      // Employee agreements: the one-time sign page lives outside /app so
+      // that someone without a session can reach it, but it is the same
+      // private product surface and gets the same headers: never indexed,
+      // and the strict same-origin policy rather than the marketing one.
+      // Its token sits in the path, so no Referer leaves the page either.
+      rule.source === '/app/:path*'
+        ? [
+            rule,
+            {
+              source: '/agreements/:path*',
+              headers: [
+                ...rule.headers,
+                { key: 'Referrer-Policy', value: 'no-referrer' },
+              ],
+            },
+          ]
+        : [rule],
+    );
   },
 };
 

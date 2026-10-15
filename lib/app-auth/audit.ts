@@ -20,7 +20,10 @@ import { clientIpFrom } from "@/lib/rate-limit";
 //
 // An explicit value from the caller always wins, including an explicit
 // null.
-async function requestContext(): Promise<{ ip: string | null; userAgent: string | null }> {
+//
+// Exported for the employee agreements, which store the same two values
+// on the signature row itself and must agree with the audit row beside it.
+export async function requestContext(): Promise<{ ip: string | null; userAgent: string | null }> {
   try {
     const { headers } = await import("next/headers");
     const h = await headers();

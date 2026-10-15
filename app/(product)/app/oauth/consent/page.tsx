@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/app-auth/session";
+import { CONFIDENTIALITY_SIGN_PATH, confidentialitySignatures, mustSignConfidentiality } from "@/lib/agreements";
 import { getClient } from "@/lib/mcp/oauth/store";
 import { findMatchingRedirectUri } from "@/lib/mcp/oauth/redirect";
 
@@ -72,6 +73,12 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
   if (!user) {
     const here = new URLSearchParams(Object.entries(sp).filter(([, v]) => typeof v === "string") as [string, string][]);
     redirect(`/app/login?callbackUrl=${encodeURIComponent(`/app/oauth/consent?${here.toString()}`)}`);
+  }
+
+  // Connecting Claude hands it the same data the app shows, so the same
+  // confidentiality gate applies here as in the app's own layout.
+  if (user.role !== "CLIENT_USER" && mustSignConfidentiality(user.role, await confidentialitySignatures(user.id))) {
+    redirect(CONFIDENTIALITY_SIGN_PATH);
   }
 
   return (

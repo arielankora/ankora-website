@@ -63,6 +63,9 @@ export const ENTITY_TYPES = [
   "ClientNarrative",
   "ExtractionGuide",
   "PortalSummary",
+  // Employee agreements.
+  "EmployeeAgreement",
+  "AgreementSignLink",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -147,6 +150,11 @@ export const ACTION_LABEL: Record<string, string> = {
   "user.role_status_change": "שינוי תפקיד/סטטוס",
   "user.client_access_change": "שינוי גישה ללקוחות",
   "user.logout_all_sessions": "ניתוק כל ההתחברויות",
+  "user.personal_email_change": "שינוי מייל פרטי",
+  // Employee agreements.
+  "agreement.sign": "חתימה על מסמך עובד",
+  "agreement.link_issued": "שליחת קישור לחתימה על הצהרת מחיקה",
+  "agreement.pdf_recorded": "רישום חתימה ב-PDF",
   "client.create": "יצירת לקוח",
   "client.settings_change": "עדכון הגדרות לקוח",
   "client.archive": "העברת לקוח לארכיון",

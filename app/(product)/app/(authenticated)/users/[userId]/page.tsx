@@ -12,6 +12,20 @@ import { ResendInviteForm } from "./ResendInviteForm";
 import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
 import { countClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
+import { listAgreementsForUser } from "@/lib/app-domain/agreements";
+import { AGREEMENT_CHANNEL_LABEL, AGREEMENT_KIND_LABEL } from "@/lib/agreements";
+import { PersonalEmailForm } from "./PersonalEmailForm";
+import { DeletionDeclarationForm } from "./DeletionDeclarationForm";
+
+const SIGNED_AT = new Intl.DateTimeFormat("he-IL", {
+  timeZone: "Asia/Jerusalem",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -49,6 +63,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         role: true,
         status: true,
         canApproveExceptions: true,
+        personalEmail: true,
         createdAt: true,
         clientAccess: true,
       },
@@ -57,7 +72,10 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
   ]);
   if (!targetUser) notFound();
 
-  const claudeGrantCount = await countClaudeGrantsForUser(user, targetUser.id);
+  const [claudeGrantCount, agreements] = await Promise.all([
+    countClaudeGrantsForUser(user, targetUser.id),
+    targetUser.role === "CLIENT_USER" ? Promise.resolve([]) : listAgreementsForUser(targetUser.id),
+  ]);
 
   const isSelf = targetUser.id === user.id;
 
@@ -88,6 +106,62 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           <div className="rounded-2xl border border-lineDark bg-white p-6">
             <h2 className="mb-4 text-sm font-medium text-appNavy">הרשאות מיוחדות</h2>
             <ExceptionApproverForm userId={targetUser.id} value={targetUser.canApproveExceptions} />
+          </div>
+        )}
+
+        {/* Employee agreements: the private address, what this person
+            has signed, and the deletion declaration for when they leave.
+            Staff only; clients sign nothing here. */}
+        {targetUser.role !== "CLIENT_USER" && (
+          <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <h2 className="mb-4 text-sm font-medium text-appNavy">מסמכים חתומים</h2>
+            <PersonalEmailForm userId={targetUser.id} value={targetUser.personalEmail} />
+
+            <div className="mt-5 border-t border-lineDark pt-5">
+              {agreements.length === 0 ? (
+                <p className="text-sm text-appNavy/60">עדיין לא נחתם אף מסמך.</p>
+              ) : (
+                <ul className="divide-y divide-lineDark text-sm">
+                  {agreements.map((a) => (
+                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <span className="text-appNavy">
+                        {AGREEMENT_KIND_LABEL[a.kind]} <span className="text-appNavy/50">· {a.version}</span>
+                      </span>
+                      <span className="text-xs text-appNavy/60">
+                        {AGREEMENT_CHANNEL_LABEL[a.channel]} · {SIGNED_AT.format(a.signedAt)}
+                        {a.driveFileId ? (
+                          <>
+                            {" · "}
+                            <a
+                              href={`https://drive.google.com/file/d/${encodeURIComponent(a.driveFileId)}/view`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-gold-dim underline underline-offset-2 hover:text-appNavy"
+                            >
+                              PDF
+                            </a>
+                          </>
+                        ) : (
+                          " · ללא PDF"
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="mt-5 border-t border-lineDark pt-5">
+              <p className="text-sm font-medium text-appNavy">הצהרת מחיקה</p>
+              <p className="mt-1 text-sm text-appNavy/60">
+                בסיום העבודה נשלח למייל הפרטי קישור חד-פעמי לשבעה ימים, לקריאה ולאישור של הצהרת המחיקה והחזרת הציוד.
+              </p>
+              <DeletionDeclarationForm
+                userId={targetUser.id}
+                isActive={targetUser.status === "ACTIVE" || targetUser.status === "INVITED"}
+                hasPersonalEmail={!!targetUser.personalEmail}
+              />
+            </div>
           </div>
         )}
 
