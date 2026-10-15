@@ -335,7 +335,7 @@ export async function teamMembers(
   return users
     .filter((u: UserRow) => !u.deletedAt && statuses.includes(u.status))
     .filter((u: UserRow) => opts.includeClients || u.role !== "CLIENT_USER")
-    .map((u: UserRow & { lastLoginAt?: Date | null }) =>
+    .map((u: UserRow & { lastLoginAt?: Date | null; lastSeenAt?: Date | null }) =>
       serializeTeamMember({
         id: u.id,
         name: u.name,
@@ -343,6 +343,7 @@ export async function teamMembers(
         role: u.role,
         status: u.status,
         lastLoginAt: u.lastLoginAt ?? null,
+        lastSeenAt: u.lastSeenAt ?? null,
       })
     );
 }

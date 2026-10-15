@@ -28,6 +28,7 @@ beforeEach(() => {
     role: "ANKORA_EMPLOYEE",
     status: "ACTIVE",
     lastLoginAt: new Date("2026-10-13T21:30:00Z"), // 14.10 at 00:30 in Israel
+    lastSeenAt: new Date("2026-10-15T06:00:00Z"), // this morning
     personalEmail: "dana.private@example.com",
   });
   db.passkey.count.mockResolvedValue(1);
@@ -76,6 +77,8 @@ describe("getEmployeeStatus", () => {
       status: "ACTIVE",
       lastLoginAt: "2026-10-13T21:30:00.000Z",
       daysSinceLogin: 1,
+      lastSeenAt: "2026-10-15T06:00:00.000Z",
+      daysSinceSeen: 0,
       personalEmailOnFile: true,
       passkeyCount: 1,
     });

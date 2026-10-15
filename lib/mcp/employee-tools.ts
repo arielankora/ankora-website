@@ -104,7 +104,7 @@ export function registerEmployeeTools(server: McpServer): void {
       title: "Get an employee's onboarding or offboarding status",
       description: [
         "One Ankora staff member's lifecycle state, for running their onboarding or offboarding. Managers and admins only.",
-        "Returns: role, status (INVITED, ACTIVE, SUSPENDED), lastLoginAt and daysSinceLogin (Israel calendar days, null if never), personalEmailOnFile (true or false only; the address is never shown), passkeyCount, and for each agreement kind (CONFIDENTIALITY, DELETION_DECLARATION) its currentVersion, whether the current version is signed in the app (appSignedCurrent) and as a returned PDF (emailPdfSignedCurrent), and the latest signature per channel with its version and signedAt.",
+        "Returns: role, status (INVITED, ACTIVE, SUSPENDED), lastSeenAt and daysSinceSeen (last use of Ankora in the app or through Claude, Israel calendar days, null if never: the signal for whether someone has stopped working), lastLoginAt and daysSinceLogin (last sign-in only, kept for compatibility), personalEmailOnFile (true or false only; the address is never shown), passkeyCount, and for each agreement kind (CONFIDENTIALITY, DELETION_DECLARATION) its currentVersion, whether the current version is signed in the app (appSignedCurrent) and as a returned PDF (emailPdfSignedCurrent), and the latest signature per channel with its version and signedAt.",
         "Also the open onboarding/offboarding tasks about this person (taskId, kind, url, due date, stepsDone of stepsTotal, and the titles of open steps), and adminPageUrl, the person's page in Ankora.",
         "Identify the person by `userId` when you have it, else by `person`.",
       ].join(" "),

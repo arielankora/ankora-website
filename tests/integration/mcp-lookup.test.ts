@@ -243,6 +243,8 @@ describe("lookupTeamMember() / teamMembers() - the admin-only roster", () => {
       status: "ACTIVE",
       lastLoginAt: hadas.lastLoginAt ? hadas.lastLoginAt.toISOString() : null,
       daysSinceLogin: hadas.lastLoginAt ? expect.any(Number) : null,
+      lastSeenAt: hadas.lastSeenAt ? hadas.lastSeenAt.toISOString() : null,
+      daysSinceSeen: hadas.lastSeenAt ? expect.any(Number) : null,
     });
     // ACTIVE is the default; the suspended person appears only when the
     // caller asks for inactive staff, and the deleted one never does.

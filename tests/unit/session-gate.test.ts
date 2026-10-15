@@ -23,6 +23,11 @@ vi.mock("react", async (importOriginal) => {
   return { ...real, cache: <T extends (...args: never[]) => unknown>(fn: T) => fn };
 });
 
+// User.lastSeenAt: the gate records activity. Mocked here; the throttle
+// and the write are tests/unit/last-seen.test.ts's subject.
+const touchLastSeen = vi.fn();
+vi.mock("@/lib/app-auth/last-seen", () => ({ touchLastSeen: (u: unknown) => touchLastSeen(u) }));
+
 const authMock = vi.fn();
 vi.mock("@/auth", () => ({ auth: () => authMock() }));
 
@@ -91,6 +96,16 @@ describe("getCurrentUser() - who is making this request", () => {
     const user = await getCurrentUser();
     expect(findUnique).toHaveBeenCalledWith({ where: { id: "user-1" } });
     expect(user?.role).toBe("ANKORA_ADMIN");
+    // Activity is recorded for the person who got through, and only them.
+    expect(touchLastSeen).toHaveBeenCalledWith(user);
+  });
+
+  it("records no activity for a request the gate refuses", async () => {
+    touchLastSeen.mockClear();
+    authMock.mockResolvedValue(sessionFor({ id: "user-1", tokenVersion: 3 }));
+    findUnique.mockResolvedValue(dbUser({ status: "SUSPENDED" }));
+    expect(await getCurrentUser()).toBeNull();
+    expect(touchLastSeen).not.toHaveBeenCalled();
   });
 
   it("returns null when the account no longer exists", async () => {
