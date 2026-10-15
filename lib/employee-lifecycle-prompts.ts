@@ -1,47 +1,69 @@
 // The prompts an owner pastes into Claude to have the onboarding or
 // offboarding of one employee run to the end. Pure text builders, so they
 // can be tested and refined without a database. The wording is Ariel's
-// from the procedure; only names, ids and dates are substituted. Keep them
+// from the procedure; only names, ids, dates, links and the version code
+// are substituted. Keep them
 // faithful: the agent that refines them later works from this file.
 
 export const PROCEDURE_DOC_URL = "https://claude.ai/code/artifact/771a9af2-6b29-4dd8-8bec-ed61ba26b967";
 
+/// The prompt for the onboarding agent. `code` is the Latin code of the
+/// current confidentiality version (agreementCode in lib/agreements.ts),
+/// passed in rather than written here so a new version cannot leave an
+/// old code in a prompt; this file stays free of imports for its tests.
 export function onboardingPrompt(input: {
   ownerName: string;
   employeeName: string;
   employeeEmail: string;
+  userId: string;
   taskId: string;
+  code: string;
 }): string {
-  return [
-    `אני ${input.ownerName} מאנקורה. תנהל את קליטת העובד/ת ${input.employeeName} (${input.employeeEmail}) עד הסוף, לפי נוהל הקליטה והעזיבה.`,
-    `משימת הקליטה: taskId "${input.taskId}". תזהה אותה תמיד לפי ה-taskId.`,
-    "1. תיצור משימה מתוזמנת שרצה כל יום עסקים ב-09:00 ובודקת את מצב הקליטה, עד שהמשימה נסגרת.",
-    "2. בריצה הראשונה: תנסח מייל מ-ops@ankora.co.il לעובד עם ההתחייבות לסודיות כ-PDF לחתימה, ותבקש שיחזיר אותו חתום באותו שרשור. תציג לי את הטיוטה לפני שליחה.",
-    "3. בכל ריצה: תבדוק אם ה-PDF החתום חזר, ואם מספר הגרסה בו תואם לגרסה הנוכחית ויש חתימה. אם כן, תתייק אותו בתיק Ankora פנימי עם קישור למשימה ותסמן את השלב. אם משהו לא ברור, תסמן אותו לבדיקה אנושית ולא תתייק.",
-    "4. תבדוק בחיבור של אנקורה שהאישור במערכת קיים, ותסמן את השלב.",
-    "5. ביום העסקים השני בלי שתי החתימות: תזכורת לעובד. ביום השלישי: עדכון לבעלת המשימה.",
-    "6. כל שלב שהסתיים: הערה קצרה במשימה.",
-    "אל תשלח שום דבר בלי אישור שלי, ואל תשייך את העובד ללקוחות לפני ששתי החתימות קיימות.",
-  ].join("\n");
+  return `אני ${input.ownerName} מאנקורה. תנהל את קליטת ${input.employeeName} (${input.employeeEmail}) עד הסוף, לפי נוהל הקליטה והעזיבה: ${PROCEDURE_DOC_URL}
+העובד: userId "${input.userId}". משימת הקליטה: taskId "${input.taskId}". תזהה אותם תמיד לפי המזהים האלה, לא לפי שם.
+
+עכשיו, פעם אחת:
+1. תיצור משימה מתוזמנת שרצה בכל יום עסקים ב-09:00 ומבצעת את "בכל ריצה" שלמטה. כשמשימת הקליטה נסגרת, היא מבטלת את עצמה.
+2. תוריד את הטופס עם get_blank_agreement_pdf (CONFIDENTIALITY), ותנסח מייל מ-ops@ankora.co.il לעובד עם הטופס מצורף: לקרוא, לחתום (חתימה דיגיטלית, או מודפס, חתום וסרוק) ולהחזיר באותו שרשור. תציג לי את הטיוטה, ותשלח רק אחרי אישור שלי.
+
+בכל ריצה:
+3. get_employee_status עם ה-userId, כדי לדעת מה כבר קיים.
+4. תחפש בתיבה של ops@ankora.co.il תשובה של העובד עם PDF. אם יש, תקרא אותו ותוודא שני דברים: שהקוד ${input.code} מופיע בכותרת התחתונה, ושיש שם וחתימה. אם שניהם קיימים: תתייק אותו בתיק Ankora פנימי, מקושר למשימה ומוסתר מהלקוח, ורק אחר כך תרשום אותו עם record_pdf_signature. אם משהו לא ברור: הערה במשימה לבדיקה שלי, בלי לתייק ובלי לרשום.
+5. האישור במערכת וה-passkey נסגרים לבד כשהעובד מבצע אותם. אם הם חסרים, אין מה לעשות מלבד לעקוב.
+6. ביום העסקים השני בלי שתי החתימות: תנסח תזכורת לעובד ותציג לי לפני שליחה. ביום העסקים השלישי: הערה במשימה ועדכון אליי.
+7. כששתי החתימות קיימות: תזכיר לי את הגישות לכלים, את השיוך ללקוחות ואת ההדרכה, ותסמן כל שלב רק אחרי שאישרתי שבוצע.
+8. כל שלב שהסתיים: הערה קצרה במשימה, מה נעשה ומה יצא.
+
+גבולות: לא לשלוח שום דבר בלי אישור שלי. לא לשייך את העובד ללקוחות. לא לתייק ולא לרשום PDF שלא נבדק.`;
 }
 
+/// The prompt for the offboarding agent. `code` is the Latin code of the
+/// current deletion declaration; `deadline` the DPA date as dd.mm.yyyy;
+/// `adminUrl` the absolute address of the person's page in Ankora.
 export function offboardingPrompt(input: {
   ownerName: string;
   employeeName: string;
+  userId: string;
   taskId: string;
-  /// The DPA deadline, already formatted for reading (e.g. "20.10.2026").
+  code: string;
   deadline: string;
+  adminUrl: string;
 }): string {
-  return [
-    `אני ${input.ownerName} מאנקורה. תנהל את עזיבת העובד/ת ${input.employeeName} עד הסוף, לפי נוהל הקליטה והעזיבה ולפי ה-DPA.`,
-    `משימת העזיבה: taskId "${input.taskId}". המועד לביטול כל הגישות: ${input.deadline}.`,
-    "1. תיצור משימה מתוזמנת שרצה כל יום עסקים ב-09:00 עד שהמשימה נסגרת.",
-    "2. תכין לכל לקוח שהעובד צפה בגישות שלו טיוטת מייל עם דוח הגישות שנצפו ב-90 הימים האחרונים והמלצה להחליף אותן. אני שולח, לא אתה.",
-    "3. תנסח מייל מ-ops@ankora.co.il למייל הפרטי של העובד עם הצהרת המחיקה כ-PDF, ותציג לי לפני שליחה. תעקוב עד שה-PDF החתום חוזר ותתייק אותו בתיק Ankora פנימי.",
-    "4. תבדוק כל שלב, ותזכיר לי ביום העסקים השלישי על כל גישה שעוד לא בוטלה.",
-    "5. כל שלב שהסתיים: הערה קצרה במשימה.",
-    "אל תשלח שום דבר ללקוח או לעובד בלי אישור שלי.",
-  ].join("\n");
+  return `אני ${input.ownerName} מאנקורה. תנהל את עזיבת ${input.employeeName} עד הסוף, לפי נוהל הקליטה והעזיבה (${PROCEDURE_DOC_URL}) ולפי ה-DPA.
+העובד: userId "${input.userId}". משימת העזיבה: taskId "${input.taskId}". כל הגישות חייבות להתבטל עד ${input.deadline}.
+
+עכשיו, פעם אחת:
+1. תיצור משימה מתוזמנת שרצה בכל יום עסקים ב-09:00 ומבצעת את "בכל ריצה" שלמטה. כשמשימת העזיבה נסגרת, היא מבטלת את עצמה.
+2. תפיק את דוח הגישות שנצפו ב-90 הימים האחרונים מדף המשתמש (${input.adminUrl}), או תבקש ממני להפיק אותו. לכל לקוח שהעובד צפה בגישות שלו: טיוטת מייל עם הדוח והמלצה להחליף את הגישות האלה. אני שולח, לא אתה.
+3. תוריד את הצהרת המחיקה עם get_blank_agreement_pdf (DELETION_DECLARATION), ותנסח מייל מ-ops@ankora.co.il למייל הפרטי של העובד עם ההצהרה מצורפת. תזכיר לי לשלוח גם את קישור החתימה מדף המשתמש. תציג לי את הטיוטה לפני שליחה.
+
+בכל ריצה:
+4. get_employee_status עם ה-userId: אילו שלבים פתוחים ואילו חתימות קיימות.
+5. תחפש בתיבה של ops@ankora.co.il תשובה עם PDF חתום. אם הקוד ${input.code} מופיע בכותרת התחתונה ויש שם וחתימה: תתייק בתיק Ankora פנימי, מקושר למשימה ומוסתר מהלקוח, ותרשום עם record_pdf_signature. אם משהו לא ברור: הערה לבדיקה שלי.
+6. ביום העסקים השלישי (${input.deadline}): תשלח לי רשימה של כל גישה שעוד לא סומנה כמבוטלת.
+7. כל שלב שהסתיים: הערה קצרה במשימה.
+
+גבולות: לא לשלוח שום דבר ללקוח או לעובד בלי אישור שלי. לסמן שלב רק אחרי שאישרתי שבוצע.`;
 }
 
 export const ONBOARDING_STEPS = [

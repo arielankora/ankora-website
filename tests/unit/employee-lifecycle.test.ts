@@ -43,6 +43,7 @@ vi.mock("@/lib/mcp/lookup", () => ({ autoPickCategory: (...a: unknown[]) => auto
 
 const lifecycle = await import("@/lib/app-domain/employee-lifecycle");
 const prompts = await import("@/lib/employee-lifecycle-prompts");
+const { agreementCode, CURRENT_AGREEMENTS } = await import("@/lib/agreements");
 
 const DASHES = [String.fromCharCode(0x2014), String.fromCharCode(0x2013)];
 const hasDash = (s: string) => DASHES.some((d) => s.includes(d));
@@ -80,16 +81,41 @@ beforeEach(() => {
 });
 
 describe("prompts", () => {
-  it("names the task id, the people and nothing with a dash", () => {
-    const on = prompts.onboardingPrompt({ ownerName: "הדס", employeeName: "נועה לוי", employeeEmail: "noa@ankora.co.il", taskId: "task-123" });
+  it("names the ids, the people, the procedure and the code, and nothing with a dash", () => {
+    const on = prompts.onboardingPrompt({
+      ownerName: "הדס",
+      employeeName: "נועה לוי",
+      employeeEmail: "noa@ankora.co.il",
+      userId: "user-42",
+      taskId: "task-123",
+      code: "ANKORA-CONF-1.0",
+    });
     expect(on).toContain('taskId "task-123"');
+    expect(on).toContain('userId "user-42"');
     expect(on).toContain("אני הדס מאנקורה");
     expect(on).toContain("נועה לוי (noa@ankora.co.il)");
+    expect(on).toContain(prompts.PROCEDURE_DOC_URL);
+    expect(on).toContain("שהקוד ANKORA-CONF-1.0 מופיע בכותרת התחתונה");
+    expect(on).toContain("get_blank_agreement_pdf (CONFIDENTIALITY)");
+    expect(on).not.toMatch(/<[a-zA-Z]+>/); // every placeholder filled
     expect(hasDash(on)).toBe(false);
 
-    const off = prompts.offboardingPrompt({ ownerName: "אריאל", employeeName: "נועה לוי", taskId: "task-9", deadline: "20.10.2026" });
+    const off = prompts.offboardingPrompt({
+      ownerName: "אריאל",
+      employeeName: "נועה לוי",
+      userId: "user-42",
+      taskId: "task-9",
+      code: "ANKORA-DEL-1.0",
+      deadline: "20.10.2026",
+      adminUrl: "https://www.ankora.co.il/app/users/user-42",
+    });
     expect(off).toContain('taskId "task-9"');
-    expect(off).toContain("המועד לביטול כל הגישות: 20.10.2026.");
+    expect(off).toContain('userId "user-42"');
+    expect(off).toContain("כל הגישות חייבות להתבטל עד 20.10.2026.");
+    expect(off).toContain("ביום העסקים השלישי (20.10.2026)");
+    expect(off).toContain("(https://www.ankora.co.il/app/users/user-42)");
+    expect(off).toContain("אם הקוד ANKORA-DEL-1.0 מופיע");
+    expect(off).not.toMatch(/<[a-zA-Z]+>/);
     expect(hasDash(off)).toBe(false);
   });
 
@@ -151,7 +177,7 @@ describe("shouldOpenOffboarding", () => {
 
 describe("openOnboardingTask", () => {
   it("opens the task on the owner, about the employee, with its steps in order and step 1 done", async () => {
-    const id = await lifecycle.openOnboardingTask(admin, person());
+    const id = await lifecycle.openOnboardingTask(admin, person({ personalEmail: "private@example.com" }));
     expect(id).toBe("t0");
 
     const parent = createTask.mock.calls[0][1];
@@ -171,7 +197,12 @@ describe("openOnboardingTask", () => {
     // The description carries the prompt with the task's own id.
     const description = updateTask.mock.calls.find((c) => c[2].description)![2].description;
     expect(description).toContain('taskId "t0"');
+    expect(description).toContain('userId "emp"');
     expect(description).toContain("אני הדס מאנקורה");
+    // The code comes from the registry, not from the prompt file.
+    expect(description).toContain(agreementCode("CONFIDENTIALITY", CURRENT_AGREEMENTS.CONFIDENTIALITY));
+    // No secrets and nothing private: the personal email never enters it.
+    expect(description).not.toContain("private@example.com");
     expect(updateTask).toHaveBeenCalledWith(admin, "t1", { status: "DONE" });
   });
 
@@ -225,6 +256,12 @@ describe("runOffboarding", () => {
     expect(createTask.mock.calls.slice(1).map((c) => c[1].title)).toEqual([...prompts.OFFBOARDING_STEPS]);
 
     const description = updateTask.mock.calls.find((c) => c[2].description)![2].description;
+    expect(description).toContain('userId "emp"');
+    expect(description).toContain(agreementCode("DELETION_DECLARATION", CURRENT_AGREEMENTS.DELETION_DECLARATION));
+    expect(hasDash(description)).toBe(false);
+    // The details list the private address for the owner; the prompt
+    // handed to Claude does not carry it.
+    expect(description.split("```")[1]).not.toContain("noa@example.com");
     expect(description).toContain("לקוח א");
     expect(description).toContain("/app/users/emp");
     expect(description).toContain("noa@example.com");

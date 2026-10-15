@@ -4,7 +4,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { addBusinessDays } from "@/lib/business-calendar";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/email-templates";
-import { CURRENT_AGREEMENTS, hasSignedCurrent } from "@/lib/agreements";
+import { CURRENT_AGREEMENTS, agreementCode, hasSignedCurrent } from "@/lib/agreements";
 import { OPEN_STATUSES, assignableUsers, completeStepAsSystem, createTask, updateTask } from "@/lib/app-domain/tasks";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { isDemoName } from "@/lib/mcp/category-pick";
@@ -246,7 +246,9 @@ export async function openOnboardingTask(actor: User, subject: User): Promise<st
             ownerName: owner.name,
             employeeName: subject.name,
             employeeEmail: subject.email,
+            userId: subject.id,
             taskId,
+            code: agreementCode("CONFIDENTIALITY", CURRENT_AGREEMENTS.CONFIDENTIALITY),
           }),
         }),
     });
@@ -343,6 +345,7 @@ export async function runOffboarding(actor: User, subject: User): Promise<string
     });
     const { date, key } = businessDueDate(OFFBOARDING_DUE_BUSINESS_DAYS);
     const deadline = displayDate(key);
+    const adminUrl = `${appBaseUrl()}/app/users/${subject.id}`;
 
     const { task } = await openLifecycleTask(actor, {
       kind: "OFFBOARDING",
@@ -359,9 +362,17 @@ export async function runOffboarding(actor: User, subject: User): Promise<string
           workEmail: subject.email,
           personalEmail: subject.personalEmail,
           deadline,
-          userPageUrl: `${appBaseUrl()}/app/users/${subject.id}`,
+          userPageUrl: adminUrl,
           clientNames: access.map((a) => a.client.name),
-          prompt: offboardingPrompt({ ownerName: owner.name, employeeName: subject.name, taskId, deadline }),
+          prompt: offboardingPrompt({
+            ownerName: owner.name,
+            employeeName: subject.name,
+            userId: subject.id,
+            taskId,
+            code: agreementCode("DELETION_DECLARATION", CURRENT_AGREEMENTS.DELETION_DECLARATION),
+            deadline,
+            adminUrl,
+          }),
         }),
     });
 
