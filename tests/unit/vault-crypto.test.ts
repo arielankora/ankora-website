@@ -101,6 +101,39 @@ describe("key provider selection", () => {
     expect((await k.unwrapDataKey(w.wrapped, w.kekRef, aad)).equals(dek)).toBe(true);
   });
 
+  it("during a rotation writes with VAULT_KEK_NEXT and still opens rows of VAULT_KEK", async () => {
+    delete process.env.VERCEL_ENV;
+    delete process.env.GCP_VAULT_KMS_KEY;
+    delete process.env.VAULT_KEK_NEXT;
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
+    let k = await keys();
+    const aad = Buffer.from("aad");
+    const dek = generateDataKey();
+    const old = await k.wrapDataKey(dek, aad);
+
+    process.env.VAULT_KEK_NEXT = randomBytes(32).toString("base64");
+    k = await keys();
+    const fresh = await k.wrapDataKey(dek, aad);
+    expect(fresh.kekRef).not.toBe(old.kekRef);
+    expect(k.kekRefStatus(old.kekRef)).toBe("stale");
+    expect(k.kekRefStatus(fresh.kekRef)).toBe("current");
+    expect(k.kekRefStatus("env:0000000000000000")).toBe("foreign");
+    expect((await k.unwrapDataKey(old.wrapped, old.kekRef, aad)).equals(dek)).toBe(true);
+    expect((await k.unwrapDataKey(fresh.wrapped, fresh.kekRef, aad)).equals(dek)).toBe(true);
+    delete process.env.VAULT_KEK_NEXT;
+  });
+
+  it("refuses the public CI key as VAULT_KEK_NEXT in production", async () => {
+    process.env.VERCEL_ENV = "production";
+    delete process.env.GCP_VAULT_KMS_KEY;
+    process.env.VAULT_KEK = randomBytes(32).toString("base64");
+    process.env.VAULT_KEK_NEXT = "Y2ktb25seS12YXVsdC1rZXktbm90LWEtc2VjcmV0ISE=";
+    const k = await keys();
+    expect(k.isVaultConfigured()).toBe(false);
+    delete process.env.VAULT_KEK_NEXT;
+    delete process.env.VERCEL_ENV;
+  });
+
   it("refuses, in words, a row wrapped by another environment's key", async () => {
     delete process.env.VERCEL_ENV;
     delete process.env.GCP_VAULT_KMS_KEY;

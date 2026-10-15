@@ -1562,6 +1562,30 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "Opens runs from dates and by hand: only an active process with an approved procedure, once per occurrence, steps on business days"
+    },
+    "api:/api/cron/vault-rewrap": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "re-wraps every client credential's data key; a bug here can make passwords unreadable"
+    },
+    "cron:/api/cron/vault-rewrap": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "re-wraps every client credential's data key; a bug here can make passwords unreadable"
+    },
+    "domain:vault-rewrap": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "re-wraps every client credential's data key; a bug here can make passwords unreadable"
     }
   },
   "waivers": {},
