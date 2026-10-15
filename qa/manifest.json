@@ -1642,6 +1642,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-16",
       "riskReason": "The routine of ongoing processes: who sees it, when a check is due and reminds once, and an issue opening a task"
+    },
+    "domain:process-review": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-16",
+      "riskReason": "Rescans approved procedures when a client's rule or exception changes: marks for review, notifies, notes open runs; blocks approval against checked rules"
     }
   },
   "waivers": {},

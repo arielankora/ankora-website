@@ -78,6 +78,18 @@ export const HUMAN_REVIEWED_TAGS: ActionTag[] = ["CLIENT_MESSAGE"];
 /// Money moving: what a client's approval thresholds are about (R2).
 export const MONEY_TAGS: ActionTag[] = ["PAYMENT", "PURCHASE", "REFUND"];
 
+/// How a message to the client goes out (R10, a COMMUNICATION rule).
+export const CHANNELS = ["EMAIL", "WHATSAPP", "PHONE", "MEETING", "PORTAL", "SLACK"] as const;
+export type Channel = (typeof CHANNELS)[number];
+export const CHANNEL_LABELS: Record<Channel, string> = {
+  EMAIL: "מייל",
+  WHATSAPP: "וואטסאפ",
+  PHONE: "טלפון",
+  MEETING: "פגישה",
+  PORTAL: "פורטל",
+  SLACK: "Slack",
+};
+
 export type ProcessStep = {
   title: string;
   mode: StepModeLike;
@@ -90,6 +102,8 @@ export type ProcessStep = {
   /// For an automated step: how a person makes sure it happened (R3).
   verification: string | null;
   requiresApproval: boolean;
+  /// For a message to the client: the channel it goes through.
+  channel: Channel | null;
 };
 
 const s = (v: unknown, max: number): string | null => {
@@ -114,6 +128,7 @@ export function readSteps(value: unknown): ProcessStep[] {
       output: s(v.output, 500),
       verification: s(v.verification, 500),
       requiresApproval: v.requiresApproval === true,
+      channel: CHANNELS.includes(v.channel as Channel) ? (v.channel as Channel) : null,
     }))
     .filter((st) => st.title);
 }
@@ -223,4 +238,89 @@ export function processGaps(p: CompletenessInput & { backupOwnerId: string | nul
   if (p.systemsWithoutAccess.length) gaps.push(`אין לנו גישה ל: ${p.systemsWithoutAccess.map(systemName).join(", ")}`);
   if (!p.backupOwnerId) gaps.push("אין מחליף: הידע אצל אדם אחד");
   return gaps;
+}
+
+// ---------------------------------------------------------------------------
+// The client's rules against the steps (spec 7.2: R7, R8, R9, R10, R15)
+// ---------------------------------------------------------------------------
+
+/// A client rule as the server checks it: its kind and the structured part
+/// a person filled in. A rule with none of it is read, not checked.
+export type RuleForCheck = {
+  id: string;
+  kind: string;
+  title: string;
+  checkTags: string[];
+  requiredTags: string[];
+  channels: string[];
+  minLeadBusinessDays: number | null;
+};
+
+/// A finding against a rule. It does not block outright: it needs either
+/// a fix or an exception to the rule (spec 7.2, "דורש חריגה"). With an
+/// exception in force it is `excepted`, shown and not counted.
+export type RuleFinding = CheckResult & { policyId: string; excepted: boolean };
+
+const tagNames = (tags: string[]) => tags.map((t) => ACTION_TAG_LABELS[t as ActionTag] ?? t).join(", ");
+
+/// Steps that move money or record it: what a separation between entities
+/// is about.
+const SEPARATED_TAGS: ActionTag[] = [...MONEY_TAGS, "INVOICE"];
+
+export function ruleChecks(
+  steps: ProcessStep[],
+  process: { entityId: string | null },
+  rules: RuleForCheck[],
+  exceptedPolicyIds: ReadonlySet<string>
+): RuleFinding[] {
+  const out: RuleFinding[] = [];
+  const add = (rule: RuleForCheck, f: CheckResult) => out.push({ ...f, policyId: rule.id, excepted: exceptedPolicyIds.has(rule.id) });
+  for (const rule of rules) {
+    const quote = `"${rule.title}"`;
+    if (rule.kind === "FORBIDDEN" && rule.checkTags.length) {
+      steps.forEach((st, i) => {
+        const hit = st.actionTags.filter((t) => rule.checkTags.includes(t));
+        if (hit.length) add(rule, { code: "R15", step: i + 1, message: `שלב ${i + 1}: ${tagNames(hit)} אסור לפי הכלל ${quote}.` });
+      });
+    }
+    if (rule.kind === "REQUIRED_STEP" && rule.checkTags.length && rule.requiredTags.length) {
+      const does = steps.some((st) => st.actionTags.some((t) => rule.checkTags.includes(t)));
+      const has = steps.some((st) => st.actionTags.some((t) => rule.requiredTags.includes(t)));
+      if (does && !has) add(rule, { code: "R7", message: `בנוהל יש ${tagNames(rule.checkTags)}, ואין שלב של ${tagNames(rule.requiredTags)}, שהכלל ${quote} מחייב.` });
+    }
+    if (rule.kind === "TIMING" && rule.checkTags.length && rule.minLeadBusinessDays) {
+      steps.forEach((st, i) => {
+        if (!st.actionTags.some((t) => rule.checkTags.includes(t))) return;
+        const lead = -(st.offsetBusinessDays ?? 0);
+        if (lead < rule.minLeadBusinessDays!) {
+          add(rule, { code: "R9", step: i + 1, message: `שלב ${i + 1}: ${lead > 0 ? `${lead} ימי עסקים` : "ביום עצמו"} לפני המועד, והכלל ${quote} דורש ${rule.minLeadBusinessDays} לפחות.` });
+        }
+      });
+    }
+    if (rule.kind === "COMMUNICATION" && rule.channels.length) {
+      const allowed = rule.channels.map((c) => CHANNEL_LABELS[c as Channel] ?? c).join(", ");
+      steps.forEach((st, i) => {
+        if (!st.actionTags.includes("CLIENT_MESSAGE")) return;
+        if (!st.channel) add(rule, { code: "R10", step: i + 1, message: `שלב ${i + 1}: הודעה ללקוח בלי ערוץ. לפי הכלל ${quote} רק ${allowed}.` });
+        else if (!rule.channels.includes(st.channel)) {
+          add(rule, { code: "R10", step: i + 1, message: `שלב ${i + 1}: הודעה ב${CHANNEL_LABELS[st.channel]}, והכלל ${quote} מתיר רק ${allowed}.` });
+        }
+      });
+    }
+    if (rule.kind === "SEPARATION" && !process.entityId && steps.some((st) => st.actionTags.some((t) => SEPARATED_TAGS.includes(t)))) {
+      add(rule, { code: "R8", message: `בנוהל יש כסף או חשבוניות, ולתהליך לא נקבעה ישות. הכלל ${quote} מפריד בין הישויות.` });
+    }
+  }
+  return out;
+}
+
+/// What the server checks of a rule, in one line under it, or null when it
+/// only reads it.
+export function ruleCheckSummary(r: Omit<RuleForCheck, "id" | "title">): string | null {
+  if (r.kind === "FORBIDDEN" && r.checkTags.length) return `נבדק בנהלים: שלב של ${tagNames(r.checkTags)} אסור`;
+  if (r.kind === "REQUIRED_STEP" && r.checkTags.length && r.requiredTags.length) return `נבדק בנהלים: נוהל עם ${tagNames(r.checkTags)} צריך שלב של ${tagNames(r.requiredTags)}`;
+  if (r.kind === "TIMING" && r.checkTags.length && r.minLeadBusinessDays) return `נבדק בנהלים: ${tagNames(r.checkTags)} לפחות ${r.minLeadBusinessDays} ימי עסקים לפני המועד`;
+  if (r.kind === "COMMUNICATION" && r.channels.length) return `נבדק בנהלים: הודעה ללקוח רק ב${r.channels.map((c) => CHANNEL_LABELS[c as Channel] ?? c).join(", ")}`;
+  if (r.kind === "SEPARATION") return "נבדק בנהלים: נוהל עם כסף או חשבוניות צריך ישות";
+  return null;
 }

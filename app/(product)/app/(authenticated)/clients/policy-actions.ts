@@ -39,6 +39,8 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
   const kind = String(formData.get("kind") ?? "");
   if (!(POLICY_KINDS as string[]).includes(kind)) return { error: "צריך לבחור את סוג הכלל." };
   const status = String(formData.get("knowledgeStatus") ?? "");
+  const lead = text(formData, "minLeadBusinessDays");
+  if (lead !== null && !/^\d+$/.test(lead)) return { error: "ימי עסקים הם מספר שלם." };
   return {
     value: {
       kind: kind as PolicyKind,
@@ -46,6 +48,12 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
       statement: String(formData.get("statement") ?? ""),
       rationale: text(formData, "rationale"),
       interimStatement: text(formData, "interimStatement"),
+      check: {
+        checkTags: formData.getAll("checkTags").map(String),
+        requiredTags: formData.getAll("requiredTags").map(String),
+        channels: formData.getAll("channels").map(String),
+        minLeadBusinessDays: lead === null ? null : Number(lead),
+      },
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(formData, "toResolve"),
       sources: refs,

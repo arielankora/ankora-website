@@ -8,11 +8,14 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import {
   ACTION_TAGS,
   ACTION_TAG_LABELS,
+  CHANNELS,
+  CHANNEL_LABELS,
   MAX_PROCESS_STEPS,
   STEP_MODE_LABELS,
   TRANSITION_LABELS,
   TRIGGER_LABELS,
   type ActionTag,
+  type Channel,
   type ProcessStep,
   type StepModeLike,
   type TransitionLike,
@@ -75,7 +78,19 @@ export type PanelProcess = {
   dateIds: string[];
   latestVersion: number;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null } | null;
-  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: { code: string; message: string }[] } | null;
+  draft: {
+    version: number;
+    steps: ProcessStep[];
+    highlights: string | null;
+    outputs: string | null;
+    changeNote: string | null;
+    checks: { code: string; message: string }[];
+    /// Findings against a rule with an exception in force: shown, not blocking.
+    excepted: { code: string; message: string }[];
+  } | null;
+  /// The approved procedure no longer passes the client's rules (spec 7.3).
+  needsReview: boolean;
+  reviewFindings: { code: string; message: string }[];
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
@@ -246,7 +261,7 @@ function ProcessForm({
   );
 }
 
-const EMPTY_STEP: ProcessStep = { title: "", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false };
+const EMPTY_STEP: ProcessStep = { title: "", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false, channel: null };
 
 function ProcedureEditor({ clientId, process, systems }: { clientId: string; process: PanelProcess; systems: Option[] }) {
   const close = useDrawerClose();
@@ -319,6 +334,21 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
                 </label>
               ))}
             </div>
+            {st.actionTags.includes("CLIENT_MESSAGE") && (
+              <select
+                aria-label={`שלב ${i + 1}: ערוץ`}
+                value={st.channel ?? ""}
+                onChange={(e) => set(i, { channel: (e.target.value || null) as Channel | null })}
+                className={`mt-2 ${INPUT}`}
+              >
+                <option value="">באיזה ערוץ ההודעה יוצאת</option>
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {CHANNEL_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            )}
             {systems.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                 {systems.map((s) => (
@@ -419,6 +449,7 @@ function StepList({ steps, systemName }: { steps: ProcessStep[]; systemName: Map
             {st.offsetBusinessDays !== null && ` · ${st.offsetBusinessDays >= 0 ? `+${st.offsetBusinessDays}` : st.offsetBusinessDays} ימי עסקים`}
             {st.actionTags.length > 0 && ` · ${st.actionTags.map((t) => ACTION_TAG_LABELS[t]).join(", ")}`}
             {st.systemIds.length > 0 && ` · ${st.systemIds.map((id) => systemName.get(id) ?? "מערכת שהוסרה").join(", ")}`}
+            {st.channel && ` · ${CHANNEL_LABELS[st.channel]}`}
             {st.requiresApproval && " · דורש אישור"}
           </span>
           {st.verification && <span className="block text-appNavy/50">אימות: {st.verification}</span>}
@@ -519,6 +550,20 @@ export function ProcessesPanel({
                   <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
                   <SourceCodes sources={p.sources} options={sourceOptions} />
 
+                  {p.needsReview && p.reviewFindings.length > 0 && (
+                    <div className="mt-2 rounded-lg border border-red-200 bg-red-50/60 px-3 py-2" role="note">
+                      <p className="text-xs font-medium text-red-800">הנוהל דורש סקירה: הוא כבר לא עובר את כללי הלקוח.</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {p.reviewFindings.map((f, i) => (
+                          <li key={i} className="text-xs text-red-700">
+                            {f.message}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-1 text-[11px] text-red-800/70">מתקנים בגרסה חדשה לנוהל, או מבקשים חריגה מהכלל. ריצות פתוחות קיבלו הערה.</p>
+                    </div>
+                  )}
+
                   {p.current ? (
                     <div className="mt-2">
                       <p className="text-xs font-medium text-appNavy/70">
@@ -589,6 +634,11 @@ export function ProcessesPanel({
                       {p.draft.checks.map((c, i) => (
                         <p key={i} className="mt-1 text-xs text-red-700">
                           {c.message}
+                        </p>
+                      ))}
+                      {p.draft.excepted.map((c, i) => (
+                        <p key={`x${i}`} className="mt-1 text-xs text-appNavy/55">
+                          {c.message} יש חריגה מאושרת לכלל.
                         </p>
                       ))}
                       {canApprove && p.draft.checks.length === 0 && (

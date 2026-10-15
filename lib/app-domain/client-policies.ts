@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
-import { changesSubstance, policyShapeError, type PolicyKindLike } from "@/lib/client-policies";
+import { changesSubstance, checkFieldsError, checkFieldsFor, policyShapeError, sameCheckFields, type PolicyCheckFields, type PolicyKindLike } from "@/lib/client-policies";
+import { rescanClientProcesses } from "@/lib/app-domain/process-review";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type { ClientPolicy, PolicyKind, User } from "@prisma/client";
@@ -30,6 +31,22 @@ export interface ClientPolicyInput extends KnowledgeInput {
   statement: string;
   rationale?: string | null;
   interimStatement?: string | null;
+  /// What the server checks against procedures (spec 7.2). Only the
+  /// fields the kind takes are kept.
+  check?: Partial<PolicyCheckFields>;
+}
+
+function checkOf(kind: PolicyKindLike, f: Partial<PolicyCheckFields> | undefined): PolicyCheckFields {
+  const fields = checkFieldsFor(kind, f ?? {});
+  const error = checkFieldsError(kind, fields);
+  if (error) throw new Error(error);
+  return fields;
+}
+
+/// A rule changed: the client's approved procedures are checked against
+/// the rules as they are now (spec 7.3).
+async function rescan(clientId: string, cause: string) {
+  await rescanClientProcesses(clientId, cause);
 }
 
 function clean(v: string | null | undefined): string | null {
@@ -53,11 +70,13 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
   const shapeError = policyShapeError({ ...input, status: "PROPOSED" });
   if (shapeError) throw new Error(shapeError);
   assertResolvable(input.knowledgeStatus, input.toResolve);
+  const check = checkOf(input.kind as PolicyKindLike, input.check);
   const sourced = await sourcedFields(input.clientId, input, [input.statement, input.rationale, input.interimStatement]);
   const row = await prisma.clientPolicy.create({
     data: {
       clientId: input.clientId,
       kind: input.kind,
+      ...check,
       status: "PROPOSED",
       title: input.title.trim(),
       statement: input.statement.trim(),
@@ -69,6 +88,7 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
     },
   });
   await recordAudit({ actorId: actor.id, action: "client_policy.add", entityType: "ClientPolicy", entityId: row.id, clientId: input.clientId, after: row });
+  await rescan(input.clientId, `נוסף הכלל "${row.title}"`);
   return row;
 }
 
@@ -76,7 +96,12 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
   assertCan(actor.role, "time_entry.create_self");
   const before = await findPolicy(actor, id);
   if (before.status === "RETIRED") throw new Error("כלל שבוטל לא נערך. כותבים כלל חדש.");
-  const substantive = changesSubstance(before, {
+  const kindAfter = (input.kind ?? before.kind) as PolicyKindLike;
+  // The structured part follows the kind: sent, it replaces; not sent, the
+  // rule keeps what it had, less what a new kind does not take.
+  const check = checkOf(kindAfter, input.check ?? before);
+  const checkChanged = !sameCheckFields(check, before);
+  const substantive = checkChanged || changesSubstance(before, {
     kind: input.kind,
     title: input.title,
     statement: input.statement,
@@ -101,6 +126,7 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
       statement: input.statement !== undefined ? input.statement.trim() : undefined,
       rationale: input.rationale !== undefined ? clean(input.rationale) : undefined,
       interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
+      ...check,
       // What it says changed: a new version, and back to a manager.
       ...(substantive
         ? { version: before.version + 1, status: "PROPOSED" as const, approvedById: null, approvedAt: null }
@@ -119,6 +145,7 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
     before,
     after: updated,
   });
+  if (substantive) await rescan(before.clientId, `הכלל "${updated.title}" השתנה`);
   return updated;
 }
 
@@ -134,6 +161,8 @@ export async function approveClientPolicy(actor: User, id: string) {
     data: { status: "ACTIVE", approvedById: actor.id, approvedAt: new Date() },
   });
   await recordAudit({ actorId: actor.id, action: "client_policy.approve", entityType: "ClientPolicy", entityId: id, clientId: before.clientId, before, after: updated });
+  // The interim rule is gone and the rule binds as written.
+  await rescan(before.clientId, `הכלל "${updated.title}" אושר`);
   return updated;
 }
 
@@ -156,6 +185,7 @@ export async function retireClientPolicy(actor: User, id: string, reason: string
     before,
     after: { ...updated, reason: why.slice(0, 500) },
   });
+  await rescan(before.clientId, `הכלל "${updated.title}" בוטל`);
   return updated;
 }
 
@@ -167,6 +197,7 @@ export async function removeClientPolicy(actor: User, id: string) {
   if (row.status !== "PROPOSED") throw new Error("כלל שאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
   const removed = await prisma.clientPolicy.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "client_policy.remove", entityType: "ClientPolicy", entityId: id, clientId: row.clientId, before: row });
+  await rescan(row.clientId, `הכלל "${row.title}" הוסר`);
   return removed;
 }
 

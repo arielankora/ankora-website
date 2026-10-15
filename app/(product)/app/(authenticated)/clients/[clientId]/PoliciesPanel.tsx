@@ -26,6 +26,8 @@ import {
   updatePolicyAction,
   withdrawExceptionAction,
 } from "../policy-actions";
+import { ACTION_TAGS, ACTION_TAG_LABELS, CHANNELS, CHANNEL_LABELS, ruleCheckSummary } from "@/lib/process-rules";
+import { CHECK_FIELDS_BY_KIND } from "@/lib/client-policies";
 import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 3: the client's own rules, sections 6 and 14 of the
@@ -50,7 +52,66 @@ export type PanelPolicy = {
   knowledgeStatus: KnowledgeStatusLike;
   toResolve: string | null;
   sources: string[];
+  checkTags: string[];
+  requiredTags: string[];
+  channels: string[];
+  minLeadBusinessDays: number | null;
 };
+
+/// The structured part of a rule: what the server checks against
+/// procedures (spec 7.2). Only for kinds that take it.
+function CheckFields({ kind, existing }: { kind: PolicyKindLike; existing?: PanelPolicy }) {
+  const takes = CHECK_FIELDS_BY_KIND[kind] ?? [];
+  if (takes.length === 0) return null;
+  const tags = (name: "checkTags" | "requiredTags", selected: string[]) => (
+    <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+      {ACTION_TAGS.map((t) => (
+        <label key={t} className="flex items-center gap-1 text-xs text-appNavy">
+          <input type="checkbox" name={name} value={t} defaultChecked={selected.includes(t)} className="h-3.5 w-3.5 accent-gold" />
+          {ACTION_TAG_LABELS[t]}
+        </label>
+      ))}
+    </div>
+  );
+  return (
+    <fieldset className="rounded-lg border border-lineDark px-3 py-2.5">
+      <legend className="px-1 text-xs font-medium text-appNavy/70">מה נבדק בנהלים (לא חובה)</legend>
+      {takes.includes("checkTags") && (
+        <div>
+          <span className="text-xs text-appNavy/60">{kind === "FORBIDDEN" ? "פעולות אסורות" : kind === "TIMING" ? "על איזו פעולה" : "כשבנוהל יש"}</span>
+          {tags("checkTags", existing?.checkTags ?? [])}
+        </div>
+      )}
+      {takes.includes("requiredTags") && (
+        <div className="mt-2">
+          <span className="text-xs text-appNavy/60">חייב להיות גם שלב של</span>
+          {tags("requiredTags", existing?.requiredTags ?? [])}
+        </div>
+      )}
+      {takes.includes("minLeadBusinessDays") && (
+        <div className="mt-2">
+          <Field label="לפחות כמה ימי עסקים לפני המועד">
+            <input name="minLeadBusinessDays" inputMode="numeric" defaultValue={existing?.minLeadBusinessDays ?? ""} placeholder="2" className={INPUT} />
+          </Field>
+        </div>
+      )}
+      {takes.includes("channels") && (
+        <div>
+          <span className="text-xs text-appNavy/60">ערוצים מותרים להודעה ללקוח</span>
+          <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+            {CHANNELS.map((c) => (
+              <label key={c} className="flex items-center gap-1 text-xs text-appNavy">
+                <input type="checkbox" name="channels" value={c} defaultChecked={existing?.channels.includes(c)} className="h-3.5 w-3.5 accent-gold" />
+                {CHANNEL_LABELS[c]}
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+      <p className="mt-2 text-[11px] text-appNavy/50">בלי בחירה, הכלל נקרא על ידי אנשים ועל ידי Claude ולא נבדק אוטומטית.</p>
+    </fieldset>
+  );
+}
 
 export type PanelException = {
   id: string;
@@ -154,7 +215,7 @@ function PolicyForm({ clientId, sourceOptions, existing }: { clientId: string; s
       {existing && <input type="hidden" name="id" value={existing.id} />}
       {existing?.status === "ACTIVE" && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          הכלל בתוקף. שינוי בשם, בסוג או בנוסח מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
+          הכלל בתוקף. שינוי בשם, בסוג, בנוסח או במה שנבדק מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
         </p>
       )}
       <Field label="סוג הכלל *">
@@ -184,6 +245,7 @@ function PolicyForm({ clientId, sourceOptions, existing }: { clientId: string; s
         />
       </Field>
       <p className="-mt-2 text-[11px] text-appNavy/50">הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.</p>
+      <CheckFields kind={kind} existing={existing} />
       <Field label="למה">
         <input name="rationale" defaultValue={existing?.rationale ?? ""} className={INPUT} />
       </Field>
@@ -327,6 +389,7 @@ export function PoliciesPanel({
                   <p className="mt-1 text-xs text-appNavy/80">{p.statement}</p>
                 )}
                 {p.rationale && <p className="mt-0.5 text-xs text-appNavy/55">למה: {p.rationale}</p>}
+                {ruleCheckSummary(p) && <p className="mt-0.5 text-[11px] text-appNavy/55">{ruleCheckSummary(p)}</p>}
                 {p.status === "ACTIVE" && p.approvedByName && (
                   <p className="mt-0.5 text-[11px] text-appNavy/45">
                     אושר על ידי {p.approvedByName}

@@ -51,13 +51,13 @@ export const POLICY_KIND_LABELS: Record<PolicyKindLike, string> = {
 export const POLICY_KIND_HINTS: Record<PolicyKindLike, string> = {
   DATA_HANDLING: "מה נכנס לתיק ואיך. נשלח לכל חילוץ, ידני ויומי.",
   DISCLOSURE: "למי אסור לספר מה. מוצג בראש מסך הלקוח ובראש התיק.",
-  COMMUNICATION: "באיזה ערוץ עושים מה. ייבדק מול שלבי נוהל כשיהיו תהליכים.",
-  SEPARATION: "מה נשאר מופרד, למשל בין ישויות. ייבדק מול שלבי נוהל וסוגי פניות.",
+  COMMUNICATION: "באיזה ערוץ עושים מה. כשבוחרים ערוצים מותרים, כל הודעה ללקוח בנוהל נבדקת מולם.",
+  SEPARATION: "מה נשאר מופרד, למשל בין ישויות. נוהל עם כסף או חשבוניות צריך ישות.",
   APPROVAL_REQUIRED: "מה דורש אישור, וממי. ייבדק מול שלבי נוהל.",
   THRESHOLD: "סכום שמעליו צריך אישור. ייבדק מול שלבי נוהל.",
-  REQUIRED_STEP: "שלב שחייב להיות. ייבדק מול שלבי נוהל.",
-  TIMING: "כמה זמן לפני. ייבדק מול מועדים ותהליכים.",
-  FORBIDDEN: "מה אסור לכולם, לא רק ל-AI.",
+  REQUIRED_STEP: "שלב שחייב להיות. כשבוחרים פעולה ושלב חובה, כל נוהל שעושה את הפעולה נבדק.",
+  TIMING: "כמה זמן לפני. כשבוחרים פעולה וימי עסקים, כל שלב כזה בנוהל נבדק.",
+  FORBIDDEN: "מה אסור לכולם, לא רק ל-AI. כשבוחרים פעולות, שלב שעושה אחת מהן בנוהל נבדק.",
   INFO: "כל השאר: נקרא על ידי אנשים ועל ידי Claude.",
 };
 
@@ -154,4 +154,61 @@ export function exceptionShapeError(e: { what?: string | null; reason?: string |
 /// Approved and its last day not yet over.
 export function isExceptionInForce(e: { status: string; validUntil: Date }, now: Date): boolean {
   return e.status === "APPROVED" && e.validUntil.getTime() + 24 * 60 * 60 * 1000 > now.getTime();
+}
+
+// ---------------------------------------------------------------------------
+// What the server checks of a rule (spec 7.2)
+// ---------------------------------------------------------------------------
+
+/// The structured part of a rule: which fields each kind takes. A field a
+/// kind does not take is dropped, so a FORBIDDEN rule never carries a
+/// channel list nobody will read.
+export type PolicyCheckFields = {
+  checkTags: string[];
+  requiredTags: string[];
+  channels: string[];
+  minLeadBusinessDays: number | null;
+};
+
+export const CHECK_FIELDS_BY_KIND: Partial<Record<PolicyKindLike, (keyof PolicyCheckFields)[]>> = {
+  FORBIDDEN: ["checkTags"],
+  REQUIRED_STEP: ["checkTags", "requiredTags"],
+  TIMING: ["checkTags", "minLeadBusinessDays"],
+  COMMUNICATION: ["channels"],
+};
+
+export const NO_CHECK: PolicyCheckFields = { checkTags: [], requiredTags: [], channels: [], minLeadBusinessDays: null };
+
+/// Only what the kind takes, deduplicated.
+export function checkFieldsFor(kind: PolicyKindLike, f: Partial<PolicyCheckFields>): PolicyCheckFields {
+  const takes = CHECK_FIELDS_BY_KIND[kind] ?? [];
+  const list = (v: string[] | undefined) => [...new Set((v ?? []).filter(Boolean))];
+  return {
+    checkTags: takes.includes("checkTags") ? list(f.checkTags) : [],
+    requiredTags: takes.includes("requiredTags") ? list(f.requiredTags) : [],
+    channels: takes.includes("channels") ? list(f.channels) : [],
+    minLeadBusinessDays: takes.includes("minLeadBusinessDays") ? f.minLeadBusinessDays ?? null : null,
+  };
+}
+
+/// Half a check is no check: it is refused rather than stored as if it
+/// were one.
+export function checkFieldsError(kind: PolicyKindLike, f: PolicyCheckFields): string | null {
+  if (kind === "REQUIRED_STEP" && f.requiredTags.length && !f.checkTags.length) return "שלב חובה: צריך לבחור גם על איזו פעולה הוא חל.";
+  if (kind === "REQUIRED_STEP" && f.checkTags.length && !f.requiredTags.length) return "שלב חובה: צריך לבחור איזה שלב חייב להיות.";
+  if (kind === "TIMING" && f.minLeadBusinessDays !== null && (!Number.isInteger(f.minLeadBusinessDays) || f.minLeadBusinessDays < 1 || f.minLeadBusinessDays > 60)) {
+    return "תזמון: בין 1 ל-60 ימי עסקים.";
+  }
+  if (kind === "TIMING" && (f.minLeadBusinessDays !== null) !== f.checkTags.length > 0) return "תזמון: צריך לבחור גם פעולה וגם כמה ימי עסקים לפני.";
+  return null;
+}
+
+/// Whether the server checks this rule at all.
+export function isChecked(f: PolicyCheckFields): boolean {
+  return f.checkTags.length > 0 || f.requiredTags.length > 0 || f.channels.length > 0 || f.minLeadBusinessDays !== null;
+}
+
+export function sameCheckFields(a: PolicyCheckFields, b: PolicyCheckFields): boolean {
+  const eq = (x: string[], y: string[]) => x.length === y.length && [...x].sort().join() === [...y].sort().join();
+  return eq(a.checkTags, b.checkTags) && eq(a.requiredTags, b.requiredTags) && eq(a.channels, b.channels) && a.minLeadBusinessDays === b.minLeadBusinessDays;
 }

@@ -434,8 +434,18 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   taskId: c.taskId,
                 })),
                 draft: p.draft
-                  ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
+                  ? {
+                      version: p.draft.version,
+                      steps: p.draft.steps,
+                      highlights: p.draft.highlights,
+                      outputs: p.draft.outputs,
+                      changeNote: p.draft.changeNote,
+                      checks: p.draft.checks,
+                      excepted: p.draft.excepted,
+                    }
                   : null,
+                needsReview: p.needsReview,
+                reviewFindings: p.reviewFindings,
               }))}
             />
 
@@ -475,6 +485,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
                 toResolve: p.toResolve,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
+                checkTags: p.checkTags,
+                requiredTags: p.requiredTags,
+                channels: p.channels,
+                minLeadBusinessDays: p.minLeadBusinessDays,
               }))}
             />
 

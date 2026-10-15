@@ -3386,6 +3386,19 @@ model ClientPolicy {
   /// approved" is).
   interimStatement String?
 
+  /// What the server can check against a procedure's steps (spec 7.2),
+  /// beside the words. Empty: the rule is read, not checked.
+  /// FORBIDDEN, TIMING, REQUIRED_STEP: the actions (step tags) it is about.
+  checkTags           String[] @default([])
+  /// REQUIRED_STEP: a procedure that does `checkTags` also has a step
+  /// doing one of these ("a payment needs the invoice uploaded").
+  requiredTags        String[] @default([])
+  /// COMMUNICATION: the channels a message to the client may go through.
+  channels            String[] @default([])
+  /// TIMING: how many business days before the date a step with
+  /// `checkTags` has to happen, at least.
+  minLeadBusinessDays Int?
+
   approvedById String?
   approvedAt   DateTime?
   retiredAt    DateTime?
@@ -3566,6 +3579,9 @@ model Process {
   lastReviewedAt DateTime?
   lastRunAt      DateTime?
   needsReview    Boolean       @default(false)
+  /// Why it needs review: what the last rescan against the client's rules
+  /// found (spec 7.3). Empty when it passes.
+  reviewFindings Json          @default("[]")
 
   /// An ongoing process (CONTINUOUS) opens no tasks. It can have a check
   /// every N days instead ("once a week: no invoice is stuck"), which is

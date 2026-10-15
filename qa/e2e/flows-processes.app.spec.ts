@@ -37,7 +37,7 @@ async function submit(page: import("@playwright/test").Page, button: string) {
 }
 
 test.describe("clients/process-actions", () => {
-  test("a procedure that automates a payment is held back; fixed, a manager approves it", async ({ page }) => {
+  test("a procedure that automates a contract is held back; fixed, a manager approves it", async ({ page }) => {
     const title = tag("[E2E] תהליך");
 
     await page.goto(`/app/clients/${CLIENT}?tab=file`);
@@ -61,9 +61,11 @@ test.describe("clients/process-actions", () => {
     await card().getByRole("button", { name: "כתיבת נוהל" }).click();
     const editor = page.getByRole("dialog");
     await expect(editor).toBeVisible();
-    await editor.getByLabel("שלב 1: מה עושים").fill("מעבירים תשלום לספק");
+    // A contract, not a payment: human-only (R1) without touching money,
+    // so a separation rule left by another spec (R8) cannot hold it back.
+    await editor.getByLabel("שלב 1: מה עושים").fill("חותמים על חוזה עם הספק");
     await editor.getByLabel("שלב 1: איך").selectOption("AUTOMATED");
-    await editor.getByRole("checkbox", { name: "תשלום" }).check();
+    await editor.getByRole("checkbox", { name: "חוזה", exact: true }).check();
     await submit(page, "שמירת טיוטה");
 
     await expect(card()).toContainText("טיוטה, גרסה 1", { timeout: 15_000 });
@@ -95,7 +97,7 @@ test.describe("clients/process-actions", () => {
     await card().getByRole("link").first().click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
+    await expect(page.getByText("חותמים על חוזה עם הספק").first()).toBeVisible();
   });
 
   test("an ongoing process is in its owner's routine; a check that finds an issue opens a task", async ({ page }) => {

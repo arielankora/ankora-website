@@ -106,6 +106,35 @@ test.describe("clients/policy-actions", () => {
   });
 });
 
+test.describe("clients/policy-actions: what is checked", () => {
+  test("a channel rule says what it checks in procedures", async ({ page }) => {
+    const title = tag("[E2E] ערוצים");
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const code = await addSource(page);
+    await page.getByRole("button", { name: "+ כלל", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.locator('select[name="kind"]').selectOption("COMMUNICATION");
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('textarea[name="statement"]').fill("החלטות מול הלקוח רק במייל");
+    await dialog.locator('input[name="channels"][value="EMAIL"]').check();
+    await dialog.locator('input[name="sources"]').fill(code);
+    await submit(page, "הוספה לתיק");
+
+    const row = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+    await expect(row(), "the rule was not added").toBeVisible({ timeout: 15_000 });
+    await expect(row()).toContainText("נבדק בנהלים: הודעה ללקוח רק במייל");
+
+    // Removed right away: a channel rule binds every procedure of the
+    // client, and other specs write procedures on this one.
+    const removed = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await row().getByRole("button", { name: "הסרה" }).click();
+    await removed;
+    await page.reload();
+    await expect(page.locator("li", { hasText: title })).toHaveCount(0, { timeout: 15_000 });
+  });
+});
+
 test.describe("clients/policy-actions: exceptions", () => {
   test("an exception to a rule is requested with an end date and approved by the client's approver", async ({ page }) => {
     const title = tag("[E2E] הפרדה");

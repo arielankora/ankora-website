@@ -7,6 +7,7 @@ import { assertCanApproveForClient, notifyRuleApprovers } from "@/lib/app-domain
 import { findSecrets } from "@/lib/secret-scan";
 import { exceptionShapeError, isExceptionInForce, EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
 import type { User } from "@prisma/client";
+import { rescanClientProcesses } from "@/lib/app-domain/process-review";
 
 // Org brain, phase 3: exceptions to a client's rules
 // (claude/org-brain-spec-2026-10-12.md, 3.11 PolicyException, 7.2).
@@ -96,7 +97,12 @@ async function decide(actor: User, id: string, approve: boolean, note: string | 
   return updated;
 }
 
-export const approveException = (actor: User, id: string, note?: string | null) => decide(actor, id, true, note ?? null);
+export async function approveException(actor: User, id: string, note?: string | null) {
+  const updated = await decide(actor, id, true, note ?? null);
+  // A procedure held for review by this rule may pass now (spec 7.3).
+  await rescanClientProcesses(updated.clientId, "אושרה חריגה מכלל של הלקוח");
+  return updated;
+}
 export const rejectException = (actor: User, id: string, note: string) => decide(actor, id, false, note);
 
 export async function withdrawException(actor: User, id: string) {

@@ -9,6 +9,7 @@ import { processGaps, readSteps } from "@/lib/process-rules";
 import { ruleLine, isExceptionInForce } from "@/lib/client-policies";
 import { runDescription, stepDueKeys, stepTitle } from "@/lib/process-runs";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { readFindings } from "@/lib/app-domain/process-review";
 
 // Org brain, phase 1: a run of a process (claude/org-brain-spec-2026-10-12.md,
 // 3.12, 5.3). A run is a task: the process's title, the approved
@@ -108,6 +109,12 @@ export async function openProcessRun(input: OpenRunInput) {
     exceptionPlaybook: process.exceptionPlaybook,
     systemName: (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה",
   });
+  // A procedure held for review still runs (process-review.ts): the
+  // person running it reads why first.
+  const review = process.needsReview ? readFindings(process.reviewFindings) : [];
+  const fullDescription = review.length
+    ? `**הנוהל דורש סקירה.** לפני כל שלב שמופיע כאן, לבדוק מול כללי הלקוח:\n${review.map((f) => `- ${f.message}`).join("\n")}\n\n${description}`
+    : description;
   const dueKeys = stepDueKeys(runKey, steps, calendar);
 
   const run = await prisma.task.create({
@@ -115,7 +122,7 @@ export async function openProcessRun(input: OpenRunInput) {
       clientId: process.clientId,
       categoryId: process.categoryId ?? input.fallbackCategoryId ?? null,
       title: `${process.code} ${process.title}`.slice(0, 200),
-      description,
+      description: fullDescription,
       assignedToId: assignee,
       dueDate: dayAt(runKey),
       importantDateId: input.importantDateId ?? null,

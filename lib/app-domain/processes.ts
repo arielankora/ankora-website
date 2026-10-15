@@ -6,8 +6,8 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { findSecrets } from "@/lib/secret-scan";
-import { ruleInForce } from "@/lib/client-policies";
 import { checkEveryError } from "@/lib/process-checks";
+import { checkProcedure, readFindings, reviewContext } from "@/lib/app-domain/process-review";
 import {
   MAX_PROCESS_STEPS,
   blockingChecks,
@@ -242,16 +242,6 @@ export type VersionInput = {
   baseVersion: number;
 };
 
-/// The client's approval rules in force, by title: what R2 holds a
-/// procedure that moves money against.
-async function approvalRules(clientId: string): Promise<string[]> {
-  const rows = await prisma.clientPolicy.findMany({
-    where: { clientId, deletedAt: null, status: { not: "RETIRED" }, kind: { in: ["THRESHOLD", "APPROVAL_REQUIRED"] } },
-    select: { title: true, status: true, statement: true, interimStatement: true },
-  });
-  return rows.filter((r) => ruleInForce(r)).map((r) => r.title);
-}
-
 export async function saveProcessVersion(actor: User, processId: string, input: VersionInput) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await findProcess(actor, processId);
@@ -292,9 +282,15 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
   }
 }
 
-/// The checks a version would face if approved now.
-export async function checkProcessVersion(clientId: string, v: { steps: unknown; highlights: string | null; outputs: string | null }): Promise<CheckResult[]> {
-  return blockingChecks({ steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, await approvalRules(clientId));
+/// The checks a version would face if approved now: R1 to R4, and the
+/// client's rules unless an exception to the rule is in force.
+export async function checkProcessVersion(
+  clientId: string,
+  process: { entityId: string | null },
+  v: { steps: unknown; highlights: string | null; outputs: string | null }
+): Promise<CheckResult[]> {
+  const ctx = await reviewContext(clientId);
+  return checkProcedure(ctx, process, { steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }).failing;
 }
 
 export async function approveProcessVersion(actor: User, processId: string, version: number) {
@@ -303,7 +299,7 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
   if (!latest || latest.version !== version) throw new Error("זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
   if (latest.status !== "DRAFT") throw new Error("הגרסה הזו כבר מאושרת.");
-  const blocking = await checkProcessVersion(process.clientId, latest);
+  const blocking = await checkProcessVersion(process.clientId, process, latest);
   if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
   const now = new Date();
   await prisma.$transaction([
@@ -311,7 +307,7 @@ export async function approveProcessVersion(actor: User, processId: string, vers
     prisma.processVersion.update({ where: { id: latest.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: now } }),
     prisma.process.update({
       where: { id: processId },
-      data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false },
+      data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false, reviewFindings: [] },
     }),
   ]);
   await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version } });
@@ -337,7 +333,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
   await assertClientAccess(actor, clientId);
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { accountManagerId: true } });
   const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
-  const [rows, systems, thresholds] = await Promise.all([
+  const [rows, systems, ctx] = await Promise.all([
     prisma.process.findMany({
       where: { clientId, deletedAt: null, ...(options.includeRetired ? {} : { status: { not: "RETIRED" } }) },
       orderBy: { seq: "asc" },
@@ -347,7 +343,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
       },
     }),
     prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true, accessStatus: true } }),
-    approvalRules(clientId),
+    reviewContext(clientId),
   ]);
   const systemById = new Map(systems.map((s) => [s.id, s]));
   return rows
@@ -372,10 +368,15 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         nextDate,
       };
       const steps = (v: typeof current): ProcessStep[] => (v ? readSteps(v.steps) : []);
+      const draftChecks = (d: NonNullable<typeof draft>) => {
+        const c = checkProcedure(ctx, r, { steps: steps(d), highlights: d.highlights, outputs: d.outputs });
+        return { checks: c.failing, excepted: c.excepted.map((f) => ({ code: f.code, message: f.message })) };
+      };
       return {
         ...r,
         current: current ? { ...current, steps: steps(current) } : null,
-        draft: draft ? { ...draft, steps: steps(draft), checks: blockingChecks({ steps: steps(draft), highlights: draft.highlights, outputs: draft.outputs }, thresholds) } : null,
+        draft: draft ? { ...draft, steps: steps(draft), ...draftChecks(draft) } : null,
+        reviewFindings: readFindings(r.reviewFindings),
         latestVersion: latest?.version ?? 0,
         nextDate,
         completeness: completeness(input),

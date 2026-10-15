@@ -32,8 +32,11 @@ async function setup(options: { approve?: boolean; createAutoTask?: boolean } = 
   await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: client.id } });
   await addClientSource(hadas, { clientId: client.id, kind: "TRANSCRIPT", title: "Nextage & Ankora" });
   await addClientPolicy(hadas, { clientId: client.id, kind: "SEPARATION", title: "Inc ו-LTD", statement: "לא שולחים לאיילה שום דבר של Inc", sources: S1 });
+  // LTD: a separation rule wants a procedure with invoices to say whose (R8).
+  const ltd = await prisma.clientEntity.create({ data: { clientId: client.id, name: "LTD", country: "IL" } });
   const process = await addProcess(hadas, {
     clientId: client.id,
+    entityId: ltd.id,
     title: "תשלומי ספקים, LTD",
     triggerKinds: ["SCHEDULED", "EVENT"],
     triggerText: "10 ו-25 לחודש",

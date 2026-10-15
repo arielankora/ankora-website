@@ -18,7 +18,7 @@ import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses } from "@/lib/app-domain/processes";
-import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
+import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, ruleCheckSummary } from "@/lib/process-rules";
 import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
@@ -131,6 +131,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       details: [
         p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
         p.rationale ? `למה: ${p.rationale}` : null,
+        ruleCheckSummary(p),
         // An approved exception travels with its rule: whoever reads the
         // rule reads that, until a date, it is done otherwise.
         ...exceptions
@@ -261,6 +262,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
           p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
           `שלמות ${p.completeness.score} מתוך 9`,
+          p.needsReview && p.reviewFindings.length ? `דורש סקירה: ${p.reviewFindings.map((f) => f.message).join(" ")}` : null,
           ...p.gaps,
           p.current
             ? `נוהל גרסה ${p.current.version}: ${p.current.steps.map((st, i) => `${i + 1}. ${st.title} (${STEP_MODE_LABELS[st.mode]}${st.requiresApproval ? ", דורש אישור" : ""})`).join(" ")}`
