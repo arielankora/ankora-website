@@ -1650,6 +1650,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "A colleague's lifecycle state handed to a model; must never carry the personal email, IPs or hashes"
+    },
+    "api:/app/agreements/blank/[kind]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "The blank agreement form; managers and admins only"
     }
   },
   "waivers": {},

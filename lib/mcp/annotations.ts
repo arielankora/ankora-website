@@ -115,6 +115,9 @@ export const TOOL_ANNOTATIONS = {
   // is a read. Recording a returned PDF is a write, and idempotent: a
   // second call for the same person, kind and version returns the first.
   get_employee_status: READ_ONLY,
+  // Issues a 15-minute download address for a blank form. It writes a
+  // ticket row and nothing a person sees, like read_document's address.
+  get_blank_agreement_pdf: READ_ONLY,
   record_pdf_signature: { ...WRITES, idempotentHint: true },
 } as const;
 
@@ -123,7 +126,7 @@ export type ToolName = keyof typeof TOOL_ANNOTATIONS;
 /// Tools that read data belonging to someone other than the caller. Each
 /// must assert `time_entry.edit_others` - the same permission the admin
 /// screen and the CSV export route already gate this data on.
-export const TEAM_TOOLS = ["list_team_members", "list_team_time_entries", "get_employee_status"] as const;
+export const TEAM_TOOLS = ["list_team_members", "list_team_time_entries", "get_employee_status", "get_blank_agreement_pdf"] as const;
 /// record_pdf_signature asserts the same permission but is a write, so it
 /// is listed in WRITE_TOOLS rather than here (team tools are reads).
 

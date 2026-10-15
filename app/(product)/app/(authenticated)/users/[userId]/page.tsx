@@ -114,7 +114,21 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             Staff only; clients sign nothing here. */}
         {targetUser.role !== "CLIENT_USER" && (
           <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-4 text-sm font-medium text-appNavy">מסמכים חתומים</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-appNavy">מסמכים חתומים</h2>
+              {/* The blank forms for the PDF channel. A plain link: the
+                  route answers with the file as an attachment. */}
+              <span className="text-xs text-appNavy/60">
+                הורדת טופס לחתימה:{" "}
+                <a href="/app/agreements/blank/confidentiality" download className="text-gold-dim underline underline-offset-2 hover:text-appNavy">
+                  התחייבות לסודיות
+                </a>
+                {" · "}
+                <a href="/app/agreements/blank/deletion-declaration" download className="text-gold-dim underline underline-offset-2 hover:text-appNavy">
+                  הצהרת מחיקה
+                </a>
+              </span>
+            </div>
             <PersonalEmailForm userId={targetUser.id} value={targetUser.personalEmail} />
 
             <div className="mt-5 border-t border-lineDark pt-5">

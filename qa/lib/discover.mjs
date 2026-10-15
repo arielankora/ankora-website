@@ -79,9 +79,12 @@ function appScreens() {
   }));
 }
 
-/** Every HTTP endpoint. */
+/** Every HTTP endpoint. Route handlers live under app/api, with one
+ *  exception so far: the blank agreement form download, which sits under
+ *  /app so the session middleware covers it. Walked from app/ so the next
+ *  one is not missed either. */
 function apiRoutes() {
-  return walk("app/api", (f) => f.endsWith("/route.ts")).map((file) => {
+  return walk("app", (f) => f.endsWith("/route.ts")).map((file) => {
     const route = routeFromFile(file);
     const body = read(file);
     const methods = [...body.matchAll(/export\s+(?:async\s+)?function\s+(GET|POST|PUT|PATCH|DELETE)/g)].map(

@@ -8,6 +8,7 @@ const db = {
   employeeAgreement: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   agreementSignLink: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
   clientDocument: { findFirst: vi.fn() },
+  mcpFileTicket: { create: vi.fn() },
   user: { findFirst: vi.fn() },
   $transaction: vi.fn(),
 };
@@ -46,6 +47,8 @@ const {
   issueDeletionDeclarationLink,
   recordPdfSignature,
   recordPdfSignatureFromDocument,
+  issueBlankAgreementTicket,
+  kindFromBlankFileName,
   getAgreementStatus,
 } =
   await import("@/lib/app-domain/agreements");
@@ -326,6 +329,18 @@ describe("recordPdfSignatureFromDocument (the MCP tool's domain half)", () => {
     expect(db.employeeAgreement.create).not.toHaveBeenCalled();
   });
 
+  it("accepts the Latin code from the PDF's footer in place of the Hebrew version", async () => {
+    const out = await recordPdfSignatureFromDocument(admin, input({ version: "ANKORA-CONF-1.0" }));
+    expect(out.alreadyRecorded).toBe(false);
+    expect(db.employeeAgreement.create.mock.calls[0][0].data.version).toBe(CURRENT_AGREEMENTS.CONFIDENTIALITY);
+  });
+
+  it("refuses another kind's code, naming the expected code", async () => {
+    const err = await recordPdfSignatureFromDocument(admin, input({ version: "ANKORA-DEL-1.0" })).catch((e) => e);
+    expect(err).toBeInstanceOf(AgreementError);
+    expect(err.message).toContain("ANKORA-CONF-1.0");
+  });
+
   it("refuses a document that is not on the internal client", async () => {
     db.clientDocument.findFirst.mockResolvedValue({ id: "doc-1", clientId: "some-client", driveFileId: "x" });
     await expect(recordPdfSignatureFromDocument(admin, input())).rejects.toThrow(/Ankora פנימי/);
@@ -351,5 +366,35 @@ describe("recordPdfSignatureFromDocument (the MCP tool's domain half)", () => {
     });
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.pdf_recorded" }));
     expect(onPdfSignatureRecorded).toHaveBeenCalledWith("u1", "CONFIDENTIALITY", "a1");
+  });
+});
+
+describe("issueBlankAgreementTicket", () => {
+  beforeEach(() => resolveInternalClient.mockResolvedValue({ id: "internal", name: "Ankora פנימי" }));
+
+  it("is for managers and admins only, and writes nothing otherwise", async () => {
+    await expect(issueBlankAgreementTicket(user(), "CONFIDENTIALITY")).rejects.toBeInstanceOf(ForbiddenError);
+    expect(db.mcpFileTicket.create).not.toHaveBeenCalled();
+  });
+
+  it("issues a read_document-style address: hash stored, 15 minutes, named by the code", async () => {
+    const admin = user({ id: "admin", role: "ANKORA_ADMIN", tokenVersion: 4 });
+    const now = new Date("2026-10-15T08:00:00Z");
+    const t = await issueBlankAgreementTicket(admin, "DELETION_DECLARATION", now);
+    expect(t.url).toMatch(/\/api\/mcp\/files\/ank_fil_[A-Za-z0-9_-]+$/);
+    expect(t.code).toBe("ANKORA-DEL-1.0");
+    expect(t.fileName).toBe("ANKORA-DEL-1.0.pdf");
+    expect(t.expiresAt.getTime() - now.getTime()).toBe(15 * 60_000);
+    const data = db.mcpFileTicket.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({ purpose: "agreement-blank", userId: "admin", tokenVersion: 4, clientId: "internal", fileName: "ANKORA-DEL-1.0.pdf" });
+    expect(JSON.stringify(data)).not.toContain(t.url.split("/").pop()!);
+    expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.blank_issued" }));
+  });
+
+  it("maps a ticket's file name back to its kind", () => {
+    expect(kindFromBlankFileName("ANKORA-CONF-1.0.pdf")).toBe("CONFIDENTIALITY");
+    expect(kindFromBlankFileName("ANKORA-DEL-1.0.pdf")).toBe("DELETION_DECLARATION");
+    expect(kindFromBlankFileName("other.pdf")).toBeNull();
+    expect(kindFromBlankFileName(null)).toBeNull();
   });
 });

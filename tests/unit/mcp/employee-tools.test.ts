@@ -21,7 +21,7 @@ const agreements = vi.hoisted(() => {
       this.name = "AgreementError";
     }
   }
-  return { AgreementError, recordPdfSignatureFromDocument: vi.fn() };
+  return { AgreementError, recordPdfSignatureFromDocument: vi.fn(), issueBlankAgreementTicket: vi.fn() };
 });
 const lookup = vi.hoisted(() => ({ lookupStaffMember: vi.fn(), lookupClient: vi.fn() }));
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
@@ -103,6 +103,8 @@ describe("registration", () => {
   it("tells the agent to check version and signature, and to stop when unsure", () => {
     const d = String(tools.get("record_pdf_signature")!.config.description);
     expect(d).toContain("version");
+    expect(d).toContain("ANKORA-CONF-1.0");
+    expect(d).toContain("read_document");
     expect(d).toContain("signature is visibly there");
     expect(d).toContain("do not record");
     expect(d).toContain("Ankora פנימי");
@@ -119,6 +121,38 @@ describe("the manager/admin gate", () => {
     expect(lookup.lookupStaffMember).not.toHaveBeenCalled();
     expect(status.getEmployeeStatus).not.toHaveBeenCalled();
     expect(agreements.recordPdfSignatureFromDocument).not.toHaveBeenCalled();
+    const c = await tools.get("get_blank_agreement_pdf")!.handler({ kind: "CONFIDENTIALITY" }, CTX);
+    expect(c.isError).toBe(true);
+    expect(agreements.issueBlankAgreementTicket).not.toHaveBeenCalled();
+  });
+});
+
+describe("get_blank_agreement_pdf", () => {
+  it("hands back the download address, the code and the file name", async () => {
+    agreements.issueBlankAgreementTicket.mockResolvedValue({
+      url: "https://www.ankora.co.il/api/mcp/files/ank_fil_abc",
+      expiresAt: new Date("2026-10-15T08:15:00Z"),
+      code: "ANKORA-CONF-1.0",
+      version: "סודיות-1.0",
+      fileName: "ANKORA-CONF-1.0.pdf",
+    });
+    const out = json(await tools.get("get_blank_agreement_pdf")!.handler({ kind: "CONFIDENTIALITY" }, CTX));
+    expect(agreements.issueBlankAgreementTicket).toHaveBeenCalledWith(ADMIN, "CONFIDENTIALITY");
+    expect(out).toEqual({
+      kind: "CONFIDENTIALITY",
+      version: "סודיות-1.0",
+      code: "ANKORA-CONF-1.0",
+      fileName: "ANKORA-CONF-1.0.pdf",
+      downloadUrl: "https://www.ankora.co.il/api/mcp/files/ank_fil_abc",
+      expiresAt: "2026-10-15T08:15:00.000Z",
+    });
+  });
+
+  it("tells the agent to attach the file and that the footer code is the check", () => {
+    const d = String(tools.get("get_blank_agreement_pdf")!.config.description);
+    expect(d).toContain("attach");
+    expect(d).toContain("code");
+    expect(d).toContain("curl");
   });
 });
 

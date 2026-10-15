@@ -156,6 +156,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "agreement.sign": "חתימה על מסמך עובד",
   "agreement.link_issued": "שליחת קישור לחתימה על הצהרת מחיקה",
   "agreement.pdf_recorded": "רישום חתימה ב-PDF",
+  "agreement.blank_issued": "הורדת טופס הסכם לחתימה",
   // Employee lifecycle.
   "employee_lifecycle.task_opened": "פתיחת משימת קליטה או עזיבה",
   "employee_lifecycle.trigger_failed": "כשל בפתיחת משימת קליטה או עזיבה",

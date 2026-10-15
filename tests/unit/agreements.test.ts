@@ -11,7 +11,10 @@ const {
   CURRENT_AGREEMENTS,
   SIGN_LINK_TTL_MS,
   agreementBody,
+  agreementCode,
   agreementFileName,
+  findAgreementByVersionOrCode,
+  kindFromParam,
   agreementPath,
   contentHash,
   currentAgreement,
@@ -209,5 +212,33 @@ describe("agreementFileName", () => {
     expect(agreementFileName("DELETION_DECLARATION", "מחיקה-1.0", "a/b", new Date("2026-10-15T08:00:00Z"))).toBe(
       "DELETION_DECLARATION-מחיקה-1.0-a_b-2026-10-15.pdf"
     );
+  });
+});
+
+describe("Latin version codes", () => {
+  it("derives ANKORA-CONF-1.0 and ANKORA-DEL-1.0 from kind and version", () => {
+    expect(agreementCode("CONFIDENTIALITY", "סודיות-1.0")).toBe("ANKORA-CONF-1.0");
+    expect(agreementCode("DELETION_DECLARATION", "מחיקה-1.0")).toBe("ANKORA-DEL-1.0");
+    expect(agreementCode("CONFIDENTIALITY", "סודיות-2.1")).toBe("ANKORA-CONF-2.1");
+  });
+
+  it("gives every registered version a distinct, Latin-only code", () => {
+    const codes = AGREEMENT_FILES.map((a) => agreementCode(a.kind, a.version));
+    expect(new Set(codes).size).toBe(codes.length);
+    for (const c of codes) expect(c).toMatch(/^ANKORA-[A-Z]+-\d+\.\d+$/);
+  });
+
+  it("finds a version by its Hebrew string or its code, but not across kinds", () => {
+    expect(findAgreementByVersionOrCode("CONFIDENTIALITY", "סודיות-1.0")?.file).toBe("confidentiality-1.0.he.md");
+    expect(findAgreementByVersionOrCode("CONFIDENTIALITY", " ankora-conf-1.0 ")?.file).toBe("confidentiality-1.0.he.md");
+    expect(findAgreementByVersionOrCode("DELETION_DECLARATION", "ANKORA-CONF-1.0")).toBeNull();
+    expect(findAgreementByVersionOrCode("CONFIDENTIALITY", "ANKORA-CONF-9.9")).toBeNull();
+  });
+
+  it("reads a kind from a URL segment", () => {
+    expect(kindFromParam("confidentiality")).toBe("CONFIDENTIALITY");
+    expect(kindFromParam("DELETION_DECLARATION")).toBe("DELETION_DECLARATION");
+    expect(kindFromParam("del")).toBe("DELETION_DECLARATION");
+    expect(kindFromParam("nda")).toBeNull();
   });
 });
