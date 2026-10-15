@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/app/states/EmptyState";
 import { TaskRow } from "./TaskRow";
 import { TaskBoard } from "./TaskBoard";
 import { useTaskList, type ListRow } from "./TaskListProvider";
+import type { MineScope } from "./mine-scope";
 
 // Everything below the filter bar on the tasks screen: the empty state,
 // the board, the grouped list and the flat list.
@@ -13,15 +14,35 @@ import { useTaskList, type ListRow } from "./TaskListProvider";
 // page stay a Server Component while the rows themselves are held in the
 // browser and can gain one the moment it is created.
 
+/// The empty list, said in the terms of the filter that emptied it.
+const EMPTY: Record<MineScope, { title: string; description: string }> = {
+  involved: {
+    title: "אין משימות פתוחות עליך",
+    description: "כשמשימה תשויך אליך או תחכה לאישורך היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
+  },
+  assigned: {
+    title: "אין משימות לביצוע שלך",
+    description: "כשמשימה תשויך אליך היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
+  },
+  supervising: {
+    title: "אין משימות בפיקוחך",
+    description: "כשתוגדר כמפקח על משימה היא תופיע כאן. \"כולם\" מציג את כל המשימות.",
+  },
+  all: {
+    title: "אין עדיין משימות",
+    description: "הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם.",
+  },
+};
+
 export function TaskListView({
   board,
   grouped,
-  mine,
+  mineScope,
   q,
 }: {
   board: boolean;
   grouped: boolean;
-  mine: boolean;
+  mineScope: MineScope;
   q?: string;
 }) {
   const { rows } = useTaskList();
@@ -34,13 +55,11 @@ export function TaskListView({
     return (
       <EmptyState
         icon={ListChecks}
-        title={q ? "לא נמצאו משימות" : mine ? "אין משימות פתוחות עליך" : "אין עדיין משימות"}
+        title={q ? "לא נמצאו משימות" : EMPTY[mineScope].title}
         description={
           q
             ? `אין משימה שמכילה "${q}" בכותרת, בתיאור, בשרשור או בשם הלקוח. אפשר לנקות את החיפוש או לוותר על אחד המסננים.`
-            : mine
-              ? "כשמשימה תשויך אליך היא תופיע כאן. אפשר לכבות את המסנן כדי לראות את כל המשימות."
-              : "הוספת משימה ראשונה תופיע כאן, לפי הלקוח והקטגוריה שבחרתם."
+            : EMPTY[mineScope].description
         }
       />
     );

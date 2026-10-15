@@ -15,6 +15,7 @@ import { TaskFilters } from "./TaskFilters";
 import { TaskListProvider, type ListRow } from "./TaskListProvider";
 import { TaskListView } from "./TaskListView";
 import { listQueryOf } from "./list-query";
+import { MINE_OPTIONS, mineFilters, mineParam, parseMineScope, type MineScope } from "./mine-scope";
 import { ListChecks } from "lucide-react";
 import type { TaskStatus } from "@prisma/client";
 
@@ -119,7 +120,9 @@ export default async function TasksPage(props: {
   // opening this screen wants is their own list. `mine=0` turns it off;
   // `mine=1` still means on, so every link written before today works.
   // "Mine" is assignee OR supervisor - see TaskFilters.involvedUserId.
-  const mine = searchParams.mine !== "0";
+  // Since 15.10.2026 each half can be shown on its own: see mine-scope.ts.
+  const mineScope = parseMineScope(searchParams.mine);
+  const personFilters = mineFilters(mineScope, user.id);
   /// "הושלמו" only: the whole history instead of the last month.
   const allClosed = searchParams.closed === "all";
   const q = searchParams.q?.trim() || undefined;
@@ -171,7 +174,7 @@ export default async function TasksPage(props: {
           statusIn: board || listStatus || searchAll ? undefined : ACTIVE_STATUSES,
           completedSince:
             listStatus === "DONE" && !allClosed ? new Date(Date.now() - DONE_WINDOW_DAYS * 86_400_000) : undefined,
-          involvedUserId: mine ? user.id : undefined,
+          ...personFilters,
           q,
         }),
         listAccessibleClients(user),
@@ -195,7 +198,7 @@ export default async function TasksPage(props: {
   // "mine" on and turning "mine" off keeps the status.
   function href(next: {
     status?: TaskStatus | "ACTIVE";
-    mine?: boolean;
+    mine?: MineScope;
     group?: boolean;
     view?: "list" | "board";
   }) {
@@ -205,8 +208,9 @@ export default async function TasksPage(props: {
       params.set("categoryId", searchParams.categoryId);
     const nextStatus = next.status ?? activePill ?? "ACTIVE";
     if (nextStatus !== "ACTIVE") params.set("status", nextStatus);
-    // On is the default, so only "off" needs saying.
-    if (!(next.mine ?? mine)) params.set("mine", "0");
+    // "שלי" is the default, so only the other three need saying.
+    const nextMine = mineParam(next.mine ?? mineScope);
+    if (nextMine) params.set("mine", nextMine);
     // Carried through every pill and toggle, so narrowing by status does
     // not silently throw away what somebody searched for.
     if (q) params.set("q", q);
@@ -218,7 +222,6 @@ export default async function TasksPage(props: {
   }
   const pillHref = (value: TaskStatus | "ACTIVE") => href({ status: value });
   const allClosedHref = `${href({})}${href({}).includes("?") ? "&" : "?"}closed=all`;
-  const mineHref = href({ mine: !mine });
   const groupHref = href({ group: !grouped });
   const listHref = href({ view: "list" });
   const boardHref = href({ view: "board" });
@@ -248,7 +251,7 @@ export default async function TasksPage(props: {
               ?.name,
             // The create form can now name an assignee, so a task born
             // on somebody else no longer belongs under "שלי".
-            involvedUserId: mine ? user.id : undefined,
+            ...personFilters,
           }}
         >
           <div className="flex flex-wrap items-center gap-2.5">
@@ -312,19 +315,29 @@ export default async function TasksPage(props: {
               </div>
             )}
 
-            {/* "Mine" is a separate toggle rather than a fifth status pill:
+            {/* "Mine" is its own control rather than a fifth status pill:
               it answers a different question and combines with all four
-              of them. */}
-            <Link
-              href={mineHref}
-              className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
-                mine
-                  ? "border-appNavy bg-appNavy text-cream"
-                  : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
-              }`}
+              of them. Four choices since 15.10.2026: both halves, each
+              half, and everyone's work. */}
+            <div
+              data-testid="mine-scope"
+              className="flex max-w-full overflow-x-auto rounded-full border border-lineDark bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
-              שלי
-            </Link>
+              {MINE_OPTIONS.map((option) => (
+                <Link
+                  key={option.scope}
+                  href={href({ mine: option.scope })}
+                  aria-current={mineScope === option.scope ? "true" : undefined}
+                  className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
+                    mineScope === option.scope
+                      ? "bg-appNavy text-cream"
+                      : "text-appNavy/60 hover:text-appNavy"
+                  }`}
+                >
+                  {option.label}
+                </Link>
+              ))}
+            </div>
 
             {/* Grouping is a way of reading the same list, not a filter on
               it, so it sits with the toggles rather than in the filter
@@ -344,7 +357,7 @@ export default async function TasksPage(props: {
             )}
           </div>
 
-          <TaskListView board={board} grouped={grouped} mine={mine} q={q} />
+          <TaskListView board={board} grouped={grouped} mineScope={mineScope} q={q} />
 
           {/* Says what the pill is hiding and how to see it, rather than
               leaving somebody to wonder where March went. */}

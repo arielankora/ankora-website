@@ -60,8 +60,13 @@ test("the tasks screen opens on this person's active work, and can show everyone
   // them. The first version clicked, and spent a round failing on a URL
   // that had not changed - which says nothing about whether the filter
   // works and everything about when a client-side navigation settles.
-  const mineToggle = page.getByRole("link", { name: "שלי", exact: true });
-  await expect(mineToggle).toHaveAttribute("href", "/app/tasks?mine=0");
+  // Four choices since 15.10.2026: both halves (the default), each half
+  // on its own, and everyone's work.
+  const scope = page.getByTestId("mine-scope");
+  await expect(scope.getByRole("link", { name: "שלי", exact: true })).toHaveAttribute("aria-current", "true");
+  await expect(scope.getByRole("link", { name: "לביצוע", exact: true })).toHaveAttribute("href", "/app/tasks?mine=assigned");
+  await expect(scope.getByRole("link", { name: "בפיקוח", exact: true })).toHaveAttribute("href", "/app/tasks?mine=supervising");
+  await expect(scope.getByRole("link", { name: "כולם", exact: true })).toHaveAttribute("href", "/app/tasks?mine=0");
   await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks");
   // "הכל" is gone: a list that grows with every closed task is not a
   // working view.
@@ -77,7 +82,10 @@ test("the tasks screen opens on this person's active work, and can show everyone
     "href",
     "/app/tasks?status=IN_PROGRESS&mine=0"
   );
-  await expect(page.getByRole("link", { name: "שלי", exact: true })).toHaveAttribute("href", "/app/tasks");
+  await expect(page.getByTestId("mine-scope").getByRole("link", { name: "שלי", exact: true })).toHaveAttribute(
+    "href",
+    "/app/tasks?status=IN_PROGRESS"
+  );
 });
 
 test("a promise the client can see cannot be closed without a sentence for them", async ({ page }) => {

@@ -77,6 +77,8 @@ function accepts(row: ListRow, filters: ListFilters): boolean {
   if (filters.clientId && filters.clientName && filters.clientName !== row.clientName) return false;
   if (filters.involvedUserId && filters.involvedUserId !== row.assignedToId && filters.involvedUserId !== row.supervisorId)
     return false;
+  if (filters.assignedToId && filters.assignedToId !== row.assignedToId) return false;
+  if (filters.supervisorId && filters.supervisorId !== row.supervisorId) return false;
   return true;
 }
 
@@ -87,6 +89,10 @@ type ListFilters = {
   /// Set while "שלי" is on: only tasks this person is the assignee or
   /// the supervisor of belong.
   involvedUserId?: string;
+  /// Set under "לביצוע" (15.10.2026): only tasks assigned to this person.
+  assignedToId?: string;
+  /// Set under "בפיקוח" (15.10.2026): only tasks this person supervises.
+  supervisorId?: string;
 };
 
 /// `children` is a plain ReactNode and NOT a render prop, which is not a
