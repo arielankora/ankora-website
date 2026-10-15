@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { OPEN_STATUSES, listTasks } from "@/lib/app-domain/tasks";
+import { OPEN_STATUSES, listTasks, supervisionCounts } from "@/lib/app-domain/tasks";
 import { timed } from "@/lib/slow-log";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -163,7 +163,7 @@ export default async function TasksPage(props: {
   // times the data, the same as the dashboard does, so the two are
   // comparable. If the data is fast and the screen still is not, that is
   // itself the finding.
-  const [tasks, clients, allCategories] = await timed(
+  const [tasks, clients, allCategories, supervision] = await timed(
     "screen.tasks.load",
     () =>
       Promise.all([
@@ -179,6 +179,9 @@ export default async function TasksPage(props: {
         }),
         listAccessibleClients(user),
         listCategories(),
+        // For the count beside "בפיקוח": what the removed "בפיקוח שלי"
+        // nav row used to say without being asked.
+        supervisionCounts(user),
       ]),
     (result) =>
       result
@@ -328,6 +331,11 @@ export default async function TasksPage(props: {
                   key={option.scope}
                   href={href({ mine: option.scope })}
                   aria-current={mineScope === option.scope ? "true" : undefined}
+                  aria-label={
+                    option.scope === "supervising" && supervision.pending > 0
+                      ? `${option.label}, ${supervision.pending} ממתינות לאישורך`
+                      : undefined
+                  }
                   className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
                     mineScope === option.scope
                       ? "bg-appNavy text-cream"
@@ -335,6 +343,16 @@ export default async function TasksPage(props: {
                   }`}
                 >
                   {option.label}
+                  {option.scope === "supervising" && supervision.pending > 0 && (
+                    <span
+                      data-testid="supervising-pending"
+                      className={`ms-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-jbmono text-[11px] ${
+                        mineScope === "supervising" ? "bg-cream/20 text-cream" : "bg-appNavy/10 text-appNavy"
+                      }`}
+                    >
+                      {supervision.pending}
+                    </span>
+                  )}
                 </Link>
               ))}
             </div>

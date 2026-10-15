@@ -65,7 +65,9 @@ test("the tasks screen opens on this person's active work, and can show everyone
   const scope = page.getByTestId("mine-scope");
   await expect(scope.getByRole("link", { name: "שלי", exact: true })).toHaveAttribute("aria-current", "true");
   await expect(scope.getByRole("link", { name: "לביצוע", exact: true })).toHaveAttribute("href", "/app/tasks?mine=assigned");
-  await expect(scope.getByRole("link", { name: "בפיקוח", exact: true })).toHaveAttribute("href", "/app/tasks?mine=supervising");
+  await expect(// Not exact: with work waiting on this person the link also reads
+  // its count ("בפיקוח, 2 ממתינות לאישורך").
+  scope.getByRole("link", { name: /^בפיקוח/ })).toHaveAttribute("href", "/app/tasks?mine=supervising");
   await expect(scope.getByRole("link", { name: "כולם", exact: true })).toHaveAttribute("href", "/app/tasks?mine=0");
   await expect(page.getByRole("link", { name: "פעילות", exact: true })).toHaveAttribute("href", "/app/tasks");
   // "הכל" is gone: a list that grows with every closed task is not a

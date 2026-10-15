@@ -17,7 +17,7 @@ const ROLE_LABELS: Record<User["role"], string> = {
   CLIENT_USER: "לקוח",
 };
 
-function navItemsFor(role: User["role"], supervises: boolean, proposals = 0): NavItem[] {
+function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
   // Phase 6 (spec 13 "Client Portal"): a CLIENT_USER gets an entirely
   // separate, deliberately short nav - the portal is meant to "feel part
   // of Ankora, not an internal tool exposed outward" (spec 13's own
@@ -58,13 +58,11 @@ function navItemsFor(role: User["role"], supervises: boolean, proposals = 0): Na
   // Tasks screen - same gate as Timer/My Time (see lib/app-domain/tasks.ts
   // for why no dedicated permission exists).
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/tasks", label: "משימות", group: "העבודה שלי" });
-  // Tasks phase 2. Shown only to people who actually supervise something
-  // open, rather than to every member of staff: a permanently empty
-  // screen in the nav is a row everybody learns to ignore, and this one
-  // has to be noticed on the day it stops being empty. It appears when
-  // somebody names you supervisor and goes when the last of that work
-  // closes.
-  if (supervises) items.push({ href: "/app/supervising", label: "בפיקוח שלי", group: "העבודה שלי" });
+  // "בפיקוח שלי" had its own row here from tasks phase 2 until
+  // 15.10.2026 (Ariel): the tasks screen's "בפיקוח" shows the same work,
+  // and two places for one list is one too many. What the row carried
+  // that mattered, the count of tasks waiting on this person's sign-off,
+  // now sits beside "משימות". /app/supervising redirects there.
   // Org brain (spec 5.2): proposals to client files, from Claude. Same rule
   // as supervision: the row is there only while something waits.
   if (proposals > 0) items.push({ href: "/app/knowledge", label: "ממתין לאישור", group: "העבודה שלי" });
@@ -151,15 +149,15 @@ export function AppShell({
   unreadCount: number;
   importantDatesCount: number;
   alertsCount: number;
-  /// Tasks phase 2. `total` decides whether the nav row exists at all,
-  /// `pending` is the number printed beside it.
+  /// Tasks phase 2. `pending`, the tasks waiting on this person's
+  /// sign-off, is printed beside "משימות".
   supervising: { total: number; pending: number };
   /// Proposals to client files waiting for a person (spec 5.2).
   proposals?: number;
   clients: { id: string; name: string }[];
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role, supervising.total > 0, proposals);
+  const items = navItemsFor(user.role, proposals);
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (

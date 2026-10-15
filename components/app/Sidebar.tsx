@@ -109,7 +109,7 @@ export function Sidebar({
               ? timerCounter
               : item.href === "/app/important-dates" && counters?.importantDatesCount
                 ? String(counters.importantDatesCount)
-                : item.href === "/app/supervising" && counters?.supervisingCount
+                : item.href === "/app/tasks" && counters?.supervisingCount
                 ? String(counters.supervisingCount)
                 : item.href === "/app/knowledge" && counters?.knowledgeCount
                 ? String(counters.knowledgeCount)
