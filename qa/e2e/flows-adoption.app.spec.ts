@@ -84,7 +84,7 @@ test("the tasks screen opens on this person's active work, and can show everyone
   );
   await expect(page.getByTestId("mine-scope").getByRole("link", { name: "שלי", exact: true })).toHaveAttribute(
     "href",
-    "/app/tasks?status=IN_PROGRESS"
+    "/app/tasks"
   );
 });
 
