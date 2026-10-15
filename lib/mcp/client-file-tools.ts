@@ -30,7 +30,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get client file",
       description:
-        "Returns a client's file as one Markdown document, in Ankora's standard order: identity and legal entities, scope, people, preferences, requirements, systems and access, suppliers, finance, communication, dates, temporary information, one-off decisions, open questions, items awaiting confirmation, recent updates, and the source legend. Lines not yet confirmed say so, with what would confirm them; sources appear as [S1 08:13]. Contact details and sensitive items are left out. Read it before working on a client you have not worked on in this conversation, and before drafting anything to the client or their suppliers.",
+        "Returns a client's file as one Markdown document, in Ankora's standard order: identity and legal entities, scope, people, preferences, requirements, the client's rules (follow them; a proposed rule's interim rule applies until it is approved), systems and access, suppliers, finance, communication, dates, temporary information, one-off decisions, open questions, items awaiting confirmation, recent updates, and the source legend. Lines not yet confirmed say so, with what would confirm them; sources appear as [S1 08:13]. Contact details and sensitive items are left out. Read it before working on a client you have not worked on in this conversation, and before drafting anything to the client or their suppliers.",
       inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
       annotations: TOOL_ANNOTATIONS.get_client_file,
     },
@@ -55,10 +55,11 @@ export function registerClientFileTools(server: McpServer): void {
       description: [
         "Sends a batch of proposed items for a client's file, from ONE source (a meeting or a document). Nothing enters the file until a person approves each item on Ankora's review screen; there is no tool that approves.",
         "Source: pass `sourceCode` (\"S3\") if the source is already in the client's register (get_client_file lists it), or `newSource` to register it. A recording is found again by its `firefliesId`, so sending the same meeting twice does not create a second source.",
-        "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence), and optionally `quote` (short; never from a topics-only source).",
+        "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM | REQUEST_TYPE | POLICY, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence), and optionally `quote` (short; never from a topics-only source).",
         "FACT payload: kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE), body, and as relevant topic, referTo, validUntil or validUntilEvent (TEMPORARY needs one), decidedAt (ONE_OFF_DECISION needs it), decidedBy.",
         "CONTACT payload: name and/or role, relationship (CLIENT_STAFF, PROVIDER, ADVISOR, INVESTOR, SUPPLIER), emails, phones, organizationName, context, channelOrder, isPrimary, isDecisionMaker.",
         "ORGANIZATION payload: name, domains, role, relationship, monthlyCostMinor (agorot or cents), currency, notes. SYSTEM payload: systemName, purpose, url, accountUsed, ourPermission, accessStatus, blocker, clientAdmin, notes. REQUEST_TYPE payload (what comes in, from whom, and how it is answered): title, fromWho, arrivesVia, handling.",
+        "POLICY payload (a rule the client set): kind (DATA_HANDLING what may enter the file, DISCLOSURE who must not be told what, COMMUNICATION, SEPARATION, APPROVAL_REQUIRED, THRESHOLD, REQUIRED_STEP, TIMING, FORBIDDEN, INFO), title, statement, rationale, and for THRESHOLD and APPROVAL_REQUIRED an interimStatement: the careful rule that applies until a manager approves it. A rule enters the file as proposed; it binds once a manager approves it.",
         "Every payload may carry knowledgeStatus (CONFIRMED only if the client or their supplier said or showed it explicitly; UNCERTAIN with toResolve otherwise) and sensitivity.",
         "To change an existing fact, set action SUPERSEDE (the client changed it) or CONTRADICT (someone said otherwise; nothing is overwritten) with `targetId` from the file.",
         "Never include passwords, keys or card numbers: such items are dropped and a task to change the secret is opened. Leave out small talk, momentary technical issues, guesses, and Ankora's own commercial terms.",
@@ -81,7 +82,7 @@ export function registerClientFileTools(server: McpServer): void {
         items: z
           .array(
             z.object({
-              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE"]),
+              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE", "POLICY"]),
               action: z.enum(["CREATE", "SUPERSEDE", "CONTRADICT"]).optional(),
               targetId: z.string().optional(),
               payload: z.record(z.string(), z.unknown()),
@@ -169,7 +170,8 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get the extraction brief",
       description: [
-        "Everything an extraction run needs before reading a meeting: Ankora's approved extraction guidance (follow it), the user's clients with the email domains that identify their meetings, and the Fireflies recordings already turned into proposals in the last 30 days (skip those).",
+        "Everything an extraction run needs before reading a meeting: Ankora's approved extraction guidance (follow it), the user's clients with the email domains that identify their meetings and each client's own data-handling rules, and the Fireflies recordings already turned into proposals in the last 30 days (skip those).",
+        "A client's `dataHandlingRules` bind every item proposed for that client, on top of Ankora's guidance: what they do not allow is not proposed at all. A rule marked as an interim rule applies as written until its proposed rule is approved.",
         "Matching a meeting to a client: a participant from a CLIENT domain decides it. A PARTNER domain decides it only when that partner appears under one client; if it appears under several, decide from the title and content and say why in the batch note. A meeting about several clients is split: each item goes to its own client's batch. A meeting with no client participant and no client named is internal: skip it.",
       ].join(" "),
       inputSchema: z.object({}),

@@ -538,6 +538,7 @@ model Client {
   knowledgeBatches KnowledgeBatch[]
   requestTypes     RequestType[]
   narratives       ClientNarrative[]
+  policies         ClientPolicy[]
 
   @@index([status])
   @@index([accountManagerId])
@@ -3076,6 +3077,7 @@ enum ProposalTarget {
   ORGANIZATION
   SYSTEM
   REQUEST_TYPE
+  POLICY
 }
 
 /// What approving a proposal does.
@@ -3265,4 +3267,97 @@ model ExtractionGuide {
   rejectReason String?
 
   @@map("extraction_guides")
+}
+
+// ---------------------------------------------------------------------------
+// Org brain, phase 3: the client's own rules
+// (claude/org-brain-spec-2026-10-12.md, 3.11 and section 6 of the file).
+// Ankora's own rules (the SOP book) stay in code; these are the client's.
+// ---------------------------------------------------------------------------
+
+/// What a client rule is about, and so where it is checked (spec 3.11).
+/// Rules about procedure steps are kept now and enforced once processes
+/// exist; rules about the file itself act today.
+enum PolicyKind {
+  /// What may enter the file and how: "board meetings, topics only".
+  /// Given to every extraction.
+  DATA_HANDLING
+  /// Who must not be told what: "employees are not told Guy is leaving".
+  /// Shown at the top of the client screen and the file.
+  DISCLOSURE
+  /// Which channel for what: "approvals by email, even if they began on WhatsApp".
+  COMMUNICATION
+  /// What must stay apart: "nothing of Inc goes to Ayala".
+  SEPARATION
+  APPROVAL_REQUIRED
+  THRESHOLD
+  REQUIRED_STEP
+  TIMING
+  /// Forbidden to everyone, not only to AI.
+  FORBIDDEN
+  /// Everything code cannot check: read by people and by Claude.
+  INFO
+}
+
+enum PolicyStatus {
+  /// Said, not approved. Its interim rule, when it has one, is what applies.
+  PROPOSED
+  /// Approved by a manager. The rule itself applies.
+  ACTIVE
+  /// No longer in force. Kept, as history.
+  RETIRED
+}
+
+/// A rule the client set (spec 3.11). A change to what an approved rule
+/// says sends it back to "proposed": a rule cannot be softened quietly.
+model ClientPolicy {
+  id       String       @id @default(cuid())
+  clientId String
+  kind     PolicyKind
+  status   PolicyStatus @default(PROPOSED)
+  /// 1 when written; +1 on every change to what it says.
+  version  Int          @default(1)
+
+  title            String
+  /// The rule, in a sentence or two.
+  statement        String
+  /// Why it exists, when known.
+  rationale        String?
+  /// While proposed: the careful rule that applies until it is approved
+  /// ("every expense goes to Oren" until "software up to $3,000 a year is
+  /// approved" is).
+  interimStatement String?
+
+  approvedById String?
+  approvedAt   DateTime?
+  retiredAt    DateTime?
+  retiredById  String?
+
+  // Knowledge fields (spec 3.1).
+  knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
+  fieldStatus     Json                 @default("{}")
+  sources         Json                 @default("[]")
+  externalRefs    Json                 @default("[]")
+  alternatives    Json                 @default("[]")
+  toResolve       String?
+  importance      KnowledgeImportance  @default(NORMAL)
+  audience        KnowledgeAudience    @default(ALL_STAFF)
+  audienceUserIds String[]             @default([])
+  doNotDisclose   String?
+  sensitivity     KnowledgeSensitivity @default(NORMAL)
+  clientVisible   Boolean              @default(false)
+  ownerId         String?
+  verifiedAt      DateTime?
+  supersededById  String?
+  supersededAt    DateTime?
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId, deletedAt])
+  @@map("client_policies")
 }

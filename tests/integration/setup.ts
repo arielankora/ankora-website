@@ -47,6 +47,7 @@ const TABLES = [
   "client_organizations",
   "extraction_guides",
   "request_types",
+  "client_policies",
   "client_narratives",
   "knowledge_proposals",
   "knowledge_batches",

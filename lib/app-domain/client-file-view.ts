@@ -15,6 +15,8 @@ import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { listImportantDates } from "@/lib/app-domain/important-dates";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { listNarratives } from "@/lib/app-domain/client-narratives";
+import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 
@@ -39,7 +41,7 @@ const RELATIONSHIP: Record<string, string> = {
 };
 
 /// The entity types whose changes make up section 16.
-const FILE_ENTITY_TYPES = ["RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
+const FILE_ENTITY_TYPES = ["ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -60,7 +62,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity }) => !ai || r.sensitivity !== "SENSITIVE";
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -76,6 +78,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     }),
     listRequestTypes(actor, clientId),
     listNarratives(actor, clientId),
+    listClientPolicies(actor, clientId),
   ]);
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
@@ -109,6 +112,24 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     ...(f.kind === "QUESTION" ? { status: f.answeredAt ? f.knowledgeStatus : undefined, toResolve: null } : {}),
     group: f.topic ? FACT_TOPIC_LABELS[f.topic as FactTopicLike] : undefined,
   });
+
+  // Rules in force and proposed; a retired rule is history, read on the
+  // screen. A proposed rule says what applies until it is approved.
+  const rules = policies.filter((p) => p.status !== "RETIRED").filter(shown);
+  const ruleItem = (p: (typeof rules)[number]): DocItem & { group?: string; proposed?: boolean } => {
+    const now = ruleInForce(p)!;
+    return {
+      text: `${p.title}: ${now.text}`,
+      details: [
+        p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
+        p.rationale ? `למה: ${p.rationale}` : null,
+      ],
+      ...knowledge(p),
+      group: POLICY_KIND_LABELS[p.kind],
+      proposed: p.status === "PROPOSED",
+    };
+  };
+  const generalRule = (k: string) => k === "INFO" || k === "DATA_HANDLING";
 
   const primary = contacts.find((c) => c.isPrimary);
   const sections: DocSection[] = [
@@ -164,6 +185,12 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     },
     { number: "4", title: "העדפות", empty: "אין עדיין העדפות.", items: of("PREFERENCE").map(factItem) },
     { number: "5", title: "דרישות חוזרות", empty: "אין עדיין דרישות חוזרות.", items: of("REQUIREMENT").map(factItem) },
+    {
+      number: "6",
+      title: "כללים והגבלות",
+      empty: "הלקוח עוד לא קבע כללים.",
+      items: rules.filter((p) => !generalRule(p.kind)).map(ruleItem),
+    },
     {
       number: "7.1",
       title: "מערכות וגישות",
@@ -239,6 +266,12 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "אין שאלות פתוחות.",
       items: of("QUESTION").filter((f) => !f.answeredAt).map(factItem),
     },
+    {
+      number: "14",
+      title: "כללי עבודה ספציפיים",
+      empty: "אין כללי עבודה או כללי טיפול במידע.",
+      items: rules.filter((p) => generalRule(p.kind)).map(ruleItem),
+    },
     { number: "", title: "הערות", empty: "אין הערות.", items: of("NOTE").map(factItem) },
   ];
 
@@ -246,8 +279,11 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   // is not confirmed, in one place.
   const pending = sections
     .flatMap((s) => s.items.map((i) => ({ ...i, where: s.title })))
-    .filter((i) => i.status === "UNCERTAIN" || i.status === "MISSING")
-    .map(({ where, group: _group, ...i }) => ({ ...i, details: [where, ...(i.details ?? [])] }));
+    .filter((i) => i.status === "UNCERTAIN" || i.status === "MISSING" || ("proposed" in i && i.proposed))
+    .map(({ where, group: _group, ...i }) => {
+      const { proposed: _proposed, ...item } = i as typeof i & { proposed?: boolean };
+      return { ...item, details: [where, ...(item.details ?? [])] };
+    });
   sections.push({ number: "15", title: "ממתין לאישור וסתירות", empty: "אין פריטים שממתינים לאישור.", items: pending });
 
   sections.push({
@@ -261,7 +297,13 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     clientName: client.name,
     generatedAt: now,
     audience: options.audience,
-    sections: sections.map((s) => ({ ...s, items: s.items.filter((i) => i.text) })),
+    sections: sections.map((s) => ({
+      ...s,
+      items: s.items.filter((i) => i.text).map((i) => {
+        const { proposed: _proposed, ...item } = i as typeof i & { proposed?: boolean };
+        return item;
+      }),
+    })),
     legend: sources.map((s) => ({
       code: s.code,
       title: s.title,

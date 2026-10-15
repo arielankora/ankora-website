@@ -15,6 +15,17 @@ import { ATTENTION_TYPE, notifyClientFileAttention } from "@/lib/app-domain/clie
 
 const DAY = 24 * 60 * 60 * 1000;
 
+/// This morning, 05:00 UTC, when the daily job runs. Relative to the real
+/// clock on purpose: the job compares against notifications it wrote, and
+/// those carry the real time, so a fixed date here turns the test into a
+/// time bomb (it broke the day after it was written).
+function morning(offsetDays = 0): Date {
+  const d = new Date();
+  d.setUTCHours(5, 0, 0, 0);
+  return new Date(d.getTime() + offsetDays * DAY);
+}
+const day = (d: Date) => new Date(`${d.toISOString().slice(0, 10)}T00:00:00Z`);
+
 async function setup(withManager = true) {
   const { user: manager } = await createTestUser({ role: "ANKORA_ADMIN" });
   const { user: hadas } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
@@ -30,12 +41,12 @@ const S1 = [{ code: "S1" }];
 describe("client file attention", () => {
   it("tells the manager everything and the assignee their questions, once a week", async () => {
     const { client, manager, hadas } = await setup();
-    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "Anthropic בכרטיס הפרטי", validUntil: new Date("2026-10-01T00:00:00Z"), sources: S1 });
+    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "Anthropic בכרטיס הפרטי", validUntil: day(morning(-14)), sources: S1 });
     await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "מי מורשה החתימה?", assigneeId: hadas.id });
     const stale = await addClientFact(hadas, { clientId: client.id, kind: "FINANCE", body: "מגבלת Justworks", knowledgeStatus: "UNCERTAIN", toResolve: "אישור בכתב", sources: S1 });
-    await prisma.clientFact.update({ where: { id: stale.id }, data: { updatedAt: new Date("2026-09-01T00:00:00Z") } });
+    await prisma.clientFact.update({ where: { id: stale.id }, data: { updatedAt: morning(-45) } });
 
-    const now = new Date("2026-10-14T05:00:00Z");
+    const now = morning();
     expect(await notifyClientFileAttention(now)).toEqual({ notified: 2, unowned: 0 });
 
     const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
@@ -55,20 +66,20 @@ describe("client file attention", () => {
 
   it("a temporary item that expires after the last notice is news the next morning", async () => {
     const { client, manager, hadas } = await setup();
-    const now = new Date("2026-10-14T05:00:00Z");
+    const now = morning();
     await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "שאלה", assigneeId: manager.id });
     expect((await notifyClientFileAttention(now)).notified).toBe(1);
 
-    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "עד מחר", validUntil: new Date("2026-10-15T00:00:00Z"), sources: S1 });
+    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "עד מחר", validUntil: day(morning(1)), sources: S1 });
     // The day before it expires, still the same week: quiet.
-    expect((await notifyClientFileAttention(new Date("2026-10-14T20:00:00Z"))).notified).toBe(0);
+    expect((await notifyClientFileAttention(new Date(now.getTime() + 15 * 60 * 60 * 1000))).notified).toBe(0);
     // The morning after it expired: news.
-    expect((await notifyClientFileAttention(new Date("2026-10-15T05:00:00Z"))).notified).toBe(1);
+    expect((await notifyClientFileAttention(morning(1))).notified).toBe(1);
   });
 
   it("a paused client says nothing", async () => {
     const { client, hadas } = await setup();
-    const now = new Date("2026-10-14T05:00:00Z");
+    const now = morning();
     await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "שאלה", assigneeId: hadas.id });
     await prisma.client.update({ where: { id: client.id }, data: { status: "PAUSED" } });
     expect((await notifyClientFileAttention(now)).notified).toBe(0);
@@ -77,6 +88,6 @@ describe("client file attention", () => {
   it("a client with nobody to tell is counted", async () => {
     const { client, hadas } = await setup(false);
     await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "שאלה בלי אחראי" });
-    expect(await notifyClientFileAttention(new Date("2026-10-14T05:00:00Z"))).toEqual({ notified: 0, unowned: 1 });
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 0, unowned: 1 });
   });
 });

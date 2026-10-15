@@ -32,6 +32,9 @@ import { EntitiesPanel } from "./EntitiesPanel";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
+import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
+import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { ruleInForce } from "@/lib/client-policies";
 import { NarrativesPanel } from "./NarrativesPanel";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { listNarratives } from "@/lib/app-domain/client-narratives";
@@ -91,7 +94,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -126,6 +129,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // Spec 3.7 and 3.3: request types, and the file's free text.
     listRequestTypes(user, client.id),
     listNarratives(user, client.id),
+    // Phase 3, spec 3.11: the client's own rules.
+    listClientPolicies(user, client.id),
   ]);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
@@ -216,6 +221,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             </div>
           </div>
         </div>
+
+        <DisclosureBanner
+          rules={policies
+            .filter((p) => p.kind === "DISCLOSURE" && p.status !== "RETIRED")
+            .map((p) => ({ id: p.id, title: p.title, text: ruleInForce(p)!.text, proposed: p.status === "PROPOSED" }))}
+        />
 
         <nav className="flex gap-1 border-b border-lineDark" aria-label="לשוניות הלקוח">
           {(
@@ -329,6 +340,27 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               subjects={subjects}
               facts={facts.current.map(toPanelFact)}
               history={facts.superseded.map(toPanelFact)}
+            />
+
+            <PoliciesPanel
+              clientId={client.id}
+              sourceOptions={sourceOptions}
+              canApprove={can(user.role, "client.manage")}
+              policies={policies.map((p) => ({
+                id: p.id,
+                kind: p.kind,
+                status: p.status,
+                version: p.version,
+                title: p.title,
+                statement: p.statement,
+                rationale: p.rationale,
+                interimStatement: p.interimStatement,
+                approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
+                approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
+                knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
+                toResolve: p.toResolve,
+                sources: readSourceRefs(p.sources).map(formatSourceRef),
+              }))}
             />
 
             <RequestTypesPanel

@@ -21,6 +21,7 @@ import { addClientContact, addClientOrganization } from "@/lib/app-domain/client
 import { addClientFact, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
+import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
 
 // Org brain, phase 2: proposals to the client file
@@ -142,6 +143,15 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
       where: { clientId, deletedAt: null, organization: { name: { equals: name, mode: "insensitive" } } },
     });
     if (known) flags.push({ code: "DUPLICATE", message: "הארגון כבר בתיק." });
+  }
+  if (item.target === "POLICY") {
+    const title = normalizeForMatch(String(item.payload.title ?? ""));
+    const statement = normalizeForMatch(String(item.payload.statement ?? ""));
+    const known = await prisma.clientPolicy.findMany({ where: { clientId, deletedAt: null, status: { not: "RETIRED" } }, select: { title: true, statement: true } });
+    if (known.some((k) => normalizeForMatch(k.statement) === statement || (title && normalizeForMatch(k.title) === title))) {
+      flags.push({ code: "DUPLICATE", message: "כלל עם אותו שם או אותו נוסח כבר בתיק." });
+    }
+    flags.push({ code: "POLICY", message: "באישור, הכלל נכנס לתיק כמוצע. מנהל מאשר אותו בנפרד כדי שייכנס לתוקף." });
   }
   return flags;
 }
@@ -324,6 +334,9 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   if (p.target === "CONTACT") return (await addClientContact(actor, { ...PAYLOADS.CONTACT.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "ORGANIZATION") return (await addClientOrganization(actor, { ...PAYLOADS.ORGANIZATION.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...PAYLOADS.REQUEST_TYPE.parse(payload), sources, clientId: p.clientId })).id;
+  // A rule enters the file as "proposed": approving the proposal records
+  // what the client said; making it binding is a manager's separate step.
+  if (p.target === "POLICY") return (await addClientPolicy(actor, { ...PAYLOADS.POLICY.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...PAYLOADS.SYSTEM.parse(payload), sources, clientId: p.clientId })).id;
   throw new Error("סוג פריט לא מוכר.");
 }

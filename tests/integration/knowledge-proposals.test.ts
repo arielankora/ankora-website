@@ -189,6 +189,7 @@ describe("request types and the extraction brief", () => {
           { domain: "nux.ai", kind: "CLIENT", organization: null },
           { domain: "nextage.co.il", kind: "PARTNER", organization: "Nextage" },
         ]),
+        dataHandlingRules: [],
       },
     ]);
     expect(b.clients.map((c) => c.name)).not.toContain(other.name);

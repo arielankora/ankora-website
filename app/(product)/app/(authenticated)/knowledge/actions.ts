@@ -15,6 +15,8 @@ type FormState = { error?: string; ok?: boolean };
 const EDITABLE = new Set([
   "title",
   "handling",
+  "statement",
+  "interimStatement",
   "body",
   "name",
   "role",

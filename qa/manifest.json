@@ -1490,8 +1490,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-14",
       "riskReason": "What the unattended daily extraction reads: guidance, clients' domains (never addresses), recordings already proposed"
+    },
+    "action:(product)/app/(authenticated)/clients/policy-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "Writes, approves and retires the client's binding rules; only a manager makes a rule binding"
+    },
+    "domain:client-policies": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-15",
+      "riskReason": "A rule binds only once approved; changing an approved rule's text sends it back; data-handling rules reach every extraction"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-14"
+  "lastScan": "2026-10-15"
 }
