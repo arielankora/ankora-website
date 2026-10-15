@@ -219,7 +219,7 @@ export interface LegalContent {
   pages: Record<LegalPageKey, LegalDocument>;
 }
 
-export type LegalPageKey = "terms" | "privacy" | "service" | "security" | "dpa";
+export type LegalPageKey = "terms" | "privacy" | "service" | "dpa";
 
 export interface SegmentContent {
   eyebrow: string;
