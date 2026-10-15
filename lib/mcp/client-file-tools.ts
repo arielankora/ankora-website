@@ -10,6 +10,9 @@ import { toMarkdown } from "@/lib/client-file-document";
 import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
 import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
+import { startProcessRun } from "@/lib/app-domain/process-runs";
+import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/email-templates";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.3 and 8): the
 // client file, for Claude.
@@ -160,6 +163,48 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson({ count: matches.length, matches });
       } catch (err) {
         console.error("[mcp] lookup_contact failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "start_process",
+    {
+      title: "Start a run of a process",
+      description:
+        "Opens a run of one of a client's processes (get_client_file lists them as P1, P2... in section 7.4): a task with the approved procedure's steps, each due on its business day, assigned to the process's owner. Use it when something happened that the process answers (an employee's trip, a request) or when the user asks. Confirm the process and the date with the user first: every call opens another run. A process without an approved procedure, a paused one, or an ongoing one cannot be started.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+        date: z.string().describe("The day the run is for, YYYY-MM-DD."),
+      }),
+      annotations: TOOL_ANNOTATIONS.start_process,
+    },
+    async (args: { client: string; process: string; date: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(args.date)) return toolText("date must be YYYY-MM-DD.");
+        const q = args.process.trim();
+        const candidates = await prisma.process.findMany({
+          where: { clientId: client.value.id, deletedAt: null, status: { not: "RETIRED" } },
+          select: { id: true, code: true, title: true },
+        });
+        const exact = candidates.filter((p) => p.code.toLowerCase() === q.toLowerCase() || p.title === q);
+        const loose = exact.length ? exact : candidates.filter((p) => p.title.includes(q));
+        if (loose.length !== 1) {
+          return toolText(
+            loose.length === 0
+              ? `No process "${q}" for ${client.value.name}. Processes: ${candidates.map((p) => `${p.code} ${p.title}`).join("; ") || "none yet"}.`
+              : `"${q}" matches several processes: ${loose.map((p) => `${p.code} ${p.title}`).join("; ")}. Ask which one.`
+          );
+        }
+        const run = await startProcessRun(actor, loose[0].id, new Date(`${args.date}T00:00:00Z`));
+        return toolJson({ taskId: run.id, title: run.title, link: `${appBaseUrl()}/app/tasks/${run.id}` });
+      } catch (err) {
+        console.error("[mcp] start_process failed", err);
         return toolFailure(err);
       }
     }

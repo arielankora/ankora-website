@@ -25,8 +25,10 @@ import {
   removeProcessAction,
   saveProcessVersionAction,
   setProcessStatusAction,
+  startProcessRunAction,
   updateProcessAction,
 } from "../process-actions";
+import Link from "next/link";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 1: processes and their procedures, section 7.4 of the
@@ -72,6 +74,7 @@ export type PanelProcess = {
   latestVersion: number;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null } | null;
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: { code: string; message: string }[] } | null;
+  runs: { id: string; title: string; status: string; dueDate: string | null }[];
 };
 
 const TONE: Record<TransitionLike, "green" | "amber" | "gray"> = { WITH_ANKORA: "green", IN_HANDOVER: "amber", WITH_CLIENT: "gray", NOT_PLANNED: "gray" };
@@ -364,6 +367,27 @@ function DatesForm({ clientId, process, dates }: { clientId: string; process: Pa
   );
 }
 
+function StartRunForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(startProcessRunAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="processId" value={process.id} />
+      <p className="text-xs text-appNavy/60">
+        נפתחת משימה עם {process.current?.steps.length ?? 0} השלבים של נוהל גרסה {process.current?.version}, כל אחד ביום העסקים שלו.
+      </p>
+      <Field label="לאיזה יום *">
+        <input name="day" type="date" required className={INPUT} />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+        {pending ? "פותח..." : "פתיחת הריצה"}
+      </button>
+    </form>
+  );
+}
+
 function StepList({ steps, systemName }: { steps: ProcessStep[]; systemName: Map<string, string> }) {
   return (
     <ol className="mt-1.5 space-y-1.5">
@@ -491,6 +515,21 @@ export function ProcessesPanel({
                     !p.draft && <p className="mt-2 text-xs text-appNavy/50">עוד אין נוהל.</p>
                   )}
 
+                  {p.runs.length > 0 && (
+                    <p className="mt-1.5 text-xs text-appNavy/60">
+                      ריצות:{" "}
+                      {p.runs.map((r, i) => (
+                        <span key={r.id}>
+                          {i > 0 && " · "}
+                          <Link href={`/app/tasks/${r.id}`} className="text-gold-dim hover:underline">
+                            {r.dueDate ? day(r.dueDate) : r.title}
+                          </Link>
+                          {r.status === "DONE" && " (בוצע)"}
+                        </span>
+                      ))}
+                    </p>
+                  )}
+
                   {p.draft && (
                     <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
                       <p className="text-xs font-medium text-amber-900">
@@ -522,6 +561,11 @@ export function ProcessesPanel({
                   <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
                     <ProcedureEditor clientId={clientId} process={p} systems={systems} />
                   </Drawer>
+                  {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
+                    <Drawer triggerLabel="פתיחת ריצה" title={`ריצה: ${p.code} ${p.title}`} variant="link">
+                      <StartRunForm clientId={clientId} process={p} />
+                    </Drawer>
+                  )}
                   {p.triggerKinds.includes("SCHEDULED") && (
                     <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
                       <DatesForm clientId={clientId} process={p} dates={dates} />

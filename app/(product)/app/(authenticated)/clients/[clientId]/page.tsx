@@ -36,6 +36,7 @@ import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses } from "@/lib/app-domain/processes";
+import { listProcessRuns } from "@/lib/app-domain/process-runs";
 import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
@@ -143,6 +144,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // Phase 1, spec 3.8 and 3.9: processes and their procedures.
     listProcesses(user, client.id),
   ]);
+  // The last runs of each process, for its card.
+  const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
@@ -404,6 +407,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                       approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
                     }
                   : null,
+                runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
                 draft: p.draft
                   ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
                   : null,

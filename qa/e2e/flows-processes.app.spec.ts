@@ -83,5 +83,18 @@ test.describe("clients/process-actions", () => {
     await page.reload();
     await expect(card()).toContainText("נוהל, גרסה 2", { timeout: 15_000 });
     await expect(card()).not.toContainText("אין נוהל מאושר");
+
+    // An event happened: a run opens as a task, and the card links to it.
+    await card().getByRole("button", { name: "פתיחת ריצה" }).click();
+    const start = page.getByRole("dialog");
+    await expect(start).toBeVisible();
+    const today = new Date().toISOString().slice(0, 10);
+    await start.locator('input[name="day"]').fill(today);
+    await submit(page, "פתיחת הריצה");
+    await expect(card()).toContainText("ריצות:", { timeout: 15_000 });
+    await card().getByRole("link").first().click();
+    await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
+    await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
   });
 });
