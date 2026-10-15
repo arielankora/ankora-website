@@ -94,8 +94,11 @@ test.describe("clients/policy-actions", () => {
     await expect(page.getByRole("note")).toContainText(title);
 
     await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    // The rule's row in the panel, not its line in the banner above the
+    // tabs, which carries the same name.
+    const row = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) });
     const removed = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
-    await page.locator("li", { hasText: title }).first().getByRole("button", { name: "הסרה" }).click();
+    await row.first().getByRole("button", { name: "הסרה" }).click();
     await removed;
     await page.reload();
     await expect(page.locator("li", { hasText: title })).toHaveCount(0, { timeout: 15_000 });
