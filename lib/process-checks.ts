@@ -4,7 +4,14 @@
 // stuck"). Pure: the home screen, the client file, the daily job and the
 // tests compute when a check is due the same way.
 
-import { addDaysToKey } from "@/lib/timezone";
+// No import from lib/timezone: the card on the client screen is a client
+// component and reads the labels below, and that module is server-only.
+
+/// A `YYYY-MM-DD` key moved by whole calendar days, on the key itself.
+function addDaysToKey(key: string, days: number): string {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
 
 export const CHECK_MAX_DAYS = 365;
 
