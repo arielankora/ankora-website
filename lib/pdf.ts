@@ -69,8 +69,8 @@ import PDFDocument from "pdfkit";
 // run-order-reversal approach (not a general Unicode Bidi Algorithm
 // implementation) is deliberately as simple as the real requirement.
 
-const HEBREW_FONT = "Heebo-Hebrew";
-const LATIN_FONT = "Heebo-Latin";
+export const HEBREW_FONT = "Heebo-Hebrew";
+export const LATIN_FONT = "Heebo-Latin";
 
 function registerFonts(doc: PDFKit.PDFDocument) {
   // NOTE: .woff (v1), not .woff2. Verified empirically (Phase 9 gap-fix,
@@ -124,7 +124,7 @@ function registerFonts(doc: PDFKit.PDFDocument) {
 /// point present in neither subset (rare - e.g. an unsupported symbol)
 /// falls back to the Latin font, which pdfkit will simply skip/tofu
 /// rather than throw on.
-function splitRuns(text: string): { font: string; text: string }[] {
+export function splitRuns(text: string): { font: string; text: string }[] {
   const runs: { font: string; text: string }[] = [];
   for (const ch of text) {
     const font = charFont(ch);
@@ -146,7 +146,7 @@ function charFont(ch: string): string {
 /// [x, x+width], vertically at y. Used for both header and body cells -
 /// every report in this app is RTL Hebrew with embedded LTR numbers, so
 /// there is no "sometimes LTR paragraph" case to also support.
-function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, opts: { bold?: boolean; size?: number } = {}) {
+export function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, opts: { bold?: boolean; size?: number } = {}) {
   const size = opts.size ?? 9;
   doc.fontSize(size);
   // Reverse RUN order (visual RTL flow), never a run's own characters -
@@ -165,6 +165,108 @@ function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: number, w
     doc.font(run.font);
     doc.text(run.text, cursorX, y, { lineBreak: false });
     cursorX += doc.widthOfString(run.text);
+  }
+}
+
+// --- Paragraph text -------------------------------------------------------
+//
+// drawCell() above is tuned for table cells, which are a word or two and a
+// number: it reverses the order of font runs and nothing else. In running
+// prose that rule shows its edges. Spaces and punctuation live in the
+// Latin subset, so "1.1. אנקורה", "(שעון ישראל)" or "סודיות-1.0" put a
+// neutral character on the wrong side of its neighbour. Changing drawCell
+// would move every report's glyphs, which the tests pin by hand, so prose
+// gets its own small resolver instead: a reduced Unicode bidi pass for an
+// RTL paragraph that holds Hebrew, Latin letters, digits and punctuation.
+//
+//   1. Every character is strong RTL (Hebrew), strong LTR (any other
+//      letter or digit), or neutral.
+//   2. A neutral run takes the direction of its neighbours when both
+//      sides agree, and the paragraph's (RTL) otherwise. The line's edges
+//      count as RTL.
+//   3. Visual order: LTR runs keep their characters, RTL runs are
+//      reversed, and the sequence of runs is reversed. Brackets inside an
+//      RTL run are mirrored, which is what makes "(שעון ישראל)" close on
+//      the correct side.
+//
+// The visual string is then cut into font segments for drawing. A Hebrew
+// segment is handed to pdfkit in LOGICAL order, because fontkit reverses
+// any Hebrew-script text it is given (the header comment above records
+// how that was established); every other segment is drawn as it stands.
+
+type BidiClass = "R" | "L" | "N";
+
+function bidiClass(ch: string): BidiClass {
+  if (HEBREW_RANGE.test(ch)) return "R";
+  if (/[\p{L}\p{N}]/u.test(ch)) return "L";
+  return "N";
+}
+
+const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[", "{": "}", "}": "{", "<": ">", ">": "<" };
+
+/// Left-to-right drawing segments for one line of an RTL paragraph.
+/// Exported for its unit test; drawBidiLine() is the only caller.
+export function visualSegments(text: string): { font: string; text: string }[] {
+  const chars = Array.from(text);
+  const cls = chars.map(bidiClass);
+
+  // Resolve neutrals.
+  const dir: ("R" | "L")[] = new Array(chars.length);
+  for (let i = 0; i < chars.length; ) {
+    if (cls[i] !== "N") {
+      dir[i] = cls[i] as "R" | "L";
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < chars.length && cls[j] === "N") j++;
+    const before = i > 0 ? dir[i - 1] : "R";
+    const after = j < chars.length ? (cls[j] as "R" | "L") : "R";
+    const resolved = before === after ? before : "R";
+    for (let k = i; k < j; k++) dir[k] = resolved;
+    i = j;
+  }
+
+  // Directional runs in logical order, then visual order.
+  const runs: { dir: "R" | "L"; chars: string[] }[] = [];
+  chars.forEach((ch, i) => {
+    const last = runs[runs.length - 1];
+    if (last && last.dir === dir[i]) last.chars.push(ch);
+    else runs.push({ dir: dir[i], chars: [ch] });
+  });
+  const visual: string[] = [];
+  for (const run of runs.reverse()) {
+    if (run.dir === "L") visual.push(...run.chars);
+    else visual.push(...run.chars.reverse().map((ch) => MIRROR[ch] ?? ch));
+  }
+
+  // Font segments, left to right.
+  const segments: { font: string; text: string }[] = [];
+  for (const ch of visual) {
+    const font = charFont(ch);
+    const last = segments[segments.length - 1];
+    if (last && last.font === font) last.text += ch;
+    else segments.push({ font, text: ch });
+  }
+  return segments.map((seg) =>
+    seg.font === HEBREW_FONT ? { font: seg.font, text: Array.from(seg.text).reverse().join("") } : seg
+  );
+}
+
+/// One line of an RTL paragraph, right-aligned within [x, x+width].
+export function drawBidiLine(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, size: number) {
+  doc.fontSize(size);
+  const segments = visualSegments(text);
+  let total = 0;
+  for (const seg of segments) {
+    doc.font(seg.font);
+    total += doc.widthOfString(seg.text);
+  }
+  let cursorX = x + width - total;
+  for (const seg of segments) {
+    doc.font(seg.font);
+    doc.text(seg.text, cursorX, y, { lineBreak: false });
+    cursorX += doc.widthOfString(seg.text);
   }
 }
 
@@ -194,6 +296,57 @@ export function layoutRtlColumns(colWidths: number[], left: number): number[] {
   return colWidths.map((_, i) => slotX[colWidths.length - 1 - i]);
 }
 
+/// An A4 pdfkit document with both Heebo subsets registered. Shared by
+/// the report tables below and by lib/agreement-pdf.ts, so the two
+/// production lessons recorded here (the eager standard font, and the
+/// .woff font files) are learned once.
+export function createHebrewPdfDocument(): PDFKit.PDFDocument {
+  // `font: false` is load-bearing, not cosmetic. Discovered via live QA on
+  // the Phase 9 gap-fix Preview deployment (docs/adr/0001 section 18):
+  // without it, pdfkit's constructor eagerly calls `.font("Helvetica")`
+  // (its built-in default) before this function ever runs. Loading that
+  // *standard* font requires pdfkit's Node build to
+  // `require("#standard-fonts/Helvetica")` - a package.json "imports"
+  // subpath resolved relative to pdfkit's own install location. Next.js's
+  // serverless output-file-tracing does not follow that dynamic,
+  // computed-specifier require() (it's invoked via a `createRequire`
+  // handle stored in a variable, not a literal `require("...")` call), so
+  // the .afm data file it points to is silently missing from the deployed
+  // function's bundle -> `Error: Cannot find module
+  // '#standard-fonts/Helvetica'` (MODULE_NOT_FOUND) at runtime in
+  // production/preview, despite working perfectly under plain `node`
+  // locally (incl. this file's own vitest suite) where node_modules is
+  // intact on disk. `font: false` disables that eager default-font load
+  // entirely; every actual text draw in this file goes through drawCell(),
+  // which always explicitly sets HEBREW_FONT/LATIN_FONT (real embedded
+  // fontsource files, not a pdfkit standard font) before drawing, so
+  // pdfkit's standard-font loader is never invoked at all.
+  // (@types/pdfkit's PDFDocumentOptions only types `font` as
+  // `string | undefined`, missing pdfkit's own documented `false` option,
+  // hence the cast.)
+  const doc = new PDFDocument({
+    size: "A4",
+    margin: 40,
+    bufferPages: true,
+    font: false,
+  } as unknown as PDFKit.PDFDocumentOptions);
+  registerFonts(doc);
+  return doc;
+}
+
+/// Total width of a mixed Hebrew/Latin string, measured run by run with
+/// the font each run is drawn in. drawCell() right-aligns with exactly
+/// this; a caller wrapping a paragraph needs the same number.
+export function measureMixed(doc: PDFKit.PDFDocument, text: string, size: number): number {
+  doc.fontSize(size);
+  let total = 0;
+  for (const run of splitRuns(text)) {
+    doc.font(run.font);
+    total += doc.widthOfString(run.text);
+  }
+  return total;
+}
+
 export interface PdfTableOptions {
   title: string;
   subtitle?: string;
@@ -209,36 +362,7 @@ export interface PdfTableOptions {
 /// no built-in table/pagination widget.
 export function toPdfTable(opts: PdfTableOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    // `font: false` is load-bearing, not cosmetic. Discovered via live QA on
-    // the Phase 9 gap-fix Preview deployment (docs/adr/0001 section 18):
-    // without it, pdfkit's constructor eagerly calls `.font("Helvetica")`
-    // (its built-in default) before this function ever runs. Loading that
-    // *standard* font requires pdfkit's Node build to
-    // `require("#standard-fonts/Helvetica")` - a package.json "imports"
-    // subpath resolved relative to pdfkit's own install location. Next.js's
-    // serverless output-file-tracing does not follow that dynamic,
-    // computed-specifier require() (it's invoked via a `createRequire`
-    // handle stored in a variable, not a literal `require("...")` call), so
-    // the .afm data file it points to is silently missing from the deployed
-    // function's bundle -> `Error: Cannot find module
-    // '#standard-fonts/Helvetica'` (MODULE_NOT_FOUND) at runtime in
-    // production/preview, despite working perfectly under plain `node`
-    // locally (incl. this file's own vitest suite) where node_modules is
-    // intact on disk. `font: false` disables that eager default-font load
-    // entirely; every actual text draw in this file goes through drawCell(),
-    // which always explicitly sets HEBREW_FONT/LATIN_FONT (real embedded
-    // fontsource files, not a pdfkit standard font) before drawing, so
-    // pdfkit's standard-font loader is never invoked at all.
-    // (@types/pdfkit's PDFDocumentOptions only types `font` as
-    // `string | undefined`, missing pdfkit's own documented `false` option,
-    // hence the cast.)
-    const doc = new PDFDocument({
-      size: "A4",
-      margin: 40,
-      bufferPages: true,
-      font: false,
-    } as unknown as PDFKit.PDFDocumentOptions);
-    registerFonts(doc);
+    const doc = createHebrewPdfDocument();
 
     const chunks: Buffer[] = [];
     doc.on("data", (c: Buffer) => chunks.push(c));

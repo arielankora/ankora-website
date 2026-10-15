@@ -91,6 +91,15 @@ export function clientDocumentsFolder(): string | null {
   return process.env.GCP_DRIVE_FOLDER_CLIENT_DOCS || null;
 }
 
+/// Employee agreements: where each signed confidentiality undertaking
+/// and deletion declaration is filed as a PDF. Same rule as the client
+/// documents folder above: until the folder exists and is shared with
+/// the service account this returns null, and a signature is recorded
+/// without a PDF rather than refused.
+export function employeeAgreementsFolder(): string | null {
+  return process.env.GOOGLE_DRIVE_FOLDER_EMPLOYEE_AGREEMENTS || null;
+}
+
 export interface DriveUploadFileResult {
   ok: boolean;
   fileId?: string;

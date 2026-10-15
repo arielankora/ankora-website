@@ -142,6 +142,12 @@ model User {
   status       UserStatus @default(INVITED)
   timezone     String     @default("Asia/Jerusalem")
 
+  /// Employee agreements: a private address, collected at hiring. The
+  /// work account is suspended the day someone leaves, and that is the
+  /// day the deletion declaration has to reach them, so the work address
+  /// is exactly the one that cannot be used for it.
+  personalEmail String?
+
   /// App redesign, Profile screen (screen 18, docs/adr/0001 section 23):
   /// the one real per-user notification preference backing that screen's
   /// "התראות אישיות" toggle. Gates only the *email* half of
@@ -241,6 +247,10 @@ model User {
   stepUpGrants        StepUpGrant[]
   passkeys            Passkey[]
   webauthnChallenges  WebAuthnChallenge[]
+
+  // Employee agreements.
+  employeeAgreements EmployeeAgreement[]
+  agreementSignLinks AgreementSignLink[]
 
   @@index([role, status])
   @@map("users")
@@ -3599,4 +3609,85 @@ model ProcessVersion {
 
   @@unique([processId, version])
   @@map("process_versions")
+}
+
+// --- Employee agreements --------------------------------------------------
+//
+// Everyone at Ankora signs a confidentiality undertaking before they may
+// use the app, and a deletion declaration when they leave. The point of
+// recording a signature here, rather than only filing a PDF, is that the
+// record says exactly which text was agreed to: the version, and a
+// SHA-256 of the file that was on screen. A text that changes later gets
+// a new version and a new file; the old file stays so every hash keeps
+// resolving to the words it was taken over.
+
+enum AgreementKind {
+  CONFIDENTIALITY
+  DELETION_DECLARATION
+}
+
+/// How the signature was given. APP is the in-app form (a session, or a
+/// one-time link for someone who has already left). EMAIL_PDF is a PDF
+/// sent to the person and returned signed, recorded afterwards by an
+/// admin; it exists from the start so the two channels never need a
+/// migration to sit side by side.
+enum AgreementChannel {
+  APP
+  EMAIL_PDF
+}
+
+/// One signature. Append-only: lib/app-domain/agreements.ts only ever
+/// creates rows. A signature that turns out to be wrong is answered by a
+/// new one, never by editing the old one, because the old one is evidence.
+model EmployeeAgreement {
+  id      String           @id @default(cuid())
+  userId  String
+  kind    AgreementKind
+  /// The registry version that was signed, e.g. "סודיות-1.0".
+  version String
+  channel AgreementChannel
+
+  signedAt   DateTime
+  /// The full name as the signer typed it, not as the users table has it.
+  signedName String
+  ip         String?
+  userAgent  String?
+  /// SHA-256 hex of the exact file text that was shown.
+  contentHash String
+  /// The signed PDF in Drive. Null when Drive was unavailable: the
+  /// signature still counts, and the PDF can be produced again from this
+  /// row and the versioned text.
+  driveFileId String?
+  /// Who recorded an EMAIL_PDF signature. Null for APP, where the signer
+  /// recorded it themselves.
+  recordedById String?
+  createdAt    DateTime @default(now())
+
+  /// Restrict, not Cascade: users are soft-deleted in this product, and a
+  /// hard delete that silently took the signatures with it would destroy
+  /// the one record that has to outlive the employment.
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, kind])
+  @@map("employee_agreements")
+}
+
+/// A one-time link to sign an agreement without a session, for someone
+/// whose account is already suspended. Hash-only storage, exactly like
+/// PortalLoginToken: the raw token exists only in the emailed link.
+model AgreementSignLink {
+  id          String        @id @default(cuid())
+  userId      String
+  kind        AgreementKind
+  version     String
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdById String
+  createdAt   DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("agreement_sign_links")
 }

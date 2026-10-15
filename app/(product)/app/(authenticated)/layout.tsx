@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import type { Notification, Client } from "@prisma/client";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
+import { CONFIDENTIALITY_SIGN_PATH, confidentialitySignatures, mustSignConfidentiality } from "@/lib/agreements";
 import { AppShell } from "@/components/app/AppShell";
 import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimers } from "@/lib/app-domain/time-entries";
@@ -48,6 +50,15 @@ import { supervisionCounts } from "@/lib/app-domain/tasks";
 /// top of one - no new domain logic was added for this.
 export default async function AuthenticatedAppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
+
+  // Employee agreements: nobody on Ankora's side sees a client's data
+  // before they have signed the confidentiality undertaking, including
+  // people who were already working when the gate shipped. The sign page
+  // lives outside this route group, so this redirect cannot loop; client
+  // portal users skip the query entirely.
+  if (user.role !== "CLIENT_USER" && mustSignConfidentiality(user.role, await confidentialitySignatures(user.id))) {
+    redirect(CONFIDENTIALITY_SIGN_PATH);
+  }
 
   const canTrackTime = can(user.role, "time_entry.create_self");
   const canSeeAlerts = can(user.role, "alert.manage");

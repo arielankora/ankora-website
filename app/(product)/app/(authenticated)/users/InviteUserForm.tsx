@@ -77,6 +77,21 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
           />
         </div>
+        {/* Employee agreements: the address the deletion declaration is
+            sent to when the person leaves and their work account is
+            suspended. Staff only; a client's own address is their login. */}
+        {role !== "CLIENT_USER" && (
+          <div>
+            <label className="block text-xs font-medium text-appNavy/60">מייל פרטי</label>
+            <input
+              name="personalEmail"
+              type="email"
+              dir="ltr"
+              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            />
+            <p className="mt-1 text-[11px] text-appNavy/50">לא חובה. משמש רק לשליחת מסמכים בסיום העבודה.</p>
+          </div>
+        )}
         <div>
           <label className="block text-xs font-medium text-appNavy/60">תפקיד *</label>
           <select

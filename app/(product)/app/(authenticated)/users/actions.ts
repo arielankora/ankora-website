@@ -2,7 +2,15 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
-import { inviteUser, resendInvite, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
+import {
+  inviteUser,
+  resendInvite,
+  updateUserRoleStatus,
+  setUserClientAccess,
+  logoutAllSessions,
+  setUserPersonalEmail,
+} from "@/lib/app-domain/users";
+import { issueDeletionDeclarationLink } from "@/lib/app-domain/agreements";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
 import { setUserCanApproveExceptions } from "@/lib/app-domain/rule-approvals";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -38,9 +46,17 @@ export async function inviteUserAction(_prev: InviteState | undefined, formData:
 
   const clientIds = formData.getAll("clientIds").map(String).filter(Boolean);
   const clientUserRole = (String(formData.get("clientUserRole") || "") as ClientUserRole) || undefined;
+  const personalEmail = String(formData.get("personalEmail") || "");
 
   try {
-    const { user, setPasswordToken, emailSent } = await inviteUser(actor, { name, email, role, clientIds, clientUserRole });
+    const { user, setPasswordToken, emailSent } = await inviteUser(actor, {
+      name,
+      email,
+      role,
+      clientIds,
+      clientUserRole,
+      personalEmail,
+    });
     revalidatePath("/app/users");
 
     // Portal phase 0: the invite email is sent by inviteUser itself. The
@@ -211,4 +227,43 @@ export async function setExceptionApproverAction(_prev: FormState | undefined, f
   }
   revalidatePath(`/app/users/${userId}`);
   return { ok: true };
+}
+
+/// Employee agreements: the private address on the user's page.
+export async function setPersonalEmailAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "משתמש לא נמצא." };
+  try {
+    await setUserPersonalEmail(actor, userId, String(formData.get("personalEmail") || ""));
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  return { ok: true };
+}
+
+type DeletionLinkState = { error?: string; sent?: boolean; link?: string };
+
+/// Sends the deletion declaration link to the person's private address.
+/// Normally for someone already suspended; for anyone still active the
+/// form asks for an explicit confirmation, which the domain checks.
+/// The link comes back either way, so the admin can relay it by hand when
+/// the mail does not arrive, as with an invite.
+export async function issueDeletionDeclarationAction(
+  _prev: DeletionLinkState | undefined,
+  formData: FormData
+): Promise<DeletionLinkState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "משתמש לא נמצא." };
+  try {
+    const { url, emailSent } = await issueDeletionDeclarationLink(actor, userId, {
+      confirmActive: formData.get("confirm") === "on",
+    });
+    revalidatePath(`/app/users/${userId}`);
+    return { sent: emailSent, link: url };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }

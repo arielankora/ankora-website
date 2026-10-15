@@ -6,6 +6,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { hashPassword } from "@/lib/app-auth/password";
 import { sendEmail } from "@/lib/email";
 import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
+import { normalizeEmail } from "@/lib/contact-normalize";
 import type { User, UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
 // Portal phase 0: the invite is now actually sent. Resend has been wired
@@ -39,6 +40,8 @@ export async function inviteUser(
     clientIds?: string[];
     /// Phase 6: only meaningful when role === "CLIENT_USER" - see below.
     clientUserRole?: ClientUserRole;
+    /// Employee agreements: optional private address, staff only.
+    personalEmail?: string;
   }
 ) {
   assertCan(actor.role, "user.manage");
@@ -46,6 +49,9 @@ export async function inviteUser(
   const email = input.email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) throw new Error("A user with this email already exists.");
+
+  const personalEmail =
+    input.role === "CLIENT_USER" ? null : parsePersonalEmail(input.personalEmail ?? "");
 
   // Phase 6: a CLIENT_USER is scoped by ClientUser membership (their
   // Client Portal - lib/app-domain/client-portal.ts's resolvePortalClient
@@ -74,6 +80,7 @@ export async function inviteUser(
       role: input.role,
       status: "INVITED",
       passwordHash: placeholder,
+      personalEmail,
       clientAccess:
         input.role !== "CLIENT_USER" && input.clientIds?.length
           ? { create: input.clientIds.map((clientId) => ({ clientId })) }
@@ -92,10 +99,43 @@ export async function inviteUser(
     action: "user.invite",
     entityType: "User",
     entityId: user.id,
-    after: { name: user.name, email: user.email, role: user.role },
+    after: { name: user.name, email: user.email, role: user.role, personalEmail: user.personalEmail },
   });
 
   return { user, setPasswordToken: raw, emailSent, emailError };
+}
+
+/// Empty means "none". Anything else must look like an address, and the
+/// error says so in the words the form uses.
+function parsePersonalEmail(raw: string): string | null {
+  if (!raw.trim()) return null;
+  const email = normalizeEmail(raw);
+  if (!email) throw new Error("המייל הפרטי אינו כתובת תקינה.");
+  return email;
+}
+
+/// Employee agreements: the private address the deletion declaration is
+/// sent to after the work account is suspended. Audited with both values,
+/// because "where did we send it" is a question someone will ask.
+export async function setUserPersonalEmail(actor: User, userId: string, raw: string) {
+  assertCan(actor.role, "user.manage");
+  const before = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+  if (!before) throw new Error("משתמש לא נמצא.");
+  if (before.role === "CLIENT_USER") throw new Error("מייל פרטי נשמר רק לאנשי אנקורה.");
+
+  const personalEmail = parsePersonalEmail(raw);
+  if (personalEmail === before.personalEmail) return before;
+
+  const user = await prisma.user.update({ where: { id: userId }, data: { personalEmail } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "user.personal_email_change",
+    entityType: "User",
+    entityId: userId,
+    before: { personalEmail: before.personalEmail },
+    after: { personalEmail: user.personalEmail },
+  });
+  return user;
 }
 
 /// Mints a fresh set-password link for a user and mails it.

@@ -141,6 +141,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   RequestType: { decision: "DUMP", table: "request_types", reason: "What comes in from whom and how it is answered. Typed by people." },
   Process: { decision: "DUMP", table: "processes", reason: "The client's recurring processes: owner, trigger, SLA, systems, approvals and handover status. Typed by people." },
   ProcessVersion: { decision: "DUMP", table: "process_versions", reason: "Every version of every procedure, and who approved it. A run is opened from the approved one." },
+  EmployeeAgreement: { decision: "DUMP", table: "employee_agreements", reason: "Every signed confidentiality undertaking and deletion declaration: who, which version, when, from where, and the hash of the text. Evidence that cannot be typed again." },
   PolicyException: { decision: "DUMP", table: "policy_exceptions", reason: "Every exception to a client's rules: what, why, until when, who asked and who approved. The audit answer to 'why was the rule broken'." },
   ClientPolicy: { decision: "DUMP", table: "client_policies", reason: "The client's own rules, who approved them and every version's status. Typed by people; binds the work." },
   ClientNarrative: { decision: "DUMP", table: "client_narratives", reason: "The client file's free text and every earlier version of it." },
@@ -242,6 +243,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   // nothing, because none of them can be turned back into something a
   // person can use.
   PasswordResetToken: { decision: "SKIP", table: "password_reset_tokens", reason: "Single-use password reset hashes, valid for minutes.", recovery: "The user asks for a new reset link." },
+  AgreementSignLink: { decision: "SKIP", table: "agreement_sign_links", reason: "Single-use hashes for signing an agreement without a session, valid for seven days.", recovery: "An admin sends a new link from the user's page." },
   PortalLoginToken: { decision: "SKIP", table: "portal_login_tokens", reason: "Single-use portal login hashes, valid for one click.", recovery: "The client asks for a new portal link." },
   McpAccessToken: { decision: "SKIP", table: "mcp_access_tokens", reason: "Hashed MCP access tokens, one per integration client.", recovery: "Re-issue with scripts/mcp-issue-token.ts." },
   OAuthClient: {
@@ -279,6 +281,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "client_credentials.secretUpdatedAt": "When the secret last changed. A timestamp.",
   "passkeys.publicKey": "The public half of a passkey. Verifies a signature; cannot make one.",
   "passkeys.credentialId": "The authenticator's public identifier for the passkey.",
+  "employee_agreements.contentHash": "SHA-256 of a published agreement text, so anyone can recompute it. Proves which words were signed; grants nothing.",
 } as const;
 
 export const SENSITIVE_COLUMN_PATTERN = /pass|secret|token|hash|key|credential/i;
