@@ -28,6 +28,8 @@ export type ReviewProposal = {
   link: string | null;
   existing: { body: string } | null;
   rejectReason: string | null;
+  /// Sensitive and this person is not an approver (R6): who decides it.
+  hiddenFor: string | null;
 };
 
 const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
@@ -158,6 +160,15 @@ function ProposalRow({ p }: { p: ReviewProposal }) {
         {p.state === "APPROVED" ? "אושר: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
+      </li>
+    );
+  }
+
+  if (p.hiddenFor) {
+    return (
+      <li className="py-3.5">
+        <p className="text-xs text-appNavy/50">{kindLabel}</p>
+        <p className="mt-0.5 text-sm text-appNavy/60">פריט רגיש. רק {p.hiddenFor} רואה אותו ומחליט עליו.</p>
       </li>
     );
   }

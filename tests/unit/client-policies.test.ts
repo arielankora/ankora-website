@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { changesSubstance, policyShapeError, ruleInForce, ruleLine, POLICY_KINDS, POLICY_KIND_HINTS, POLICY_KIND_LABELS } from "@/lib/client-policies";
+import { EXCEPTION_MAX_DAYS, exceptionShapeError, isExceptionInForce, changesSubstance, policyShapeError, ruleInForce, ruleLine, POLICY_KINDS, POLICY_KIND_HINTS, POLICY_KIND_LABELS } from "@/lib/client-policies";
 import { PAYLOADS, proposalHeadline, TARGET_LABELS } from "@/lib/knowledge-proposals";
 
 // Org brain, phase 3 (claude/org-brain-spec-2026-10-12.md, 3.11): what a
@@ -64,5 +64,27 @@ describe("labels and proposals", () => {
     expect(PAYLOADS.POLICY.safeParse({ kind: "DISCLOSURE", title: "עזיבת גיא", statement: "לא מספרים לעובדים" }).success).toBe(true);
     expect(PAYLOADS.POLICY.safeParse({ kind: "VENDOR", title: "x", statement: "y" }).success).toBe(false);
     expect(proposalHeadline("POLICY", { title: "עזיבת גיא", statement: "לא מספרים לעובדים" })).toBe("עזיבת גיא: לא מספרים לעובדים");
+  });
+});
+
+describe("exceptions", () => {
+  const now = new Date("2026-10-15T10:00:00Z");
+
+  it("needs what, why and an end that has not passed and is not too far", () => {
+    const ok = { what: "x", reason: "y", validUntil: new Date("2026-10-15T00:00:00Z") };
+    expect(exceptionShapeError(ok, now)).toBeNull();
+    expect(exceptionShapeError({ ...ok, what: " " }, now)).toContain("מה עושים");
+    expect(exceptionShapeError({ ...ok, reason: "" }, now)).toContain("למה");
+    expect(exceptionShapeError({ ...ok, validUntil: null }, now)).toContain("תאריך סיום");
+    expect(exceptionShapeError({ ...ok, validUntil: new Date("2026-10-14T00:00:00Z") }, now)).toContain("עבר");
+    const far = new Date(Date.UTC(2026, 9, 15) + (EXCEPTION_MAX_DAYS + 1) * 86400000);
+    expect(exceptionShapeError({ ...ok, validUntil: far }, now)).toContain("משנים את הכלל");
+  });
+
+  it("is in force when approved, through its last day", () => {
+    const last = new Date("2026-10-15T00:00:00Z");
+    expect(isExceptionInForce({ status: "APPROVED", validUntil: last }, now)).toBe(true);
+    expect(isExceptionInForce({ status: "APPROVED", validUntil: last }, new Date("2026-10-16T00:00:01Z"))).toBe(false);
+    expect(isExceptionInForce({ status: "REQUESTED", validUntil: last }, now)).toBe(false);
   });
 });

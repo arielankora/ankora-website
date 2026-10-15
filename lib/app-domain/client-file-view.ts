@@ -16,6 +16,7 @@ import { listImportantDates } from "@/lib/app-domain/important-dates";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
@@ -41,7 +42,7 @@ const RELATIONSHIP: Record<string, string> = {
 };
 
 /// The entity types whose changes make up section 16.
-const FILE_ENTITY_TYPES = ["ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
+const FILE_ENTITY_TYPES = ["PolicyException", "ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -62,7 +63,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity }) => !ai || r.sensitivity !== "SENSITIVE";
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -79,6 +80,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     listRequestTypes(actor, clientId),
     listNarratives(actor, clientId),
     listClientPolicies(actor, clientId),
+    listOpenExceptions(actor, clientId),
   ]);
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
@@ -123,6 +125,11 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       details: [
         p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
         p.rationale ? `למה: ${p.rationale}` : null,
+        // An approved exception travels with its rule: whoever reads the
+        // rule reads that, until a date, it is done otherwise.
+        ...exceptions
+          .filter((e) => e.policyId === p.id && e.status === "APPROVED")
+          .map((e) => `חריגה מאושרת עד ${day(e.validUntil)}: ${e.what}${e.decidedByName ? `, אישר/ה ${e.decidedByName}` : ""}`),
       ],
       ...knowledge(p),
       group: POLICY_KIND_LABELS[p.kind],

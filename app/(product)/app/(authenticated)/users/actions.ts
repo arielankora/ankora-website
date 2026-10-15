@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { requireUser } from "@/lib/app-auth/session";
 import { inviteUser, resendInvite, updateUserRoleStatus, setUserClientAccess, logoutAllSessions } from "@/lib/app-domain/users";
 import { revokeClaudeGrantsForUser } from "@/lib/app-domain/mcp-connections";
+import { setUserCanApproveExceptions } from "@/lib/app-domain/rule-approvals";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import type { UserRole, UserStatus, ClientUserRole } from "@prisma/client";
 
@@ -195,4 +196,19 @@ export async function credentialExposureReportAction(userId: string): Promise<Ex
     if (err instanceof ForbiddenError) return { ok: false, error: "אין לך הרשאה לבצע פעולה זו." };
     return { ok: false, error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
   }
+}
+
+/// Org brain, phase 3 (decision 5): "אישור חריגות ומידע רגיש", given to a
+/// person rather than a role.
+export async function setExceptionApproverAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return { error: "משתמש לא נמצא." };
+  try {
+    await setUserCanApproveExceptions(actor, userId, formData.get("canApproveExceptions") === "on");
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/users/${userId}`);
+  return { ok: true };
 }

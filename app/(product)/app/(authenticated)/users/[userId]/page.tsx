@@ -7,6 +7,7 @@ import { listClients } from "@/lib/app-domain/clients";
 import { Forbidden } from "@/components/app/Forbidden";
 import { EditRoleStatusForm } from "./EditRoleStatusForm";
 import { ClientAccessForm } from "./ClientAccessForm";
+import { ExceptionApproverForm } from "./ExceptionApproverForm";
 import { ResendInviteForm } from "./ResendInviteForm";
 import { ExposureReport } from "./ExposureReport";
 import { logoutAllSessionsAction, revokeClaudeGrantsAction } from "../actions";
@@ -47,6 +48,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         email: true,
         role: true,
         status: true,
+        canApproveExceptions: true,
         createdAt: true,
         clientAccess: true,
       },
@@ -81,6 +83,13 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             isSelf={isSelf}
           />
         </div>
+
+        {targetUser.role !== "CLIENT_USER" && (
+          <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <h2 className="mb-4 text-sm font-medium text-appNavy">הרשאות מיוחדות</h2>
+            <ExceptionApproverForm userId={targetUser.id} value={targetUser.canApproveExceptions} />
+          </div>
+        )}
 
         <div className="rounded-2xl border border-lineDark bg-white p-6">
           <h2 className="mb-4 text-sm font-medium text-appNavy">גישה ללקוחות</h2>

@@ -12,6 +12,8 @@ import {
   updateClientPolicy,
   type ClientPolicyInput,
 } from "@/lib/app-domain/client-policies";
+import { approveException, rejectException, requestException, withdrawException } from "@/lib/app-domain/policy-exceptions";
+import { setClientRuleApprovers } from "@/lib/app-domain/rule-approvals";
 import type { KnowledgeStatus, PolicyKind } from "@prisma/client";
 
 // Org brain, phase 3: the client's own rules on the client screen
@@ -91,4 +93,45 @@ export async function approvePolicyAction(id: string, clientId: string): Promise
 export async function removePolicyAction(id: string, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => removeClientPolicy(user, id));
+}
+
+// ---------------------------------------------------------------------------
+// Exceptions and approvers (spec 3.11, decision 5)
+// ---------------------------------------------------------------------------
+
+export async function requestExceptionAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") ?? "");
+  const until = String(formData.get("validUntil") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(until)) return { error: "חריגה צריכה תאריך סיום." };
+  return run(clientId, () =>
+    requestException(user, {
+      policyId: String(formData.get("policyId") ?? ""),
+      what: String(formData.get("what") ?? ""),
+      reason: String(formData.get("reason") ?? ""),
+      validUntil: new Date(`${until}T00:00:00Z`),
+    })
+  );
+}
+
+export async function approveExceptionAction(id: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => approveException(user, id));
+}
+
+export async function rejectExceptionAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") ?? "");
+  return run(clientId, () => rejectException(user, String(formData.get("id") ?? ""), String(formData.get("note") ?? "")));
+}
+
+export async function withdrawExceptionAction(id: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => withdrawException(user, id));
+}
+
+export async function setRuleApproversAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") ?? "");
+  return run(clientId, () => setClientRuleApprovers(user, clientId, formData.getAll("approver").map(String)));
 }

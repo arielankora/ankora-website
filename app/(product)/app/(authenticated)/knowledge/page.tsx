@@ -66,6 +66,7 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
               link: fireflies ? firefliesLink(fireflies, at) : null,
               existing: p.existing ? { body: p.existing.body } : null,
               rejectReason: p.rejectReason,
+              hiddenFor: p.hiddenFor,
             };
           });
           return (

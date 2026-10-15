@@ -34,6 +34,9 @@ import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
+import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
+import { EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
 import { ruleInForce } from "@/lib/client-policies";
 import { NarrativesPanel } from "./NarrativesPanel";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
@@ -94,7 +97,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -131,6 +134,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     listNarratives(user, client.id),
     // Phase 3, spec 3.11: the client's own rules.
     listClientPolicies(user, client.id),
+    // Exceptions to them, and who decides (decision 5).
+    listOpenExceptions(user, client.id),
+    ruleApproversFor(client.id),
+    canApproveForClient(user, client.id),
   ]);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
@@ -346,6 +353,24 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               clientId={client.id}
               sourceOptions={sourceOptions}
               canApprove={can(user.role, "client.manage")}
+              exceptions={exceptions.map((e) => ({
+                id: e.id,
+                policyId: e.policyId,
+                what: e.what,
+                reason: e.reason,
+                validUntil: e.validUntil.toISOString(),
+                status: e.status as "REQUESTED" | "APPROVED",
+                requestedById: e.requestedById,
+                requestedByName: e.requestedByName,
+                decidedByName: e.decidedByName,
+                decisionNote: e.decisionNote,
+              }))}
+              approvers={ruleApprovers}
+              clientApproverIds={client.ruleApproverIds}
+              staff={staff.map((s) => ({ id: s.id, name: s.name }))}
+              canDecideExceptions={canDecideExceptions}
+              viewerId={user.id}
+              maxExceptionDays={EXCEPTION_MAX_DAYS}
               policies={policies.map((p) => ({
                 id: p.id,
                 kind: p.kind,

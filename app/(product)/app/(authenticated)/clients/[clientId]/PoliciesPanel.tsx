@@ -14,7 +14,18 @@ import {
   type PolicyKindLike,
   type PolicyStatusLike,
 } from "@/lib/client-policies";
-import { addPolicyAction, approvePolicyAction, removePolicyAction, retirePolicyAction, updatePolicyAction } from "../policy-actions";
+import {
+  addPolicyAction,
+  approveExceptionAction,
+  approvePolicyAction,
+  rejectExceptionAction,
+  removePolicyAction,
+  requestExceptionAction,
+  retirePolicyAction,
+  setRuleApproversAction,
+  updatePolicyAction,
+  withdrawExceptionAction,
+} from "../policy-actions";
 import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 3: the client's own rules, sections 6 and 14 of the
@@ -40,6 +51,95 @@ export type PanelPolicy = {
   toResolve: string | null;
   sources: string[];
 };
+
+export type PanelException = {
+  id: string;
+  policyId: string;
+  what: string;
+  reason: string;
+  validUntil: string;
+  status: "REQUESTED" | "APPROVED";
+  requestedById: string;
+  requestedByName: string | null;
+  decidedByName: string | null;
+  decisionNote: string | null;
+};
+
+function dayLabel(iso: string) {
+  return new Date(iso).toLocaleDateString("he-IL", { timeZone: "UTC" });
+}
+
+function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy: PanelPolicy; maxDays: number }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(requestExceptionAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="policyId" value={policy.id} />
+      <p className="text-xs text-appNavy/60">
+        הכלל: {policy.statement}
+      </p>
+      <Field label="מה עושים אחרת *">
+        <textarea name="what" required rows={2} placeholder="לשלוח לאיילה את חשבוניות Inc של אוקטובר" className={INPUT} />
+      </Field>
+      <Field label="למה *">
+        <input name="reason" required placeholder="שני בחופשה, והתשלום ב-25 לחודש" className={INPUT} />
+      </Field>
+      <Field label="עד (כולל) *">
+        <input name="validUntil" type="date" required className={INPUT} />
+      </Field>
+      <p className="-mt-2 text-[11px] text-appNavy/50">עד {maxDays} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.</p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+        {pending ? "שולח..." : "שליחת הבקשה"}
+      </button>
+    </form>
+  );
+}
+
+function RejectExceptionForm({ clientId, exception }: { clientId: string; exception: PanelException }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(rejectExceptionAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="id" value={exception.id} />
+      <p className="text-sm text-appNavy">{exception.what}</p>
+      <Field label="למה לא, בשורה אחת *">
+        <input name="note" required className={INPUT} />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+        {pending ? "שומר..." : "דחיית הבקשה"}
+      </button>
+    </form>
+  );
+}
+
+function ApproversForm({ clientId, staff, selected }: { clientId: string; staff: { id: string; name: string }[]; selected: string[] }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setRuleApproversAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="clientId" value={clientId} />
+      <p className="text-xs text-appNavy/60">
+        רק כשהלקוח קבע מי מאשר. בלי בחירה, מאשר כל מי שקיבל את ההרשאה &quot;אישור חריגות ומידע רגיש&quot; בדף המשתמש.
+      </p>
+      <fieldset className="flex flex-col gap-1.5">
+        {staff.map((u) => (
+          <label key={u.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+            <input type="checkbox" name="approver" value={u.id} defaultChecked={selected.includes(u.id)} className="h-4 w-4 accent-gold" />
+            {u.name}
+          </label>
+        ))}
+      </fieldset>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+        {pending ? "שומר..." : "שמירה"}
+      </button>
+    </form>
+  );
+}
 
 const STATUS_TONE: Record<PolicyStatusLike, "green" | "amber" | "gray"> = { ACTIVE: "green", PROPOSED: "amber", RETIRED: "gray" };
 
@@ -132,11 +232,27 @@ export function PoliciesPanel({
   policies,
   sourceOptions,
   canApprove,
+  exceptions,
+  approvers,
+  clientApproverIds,
+  staff,
+  canDecideExceptions,
+  viewerId,
+  maxExceptionDays,
 }: {
   clientId: string;
   policies: PanelPolicy[];
   sourceOptions: SourceOption[];
+  /// Approves and retires rules, and names the client's approvers: a manager.
   canApprove: boolean;
+  exceptions: PanelException[];
+  /// Who decides exceptions and sensitive items for this client, now.
+  approvers: { id: string; name: string }[];
+  clientApproverIds: string[];
+  staff: { id: string; name: string }[];
+  canDecideExceptions: boolean;
+  viewerId: string;
+  maxExceptionDays: number;
 }) {
   const { showToast } = useToast();
   const live = policies.filter((p) => p.status !== "RETIRED");
@@ -147,6 +263,16 @@ export function PoliciesPanel({
     if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
     else showToast({ tone: "success", title: "הכלל בתוקף", description: p.title });
   }
+  async function decide(e: PanelException) {
+    const r = await approveExceptionAction(e.id, clientId);
+    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+    else showToast({ tone: "success", title: "החריגה אושרה", description: e.what.slice(0, 80) });
+  }
+  async function withdraw(e: PanelException) {
+    const r = await withdrawExceptionAction(e.id, clientId);
+    if (r.error) showToast({ tone: "error", title: "המשיכה נכשלה", description: r.error });
+    else showToast({ tone: "info", title: "הבקשה נמשכה", description: e.what.slice(0, 80) });
+  }
   async function remove(p: PanelPolicy) {
     const r = await removePolicyAction(p.id, clientId);
     if (r.error) showToast({ tone: "error", title: "ההסרה נכשלה", description: r.error });
@@ -154,13 +280,24 @@ export function PoliciesPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div id="rules" className="rounded-2xl border border-lineDark bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-appNavy">כללים של הלקוח ({live.length})</h2>
         <Drawer triggerLabel="+ כלל" title="כלל של הלקוח" variant="link">
           <PolicyForm clientId={clientId} sourceOptions={sourceOptions} />
         </Drawer>
       </div>
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-appNavy/50">
+        <span>
+          חריגות ומידע רגיש מאשר/ת: {approvers.length ? approvers.map((a) => a.name).join(", ") : "עוד אין מי שמאשר. נותנים הרשאה בדף המשתמש."}
+          {clientApproverIds.length > 0 && " (לפי מה שהלקוח קבע)"}
+        </span>
+        {canApprove && (
+          <Drawer triggerLabel="שינוי" title="מי מאשר אצל הלקוח" variant="link">
+            <ApproversForm clientId={clientId} staff={staff} selected={clientApproverIds} />
+          </Drawer>
+        )}
+      </p>
       {live.length === 0 ? (
         <p className="mt-2 text-sm text-appNavy/50">
           אין עדיין כללים. מה מותר ומה אסור אצל הלקוח, מי מאשר, מה לא מספרים למי, ומה לא נכנס לתיק בכלל.
@@ -198,6 +335,42 @@ export function PoliciesPanel({
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
                 <SourceCodes sources={p.sources} options={sourceOptions} />
+                {exceptions
+                  .filter((e) => e.policyId === p.id)
+                  .map((e) => (
+                    <div key={e.id} className="mt-2 rounded-lg border border-lineDark bg-appNavy/[0.02] px-3 py-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge label={e.status === "APPROVED" ? `חריגה עד ${dayLabel(e.validUntil)}` : "בקשה לחריגה"} tone={e.status === "APPROVED" ? "gray" : "amber"} />
+                        <span className="text-appNavy">{e.what}</span>
+                      </div>
+                      <p className="mt-1 text-appNavy/55">
+                        למה: {e.reason}
+                        {e.status === "REQUESTED" && ` · עד ${dayLabel(e.validUntil)}`}
+                        {e.requestedByName && ` · ביקש/ה ${e.requestedByName}`}
+                        {e.decidedByName && ` · אישר/ה ${e.decidedByName}`}
+                        {e.decisionNote && ` · ${e.decisionNote}`}
+                      </p>
+                      {e.status === "REQUESTED" && (
+                        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+                          {canDecideExceptions && (
+                            <>
+                              <button type="button" onClick={() => decide(e)} className="font-medium text-gold-dim hover:underline">
+                                אישור החריגה
+                              </button>
+                              <Drawer triggerLabel="דחיית החריגה" title="דחיית בקשה לחריגה" variant="link">
+                                <RejectExceptionForm clientId={clientId} exception={e} />
+                              </Drawer>
+                            </>
+                          )}
+                          {e.requestedById === viewerId && (
+                            <button type="button" onClick={() => withdraw(e)} className="text-appNavy/50 hover:text-appNavy">
+                              משיכת הבקשה
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
                 {canApprove && p.status === "PROPOSED" && (
@@ -207,6 +380,9 @@ export function PoliciesPanel({
                 )}
                 <Drawer triggerLabel="עריכה" title={`עריכה: ${p.title}`} variant="link">
                   <PolicyForm clientId={clientId} sourceOptions={sourceOptions} existing={p} />
+                </Drawer>
+                <Drawer triggerLabel="בקשת חריגה" title={`בקשת חריגה: ${p.title}`} variant="link">
+                  <ExceptionForm clientId={clientId} policy={p} maxDays={maxExceptionDays} />
                 </Drawer>
                 {canApprove && (
                   <Drawer triggerLabel="ביטול" title={`ביטול: ${p.title}`} variant="link">
