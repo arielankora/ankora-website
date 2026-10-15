@@ -361,69 +361,6 @@ const legal: LegalContent = {
         },
       ],
     },
-    security: {
-      title: "Security and Trust",
-      sub: "Clients give Ankora access to parts of their lives. This page explains how we protect them. It is updated as the setup develops.",
-      sections: [
-        {
-          id: "access-and-permissions",
-          title: "Access and permissions",
-          body: [
-            "Each member of the Ankora team works under a personal, identified user in Ankora's systems, in a way that allows the activity to be monitored and controlled. These permissions are revoked when the person leaves Ankora.",
-            "The portal is built so that separation between clients is structural: the client identity is derived from the user's assignment on the server and not from a parameter that can be changed in the browser. A user cannot reach another client's data even by deliberate attempt.",
-          ],
-        },
-        {
-          id: "encryption",
-          title: "Encryption",
-          body: [
-            "Encryption in transit on every access path, and encryption at rest in the database. Passwords are stored as bcrypt hashes and not in plain text. Password reset tokens are single use and expiring.",
-          ],
-        },
-        {
-          id: "audit-log",
-          title: "Audit log",
-          body: [
-            "Material actions in the system are recorded with the actor, the time, the entity, the state before and after, the IP address and the browser. Time entries are kept with a full version history, so that it is possible to reconstruct who changed what and when.",
-          ],
-        },
-        {
-          id: "application-hardening",
-          title: "Application hardening",
-          body: [
-            "A dedicated CSP policy for the client area, with no third-party source at all. Shared rate limiting across all login and contact endpoints. Constant time comparison for sensitive comparisons. The client area is blocked from search engine indexing.",
-          ],
-        },
-        {
-          id: "reviews-and-testing",
-          title: "Reviews and testing",
-          body: [
-            "A documented periodic security review, including mapping against the OWASP Top 10 and tracking of vulnerable dependencies. Findings are documented with a severity and a remediation date.",
-          ],
-        },
-        {
-          id: "where-the-information-sits",
-          title: "Where the information sits",
-          body: [
-            "The infrastructure is hosted in the United States. The full sub-processor list appears in the privacy policy, section 7.",
-          ],
-        },
-        {
-          id: "incident-response",
-          title: "Incident response",
-          body: [
-            "In the event of a serious security incident: we will notify the affected clients and the Israeli Privacy Protection Authority as required by law, without waiting for a full investigation.",
-          ],
-        },
-        {
-          id: "questions",
-          title: "Questions",
-          body: [
-            "hello@ankora.co.il",
-          ],
-        },
-      ],
-    },
     dpa: {
       title: "Data Processing Addendum",
       sub: "This addendum applies where Ankora is exposed to personal data for which the client is responsible, for example data about the client's employees, customers or suppliers. It is a standing annex to the engagement agreement, and it is designed to let the client meet its own obligations under regulation 15 of the Israeli Privacy Protection (Data Security) Regulations, and under the GDPR for those to whom it applies.",

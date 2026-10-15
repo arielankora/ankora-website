@@ -14,10 +14,13 @@ export function InnerCTA({
   dict,
   locale,
   title,
+  body,
 }: {
   dict: Dictionary;
   locale: Locale;
   title?: string;
+  /** The security page answers "a question we didn't answer?" with its own line. */
+  body?: string;
 }) {
   return (
     <section className="relative overflow-hidden border-t border-[rgba(243,234,219,0.12)] py-[clamp(64px,9vw,130px)]">
@@ -29,7 +32,7 @@ export function InnerCTA({
         </Reveal>
         <Reveal delay={0.1}>
           <p className="mx-auto font-assistant text-[1.05rem] font-light text-muted">
-            {dict.finalCta.body}
+            {body ?? dict.finalCta.body}
           </p>
         </Reveal>
         <Reveal delay={0.2} className="mt-5 flex justify-center">
