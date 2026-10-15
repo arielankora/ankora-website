@@ -121,6 +121,10 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
           body: attentionSentence(attention),
           entityType: "Client",
           entityId: client.id,
+          // Stamped with the run's own clock, the one the week is counted
+          // against. With the database's clock, a run for any other "now"
+          // (the tests, from 15.10.2026) compared a past week with today.
+          createdAt: now,
         },
       });
       notified++;
