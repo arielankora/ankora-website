@@ -237,17 +237,15 @@ describe("lookupTeamMember() / teamMembers() - the admin-only roster", () => {
     expect((await lookupTeamMember(ariel, "Gone Person")).ok).toBe(false);
   });
 
-  // QUESTION (not marked as a bug): teamMembers() filters on status and
-  // deletedAt but not on role, so CLIENT_USER portal accounts (a client's
-  // own contacts, with their emails) appear in list_team_members, whose
-  // description promises "active Ankora staff". Only admins can call it
-  // and they can see those users elsewhere, but the roster is handed to a
-  // third-party model's context. Asserted as it is today.
-  it("currently includes client portal users in the roster (see QUESTION above)", async () => {
+  // Answered 15.10.2026: client portal users (a client's own contacts,
+  // with their emails) no longer appear in the staff roster unless the
+  // caller asks for them with includeClients.
+  it("leaves client portal users out of the roster unless asked", async () => {
     const { ariel, nux } = await setup();
     const { user: oren } = await createTestClientUser({ clientId: nux.id, role: "ADMIN" });
-    const roster = await teamMembers(ariel);
-    expect(roster.some((m) => m.id === oren.id && m.role === "CLIENT_USER")).toBe(true);
+    expect((await teamMembers(ariel)).some((m) => m.id === oren.id)).toBe(false);
+    const withClients = await teamMembers(ariel, { includeClients: true });
+    expect(withClients.some((m) => m.id === oren.id && m.role === "CLIENT_USER")).toBe(true);
   });
 });
 

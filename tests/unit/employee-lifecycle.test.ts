@@ -352,3 +352,28 @@ describe("the lifecycle task's category", () => {
     expect(createTask.mock.calls[0][1].categoryId).toBeNull();
   });
 });
+
+describe("onPdfSignatureRecorded", () => {
+  it("closes onboarding step 5 once the in-app signature also exists", async () => {
+    db.employeeAgreement.findFirst.mockResolvedValue({ id: "app" });
+    db.task.findFirst.mockResolvedValueOnce({ id: "parent", clientId: "internal" }).mockResolvedValueOnce({ id: "step5" });
+    completeStepAsSystem.mockResolvedValue(true);
+    await lifecycle.onPdfSignatureRecorded("emp", "CONFIDENTIALITY", "agr");
+    expect(db.task.findFirst.mock.calls[1][0].where.title).toBe(prompts.ONBOARDING_STEPS[4]);
+    expect(completeStepAsSystem).toHaveBeenCalledWith("step5", expect.any(String));
+  });
+
+  it("leaves step 5 while the in-app signature is missing", async () => {
+    db.employeeAgreement.findFirst.mockResolvedValue(null);
+    await lifecycle.onPdfSignatureRecorded("emp", "CONFIDENTIALITY", "agr");
+    expect(completeStepAsSystem).not.toHaveBeenCalled();
+  });
+
+  it("notes a deletion declaration on the offboarding task and closes nothing", async () => {
+    db.task.findFirst.mockResolvedValue({ id: "off", clientId: "internal" });
+    await lifecycle.onPdfSignatureRecorded("emp", "DELETION_DECLARATION", "agr-9");
+    expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ lifecycleKind: "OFFBOARDING" });
+    expect(db.taskComment.create.mock.calls[0][0].data.body).toContain("agr-9");
+    expect(completeStepAsSystem).not.toHaveBeenCalled();
+  });
+});

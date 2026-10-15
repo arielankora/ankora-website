@@ -706,3 +706,24 @@ the app could remove a step, so `replace_task_steps` was added
   new list is not added twice.
 - It is the one tool annotated `destructiveHint: true`, so a client asks
   before calling it. The annotation test now asserts it is the only one.
+
+### Addendum, 15.10.2026: employee lifecycle tools
+
+For the onboarding, weekly and offboarding agents, which work only through
+this server (lib/mcp/employee-tools.ts):
+
+- `list_team_members` now returns `status`, `lastLoginAt` and
+  `daysSinceLogin` (Israel calendar days), leaves client portal users out
+  unless `includeClients` is set, and lists INVITED and SUSPENDED staff
+  with `includeInactive`.
+- `get_employee_status` (read, managers and admins): agreements per kind
+  and channel, passkey count, last sign-in, open lifecycle tasks with
+  their open steps. Never the personal email, IPs, browsers or hashes.
+- `record_pdf_signature` (write, idempotent, managers and admins): records
+  a signed PDF already filed on "Ankora פנימי", current version only.
+
+Both take `userId` beside `person`, the one deliberate exception to "never
+take a raw id": a scheduled agent is handed the id once in its task's
+prompt, and matching a name afresh every morning is how a second person
+with the same first name would get in. An id that is not staff finds
+nothing.

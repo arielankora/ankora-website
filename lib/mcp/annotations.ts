@@ -111,6 +111,11 @@ export const TOOL_ANNOTATIONS = {
   // A check of an ongoing process. An issue also opens a task, so a second
   // call is a second check and possibly a second task.
   record_process_check: WRITES,
+  // Employee lifecycle (lib/mcp/employee-tools.ts, 15.10.2026). The status
+  // is a read. Recording a returned PDF is a write, and idempotent: a
+  // second call for the same person, kind and version returns the first.
+  get_employee_status: READ_ONLY,
+  record_pdf_signature: { ...WRITES, idempotentHint: true },
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -118,7 +123,9 @@ export type ToolName = keyof typeof TOOL_ANNOTATIONS;
 /// Tools that read data belonging to someone other than the caller. Each
 /// must assert `time_entry.edit_others` - the same permission the admin
 /// screen and the CSV export route already gate this data on.
-export const TEAM_TOOLS = ["list_team_members", "list_team_time_entries"] as const;
+export const TEAM_TOOLS = ["list_team_members", "list_team_time_entries", "get_employee_status"] as const;
+/// record_pdf_signature asserts the same permission but is a write, so it
+/// is listed in WRITE_TOOLS rather than here (team tools are reads).
 
 /// Tools that write.
 export const WRITE_TOOLS = [
@@ -140,6 +147,7 @@ export const WRITE_TOOLS = [
   "propose_knowledge",
   "start_process",
   "record_process_check",
+  "record_pdf_signature",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

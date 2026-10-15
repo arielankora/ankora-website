@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = {
   employeeAgreement: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), findMany: vi.fn() },
   agreementSignLink: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+  clientDocument: { findFirst: vi.fn() },
   user: { findFirst: vi.fn() },
   $transaction: vi.fn(),
 };
@@ -29,12 +30,24 @@ vi.mock("@/lib/agreement-pdf", () => ({ renderAgreementPdf: async () => Buffer.f
 
 const onConfidentialitySigned = vi.fn();
 const onDeletionDeclarationSigned = vi.fn();
+const onPdfSignatureRecorded = vi.fn();
+const resolveInternalClient = vi.fn();
 vi.mock("@/lib/app-domain/employee-lifecycle", () => ({
   onConfidentialitySigned: (...a: unknown[]) => onConfidentialitySigned(...a),
   onDeletionDeclarationSigned: (...a: unknown[]) => onDeletionDeclarationSigned(...a),
+  onPdfSignatureRecorded: (...a: unknown[]) => onPdfSignatureRecorded(...a),
+  resolveInternalClient: () => resolveInternalClient(),
 }));
 
-const { AgreementError, signConfidentiality, signWithLink, issueDeletionDeclarationLink, recordPdfSignature, getAgreementStatus } =
+const {
+  AgreementError,
+  signConfidentiality,
+  signWithLink,
+  issueDeletionDeclarationLink,
+  recordPdfSignature,
+  recordPdfSignatureFromDocument,
+  getAgreementStatus,
+} =
   await import("@/lib/app-domain/agreements");
 const { CURRENT_AGREEMENTS, hashSignToken } = await import("@/lib/agreements");
 const { ForbiddenError } = await import("@/lib/app-auth/permissions");
@@ -256,14 +269,87 @@ describe("recordPdfSignature", () => {
 });
 
 describe("getAgreementStatus", () => {
-  it("reports each kind per channel, for the current version only", async () => {
+  it("reports each kind per channel, for the current version only, and the latest signature per channel", async () => {
+    const at = new Date("2026-10-01T09:00:00Z");
     db.employeeAgreement.findMany.mockResolvedValue([
-      { kind: "CONFIDENTIALITY", version: CURRENT_AGREEMENTS.CONFIDENTIALITY, channel: "APP" },
-      { kind: "DELETION_DECLARATION", version: "מחיקה-0.1", channel: "EMAIL_PDF" },
+      { kind: "CONFIDENTIALITY", version: CURRENT_AGREEMENTS.CONFIDENTIALITY, channel: "APP", signedAt: at },
+      { kind: "DELETION_DECLARATION", version: "מחיקה-0.1", channel: "EMAIL_PDF", signedAt: at },
     ]);
     expect(await getAgreementStatus("u1")).toEqual([
-      { kind: "CONFIDENTIALITY", currentVersion: CURRENT_AGREEMENTS.CONFIDENTIALITY, app: true, emailPdf: false },
-      { kind: "DELETION_DECLARATION", currentVersion: CURRENT_AGREEMENTS.DELETION_DECLARATION, app: false, emailPdf: false },
+      {
+        kind: "CONFIDENTIALITY",
+        currentVersion: CURRENT_AGREEMENTS.CONFIDENTIALITY,
+        app: true,
+        emailPdf: false,
+        appLatest: { version: CURRENT_AGREEMENTS.CONFIDENTIALITY, signedAt: at },
+        emailPdfLatest: null,
+      },
+      {
+        kind: "DELETION_DECLARATION",
+        currentVersion: CURRENT_AGREEMENTS.DELETION_DECLARATION,
+        app: false,
+        emailPdf: false,
+        appLatest: null,
+        emailPdfLatest: { version: "מחיקה-0.1", signedAt: at },
+      },
     ]);
+  });
+});
+
+describe("recordPdfSignatureFromDocument (the MCP tool's domain half)", () => {
+  const admin = user({ id: "admin", role: "SUPER_ADMIN" });
+  const input = (o: Record<string, unknown> = {}) => ({
+    userId: "u1",
+    kind: "CONFIDENTIALITY" as const,
+    version: CURRENT_AGREEMENTS.CONFIDENTIALITY,
+    signedName: "דנה כהן",
+    signedAt: new Date("2026-10-14T21:00:00Z"),
+    documentId: "doc-1",
+    ...o,
+  });
+
+  beforeEach(() => {
+    resolveInternalClient.mockResolvedValue({ id: "internal", name: "Ankora פנימי" });
+    db.clientDocument.findFirst.mockResolvedValue({ id: "doc-1", clientId: "internal", driveFileId: "drive-7" });
+    db.user.findFirst.mockResolvedValue(user());
+    db.employeeAgreement.findFirst.mockResolvedValue(null);
+  });
+
+  it("is for admins only", async () => {
+    await expect(recordPdfSignatureFromDocument(user(), input())).rejects.toBeInstanceOf(ForbiddenError);
+  });
+
+  it("refuses a version other than the current one, naming the expected version", async () => {
+    const err = await recordPdfSignatureFromDocument(admin, input({ version: "סודיות-0.9" })).catch((e) => e);
+    expect(err).toBeInstanceOf(AgreementError);
+    expect(err.message).toContain(`"${CURRENT_AGREEMENTS.CONFIDENTIALITY}"`);
+    expect(db.employeeAgreement.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a document that is not on the internal client", async () => {
+    db.clientDocument.findFirst.mockResolvedValue({ id: "doc-1", clientId: "some-client", driveFileId: "x" });
+    await expect(recordPdfSignatureFromDocument(admin, input())).rejects.toThrow(/Ankora פנימי/);
+    expect(db.employeeAgreement.create).not.toHaveBeenCalled();
+  });
+
+  it("returns the existing row instead of a second one", async () => {
+    db.employeeAgreement.findFirst.mockResolvedValue({ id: "old", channel: "EMAIL_PDF" });
+    const out = await recordPdfSignatureFromDocument(admin, input());
+    expect(out).toEqual({ row: { id: "old", channel: "EMAIL_PDF" }, alreadyRecorded: true });
+    expect(db.employeeAgreement.create).not.toHaveBeenCalled();
+    expect(onPdfSignatureRecorded).not.toHaveBeenCalled();
+  });
+
+  it("records with the document's Drive file, audits, and tells the lifecycle task", async () => {
+    const out = await recordPdfSignatureFromDocument(admin, input());
+    expect(out.alreadyRecorded).toBe(false);
+    expect(db.employeeAgreement.create.mock.calls[0][0].data).toMatchObject({
+      channel: "EMAIL_PDF",
+      driveFileId: "drive-7",
+      recordedById: "admin",
+      version: CURRENT_AGREEMENTS.CONFIDENTIALITY,
+    });
+    expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.pdf_recorded" }));
+    expect(onPdfSignatureRecorded).toHaveBeenCalledWith("u1", "CONFIDENTIALITY", "a1");
   });
 });

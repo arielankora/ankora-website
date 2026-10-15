@@ -1,12 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
-  elapsedMinutes,
+import { elapsedMinutes,
   serializeClient,
   serializeTeamTimeEntry,
   serializeTimeEntry,
   toMinutes,
-  type TimeEntryLike,
-} from "@/lib/mcp/serialize";
+  type TimeEntryLike, calendarDaysSince, serializeTeamMember } from "@/lib/mcp/serialize";
 
 // Phase 13 (MCP server, docs/adr/0005).
 
@@ -158,5 +156,32 @@ describe("serializeTeamTimeEntry()", () => {
     const self = serializeTimeEntry(entry({ user: { name: "הדס" } })) as Record<string, unknown>;
     expect(Object.keys(self)).not.toContain("employee");
     expect(Object.values(self)).not.toContain("הדס");
+  });
+});
+
+describe("calendarDaysSince", () => {
+  const now = new Date("2026-10-15T07:00:00Z"); // 10:00 on 15.10 in Israel
+  it("counts Israeli calendar days, not 24-hour blocks", () => {
+    expect(calendarDaysSince(new Date("2026-10-14T20:50:00Z"), now)).toBe(1); // 23:50 on 14.10
+    expect(calendarDaysSince(new Date("2026-10-14T21:10:00Z"), now)).toBe(0); // 00:10 on 15.10
+    expect(calendarDaysSince(new Date("2026-10-01T07:00:00Z"), now)).toBe(14);
+    expect(calendarDaysSince(null, now)).toBeNull();
+  });
+});
+
+describe("serializeTeamMember", () => {
+  it("names its fields and never passes others through", () => {
+    const row = {
+      id: "u1",
+      name: "דנה",
+      email: "d@ankora.co.il",
+      role: "ANKORA_EMPLOYEE",
+      status: "INVITED",
+      lastLoginAt: null,
+      passwordHash: "$2b$secret",
+      personalEmail: "private@example.com",
+    };
+    const out = serializeTeamMember(row, new Date("2026-10-15T07:00:00Z"));
+    expect(out).toEqual({ id: "u1", name: "דנה", email: "d@ankora.co.il", role: "ANKORA_EMPLOYEE", status: "INVITED", lastLoginAt: null, daysSinceLogin: null });
   });
 });

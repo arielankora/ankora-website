@@ -223,3 +223,38 @@ export type ClientLike = { id: string; name: string; status: string };
 export function serializeClient(client: ClientLike): { id: string; name: string; status: string } {
   return { id: client.id, name: client.name, status: client.status };
 }
+
+/// Whole calendar days between a moment and now, counted on the Israeli
+/// calendar (Asia/Jerusalem), not in 24-hour blocks: someone who signed
+/// in at 23:50 last night signed in "1 day ago" this morning, which is how
+/// a person reading the answer counts. Null when there is no moment.
+export function calendarDaysSince(moment: Date | null, now: Date = new Date()): number | null {
+  if (!moment) return null;
+  const key = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(d);
+  const day = (k: string) => Date.UTC(Number(k.slice(0, 4)), Number(k.slice(5, 7)) - 1, Number(k.slice(8, 10)));
+  return Math.round((day(key(now)) - day(key(moment))) / 86_400_000);
+}
+
+export type TeamMemberLike = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: string;
+  lastLoginAt: Date | null;
+};
+
+/// One row of list_team_members. Named fields only (rule 1 above): the
+/// users table also holds a password hash, a personal email and lockout
+/// counters, none of which belong in a model's context.
+export function serializeTeamMember(u: TeamMemberLike, now: Date = new Date()) {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    status: u.status,
+    lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
+    daysSinceLogin: calendarDaysSince(u.lastLoginAt, now),
+  };
+}
