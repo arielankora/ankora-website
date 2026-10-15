@@ -27,6 +27,13 @@ vi.mock("@/lib/google-drive", () => ({
 
 vi.mock("@/lib/agreement-pdf", () => ({ renderAgreementPdf: async () => Buffer.from("%PDF-test") }));
 
+const onConfidentialitySigned = vi.fn();
+const onDeletionDeclarationSigned = vi.fn();
+vi.mock("@/lib/app-domain/employee-lifecycle", () => ({
+  onConfidentialitySigned: (...a: unknown[]) => onConfidentialitySigned(...a),
+  onDeletionDeclarationSigned: (...a: unknown[]) => onDeletionDeclarationSigned(...a),
+}));
+
 const { AgreementError, signConfidentiality, signWithLink, issueDeletionDeclarationLink, recordPdfSignature, getAgreementStatus } =
   await import("@/lib/app-domain/agreements");
 const { CURRENT_AGREEMENTS, hashSignToken } = await import("@/lib/agreements");
@@ -99,6 +106,8 @@ describe("signConfidentiality", () => {
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.sign", entityId: "a1" }));
     expect(upload).not.toHaveBeenCalled();
     expect(db.employeeAgreement.update).not.toHaveBeenCalled();
+    // The onboarding task hears about it.
+    expect(onConfidentialitySigned).toHaveBeenCalledWith("u1");
   });
 
   it("keeps the signature when the Drive upload fails, and stores the file id when it works", async () => {
@@ -161,6 +170,8 @@ describe("signWithLink", () => {
       userId: "u1",
     });
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.sign", actorId: "u1" }));
+    // The offboarding task is told the declaration came back.
+    expect(onDeletionDeclarationSigned).toHaveBeenCalledWith("u1", "a1");
   });
 
   it("writes nothing when a second submit loses the race for the link", async () => {

@@ -250,6 +250,8 @@ model User {
 
   // Employee agreements.
   employeeAgreements EmployeeAgreement[]
+  // Employee lifecycle: onboarding and offboarding tasks about this person.
+  lifecycleTasks     Task[]              @relation("TaskSubject")
   agreementSignLinks AgreementSignLink[]
 
   @@index([role, status])
@@ -930,6 +932,21 @@ model Task {
   blockedOn     TaskBlocker?
   blockedReason String?
 
+  // Employee lifecycle (15.10.2026): a task ABOUT a person, as opposed to
+  // one assigned TO a person. Opened by the server when a staff member
+  // is invited (onboarding) or suspended (offboarding), so the system can
+  // find that task again by who it is about: to close the confidentiality
+  // step when the person signs, to note the deletion declaration when it
+  // comes back, and to refuse opening a second offboarding task.
+  //
+  // SetNull rather than Restrict. The task is a record of work Ankora
+  // did, and its title and description already name the person; a hard
+  // delete of the user row (which this product never does on its own)
+  // should not be blocked by a checklist. The signatures themselves are
+  // the evidence that must outlive the person, and those restrict.
+  subjectUserId String?
+  lifecycleKind EmployeeLifecycleKind?
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
@@ -954,6 +971,7 @@ model Task {
   parent        Task?          @relation("TaskParent", fields: [parentId], references: [id], onDelete: Cascade)
   subtasks      Task[]         @relation("TaskParent")
   importantDate ImportantDate? @relation(fields: [importantDateId], references: [id], onDelete: SetNull)
+  subjectUser   User?          @relation("TaskSubject", fields: [subjectUserId], references: [id], onDelete: SetNull)
   timeEntries   TimeEntry[]
   decisions     Decision[]
   documents     ClientDocument[]
@@ -962,6 +980,7 @@ model Task {
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([processId])
+  @@index([subjectUserId, lifecycleKind])
   @@index([clientId])
   @@index([assignedToId])
   // Portal phase 1: every portal screen reads this client's visible tasks.
@@ -3620,6 +3639,12 @@ model ProcessVersion {
 // SHA-256 of the file that was on screen. A text that changes later gets
 // a new version and a new file; the old file stays so every hash keeps
 // resolving to the words it was taken over.
+
+/// Which lifecycle task a Task is, when it is one. See Task.subjectUserId.
+enum EmployeeLifecycleKind {
+  ONBOARDING
+  OFFBOARDING
+}
 
 enum AgreementKind {
   CONFIDENTIALITY

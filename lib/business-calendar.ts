@@ -211,3 +211,11 @@ export function shiftBusinessDays(key: string, count: number, calendar: Business
   }
   return cursor;
 }
+
+/// The business day that is `count` business days after `key`, counting
+/// only days strictly after it. Used for deadlines that run forward from
+/// today, such as the DPA's three working days to revoke a departing
+/// employee's access. Never goes backwards: a negative `count` is 0.
+export function addBusinessDays(key: string, count: number, calendar: BusinessCalendarKey): string {
+  return shiftBusinessDays(key, Math.max(0, Math.floor(count)), calendar);
+}

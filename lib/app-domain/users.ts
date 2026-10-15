@@ -102,7 +102,17 @@ export async function inviteUser(
     after: { name: user.name, email: user.email, role: user.role, personalEmail: user.personalEmail },
   });
 
-  return { user, setPasswordToken: raw, emailSent, emailError };
+  // Employee lifecycle: a staff invite opens the onboarding task on the
+  // internal client. Never throws; a failure is audited and the invite
+  // stands. Imported here rather than at the top because that module
+  // reaches the tasks and MCP modules, which import this one.
+  let onboardingTaskId: string | null = null;
+  if (user.role !== "CLIENT_USER") {
+    const { openOnboardingTask } = await import("@/lib/app-domain/employee-lifecycle");
+    onboardingTaskId = await openOnboardingTask(actor, user);
+  }
+
+  return { user, setPasswordToken: raw, emailSent, emailError, onboardingTaskId };
 }
 
 /// Empty means "none". Anything else must look like an address, and the
@@ -281,6 +291,15 @@ export async function updateUserRoleStatus(
     before: { role: before.role, status: before.status },
     after: { role: user.role, status: user.status },
   });
+
+  // Employee lifecycle: the move INTO suspension (not a save that leaves
+  // someone suspended) revokes what the session cut above does not reach
+  // and opens the offboarding task. Never throws: the suspension itself
+  // has already happened and must stand whatever the paperwork does.
+  if (before.status !== "SUSPENDED" && user.status === "SUSPENDED" && user.role !== "CLIENT_USER") {
+    const { runOffboarding } = await import("@/lib/app-domain/employee-lifecycle");
+    await runOffboarding(actor, user);
+  }
 
   return user;
 }

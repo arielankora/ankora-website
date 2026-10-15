@@ -4,7 +4,15 @@ import { ForbiddenError, assertCan, can, canManageClients } from "@/lib/app-auth
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { localDateTimeToUtc, TIMEZONE, localDateKey } from "@/lib/timezone";
-import type { SupplierExperience, TaskBlocker, User, TaskPriority, TaskStatus, UserRole } from "@prisma/client";
+import type {
+  EmployeeLifecycleKind,
+  SupplierExperience,
+  TaskBlocker,
+  User,
+  TaskPriority,
+  TaskStatus,
+  UserRole,
+} from "@prisma/client";
 import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 
@@ -854,6 +862,10 @@ export async function createTask(
     /// step on a different client than the task it belongs to would pass
     /// every access check on its own and still be nonsense.
     parentId?: string | null;
+    /// Employee lifecycle: the staff member this task is about, for the
+    /// onboarding and offboarding tasks the server opens. Not offered to
+    /// any form or tool; see Task.subjectUserId.
+    subject?: { userId: string; kind: EmployeeLifecycleKind } | null;
   }
 ) {
   // permissions.ts requires every server-side entry point to assert, and
@@ -891,6 +903,8 @@ export async function createTask(
       dueDate: input.dueDate ?? null,
       clientVisible: input.clientVisible ?? false,
       clientTitle: input.clientTitle?.trim() || null,
+      subjectUserId: input.subject?.userId ?? null,
+      lifecycleKind: input.subject?.kind ?? null,
     },
   });
 
@@ -916,6 +930,35 @@ export async function createTask(
     task
   );
   return task;
+}
+
+/// Closes one internal step on the system's behalf, with no person
+/// behind it: the employee lifecycle closes the onboarding signature step
+/// when the signer is someone who cannot see the internal client at all.
+///
+/// Narrow on purpose, so it cannot become a way around updateTask: only
+/// a step (never a task in its own right), only one no client can see
+/// (so the outcome rule above has nothing to say), and only one still
+/// open. Anything else is refused and left for a person.
+export async function completeStepAsSystem(stepId: string, reason: string): Promise<boolean> {
+  const step = await prisma.task.findFirst({
+    where: { id: stepId, deletedAt: null },
+    select: { id: true, parentId: true, clientId: true, clientVisible: true, status: true },
+  });
+  if (!step || !step.parentId || step.clientVisible || !OPEN_STATUSES.includes(step.status)) return false;
+
+  const now = new Date();
+  await prisma.task.update({ where: { id: step.id }, data: { status: "DONE", completedAt: now } });
+  await recordAudit({
+    actorId: null,
+    action: "task.status_change",
+    entityType: "Task",
+    entityId: step.id,
+    clientId: step.clientId,
+    before: { status: step.status },
+    after: { status: "DONE", completedAt: now, system: reason },
+  });
+  return true;
 }
 
 /// The one TaskPatch key the audit action is named after. A named

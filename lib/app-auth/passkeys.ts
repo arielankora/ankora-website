@@ -177,6 +177,16 @@ export async function finishPasskeyRegistration(
     entityId: created.id,
     after: { name: label, deviceType: info.credentialDeviceType, backedUp: info.credentialBackedUp },
   });
+
+  // Employee lifecycle: a passkey may be the second half of the
+  // onboarding signature step. Best effort; the passkey is already saved
+  // and nothing here may undo or delay that.
+  try {
+    const { onPasskeyRegistered } = await import("@/lib/app-domain/employee-lifecycle");
+    await onPasskeyRegistered(actor.id);
+  } catch (err) {
+    console.error("[passkeys] onboarding hook failed:", err);
+  }
   return created;
 }
 

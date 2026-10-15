@@ -132,3 +132,25 @@ describe("what is deliberately not supported", () => {
     expect(renderMarkdownLite("   \n  \n")).toBe("");
   });
 });
+
+describe("fenced blocks", () => {
+  it("shows a fenced block exactly as written, without lists or emphasis", () => {
+    const html = renderMarkdownLite("לפני\n```\n1. ראשון\n*לא נטוי*\n```\nאחרי");
+    expect(html).toContain("<pre");
+    expect(html).toContain("1. ראשון\n*לא נטוי*");
+    expect(html).not.toContain("<ol");
+    expect(html).not.toContain("<em>");
+    expect(html.indexOf("לפני")).toBeLessThan(html.indexOf("<pre"));
+    expect(html.indexOf("אחרי")).toBeGreaterThan(html.indexOf("</pre>"));
+  });
+
+  it("still escapes inside a fence", () => {
+    const html = renderMarkdownLite("```\n<script>alert(1)</script>\n```");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("keeps the text of an unclosed fence", () => {
+    expect(renderMarkdownLite("```\nשורה")).toContain("שורה");
+  });
+});
