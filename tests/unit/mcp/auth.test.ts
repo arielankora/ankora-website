@@ -30,6 +30,10 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
+// User.lastSeenAt: working through Claude counts as activity.
+const touchLastSeen = vi.fn();
+vi.mock("@/lib/app-auth/last-seen", () => ({ touchLastSeen: (u: unknown) => touchLastSeen(u) }));
+
 const { resolveMcpActor, verifyMcpBearerToken, actorFromAuthInfo, McpUnauthorizedError } = await import(
   "@/lib/mcp/auth"
 );
@@ -252,5 +256,20 @@ describe("actorFromAuthInfo()", () => {
     expect(() => actorFromAuthInfo({ token: "t", clientId: "c", scopes: [] })).toThrow(
       McpUnauthorizedError
     );
+  });
+});
+
+describe("verifyMcpBearerToken() and last activity", () => {
+  const request = () => new Request("https://example.org/api/mcp");
+  it("records activity for the person behind an accepted token, and not for a refused one", async () => {
+    touchLastSeen.mockClear();
+    findUnique.mockResolvedValue(tokenRow());
+    const info = await verifyMcpBearerToken(request(), generateMcpToken());
+    expect(touchLastSeen).toHaveBeenCalledWith((info!.extra as { user: unknown }).user);
+
+    touchLastSeen.mockClear();
+    findUnique.mockResolvedValue(null);
+    expect(await verifyMcpBearerToken(request(), generateMcpToken())).toBeUndefined();
+    expect(touchLastSeen).not.toHaveBeenCalled();
   });
 });

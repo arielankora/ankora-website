@@ -200,6 +200,12 @@ model User {
   lockedUntil         DateTime?
 
   lastLoginAt DateTime?
+  /// The last time this person did anything: a page load with a valid
+  /// session, or an MCP call. lastLoginAt moves only on a sign-in, and a
+  /// session lives for weeks, so it says nothing about whether someone is
+  /// still working; this does. Written at most once an hour per person
+  /// (lib/app-auth/last-seen.ts).
+  lastSeenAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?

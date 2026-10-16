@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
 import { looksLikeOAuthAccessToken } from "@/lib/mcp/oauth/pkce";
 import { resolveOAuthAccessToken } from "@/lib/mcp/oauth/store";
+import { touchLastSeen } from "@/lib/app-auth/last-seen";
 
 // Phase 13 (MCP server, docs/adr/0005): "who is making this MCP request,
 // and are they still allowed to".
@@ -121,6 +122,10 @@ export async function verifyMcpBearerToken(
 
   const user = await resolveMcpActor(token);
   if (!user) return undefined;
+
+  // Working through Claude is working. One hook here covers both token
+  // kinds (OAuth and personal), after every check above has passed.
+  await touchLastSeen(user);
 
   return {
     token,

@@ -30,7 +30,7 @@ export async function getEmployeeStatus(actor: { role: Parameters<typeof assertC
 
   const user = await prisma.user.findFirst({
     where: { id: userId, deletedAt: null, role: { not: "CLIENT_USER" } },
-    select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true, personalEmail: true },
+    select: { id: true, name: true, email: true, role: true, status: true, lastLoginAt: true, lastSeenAt: true, personalEmail: true },
   });
   if (!user) throw new EmployeeNotFoundError();
 
@@ -59,6 +59,8 @@ export async function getEmployeeStatus(actor: { role: Parameters<typeof assertC
     status: user.status,
     lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
     daysSinceLogin: calendarDaysSince(user.lastLoginAt, now),
+    lastSeenAt: user.lastSeenAt ? user.lastSeenAt.toISOString() : null,
+    daysSinceSeen: calendarDaysSince(user.lastSeenAt, now),
     personalEmailOnFile: !!user.personalEmail,
     passkeyCount,
     agreements: agreements.map((a) => ({

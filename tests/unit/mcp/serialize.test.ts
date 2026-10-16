@@ -182,6 +182,34 @@ describe("serializeTeamMember", () => {
       personalEmail: "private@example.com",
     };
     const out = serializeTeamMember(row, new Date("2026-10-15T07:00:00Z"));
-    expect(out).toEqual({ id: "u1", name: "דנה", email: "d@ankora.co.il", role: "ANKORA_EMPLOYEE", status: "INVITED", lastLoginAt: null, daysSinceLogin: null });
+    expect(out).toEqual({
+      id: "u1",
+      name: "דנה",
+      email: "d@ankora.co.il",
+      role: "ANKORA_EMPLOYEE",
+      status: "INVITED",
+      lastLoginAt: null,
+      daysSinceLogin: null,
+      lastSeenAt: null,
+      daysSinceSeen: null,
+    });
+  });
+
+  it("carries last activity separately from last sign-in", () => {
+    const out = serializeTeamMember(
+      {
+        id: "u1",
+        name: "אריאל",
+        email: "a@ankora.co.il",
+        role: "SUPER_ADMIN",
+        status: "ACTIVE",
+        lastLoginAt: new Date("2026-10-10T08:00:00Z"),
+        lastSeenAt: new Date("2026-10-15T06:30:00Z"),
+      },
+      new Date("2026-10-15T07:00:00Z")
+    );
+    expect(out.daysSinceLogin).toBe(5);
+    expect(out.lastSeenAt).toBe("2026-10-15T06:30:00.000Z");
+    expect(out.daysSinceSeen).toBe(0);
   });
 });

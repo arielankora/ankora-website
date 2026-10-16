@@ -242,6 +242,7 @@ export type TeamMemberLike = {
   role: string;
   status: string;
   lastLoginAt: Date | null;
+  lastSeenAt?: Date | null;
 };
 
 /// One row of list_team_members. Named fields only (rule 1 above): the
@@ -256,5 +257,9 @@ export function serializeTeamMember(u: TeamMemberLike, now: Date = new Date()) {
     status: u.status,
     lastLoginAt: u.lastLoginAt ? u.lastLoginAt.toISOString() : null,
     daysSinceLogin: calendarDaysSince(u.lastLoginAt, now),
+    // Activity, not sign-in: the signal for "has this person stopped
+    // working". A session lasts for weeks, so lastLoginAt cannot say that.
+    lastSeenAt: u.lastSeenAt ? u.lastSeenAt.toISOString() : null,
+    daysSinceSeen: calendarDaysSince(u.lastSeenAt ?? null, now),
   };
 }

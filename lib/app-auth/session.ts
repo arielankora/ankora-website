@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
+import { touchLastSeen } from "@/lib/app-auth/last-seen";
 
 // The single, authoritative "who is making this request, and are they
 // still allowed to" check. Every protected Server Component / Route
@@ -30,6 +31,10 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
     // A "logout all sessions" happened after this JWT was issued.
     return null;
   }
+
+  // Activity, not sign-in: throttled to once an hour and run after the
+  // response, so it never slows or fails the request (lib/app-auth/last-seen.ts).
+  await touchLastSeen(user);
 
   return user;
 });

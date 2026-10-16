@@ -52,7 +52,10 @@ function initials(name: string): string {
   return name.trim().slice(0, 2);
 }
 
-function formatLastLogin(date: Date | null): string {
+/// Last activity (User.lastSeenAt), not last sign-in: a session lasts for
+/// weeks, so the sign-in date said someone had been away who was working
+/// that day. Accurate to about an hour.
+function formatLastSeen(date: Date | null): string {
   if (!date) return "מעולם לא";
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(date);
 }
@@ -89,7 +92,7 @@ export default async function UsersPage() {
           <div className="flex items-center gap-3.5 border-b border-lineDark bg-cream px-[18px] py-2.5 text-[11.5px] text-appNavy/55">
             <span className="flex-1">משתמש</span>
             <span className="w-[120px]">תפקיד</span>
-            <span className="w-[130px]">כניסה אחרונה</span>
+            <span className="w-[130px]">נראה לאחרונה</span>
             <span className="w-[80px]">סטטוס</span>
             <span className="w-[60px]"></span>
           </div>
@@ -111,7 +114,7 @@ export default async function UsersPage() {
                   {ROLE_LABEL[u.role]}
                 </span>
               </span>
-              <span className="w-[130px] text-xs text-appNavy/60">{formatLastLogin(u.lastLoginAt)}</span>
+              <span className="w-[130px] text-xs text-appNavy/60">{formatLastSeen(u.lastSeenAt)}</span>
               <span className="w-[80px]">
                 <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${STATUS_TAG_CLASSES[u.status]}`}>
                   {STATUS_LABEL[u.status]}

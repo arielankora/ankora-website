@@ -312,7 +312,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List team members",
       description:
-        "Lists Ankora staff (never client portal users unless includeClients is true). Only managers and admins may call this. By default only ACTIVE people; set includeInactive to also see people still INVITED (not yet signed in) or SUSPENDED (leaving). Each member: id, name, email, role, status, lastLoginAt (ISO 8601, or null if they never signed in) and daysSinceLogin (whole calendar days in Israel time since that sign-in, 0 meaning today, or null). Use it to get exact names before list_team_time_entries or get_employee_status, and to spot people who stopped signing in.",
+        "Lists Ankora staff (never client portal users unless includeClients is true). Only managers and admins may call this. By default only ACTIVE people; set includeInactive to also see people still INVITED (not yet signed in) or SUSPENDED (leaving). Each member: id, name, email, role, status, lastSeenAt and daysSinceSeen (the last time they used Ankora, in the app or through Claude, accurate to about an hour; whole calendar days in Israel time, 0 meaning today, or null if never), and lastLoginAt and daysSinceLogin (the last sign-in only; a session lasts weeks, so do not use these to judge activity). To ask whether someone has stopped working, use daysSinceSeen. Use it to get exact names before list_team_time_entries or get_employee_status.",
       inputSchema: z.object({
         includeInactive: z.boolean().optional().describe("Also list INVITED and SUSPENDED staff. Default false."),
         includeClients: z.boolean().optional().describe("Also list client portal users. Default false; rarely needed."),
