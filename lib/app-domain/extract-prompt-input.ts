@@ -12,11 +12,12 @@ import { currentGuide } from "@/lib/app-domain/extraction-guide";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { ruleLine } from "@/lib/client-policies";
 import { prisma } from "@/lib/prisma";
+import { canSendToAi, type KnowledgeAudienceLike } from "@/lib/knowledge";
 
 // The input to "חלץ ידע עם קלוד" (lib/extract-prompt.ts). Gathered through
 // the file's own list functions, so each item's audience applies, and in
 // the version for Claude: names only, no contact details, nothing
-// sensitive (spec 6.3). A pasted prompt leaves the product.
+// sensitive, nothing restricted to others (spec 6.3). A pasted prompt leaves the product.
 
 export async function extractPromptFor(actor: User, clientId: string): Promise<string> {
   const [client, facts, people, systems, sources, domains, requestTypes, guide, policies] = await Promise.all([
@@ -30,7 +31,8 @@ export async function extractPromptFor(actor: User, clientId: string): Promise<s
     currentGuide(),
     listClientPolicies(actor, clientId),
   ]);
-  const shown = <T extends { sensitivity: string }>(rows: T[]) => rows.filter((r) => r.sensitivity !== "SENSITIVE");
+  const shown = <T extends { sensitivity: string; audience: KnowledgeAudienceLike; audienceUserIds: string[] }>(rows: T[]) =>
+    rows.filter((r) => canSendToAi(r, actor.id));
   const day = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : null);
   const short = (s: string) => (s.length > 160 ? `${s.slice(0, 157)}...` : s);
 

@@ -7,6 +7,7 @@ import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
+import { addRequestType, listRequestTypes } from "@/lib/app-domain/request-types";
 import { toMarkdown } from "@/lib/client-file-document";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 6.1 and 6.3).
@@ -54,6 +55,31 @@ describe("client file document", () => {
 
     expect(toMarkdown(await buildClientFile(user, client.id, { audience: "staff" }))).toContain("שוקלים למכור");
     expect(toMarkdown(await buildClientFile(colleague, client.id, { audience: "staff" }))).not.toContain("שוקלים למכור");
+  });
+
+  it("a restricted item reaches Claude only for someone named on it, not for a manager who can see it", async () => {
+    const { client, user } = await setup();
+    const { user: manager } = await createTestUser({ role: "ANKORA_ADMIN" });
+    await addClientFact(user, { clientId: client.id, kind: "NOTE", body: "שוקלים למכור את החברה", audience: "RESTRICTED", audienceUserIds: [user.id], sources: S1 });
+
+    expect(toMarkdown(await buildClientFile(manager, client.id, { audience: "staff" }))).toContain("שוקלים למכור");
+    expect(toMarkdown(await buildClientFile(manager, client.id, { audience: "ai" }))).not.toContain("שוקלים למכור");
+    expect(toMarkdown(await buildClientFile(user, client.id, { audience: "ai" }))).toContain("שוקלים למכור");
+  });
+
+  it("a request type does not name a contact the reader may not see", async () => {
+    const { client, user } = await setup();
+    const { user: colleague } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: colleague.id, clientId: client.id } });
+    const hidden = await addClientContact(user, { clientId: client.id, name: "דורון החסוי", role: "Contractor", audience: "RESTRICTED", audienceUserIds: [user.id], sources: S1 });
+    const open = await addClientContact(user, { clientId: client.id, name: "שני הלוי", role: "VP Finance", sources: S1 });
+    await addRequestType(user, { clientId: client.id, title: "חשבונית Inc", handling: "מעבירים", routeToContactIds: [hidden.id, open.id], sources: S1 });
+
+    const types = await listRequestTypes(colleague, client.id);
+    expect(types[0].routeToNames).toEqual(["שני הלוי"]);
+    const md = toMarkdown(await buildClientFile(colleague, client.id, { audience: "ai" }));
+    expect(md).toContain("מפנים ל: שני הלוי");
+    expect(md).not.toContain("דורון החסוי");
   });
 
   it("section 15 gathers every unconfirmed item, and the legend explains the codes", async () => {

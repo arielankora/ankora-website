@@ -173,4 +173,15 @@ describe("lookup_contact", () => {
     expect(await lookupContact(onlyNux, "nobody@nowhere.com")).toEqual([]);
     await expect(lookupContact(onlyNux, "not an address")).rejects.toThrow("מייל או מספר");
   });
+
+  it("does not tell a manager about a restricted link they are not named on", async () => {
+    const { lookupContact } = await import("@/lib/app-domain/client-contacts");
+    const nux = await createTestClient({ name: "NUX" });
+    const named = await employeeOn(nux.id);
+    const { user: manager } = await createTestUser({ role: "ANKORA_ADMIN" });
+    await addClientContact(named, { clientId: nux.id, name: "דורון", role: "Contractor", emails: ["doron@example.com"], audience: "RESTRICTED", audienceUserIds: [named.id], sources: S1 });
+    expect(await lookupContact(manager, "doron@example.com")).toEqual([]);
+    expect(await lookupContact(named, "doron@example.com")).toEqual([expect.objectContaining({ name: "דורון", client: "NUX" })]);
+  });
 });
+

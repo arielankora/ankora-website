@@ -127,4 +127,15 @@ describe("runs started by a person", () => {
     const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
     await expect(startProcessRun(stranger, process.id, new Date())).rejects.toThrow();
   });
+
+  it("copy into the run only the rules meant for everyone on the client, never a sensitive or restricted one", async () => {
+    const { client, hadas, process } = await setup();
+    await addClientPolicy(hadas, { clientId: client.id, kind: "INFO", title: "בירור רפואי", statement: "פרט רפואי על המנכ״ל", sensitivity: "SENSITIVE", sources: S1 });
+    await addClientPolicy(hadas, { clientId: client.id, kind: "INFO", title: "עסקה סודית", statement: "שוקלים למכור את החברה", audience: "RESTRICTED", audienceUserIds: [hadas.id], sources: S1 });
+    const run = await startProcessRun(hadas, process.id, new Date("2026-11-10T00:00:00Z"));
+    const description = (await prisma.task.findUniqueOrThrow({ where: { id: run.id } })).description ?? "";
+    expect(description).toContain("לא שולחים לאיילה שום דבר של Inc");
+    expect(description).not.toContain("פרט רפואי");
+    expect(description).not.toContain("שוקלים למכור");
+  });
 });
