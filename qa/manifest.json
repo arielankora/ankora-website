@@ -1658,8 +1658,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
       "riskReason": "The blank agreement form; managers and admins only"
+    },
+    "action:(product)/agreements/upload/[token]/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-16",
+      "riskReason": "No session: a one-time token files a signed PDF. Token, size, PDF and race rules are unit-tested; a browser run needs an MCP-issued link and Drive, which CI does not have"
+    },
+    "screen:/agreements/upload/[token]": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-16",
+      "riskReason": "Public page reachable by token only; must reveal nothing about a bad token"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-15"
+  "lastScan": "2026-10-16"
 }

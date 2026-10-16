@@ -83,7 +83,6 @@ beforeEach(() => {
 describe("prompts", () => {
   it("names the ids, the people, the procedure and the code, and nothing with a dash", () => {
     const on = prompts.onboardingPrompt({
-      ownerName: "הדס",
       employeeName: "נועה לוי",
       employeeEmail: "noa@ankora.co.il",
       userId: "user-42",
@@ -92,7 +91,15 @@ describe("prompts", () => {
     });
     expect(on).toContain('taskId "task-123"');
     expect(on).toContain('userId "user-42"');
-    expect(on).toContain("אני הדס מאנקורה");
+    // Name neutral: the task can be reassigned, and the prompt goes with it.
+    expect(on.startsWith("אני מצוות אנקורה.")).toBe(true);
+    // The signed PDF comes back through the personal link, never a reply.
+    expect(on).toContain("issue_agreement_upload_link (CONFIDENTIALITY");
+    expect(on).toContain("htmlBody עם <a href>");
+    expect(on).toContain("לא לשלוח אותו בתשובה");
+    expect(on).toContain("מחליף את השולח ל-ops@ankora.co.il");
+    expect(on).toContain("pendingPdfUploads");
+    expect(on).not.toContain("תחפש בתיבה");
     expect(on).toContain("נועה לוי (noa@ankora.co.il)");
     expect(on).toContain(prompts.PROCEDURE_DOC_URL);
     expect(on).toContain("שהקוד ANKORA-CONF-1.0 מופיע בכותרת התחתונה");
@@ -101,7 +108,6 @@ describe("prompts", () => {
     expect(hasDash(on)).toBe(false);
 
     const off = prompts.offboardingPrompt({
-      ownerName: "אריאל",
       employeeName: "נועה לוי",
       userId: "user-42",
       taskId: "task-9",
@@ -115,6 +121,10 @@ describe("prompts", () => {
     expect(off).toContain("ביום העסקים השלישי (20.10.2026)");
     expect(off).toContain("(https://www.ankora.co.il/app/users/user-42)");
     expect(off).toContain("אם הקוד ANKORA-DEL-1.0 מופיע");
+    expect(off.startsWith("אני מצוות אנקורה.")).toBe(true);
+    expect(off).toContain("issue_agreement_upload_link (DELETION_DECLARATION");
+    expect(off).toContain("pendingPdfUploads");
+    expect(off).not.toContain("תחפש בתיבה");
     expect(off).not.toMatch(/<[a-zA-Z]+>/);
     expect(hasDash(off)).toBe(false);
   });
@@ -198,7 +208,8 @@ describe("openOnboardingTask", () => {
     const description = updateTask.mock.calls.find((c) => c[2].description)![2].description;
     expect(description).toContain('taskId "t0"');
     expect(description).toContain('userId "emp"');
-    expect(description).toContain("אני הדס מאנקורה");
+    // The owner (Hadas) is not written into the prompt as its author.
+    expect(description.split("```")[1]).not.toContain("הדס");
     // The code comes from the registry, not from the prompt file.
     expect(description).toContain(agreementCode("CONFIDENTIALITY", CURRENT_AGREEMENTS.CONFIDENTIALITY));
     // No secrets and nothing private: the personal email never enters it.
@@ -412,5 +423,24 @@ describe("onPdfSignatureRecorded", () => {
     expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ lifecycleKind: "OFFBOARDING" });
     expect(db.taskComment.create.mock.calls[0][0].data.body).toContain("agr-9");
     expect(completeStepAsSystem).not.toHaveBeenCalled();
+  });
+});
+
+describe("onSignedPdfUploaded", () => {
+  it("notes the upload on the matching lifecycle task, with the missing code when it is missing", async () => {
+    db.task.findFirst.mockResolvedValue({ id: "onb", clientId: "internal" });
+    await lifecycle.onSignedPdfUploaded("emp", "CONFIDENTIALITY", "doc-7", false);
+    expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ subjectUserId: "emp", lifecycleKind: "ONBOARDING" });
+    const body = db.taskComment.create.mock.calls[0][0].data.body;
+    expect(body).toContain("הועלה PDF חתום (documentId doc-7), ממתין לבדיקת קוד וחתימה ורישום.");
+    expect(body).toContain("הקוד לא נמצא בטקסט.");
+    expect(completeStepAsSystem).not.toHaveBeenCalled();
+  });
+
+  it("puts a deletion declaration on the offboarding task, and leaves the code line out when found", async () => {
+    db.task.findFirst.mockResolvedValue({ id: "off", clientId: "internal" });
+    await lifecycle.onSignedPdfUploaded("emp", "DELETION_DECLARATION", "doc-8", true);
+    expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ lifecycleKind: "OFFBOARDING" });
+    expect(db.taskComment.create.mock.calls[0][0].data.body).not.toContain("הקוד לא נמצא");
   });
 });

@@ -75,7 +75,20 @@ export interface AddClientDocumentInput {
 export async function addClientDocument(actor: User, input: AddClientDocumentInput) {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
+  return storeClientDocument(input, actor.id);
+}
 
+/// Files a document with no signed-in person behind it, on the strength
+/// of a credential the caller has already checked: the personal upload
+/// link for a signed agreement PDF (lib/app-domain/agreements.ts), whose
+/// holder has no session and usually no access to the internal client.
+/// Same storage, same rules on size, task and Drive, same audit line,
+/// attributed to the person who uploaded. Never call it from a screen.
+export async function addClientDocumentForLink(input: AddClientDocumentInput, uploadedById: string) {
+  return storeClientDocument(input, uploadedById);
+}
+
+async function storeClientDocument(input: AddClientDocumentInput, uploadedById: string) {
   const title = input.title.trim();
   if (!title) throw new Error("יש להזין שם למסמך.");
   if (input.content.byteLength === 0) throw new Error("הקובץ ריק.");
@@ -122,12 +135,12 @@ export async function addClientDocument(actor: User, input: AddClientDocumentInp
       mimeType: input.mimeType,
       sizeBytes: input.content.byteLength,
       clientVisible: input.clientVisible ?? true,
-      uploadedById: actor.id,
+      uploadedById,
     },
   });
 
   await recordAudit({
-    actorId: actor.id,
+    actorId: uploadedById,
     action: "client_document.add",
     entityType: "ClientDocument",
     entityId: doc.id,

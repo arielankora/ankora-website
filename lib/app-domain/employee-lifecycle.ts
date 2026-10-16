@@ -236,14 +236,13 @@ export async function openOnboardingTask(actor: User, subject: User): Promise<st
       priority: "NORMAL",
       dueDate: date,
       steps: ONBOARDING_STEPS,
-      describe: (taskId, owner) =>
+      describe: (taskId) =>
         onboardingDescription({
           employeeName: subject.name,
           role: subject.role,
           workEmail: subject.email,
           hasPersonalEmail: !!subject.personalEmail,
           prompt: onboardingPrompt({
-            ownerName: owner.name,
             employeeName: subject.name,
             employeeEmail: subject.email,
             userId: subject.id,
@@ -355,7 +354,7 @@ export async function runOffboarding(actor: User, subject: User): Promise<string
       priority: "HIGH",
       dueDate: date,
       steps: OFFBOARDING_STEPS,
-      describe: (taskId, owner) =>
+      describe: (taskId) =>
         offboardingDescription({
           employeeName: subject.name,
           role: subject.role,
@@ -365,7 +364,6 @@ export async function runOffboarding(actor: User, subject: User): Promise<string
           userPageUrl: adminUrl,
           clientNames: access.map((a) => a.client.name),
           prompt: offboardingPrompt({
-            ownerName: owner.name,
             employeeName: subject.name,
             userId: subject.id,
             taskId,
@@ -403,6 +401,32 @@ async function openLifecycleTaskFor(userId: string, kind: EmployeeLifecycleKind)
     orderBy: { createdAt: "desc" },
     select: { id: true, clientId: true },
   });
+}
+
+/// The open lifecycle task about this person, of one kind, or null.
+export async function openLifecycleTaskId(userId: string, kind: EmployeeLifecycleKind): Promise<string | null> {
+  const task = await openLifecycleTaskFor(userId, kind);
+  return task?.id ?? null;
+}
+
+/// Called after a signed PDF arrives through a personal upload link.
+/// A note on the matching lifecycle task, and nothing closed: the PDF
+/// still has to be checked (code, signature) and recorded.
+export async function onSignedPdfUploaded(
+  userId: string,
+  kind: "CONFIDENTIALITY" | "DELETION_DECLARATION",
+  documentId: string,
+  codeFound: boolean
+): Promise<void> {
+  try {
+    const task = await openLifecycleTaskFor(userId, kind === "CONFIDENTIALITY" ? "ONBOARDING" : "OFFBOARDING");
+    if (!task) return;
+    const lines = [`הועלה PDF חתום (documentId ${documentId}), ממתין לבדיקת קוד וחתימה ורישום.`];
+    if (!codeFound) lines.push("הקוד לא נמצא בטקסט.");
+    await systemComment(task.id, task.clientId, lines.join(" "));
+  } catch (err) {
+    await recordFailure(null, userId, "pdf_uploaded_hook", err);
+  }
 }
 
 /// Called after the APP confidentiality signature is recorded.

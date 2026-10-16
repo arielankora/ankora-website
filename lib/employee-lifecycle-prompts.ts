@@ -11,37 +11,46 @@ export const PROCEDURE_DOC_URL = "https://claude.ai/code/artifact/771a9af2-6b29-
 /// current confidentiality version (agreementCode in lib/agreements.ts),
 /// passed in rather than written here so a new version cannot leave an
 /// old code in a prompt; this file stays free of imports for its tests.
+///
+/// It names no person as its author: the task can be reassigned, and a
+/// prompt that says "I am Hadas" stays wrong after it is (16.10.2026).
+///
+/// The signed PDF comes back through a personal upload link, not as a
+/// reply: the Gmail connector cannot download attachments, so a reply
+/// with the PDF could never be filed. The link goes in as a real <a href>
+/// in htmlBody, because plain URLs in the dry run came out rewritten as
+/// google.com redirects. The connector also cannot choose the sender, so
+/// the person sending switches the draft to ops@ before sending.
 export function onboardingPrompt(input: {
-  ownerName: string;
   employeeName: string;
   employeeEmail: string;
   userId: string;
   taskId: string;
   code: string;
 }): string {
-  return `אני ${input.ownerName} מאנקורה. תנהל את קליטת ${input.employeeName} (${input.employeeEmail}) עד הסוף, לפי נוהל הקליטה והעזיבה: ${PROCEDURE_DOC_URL}
+  return `אני מצוות אנקורה. תנהל את קליטת ${input.employeeName} (${input.employeeEmail}) עד הסוף, לפי נוהל הקליטה והעזיבה: ${PROCEDURE_DOC_URL}
 העובד: userId "${input.userId}". משימת הקליטה: taskId "${input.taskId}". תזהה אותם תמיד לפי המזהים האלה, לא לפי שם.
 
 עכשיו, פעם אחת:
 1. תיצור משימה מתוזמנת שרצה בכל יום עסקים ב-09:00 ומבצעת את "בכל ריצה" שלמטה. כשמשימת הקליטה נסגרת, היא מבטלת את עצמה.
-2. תוריד את הטופס עם get_blank_agreement_pdf (CONFIDENTIALITY), ותנסח מייל מ-ops@ankora.co.il לעובד עם הטופס מצורף: לקרוא, לחתום (חתימה דיגיטלית, או מודפס, חתום וסרוק) ולהחזיר באותו שרשור. תציג לי את הטיוטה, ותשלח רק אחרי אישור שלי.
+2. תוריד את הטופס עם get_blank_agreement_pdf (CONFIDENTIALITY), ותיצור קישור אישי להעלאה עם issue_agreement_upload_link (CONFIDENTIALITY, עם ה-userId). תנסח טיוטת מייל לעובד, עם הטופס מצורף ועם הקישור האישי כקישור אמיתי בגוף המייל (htmlBody עם <a href>, לא כתובת גלויה): לקרוא, לחתום (חתימה דיגיטלית, או מודפס, חתום וסרוק) ולהעלות את ה-PDF החתום בקישור, לא לשלוח אותו בתשובה. החיבור ל-Gmail לא בוחר שולח, ולכן מי ששולח מחליף את השולח ל-ops@ankora.co.il לפני השליחה. תציג לי את הטיוטה, ותשלח רק אחרי אישור שלי. את הקישור לא לשים בשום מקום אחר.
 
 בכל ריצה:
 3. get_employee_status עם ה-userId, כדי לדעת מה כבר קיים.
-4. תחפש בתיבה של ops@ankora.co.il תשובה של העובד עם PDF. אם יש, תקרא אותו ותוודא שני דברים: שהקוד ${input.code} מופיע בכותרת התחתונה, ושיש שם וחתימה. אם שניהם קיימים: תתייק אותו בתיק Ankora פנימי, מקושר למשימה ומוסתר מהלקוח, ורק אחר כך תרשום אותו עם record_pdf_signature. אם משהו לא ברור: הערה במשימה לבדיקה שלי, בלי לתייק ובלי לרשום.
+4. לכל מסמך ב-pendingPdfUploads: תקרא אותו עם read_document ותוודא שני דברים: שהקוד ${input.code} מופיע בכותרת התחתונה, ושיש שם וחתימה גלויה (כשהטקסט לא מראה את החתימה, תוריד את הקובץ ותסתכל בעמוד החתימה). אם שניהם קיימים: תרשום אותו עם record_pdf_signature עם ה-documentId הזה. אם משהו לא ברור: הערה במשימה לבדיקה שלי, ולעצור בלי לרשום.
 5. האישור במערכת וה-passkey נסגרים לבד כשהעובד מבצע אותם. אם הם חסרים, אין מה לעשות מלבד לעקוב.
 6. ביום העסקים השני בלי שתי החתימות: תנסח תזכורת לעובד ותציג לי לפני שליחה. ביום העסקים השלישי: הערה במשימה ועדכון אליי.
 7. כששתי החתימות קיימות: תזכיר לי את הגישות לכלים, את השיוך ללקוחות ואת ההדרכה, ותסמן כל שלב רק אחרי שאישרתי שבוצע.
 8. כל שלב שהסתיים: הערה קצרה במשימה, מה נעשה ומה יצא.
 
-גבולות: לא לשלוח שום דבר בלי אישור שלי. לא לשייך את העובד ללקוחות. לא לתייק ולא לרשום PDF שלא נבדק.`;
+גבולות: לא לשלוח שום דבר בלי אישור שלי. לא לשייך את העובד ללקוחות. לא לרשום PDF שלא נבדק.`;
 }
 
 /// The prompt for the offboarding agent. `code` is the Latin code of the
 /// current deletion declaration; `deadline` the DPA date as dd.mm.yyyy;
-/// `adminUrl` the absolute address of the person's page in Ankora.
+/// `adminUrl` the absolute address of the person's page in Ankora. Same
+/// upload link and sender notes as onboarding above.
 export function offboardingPrompt(input: {
-  ownerName: string;
   employeeName: string;
   userId: string;
   taskId: string;
@@ -49,21 +58,21 @@ export function offboardingPrompt(input: {
   deadline: string;
   adminUrl: string;
 }): string {
-  return `אני ${input.ownerName} מאנקורה. תנהל את עזיבת ${input.employeeName} עד הסוף, לפי נוהל הקליטה והעזיבה (${PROCEDURE_DOC_URL}) ולפי ה-DPA.
+  return `אני מצוות אנקורה. תנהל את עזיבת ${input.employeeName} עד הסוף, לפי נוהל הקליטה והעזיבה (${PROCEDURE_DOC_URL}) ולפי ה-DPA.
 העובד: userId "${input.userId}". משימת העזיבה: taskId "${input.taskId}". כל הגישות חייבות להתבטל עד ${input.deadline}.
 
 עכשיו, פעם אחת:
 1. תיצור משימה מתוזמנת שרצה בכל יום עסקים ב-09:00 ומבצעת את "בכל ריצה" שלמטה. כשמשימת העזיבה נסגרת, היא מבטלת את עצמה.
-2. תפיק את דוח הגישות שנצפו ב-90 הימים האחרונים מדף המשתמש (${input.adminUrl}), או תבקש ממני להפיק אותו. לכל לקוח שהעובד צפה בגישות שלו: טיוטת מייל עם הדוח והמלצה להחליף את הגישות האלה. אני שולח, לא אתה.
-3. תוריד את הצהרת המחיקה עם get_blank_agreement_pdf (DELETION_DECLARATION), ותנסח מייל מ-ops@ankora.co.il למייל הפרטי של העובד עם ההצהרה מצורפת. תזכיר לי לשלוח גם את קישור החתימה מדף המשתמש. תציג לי את הטיוטה לפני שליחה.
+2. תוריד את הצהרת המחיקה עם get_blank_agreement_pdf (DELETION_DECLARATION), ותיצור קישור אישי להעלאה עם issue_agreement_upload_link (DELETION_DECLARATION, עם ה-userId). תנסח טיוטת מייל למייל הפרטי של העובד, עם ההצהרה מצורפת ועם הקישור האישי כקישור אמיתי בגוף המייל (htmlBody עם <a href>, לא כתובת גלויה): לחתום ולהעלות את ה-PDF החתום בקישור, לא לשלוח אותו בתשובה. תזכיר לי לשלוח גם את קישור החתימה מדף המשתמש. החיבור ל-Gmail לא בוחר שולח, ולכן מי ששולח מחליף את השולח ל-ops@ankora.co.il לפני השליחה. תציג לי את הטיוטה לפני שליחה. את הקישור לא לשים בשום מקום אחר.
+3. תפיק את דוח הגישות שנצפו ב-90 הימים האחרונים מדף המשתמש (${input.adminUrl}), או תבקש ממני להפיק אותו. לכל לקוח שהעובד צפה בגישות שלו: טיוטת מייל עם הדוח והמלצה להחליף את הגישות האלה. אני שולח, לא אתה.
 
 בכל ריצה:
 4. get_employee_status עם ה-userId: אילו שלבים פתוחים ואילו חתימות קיימות.
-5. תחפש בתיבה של ops@ankora.co.il תשובה עם PDF חתום. אם הקוד ${input.code} מופיע בכותרת התחתונה ויש שם וחתימה: תתייק בתיק Ankora פנימי, מקושר למשימה ומוסתר מהלקוח, ותרשום עם record_pdf_signature. אם משהו לא ברור: הערה לבדיקה שלי.
+5. לכל מסמך ב-pendingPdfUploads: תקרא אותו עם read_document. אם הקוד ${input.code} מופיע בכותרת התחתונה ויש שם וחתימה גלויה (כשהטקסט לא מראה את החתימה, תוריד את הקובץ ותסתכל בעמוד החתימה): תרשום עם record_pdf_signature עם ה-documentId הזה. אם משהו לא ברור: הערה במשימה לבדיקה שלי, ולעצור בלי לרשום.
 6. ביום העסקים השלישי (${input.deadline}): תשלח לי רשימה של כל גישה שעוד לא סומנה כמבוטלת.
 7. כל שלב שהסתיים: הערה קצרה במשימה.
 
-גבולות: לא לשלוח שום דבר ללקוח או לעובד בלי אישור שלי. לסמן שלב רק אחרי שאישרתי שבוצע.`;
+גבולות: לא לשלוח שום דבר ללקוח או לעובד בלי אישור שלי. לסמן שלב רק אחרי שאישרתי שבוצע. לא לרשום PDF שלא נבדק.`;
 }
 
 export const ONBOARDING_STEPS = [

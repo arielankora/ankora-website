@@ -17,6 +17,11 @@ import {
   findAgreement,
   findAgreementByVersionOrCode,
   hashSignToken,
+  lifecycleKindFor,
+  linkStateFor,
+  looksLikePdf,
+  MAX_SIGNED_PDF_BYTES,
+  textHasAgreementCode,
   loadAgreementText,
   namesMatch,
   newSignToken,
@@ -178,7 +183,7 @@ export async function viewSignLink(raw: string): Promise<SignLinkView | null> {
     where: { tokenHash: hashSignToken(raw) },
     include: { user: { select: { name: true, deletedAt: true } } },
   });
-  if (signLinkState(link) !== "valid" || !link || link.user.deletedAt) return null;
+  if (linkStateFor(link, "APP_SIGN") !== "valid" || !link || link.user.deletedAt) return null;
   const agreement = findAgreement(link.kind, link.version);
   if (!agreement) return null;
   return { userName: link.user.name, agreement, text: loadAgreementText(agreement) };
@@ -196,7 +201,7 @@ export async function signWithLink(raw: string, input: SignInput): Promise<Emplo
     where: { tokenHash: hashSignToken(raw) },
     include: { user: true },
   });
-  if (!link || signLinkState(link) !== "valid" || link.user.deletedAt) throw invalid;
+  if (!link || linkStateFor(link, "APP_SIGN") !== "valid" || link.user.deletedAt) throw invalid;
 
   const agreement = findAgreement(link.kind, link.version);
   if (!agreement) throw invalid;
@@ -274,13 +279,16 @@ export async function issueDeletionDeclarationLink(
 
   const [revoked, link] = await prisma.$transaction([
     prisma.agreementSignLink.updateMany({
-      where: { userId: target.id, kind: "DELETION_DECLARATION", usedAt: null },
+      // Sign links only: a live upload link for the PDF channel is a
+      // different thing the person may still need.
+      where: { userId: target.id, kind: "DELETION_DECLARATION", purpose: "APP_SIGN", usedAt: null },
       data: { usedAt: new Date() },
     }),
     prisma.agreementSignLink.create({
       data: {
         userId: target.id,
         kind: "DELETION_DECLARATION",
+        purpose: "APP_SIGN",
         version: agreement.version,
         tokenHash,
         expiresAt: new Date(Date.now() + SIGN_LINK_TTL_MS),
@@ -560,4 +568,224 @@ export function kindFromBlankFileName(fileName: string | null): AgreementKind | 
     (k) => fileName === `${agreementCode(k, CURRENT_AGREEMENTS[k])}.pdf`
   );
   return kind ?? null;
+}
+
+// --- The personal upload link, for the PDF channel --------------------------
+//
+// 16.10.2026, approved by Ariel. A dry run showed the agent cannot take an
+// attachment out of an email reply (the Gmail connector does not download
+// attachments), so a signed PDF sent back by email could never be filed.
+// Instead the email carries a personal link; the person uploads the signed
+// PDF on a public page; the server files it on the internal client; the
+// agent then checks it (code in the footer, a visible signature) and calls
+// record_pdf_signature as before. Uploading never records a signature by
+// itself: a person or an agent still looks at the document.
+
+export async function issueAgreementUploadLink(actor: User, userId: string, kind: AgreementKind) {
+  assertAgreementAdmin(actor.role);
+  const target = await prisma.user.findFirst({ where: { id: userId, deletedAt: null } });
+  if (!target || target.role === "CLIENT_USER") throw new AgreementError("No Ankora staff member with that id.");
+
+  const agreement = currentAgreement(kind);
+  const { raw, tokenHash } = newSignToken();
+  const expiresAt = new Date(Date.now() + SIGN_LINK_TTL_MS);
+
+  // A new link replaces any earlier unused one for the same document, so
+  // "send again" never leaves two live upload addresses.
+  const [revoked, link] = await prisma.$transaction([
+    prisma.agreementSignLink.updateMany({
+      where: { userId: target.id, kind, purpose: "PDF_UPLOAD", usedAt: null },
+      data: { usedAt: new Date() },
+    }),
+    prisma.agreementSignLink.create({
+      data: {
+        userId: target.id,
+        kind,
+        version: agreement.version,
+        purpose: "PDF_UPLOAD",
+        tokenHash,
+        expiresAt,
+        createdById: actor.id,
+      },
+    }),
+  ]);
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "agreement.upload_link_issued",
+    entityType: "AgreementSignLink",
+    entityId: link.id,
+    after: { userId: target.id, kind, version: agreement.version, revokedLinks: revoked.count },
+  });
+
+  return {
+    url: `${appBaseUrl()}/agreements/upload/${raw}`,
+    expiresAt,
+    version: agreement.version,
+    code: agreementCode(kind, agreement.version),
+  };
+}
+
+export interface UploadLinkView {
+  userName: string;
+  title: string;
+  version: string;
+  code: string;
+  expiresAt: Date;
+}
+
+/// What the public upload page shows for a token, or null for any token
+/// that cannot be used. As with signing, the reason is not returned.
+export async function viewUploadLink(raw: string): Promise<UploadLinkView | null> {
+  if (!raw) return null;
+  const link = await prisma.agreementSignLink.findUnique({
+    where: { tokenHash: hashSignToken(raw) },
+    include: { user: { select: { name: true, deletedAt: true } } },
+  });
+  if (!link || linkStateFor(link, "PDF_UPLOAD") !== "valid" || link.user.deletedAt) return null;
+  const agreement = findAgreement(link.kind, link.version);
+  if (!agreement) return null;
+  return {
+    userName: link.user.name,
+    title: agreement.title,
+    version: agreement.version,
+    code: agreementCode(link.kind, agreement.version),
+    expiresAt: link.expiresAt,
+  };
+}
+
+/// Files the signed PDF that came through an upload link.
+///
+/// The link is claimed before anything is stored (conditionally, so two
+/// uploads racing on one link file one document) and released again if
+/// filing fails, so a storage hiccup does not cost the person their link.
+/// The document goes on the internal client, hidden from the client, on
+/// the person's open lifecycle task when there is one. A copy goes to the
+/// employee agreements folder, best effort, as signed PDFs do.
+export async function uploadSignedPdfWithLink(
+  raw: string,
+  file: { content: Buffer; fileName: string }
+): Promise<{ documentId: string; codeFound: boolean }> {
+  const invalid = new AgreementError("הקישור אינו זמין עוד. אפשר לפנות לאנקורה ולבקש קישור חדש.");
+  if (!raw) throw invalid;
+
+  const link = await prisma.agreementSignLink.findUnique({
+    where: { tokenHash: hashSignToken(raw) },
+    include: { user: { select: { id: true, name: true, deletedAt: true } } },
+  });
+  if (!link || linkStateFor(link, "PDF_UPLOAD") !== "valid" || link.user.deletedAt) throw invalid;
+  const agreement = findAgreement(link.kind, link.version);
+  if (!agreement) throw invalid;
+
+  if (file.content.byteLength === 0) throw new AgreementError("הקובץ ריק. יש לבחור את קובץ ה-PDF החתום.");
+  if (file.content.byteLength > MAX_SIGNED_PDF_BYTES) {
+    throw new AgreementError("הקובץ גדול מ-4MB. אפשר לסרוק שוב באיכות נמוכה יותר ולנסות שוב.");
+  }
+  if (!looksLikePdf(file.content)) throw new AgreementError("הקובץ אינו PDF. יש להעלות את הטופס החתום כקובץ PDF.");
+
+  const { resolveInternalClient, openLifecycleTaskId, onSignedPdfUploaded } = await import(
+    "@/lib/app-domain/employee-lifecycle"
+  );
+  const internal = await resolveInternalClient();
+  if (!internal) {
+    console.error("[agreements] upload link used but the internal client was not found");
+    throw new AgreementError("לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, הקישור עדיין בתוקף.");
+  }
+
+  const now = new Date();
+  const claimed = await prisma.agreementSignLink.updateMany({
+    where: { id: link.id, usedAt: null, expiresAt: { gt: now } },
+    data: { usedAt: now },
+  });
+  if (claimed.count !== 1) throw invalid;
+
+  const code = agreementCode(link.kind, link.version);
+  const taskId = await openLifecycleTaskId(link.userId, lifecycleKindFor(link.kind));
+  let documentId: string;
+  try {
+    const { addClientDocumentForLink } = await import("@/lib/app-domain/client-documents");
+    const doc = await addClientDocumentForLink(
+      {
+        clientId: internal.id,
+        taskId,
+        title: `${agreement.title} חתום (PDF) - ${link.user.name}`,
+        kind: "CONTRACT",
+        fileName: `${code}-${link.user.name}.pdf`,
+        mimeType: "application/pdf",
+        content: file.content,
+        clientVisible: false,
+      },
+      link.userId
+    );
+    documentId = doc.id;
+  } catch (err) {
+    console.error("[agreements] filing an uploaded PDF failed", err);
+    await prisma.agreementSignLink.updateMany({ where: { id: link.id, documentId: null }, data: { usedAt: null } });
+    throw new AgreementError("לא הצלחנו לשמור את הקובץ כרגע. אפשר לנסות שוב מאוחר יותר, הקישור עדיין בתוקף.");
+  }
+
+  await prisma.agreementSignLink.update({ where: { id: link.id }, data: { documentId } });
+
+  // The code check is a hint for whoever verifies, not a gate: a scan has
+  // no text layer at all, and the person should not be refused for that.
+  let codeFound = false;
+  try {
+    const { extractDocumentText } = await import("@/lib/document-text");
+    const extracted = await extractDocumentText(file.content, "application/pdf", file.fileName);
+    codeFound = extracted.kind === "text" && textHasAgreementCode(extracted.text, code);
+  } catch (err) {
+    console.error("[agreements] text extraction of an uploaded PDF failed", err);
+  }
+
+  // A copy beside the in-app signed PDFs, best effort, exactly as those.
+  const folderId = employeeAgreementsFolder();
+  if (folderId) {
+    const copy = await uploadFileToDriveFolder({
+      name: agreementFileName(link.kind, link.version, link.user.name, now).replace(/\.pdf$/, "-uploaded.pdf"),
+      mimeType: "application/pdf",
+      content: file.content,
+      folderId,
+    });
+    if (!copy.ok) console.error(`[agreements] copy of uploaded PDF to the agreements folder failed: ${copy.error ?? "no file id"}`);
+  }
+
+  await recordAudit({
+    actorId: link.userId,
+    action: "agreement.pdf_uploaded",
+    entityType: "AgreementSignLink",
+    entityId: link.id,
+    after: { kind: link.kind, version: link.version, documentId, codeFound },
+  });
+
+  await onSignedPdfUploaded(link.userId, link.kind, documentId, codeFound);
+  return { documentId, codeFound };
+}
+
+/// Signed PDFs uploaded through a link and not yet recorded: there is no
+/// EMAIL_PDF signature carrying that document's Drive file. Per kind, for
+/// get_employee_status.
+export async function pendingPdfUploads(userId: string): Promise<Record<AgreementKind, { documentId: string; uploadedAt: Date }[]>> {
+  const links = await prisma.agreementSignLink.findMany({
+    where: { userId, purpose: "PDF_UPLOAD", documentId: { not: null } },
+    orderBy: { usedAt: "asc" },
+    select: { kind: true, documentId: true, usedAt: true },
+  });
+  const out: Record<AgreementKind, { documentId: string; uploadedAt: Date }[]> = { CONFIDENTIALITY: [], DELETION_DECLARATION: [] };
+  if (links.length === 0) return out;
+
+  const docs = await prisma.clientDocument.findMany({
+    where: { id: { in: links.map((l) => l.documentId!) }, deletedAt: null },
+    select: { id: true, driveFileId: true, createdAt: true },
+  });
+  const recorded = await prisma.employeeAgreement.findMany({
+    where: { userId, channel: "EMAIL_PDF", driveFileId: { in: docs.map((d) => d.driveFileId) } },
+    select: { driveFileId: true },
+  });
+  const recordedFiles = new Set(recorded.map((r) => r.driveFileId));
+  for (const link of links) {
+    const doc = docs.find((d) => d.id === link.documentId);
+    if (!doc || recordedFiles.has(doc.driveFileId)) continue;
+    out[link.kind].push({ documentId: doc.id, uploadedAt: link.usedAt ?? doc.createdAt });
+  }
+  return out;
 }

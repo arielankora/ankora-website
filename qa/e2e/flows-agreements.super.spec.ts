@@ -16,6 +16,7 @@ const SUSPENDED = { email: "demo.suspended@ankora.co.il", name: "[DEMO] עובד
 // @covers action:(product)/app/agreements/confidentiality/actions
 // @covers screen:/agreements/sign/[token]
 // @covers action:(product)/agreements/sign/[token]/actions
+// @covers screen:/agreements/upload/[token]
 // @covers action:(product)/app/(authenticated)/users/actions
 
 test("someone who already signed is sent from the sign page back to work", async ({ page }) => {
@@ -77,4 +78,21 @@ test("a suspended employee signs the deletion declaration once through a link", 
   await page.reload();
   await expect(section.getByText("הצהרת מחיקה", { exact: false }).first()).toBeVisible();
   await expect(section.locator("li", { hasText: "מחיקה-1.0" }).first()).toBeVisible();
+});
+
+// The personal upload page for a signed PDF (16.10.2026). A link is issued
+// only through the MCP tool and filing needs Drive, neither of which CI
+// has, so the browser covers the page's refusal: an unknown token says
+// nothing about why, and offers no form.
+test("the upload page refuses an unknown link calmly, with no form", async ({ browser }) => {
+  const outsider = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await outsider.newPage();
+  try {
+    const res = await page.goto("/agreements/upload/not-a-real-token");
+    expect(res?.status()).toBe(200);
+    await expect(page.getByRole("heading", { name: "הקישור אינו זמין" })).toBeVisible();
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  } finally {
+    await outsider.close();
+  }
 });

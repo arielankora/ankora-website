@@ -11,7 +11,11 @@ const db = {
 };
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 const getAgreementStatus = vi.fn();
-vi.mock("@/lib/app-domain/agreements", () => ({ getAgreementStatus: (id: string) => getAgreementStatus(id) }));
+const pendingPdfUploads = vi.fn();
+vi.mock("@/lib/app-domain/agreements", () => ({
+  getAgreementStatus: (id: string) => getAgreementStatus(id),
+  pendingPdfUploads: (id: string) => pendingPdfUploads(id),
+}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"] }));
 
 const { getEmployeeStatus, EmployeeNotFoundError } = await import("@/lib/app-domain/employee-status");
@@ -32,6 +36,10 @@ beforeEach(() => {
     personalEmail: "dana.private@example.com",
   });
   db.passkey.count.mockResolvedValue(1);
+  pendingPdfUploads.mockResolvedValue({
+    CONFIDENTIALITY: [{ documentId: "doc-9", uploadedAt: new Date("2026-10-15T08:30:00Z") }],
+    DELETION_DECLARATION: [],
+  });
   getAgreementStatus.mockResolvedValue([
     {
       kind: "CONFIDENTIALITY",
@@ -89,6 +97,7 @@ describe("getEmployeeStatus", () => {
       emailPdfSignedCurrent: false,
       app: { version: "סודיות-1.0", signedAt: "2026-10-14T08:00:00.000Z" },
       emailPdf: null,
+      pendingPdfUploads: [{ documentId: "doc-9", uploadedAt: "2026-10-15T08:30:00.000Z" }],
     });
     expect(out.lifecycleTasks).toEqual([
       expect.objectContaining({

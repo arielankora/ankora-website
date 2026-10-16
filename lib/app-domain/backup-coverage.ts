@@ -250,7 +250,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   // nothing, because none of them can be turned back into something a
   // person can use.
   PasswordResetToken: { decision: "SKIP", table: "password_reset_tokens", reason: "Single-use password reset hashes, valid for minutes.", recovery: "The user asks for a new reset link." },
-  AgreementSignLink: { decision: "SKIP", table: "agreement_sign_links", reason: "Single-use hashes for signing an agreement without a session, valid for seven days.", recovery: "An admin sends a new link from the user's page." },
+  AgreementSignLink: { decision: "SKIP", table: "agreement_sign_links", reason: "Single-use hashes for signing an agreement without a session or uploading its signed PDF, valid for seven days. An uploaded PDF itself is a client_documents row, which is dumped.", recovery: "An admin sends a new link from the user's page, or the agent issues a new upload link; an uploaded PDF still waiting to be recorded is found in the internal client's documents." },
   PortalLoginToken: { decision: "SKIP", table: "portal_login_tokens", reason: "Single-use portal login hashes, valid for one click.", recovery: "The client asks for a new portal link." },
   McpAccessToken: { decision: "SKIP", table: "mcp_access_tokens", reason: "Hashed MCP access tokens, one per integration client.", recovery: "Re-issue with scripts/mcp-issue-token.ts." },
   OAuthClient: {
