@@ -49,11 +49,11 @@ describe("security page content", () => {
     for (const v of he.vendors.rows) expect(v.policyUrl).toMatch(/^https:\/\//);
   });
 
-  it("lists every sub-processor the privacy policy names, and nothing ungated beyond them", () => {
+  it("shows exactly the sub-processors the privacy policy names", () => {
     for (const legal of [legalHe, legalEn]) {
       const listed = subProcessors(legal);
       expect(listed.length).toBeGreaterThan(0);
-      const live = openOnly(he.vendors.rows, ALL_CLOSED).map((v) => v.name);
+      const live = openOnly(he.vendors.rows).map((v) => v.name);
       expect(live.sort()).toEqual([...listed].sort());
     }
   });

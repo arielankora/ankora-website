@@ -84,7 +84,7 @@ const security: SecurityPageContent = {
     commitments: [
       {
         title: "No training.",
-        body: "We work with Anthropic and OpenAI on business tiers that prohibit using your data to train models.",
+        body: "We work with Anthropic and OpenAI on paid plans only, and every account is set so your data is never used to train models.",
         gate: "openaiTier",
       },
       {
@@ -235,7 +235,7 @@ const security: SecurityPageContent = {
       },
       {
         q: "Is my data used to train AI models?",
-        a: "No. We work only on business tiers that prohibit it, and credentials never reach an AI system at all.",
+        a: "No. We work only on paid plans, and every account is set so data is never used for training. Credentials never reach an AI system at all.",
         gate: "openaiTier",
       },
       {

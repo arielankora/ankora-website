@@ -162,6 +162,7 @@ const legal: LegalContent = {
               ["ClickUp", "Task management and tracking", "Operational client data", "United States"],
               ["Fireflies", "Transcription and summary of calls", "Recordings and transcripts", "United States"],
               ["Anthropic", "The operational AI layer", "Operational client data", "United States"],
+              ["OpenAI", "The operational AI layer", "Operational client data", "United States"],
               ["Google Analytics", "Measurement of use of the marketing site", "Anonymous usage data", "Global"],
             ],
           },
