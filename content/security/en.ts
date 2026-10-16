@@ -13,6 +13,7 @@ const security: SecurityPageContent = {
   chips: [
     { text: "AES-256 encryption for every password" },
     { text: "On-device verification before every view" },
+    { text: "Two-step sign-in for every staff login" },
     { text: "Every action is logged" },
     { text: "Your data never trains models", gate: "openaiTier" },
   ],
@@ -44,7 +45,7 @@ const security: SecurityPageContent = {
         title: "You see only your own. Technically, too.",
         intro: [
           {
-            text: "Your portal identifies your account from the user's assignment on the server, not from anything that can be changed in a browser. One user cannot reach another client's data, even on purpose. Data is encrypted in transit and at rest, and the client area is closed to search engines.",
+            text: "Your portal identifies your account from the user's assignment on the server, not from anything that can be changed in a browser. One user cannot reach another client's data, even on purpose. Data is encrypted in transit and at rest, and the client area is closed to search engines. You can turn on two-step sign-in for your own portal access too.",
           },
         ],
       },
@@ -104,6 +105,10 @@ const security: SecurityPageContent = {
     title: "Few people, each named, each with limited access.",
     items: [
       { title: "A personal account for everyone.", body: "No shared users. Every action is tied to the person who took it." },
+      {
+        title: "Two-step sign-in, every time.",
+        body: "Everyone at Ankora signs in with a password and a confirmation on their own device: fingerprint or face. A password alone does not open the system.",
+      },
       {
         title: "Access by assignment.",
         body: "An Operations Manager sees only the clients assigned to them. Any other client simply doesn't exist for them.",
@@ -200,6 +205,7 @@ const security: SecurityPageContent = {
     updated: "Page last updated: October 2026",
     changelogTitle: "Changelog",
     changelog: [
+      { date: "October 2026", change: "Two-step sign-in, required for all staff and available to clients" },
       { date: "October 2026", change: "On-device verification before every password view" },
       { date: "October 2026", change: "Encrypted credentials vault, with every view logged" },
       { date: "October 2026", change: "Full nightly backup with an automated restore test" },
