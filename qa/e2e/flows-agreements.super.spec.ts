@@ -110,7 +110,7 @@ test("the upload page answers a wrong code with the generic message", async ({ b
     await expect(page.getByRole("heading", { name: "העלאת מסמך חתום" })).toBeVisible();
     await page.locator('input[name="code"]').fill("ZZZZ-ZZZZ");
     await page.getByRole("button", { name: "המשך" }).click();
-    await expect(page.getByRole("alert")).toContainText("הקוד אינו תקף", { timeout: 30_000 });
+    await expect(page.getByRole("alert").filter({ hasText: "הקוד אינו תקף" })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
   } finally {
     await outsider.close();
