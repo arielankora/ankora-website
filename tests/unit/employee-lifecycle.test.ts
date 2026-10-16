@@ -94,8 +94,12 @@ describe("prompts", () => {
     // Name neutral: the task can be reassigned, and the prompt goes with it.
     expect(on.startsWith("אני מצוות אנקורה.")).toBe(true);
     // The signed PDF comes back through the personal link, never a reply.
-    expect(on).toContain("issue_agreement_upload_link (CONFIDENTIALITY");
-    expect(on).toContain("htmlBody עם <a href>");
+    expect(on).toContain("issue_agreement_upload_code (CONFIDENTIALITY");
+    expect(on).toContain('"נכנסים ל-www.ankora.co.il/upload ומקלידים את הקוד"');
+    expect(on).toContain("הקוד לא כקישור");
+    expect(on).toContain("dismiss_pdf_upload");
+    expect(on).not.toContain("<a href>");
+    expect(on).not.toContain("issue_agreement_upload_link");
     expect(on).toContain("לא לשלוח אותו בתשובה");
     expect(on).toContain("מחליף את השולח ל-ops@ankora.co.il");
     expect(on).toContain("pendingPdfUploads");
@@ -122,7 +126,10 @@ describe("prompts", () => {
     expect(off).toContain("(https://www.ankora.co.il/app/users/user-42)");
     expect(off).toContain("אם הקוד ANKORA-DEL-1.0 מופיע");
     expect(off.startsWith("אני מצוות אנקורה.")).toBe(true);
-    expect(off).toContain("issue_agreement_upload_link (DELETION_DECLARATION");
+    expect(off).toContain("issue_agreement_upload_code (DELETION_DECLARATION");
+    expect(off).toContain('"נכנסים ל-www.ankora.co.il/upload ומקלידים את הקוד"');
+    expect(off).toContain("dismiss_pdf_upload");
+    expect(off).not.toContain("<a href>");
     expect(off).toContain("pendingPdfUploads");
     expect(off).not.toContain("תחפש בתיבה");
     expect(off).not.toMatch(/<[a-zA-Z]+>/);
@@ -442,5 +449,15 @@ describe("onSignedPdfUploaded", () => {
     await lifecycle.onSignedPdfUploaded("emp", "DELETION_DECLARATION", "doc-8", true);
     expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ lifecycleKind: "OFFBOARDING" });
     expect(db.taskComment.create.mock.calls[0][0].data.body).not.toContain("הקוד לא נמצא");
+  });
+});
+
+describe("onPdfUploadDismissed", () => {
+  it("puts the reason on the matching lifecycle task and closes nothing", async () => {
+    db.task.findFirst.mockResolvedValue({ id: "onb", clientId: "internal" });
+    await lifecycle.onPdfUploadDismissed("emp", "CONFIDENTIALITY", "doc-3", "אין חתימה גלויה");
+    expect(db.task.findFirst.mock.calls[0][0].where).toMatchObject({ lifecycleKind: "ONBOARDING" });
+    expect(db.taskComment.create.mock.calls[0][0].data.body).toBe("ה-PDF שהועלה (documentId doc-3) לא נרשם. הסיבה: אין חתימה גלויה");
+    expect(completeStepAsSystem).not.toHaveBeenCalled();
   });
 });

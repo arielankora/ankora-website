@@ -273,6 +273,51 @@ export function looksLikePdf(content: Buffer): boolean {
   return content.byteLength >= 5 && content.subarray(0, 5).toString("latin1") === "%PDF-";
 }
 
+// --- The upload code -----------------------------------------------------------
+//
+// 16.10.2026, replacing the emailed upload link. The Gmail connector
+// rewrites every href in a draft, even a real <a href>, into a google.com
+// redirect stored in the draft itself: the token passes through Google,
+// and after a day Google may show a warning page in front of it. A short
+// code typed on a fixed page avoids both. The page address carries no
+// secret, so it does not matter what Gmail does to it.
+//
+// Eight characters from an alphabet with nothing to misread (no 0 O 1 I
+// L), shown as XXXX-XXXX. 31^8 is about 8.5e11 codes; with the page's
+// rate limit of 10 checks per IP per 15 minutes, guessing one live code
+// in its 7 days is not a realistic attack.
+
+export const UPLOAD_CODE_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+export const UPLOAD_CODE_LENGTH = 8;
+
+/// A new code, formatted for reading: "K7QM-3XRB".
+export function newUploadCode(): string {
+  let code = "";
+  for (let i = 0; i < UPLOAD_CODE_LENGTH; i++) code += UPLOAD_CODE_ALPHABET[crypto.randomInt(UPLOAD_CODE_ALPHABET.length)];
+  return `${code.slice(0, 4)}-${code.slice(4)}`;
+}
+
+/// What a person typed, as it is hashed: upper case, with spaces and any
+/// hyphen or dash character removed, so "k7qm 3xrb" and "K7QM-3XRB" are
+/// the same code.
+export function normalizeUploadCode(input: string): string {
+  return input.toUpperCase().replace(/[\s\-\u2010-\u2015\u2212]/g, "");
+}
+
+/// Only this is stored. Null for anything that cannot be a code, so a
+/// typo is refused before any lookup.
+export function hashUploadCode(input: string): string | null {
+  const code = normalizeUploadCode(input);
+  if (code.length !== UPLOAD_CODE_LENGTH) return null;
+  for (const ch of code) if (!UPLOAD_CODE_ALPHABET.includes(ch)) return null;
+  return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+/// Upload links issued before the code replaced them are long random
+/// tokens. The legacy page accepts only those, so it cannot be used to
+/// try codes outside the code page's own rate limit.
+export const MIN_LEGACY_TOKEN_LENGTH = 32;
+
 /// Which lifecycle task a signed agreement belongs on.
 export function lifecycleKindFor(kind: AgreementKind): EmployeeLifecycleKind {
   return kind === "CONFIDENTIALITY" ? "ONBOARDING" : "OFFBOARDING";

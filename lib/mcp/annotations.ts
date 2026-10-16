@@ -118,8 +118,10 @@ export const TOOL_ANNOTATIONS = {
   // Issues a 15-minute download address for a blank form. It writes a
   // ticket row and nothing a person sees, like read_document's address.
   get_blank_agreement_pdf: READ_ONLY,
-  // A new personal upload link each call, replacing the last unused one.
-  issue_agreement_upload_link: WRITES,
+  // A new upload code each call, replacing the last unused one.
+  issue_agreement_upload_code: WRITES,
+  // Marks one upload reviewed; a second call is refused, not applied twice.
+  dismiss_pdf_upload: WRITES,
   record_pdf_signature: { ...WRITES, idempotentHint: true },
 } as const;
 
@@ -153,7 +155,8 @@ export const WRITE_TOOLS = [
   "start_process",
   "record_process_check",
   "record_pdf_signature",
-  "issue_agreement_upload_link",
+  "issue_agreement_upload_code",
+  "dismiss_pdf_upload",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.
