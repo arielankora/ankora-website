@@ -9,8 +9,9 @@
  * Each key names its step in the Ankora task "טיפול בנושאי אבטחה" (Ankora פנימי).
  */
 export const SECURITY_GATES = {
-  /** OpenAI on a business tier whose terms forbid training on our data. */
-  openaiTier: false,
+  /** Claude and OpenAI on paid plans, with training on our data switched
+   *  off on every account. Confirmed by Ariel, 16.10.2026. */
+  openaiTier: true,
   /** Fireflies terms on our plan checked: no training, business retention. */
   firefliesTier: false,
   /** A client can mark a task or material as "no AI" (development task). */
