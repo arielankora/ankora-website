@@ -3736,19 +3736,33 @@ model EmployeeAgreement {
   @@map("employee_agreements")
 }
 
+/// What a one-time agreement link is for.
+enum AgreementLinkPurpose {
+  /// Sign in the app's own form, without a session.
+  APP_SIGN
+  /// Upload the signed PDF of the blank form (the PDF channel). Added
+  /// 16.10.2026: an agent cannot take an attachment out of an email reply,
+  /// so the person uploads it here and the server files it.
+  PDF_UPLOAD
+}
+
 /// A one-time link to sign an agreement without a session, for someone
-/// whose account is already suspended. Hash-only storage, exactly like
-/// PortalLoginToken: the raw token exists only in the emailed link.
+/// whose account is already suspended, or to upload the signed PDF.
+/// Hash-only storage, exactly like PortalLoginToken: the raw token exists
+/// only in the emailed link.
 model AgreementSignLink {
-  id          String        @id @default(cuid())
+  id          String               @id @default(cuid())
   userId      String
   kind        AgreementKind
   version     String
-  tokenHash   String        @unique
+  purpose     AgreementLinkPurpose @default(APP_SIGN)
+  tokenHash   String               @unique
   expiresAt   DateTime
   usedAt      DateTime?
+  /// PDF_UPLOAD: the ClientDocument the upload was filed as.
+  documentId  String?
   createdById String
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime             @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

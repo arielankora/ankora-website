@@ -3,7 +3,13 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { prisma } from "@/lib/prisma";
-import type { AgreementChannel, AgreementKind, UserRole } from "@prisma/client";
+import type {
+  AgreementChannel,
+  AgreementKind,
+  AgreementLinkPurpose,
+  EmployeeLifecycleKind,
+  UserRole,
+} from "@prisma/client";
 
 // Employee agreements: which text is current, what it hashes to, and the
 // small decisions (who is gated, does a typed name match, is a link still
@@ -241,6 +247,43 @@ export function signLinkState(
   if (link.usedAt) return "used";
   if (link.expiresAt.getTime() <= now.getTime()) return "expired";
   return "valid";
+}
+
+/// The state of a link for one purpose. A link issued for the other
+/// purpose is "missing" here, so an upload link can never sign and a sign
+/// link can never upload, and the page says nothing about why.
+export function linkStateFor(
+  link: { purpose: AgreementLinkPurpose; usedAt: Date | null; expiresAt: Date } | null,
+  purpose: AgreementLinkPurpose,
+  now: Date = new Date()
+): SignLinkState {
+  if (!link || link.purpose !== purpose) return "missing";
+  return signLinkState(link, now);
+}
+
+// --- Uploading the signed PDF -------------------------------------------------
+
+/// The same ceiling as every other document in a client's file.
+export const MAX_SIGNED_PDF_BYTES = 4 * 1024 * 1024;
+
+/// A PDF begins with "%PDF-". The browser's declared type and the file
+/// name are what the person's machine says; these five bytes are what the
+/// file is.
+export function looksLikePdf(content: Buffer): boolean {
+  return content.byteLength >= 5 && content.subarray(0, 5).toString("latin1") === "%PDF-";
+}
+
+/// Which lifecycle task a signed agreement belongs on.
+export function lifecycleKindFor(kind: AgreementKind): EmployeeLifecycleKind {
+  return kind === "CONFIDENTIALITY" ? "ONBOARDING" : "OFFBOARDING";
+}
+
+/// Does extracted text carry this version's Latin code? Whitespace and
+/// the direction marks some extractors insert are ignored, because they
+/// can land inside the code without changing what was printed.
+export function textHasAgreementCode(text: string, code: string): boolean {
+  const flat = text.replace(/[\s\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "");
+  return flat.includes(code);
 }
 
 /// `<kind>-<version>-<name>-<YYYY-MM-DD>.pdf`, date in Israel time.

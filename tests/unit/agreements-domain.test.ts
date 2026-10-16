@@ -153,6 +153,7 @@ describe("signWithLink", () => {
     userId: "u1",
     kind: "DELETION_DECLARATION",
     version: CURRENT_AGREEMENTS.DELETION_DECLARATION,
+    purpose: "APP_SIGN",
     usedAt: null,
     expiresAt: new Date(Date.now() + 60_000),
     user: user({ status: "SUSPENDED" }),

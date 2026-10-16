@@ -21,7 +21,12 @@ const agreements = vi.hoisted(() => {
       this.name = "AgreementError";
     }
   }
-  return { AgreementError, recordPdfSignatureFromDocument: vi.fn(), issueBlankAgreementTicket: vi.fn() };
+  return {
+    AgreementError,
+    recordPdfSignatureFromDocument: vi.fn(),
+    issueBlankAgreementTicket: vi.fn(),
+    issueAgreementUploadLink: vi.fn(),
+  };
 });
 const lookup = vi.hoisted(() => ({ lookupStaffMember: vi.fn(), lookupClient: vi.fn() }));
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
@@ -124,6 +129,41 @@ describe("the manager/admin gate", () => {
     const c = await tools.get("get_blank_agreement_pdf")!.handler({ kind: "CONFIDENTIALITY" }, CTX);
     expect(c.isError).toBe(true);
     expect(agreements.issueBlankAgreementTicket).not.toHaveBeenCalled();
+  });
+});
+
+describe("issue_agreement_upload_link", () => {
+  it("refuses an employee and issues nothing", async () => {
+    auth.actorFromAuthInfo.mockReturnValue(EMPLOYEE);
+    const r = await tools.get("issue_agreement_upload_link")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX);
+    expect(r.isError).toBe(true);
+    expect(agreements.issueAgreementUploadLink).not.toHaveBeenCalled();
+  });
+
+  it("returns the personal url with version, code and expiry", async () => {
+    agreements.issueAgreementUploadLink.mockResolvedValue({
+      url: "https://www.ankora.co.il/agreements/upload/tok",
+      expiresAt: new Date("2026-10-23T08:00:00Z"),
+      version: "סודיות-1.0",
+      code: "ANKORA-CONF-1.0",
+    });
+    const out = json(await tools.get("issue_agreement_upload_link")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX));
+    expect(agreements.issueAgreementUploadLink).toHaveBeenCalledWith(ADMIN, "u-new", "CONFIDENTIALITY");
+    expect(out).toEqual({
+      kind: "CONFIDENTIALITY",
+      version: "סודיות-1.0",
+      code: "ANKORA-CONF-1.0",
+      url: "https://www.ankora.co.il/agreements/upload/tok",
+      expiresAt: "2026-10-23T08:00:00.000Z",
+    });
+  });
+
+  it("tells the agent the url goes only into the email to that employee, as a real link", () => {
+    const d = String(tools.get("issue_agreement_upload_link")!.config.description);
+    expect(d).toContain("only into the email to that employee");
+    expect(d).toContain("<a href>");
+    expect(d).toContain("pendingPdfUploads");
+    expect(TOOL_ANNOTATIONS.issue_agreement_upload_link.readOnlyHint).toBe(false);
   });
 });
 

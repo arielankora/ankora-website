@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { appBaseUrl } from "@/lib/email-templates";
 import { localDateKey } from "@/lib/timezone";
-import { getAgreementStatus } from "@/lib/app-domain/agreements";
+import { getAgreementStatus, pendingPdfUploads } from "@/lib/app-domain/agreements";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { calendarDaysSince } from "@/lib/mcp/serialize";
 
@@ -34,8 +34,9 @@ export async function getEmployeeStatus(actor: { role: Parameters<typeof assertC
   });
   if (!user) throw new EmployeeNotFoundError();
 
-  const [agreements, passkeyCount, tasks] = await Promise.all([
+  const [agreements, pending, passkeyCount, tasks] = await Promise.all([
     getAgreementStatus(user.id),
+    pendingPdfUploads(user.id),
     prisma.passkey.count({ where: { userId: user.id } }),
     prisma.task.findMany({
       where: { subjectUserId: user.id, deletedAt: null, parentId: null, status: { in: OPEN_STATUSES } },
@@ -70,6 +71,9 @@ export async function getEmployeeStatus(actor: { role: Parameters<typeof assertC
       emailPdfSignedCurrent: a.emailPdf,
       app: a.appLatest ? { version: a.appLatest.version, signedAt: a.appLatest.signedAt.toISOString() } : null,
       emailPdf: a.emailPdfLatest ? { version: a.emailPdfLatest.version, signedAt: a.emailPdfLatest.signedAt.toISOString() } : null,
+      // Uploaded through the personal link and not yet recorded: each one
+      // waits for a check (code, signature) and record_pdf_signature.
+      pendingPdfUploads: pending[a.kind].map((p) => ({ documentId: p.documentId, uploadedAt: p.uploadedAt.toISOString() })),
     })),
     lifecycleTasks: tasks.map((t) => {
       const steps = t.subtasks.filter((s) => s.status !== "ARCHIVED");
