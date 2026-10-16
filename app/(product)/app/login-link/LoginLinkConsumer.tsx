@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { consumeLoginLinkAction } from "./actions";
+import { SecondFactorStep } from "../login/SecondFactorStep";
 
 function Submit() {
   const { pending } = useFormStatus();
@@ -35,6 +36,19 @@ export function LoginLinkConsumer({ token }: { token: string }) {
     submitted.current = true;
     formRef.current?.requestSubmit();
   }, [token]);
+
+  // The link was good, and this client asked for a passkey at every
+  // sign-in.
+  if (state?.step && state.token) {
+    return (
+      <SecondFactorStep
+        step={state.step}
+        token={state.token}
+        callbackUrl={state.callbackUrl ?? "/app/portal"}
+        restartHref="/app/login-link/request"
+      />
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction}>

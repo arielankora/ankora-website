@@ -2,7 +2,8 @@
 import { headers } from "next/headers";
 import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
-import { requestLoginLink } from "@/lib/app-auth/login-link";
+import { consumeLoginLink, requestLoginLink } from "@/lib/app-auth/login-link";
+import { startPendingLogin } from "@/lib/app-auth/second-factor";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 
 // Portal phase 0. Same unauthenticated-endpoint reasoning as
@@ -20,6 +21,10 @@ const LINK_CONSUME_LIMIT = 10;
 const LINK_CONSUME_WINDOW_MS = 15 * 60 * 1000;
 
 export type RequestLinkState = { submitted?: boolean; devLink?: string };
+export type LinkLoginState = { error?: string; step?: "passkey" | "enroll"; token?: string; callbackUrl?: string };
+
+const LINK_ERROR = "הקישור אינו תקין או שפג תוקפו.";
+const PORTAL = "/app/portal";
 
 export async function requestLoginLinkAction(
   _prev: RequestLinkState | undefined,
@@ -40,31 +45,33 @@ export async function requestLoginLinkAction(
   };
 }
 
-/// Consumes the token and starts a session. Reached by POST only: the
-/// emailed page auto-submits this form, so a mail scanner or link
-/// preview that merely GETs the URL cannot burn the client's one use.
+/// Consumes the token and starts a session, or, for a client who asked
+/// for a passkey at every sign-in, hands over to the passkey step. Reached
+/// by POST only: the emailed page auto-submits this form, so a mail
+/// scanner or link preview that merely GETs the URL cannot burn the
+/// client's one use.
 export async function consumeLoginLinkAction(
-  _prev: { error?: string } | undefined,
+  _prev: LinkLoginState | undefined,
   formData: FormData
-): Promise<{ error?: string }> {
+): Promise<LinkLoginState> {
   const ip = clientIpFrom(await headers());
   if (!(await checkRateLimit(`login-link-consume:${ip}`, LINK_CONSUME_LIMIT, LINK_CONSUME_WINDOW_MS)).allowed) {
-    return { error: "הקישור אינו תקין או שפג תוקפו." };
+    return { error: LINK_ERROR };
   }
 
+  const user = await consumeLoginLink(String(formData.get("token") || ""));
+  if (!user) return { error: LINK_ERROR };
+
+  // A client's home is the portal, and a link is only ever issued to a
+  // CLIENT_USER - so there is no callbackUrl to carry here, and nothing a
+  // caller could point this at.
+  const { token, step } = await startPendingLogin(user, "link");
+  if (step !== "none") return { step, token, callbackUrl: PORTAL };
   try {
-    await signIn("login-link", {
-      token: String(formData.get("token") || ""),
-      // A client's home is the portal, and a link is only ever issued to
-      // a CLIENT_USER - so there is no callbackUrl to carry here, and
-      // nothing a caller could point this at.
-      redirectTo: "/app/portal",
-    });
+    await signIn("pending-login", { token, redirectTo: PORTAL });
     return {};
   } catch (err) {
-    if (err instanceof AuthError) {
-      return { error: "הקישור אינו תקין או שפג תוקפו." };
-    }
+    if (err instanceof AuthError) return { error: LINK_ERROR };
     throw err;
   }
 }

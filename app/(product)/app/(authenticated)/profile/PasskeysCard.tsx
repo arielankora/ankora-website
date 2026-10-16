@@ -3,19 +3,32 @@ import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Fingerprint } from "lucide-react";
 import { addPasskey, passkeysSupported } from "@/components/app/vault/webauthn-client";
-import { removePasskeyAction } from "./actions";
+import { removePasskeyAction, setLoginPasskeyRequiredAction } from "./actions";
 
-// "Passkey (Touch ID)": the identity check before a client's login is
-// shown in "מערכות וגישות" (claude/credentials-vault-spec-2026-10-06.md,
-// phase 1a). Adding one asks for the Ankora password first; see
-// lib/app-auth/passkeys.ts for why.
+// "Passkey (Touch ID)". For Ankora staff: the second step of every sign-in
+// and the identity check before a client's login is shown in "מערכות
+// וגישות". For clients: an opt-in second step at sign-in
+// (lib/app-auth/second-factor.ts). Adding one asks for the Ankora password
+// first; see lib/app-auth/passkeys.ts for why.
 
 type Row = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
 
 const INPUT =
   "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
 
-export function PasskeysCard({ passkeys, required }: { passkeys: Row[]; required: boolean }) {
+export function PasskeysCard({
+  passkeys,
+  required,
+  audience,
+  loginRequired,
+}: {
+  passkeys: Row[];
+  required: boolean;
+  audience: "staff" | "client";
+  /// Staff: enforced on this deployment. Client: their own choice.
+  loginRequired: boolean;
+}) {
+  const [toggling, setToggling] = useState(false);
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,11 +60,18 @@ export function PasskeysCard({ passkeys, required }: { passkeys: Row[]; required
         Passkey (Touch ID)
       </h2>
       <p className="mt-1 text-xs text-appNavy/60">
-        אימות זהות לפני צפייה בפרטי גישה של לקוחות, בטביעת אצבע או בזיהוי פנים. המפתח נשאר במכשיר שלך.
+        {audience === "staff"
+          ? "אימות דו-שלבי בכל כניסה, ואימות זהות לפני צפייה בפרטי גישה של לקוחות. בטביעת אצבע או בזיהוי פנים, והמפתח נשאר במכשיר שלך."
+          : "שכבת הגנה נוספת לפורטל: אחרי הסיסמה או הקישור במייל, אישור בטביעת אצבע או בזיהוי פנים. המפתח נשאר במכשיר שלך."}
       </p>
-      {required && passkeys.length === 0 && (
+      {audience === "staff" && required && passkeys.length === 0 && (
         <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-appNavy/80">
           כדי לצפות בגישות במערכות וגישות צריך להגדיר passkey אחד לפחות.
+        </p>
+      )}
+      {passkeys.length === 1 && (
+        <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-appNavy/80">
+          מומלץ להוסיף מכשיר שני, למשל טלפון ומחשב, כדי שאובדן של אחד מהם לא ינעל את הכניסה.
         </p>
       )}
 
@@ -119,6 +139,57 @@ export function PasskeysCard({ passkeys, required }: { passkeys: Row[]; required
         >
           הוספת passkey
         </button>
+      )}
+      {audience === "client" && passkeys.length > 0 && (
+        <div className="mt-5 border-t border-lineDark/70 pt-4">
+          <p className="text-sm text-appNavy">
+            אימות דו-שלבי בכל כניסה: <span className="font-medium">{loginRequired ? "פעיל" : "כבוי"}</span>
+          </p>
+          {toggling ? (
+            <form
+              className="mt-3 flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
+                setError(null);
+                start(async () => {
+                  const r = await setLoginPasskeyRequiredAction(!loginRequired, password);
+                  if (r.error) return setError(r.error);
+                  setToggling(false);
+                  router.refresh();
+                });
+              }}
+            >
+              <div>
+                <label className="block text-xs font-medium text-appNavy/60" htmlFor="lp-pass">הסיסמה שלך לאנקורה</label>
+                <input id="lp-pass" name="password" type="password" required autoComplete="current-password" className={INPUT} />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  disabled={pending}
+                  className="rounded-full bg-gold-gradient px-5 py-2 text-sm font-medium text-navy disabled:opacity-50"
+                >
+                  {loginRequired ? "כיבוי" : "הפעלה"}
+                </button>
+                <button type="button" onClick={() => setToggling(false)} className="px-3 text-sm text-appNavy/60">
+                  ביטול
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setToggling(true)}
+              className="mt-3 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5"
+            >
+              {loginRequired ? "כיבוי אימות דו-שלבי" : "הפעלת אימות דו-שלבי"}
+            </button>
+          )}
+        </div>
+      )}
+      {audience === "staff" && loginRequired && (
+        <p className="mt-4 text-xs text-appNavy/50">לצוות אנקורה האימות הדו-שלבי פעיל תמיד.</p>
       )}
       {error && <p className="mt-3 text-xs text-error">{error}</p>}
     </div>

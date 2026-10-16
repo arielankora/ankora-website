@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useFormState, useFormStatus } from "react-dom";
 import { loginAction } from "./actions";
+import { SecondFactorStep } from "./SecondFactorStep";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -37,6 +38,18 @@ function SubmitButton() {
 // but a new one - out of scope for a visual pass.
 export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
   const [state, formAction] = useFormState(loginAction, {});
+
+  // The password was right and the account needs a passkey too.
+  if (state?.step && state.token) {
+    return (
+      <SecondFactorStep
+        step={state.step}
+        token={state.token}
+        callbackUrl={state.callbackUrl ?? ""}
+        restartHref="/app/login"
+      />
+    );
+  }
 
   return (
     <form action={formAction}>

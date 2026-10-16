@@ -167,6 +167,18 @@ export async function logoutAllSessionsAction(formData: FormData) {
   revalidatePath(`/app/users/${userId}`);
 }
 
+/// After a lost device: clears the person's passkeys and logs them out
+/// everywhere. They enrol a new passkey at their next sign-in, right after
+/// their password (lib/app-auth/second-factor.ts).
+export async function resetPasskeysAction(formData: FormData) {
+  const actor = await requireUser();
+  const userId = String(formData.get("userId") || "");
+  if (!userId) return;
+  const { resetPasskeysByAdmin } = await import("@/lib/app-auth/passkeys");
+  await resetPasskeysByAdmin(actor, userId);
+  revalidatePath(`/app/users/${userId}`);
+}
+
 /// Cuts a user's Claude access without touching their browser sessions.
 ///
 /// Sits beside logoutAllSessionsAction rather than inside it: the two
