@@ -95,7 +95,9 @@ describe("prompts", () => {
     expect(on.startsWith("אני מצוות אנקורה.")).toBe(true);
     // The signed PDF comes back through the personal link, never a reply.
     expect(on).toContain("issue_agreement_upload_code (CONFIDENTIALITY");
-    expect(on).toContain('"נכנסים ל-www.ankora.co.il/upload ומקלידים את הקוד"');
+    expect(on).toContain('"כדי להעלות, נכנסים לכתובת הבאה ומקלידים את הקוד:"');
+    expect(on).toContain("https://www.ankora.co.il/upload");
+    expect(on).not.toMatch(/[\u0590-\u05FF]-www\./);
     expect(on).toContain("הקוד לא כקישור");
     expect(on).toContain("dismiss_pdf_upload");
     expect(on).not.toContain("<a href>");
@@ -127,7 +129,9 @@ describe("prompts", () => {
     expect(off).toContain("אם הקוד ANKORA-DEL-1.0 מופיע");
     expect(off.startsWith("אני מצוות אנקורה.")).toBe(true);
     expect(off).toContain("issue_agreement_upload_code (DELETION_DECLARATION");
-    expect(off).toContain('"נכנסים ל-www.ankora.co.il/upload ומקלידים את הקוד"');
+    expect(off).toContain('"כדי להעלות, נכנסים לכתובת הבאה ומקלידים את הקוד:"');
+    expect(off).toContain("https://www.ankora.co.il/upload");
+    expect(off).not.toMatch(/[\u0590-\u05FF]-www\./);
     expect(off).toContain("dismiss_pdf_upload");
     expect(off).not.toContain("<a href>");
     expect(off).toContain("pendingPdfUploads");
