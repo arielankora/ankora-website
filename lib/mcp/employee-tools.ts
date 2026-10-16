@@ -11,7 +11,8 @@ import { localDateTimeToUtc } from "@/lib/timezone";
 import { EmployeeNotFoundError, getEmployeeStatus } from "@/lib/app-domain/employee-status";
 import {
   AgreementError,
-  issueAgreementUploadLink,
+  dismissPdfUpload,
+  issueAgreementUploadCode,
   issueBlankAgreementTicket,
   recordPdfSignatureFromDocument,
 } from "@/lib/app-domain/agreements";
@@ -23,10 +24,12 @@ import {
 //   get_employee_status     one person's agreements, passkeys, last
 //                           sign-in and open onboarding/offboarding tasks
 //   get_blank_agreement_pdf the blank form to email for a PDF signature
-//   issue_agreement_upload_link
-//                           the personal page where the signed PDF is
-//                           uploaded (an agent cannot take an attachment
-//                           out of an email reply)
+//   issue_agreement_upload_code
+//                           a short code the employee types on /upload to
+//                           send back the signed PDF (an agent cannot take
+//                           an attachment out of an email reply, and Gmail
+//                           rewrites links in a draft)
+//   dismiss_pdf_upload      an uploaded PDF that will not be recorded
 //   record_pdf_signature    a signed PDF came back and was filed: record it
 //
 // Both are for managers and admins only, behind the same permission as the
@@ -108,36 +111,65 @@ export function registerEmployeeTools(server: McpServer): void {
   );
 
   server.registerTool(
-    "issue_agreement_upload_link",
+    "issue_agreement_upload_code",
     {
-      title: "Issue a personal upload link for a signed agreement PDF",
+      title: "Issue an upload code for a signed agreement PDF",
       description: [
-        "Creates a personal, one-time link where a staff member uploads the signed PDF of an agreement (CONFIDENTIALITY or DELETION_DECLARATION). Valid 7 days; a new link replaces any earlier unused one. Managers and admins only.",
-        "The url goes only into the email to that employee, as a real link (<a href> in htmlBody), next to the blank form from get_blank_agreement_pdf. Never put it anywhere else: not in a task, a comment, a chat or a reply to anyone but them. It is a credential.",
-        "Ask the employee to upload the signed PDF there rather than replying with it. Once uploaded, the document appears in get_employee_status under pendingPdfUploads; check it and record it with record_pdf_signature.",
+        "Creates a short personal code (like K7QM-3XRB) with which a staff member uploads the signed PDF of an agreement (CONFIDENTIALITY or DELETION_DECLARATION) on Ankora's fixed upload page. Valid 7 days; a new code replaces any earlier unused one. Managers and admins only.",
+        "Put the page address (uploadPageUrl) and the code as plain text in the email to that employee only, next to the blank form from get_blank_agreement_pdf, with the line: נכנסים ל-www.ankora.co.il/upload ומקלידים את הקוד. The address carries no secret, so it does not matter if the mail client wraps it. The code must not be a link, and must never go anywhere else: not in a task, a comment, a chat or any other message. It is a credential.",
+        "Ask the employee to upload the signed PDF there rather than replying with it. Once uploaded, the document appears in get_employee_status under pendingPdfUploads; check it, then record_pdf_signature or dismiss_pdf_upload.",
       ].join(" "),
       inputSchema: z.object({
         ...PERSON_ARGS,
         kind: z.enum(["CONFIDENTIALITY", "DELETION_DECLARATION"]),
       }),
-      annotations: TOOL_ANNOTATIONS.issue_agreement_upload_link,
+      annotations: TOOL_ANNOTATIONS.issue_agreement_upload_code,
     },
     async (args: { person?: string; userId?: string; kind: AgreementKind }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const who = await resolvePerson(actor, args);
         if (!who.ok) return toolText(who.text);
-        const link = await issueAgreementUploadLink(actor, who.id, args.kind);
+        const issued = await issueAgreementUploadCode(actor, who.id, args.kind);
         return toolJson({
           kind: args.kind,
-          version: link.version,
-          code: link.code,
-          url: link.url,
-          expiresAt: link.expiresAt.toISOString(),
+          uploadCode: issued.uploadCode,
+          uploadPageUrl: issued.uploadPageUrl,
+          expiresAt: issued.expiresAt.toISOString(),
+          version: issued.version,
+          agreementCode: issued.agreementCode,
         });
       } catch (err) {
         if (err instanceof AgreementError) return toolText(err.message);
-        console.error("[mcp] issue_agreement_upload_link failed", err);
+        console.error("[mcp] issue_agreement_upload_code failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "dismiss_pdf_upload",
+    {
+      title: "Dismiss an uploaded agreement PDF",
+      description: [
+        "Marks a signed PDF from pendingPdfUploads as reviewed without recording it, when it cannot be recorded: the footer code is missing or wrong, there is no visible signature, it is the wrong file. Managers and admins only.",
+        "Give the reason in a sentence; it goes on the onboarding or offboarding task as a comment so a person can follow up, usually with a new upload code. The document stays in the file. Use it only after looking at the document; when you are unsure, leave it pending and comment on the task instead.",
+      ].join(" "),
+      inputSchema: z.object({
+        documentId: z.string().describe("The documentId from pendingPdfUploads."),
+        reason: z.string().describe("Why it is not recorded, in a sentence."),
+      }),
+      annotations: TOOL_ANNOTATIONS.dismiss_pdf_upload,
+    },
+    async (args: { documentId: string; reason: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        assertCan(actor.role, "time_entry.edit_others");
+        const out = await dismissPdfUpload(actor, args.documentId, args.reason);
+        return toolJson({ dismissed: true, documentId: out.documentId, kind: out.kind });
+      } catch (err) {
+        if (err instanceof AgreementError) return toolText(err.message);
+        console.error("[mcp] dismiss_pdf_upload failed", err);
         return toolFailure(err);
       }
     }
@@ -149,7 +181,7 @@ export function registerEmployeeTools(server: McpServer): void {
       title: "Get an employee's onboarding or offboarding status",
       description: [
         "One Ankora staff member's lifecycle state, for running their onboarding or offboarding. Managers and admins only.",
-        "Returns: role, status (INVITED, ACTIVE, SUSPENDED), lastSeenAt and daysSinceSeen (last use of Ankora in the app or through Claude, Israel calendar days, null if never: the signal for whether someone has stopped working), lastLoginAt and daysSinceLogin (last sign-in only, kept for compatibility), personalEmailOnFile (true or false only; the address is never shown), passkeyCount, and for each agreement kind (CONFIDENTIALITY, DELETION_DECLARATION) its currentVersion, whether the current version is signed in the app (appSignedCurrent) and as a returned PDF (emailPdfSignedCurrent), and the latest signature per channel with its version and signedAt, and pendingPdfUploads: signed PDFs uploaded through a personal link and not yet recorded ({documentId, uploadedAt}); check each with read_document, then record_pdf_signature.",
+        "Returns: role, status (INVITED, ACTIVE, SUSPENDED), lastSeenAt and daysSinceSeen (last use of Ankora in the app or through Claude, Israel calendar days, null if never: the signal for whether someone has stopped working), lastLoginAt and daysSinceLogin (last sign-in only, kept for compatibility), personalEmailOnFile (true or false only; the address is never shown), passkeyCount, and for each agreement kind (CONFIDENTIALITY, DELETION_DECLARATION) its currentVersion, whether the current version is signed in the app (appSignedCurrent) and as a returned PDF (emailPdfSignedCurrent), and the latest signature per channel with its version and signedAt, and pendingPdfUploads: signed PDFs the employee uploaded (with an upload code) that nobody has dealt with yet ({documentId, uploadedAt}); check each with read_document, then record_pdf_signature or dismiss_pdf_upload.",
         "Also the open onboarding/offboarding tasks about this person (taskId, kind, url, due date, stepsDone of stepsTotal, and the titles of open steps), and adminPageUrl, the person's page in Ankora.",
         "Identify the person by `userId` when you have it, else by `person`.",
       ].join(" "),
@@ -176,10 +208,10 @@ export function registerEmployeeTools(server: McpServer): void {
       title: "Record a signed agreement PDF",
       description: [
         "Records that a staff member returned a signed agreement as a PDF: the confidentiality undertaking (CONFIDENTIALITY) or the deletion declaration (DELETION_DECLARATION). Managers and admins only.",
-        "The documentId is usually one from pendingPdfUploads (get_employee_status): the employee uploaded it through their personal link and it is already filed on \"Ankora פנימי\". Otherwise file it there first with upload_document or start_document_upload. A document on any other client is refused.",
+        "The documentId is usually one from pendingPdfUploads (get_employee_status): the employee uploaded it with their upload code and it is already filed on \"Ankora פנימי\". Otherwise file it there first with upload_document or start_document_upload. A document on any other client is refused.",
         "Record ONLY after checking two things yourself. First, the code in the footer of every page: read the document's text with read_document and find the Latin code, e.g. ANKORA-CONF-1.0 or ANKORA-DEL-1.0, which must match the current version (get_employee_status gives the version; get_blank_agreement_pdf gives the code). Use the code, not the Hebrew version line, because Hebrew comes out of a PDF's text reversed. Second, that a signature is visibly there (open the file itself when the text cannot show it). If either is unclear, do not record: add a comment on the task asking a person to check, and stop.",
         "signedAt is the date on the signature, YYYY-MM-DD or YYYY-MM-DD HH:MM in Israel time. signedName is the name as written on the PDF.",
-        "Safe to repeat: if this PDF channel is already recorded for the same person, kind and version, the existing record comes back with alreadyRecorded: true and nothing new is written.",
+        "Safe to repeat: if this PDF channel is already recorded for the same person, kind and version, the existing record comes back with alreadyRecorded: true and nothing new is written. Either way the uploaded document leaves pendingPdfUploads.",
         "When the confidentiality undertaking is now signed both in the app and as a PDF, the onboarding task's PDF step closes by itself; for a deletion declaration a note is added to the offboarding task.",
       ].join(" "),
       inputSchema: z.object({

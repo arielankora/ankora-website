@@ -3792,6 +3792,12 @@ model AgreementSignLink {
   usedAt      DateTime?
   /// PDF_UPLOAD: the ClientDocument the upload was filed as.
   documentId  String?
+  /// PDF_UPLOAD: when the uploaded document was dealt with, either
+  /// recorded as a signature (record_pdf_signature, also when that version
+  /// was already recorded) or dismissed with a reason (dismiss_pdf_upload).
+  /// An upload with a document and no review is what is still waiting.
+  reviewedAt   DateTime?
+  reviewedById String?
   createdById String
   createdAt   DateTime             @default(now())
 

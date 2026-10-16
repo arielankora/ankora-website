@@ -429,6 +429,23 @@ export async function onSignedPdfUploaded(
   }
 }
 
+/// Called when an uploaded PDF is dismissed instead of recorded. The
+/// reason goes on the task; nothing is closed.
+export async function onPdfUploadDismissed(
+  userId: string,
+  kind: "CONFIDENTIALITY" | "DELETION_DECLARATION",
+  documentId: string,
+  reason: string
+): Promise<void> {
+  try {
+    const task = await openLifecycleTaskFor(userId, kind === "CONFIDENTIALITY" ? "ONBOARDING" : "OFFBOARDING");
+    if (!task) return;
+    await systemComment(task.id, task.clientId, `ה-PDF שהועלה (documentId ${documentId}) לא נרשם. הסיבה: ${reason}`);
+  } catch (err) {
+    await recordFailure(null, userId, "pdf_upload_dismissed_hook", err);
+  }
+}
+
 /// Called after the APP confidentiality signature is recorded.
 ///
 /// Step 4 is "the undertaking approved in the app AND a passkey set up".

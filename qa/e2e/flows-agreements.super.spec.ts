@@ -17,6 +17,8 @@ const SUSPENDED = { email: "demo.suspended@ankora.co.il", name: "[DEMO] עובד
 // @covers screen:/agreements/sign/[token]
 // @covers action:(product)/agreements/sign/[token]/actions
 // @covers screen:/agreements/upload/[token]
+// @covers screen:/upload
+// @covers action:(product)/upload/actions
 // @covers action:(product)/app/(authenticated)/users/actions
 
 test("someone who already signed is sent from the sign page back to work", async ({ page }) => {
@@ -91,6 +93,24 @@ test("the upload page refuses an unknown link calmly, with no form", async ({ br
     const res = await page.goto("/agreements/upload/not-a-real-token");
     expect(res?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: "הקישור אינו זמין" })).toBeVisible();
+    await expect(page.locator('input[type="file"]')).toHaveCount(0);
+  } finally {
+    await outsider.close();
+  }
+});
+
+// /upload (16.10.2026): the fixed page where a signed PDF comes back with
+// a short code. A wrong code gets the one generic sentence and no file
+// input; nothing says whether the code ever existed.
+test("the upload page answers a wrong code with the generic message", async ({ browser }) => {
+  const outsider = await browser.newContext({ storageState: { cookies: [], origins: [] } });
+  const page = await outsider.newPage();
+  try {
+    await page.goto("/upload");
+    await expect(page.getByRole("heading", { name: "העלאת מסמך חתום" })).toBeVisible();
+    await page.locator('input[name="code"]').fill("ZZZZ-ZZZZ");
+    await page.getByRole("button", { name: "המשך" }).click();
+    await expect(page.getByRole("alert")).toContainText("הקוד אינו תקף", { timeout: 30_000 });
     await expect(page.locator('input[type="file"]')).toHaveCount(0);
   } finally {
     await outsider.close();

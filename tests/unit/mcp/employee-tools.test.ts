@@ -25,7 +25,8 @@ const agreements = vi.hoisted(() => {
     AgreementError,
     recordPdfSignatureFromDocument: vi.fn(),
     issueBlankAgreementTicket: vi.fn(),
-    issueAgreementUploadLink: vi.fn(),
+    issueAgreementUploadCode: vi.fn(),
+    dismissPdfUpload: vi.fn(),
   };
 });
 const lookup = vi.hoisted(() => ({ lookupStaffMember: vi.fn(), lookupClient: vi.fn() }));
@@ -132,38 +133,61 @@ describe("the manager/admin gate", () => {
   });
 });
 
-describe("issue_agreement_upload_link", () => {
+describe("issue_agreement_upload_code", () => {
   it("refuses an employee and issues nothing", async () => {
     auth.actorFromAuthInfo.mockReturnValue(EMPLOYEE);
-    const r = await tools.get("issue_agreement_upload_link")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX);
+    const r = await tools.get("issue_agreement_upload_code")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX);
     expect(r.isError).toBe(true);
-    expect(agreements.issueAgreementUploadLink).not.toHaveBeenCalled();
+    expect(agreements.issueAgreementUploadCode).not.toHaveBeenCalled();
   });
 
-  it("returns the personal url with version, code and expiry", async () => {
-    agreements.issueAgreementUploadLink.mockResolvedValue({
-      url: "https://www.ankora.co.il/agreements/upload/tok",
+  it("returns the code, the fixed page, expiry, version and agreementCode", async () => {
+    agreements.issueAgreementUploadCode.mockResolvedValue({
+      uploadCode: "K7QM-3XRB",
+      uploadPageUrl: "https://www.ankora.co.il/upload",
       expiresAt: new Date("2026-10-23T08:00:00Z"),
       version: "סודיות-1.0",
-      code: "ANKORA-CONF-1.0",
+      agreementCode: "ANKORA-CONF-1.0",
     });
-    const out = json(await tools.get("issue_agreement_upload_link")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX));
-    expect(agreements.issueAgreementUploadLink).toHaveBeenCalledWith(ADMIN, "u-new", "CONFIDENTIALITY");
+    const out = json(await tools.get("issue_agreement_upload_code")!.handler({ userId: "u-new", kind: "CONFIDENTIALITY" }, CTX));
+    expect(agreements.issueAgreementUploadCode).toHaveBeenCalledWith(ADMIN, "u-new", "CONFIDENTIALITY");
     expect(out).toEqual({
       kind: "CONFIDENTIALITY",
-      version: "סודיות-1.0",
-      code: "ANKORA-CONF-1.0",
-      url: "https://www.ankora.co.il/agreements/upload/tok",
+      uploadCode: "K7QM-3XRB",
+      uploadPageUrl: "https://www.ankora.co.il/upload",
       expiresAt: "2026-10-23T08:00:00.000Z",
+      version: "סודיות-1.0",
+      agreementCode: "ANKORA-CONF-1.0",
     });
   });
 
-  it("tells the agent the url goes only into the email to that employee, as a real link", () => {
-    const d = String(tools.get("issue_agreement_upload_link")!.config.description);
-    expect(d).toContain("only into the email to that employee");
-    expect(d).toContain("<a href>");
-    expect(d).toContain("pendingPdfUploads");
-    expect(TOOL_ANNOTATIONS.issue_agreement_upload_link.readOnlyHint).toBe(false);
+  it("tells the agent: plain text, that employee only, the code is not a link", () => {
+    const d = String(tools.get("issue_agreement_upload_code")!.config.description);
+    expect(d).toContain("plain text in the email to that employee only");
+    expect(d).toContain("The code must not be a link");
+    expect(d).toContain("ומקלידים את הקוד");
+    expect(tools.has("issue_agreement_upload_link")).toBe(false);
+    expect(TOOL_ANNOTATIONS.issue_agreement_upload_code.readOnlyHint).toBe(false);
+  });
+});
+
+describe("dismiss_pdf_upload", () => {
+  it("refuses an employee and changes nothing", async () => {
+    auth.actorFromAuthInfo.mockReturnValue(EMPLOYEE);
+    const r = await tools.get("dismiss_pdf_upload")!.handler({ documentId: "doc-1", reason: "x" }, CTX);
+    expect(r.isError).toBe(true);
+    expect(agreements.dismissPdfUpload).not.toHaveBeenCalled();
+  });
+
+  it("dismisses with the reason, and passes the domain's refusal through", async () => {
+    agreements.dismissPdfUpload.mockResolvedValueOnce({ documentId: "doc-1", kind: "CONFIDENTIALITY", userId: "u-new" });
+    const out = json(await tools.get("dismiss_pdf_upload")!.handler({ documentId: "doc-1", reason: "אין חתימה" }, CTX));
+    expect(agreements.dismissPdfUpload).toHaveBeenCalledWith(ADMIN, "doc-1", "אין חתימה");
+    expect(out).toEqual({ dismissed: true, documentId: "doc-1", kind: "CONFIDENTIALITY" });
+
+    agreements.dismissPdfUpload.mockRejectedValueOnce(new agreements.AgreementError("This upload was already reviewed. Nothing was changed."));
+    const r = await tools.get("dismiss_pdf_upload")!.handler({ documentId: "doc-1", reason: "x" }, CTX);
+    expect(text(r)).toContain("already reviewed");
   });
 });
 

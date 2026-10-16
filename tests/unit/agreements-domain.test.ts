@@ -353,6 +353,12 @@ describe("recordPdfSignatureFromDocument (the MCP tool's domain half)", () => {
     const out = await recordPdfSignatureFromDocument(admin, input());
     expect(out).toEqual({ row: { id: "old", channel: "EMAIL_PDF" }, alreadyRecorded: true });
     expect(db.employeeAgreement.create).not.toHaveBeenCalled();
+    // The upload still leaves pendingPdfUploads: without this it would wait
+    // forever once its version was already recorded.
+    expect(db.agreementSignLink.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1", documentId: "doc-1", purpose: "PDF_UPLOAD", reviewedAt: null },
+      data: { reviewedAt: expect.any(Date), reviewedById: "admin" },
+    });
     expect(onPdfSignatureRecorded).not.toHaveBeenCalled();
   });
 
@@ -367,6 +373,10 @@ describe("recordPdfSignatureFromDocument (the MCP tool's domain half)", () => {
     });
     expect(recordAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agreement.pdf_recorded" }));
     expect(onPdfSignatureRecorded).toHaveBeenCalledWith("u1", "CONFIDENTIALITY", "a1");
+    expect(db.agreementSignLink.updateMany).toHaveBeenCalledWith({
+      where: { userId: "u1", documentId: "doc-1", purpose: "PDF_UPLOAD", reviewedAt: null },
+      data: { reviewedAt: expect.any(Date), reviewedById: "admin" },
+    });
   });
 });
 

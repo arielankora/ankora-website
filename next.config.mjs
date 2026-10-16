@@ -369,6 +369,15 @@ const nextConfig = {
                 { key: 'Referrer-Policy', value: 'no-referrer' },
               ],
             },
+            // The upload page for signed agreement PDFs (a code is typed
+            // there): the same private-surface headers.
+            {
+              source: '/upload',
+              headers: [
+                ...rule.headers,
+                { key: 'Referrer-Policy', value: 'no-referrer' },
+              ],
+            },
           ]
         : [rule],
     );

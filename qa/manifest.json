@@ -1674,6 +1674,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-16",
       "riskReason": "Public page reachable by token only; must reveal nothing about a bad token"
+    },
+    "action:(product)/upload/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-16",
+      "riskReason": "No session: a typed code files a signed PDF. Strict per-IP limit and one generic answer for any unusable code"
+    },
+    "screen:/upload": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-16",
+      "riskReason": "Public page where a short code is typed; must reveal nothing about whether a code exists"
     }
   },
   "waivers": {},
