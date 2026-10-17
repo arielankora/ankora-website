@@ -244,11 +244,14 @@ export async function signWithLink(raw: string, input: SignInput): Promise<Emplo
   });
 
   await fileSignedPdf(row, agreement, text, link.user.email);
-  // Employee lifecycle: a note on the open offboarding task. Never throws.
-  if (row.kind === "DELETION_DECLARATION") {
-    const { onDeletionDeclarationSigned } = await import("@/lib/app-domain/employee-lifecycle");
-    await onDeletionDeclarationSigned(link.userId, row.id);
-  }
+  // Employee lifecycle. Never throws. A deletion declaration is noted on
+  // the offboarding task; a confidentiality undertaking signed through a
+  // link is an in-app signature like any other, so it gets the same hook
+  // as signConfidentiality (including closing the PDF step when the PDF
+  // was recorded first).
+  const lifecycle = await import("@/lib/app-domain/employee-lifecycle");
+  if (row.kind === "DELETION_DECLARATION") await lifecycle.onDeletionDeclarationSigned(link.userId, row.id);
+  else await lifecycle.onConfidentialitySigned(link.userId);
   return row;
 }
 
