@@ -216,6 +216,12 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     reason: "A sign-in halfway between the password and the passkey. Hashed, single use, five minutes.",
     recovery: "The person types their password again.",
   },
+  DeviceLinkCode: {
+    decision: "SKIP",
+    table: "device_link_codes",
+    reason: "A six-digit code for adding a device, stored as a hash. Ten minutes, single use.",
+    recovery: "The person makes a new code in their profile.",
+  },
   McpFileTicket: {
     decision: "SKIP",
     table: "mcp_file_tickets",

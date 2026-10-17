@@ -3,7 +3,13 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { Fingerprint } from "lucide-react";
 import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
-import { enrollFinishAction, enrollOptionsAction, passkeyLoginOptionsAction, passkeyLoginVerifyAction } from "./actions";
+import {
+  enrollFinishAction,
+  enrollOptionsAction,
+  passkeyLoginOptionsAction,
+  passkeyLoginVerifyAction,
+  redeemDeviceCodeAction,
+} from "./actions";
 
 // The second step of signing in (lib/app-auth/second-factor.ts). The
 // password, or the emailed link, was right; now the device answers with
@@ -12,6 +18,12 @@ import { enrollFinishAction, enrollOptionsAction, passkeyLoginOptionsAction, pas
 // The prompt opens on a click, not on load: Safari refuses to start a
 // passkey ceremony without a user gesture, and a button that says what
 // is about to happen is clearer anyway.
+//
+// A device with no passkey of its own (a phone, when the passkey was made
+// on the Mac) cannot answer; iOS then offers only a QR code for another
+// device to scan. "This is a new device" takes a code from a device that
+// is already signed in, and then enrols this one (lib/app-auth/device-
+// link.ts).
 
 const BUTTON =
   "mt-5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50";
@@ -37,6 +49,25 @@ export function SecondFactorStep({
   // An error that ended the pending sign-in: the only way on is back to
   // the first step.
   const [expired, setExpired] = useState(false);
+  // What this screen is doing now: the passkey answer, typing a code from
+  // a signed-in device, or enrolling this device.
+  const [mode, setMode] = useState<"passkey" | "code" | "enroll">(step);
+  const [linked, setLinked] = useState(false);
+
+  async function redeem(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const code = (e.currentTarget.elements.namedItem("code") as HTMLInputElement).value;
+    setBusy(true);
+    setError(null);
+    const r = await redeemDeviceCodeAction(token, code);
+    setBusy(false);
+    if (r.ok) {
+      setLinked(true);
+      return setMode("enroll");
+    }
+    if (!r.retry) setExpired(true);
+    setError(r.error);
+  }
 
   async function verify() {
     setBusy(true);
@@ -52,7 +83,11 @@ export function SecondFactorStep({
       response = await startAuthentication({ optionsJSON: opts.options as any });
     } catch (err) {
       setBusy(false);
-      return setError(cancelled(err) ? "האימות בוטל. אפשר לנסות שוב." : "המכשיר לא השלים את האימות.");
+      return setError(
+        cancelled(err)
+          ? "האימות בוטל. אם אין passkey במכשיר הזה, בחרו למטה \"זה מכשיר חדש\"."
+          : "המכשיר לא השלים את האימות.",
+      );
     }
     // On success the action redirects, and this component is gone.
     const done = await passkeyLoginVerifyAction(token, response, callbackUrl);
@@ -94,13 +129,22 @@ export function SecondFactorStep({
       <div className="flex items-center gap-2 text-appNavy">
         <Fingerprint size={20} strokeWidth={1.6} />
         <h2 className="text-[15px] font-medium">
-          {step === "passkey" ? "אימות דו-שלבי" : "הגדרת אימות דו-שלבי"}
+          {mode === "passkey" ? "אימות דו-שלבי" : mode === "code" ? "הוספת המכשיר הזה" : "הגדרת אימות דו-שלבי"}
         </h2>
       </div>
 
-      {step === "passkey" ? (
+      {mode === "passkey" ? (
         <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
           הסיסמה נכונה. עכשיו אישור במכשיר: טביעת אצבע, זיהוי פנים או קוד המכשיר.
+        </p>
+      ) : mode === "code" ? (
+        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+          במכשיר שבו אתם כבר מחוברים לאנקורה, למשל המחשב: הפרופיל שלי, &quot;הוספת מכשיר&quot;. אחרי טביעת אצבע יופיע שם
+          קוד של 6 ספרות. הקלידו אותו כאן.
+        </p>
+      ) : linked ? (
+        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+          הקוד אושר. עכשיו רושמים את המכשיר הזה, ומהפעם הבאה נכנסים ממנו בסיסמה ובזיהוי פנים או טביעת אצבע.
         </p>
       ) : (
         <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
@@ -117,11 +161,54 @@ export function SecondFactorStep({
         <Link href={restartHref} className={BUTTON}>
           חזרה לכניסה
         </Link>
-      ) : step === "passkey" ? (
-        <button type="button" onClick={verify} disabled={busy} className={BUTTON}>
-          <Fingerprint size={17} strokeWidth={1.75} />
-          {busy ? "ממתין למכשיר…" : "אימות במכשיר"}
-        </button>
+      ) : mode === "passkey" ? (
+        <>
+          <button type="button" onClick={verify} disabled={busy} className={BUTTON}>
+            <Fingerprint size={17} strokeWidth={1.75} />
+            {busy ? "ממתין למכשיר…" : "אימות במכשיר"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMode("code");
+            }}
+            className="mt-4 block w-full text-center text-[13px] text-appNavy/60 underline-offset-4 hover:underline"
+          >
+            זה מכשיר חדש, ואין בו passkey
+          </button>
+        </>
+      ) : mode === "code" ? (
+        <form onSubmit={redeem}>
+          <label className="mt-4 block">
+            <span className="mb-1.5 block text-xs text-appNavy/60">קוד מהמכשיר המחובר</span>
+            <input
+              name="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              pattern="[0-9 ]*"
+              maxLength={7}
+              required
+              dir="ltr"
+              placeholder="123456"
+              className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-center text-lg tracking-[0.3em] text-appNavy outline-none focus:border-gold"
+            />
+          </label>
+          <button type="submit" disabled={busy} className={BUTTON}>
+            {busy ? "בודק…" : "המשך"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setError(null);
+              setMode("passkey");
+            }}
+            className="mt-4 block w-full text-center text-[13px] text-appNavy/60 underline-offset-4 hover:underline"
+          >
+            חזרה לאימות במכשיר
+          </button>
+        </form>
       ) : (
         <form onSubmit={enroll}>
           <label className="mt-4 block">
@@ -131,7 +218,7 @@ export function SecondFactorStep({
               type="text"
               required
               maxLength={60}
-              placeholder="למשל: MacBook של דנה"
+              placeholder={linked ? "למשל: האייפון של דנה" : "למשל: MacBook של דנה"}
               className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-sm text-appNavy outline-none focus:border-gold"
             />
           </label>
