@@ -17,6 +17,7 @@ import {
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
+import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 
 // Org brain, phase 1: processes and their procedures on the client screen
@@ -113,6 +114,15 @@ export async function updateProcessAction(_prev: FormState | undefined, f: FormD
 export async function markProcessReviewedAction(processId: string, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => markProcessReviewed(user, processId));
+}
+
+/// Learning from runs (spec 5.4): a remark on the procedure went into it,
+/// or does not belong there.
+export async function resolveLessonAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const status = String(f.get("status") ?? "");
+  if (status !== "APPLIED" && status !== "DISMISSED") return { error: "בוחרים אם זה נכנס לנוהל או לא." };
+  return run(String(f.get("clientId") ?? ""), () => resolveLesson(user, String(f.get("id") ?? ""), status, String(f.get("resolution") ?? "")));
 }
 
 export async function saveProcessVersionAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

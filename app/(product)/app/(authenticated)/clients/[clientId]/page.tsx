@@ -41,6 +41,7 @@ import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
+import { listLessons } from "@/lib/app-domain/process-lessons";
 import { listProcessRuns } from "@/lib/app-domain/process-runs";
 import { listProcessChecks } from "@/lib/app-domain/process-checks";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -162,6 +163,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const checksByProcess = new Map(
     await Promise.all(processes.filter((p) => p.triggerKinds.includes("CONTINUOUS")).map(async (p) => [p.id, await listProcessChecks(user, p.id)] as const))
   );
+  // Spec 5.4: what people who closed runs said about each procedure.
+  const lessons = await listLessons(processes.map((p) => p.id));
   const todayKey = localDateKey(new Date(), TIMEZONE);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
@@ -388,6 +391,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
             <ProcessesPanel
               clientId={client.id}
+              userId={user.id}
               canApprove={can(user.role, "client.manage")}
               sourceOptions={sourceOptions}
               entities={entityOptions}
@@ -462,6 +466,20 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 draft: p.draft
                   ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
                   : null,
+                lessons: lessons
+                  .filter((l) => l.processId === p.id)
+                  .map((l) => ({
+                    id: l.id,
+                    status: l.status,
+                    body: l.body,
+                    version: l.version,
+                    taskId: l.taskId,
+                    runTitle: l.runTitle,
+                    authorName: l.authorName,
+                    createdAt: l.createdAt.toISOString(),
+                    resolution: l.resolution,
+                    resolvedByName: l.resolvedByName,
+                  })),
               }))}
             />
 

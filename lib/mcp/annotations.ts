@@ -107,6 +107,9 @@ export const TOOL_ANNOTATIONS = {
   list_processes: READ_ONLY,
   get_process: READ_ONLY,
   list_policies: READ_ONLY,
+  // The answer about a run's procedure (spec 5.4). One per run: a second
+  // call is refused, not applied twice.
+  record_run_lesson: WRITES,
   // Opens a run of a process (spec 8): a task with the procedure's steps.
   // Each call opens another run, so it is not idempotent.
   start_process: WRITES,
@@ -159,6 +162,7 @@ export const WRITE_TOOLS = [
   "propose_knowledge",
   "start_process",
   "record_process_check",
+  "record_run_lesson",
   "record_pdf_signature",
   "issue_agreement_upload_code",
   "dismiss_pdf_upload",

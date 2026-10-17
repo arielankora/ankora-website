@@ -3,7 +3,9 @@ import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
 import { lookupClient } from "@/lib/mcp/lookup";
-import { actorOf } from "@/lib/mcp/task-extra-tools";
+import { actorOf, findTask, TASK_ARGS } from "@/lib/mcp/task-extra-tools";
+import { recordRunLesson } from "@/lib/app-domain/process-lessons";
+import { LESSON_QUESTION } from "@/lib/process-lessons";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
@@ -219,7 +221,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get a process and its procedure",
       description:
-        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, and the last five runs. Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting.",
+        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
@@ -290,6 +292,34 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson({ taskId: run.id, title: run.title, link: `${appBaseUrl()}/app/tasks/${run.id}` });
       } catch (err) {
         console.error("[mcp] start_process failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "record_run_lesson",
+    {
+      title: "Record what a run taught about its procedure",
+      description: `For a run of a process that is done (a task opened from the process), the answer to "${LESSON_QUESTION}": what in the procedure was wrong or missing, in the user's words, or \`nothing\` true when it held. It goes to the process's owner, who decides whether it goes into the next version; it changes no procedure by itself. One answer per run. Only after the user confirms the wording.`,
+      inputSchema: z.object({
+        ...TASK_ARGS,
+        lesson: z.string().max(2000).optional().describe("What in the procedure was wrong or missing."),
+        nothing: z.boolean().optional().describe("True when the procedure held and there is nothing to change."),
+      }),
+      annotations: TOOL_ANNOTATIONS.record_run_lesson,
+    },
+    async (args: { task?: string; taskId?: string; client?: string; lesson?: string; nothing?: boolean }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        if (!args.nothing && !args.lesson?.trim()) return toolText("Pass `lesson` with what was wrong or missing, or `nothing: true`.");
+        if (args.nothing && args.lesson?.trim()) return toolText("Pass either `lesson` or `nothing: true`, not both.");
+        const task = await findTask(actor, { ...args, includeDone: true });
+        if (!task.ok) return toolText(task.message);
+        const lesson = await recordRunLesson(actor, task.value.id, args.nothing ? null : args.lesson!);
+        return toolJson({ recorded: lesson.status === "OPEN" ? "lesson" : "nothing", next: lesson.status === "OPEN" ? "The process's owner will see it on the client's processes screen." : null });
+      } catch (err) {
+        console.error("[mcp] record_run_lesson failed", err);
         return toolFailure(err);
       }
     }
