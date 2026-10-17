@@ -115,7 +115,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
             value={dimension}
             onChange={setDimension}
             options={[
-              { value: "employee", label: "לפי עובד" },
+              { value: "employee", label: "לפי איש צוות" },
               { value: "client", label: "לפי לקוח" },
               { value: "category", label: "לפי קטגוריה" },
             ]}

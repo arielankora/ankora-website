@@ -106,7 +106,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             </option>
             <option value="SUPER_ADMIN">מנהל-על</option>
             <option value="ANKORA_ADMIN">מנהל Ankora</option>
-            <option value="ANKORA_EMPLOYEE">עובד Ankora</option>
+            <option value="ANKORA_EMPLOYEE">ספק פנימי אנקורה</option>
             <option value="CLIENT_USER">לקוח (פורטל לקוח)</option>
           </select>
         </div>

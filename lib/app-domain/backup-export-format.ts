@@ -59,7 +59,7 @@ export const TIME_ENTRIES_SHEET_NAME = "דיווחי שעות";
 export const TIME_ENTRIES_SHEET_HEADERS = [
   "תאריך",
   "לקוח",
-  "עובד",
+  "איש צוות",
   "קטגוריה",
   "משימה",
   "דקות בפועל",

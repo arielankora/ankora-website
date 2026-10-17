@@ -159,7 +159,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "user.logout_all_sessions": "ניתוק כל ההתחברויות",
   "user.personal_email_change": "שינוי מייל פרטי",
   // Employee agreements.
-  "agreement.sign": "חתימה על מסמך עובד",
+  "agreement.sign": "חתימה על מסמך של איש צוות",
   "agreement.link_issued": "שליחת קישור לחתימה על הצהרת מחיקה",
   "agreement.pdf_recorded": "רישום חתימה ב-PDF",
   "agreement.blank_issued": "הורדת טופס הסכם לחתימה",

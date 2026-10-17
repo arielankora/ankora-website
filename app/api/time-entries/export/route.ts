@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   // gates this route, matching the page.tsx screen's own can() check.
   const entries = await listTimeEntriesForAdmin(filters);
 
-  const headers = ["תאריך", "עובד", "לקוח", "קטגוריה", "משך", "הערה", "מקור", "נערך"];
+  const headers = ["תאריך", "איש צוות", "לקוח", "קטגוריה", "משך", "הערה", "מקור", "נערך"];
   const rows = entries.map((e) => [
     new Intl.DateTimeFormat("he-IL", { dateStyle: "short", timeStyle: "short", timeZone: "Asia/Jerusalem" }).format(
       e.startAt

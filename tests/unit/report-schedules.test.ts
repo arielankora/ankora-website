@@ -154,7 +154,7 @@ describe("monthlyDetailedToCsv() - reuses lib/csv.ts's BOM + escaping (spec 14.4
     ]);
     const withoutBom = csv.slice(1);
     const [header, row] = withoutBom.split("\r\n");
-    expect(header).toBe("תאריך,פעילות,קטגוריה,דקות לחיוב,עובד");
+    expect(header).toBe("תאריך,פעילות,קטגוריה,דקות לחיוב,איש צוות");
     expect(row).toBe("2026-09-01,ייעוץ,ייעוץ,30,נועה");
   });
 });

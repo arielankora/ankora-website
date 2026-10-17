@@ -211,7 +211,7 @@ describe("GET /api/portal/export - the client's own monthly file", () => {
 
     const text = decodeKeepingBom(await bytesOf(await portalExport.GET(new Request(`${BASE}/api/portal/export`))));
     expect(text).not.toContain("דנה כהן");
-    expect(text.split("\r\n")[0]).not.toContain("עובד");
+    expect(text.split("\r\n")[0]).not.toContain("איש צוות");
   });
 
   it("XLSX: only client A's rows, no cell is a formula", async () => {

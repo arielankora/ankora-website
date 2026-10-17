@@ -84,7 +84,7 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
             <tr className="border-b border-lineDark text-xs text-appNavy/50">
               <th className="w-10 px-5 py-3"></th>
               <th className="px-5 py-3 font-medium">תאריך</th>
-              <th className="px-5 py-3 font-medium">עובד</th>
+              <th className="px-5 py-3 font-medium">איש צוות</th>
               <th className="px-5 py-3 font-medium">לקוח</th>
               <th className="px-5 py-3 font-medium">קטגוריה</th>
               <th className="px-5 py-3 font-medium">משך</th>

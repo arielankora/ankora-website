@@ -282,7 +282,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           <div className="rounded-2xl border border-lineDark bg-white p-6">
             <h2 className="text-sm font-medium text-appNavy">גישות של לקוחות שנצפו</h2>
             <p className="mt-1 text-sm text-appNavy/60">
-              פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת עובד,
+              פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת ספק פנימי,
               שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה.
             </p>
             <div className="mt-3">

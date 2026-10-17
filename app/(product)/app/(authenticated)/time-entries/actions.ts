@@ -45,7 +45,7 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
   const clientId = String(formData.get("clientId") || "");
   const categoryId = String(formData.get("categoryId") || "");
   if (!targetUserId || !date || !startTime || !endTime || !clientId || !categoryId) {
-    return { error: "יש למלא עובד, תאריך, שעות, לקוח וקטגוריה." };
+    return { error: "יש למלא איש צוות, תאריך, שעות, לקוח וקטגוריה." };
   }
 
   try {

@@ -204,7 +204,7 @@ describe("openOnboardingTask", () => {
     const parent = createTask.mock.calls[0][1];
     expect(parent).toMatchObject({
       clientId: "internal",
-      title: "קליטת עובד: נועה לוי",
+      title: "קליטת ספק פנימי: נועה לוי",
       priority: "NORMAL",
       assignedToId: "hadas",
       clientVisible: false,
@@ -272,7 +272,7 @@ describe("runOffboarding", () => {
     expect(db.passkey.deleteMany).toHaveBeenCalled();
 
     const parent = createTask.mock.calls[0][1];
-    expect(parent).toMatchObject({ title: "עזיבת עובד: נועה לוי", priority: "HIGH", subject: { userId: "emp", kind: "OFFBOARDING" } });
+    expect(parent).toMatchObject({ title: "עזיבת ספק פנימי: נועה לוי", priority: "HIGH", subject: { userId: "emp", kind: "OFFBOARDING" } });
     // Owner lookup asks for the offboarding owner's address.
     expect(db.user.findFirst.mock.calls[0][0].where.email).toBe("ariel@ankora.co.il");
     expect(createTask.mock.calls.slice(1).map((c) => c[1].title)).toEqual([...prompts.OFFBOARDING_STEPS]);
