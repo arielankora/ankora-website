@@ -99,7 +99,7 @@ export function PasskeysCard({
       )}
       {passkeys.length === 1 && (
         <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-appNavy/80">
-          מומלץ להוסיף מכשיר שני, למשל טלפון ומחשב, כדי שאובדן של אחד מהם לא ינעל את הכניסה.
+          מומלץ להוסיף מכשיר שני, למשל טלפון, כדי שאובדן של אחד מהם לא ינעל את הכניסה. מפיקים כאן קוד, ומקלידים אותו במכשיר החדש אחרי הסיסמה.
         </p>
       )}
 
@@ -134,6 +134,35 @@ export function PasskeysCard({
         </ul>
       )}
 
+      {supported && passkeys.length > 0 && (
+        <div className="mt-4">
+          <p className="flex items-center gap-1.5 text-sm text-appNavy">
+            <Smartphone size={15} strokeWidth={1.75} />
+            הוספת מכשיר
+          </p>
+          <p className="mt-1 text-xs text-appNavy/60">
+            לכניסה מטלפון או ממחשב אחר. מאשרים כאן בטביעת אצבע, ובמכשיר החדש מקלידים את הקוד אחרי הסיסמה, בלחיצה על
+            &quot;זה מכשיר חדש&quot;.
+          </p>
+          {link ? (
+            <div className="mt-3 rounded-lg bg-cream-dim p-4 text-center">
+              <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-appNavy">
+                {link.code.slice(0, 3)} {link.code.slice(3)}
+              </p>
+              <p className="mt-1.5 text-xs text-appNavy/60">תקף עד {link.until}, לשימוש אחד.</p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onLink}
+              disabled={linking}
+              className="mt-3 rounded-full bg-gold-gradient px-5 py-2 text-sm font-medium text-navy disabled:opacity-50"
+            >
+              {linking ? "ממתין למכשיר..." : "הפקת קוד למכשיר חדש"}
+            </button>
+          )}
+        </div>
+      )}
       {!supported ? (
         <p className="mt-4 text-xs text-appNavy/60">הדפדפן הזה לא תומך ב-passkey.</p>
       ) : adding ? (
@@ -163,39 +192,14 @@ export function PasskeysCard({
         <button
           type="button"
           onClick={() => setAdding(true)}
-          className="mt-4 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5"
+          className={
+            passkeys.length > 0
+              ? "mt-4 block text-xs text-appNavy/50 underline-offset-4 hover:underline"
+              : "mt-4 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5"
+          }
         >
-          הוספת passkey
+          {passkeys.length > 0 ? "רישום מפתח נוסף בדפדפן או במכשיר הזה" : "הוספת passkey"}
         </button>
-      )}
-      {supported && passkeys.length > 0 && (
-        <div className="mt-5 border-t border-lineDark/70 pt-4">
-          <p className="flex items-center gap-1.5 text-sm text-appNavy">
-            <Smartphone size={15} strokeWidth={1.75} />
-            הוספת מכשיר
-          </p>
-          <p className="mt-1 text-xs text-appNavy/60">
-            לכניסה מטלפון או ממחשב אחר. מאשרים כאן בטביעת אצבע, ובמכשיר החדש מקלידים את הקוד אחרי הסיסמה, בלחיצה על
-            &quot;זה מכשיר חדש&quot;.
-          </p>
-          {link ? (
-            <div className="mt-3 rounded-lg bg-cream-dim p-4 text-center">
-              <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-appNavy">
-                {link.code.slice(0, 3)} {link.code.slice(3)}
-              </p>
-              <p className="mt-1.5 text-xs text-appNavy/60">תקף עד {link.until}, לשימוש אחד.</p>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={onLink}
-              disabled={linking}
-              className="mt-3 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5 disabled:opacity-50"
-            >
-              {linking ? "ממתין למכשיר..." : "הפקת קוד למכשיר חדש"}
-            </button>
-          )}
-        </div>
       )}
       {audience === "client" && passkeys.length > 0 && (
         <div className="mt-5 border-t border-lineDark/70 pt-4">
