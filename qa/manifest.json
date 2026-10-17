@@ -1706,6 +1706,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-17",
       "riskReason": "Marks approved procedures for review when the client's rules change or the review period comes; notifies owners and comments open runs; never names a restricted rule"
+    },
+    "domain:mcp-processes": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-17",
+      "riskReason": "list_processes, get_process and list_policies for Claude: never more than the client file for Claude carries, no sensitive item, no restricted item unless the asker is named on it"
     }
   },
   "waivers": {},

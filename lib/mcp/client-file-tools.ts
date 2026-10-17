@@ -12,6 +12,7 @@ import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
+import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/email-templates";
 
@@ -184,6 +185,80 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson({ count: matches.length, matches });
       } catch (err) {
         console.error("[mcp] lookup_contact failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_processes",
+    {
+      title: "List a client's processes",
+      description:
+        "The client's processes (P1, P2...), one line each: what it is for, its triggers, owner and backup, where it stands in the handover, how complete its documentation is (out of the 9 fields), whether it needs review and why, the approved procedure's version, the next date and the last run. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
+      inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
+      annotations: TOOL_ANNOTATIONS.list_processes,
+    },
+    async (args: { client: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const processes = await mcpListProcesses(actor, client.value.id);
+        return toolJson({ client: client.value.name, count: processes.length, processes });
+      } catch (err) {
+        console.error("[mcp] list_processes failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_process",
+    {
+      title: "Get a process and its procedure",
+      description:
+        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, and the last five runs. Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_process,
+    },
+    async (args: { client: string; process: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const detail = await mcpGetProcess(actor, client.value.id, process.id);
+        if (!detail) return toolText(`No process "${args.process}" for ${client.value.name}.`);
+        return toolJson(detail);
+      } catch (err) {
+        console.error("[mcp] get_process failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_policies",
+    {
+      title: "List the rules for a client",
+      description:
+        "The rules that bind work for a client. `ankora`: Ankora's own rules, the same for every client. `clientRules`: the client's rules as they apply today: the rule in force (for a proposed rule with an interim rule, the interim one applies until a manager approves), what the server checks against procedures, why, who must not be told, and approved exceptions with their end date. Follow them when preparing anything for the client; when a rule forbids what the user asks, say so and suggest requesting an exception. Sensitive rules, and restricted ones the user is not named on, are left out.",
+      inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
+      annotations: TOOL_ANNOTATIONS.list_policies,
+    },
+    async (args: { client: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        return toolJson({ client: client.value.name, ...(await mcpListPolicies(actor, client.value.id)) });
+      } catch (err) {
+        console.error("[mcp] list_policies failed", err);
         return toolFailure(err);
       }
     }

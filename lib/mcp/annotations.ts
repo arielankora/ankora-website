@@ -102,6 +102,11 @@ export const TOOL_ANNOTATIONS = {
   // The guidance, the clients' domains and what was already proposed, for
   // the daily extraction (spec 5.1). Reads only.
   get_extraction_brief: READ_ONLY,
+  // A client's processes, one in full, and the rules that bind them (spec
+  // 8). Assembled on each call; nothing is written.
+  list_processes: READ_ONLY,
+  get_process: READ_ONLY,
+  list_policies: READ_ONLY,
   // Opens a run of a process (spec 8): a task with the procedure's steps.
   // Each call opens another run, so it is not idempotent.
   start_process: WRITES,
