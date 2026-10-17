@@ -20,6 +20,7 @@ import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { controlFrom, controlParts } from "@/lib/client-control";
+import { batchItem, CHANGES_GROUP, oneOffSuppliers, ruleSection } from "@/lib/client-file-sections";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
@@ -76,7 +77,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, batches] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -97,6 +98,20 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     listProcesses(actor, clientId),
     ruleWarnings(actor, clientId),
     daysSinceLastBatch(clientId),
+    // Section 7.2: suppliers named on the client's tasks (decision 2).
+    prisma.task.findMany({
+      where: { clientId, deletedAt: null, parentId: null, supplierName: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+      select: { title: true, supplierName: true, supplierExperience: true, supplierRecordedAt: true, createdAt: true },
+    }),
+    // Section 16: what the extraction delivered, and what became of it.
+    prisma.knowledgeBatch.findMany({
+      where: { clientId },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      select: { createdAt: true, via: true, note: true, sourceId: true, proposals: { select: { state: true } } },
+    }),
   ]);
   const ownerIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
@@ -161,7 +176,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       proposed: p.status === "PROPOSED",
     };
   };
-  const generalRule = (k: string) => k === "INFO" || k === "DATA_HANDLING";
+  const rulesIn = (section: ReturnType<typeof ruleSection>) => rules.filter((p) => ruleSection(p.kind) === section).map(ruleItem);
 
   const primary = contacts.find((c) => c.isPrimary);
   const sections: DocSection[] = [
@@ -221,7 +236,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       number: "6",
       title: "כללים והגבלות",
       empty: "הלקוח עוד לא קבע כללים.",
-      items: rules.filter((p) => !generalRule(p.kind)).map(ruleItem),
+      items: rulesIn("6"),
     },
     {
       number: "7.1",
@@ -249,16 +264,21 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       number: "7.2",
       title: "ספקים ונותני שירות",
       empty: "אין עדיין ספקים או נותני שירות קבועים.",
-      items: orgs.map((o) => ({
-        text: o.organization.name,
-        details: [
-          o.role,
-          RELATIONSHIP[o.relationship],
-          o.monthlyCostMinor !== null ? `${o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor)} בחודש` : null,
-          o.notes,
-        ],
-        ...knowledge(o),
-      })),
+      items: [
+        ...orgs.map((o) => ({
+          text: o.organization.name,
+          details: [
+            o.role,
+            RELATIONSHIP[o.relationship],
+            o.monthlyCostMinor !== null ? `${o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor)} בחודש` : null,
+            o.notes,
+          ],
+          ...knowledge(o),
+        })),
+        // Against every organization of the client, shown or not, so one
+        // hidden from this version does not come back as a one-off.
+        ...oneOffSuppliers(supplierTasks, people.organizations.map((o) => o.organization.name), day),
+      ],
     },
     { number: "7.3", title: "מקורות ידע ומיקומים", empty: "עוד לא נכתב איפה נמצא הידע.", items: of("LOCATION").map(factItem) },
     {
@@ -303,12 +323,12 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
         ...knowledge(r),
       })),
     },
-    { number: "8", title: "כספים", empty: "אין עדיין עובדות כספיות.", items: of("FINANCE").map(factItem) },
+    { number: "8", title: "כספים וכללי אישור", empty: "אין עדיין עובדות כספיות או כללי אישור.", items: [...of("FINANCE").map(factItem), ...rulesIn("8")] },
     {
       number: "9",
       title: "תקשורת",
       empty: "עוד לא נכתב באילו ערוצים פונים למי.",
-      items: contacts.filter((c) => c.channelOrder.length > 0).map((c) => ({ text: `${c.person.name ?? c.role}: ${c.channelOrder.join(", ")}` })),
+      items: [...contacts.filter((c) => c.channelOrder.length > 0).map((c) => ({ text: `${c.person.name ?? c.role}: ${c.channelOrder.join(", ")}` })), ...rulesIn("9")],
     },
     {
       number: "10",
@@ -335,7 +355,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       number: "14",
       title: "כללי עבודה ספציפיים",
       empty: "אין כללי עבודה או כללי טיפול במידע.",
-      items: rules.filter((p) => generalRule(p.kind)).map(ruleItem),
+      items: rulesIn("14"),
     },
     { number: "", title: "הערות", empty: "אין הערות.", items: of("NOTE").map(factItem) },
   ];
@@ -355,7 +375,13 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     number: "16",
     title: "יומן עדכונים",
     empty: "אין עדכונים.",
-    items: audit.map((a) => ({ text: `${day(a.createdAt)}: ${ACTION_LABEL[a.action] ?? a.action}`, details: [a.actor?.name] })),
+    items: [
+      ...batches.map((b) => {
+        const src = b.sourceId ? sources.find((x) => x.id === b.sourceId) : null;
+        return batchItem({ createdAt: b.createdAt, via: b.via, note: b.note, source: src ? { code: src.code, title: src.title } : null, states: b.proposals.map((p) => p.state) }, day);
+      }),
+      ...audit.map((a) => ({ text: `${day(a.createdAt)}: ${ACTION_LABEL[a.action] ?? a.action}`, details: [a.actor?.name], group: CHANGES_GROUP })),
+    ],
   });
 
   // The same rows the sections show, so the line never counts what this

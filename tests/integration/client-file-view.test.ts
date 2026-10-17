@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { addClientContact } from "@/lib/app-domain/client-contacts";
+import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
+import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
@@ -92,6 +93,29 @@ describe("client file document", () => {
     expect(doc.legend).toEqual([{ code: "S1", title: "Nextage & Ankora", details: "הקלטה" }]);
     // Section 16 is the audit trail of the file itself.
     expect(doc.sections.find((s) => s.number === "16")!.items.length).toBeGreaterThan(0);
+  });
+
+  it("rules sit with their sections, one-off suppliers come from tasks, and section 16 lists the batches", async () => {
+    const { client, user } = await setup();
+    await addClientPolicy(user, { clientId: client.id, kind: "APPROVAL_REQUIRED", title: "ספק חדש", statement: "תשלום לספק חדש דורש אישור רו\"ח", interimStatement: "כל תשלום עובר לאורן", sources: S1 });
+    await addClientPolicy(user, { clientId: client.id, kind: "COMMUNICATION", title: "מול Nextage", statement: "רק מהמייל הארגוני", sources: S1 });
+    await addClientPolicy(user, { clientId: client.id, kind: "FORBIDDEN", title: "כרטיסים", statement: "כרטיסי אשראי לא עוברים לעובדים", sources: S1 });
+    await addClientOrganization(user, { clientId: client.id, sources: S1, name: "Nextage", role: "הנהלת חשבונות" });
+    await prisma.task.create({ data: { clientId: client.id, title: "הובלה למשרד", supplierName: "הובלות כהן", supplierExperience: "GOOD", supplierRecordedAt: new Date() } });
+    await prisma.task.create({ data: { clientId: client.id, title: "דוח חודשי", supplierName: "nextage" } });
+    const src = await prisma.clientSource.findFirstOrThrow({ where: { clientId: client.id, code: "S1" } });
+    await prisma.knowledgeBatch.create({ data: { clientId: client.id, sourceId: src.id, proposals: { create: [{ clientId: client.id, target: "FACT", payload: {} }] } } });
+
+    const doc = await buildClientFile(user, client.id, { audience: "staff" });
+    const section = (n: string) => doc.sections.find((s) => s.number === n)!;
+    const texts = (n: string) => section(n).items.map((i) => i.text);
+    expect(texts("6").join()).toContain("כרטיסים");
+    expect(texts("6").join()).not.toContain("ספק חדש");
+    expect(texts("8").join()).toContain("ספק חדש");
+    expect(texts("9").join()).toContain("מול Nextage");
+    expect(texts("7.2")).toEqual(["Nextage", "הובלות כהן"]);
+    expect(section("16").items.find((i) => i.group === "אצוות מהחילוץ")).toMatchObject({ text: expect.stringContaining("Nextage & Ankora"), sources: ["S1"] });
+    expect(toMarkdown(doc)).toContain("### אצוות מהחילוץ");
   });
 
   it("is closed to anyone not assigned to the client", async () => {

@@ -12,7 +12,7 @@ import { ControlLine } from "../ControlLine";
 // Org brain, phase 2: the client file to read, top to bottom, in the order
 // of Hadas's file (claude/org-brain-spec-2026-10-12.md, 6.1). The client
 // screen is where the file is edited; this is where it is read, by anyone
-// assigned to the client, and downloaded as Markdown.
+// assigned to the client, and downloaded as Markdown or PDF.
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -59,9 +59,14 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
         </Link>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-medium text-appNavy">תיק לקוח: {doc.clientName}</h1>
-          <a href={`/api/clients/${clientId}/client-file`} className="text-sm text-gold-dim hover:underline">
-            הורדה כ-Markdown
-          </a>
+          <div className="flex items-center gap-4">
+            <a href={`/api/clients/${clientId}/client-file?format=pdf`} className="text-sm text-gold-dim hover:underline">
+              הורדה כ-PDF
+            </a>
+            <a href={`/api/clients/${clientId}/client-file`} className="text-sm text-gold-dim hover:underline">
+              הורדה כ-Markdown
+            </a>
+          </div>
         </div>
         {doc.control && (
           <div className="mt-2">
@@ -75,6 +80,20 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
       </div>
 
       {doc.sections.map((s) => {
+        // An empty section is one quiet line (decision 7): the structure
+        // stays the same for every client, and the file stays short. It is
+        // still a heading, so the outline of the file never changes.
+        if (s.items.length === 0) {
+          return (
+            <section key={`${s.number}-${s.title}`} className="flex flex-wrap items-baseline gap-x-2 px-6 text-sm">
+              <h2 className="font-normal text-appNavy/60">
+                {s.number && <span className="me-2 font-mono text-gold-dim/70">{s.number}</span>}
+                {s.title}
+              </h2>
+              <p className="text-appNavy/45">{s.empty}</p>
+            </section>
+          );
+        }
         const ungrouped = s.items.filter((i) => !i.group);
         const groups = [...new Set(s.items.filter((i) => i.group).map((i) => i.group!))];
         return (
@@ -83,31 +102,25 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
               {s.number && <span className="me-2 font-mono text-gold-dim">{s.number}</span>}
               {s.title}
             </h2>
-            {s.items.length === 0 ? (
-              <p className="mt-2 text-sm text-appNavy/45">{s.empty}</p>
-            ) : (
-              <>
-                {ungrouped.length > 0 && (
-                  <ul className="mt-2 list-disc ps-5">
-                    {ungrouped.map((i, n) => (
+            {ungrouped.length > 0 && (
+              <ul className="mt-2 list-disc ps-5">
+                {ungrouped.map((i, n) => (
+                  <Item key={n} item={i} />
+                ))}
+              </ul>
+            )}
+            {groups.map((g) => (
+              <div key={g} className="mt-3">
+                <h3 className="text-xs font-medium text-appNavy/60">{g}</h3>
+                <ul className="mt-1 list-disc ps-5">
+                  {s.items
+                    .filter((i) => i.group === g)
+                    .map((i, n) => (
                       <Item key={n} item={i} />
                     ))}
-                  </ul>
-                )}
-                {groups.map((g) => (
-                  <div key={g} className="mt-3">
-                    <h3 className="text-xs font-medium text-appNavy/60">{g}</h3>
-                    <ul className="mt-1 list-disc ps-5">
-                      {s.items
-                        .filter((i) => i.group === g)
-                        .map((i, n) => (
-                          <Item key={n} item={i} />
-                        ))}
-                    </ul>
-                  </div>
-                ))}
-              </>
-            )}
+                </ul>
+              </div>
+            ))}
           </section>
         );
       })}
