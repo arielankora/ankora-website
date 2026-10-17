@@ -21,7 +21,7 @@ export const SECURITY_GATES = {
   /** A written DPA with every vendor: Vercel Pro and the Google Workspace CDPA. */
   vendorDpas: true,
   /** A completed security questionnaire ready to send on request. */
-  questionnaire: false,
+  questionnaire: true,
 } as const;
 
 export type SecurityGate = keyof typeof SECURITY_GATES;

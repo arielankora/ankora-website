@@ -292,7 +292,14 @@ export default function SecurityPage({ locale }: { locale: Locale }) {
             {documents.map((doc) => (
               <motion.div key={doc.title} variants={staggerItem} className="h-full">
                 <HairlineGridCell className="transition-colors duration-[350ms] hover:bg-[rgba(243,234,219,0.05)]">
-                  {doc.href ? (
+                  {doc.href?.startsWith("mailto:") ? (
+                    <a href={doc.href} className="group block">
+                      <h3 className="text-[1.1rem] font-normal text-cream transition-colors group-hover:text-gold-light">
+                        {doc.title}
+                      </h3>
+                      <p className="mt-3 font-assistant text-[14.5px] font-light leading-[1.8] text-muted">{doc.body}</p>
+                    </a>
+                  ) : doc.href ? (
                     <Link href={withLocale(locale, doc.href)} className="group block">
                       <h3 className="text-[1.1rem] font-normal text-cream transition-colors group-hover:text-gold-light">
                         {doc.title}
