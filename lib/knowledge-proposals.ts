@@ -85,6 +85,69 @@ export const PolicyPayload = z.object({
   ...knowledge,
 });
 
+/// A legal entity of the client (spec 3.3). The parent is named, and
+/// found among the client's entities when the proposal is approved.
+export const EntityPayload = z.object({
+  name: z.string().min(1).max(200),
+  legalName: z.string().max(300).nullish(),
+  registrationNumber: z.string().max(100).nullish(),
+  country: z.string().max(100).nullish(),
+  currency: z.string().max(10).nullish(),
+  billingAddress: z.string().max(500).nullish(),
+  parentName: z.string().max(200).nullish(),
+  ...knowledge,
+});
+
+export const NARRATIVE_KIND_LABELS = { OVERVIEW: "סקירה", BACKGROUND: "רקע", OUR_ROLE: "התפקיד שלנו" } as const;
+
+/// A new version of one of the file's free texts (spec 3.3). It replaces
+/// the whole text, so it is written against the version that was current
+/// when it was proposed: a text someone changed since is not overwritten.
+/// The server records that version; Claude does not send it.
+export const NarrativePayload = z.object({
+  kind: z.enum(["OVERVIEW", "BACKGROUND", "OUR_ROLE"]),
+  body: z.string().min(1).max(20000),
+  baseVersion: z.number().int().nonnegative().optional(),
+});
+
+const ProposedStep = z.object({
+  title: z.string().min(1).max(300),
+  mode: z.enum(["MANUAL", "ASSISTED", "AUTOMATED"]).optional(),
+  offsetBusinessDays: z.number().int().min(-60).max(60).nullish(),
+  actionTags: z.array(z.string().max(40)).max(13).optional(),
+  output: z.string().max(500).nullish(),
+  verification: z.string().max(500).nullish(),
+  requiresApproval: z.boolean().optional(),
+});
+
+/// A process (spec 3.8), with its procedure when it was described. It
+/// enters the file as a draft: the procedure runs only once a manager
+/// approves it, on the processes screen.
+export const ProcessPayload = z.object({
+  title: z.string().min(1).max(200),
+  purpose: z.string().max(500).nullish(),
+  triggerKinds: z.array(z.enum(["SCHEDULED", "EVENT", "ON_DEMAND", "CONTINUOUS"])).max(4).optional(),
+  triggerText: z.string().max(500).nullish(),
+  slaText: z.string().max(500).nullish(),
+  externalPartyText: z.string().max(500).nullish(),
+  approverText: z.string().max(300).nullish(),
+  approvalText: z.string().max(500).nullish(),
+  exceptionPlaybook: z.string().max(4000).nullish(),
+  executorText: z.string().max(300).nullish(),
+  transitionStatus: z.enum(["WITH_CLIENT", "IN_HANDOVER", "WITH_ANKORA", "NOT_PLANNED"]).optional(),
+  steps: z.array(ProposedStep).max(15).optional(),
+  highlights: z.string().max(4000).nullish(),
+  outputs: z.string().max(2000).nullish(),
+  ...knowledge,
+});
+
+/// An email domain that identifies the client's meetings (spec 3.5).
+export const DomainPayload = z.object({
+  domain: z.string().min(3).max(200),
+  kind: z.enum(["CLIENT", "PARTNER"]),
+  organizationName: z.string().max(200).nullish(),
+});
+
 export const PAYLOADS = {
   FACT: FactPayload,
   CONTACT: ContactPayload,
@@ -92,6 +155,10 @@ export const PAYLOADS = {
   SYSTEM: SystemPayload,
   REQUEST_TYPE: RequestTypePayload,
   POLICY: PolicyPayload,
+  ENTITY: EntityPayload,
+  NARRATIVE: NarrativePayload,
+  PROCESS: ProcessPayload,
+  DOMAIN: DomainPayload,
 } as const;
 export type ProposalTargetLike = keyof typeof PAYLOADS;
 export type ProposalActionLike = "CREATE" | "SUPERSEDE" | "CONTRADICT";
@@ -103,6 +170,10 @@ export const TARGET_LABELS: Record<ProposalTargetLike, string> = {
   SYSTEM: "מערכת",
   REQUEST_TYPE: "סוג פנייה",
   POLICY: "כלל של הלקוח",
+  ENTITY: "ישות משפטית",
+  NARRATIVE: "סקירה, רקע או תפקידנו",
+  PROCESS: "תהליך",
+  DOMAIN: "דומיין",
 };
 
 export const ACTION_LABELS: Record<ProposalActionLike, string> = {
@@ -145,7 +216,35 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
       return [s("title"), s("statement")].filter(Boolean).join(": ");
     case "SYSTEM":
       return [s("systemName"), s("purpose")].filter(Boolean).join(", ");
+    case "ENTITY":
+      return [s("name"), s("legalName")].filter(Boolean).join(", ");
+    case "NARRATIVE":
+      return s("body").length > 160 ? `${s("body").slice(0, 157)}...` : s("body");
+    case "PROCESS":
+      return [s("title"), s("purpose")].filter(Boolean).join(": ");
+    case "DOMAIN":
+      return [s("domain"), s("organizationName")].filter(Boolean).join(", ");
   }
+}
+
+/// What a reviewer needs beyond the headline to decide: a process's steps,
+/// an entity's identifiers, the whole of a long text. Empty for the rest.
+export function proposalDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
+  const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : "");
+  if (target === "PROCESS") {
+    const steps = Array.isArray(payload.steps) ? (payload.steps as { title?: unknown; requiresApproval?: unknown }[]) : [];
+    return [
+      s("triggerText") && `מה מפעיל: ${s("triggerText")}`,
+      s("slaText") && `SLA: ${s("slaText")}`,
+      ...steps.map((st, i) => `${i + 1}. ${typeof st.title === "string" ? st.title : ""}${st.requiresApproval ? " (דורש אישור)" : ""}`),
+    ].filter((x): x is string => !!x);
+  }
+  if (target === "ENTITY") {
+    return [s("registrationNumber"), s("country"), s("currency"), s("parentName") && `בת של ${s("parentName")}`].filter((x): x is string => !!x);
+  }
+  if (target === "NARRATIVE") return s("body").length > 160 ? [s("body")] : [];
+  if (target === "DOMAIN") return [payload.kind === "PARTNER" ? "דומיין של שותף" : "דומיין של הלקוח"];
+  return [];
 }
 
 /// Every string a proposal carries, for the secret scan: a secret in a

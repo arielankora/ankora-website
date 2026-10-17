@@ -5,7 +5,7 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { findSecrets } from "@/lib/secret-scan";
-import { normalizeEmail } from "@/lib/contact-normalize";
+import { normalizeDomain, normalizeEmail } from "@/lib/contact-normalize";
 import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import {
   PAYLOADS,
@@ -18,7 +18,10 @@ import {
   bulkApproveBlocker,
   MAX_BULK,
 } from "@/lib/knowledge-proposals";
-import { addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
+import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
+import { addClientEntity } from "@/lib/app-domain/client-entities";
+import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
+import { addProcess, saveProcessVersion } from "@/lib/app-domain/processes";
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
 import { addClientFact, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
@@ -159,6 +162,27 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   if (isSensitive(item.payload)) {
     flags.push({ code: "R6", message: "מידע רגיש: רק מי שמאשר מידע רגיש אצל הלקוח רואה את הפריט ומחליט עליו." });
   }
+  if (item.target === "ENTITY") {
+    const name = String(item.payload.name ?? "").trim();
+    const known = await prisma.clientEntity.count({ where: { clientId, deletedAt: null, name: { equals: name, mode: "insensitive" } } });
+    if (known) flags.push({ code: "DUPLICATE", message: "ישות בשם הזה כבר בתיק." });
+  }
+  if (item.target === "NARRATIVE") {
+    const latest = await prisma.clientNarrative.findFirst({ where: { clientId, kind: item.payload.kind as never }, orderBy: { version: "desc" }, select: { body: true } });
+    if (latest && normalizeForMatch(latest.body) === normalizeForMatch(String(item.payload.body ?? ""))) flags.push({ code: "DUPLICATE", message: "זה כבר הטקסט שבתיק." });
+    flags.push({ code: "NARRATIVE", message: latest ? "באישור, הטקסט הזה מחליף את הגרסה שבתיק (הקודמת נשמרת בהיסטוריה)." : "באישור, זו הגרסה הראשונה של הטקסט." });
+  }
+  if (item.target === "PROCESS") {
+    const title = normalizeForMatch(String(item.payload.title ?? ""));
+    const known = await prisma.process.findMany({ where: { clientId, deletedAt: null, status: { not: "RETIRED" } }, select: { title: true } });
+    if (known.some((k) => normalizeForMatch(k.title) === title)) flags.push({ code: "DUPLICATE", message: "תהליך בשם הזה כבר בתיק." });
+    flags.push({ code: "PROCESS", message: "באישור, התהליך נכנס כטיוטה. הנוהל רץ רק אחרי שמנהל מאשר אותו במסך התהליכים." });
+  }
+  if (item.target === "DOMAIN") {
+    const domain = normalizeDomain(String(item.payload.domain ?? ""));
+    const known = domain ? await prisma.clientDomain.count({ where: { clientId, domain, deletedAt: null } }) : 0;
+    if (known) flags.push({ code: "DUPLICATE", message: "הדומיין כבר בתיק." });
+  }
   if (item.target === "POLICY") {
     const title = normalizeForMatch(String(item.payload.title ?? ""));
     const statement = normalizeForMatch(String(item.payload.statement ?? ""));
@@ -219,7 +243,14 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
     // that say the same.
     const refs: SourceRef[] = [item.at ? { code: source.code, at: item.at } : { code: source.code }];
     for (const c of item.alsoSources ?? []) if (/^S\d+$/i.test(c.trim())) refs.push({ code: c.trim().toUpperCase() });
-    const payload = { ...(parsed.data as Record<string, unknown>), sources: refs };
+    const payload: Record<string, unknown> = { ...(parsed.data as Record<string, unknown>), sources: refs };
+    // A free text replaces the whole text: it is written against the
+    // version current now, so approving it later never overwrites a
+    // change made in between.
+    if (item.target === "NARRATIVE") {
+      const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
+      payload.baseVersion = latest?.version ?? 0;
+    }
     accepted.push({ item, payload, flags: await flagsFor(input.clientId, { ...item, payload }, source.weight) });
   }
 
@@ -383,6 +414,37 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   // what the client said; making it binding is a manager's separate step.
   if (p.target === "POLICY") return (await addClientPolicy(actor, { ...PAYLOADS.POLICY.parse(payload), sources, clientId: p.clientId })).id;
   if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...PAYLOADS.SYSTEM.parse(payload), sources, clientId: p.clientId })).id;
+  if (p.target === "ENTITY") {
+    const { parentName, ...e } = PAYLOADS.ENTITY.parse(payload);
+    let parentId: string | null = null;
+    if (parentName?.trim()) {
+      const parent = await prisma.clientEntity.findFirst({ where: { clientId: p.clientId, deletedAt: null, name: { equals: parentName.trim(), mode: "insensitive" } }, select: { id: true } });
+      if (!parent) throw new Error(`ישות האם "${parentName}" לא נמצאת בתיק. מוסיפים אותה קודם, או מוחקים את השם בעריכה.`);
+      parentId = parent.id;
+    }
+    return (await addClientEntity(actor, { ...e, parentId, sources, clientId: p.clientId })).id;
+  }
+  if (p.target === "NARRATIVE") {
+    const n = PAYLOADS.NARRATIVE.parse(payload);
+    try {
+      const row = await saveNarrative(actor, { clientId: p.clientId, kind: n.kind, body: n.body, baseVersion: n.baseVersion ?? 0 });
+      if (!row) throw new Error("זה כבר הטקסט שבתיק. דוחים את ההצעה.");
+      return row.id;
+    } catch (err) {
+      if (err instanceof NarrativeConflictError) throw new Error("מישהו שינה את הטקסט מאז שההצעה הגיעה. דוחים אותה, ומעדכנים את הטקסט במסך הלקוח.");
+      throw err;
+    }
+  }
+  // A process enters as a draft, with its procedure as a draft version:
+  // approving the proposal records what was described; a manager approves
+  // the procedure separately, after the checks (spec 3.9, decision 1).
+  if (p.target === "PROCESS") {
+    const { steps, highlights, outputs, ...proc } = PAYLOADS.PROCESS.parse(payload);
+    const process = await addProcess(actor, { ...proc, sources, clientId: p.clientId });
+    if (steps?.length) await saveProcessVersion(actor, process.id, { steps, highlights, outputs, baseVersion: 0 });
+    return process.id;
+  }
+  if (p.target === "DOMAIN") return (await addClientDomain(actor, { ...PAYLOADS.DOMAIN.parse(payload), clientId: p.clientId })).id;
   throw new Error("סוג פריט לא מוכר.");
 }
 

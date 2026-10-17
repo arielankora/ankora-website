@@ -3207,6 +3207,10 @@ enum ProposalTarget {
   SYSTEM
   REQUEST_TYPE
   POLICY
+  ENTITY
+  NARRATIVE
+  PROCESS
+  DOMAIN
 }
 
 /// What approving a proposal does.
