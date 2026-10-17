@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   batchMatches,
   batchUrgent,
+  facetCounts,
   narrowsItems,
   needsAttention,
   parseReviewFilters,
@@ -91,5 +92,26 @@ describe("review filters", () => {
     expect(batchUrgent([p()])).toBe(false);
     expect(batchUrgent([p(), p({ payload: { kind: "TEMPORARY" } })])).toBe(true);
     expect(batchUrgent([p({ action: "CONTRADICT", state: "REJECTED" })])).toBe(false);
+  });
+
+  it("each facet counts with every other filter applied, never its own", () => {
+    const now = new Date("2026-10-17T12:00:00Z");
+    const at = new Date("2026-10-16T12:00:00Z");
+    const items = [
+      { batch: { clientId: "a", sourceKind: "TRANSCRIPT", createdById: "u1", createdAt: at }, proposals: [p(), p(), p({ target: "CONTACT", payload: {} }), p({ state: "APPROVED" })] },
+      { batch: { clientId: "b", sourceKind: "CLIENT_DOCUMENT", createdById: "u2", createdAt: at }, proposals: [p(), p({ action: "SUPERSEDE" })] },
+    ];
+    const byClient = facetCounts(items, parseReviewFilters({ clientId: "a" }), now);
+    expect(byClient.kinds.get("FACT.FINANCE")).toBe(2);
+    expect(byClient.kinds.get("CONTACT")).toBe(1);
+    expect(byClient.clients.get("b"), "the client facet ignores the chosen client").toBe(2);
+    expect(byClient.attention).toBe(0);
+    expect(byClient.sources.get("CLIENT_DOCUMENT")).toBeUndefined();
+
+    const byKind = facetCounts(items, parseReviewFilters({ kind: "CONTACT" }), now);
+    expect(byKind.clients.get("a")).toBe(1);
+    expect(byKind.clients.get("b")).toBeUndefined();
+    expect(byKind.kinds.get("FACT.FINANCE"), "the kind facet ignores the chosen kind").toBe(4);
+    expect(facetCounts(items, parseReviewFilters({ attention: "1" }), now).clients.get("b")).toBe(1);
   });
 });

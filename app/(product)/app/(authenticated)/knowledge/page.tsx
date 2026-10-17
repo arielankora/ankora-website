@@ -7,7 +7,7 @@ import {
   batchMatches,
   batchUrgent,
   narrowsItems,
-  needsAttention,
+  facetCounts,
   parseReviewFilters,
   proposalKindKey,
   proposalKindLabel,
@@ -28,16 +28,15 @@ function day(d: Date | null): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
 }
 
-/// Options for one filter, most waiting first, with how many wait.
-function options(counts: Map<string, { label: string; n: number }>): FilterOption[] {
-  return [...counts.entries()].map(([value, { label, n }]) => ({ value, label, count: n })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "he"));
-}
-
-function bump(m: Map<string, { label: string; n: number }>, key: string | null, label: string) {
-  if (!key) return;
-  const cur = m.get(key);
-  if (cur) cur.n += 1;
-  else m.set(key, { label, n: 1 });
+/// Options for one filter, most first. The label comes from the whole
+/// queue, the count from the other filters that are set. An option that
+/// would show nothing is left out, unless it is the one chosen, or `keep`
+/// says the list is for switching (clients).
+function options(labels: Map<string, string>, counts: Map<string, number>, chosen: string[], keep = false): FilterOption[] {
+  return [...labels.entries()]
+    .map(([value, label]) => ({ value, label, count: counts.get(value) ?? 0 }))
+    .filter((o) => keep || o.count > 0 || chosen.includes(o.value))
+    .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "he"));
 }
 
 export default async function KnowledgeReviewPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
@@ -77,22 +76,22 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
     return { b, meta: { clientId: b.client.id, sourceKind: b.source?.kind ?? null, createdById: b.createdById, createdAt: b.createdAt }, proposals };
   });
 
-  const clients = new Map<string, { label: string; n: number }>();
-  const kinds = new Map<string, { label: string; n: number }>();
-  const sources = new Map<string, { label: string; n: number }>();
-  const people = new Map<string, { label: string; n: number }>();
-  let attention = 0;
+  const clients = new Map<string, string>();
+  const kinds = new Map<string, string>();
+  const sources = new Map<string, string>();
+  const people = new Map<string, string>();
   for (const { b, meta, proposals } of view) {
-    for (const p of proposals) {
-      if (p.state !== "PENDING") continue;
-      bump(clients, meta.clientId, b.client.name);
-      const k = proposalKindKey(p);
-      bump(kinds, k, proposalKindLabel(k));
-      bump(sources, meta.sourceKind, meta.sourceKind ? SOURCE_KIND_LABELS[meta.sourceKind] : "");
-      bump(people, meta.createdById, b.createdByName ?? "לא ידוע");
-      if (needsAttention(p)) attention += 1;
-    }
+    if (!proposals.some((p) => p.state === "PENDING")) continue;
+    clients.set(meta.clientId, b.client.name);
+    if (meta.sourceKind) sources.set(meta.sourceKind, SOURCE_KIND_LABELS[meta.sourceKind]);
+    if (meta.createdById) people.set(meta.createdById, b.createdByName ?? "לא ידוע");
+    for (const p of proposals) if (p.state === "PENDING") kinds.set(proposalKindKey(p), proposalKindLabel(proposalKindKey(p)));
   }
+  const counts = facetCounts(
+    view.map((v) => ({ batch: v.meta, proposals: v.proposals })),
+    filters,
+    now
+  );
 
   const shown = view
     .filter(({ meta }) => batchMatches(meta, filters, now))
@@ -117,11 +116,11 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
       {all.length > 0 && (
         <ReviewFilterBar
           filters={filters}
-          clients={options(clients)}
-          kinds={options(kinds)}
-          sources={options(sources)}
-          people={options(people)}
-          attentionCount={attention}
+          clients={options(clients, counts.clients, filters.clientId ? [filters.clientId] : [], true)}
+          kinds={options(kinds, counts.kinds, filters.kinds)}
+          sources={options(sources, counts.sources, filters.source ? [filters.source] : [])}
+          people={options(people, counts.people, filters.by ? [filters.by] : [])}
+          attentionCount={counts.attention}
         />
       )}
 
