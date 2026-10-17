@@ -184,7 +184,6 @@ const security: SecurityPageContent = {
       { name: "Upstash", role: "הגבלת קצב", location: "ארצות הברית", policyUrl: "https://upstash.com/trust/privacy.pdf" },
       { name: "Resend", role: "שליחת מיילים", location: "ארצות הברית", policyUrl: "https://resend.com/legal/privacy-policy" },
       { name: "Google Workspace", role: "מייל, מסמכים וגיבויים", location: "גלובלי", policyUrl: "https://policies.google.com/privacy" },
-      { name: "ClickUp", role: "ניהול עבודה", location: "ארצות הברית", policyUrl: "https://clickup.com/terms/privacy" },
       { name: "Fireflies", role: "תמלול שיחות", location: "ארצות הברית", policyUrl: "https://fireflies.ai/privacy-policy" },
       { name: "Anthropic", role: "AI (Claude)", location: "ארצות הברית", policyUrl: "https://www.anthropic.com/legal/privacy" },
       { name: "OpenAI", role: "AI", location: "ארצות הברית", policyUrl: "https://openai.com/policies/privacy-policy/", gate: "openaiTier" },

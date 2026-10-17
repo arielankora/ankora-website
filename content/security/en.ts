@@ -184,7 +184,6 @@ const security: SecurityPageContent = {
       { name: "Upstash", role: "Rate limiting", location: "United States", policyUrl: "https://upstash.com/trust/privacy.pdf" },
       { name: "Resend", role: "Email delivery", location: "United States", policyUrl: "https://resend.com/legal/privacy-policy" },
       { name: "Google Workspace", role: "Email, documents and backups", location: "Global", policyUrl: "https://policies.google.com/privacy" },
-      { name: "ClickUp", role: "Work management", location: "United States", policyUrl: "https://clickup.com/terms/privacy" },
       { name: "Fireflies", role: "Call transcription", location: "United States", policyUrl: "https://fireflies.ai/privacy-policy" },
       { name: "Anthropic", role: "AI (Claude)", location: "United States", policyUrl: "https://www.anthropic.com/legal/privacy" },
       { name: "OpenAI", role: "AI", location: "United States", policyUrl: "https://openai.com/policies/privacy-policy/", gate: "openaiTier" },

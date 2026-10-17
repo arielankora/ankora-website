@@ -159,7 +159,6 @@ const legal: LegalContent = {
               ["Upstash", "Protection against abuse of the system", "Technical usage data", "United States"],
               ["Resend", "Sending messages from the system", "Contact details and message content", "United States"],
               ["Google Workspace", "Email, calendar and document storage", "Operational correspondence and documents", "Global"],
-              ["ClickUp", "Task management and tracking", "Operational client data", "United States"],
               ["Fireflies", "Transcription and summary of calls", "Recordings and transcripts", "United States"],
               ["Anthropic", "The operational AI layer", "Operational client data", "United States"],
               ["OpenAI", "The operational AI layer", "Operational client data", "United States"],
