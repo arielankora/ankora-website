@@ -2,13 +2,14 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { approveProposal, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, decideProposals, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
 // approve, reject with a reason. Nothing else writes a proposal into a
 // client file.
 
 type FormState = { error?: string; ok?: boolean };
+type BulkState = FormState & { done?: number; failed?: { id: string; error: string }[] };
 
 /// The fields a person may change before approving. Anything else on the
 /// form is ignored rather than trusted.
@@ -82,4 +83,31 @@ export async function rejectProposalAction(_prev: FormState | undefined, formDat
     return { error: friendlyError(err) };
   }
   return done();
+}
+
+/// Several proposals of one batch at once (spec 5.2): each is decided as on
+/// its own, and what could not be is reported back by id.
+export async function approveProposalsAction(ids: string[]): Promise<BulkState> {
+  const user = await requireUser();
+  try {
+    const r = await decideProposals(user, ids, { approve: true });
+    revalidatePath("/app/knowledge");
+    revalidatePath("/app", "layout");
+    return { ok: r.failed.length === 0, done: r.done.length, failed: r.failed };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+}
+
+export async function rejectProposalsAction(_prev: BulkState | undefined, formData: FormData): Promise<BulkState> {
+  const user = await requireUser();
+  try {
+    const r = await decideProposals(user, formData.getAll("id").map(String), { approve: false, reason: String(formData.get("reason") ?? "") });
+    revalidatePath("/app/knowledge");
+    revalidatePath("/app", "layout");
+    if (r.failed.length) return { error: `${r.failed.length} לא נדחו: ${r.failed[0].error}`, done: r.done.length, failed: r.failed };
+    return { ok: true, done: r.done.length };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }

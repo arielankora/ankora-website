@@ -15,6 +15,8 @@ import {
   type ProposalActionLike,
   type ProposalFlag,
   type ProposalTargetLike,
+  bulkApproveBlocker,
+  MAX_BULK,
 } from "@/lib/knowledge-proposals";
 import { addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
@@ -384,7 +386,7 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   throw new Error("סוג פריט לא מוכר.");
 }
 
-export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}) {
+export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean } = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
@@ -414,12 +416,12 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
-    after: { resultId, edited: changed.length > 0, headline: proposalHeadline(proposal.target, payload) },
+    after: { resultId, edited: changed.length > 0, headline: proposalHeadline(proposal.target, payload), ...(options.bulk ? { bulk: true } : {}) },
   });
   return updated;
 }
 
-export async function rejectProposal(actor: User, id: string, reason: string) {
+export async function rejectProposal(actor: User, id: string, reason: string, options: { bulk?: boolean } = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
@@ -437,9 +439,49 @@ export async function rejectProposal(actor: User, id: string, reason: string) {
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
-    after: { reason: why },
+    after: { reason: why, ...(options.bulk ? { bulk: true } : {}) },
   });
   return updated;
+}
+
+export type BulkResult = { done: string[]; failed: { id: string; error: string }[] };
+
+/// Several proposals at once, each decided exactly as on its own, so every
+/// check still runs per item and the audit log has a line per item
+/// (marked bulk). One that cannot be decided is reported and the rest go
+/// on: a bad item does not hold back the good ones.
+export async function decideProposals(
+  actor: User,
+  ids: string[],
+  decision: { approve: true } | { approve: false; reason: string }
+): Promise<BulkResult> {
+  assertCan(actor.role, "time_entry.create_self");
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) throw new Error("לא נבחרו הצעות.");
+  if (unique.length > MAX_BULK) throw new Error(`עד ${MAX_BULK} הצעות בפעם אחת.`);
+  if (!decision.approve && !decision.reason.trim()) throw new Error("צריך לכתוב בשורה אחת למה ההצעות נדחות.");
+  const out: BulkResult = { done: [], failed: [] };
+  for (const id of unique) {
+    try {
+      if (decision.approve) {
+        const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { action: true, flags: true, payload: true } });
+        if (!p) throw new Error("ההצעה לא נמצאה.");
+        const blocker = bulkApproveBlocker({
+          action: p.action,
+          flags: (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[],
+          payload: p.payload as Record<string, unknown>,
+        });
+        if (blocker) throw new Error(`מאשרים אחת אחת: ${blocker}.`);
+        await approveProposal(actor, id, {}, { bulk: true });
+      } else {
+        await rejectProposal(actor, id, decision.reason, { bulk: true });
+      }
+      out.done.push(id);
+    } catch (err) {
+      out.failed.push({ id, error: err instanceof Error ? err.message : "אירעה שגיאה." });
+    }
+  }
+  return out;
 }
 
 /// Decision 1's measure: of the proposals decided in the window, how many
