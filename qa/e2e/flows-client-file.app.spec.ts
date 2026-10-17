@@ -10,7 +10,7 @@ import { test, expect } from "./fixtures";
 const CLIENT = "demo-client-b";
 
 test.describe("client file, to read", () => {
-  test("reads in the file's order, ends with the source legend, and downloads as Markdown", async ({ page }) => {
+  test("reads in the file's order, ends with the source legend, and downloads as Markdown and PDF", async ({ page }) => {
     await page.goto(`/app/clients/${CLIENT}`);
     await page.getByRole("link", { name: "תיק הלקוח לקריאה" }).click();
     await expect(page).toHaveURL(new RegExp(`/app/clients/${CLIENT}/client-file$`));
@@ -30,6 +30,11 @@ test.describe("client file, to read", () => {
     expect(response.headers()["content-type"]).toContain("text/markdown");
     expect(response.headers()["content-disposition"]).toContain("attachment");
     expect(await response.text()).toContain("## מקרא מקורות");
+
+    const pdf = await page.request.get(`/api/clients/${CLIENT}/client-file?format=pdf`);
+    expect(pdf.status()).toBe(200);
+    expect(pdf.headers()["content-type"]).toBe("application/pdf");
+    expect((await pdf.body()).subarray(0, 5).toString("latin1")).toBe("%PDF-");
   });
 
   test("the client screen splits day-to-day work from the file", async ({ page }) => {

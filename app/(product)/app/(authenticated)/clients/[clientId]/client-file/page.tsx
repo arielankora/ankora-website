@@ -81,13 +81,17 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
 
       {doc.sections.map((s) => {
         // An empty section is one quiet line (decision 7): the structure
-        // stays the same for every client, and the file stays short.
+        // stays the same for every client, and the file stays short. It is
+        // still a heading, so the outline of the file never changes.
         if (s.items.length === 0) {
           return (
-            <p key={`${s.number}-${s.title}`} className="px-6 text-sm text-appNavy/45">
-              {s.number && <span className="me-2 font-mono text-gold-dim/70">{s.number}</span>}
-              <span className="text-appNavy/60">{s.title}</span>: {s.empty}
-            </p>
+            <section key={`${s.number}-${s.title}`} className="flex flex-wrap items-baseline gap-x-2 px-6 text-sm">
+              <h2 className="font-normal text-appNavy/60">
+                {s.number && <span className="me-2 font-mono text-gold-dim/70">{s.number}</span>}
+                {s.title}
+              </h2>
+              <p className="text-appNavy/45">{s.empty}</p>
+            </section>
           );
         }
         const ungrouped = s.items.filter((i) => !i.group);
