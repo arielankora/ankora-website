@@ -1,12 +1,13 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
-import type { ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
+import type { KnowledgeAudience, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { findSecrets } from "@/lib/secret-scan";
-import { ruleInForce } from "@/lib/client-policies";
+import { isExceptionInForce, ruleInForce, type PolicyKindLike } from "@/lib/client-policies";
+import { hasParams, invoiceGaps, paramsInForce, requestTypeConflicts, ruleChecks, type RuleForCheck, type RuleSeverity } from "@/lib/policy-params";
 import { checkEveryError } from "@/lib/process-checks";
 import {
   MAX_PROCESS_STEPS,
@@ -242,14 +243,95 @@ export type VersionInput = {
   baseVersion: number;
 };
 
-/// The client's approval rules in force, by title: what R2 holds a
-/// procedure that moves money against.
-async function approvalRules(clientId: string): Promise<string[]> {
-  const rows = await prisma.clientPolicy.findMany({
-    where: { clientId, deletedAt: null, status: { not: "RETIRED" }, kind: { in: ["THRESHOLD", "APPROVAL_REQUIRED"] } },
-    select: { title: true, status: true, statement: true, interimStatement: true },
-  });
-  return rows.filter((r) => ruleInForce(r)).map((r) => r.title);
+/// One check a procedure faces, with how much it weighs. `excepted`: the
+/// rule it is about has an approved exception in force, so it does not
+/// hold the approval back (spec 7.2, "דורש חריגה").
+export type ProcessCheckResult = CheckResult & { severity: RuleSeverity; policyId?: string; excepted?: boolean };
+
+/// Everything the checks need about the client's rules, read once.
+export type RuleContext = {
+  /// Approval rules in force with nothing for the server to compare, by
+  /// title: R2 then holds any money step to "some step is approved".
+  textOnlyApprovals: string[];
+  rules: RuleForCheck[];
+  exceptedPolicyIds: Set<string>;
+  contacts: Map<string, { name: string; entityId: string | null }>;
+};
+
+/// A rule binds whoever reads it or not; its title is shown only to who
+/// may see it.
+const HIDDEN_RULE_TITLE = "כלל של הלקוח שמוגבל לצפייה";
+
+export async function ruleContext(
+  clientId: string,
+  options: { now?: Date; canSee?: (r: { audience: KnowledgeAudience; audienceUserIds: string[] }) => boolean } = {}
+): Promise<RuleContext> {
+  const now = options.now ?? new Date();
+  const [policies, exceptions, contacts] = await Promise.all([
+    prisma.clientPolicy.findMany({
+      where: { clientId, deletedAt: null, status: { not: "RETIRED" } },
+      select: {
+        id: true,
+        title: true,
+        kind: true,
+        status: true,
+        statement: true,
+        interimStatement: true,
+        params: true,
+        interimParams: true,
+        audience: true,
+        audienceUserIds: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.policyException.findMany({ where: { clientId, status: "APPROVED" }, select: { policyId: true, status: true, validUntil: true } }),
+    prisma.clientContact.findMany({
+      where: { clientId, deletedAt: null },
+      select: { id: true, role: true, entityId: true, audience: true, audienceUserIds: true, person: { select: { name: true } } },
+    }),
+  ]);
+  const rules: RuleForCheck[] = [];
+  const textOnlyApprovals: string[] = [];
+  for (const r of policies) {
+    if (!ruleInForce(r)) continue;
+    const title = !options.canSee || options.canSee(r) ? r.title : HIDDEN_RULE_TITLE;
+    const params = paramsInForce({ ...r, kind: r.kind as PolicyKindLike });
+    if (hasParams(params)) rules.push({ id: r.id, title, kind: r.kind as PolicyKindLike, params });
+    else if (r.kind === "THRESHOLD" || r.kind === "APPROVAL_REQUIRED") textOnlyApprovals.push(title);
+  }
+  return {
+    textOnlyApprovals,
+    rules,
+    exceptedPolicyIds: new Set(exceptions.filter((e) => isExceptionInForce(e, now)).map((e) => e.policyId)),
+    contacts: new Map(
+      contacts.map((c) => [c.id, { name: !options.canSee || options.canSee(c) ? c.person.name ?? c.role ?? "איש קשר" : "איש קשר מוגבל לצפייה", entityId: c.entityId }])
+    ),
+  };
+}
+
+/// R1 to R4 (always block), and the client's rules (R2 blocks; R7 to R10
+/// and R15 need an exception).
+export function processChecks(
+  version: { steps: ProcessStep[]; highlights?: string | null; outputs?: string | null },
+  process: { entityId: string | null; externalPartyContactIds: string[] },
+  ctx: RuleContext
+): ProcessCheckResult[] {
+  const base: ProcessCheckResult[] = blockingChecks(version, ctx.textOnlyApprovals).map((c) => ({ ...c, severity: "BLOCK" as const }));
+  const rules: ProcessCheckResult[] = ruleChecks(
+    {
+      steps: version.steps,
+      entityId: process.entityId,
+      externalParties: process.externalPartyContactIds.map((id) => ctx.contacts.get(id)).filter((c): c is { name: string; entityId: string | null } => !!c),
+    },
+    ctx.rules
+  ).map((c) => ({ ...c, excepted: c.severity === "EXCEPTION" && ctx.exceptedPolicyIds.has(c.policyId) }));
+  return [...base, ...rules];
+}
+
+/// What holds an approval back: anything blocking, and anything needing an
+/// exception that has none.
+export function holdsApproval(checks: ProcessCheckResult[]): ProcessCheckResult[] {
+  return checks.filter((c) => c.severity === "BLOCK" || !c.excepted);
 }
 
 export async function saveProcessVersion(actor: User, processId: string, input: VersionInput) {
@@ -293,8 +375,11 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
 }
 
 /// The checks a version would face if approved now.
-export async function checkProcessVersion(clientId: string, v: { steps: unknown; highlights: string | null; outputs: string | null }): Promise<CheckResult[]> {
-  return blockingChecks({ steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, await approvalRules(clientId));
+export async function checkProcessVersion(
+  process: { clientId: string; entityId: string | null; externalPartyContactIds: string[] },
+  v: { steps: unknown; highlights: string | null; outputs: string | null }
+): Promise<ProcessCheckResult[]> {
+  return processChecks({ steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, process, await ruleContext(process.clientId));
 }
 
 export async function approveProcessVersion(actor: User, processId: string, version: number) {
@@ -303,7 +388,7 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
   if (!latest || latest.version !== version) throw new Error("זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
   if (latest.status !== "DRAFT") throw new Error("הגרסה הזו כבר מאושרת.");
-  const blocking = await checkProcessVersion(process.clientId, latest);
+  const blocking = holdsApproval(await checkProcessVersion(process, latest));
   if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
   const now = new Date();
   await prisma.$transaction([
@@ -337,7 +422,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
   await assertClientAccess(actor, clientId);
   const client = await prisma.client.findUnique({ where: { id: clientId }, select: { accountManagerId: true } });
   const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
-  const [rows, systems, thresholds] = await Promise.all([
+  const [rows, systems, ctx] = await Promise.all([
     prisma.process.findMany({
       where: { clientId, deletedAt: null, ...(options.includeRetired ? {} : { status: { not: "RETIRED" } }) },
       orderBy: { seq: "asc" },
@@ -347,7 +432,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
       },
     }),
     prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true, accessStatus: true } }),
-    approvalRules(clientId),
+    ruleContext(clientId, { canSee: (r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null) }),
   ]);
   const systemById = new Map(systems.map((s) => [s.id, s]));
   return rows
@@ -374,12 +459,47 @@ export async function listProcesses(actor: User, clientId: string, options: { in
       const steps = (v: typeof current): ProcessStep[] => (v ? readSteps(v.steps) : []);
       return {
         ...r,
-        current: current ? { ...current, steps: steps(current) } : null,
-        draft: draft ? { ...draft, steps: steps(draft), checks: blockingChecks({ steps: steps(draft), highlights: draft.highlights, outputs: draft.outputs }, thresholds) } : null,
+        // The approved procedure against today's rules: a rule added or
+        // changed since the approval shows here, on the procedure that runs.
+        current: current ? { ...current, steps: steps(current), checks: processChecks({ steps: steps(current), highlights: current.highlights, outputs: current.outputs }, r, ctx) } : null,
+        draft: draft ? { ...draft, steps: steps(draft), checks: processChecks({ steps: steps(draft), highlights: draft.highlights, outputs: draft.outputs }, r, ctx) } : null,
         latestVersion: latest?.version ?? 0,
         nextDate,
         completeness: completeness(input),
         gaps: processGaps(input, (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה"),
       };
     });
+}
+
+
+/// Where the client's rules disagree with the file itself, for this
+/// person: systems whose invoice goes elsewhere (R16), and request types
+/// routed across a separation (R8). Keyed by the item's id.
+export async function ruleWarnings(actor: User, clientId: string): Promise<{ systems: Record<string, string[]>; requestTypes: Record<string, string[]> }> {
+  await assertClientAccess(actor, clientId);
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { accountManagerId: true } });
+  const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
+  const [ctx, systems, types] = await Promise.all([
+    ruleContext(clientId, { canSee: (r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null) }),
+    prisma.systemAccess.findMany({
+      where: { clientId, deletedAt: null },
+      select: { id: true, systemName: true, invoiceTo: true, entityId: true, billingCycle: true, billingCostMinor: true },
+    }),
+    prisma.requestType.findMany({ where: { clientId, deletedAt: null }, select: { id: true, title: true, entityId: true, routeToContactIds: true } }),
+  ]);
+  const push = (map: Record<string, string[]>, id: string, message: string) => (map[id] ??= []).push(message);
+  const out = { systems: {} as Record<string, string[]>, requestTypes: {} as Record<string, string[]> };
+  for (const g of invoiceGaps(
+    systems.map((s) => ({ ...s, billed: !!s.billingCycle || s.billingCostMinor !== null })),
+    ctx.rules
+  )) {
+    push(out.systems, g.systemId, g.message);
+  }
+  for (const c of requestTypeConflicts(
+    types.map((t) => ({ ...t, routes: t.routeToContactIds.map((id) => ctx.contacts.get(id)).filter((x): x is { name: string; entityId: string | null } => !!x) })),
+    ctx.rules
+  )) {
+    push(out.requestTypes, c.requestTypeId, c.message);
+  }
+  return out;
 }

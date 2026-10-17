@@ -17,7 +17,8 @@ import { listRequestTypes } from "@/lib/app-domain/request-types";
 import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
-import { listProcesses } from "@/lib/app-domain/processes";
+import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
+import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
 import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
@@ -72,7 +73,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -91,6 +92,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     listClientPolicies(actor, clientId),
     listOpenExceptions(actor, clientId),
     listProcesses(actor, clientId),
+    ruleWarnings(actor, clientId),
   ]);
   const ownerIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
@@ -140,6 +142,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       details: [
         p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
         p.rationale ? `למה: ${p.rationale}` : null,
+        (() => {
+          const checked = paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? "ישות שהוסרה");
+          return checked ? `נבדק מול הנהלים: ${checked}` : null;
+        })(),
         // An approved exception travels with its rule: whoever reads the
         // rule reads that, until a date, it is done otherwise.
         ...exceptions
@@ -230,6 +236,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           s.billingCostMinor !== null ? (s.billingCurrency === "USD" ? `$${(s.billingCostMinor / 100).toLocaleString("en-US")}` : formatMinor(s.billingCostMinor)) : null,
           !ai && s.cardLast4 ? `כרטיס ****${s.cardLast4}` : null,
           s.invoiceTo ? `חשבונית ל: ${s.invoiceTo}` : null,
+          ...(warnings.systems[s.id] ?? []),
         ],
         ...knowledge(s),
       })),
@@ -275,6 +282,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
             ? `נוהל גרסה ${p.current.version}: ${p.current.steps.map((st, i) => `${i + 1}. ${st.title} (${STEP_MODE_LABELS[st.mode]}${st.requiresApproval ? ", דורש אישור" : ""})`).join(" ")}`
             : "אין עדיין נוהל מאושר",
           p.current?.highlights ? `דגשים: ${p.current.highlights}` : null,
+          ...(p.current?.checks ?? []).filter((c) => !c.excepted).map((c) => `לא עומד בכללים: ${c.message}`),
           p.exceptionPlaybook ? `נוהל חריגים: ${p.exceptionPlaybook}` : null,
         ],
         ...knowledge(p),
@@ -286,7 +294,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "עוד לא נכתב מה מגיע, ממי ואיך עונים.",
       items: requestTypes.filter(shown).map((r) => ({
         text: r.title,
-        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, routeNames(r.routeToContactIds, contactName)],
+        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, routeNames(r.routeToContactIds, contactName), ...(warnings.requestTypes[r.id] ?? [])],
         ...knowledge(r),
       })),
     },

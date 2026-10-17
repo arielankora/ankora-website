@@ -78,6 +78,19 @@ export const HUMAN_REVIEWED_TAGS: ActionTag[] = ["CLIENT_MESSAGE"];
 /// Money moving: what a client's approval thresholds are about (R2).
 export const MONEY_TAGS: ActionTag[] = ["PAYMENT", "PURCHASE", "REFUND"];
 
+/// How a step reaches someone, when it does (R10).
+export const CHANNELS = ["EMAIL", "WHATSAPP", "SLACK", "PHONE", "PORTAL", "OTHER"] as const;
+export type Channel = (typeof CHANNELS)[number];
+
+export const CHANNEL_LABELS: Record<Channel, string> = {
+  EMAIL: "מייל",
+  WHATSAPP: "WhatsApp",
+  SLACK: "Slack",
+  PHONE: "טלפון",
+  PORTAL: "הפורטל",
+  OTHER: "אחר",
+};
+
 export type ProcessStep = {
   title: string;
   mode: StepModeLike;
@@ -90,6 +103,12 @@ export type ProcessStep = {
   /// For an automated step: how a person makes sure it happened (R3).
   verification: string | null;
   requiresApproval: boolean;
+  /// The most this step moves, in minor units, with its currency. Unknown
+  /// is read as "may be above any threshold" (R2).
+  amountMaxMinor: number | null;
+  currency: string | null;
+  /// How a message in this step goes out (R10).
+  channel: Channel | null;
 };
 
 const s = (v: unknown, max: number): string | null => {
@@ -114,6 +133,10 @@ export function readSteps(value: unknown): ProcessStep[] {
       output: s(v.output, 500),
       verification: s(v.verification, 500),
       requiresApproval: v.requiresApproval === true,
+      amountMaxMinor:
+        typeof v.amountMaxMinor === "number" && Number.isInteger(v.amountMaxMinor) && v.amountMaxMinor >= 0 && v.amountMaxMinor <= 1e13 ? v.amountMaxMinor : null,
+      currency: typeof v.currency === "string" && /^[A-Za-z]{3}$/.test(v.currency.trim()) ? v.currency.trim().toUpperCase() : null,
+      channel: CHANNELS.includes(v.channel as Channel) ? (v.channel as Channel) : null,
     }))
     .filter((st) => st.title);
 }

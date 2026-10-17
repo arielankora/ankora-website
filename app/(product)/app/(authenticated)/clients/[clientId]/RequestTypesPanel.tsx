@@ -102,12 +102,15 @@ export function RequestTypesPanel({
   contacts,
   entities,
   sourceOptions,
+  ruleWarnings = {},
 }: {
   clientId: string;
   requestTypes: PanelRequestType[];
   contacts: ContactOption[];
   entities: EntityOption[];
   sourceOptions: SourceOption[];
+  /// Where a client's separation rule disagrees with the routing (R8).
+  ruleWarnings?: Record<string, string[]>;
 }) {
   const { showToast } = useToast();
   async function remove(r: PanelRequestType) {
@@ -134,6 +137,11 @@ export function RequestTypesPanel({
                 <p className="text-xs text-appNavy/60">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
                 <p className="mt-1 text-xs text-appNavy/80">{r.handling}</p>
                 {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-appNavy/60">מפנים ל: {r.routeToNames.join(", ")}</p>}
+                {(ruleWarnings[r.id] ?? []).map((w, i) => (
+                  <p key={i} className="mt-1 text-xs text-red-700">
+                    {w}
+                  </p>
+                ))}
                 <StatusLine status={r.status} toResolve={r.toResolve} />
                 <SourceCodes sources={r.sources} options={sourceOptions} />
               </div>

@@ -4,7 +4,8 @@ import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
-import { addClientPolicy } from "@/lib/app-domain/client-policies";
+import { addClientPolicy, approveClientPolicy } from "@/lib/app-domain/client-policies";
+import { approveException, requestException } from "@/lib/app-domain/policy-exceptions";
 import {
   addProcess,
   approveProcessVersion,
@@ -125,6 +126,71 @@ describe("procedures", () => {
     const versions = await prisma.processVersion.findMany({ where: { processId: p.id }, orderBy: { version: "asc" }, select: { status: true } });
     expect(versions.map((v) => v.status)).toEqual(["DRAFT", "SUPERSEDED", "APPROVED"]);
     await expect(removeProcess(hadas, p.id)).rejects.toThrow("מבטלים");
+  });
+
+  it("checks the client's rules that say what to check: a threshold blocks, a missing required step needs an exception", async () => {
+    const { client, hadas, ariel: before } = await setup();
+    const ariel = await prisma.user.update({ where: { id: before.id }, data: { canApproveExceptions: true } });
+    const threshold = await addClientPolicy(hadas, {
+      clientId: client.id,
+      kind: "THRESHOLD",
+      title: "תוכנה",
+      statement: "תוכנה עד 3,000$ בשנה מאושרת",
+      interimStatement: "כל הוצאה עוברת לאורן",
+      params: { amountMinor: 300000, currency: "USD", appliesToTags: ["PURCHASE"] },
+      sources: S1,
+    });
+    await approveClientPolicy(ariel, threshold.id);
+    const required = await addClientPolicy(hadas, {
+      clientId: client.id,
+      kind: "REQUIRED_STEP",
+      title: "ספק חדש",
+      statement: "לספק חדש מציינים סיווג ומחלקה",
+      params: { mustInclude: "סיווג ומחלקה", appliesToTags: ["SUPPLIER_NEW"] },
+      sources: S1,
+    });
+    await approveClientPolicy(ariel, required.id);
+    const p = await addProcess(hadas, { clientId: client.id, title: "רכישת תוכנה", sources: S1 });
+
+    // Below the threshold: no approval needed. A new supplier without the words: an exception is.
+    await saveProcessVersion(hadas, p.id, {
+      steps: [{ title: "רוכשים", actionTags: ["PURCHASE", "SUPPLIER_NEW"], amountMaxMinor: 200000, currency: "USD" }],
+      baseVersion: 0,
+    });
+    let [listed] = await listProcesses(hadas, client.id);
+    expect(listed.draft!.checks.map((c) => [c.code, c.severity, c.excepted])).toEqual([["R7", "EXCEPTION", false]]);
+    await expect(approveProcessVersion(ariel, p.id, 1)).rejects.toThrow("סיווג ומחלקה");
+
+    // Above it: blocked, whatever exceptions exist.
+    await saveProcessVersion(hadas, p.id, {
+      steps: [{ title: "רוכשים", actionTags: ["PURCHASE", "SUPPLIER_NEW"], amountMaxMinor: 500000, currency: "USD" }],
+      baseVersion: 1,
+    });
+    [listed] = await listProcesses(hadas, client.id);
+    expect(listed.draft!.checks.map((c) => c.code).sort()).toEqual(["R2", "R7"]);
+
+    // An approved exception to the required step lets the approval through once nothing blocks.
+    const ex = await requestException(hadas, { policyId: required.id, what: "בלי סיווג החודש", reason: "המחלקות עוד לא הוגדרו", validUntil: new Date(Date.now() + 10 * 86400000) });
+    await approveException(ariel, ex.id);
+    await saveProcessVersion(hadas, p.id, {
+      steps: [{ title: "אורן מאשר", requiresApproval: true }, { title: "רוכשים", actionTags: ["PURCHASE", "SUPPLIER_NEW"], amountMaxMinor: 500000, currency: "USD" }],
+      baseVersion: 2,
+    });
+    [listed] = await listProcesses(hadas, client.id);
+    expect(listed.draft!.checks).toEqual([expect.objectContaining({ code: "R7", excepted: true })]);
+    await approveProcessVersion(ariel, p.id, 3);
+
+    // A rule added after the approval shows on the procedure in force.
+    const forbidden = await addClientPolicy(hadas, {
+      clientId: client.id,
+      kind: "FORBIDDEN",
+      title: "בלי ספקים חדשים",
+      statement: "לא פותחים ספק חדש עד סוף השנה",
+      params: { appliesToTags: ["SUPPLIER_NEW"] },
+      sources: S1,
+    });
+    [listed] = await listProcesses(hadas, client.id);
+    expect(listed.current!.checks.filter((c) => !c.excepted)).toEqual([expect.objectContaining({ code: "R15", policyId: forbidden.id })]);
   });
 
   it("a process with an approved procedure can be paused and resumed by a manager", async () => {
