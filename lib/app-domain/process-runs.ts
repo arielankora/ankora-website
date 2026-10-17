@@ -8,6 +8,7 @@ import { isBusinessCalendarKey, type BusinessCalendarKey } from "@/lib/business-
 import { processGaps, readSteps } from "@/lib/process-rules";
 import { ruleLine, isExceptionInForce } from "@/lib/client-policies";
 import { canCopyIntoTask } from "@/lib/knowledge";
+import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { runDescription, stepDueKeys, stepTitle } from "@/lib/process-runs";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 
@@ -90,6 +91,10 @@ export async function openProcessRun(input: OpenRunInput) {
     },
     (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה"
   );
+  // A run opened while the procedure needs review says so first: whoever
+  // works it is about to follow a procedure someone has to look at.
+  const review = readReviewReason(process.reviewReason);
+  if (review) gaps.unshift(`הנוהל דורש סקירה: ${REVIEW_REASON_LABELS[review]}. לבדוק מול כללי הלקוח בתיק לפני שמבצעים.`);
   const approverText = process.approverText;
 
   const assignee = process.ownerId ?? input.fallbackAssigneeId ?? null;

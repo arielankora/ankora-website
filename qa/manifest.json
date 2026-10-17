@@ -1553,7 +1553,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
-      "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 and the client's checkable rules (R2 thresholds, R7 to R10 and R15 needing an exception) at approval; completeness and gaps"
+      "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 and the client's checkable rules (R2 thresholds, R7 to R10 and R15 needing an exception) at approval; every rule change and the daily job mark failing procedures for review, notify the owner and comment open runs; completeness and gaps"
     },
     "domain:process-runs": {
       "kind": "domain",

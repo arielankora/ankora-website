@@ -7,6 +7,8 @@ import { changesSubstance, policyShapeError, type PolicyKindLike } from "@/lib/c
 import { entityIdsIn, paramsError, paramsKey, readParams, type PolicyParams } from "@/lib/policy-params";
 import { Prisma } from "@prisma/client";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
+import { rescanAfterRuleChange } from "@/lib/app-domain/process-review";
+import { ruleChangeCause } from "@/lib/process-review";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type { ClientPolicy, PolicyKind, User } from "@prisma/client";
 
@@ -95,6 +97,7 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
     },
   });
   await recordAudit({ actorId: actor.id, action: "client_policy.add", entityType: "ClientPolicy", entityId: row.id, clientId: input.clientId, after: row });
+  await rescanAfterRuleChange(input.clientId, ruleChangeCause(row, "נוסף כלל"));
   return row;
 }
 
@@ -156,6 +159,7 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
     before,
     after: updated,
   });
+  await rescanAfterRuleChange(before.clientId, ruleChangeCause(updated, reopened ? "כלל חזר להיות מוצע" : "כלל השתנה"));
   return updated;
 }
 
@@ -171,6 +175,7 @@ export async function approveClientPolicy(actor: User, id: string) {
     data: { status: "ACTIVE", approvedById: actor.id, approvedAt: new Date() },
   });
   await recordAudit({ actorId: actor.id, action: "client_policy.approve", entityType: "ClientPolicy", entityId: id, clientId: before.clientId, before, after: updated });
+  await rescanAfterRuleChange(before.clientId, ruleChangeCause(updated, "כלל אושר"));
   return updated;
 }
 
@@ -193,6 +198,7 @@ export async function retireClientPolicy(actor: User, id: string, reason: string
     before,
     after: { ...updated, reason: why.slice(0, 500) },
   });
+  await rescanAfterRuleChange(before.clientId, ruleChangeCause(updated, "כלל בוטל"));
   return updated;
 }
 
@@ -204,6 +210,7 @@ export async function removeClientPolicy(actor: User, id: string) {
   if (row.status !== "PROPOSED") throw new Error("כלל שאושר לא נמחק. מבטלים אותו, והוא נשאר בהיסטוריה.");
   const removed = await prisma.clientPolicy.update({ where: { id }, data: { deletedAt: new Date() } });
   await recordAudit({ actorId: actor.id, action: "client_policy.remove", entityType: "ClientPolicy", entityId: id, clientId: row.clientId, before: row });
+  await rescanAfterRuleChange(row.clientId, ruleChangeCause(row, "כלל הוסר"));
   return removed;
 }
 

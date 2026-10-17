@@ -9,6 +9,7 @@ import { findSecrets } from "@/lib/secret-scan";
 import { isExceptionInForce, ruleInForce, type PolicyKindLike } from "@/lib/client-policies";
 import { hasParams, invoiceGaps, paramsInForce, requestTypeConflicts, ruleChecks, type RuleForCheck, type RuleSeverity } from "@/lib/policy-params";
 import { checkEveryError } from "@/lib/process-checks";
+import { reviewEveryError } from "@/lib/process-review";
 import {
   MAX_PROCESS_STEPS,
   blockingChecks,
@@ -61,6 +62,8 @@ export interface ProcessInput extends KnowledgeInput {
   /// An ongoing process only: a check every N days, and what is checked.
   checkEveryDays?: number | null;
   checkText?: string | null;
+  /// Review the procedure every N days (spec 5.4).
+  reviewEveryDays?: number | null;
 }
 
 export class ProcessVersionConflictError extends Error {
@@ -90,6 +93,8 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
 }
 
 function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; systems?: string[]; policies?: string[] }) {
+  const reviewError = reviewEveryError(input.reviewEveryDays);
+  if (reviewError) throw new Error(reviewError);
   if (input.slaBusinessDays !== undefined && input.slaBusinessDays !== null && (!Number.isInteger(input.slaBusinessDays) || input.slaBusinessDays < 0 || input.slaBusinessDays > 60)) {
     throw new Error("ה-SLA בימי עסקים הוא מספר שלם בין 0 ל-60.");
   }
@@ -115,6 +120,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     transitionStatus: input.transitionStatus ?? undefined,
     checkEveryDays: input.checkEveryDays !== undefined ? input.checkEveryDays : undefined,
     checkText: input.checkText !== undefined ? clean(input.checkText) : undefined,
+    reviewEveryDays: input.reviewEveryDays !== undefined ? input.reviewEveryDays : undefined,
   };
 }
 
@@ -396,7 +402,7 @@ export async function approveProcessVersion(actor: User, processId: string, vers
     prisma.processVersion.update({ where: { id: latest.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: now } }),
     prisma.process.update({
       where: { id: processId },
-      data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false },
+      data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false, reviewReason: null },
     }),
   ]);
   await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version } });

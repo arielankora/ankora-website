@@ -19,6 +19,7 @@ import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
+import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
 import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
@@ -276,6 +277,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.slaText ? `SLA: ${p.slaText}` : null,
           p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
           p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
+          readReviewReason(p.reviewReason) ? `דורש סקירה: ${REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!]}` : null,
           `שלמות ${p.completeness.score} מתוך 9`,
           ...p.gaps,
           p.current

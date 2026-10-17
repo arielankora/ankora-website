@@ -3631,6 +3631,10 @@ model Process {
   lastReviewedAt DateTime?
   lastRunAt      DateTime?
   needsReview    Boolean       @default(false)
+  /// Why it needs review (spec 7.3, 5.4): "RULES" when the approved
+  /// procedure no longer passes the client's rules, "PERIODIC" when its
+  /// review every `reviewEveryDays` fell due. Null when it does not.
+  reviewReason   String?
 
   /// An ongoing process (CONTINUOUS) opens no tasks. It can have a check
   /// every N days instead ("once a week: no invoice is stuck"), which is

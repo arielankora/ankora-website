@@ -19,6 +19,7 @@ import { openProcessRun } from "@/lib/app-domain/process-runs";
 import { readSteps } from "@/lib/process-rules";
 import { runLeadBusinessDays } from "@/lib/process-runs";
 import { notifyDueProcessChecks } from "@/lib/app-domain/process-checks";
+import { reviewProcessesDaily } from "@/lib/app-domain/process-review";
 import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
@@ -656,6 +657,9 @@ export async function reconcileImportantDates(now = new Date()) {
     conditionChecksAsked: 0,
     escalated: 0,
     processChecksDue: 0,
+    processesFlagged: 0,
+    processesCleared: 0,
+    processReviewsDue: 0,
     errors: [] as string[],
   };
 
@@ -684,6 +688,17 @@ export async function reconcileImportantDates(now = new Date()) {
     // Org brain: an ongoing process whose check is due reminds its owner.
     // Here because this is the daily pass over what falls due.
     ["notifyDueProcessChecks", async () => { results.processChecksDue = (await notifyDueProcessChecks(now)).notified; }],
+    // Org brain (spec 7.3, 5.4): every approved procedure against its
+    // client's rules today, and the periodic reviews that fell due.
+    [
+      "reviewProcessesDaily",
+      async () => {
+        const r = await reviewProcessesDaily(now);
+        results.processesFlagged = r.flagged;
+        results.processesCleared = r.cleared;
+        results.processReviewsDue = r.due;
+      },
+    ],
   ];
 
   for (const [name, step] of steps) {
