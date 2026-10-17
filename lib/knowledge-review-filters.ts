@@ -111,3 +111,42 @@ export function proposalMatches(p: FilterableProposal, f: ReviewFilters): boolea
 export function batchUrgent(proposals: FilterableProposal[]): boolean {
   return proposals.some((p) => p.state === "PENDING" && (needsAttention(p) || proposalKindKey(p) === "FACT.TEMPORARY"));
 }
+
+export type FacetCounts = {
+  clients: Map<string, number>;
+  kinds: Map<string, number>;
+  sources: Map<string, number>;
+  people: Map<string, number>;
+  attention: number;
+};
+
+/// How many pending proposals each option would show, given every other
+/// filter that is set. Choosing a client updates the kind counts, choosing
+/// a kind updates the client counts, and so on. A facet never narrows its
+/// own counts: with "כספים" chosen, "איש קשר" still says how many it would
+/// add.
+export function facetCounts(items: { batch: FilterableBatch; proposals: FilterableProposal[] }[], f: ReviewFilters, now: Date): FacetCounts {
+  const out: FacetCounts = { clients: new Map(), kinds: new Map(), sources: new Map(), people: new Map(), attention: 0 };
+  const bump = (m: Map<string, number>, k: string | null) => {
+    if (k) m.set(k, (m.get(k) ?? 0) + 1);
+  };
+  const without = {
+    client: { ...f, clientId: null },
+    kind: { ...f, kinds: [] },
+    attention: { ...f, attention: false },
+    source: { ...f, source: null },
+    by: { ...f, by: null },
+  };
+  for (const { batch, proposals } of items) {
+    for (const p of proposals) {
+      if (p.state !== "PENDING") continue;
+      const ok = (g: ReviewFilters) => batchMatches(batch, g, now) && proposalMatches(p, g);
+      if (ok(without.client)) bump(out.clients, batch.clientId);
+      if (ok(without.kind)) bump(out.kinds, proposalKindKey(p));
+      if (ok(without.source)) bump(out.sources, batch.sourceKind);
+      if (ok(without.by)) bump(out.people, batch.createdById);
+      if (ok(without.attention) && needsAttention(p)) out.attention += 1;
+    }
+  }
+  return out;
+}
