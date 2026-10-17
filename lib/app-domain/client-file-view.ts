@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
-import { effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
+import { canSendToAi, effectiveStatus, parseFieldStatus, type KnowledgeAudienceLike } from "@/lib/knowledge";
 import { formatSourceRef, readSourceRefs, SOURCE_KIND_LABELS, SOURCE_WEIGHT_LABELS } from "@/lib/knowledge-sources";
 import { FACT_TOPIC_LABELS, isPastValidity, type FactTopicLike } from "@/lib/client-facts";
 import { SYSTEM_ACCESS_STATUS_LABELS, SYSTEM_PERMISSION_LABELS } from "@/lib/system-map";
@@ -33,7 +33,8 @@ import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 // item's audience is applied before it gets here.
 //
 // The "ai" version is what Claude receives (spec 6.3): no emails, phones,
-// card digits or vault names, and nothing marked sensitive.
+// card digits or vault names, nothing marked sensitive, and nothing
+// restricted unless the person asking is named on it (canSendToAi).
 
 const RELATIONSHIP: Record<string, string> = {
   CLIENT_STAFF: "צוות הלקוח",
@@ -46,6 +47,11 @@ const RELATIONSHIP: Record<string, string> = {
 
 /// The entity types whose changes make up section 16.
 const FILE_ENTITY_TYPES = ["Process", "PolicyException", "ClientPolicy", "RequestType", "ClientNarrative", "ClientContact", "ClientOrganization", "ClientSource", "ClientDomain", "SystemAccess", "ClientFact", "ClientEntity", "KnowledgeBatch", "KnowledgeProposal"];
+
+function routeNames(ids: string[], names: Map<string, string>): string | null {
+  const shown = ids.map((id) => names.get(id)).filter((n): n is string => !!n);
+  return shown.length ? `מפנים ל: ${shown.join(", ")}` : null;
+}
 
 function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
@@ -64,7 +70,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, clientId);
   const ai = options.audience === "ai";
-  const shown = (r: { sensitivity: KnowledgeSensitivity }) => !ai || r.sensitivity !== "SENSITIVE";
+  const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
   const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
@@ -95,6 +101,9 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const orgs = people.organizations.filter(shown);
   const current = facts.current.filter(shown);
   const of = (kind: ClientFact["kind"]) => current.filter((f) => f.kind === kind);
+  // Names come from the contacts shown here, never from the request type's
+  // own lookup, so a contact hidden from this version is not named either.
+  const contactName = new Map(contacts.map((c) => [c.id, c.person.name ?? c.role ?? ""]));
   const subjectName = new Map<string, string>([
     ...contacts.map((c) => [c.id, c.person.name ?? c.role ?? ""] as [string, string]),
     ...orgs.map((o) => [o.id, o.organization.name] as [string, string]),
@@ -277,7 +286,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "עוד לא נכתב מה מגיע, ממי ואיך עונים.",
       items: requestTypes.filter(shown).map((r) => ({
         text: r.title,
-        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, r.routeToNames.length ? `מפנים ל: ${r.routeToNames.join(", ")}` : null],
+        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, routeNames(r.routeToContactIds, contactName)],
         ...knowledge(r),
       })),
     },

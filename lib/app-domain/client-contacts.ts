@@ -4,7 +4,7 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { normalizeDomain, normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
-import { canSeeKnowledgeItem } from "@/lib/knowledge";
+import { canSeeKnowledgeItem, canSendToAi } from "@/lib/knowledge";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
@@ -424,6 +424,8 @@ export async function lookupContact(actor: User, query: string) {
   });
   return links
     .filter((l) => canSeeKnowledgeItem(l, viewer, managerOf.get(l.clientId) ?? null))
+    // The answer goes to Claude: a restricted link only for someone named on it.
+    .filter((l) => canSendToAi(l, actor.id))
     .map((l) => ({
       name: person.name,
       client: l.client.name,

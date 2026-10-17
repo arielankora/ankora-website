@@ -86,3 +86,24 @@ export function canSeeKnowledgeItem(
   if (item.audience === "ACCOUNT_TEAM" && accountManagerId === viewer.id) return true;
   return false;
 }
+
+/// Rule 3: what may leave the product for Claude (spec 3.1, 6.1, 6.3),
+/// asked on top of rule 2. A sensitive item never goes. A restricted item
+/// goes only to someone named on it: a manager sees it on the screen, but
+/// being able to see it is not being one of the people it was meant for,
+/// and a Claude conversation is a copy outside the product.
+export function canSendToAi(
+  item: { sensitivity: string; audience: KnowledgeAudienceLike; audienceUserIds: string[] },
+  viewerId: string
+): boolean {
+  if (item.sensitivity === "SENSITIVE") return false;
+  if (item.audience === "RESTRICTED") return item.audienceUserIds.includes(viewerId);
+  return true;
+}
+
+/// Rule 4: what may be written into a task. A task is read by everyone on
+/// the client and goes to Claude whole ("קדם עם קלוד", get_task), so only
+/// an item meant for all of them, and not sensitive, is copied into one.
+export function canCopyIntoTask(item: { sensitivity: string; audience: KnowledgeAudienceLike }): boolean {
+  return item.sensitivity !== "SENSITIVE" && item.audience === "ALL_STAFF";
+}

@@ -121,9 +121,14 @@ export async function listRequestTypes(actor: User, clientId: string) {
   const contactIds = [...new Set(rows.flatMap((r) => r.routeToContactIds))];
   const contacts = await prisma.clientContact.findMany({
     where: { id: { in: contactIds }, clientId, deletedAt: null },
-    select: { id: true, role: true, person: { select: { name: true } } },
+    select: { id: true, role: true, audience: true, audienceUserIds: true, person: { select: { name: true } } },
   });
-  const nameOf = new Map(contacts.map((c) => [c.id, c.person.name ?? c.role ?? ""]));
+  // A contact this person may not see is not named here either.
+  const nameOf = new Map(
+    contacts
+      .filter((c) => canSeeKnowledgeItem(c, viewer, client?.accountManagerId ?? null))
+      .map((c) => [c.id, c.person.name ?? c.role ?? ""])
+  );
   return rows
     .filter((r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null))
     .map((r) => ({ ...r, routeToNames: r.routeToContactIds.map((id) => nameOf.get(id)).filter((n): n is string => !!n) }));

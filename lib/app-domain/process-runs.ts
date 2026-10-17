@@ -7,6 +7,7 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { isBusinessCalendarKey, type BusinessCalendarKey } from "@/lib/business-calendar";
 import { processGaps, readSteps } from "@/lib/process-rules";
 import { ruleLine, isExceptionInForce } from "@/lib/client-policies";
+import { canCopyIntoTask } from "@/lib/knowledge";
 import { runDescription, stepDueKeys, stepTitle } from "@/lib/process-runs";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 
@@ -101,7 +102,9 @@ export async function openProcessRun(input: OpenRunInput) {
     highlights: version.highlights,
     outputs: version.outputs,
     gaps,
-    rules: policies.map(ruleLine).filter((l): l is string => !!l),
+    // The run is a task every one on the client reads, and Claude with
+    // them: a sensitive or restricted rule stays in the file.
+    rules: policies.filter(canCopyIntoTask).map(ruleLine).filter((l): l is string => !!l),
     exceptions: exceptions
       .filter((e) => isExceptionInForce(e, now))
       .map((e) => `${e.policy.title}: ${e.what}, עד ${e.validUntil.toISOString().slice(0, 10).split("-").reverse().join(".")}`),

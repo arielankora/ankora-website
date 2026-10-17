@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { canSeeKnowledgeItem, effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
+import { canCopyIntoTask, canSeeKnowledgeItem, canSendToAi, effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
 
 // Org-brain spec 3.1 (13.10.2026).
 
@@ -47,5 +47,28 @@ describe("canSeeKnowledgeItem", () => {
   });
   it("managers see everything", () => {
     expect(canSeeKnowledgeItem({ audience: "RESTRICTED", audienceUserIds: [] }, { id: "m", isManager: true }, null)).toBe(true);
+  });
+});
+
+describe("canSendToAi", () => {
+  it("never a sensitive item, even for someone named on it", () => {
+    expect(canSendToAi({ sensitivity: "SENSITIVE", audience: "RESTRICTED", audienceUserIds: ["u1"] }, "u1")).toBe(false);
+  });
+  it("a restricted item only to someone named on it: seeing it as a manager is not enough", () => {
+    expect(canSendToAi({ sensitivity: "NORMAL", audience: "RESTRICTED", audienceUserIds: ["u1"] }, "u1")).toBe(true);
+    expect(canSendToAi({ sensitivity: "NORMAL", audience: "RESTRICTED", audienceUserIds: ["u1"] }, "manager")).toBe(false);
+  });
+  it("everything else goes, on top of what canSeeKnowledgeItem already let through", () => {
+    expect(canSendToAi({ sensitivity: "NORMAL", audience: "ALL_STAFF", audienceUserIds: [] }, "u1")).toBe(true);
+    expect(canSendToAi({ sensitivity: "NORMAL", audience: "ACCOUNT_TEAM", audienceUserIds: [] }, "u1")).toBe(true);
+  });
+});
+
+describe("canCopyIntoTask", () => {
+  it("only an item meant for everyone on the client, and not sensitive", () => {
+    expect(canCopyIntoTask({ sensitivity: "NORMAL", audience: "ALL_STAFF" })).toBe(true);
+    expect(canCopyIntoTask({ sensitivity: "SENSITIVE", audience: "ALL_STAFF" })).toBe(false);
+    expect(canCopyIntoTask({ sensitivity: "NORMAL", audience: "ACCOUNT_TEAM" })).toBe(false);
+    expect(canCopyIntoTask({ sensitivity: "NORMAL", audience: "RESTRICTED" })).toBe(false);
   });
 });
