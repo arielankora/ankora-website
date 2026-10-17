@@ -268,6 +268,7 @@ export function ReviewBatch({
   note,
   droppedCount,
   proposals,
+  filtered = false,
 }: {
   clientId: string;
   clientName: string;
@@ -276,6 +277,9 @@ export function ReviewBatch({
   note: string | null;
   droppedCount: number;
   proposals: ReviewProposal[];
+  /// The screen is filtered, and `proposals` is only what matches. Said
+  /// on the select-all, so "all" never reads as the whole batch.
+  filtered?: boolean;
 }) {
   const { showToast } = useToast();
   const pending = proposals.filter((p) => p.state === "PENDING");
@@ -342,7 +346,7 @@ export function ReviewBatch({
               onChange={(e) => setSelected(new Set(e.target.checked ? decidable.map((p) => p.id) : []))}
               className="h-4 w-4 accent-gold"
             />
-            הכול ({decidable.length})
+            {filtered ? "כל מה שבסינון" : "הכול"} ({decidable.length})
           </label>
           {allTogether.length > 0 && allTogether.length < decidable.length && (
             <button type="button" onClick={() => setSelected(new Set(allTogether.map((p) => p.id)))} className="text-gold-dim hover:underline">
