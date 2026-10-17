@@ -41,14 +41,14 @@ export type ReportType =
 /// Spec 14.2's own table, used verbatim for labels/order.
 export const REPORT_DEFINITIONS: { id: ReportType; label: string; usage: string }[] = [
   { id: "total_client_hours", label: "סה\"כ שעות לקוחות", usage: "כל הלקוחות בתקופה; בפועל/לחיוב" },
-  { id: "hours_by_employee", label: "שעות לפי עובד", usage: "עובד, בפועל, לחיוב, מספר לקוחות" },
+  { id: "hours_by_employee", label: "שעות לפי איש צוות", usage: "איש צוות, בפועל, לחיוב, מספר לקוחות" },
   { id: "hours_by_client", label: "שעות לפי לקוח", usage: "לקוח, נוצל, נותר, אחוז ניצול" },
   { id: "hours_by_category", label: "שעות לפי קטגוריה", usage: "פילוח לפי קטגוריה, רוחבי או ללקוח נבחר" },
-  { id: "employee_client_matrix", label: "מטריצת עובדים מול לקוחות", usage: "מי עבד כמה עבור כל לקוח" },
+  { id: "employee_client_matrix", label: "מטריצת אנשי צוות מול לקוחות", usage: "מי עבד כמה עבור כל לקוח" },
   { id: "manual_edits", label: "דיווחים ידניים/ערוכים", usage: "entries ידניים/ערוכים + מבצע + סיבה" },
   { id: "overage_at_risk", label: "חריגה / בסיכון", usage: "לקוחות מעל סף או קרובים אליו" },
   { id: "active_timers", label: "טיימרים פעילים", usage: "טיימרים פעילים וזמן ריצה נוכחי" },
-  { id: "capacity", label: "קיבולת עובדים", usage: "שעות עובד בתקופה + חלוקה ללקוחות" },
+  { id: "capacity", label: "קיבולת צוות", usage: "שעות איש צוות בתקופה + חלוקה ללקוחות" },
 ];
 
 export interface ReportFilters {
@@ -189,9 +189,9 @@ async function hoursByEmployee(filters: ReportFilters): Promise<ReportResult> {
 
   return {
     type: "hours_by_employee",
-    title: "שעות לפי עובד",
+    title: "שעות לפי איש צוות",
     columns: [
-      { key: "employee", label: "עובד" },
+      { key: "employee", label: "איש צוות" },
       { key: "actualMinutes", label: "בפועל", type: "minutes" },
       { key: "billableMinutes", label: "לחיוב", type: "minutes" },
       { key: "clientCount", label: "מספר לקוחות", type: "number" },
@@ -330,9 +330,9 @@ async function employeeClientMatrix(filters: ReportFilters): Promise<ReportResul
 
   return {
     type: "employee_client_matrix",
-    title: "מטריצת עובדים מול לקוחות",
+    title: "מטריצת אנשי צוות מול לקוחות",
     columns: [
-      { key: "employee", label: "עובד" },
+      { key: "employee", label: "איש צוות" },
       { key: "client", label: "לקוח" },
       { key: "actualMinutes", label: "בפועל", type: "minutes" },
       { key: "billableMinutes", label: "לחיוב", type: "minutes" },
@@ -384,7 +384,7 @@ async function manualEdits(filters: ReportFilters): Promise<ReportResult> {
     title: "דיווחים ידניים/ערוכים",
     columns: [
       { key: "date", label: "תאריך" },
-      { key: "employee", label: "עובד" },
+      { key: "employee", label: "איש צוות" },
       { key: "client", label: "לקוח" },
       { key: "category", label: "קטגוריה" },
       { key: "manual", label: "ידני" },
@@ -513,7 +513,7 @@ async function activeTimers(filters: ReportFilters): Promise<ReportResult> {
     type: "active_timers",
     title: "טיימרים פעילים",
     columns: [
-      { key: "employee", label: "עובד" },
+      { key: "employee", label: "איש צוות" },
       { key: "client", label: "לקוח" },
       { key: "category", label: "קטגוריה" },
       { key: "startedAt", label: "התחלה" },
@@ -566,9 +566,9 @@ async function capacity(filters: ReportFilters): Promise<ReportResult> {
 
   return {
     type: "capacity",
-    title: "קיבולת עובדים",
+    title: "קיבולת צוות",
     columns: [
-      { key: "employee", label: "עובד" },
+      { key: "employee", label: "איש צוות" },
       { key: "actualMinutes", label: "בפועל", type: "minutes" },
       { key: "billableMinutes", label: "לחיוב", type: "minutes" },
       { key: "clientBreakdown", label: "חלוקה ללקוחות" },

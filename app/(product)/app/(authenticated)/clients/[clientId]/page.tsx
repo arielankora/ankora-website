@@ -696,7 +696,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <div className="rounded-2xl border border-lineDark bg-white p-6">
               <h2 className="text-sm font-medium text-appNavy">משתמשים מוקצים ({client.employeeAccess.length})</h2>
               {client.employeeAccess.length === 0 ? (
-                <p className="mt-2 text-sm text-appNavy/50">אין עדיין עובדים מוקצים ללקוח זה.</p>
+                <p className="mt-2 text-sm text-appNavy/50">אין עדיין אנשי צוות מוקצים ללקוח זה.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
                   {client.employeeAccess.map((access) => (
@@ -707,7 +707,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 </ul>
               )}
               <p className="mt-3 text-xs text-appNavy/40">
-                הקצאת עובדים ללקוחות מתבצעת מעמוד{" "}
+                הקצאת אנשי צוות ללקוחות מתבצעת מעמוד{" "}
                 <Link href="/app/users" className="underline">
                   משתמשים
                 </Link>

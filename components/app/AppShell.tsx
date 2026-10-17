@@ -13,7 +13,7 @@ import { NotificationsBell, type NotificationSummary } from "./NotificationsBell
 const ROLE_LABELS: Record<User["role"], string> = {
   SUPER_ADMIN: "מנהל-על",
   ANKORA_ADMIN: "מנהל Ankora",
-  ANKORA_EMPLOYEE: "עובד Ankora",
+  ANKORA_EMPLOYEE: "ספק פנימי אנקורה",
   CLIENT_USER: "לקוח",
 };
 

@@ -100,7 +100,7 @@ export function ClientsGrid({
                   </span>
                 </div>
                 <p className="mt-1.5 text-xs text-appNavy/55">
-                  {client.employeeCount === 0 ? "אין עדיין עובדים מוקצים" : `${client.employeeCount} עובדים מוקצים`}
+                  {client.employeeCount === 0 ? "אין עדיין אנשי צוות מוקצים" : `${client.employeeCount} אנשי צוות מוקצים`}
                 </p>
 
                 <div className="mt-4 flex items-baseline justify-between gap-2.5">

@@ -63,7 +63,7 @@ function windowYesterday(attempt = 0): { start: string; end: string } {
 
 async function openCreateForm(page: import("@playwright/test").Page) {
   await page.goto("/app/time-entries");
-  const trigger = page.getByRole("button", { name: "+ דיווח עבור עובד" });
+  const trigger = page.getByRole("button", { name: "+ דיווח עבור איש צוות" });
   await expect(trigger, "the admin create-entry trigger is not on this screen").toBeVisible({ timeout: 15_000 });
   await trigger.click();
   await expect(page.locator('select[name="userId"]')).toBeVisible();

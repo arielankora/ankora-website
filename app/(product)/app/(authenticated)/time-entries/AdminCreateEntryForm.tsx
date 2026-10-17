@@ -14,7 +14,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
       disabled={pending}
       className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
     >
-      {pending ? "שומר..." : "הוספת דיווח לעובד"}
+      {pending ? "שומר..." : "הוספת דיווח לאיש צוות"}
     </button>
   );
 }
@@ -81,7 +81,7 @@ export function AdminCreateEntryForm({
         onClick={() => setOpen(true)}
         className="rounded-full border border-lineDark bg-white px-5 py-2.5 text-sm font-medium text-appNavy hover:border-gold"
       >
-        + דיווח עבור עובד
+        + דיווח עבור איש צוות
       </button>
     );
   }
@@ -92,7 +92,7 @@ export function AdminCreateEntryForm({
       className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">עובד *</label>
+        <label className="block text-xs font-medium text-appNavy/60">איש צוות *</label>
         <select
           name="userId"
           required

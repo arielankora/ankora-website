@@ -450,7 +450,7 @@ export default async function AppHomePage() {
                   <>
                     {metrics.parallelTimerPeopleCount > 0 && (
                       <p className="mt-1.5 text-[11.5px] text-appNavy/55">
-                        {metrics.activeTimerPeopleCount} עובדים, מתוכם {metrics.parallelTimerPeopleCount} עם שני טיימרים במקביל
+                        {metrics.activeTimerPeopleCount} אנשי צוות, מתוכם {metrics.parallelTimerPeopleCount} עם שני טיימרים במקביל
                       </p>
                     )}
                     {metrics.longRunningCount > 0 && (

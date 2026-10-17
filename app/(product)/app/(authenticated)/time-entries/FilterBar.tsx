@@ -67,13 +67,13 @@ export function FilterBar({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">עובד</label>
+        <label className="block text-xs font-medium text-appNavy/60">איש צוות</label>
         <select
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         >
-          <option value="">כל העובדים</option>
+          <option value="">כל אנשי הצוות</option>
           {users.map((u) => (
             <option key={u.id} value={u.id}>
               {u.name}

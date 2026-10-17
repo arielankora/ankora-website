@@ -30,7 +30,7 @@ export async function GET(request: Request) {
     const period = `report-${year}-${String(month).padStart(2, "0")}`;
     const showEmployee = report.rows.some((r) => r.employee !== undefined);
     const headers = showEmployee
-      ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "עובד"]
+      ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "איש צוות"]
       : ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב"];
     const rows = report.rows.map((r) =>
       showEmployee

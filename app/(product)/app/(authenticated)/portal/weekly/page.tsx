@@ -137,7 +137,7 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">פעילות</th>
               <th className="px-5 py-3 font-medium">קטגוריה</th>
-              {activity.showEmployeeNames && <th className="px-5 py-3 font-medium">עובד</th>}
+              {activity.showEmployeeNames && <th className="px-5 py-3 font-medium">איש צוות</th>}
               <th className="px-5 py-3 font-medium">דקות לחיוב</th>
             </tr>
           </thead>

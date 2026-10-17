@@ -12,7 +12,7 @@ export const metadata = { robots: { index: false, follow: false } };
 const ROLE_LABEL: Record<UserRole, string> = {
   SUPER_ADMIN: "מנהל-על",
   ANKORA_ADMIN: "מנהל Ankora",
-  ANKORA_EMPLOYEE: "עובד Ankora",
+  ANKORA_EMPLOYEE: "ספק פנימי אנקורה",
   CLIENT_USER: "לקוח",
 };
 
@@ -44,7 +44,7 @@ const STATUS_TAG_CLASSES: Record<UserStatus, string> = {
 const ROLE_SCOPE_CARDS: { role: string; description: string }[] = [
   { role: "מנהל-על", description: "הכל, כולל בנקי שעות, יומן פעולות ואינטגרציות" },
   { role: "מנהל Ankora", description: "לקוחות, קטגוריות, דיווחי זמן ודוחות" },
-  { role: "עובד Ankora", description: "טיימר, הזמן שלי, משימות ומועדים של לקוחותיו" },
+  { role: "ספק פנימי אנקורה", description: "טיימר, הזמן שלי, משימות ומועדים של לקוחותיו" },
   { role: "לקוח", description: "פורטל בלבד: בנק שעות, פילוח ודוחות שלו" },
 ];
 

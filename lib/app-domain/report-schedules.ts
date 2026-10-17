@@ -565,7 +565,7 @@ export async function sendReportScheduleNow(actor: User, scheduleId: string) {
 export function monthlyDetailedToCsv(rows: { date: string; activity: string; category: string; billableMinutes: number; employee?: string }[]): string {
   const showEmployee = rows.some((r) => r.employee !== undefined);
   const headers = showEmployee
-    ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "עובד"]
+    ? ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב", "איש צוות"]
     : ["תאריך", "פעילות", "קטגוריה", "דקות לחיוב"];
   const body = rows.map((r) =>
     showEmployee
