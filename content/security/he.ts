@@ -221,7 +221,8 @@ const security: SecurityPageContent = {
       { title: "מדיניות פרטיות", body: "איזה מידע נאסף, למה, וכמה זמן הוא נשמר.", href: "/privacy" },
       {
         title: "שאלון אבטחה ממולא",
-        body: "לבקרת ספקים בארגון שלכם. נשלח לפי בקשה.",
+        body: "לבקרת ספקים בארגון שלכם. כתבו לנו, ונשלח אותו.",
+        href: "mailto:security@ankora.co.il?subject=%D7%91%D7%A7%D7%A9%D7%94%20%D7%9C%D7%A9%D7%90%D7%9C%D7%95%D7%9F%20%D7%90%D7%91%D7%98%D7%97%D7%94",
         gate: "questionnaire",
       },
     ],

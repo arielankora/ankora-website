@@ -221,7 +221,8 @@ const security: SecurityPageContent = {
       { title: "Privacy policy", body: "What data is collected, why, and how long it is kept.", href: "/privacy" },
       {
         title: "Completed security questionnaire",
-        body: "For your vendor review. Sent on request.",
+        body: "For your vendor review. Write to us and we will send it.",
+        href: "mailto:security@ankora.co.il?subject=Security%20questionnaire%20request",
         gate: "questionnaire",
       },
     ],
