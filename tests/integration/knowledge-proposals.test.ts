@@ -4,6 +4,7 @@ import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientFact, listClientFacts } from "@/lib/app-domain/client-facts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
+import { saveNarrative } from "@/lib/app-domain/client-narratives";
 import {
   approveProposal,
   countPendingProposals,
@@ -204,6 +205,58 @@ describe("request types and the extraction brief", () => {
     const rt = await prisma.requestType.findUniqueOrThrow({ where: { id: approved.resultId! } });
     expect(rt.handling).toBe("לשני ולג'נן, לא לאיילה");
     expect(rt.sources).toEqual([{ code: "S1", at: "14:20" }]);
+  });
+
+  it("an entity, a process, a domain and a free text are proposed too, and enter the file only as far as approval allows", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "ENTITY", payload: { name: "NUX Inc", country: "US", currency: "USD" }, at: "02:00" },
+        { target: "ENTITY", payload: { name: "NUX.AI Ltd", country: "IL", parentName: "NUX Inc" }, at: "02:10" },
+        {
+          target: "PROCESS",
+          payload: { title: "תשלומי ספקים LTD", triggerKinds: ["SCHEDULED"], triggerText: "ב-10 וב-25", steps: [{ title: "מעלים ל-Doka", actionTags: ["INVOICE"] }, { title: "מורשה חתימה חותם", actionTags: ["BANK_SIGNATURE"], requiresApproval: true }] },
+          at: "24:11",
+        },
+        { target: "DOMAIN", payload: { domain: "nux.ai", kind: "CLIENT" } },
+        { target: "NARRATIVE", payload: { kind: "OVERVIEW", body: "חברה, סטארטאפ AI עם שתי ישויות [S1 02:00]" } },
+      ],
+    });
+    expect(r.proposed).toBe(5);
+    const batch = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!;
+    const of = (t: string) => batch.proposals.filter((p) => p.target === t);
+    expect((of("PROCESS")[0].flags as { code: string }[]).map((f) => f.code)).toContain("PROCESS");
+
+    // The parent first; the child finds it by name.
+    const inc = await approveProposal(user, of("ENTITY")[0].id);
+    const ltd = await approveProposal(user, of("ENTITY")[1].id);
+    expect((await prisma.clientEntity.findUniqueOrThrow({ where: { id: ltd.resultId! } })).parentId).toBe(inc.resultId);
+
+    // A process enters as a draft, its procedure a draft version: nothing runs.
+    const proc = await approveProposal(user, of("PROCESS")[0].id);
+    const process = await prisma.process.findUniqueOrThrow({ where: { id: proc.resultId! }, include: { versions: true } });
+    expect(process.status).toBe("DRAFT");
+    expect(process.versions.map((v) => [v.version, v.status])).toEqual([[1, "DRAFT"]]);
+
+    const dom = await approveProposal(user, of("DOMAIN")[0].id);
+    expect((await prisma.clientDomain.findUniqueOrThrow({ where: { id: dom.resultId! } })).domain).toBe("nux.ai");
+
+    // Someone changed the text since it was proposed: the proposal does not overwrite it.
+    await saveNarrative(user, { clientId: client.id, kind: "OVERVIEW", body: "טקסט שהדס כתבה בינתיים", baseVersion: 0 });
+    await expect(approveProposal(user, of("NARRATIVE")[0].id)).rejects.toThrow("מישהו שינה את הטקסט");
+  });
+
+  it("a free text proposed against the current version replaces it when approved", async () => {
+    const { client, user } = await setup();
+    await addClientSource(user, { clientId: client.id, kind: "TRANSCRIPT", title: "Nextage & Ankora" });
+    await saveNarrative(user, { clientId: client.id, kind: "OUR_ROLE", body: "גרסה ראשונה", baseVersion: 0 });
+    const r = await proposeKnowledge(user, { clientId: client.id, source: { code: "S1" }, items: [{ target: "NARRATIVE", payload: { kind: "OUR_ROLE", body: "אנחנו מנהלים את התפעול השוטף" } }] });
+    const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
+    await approveProposal(user, p.id);
+    const versions = await prisma.clientNarrative.findMany({ where: { clientId: client.id, kind: "OUR_ROLE" }, orderBy: { version: "asc" } });
+    expect(versions.map((v) => v.body)).toEqual(["גרסה ראשונה", "אנחנו מנהלים את התפעול השוטף"]);
   });
 
   it("lists the user's clients with their domains, and the recordings already proposed", async () => {

@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, MAX_BULK, TARGET_LABELS, bulkApproveBlocker, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { ACTION_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -41,6 +41,7 @@ const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-
 function targetLabel(p: { target: ProposalTargetLike; payload: Record<string, unknown> }): string {
   if (p.target === "FACT" && p.payload.kind) return FACT_KIND_LABELS[p.payload.kind as FactKindLike];
   if (p.target === "POLICY" && p.payload.kind) return `כלל: ${POLICY_KIND_LABELS[p.payload.kind as PolicyKindLike] ?? ""}`;
+  if (p.target === "NARRATIVE" && p.payload.kind) return NARRATIVE_KIND_LABELS[p.payload.kind as keyof typeof NARRATIVE_KIND_LABELS] ?? TARGET_LABELS.NARRATIVE;
   return TARGET_LABELS[p.target];
 }
 
@@ -75,6 +76,18 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
     { key: "blocker", label: "מה חוסם" },
     { key: "notes", label: "הערות", long: true },
   ],
+  ENTITY: [
+    { key: "name", label: "שם" },
+    { key: "legalName", label: "שם משפטי" },
+    { key: "registrationNumber", label: "ח.פ. או EIN" },
+  ],
+  NARRATIVE: [{ key: "body", label: "הטקסט", long: true }],
+  PROCESS: [
+    { key: "title", label: "שם התהליך" },
+    { key: "purpose", label: "למה הוא קיים" },
+    { key: "triggerText", label: "מה מפעיל אותו" },
+  ],
+  DOMAIN: [{ key: "domain", label: "דומיין" }],
 };
 
 function str(v: unknown): string {
@@ -217,6 +230,11 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
             {p.action !== "CREATE" && <span className="ms-1.5 text-warning">· {ACTION_LABELS[p.action]}</span>}
           </p>
           <p className="mt-0.5 text-sm text-appNavy">{p.headline}</p>
+          {proposalDetails(p.target, p.payload).map((line, i) => (
+            <p key={i} className="mt-0.5 whitespace-pre-line text-xs text-appNavy/65">
+              {line}
+            </p>
+          ))}
           {p.existing && (
             <p className="mt-1 text-xs text-appNavy/55">
               היום בתיק: <span className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</span>

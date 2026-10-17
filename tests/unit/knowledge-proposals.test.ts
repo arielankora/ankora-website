@@ -31,3 +31,18 @@ describe("knowledge proposals, pure parts", () => {
     expect(FactPayload.safeParse({ kind: "TEMPORARY", body: "x", validUntil: "1.12.2026" }).success).toBe(false);
   });
 });
+
+describe("the new targets on the review card", () => {
+  it("a process shows its trigger and steps, an entity its identifiers, a long text in full", async () => {
+    const { proposalDetails, proposalHeadline, PAYLOADS } = await import("@/lib/knowledge-proposals");
+    const proc = { title: "תשלומי ספקים", triggerText: "ב-10 וב-25", steps: [{ title: "מעלים" }, { title: "חותמים", requiresApproval: true }] };
+    expect(PAYLOADS.PROCESS.safeParse(proc).success).toBe(true);
+    expect(proposalHeadline("PROCESS", proc)).toBe("תשלומי ספקים");
+    expect(proposalDetails("PROCESS", proc)).toEqual(["מה מפעיל: ב-10 וב-25", "1. מעלים", "2. חותמים (דורש אישור)"]);
+    expect(proposalDetails("ENTITY", { name: "NUX.AI Ltd", country: "IL", parentName: "NUX Inc" })).toEqual(["IL", "בת של NUX Inc"]);
+    const long = "א".repeat(200);
+    expect(proposalHeadline("NARRATIVE", { kind: "OVERVIEW", body: long })).toHaveLength(160);
+    expect(proposalDetails("NARRATIVE", { kind: "OVERVIEW", body: long })).toEqual([long]);
+    expect(PAYLOADS.DOMAIN.safeParse({ domain: "nux.ai", kind: "VENDOR" }).success).toBe(false);
+  });
+});

@@ -33,6 +33,10 @@ const EDITABLE = new Set([
   "validUntilEvent",
   "decidedAt",
   "decidedBy",
+  "legalName",
+  "registrationNumber",
+  "triggerText",
+  "domain",
 ]);
 
 function friendlyError(err: unknown): string {
