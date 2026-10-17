@@ -179,7 +179,9 @@ export function SecondFactorStep({
           </button>
         </>
       ) : mode === "code" ? (
-        <form onSubmit={redeem}>
+        // Keyed: without it React reuses the code form's <input> for the
+        // name field below, and the typed code becomes the device's name.
+        <form key="code" onSubmit={redeem}>
           <label className="mt-4 block">
             <span className="mb-1.5 block text-xs text-appNavy/60">קוד מהמכשיר המחובר</span>
             <input
@@ -210,7 +212,7 @@ export function SecondFactorStep({
           </button>
         </form>
       ) : (
-        <form onSubmit={enroll}>
+        <form key="enroll" onSubmit={enroll}>
           <label className="mt-4 block">
             <span className="mb-1.5 block text-xs text-appNavy/60">שם למכשיר</span>
             <input
