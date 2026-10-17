@@ -1,4 +1,6 @@
 import "server-only";
+import { rescanAfterRuleChange } from "@/lib/app-domain/process-review";
+import { ruleChangeCause } from "@/lib/process-review";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -24,7 +26,7 @@ export const EXCEPTION_DECIDED = "policy_exception.decided";
 export type ExceptionInput = { policyId: string; what: string; reason: string; validUntil: Date };
 
 async function findException(actor: User, id: string) {
-  const row = await prisma.policyException.findUnique({ where: { id }, include: { policy: { select: { title: true, clientId: true } } } });
+  const row = await prisma.policyException.findUnique({ where: { id }, include: { policy: { select: { title: true, clientId: true, audience: true } } } });
   if (!row) throw new Error("הבקשה לא נמצאה.");
   await assertClientAccess(actor, row.clientId);
   return row;
@@ -93,6 +95,7 @@ async function decide(actor: User, id: string, approve: boolean, note: string | 
       },
     });
   }
+  if (approve) await rescanAfterRuleChange(before.clientId, ruleChangeCause(before.policy, "אושרה חריגה לכלל"));
   return updated;
 }
 

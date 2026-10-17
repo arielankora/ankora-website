@@ -33,6 +33,7 @@ import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
 import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
+import { readReviewReason, reviewDueAt } from "@/lib/process-review";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
@@ -421,6 +422,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   : null,
                 runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
                 checkEveryDays: p.checkEveryDays,
+                reviewReason: readReviewReason(p.reviewReason),
+                reviewEveryDays: p.reviewEveryDays,
+                reviewDueAt: p.status === "ACTIVE" || p.status === "PAUSED" ? reviewDueAt(p)?.toISOString() ?? null : null,
                 checkEvery: p.checkEveryDays ? checkEveryText(p.checkEveryDays) : null,
                 checkText: p.checkText,
                 routine: isRoutine(p),

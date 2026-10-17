@@ -26,6 +26,7 @@ import {
   addProcessAction,
   approveProcessVersionAction,
   linkProcessDatesAction,
+  markProcessReviewedAction,
   removeProcessAction,
   saveProcessVersionAction,
   setProcessStatusAction,
@@ -34,6 +35,7 @@ import {
 } from "../process-actions";
 import Link from "next/link";
 import { formatAmount } from "@/lib/policy-params";
+import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
@@ -84,6 +86,10 @@ export type PanelProcess = {
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
+  /// Spec 7.3, 5.4: why it needs review, if it does, and the review period.
+  reviewReason: ReviewReason | null;
+  reviewEveryDays: number | null;
+  reviewDueAt: string | null;
   checkEvery: string | null;
   checkText: string | null;
   checkDue: { key: string; state: CheckState } | null;
@@ -221,6 +227,9 @@ function ProcessForm({
         <Checks name="approvalPolicyIds" options={rules} selected={existing?.approvalPolicyIds ?? []} />
         <input name="approvalText" defaultValue={existing?.approvalText ?? ""} placeholder='ספק חדש: אישור רו"ח, או "אין"' className={INPUT} />
       </div>
+      <Field label="סקירת הנוהל כל (ימים)">
+        <input name="reviewEveryDays" inputMode="numeric" defaultValue={existing?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
+      </Field>
       <div className="grid grid-cols-[7rem_1fr] gap-3">
         <Field label="בדיקה כל (ימים)">
           <input name="checkEveryDays" inputMode="numeric" defaultValue={existing?.checkEveryDays ?? ""} placeholder="7" className={INPUT} />
@@ -551,7 +560,24 @@ export function ProcessesPanel({
                       <StatusBadge label={p.status === "DRAFT" ? "אין נוהל מאושר" : p.status === "PAUSED" ? "מושהה" : "בוטל"} tone="gray" />
                     )}
                     <span className={`text-xs ${p.score >= 8 ? "text-emerald-700" : "text-warning"}`}>{p.score} מתוך 9</span>
+                    {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
                   </div>
+                  {p.reviewReason && (
+                    <p className="mt-1 text-xs text-red-700">
+                      {REVIEW_REASON_LABELS[p.reviewReason]}
+                      {p.reviewReason === "PERIODIC" && p.reviewEveryDays && ` (כל ${p.reviewEveryDays} ימים)`}.
+                      {canApprove && p.reviewReason === "PERIODIC" && (
+                        <button
+                          type="button"
+                          onClick={() => act(() => markProcessReviewedAction(p.id, clientId), "סומן כנסקר")}
+                          className="ms-2 font-medium text-gold-dim hover:underline"
+                        >
+                          סימון שנסקר
+                        </button>
+                      )}
+                    </p>
+                  )}
+                  {!p.reviewReason && p.reviewDueAt && <p className="mt-1 text-[11px] text-appNavy/45">סקירה הבאה: {day(p.reviewDueAt)}</p>}
                   <p className="mt-1 text-xs text-appNavy/60">
                     {[
                       p.triggerKinds.map((t) => TRIGGER_LABELS[t]).join(", ") || null,

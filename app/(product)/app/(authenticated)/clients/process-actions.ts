@@ -16,6 +16,7 @@ import {
 } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
+import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 
 // Org brain, phase 1: processes and their procedures on the client screen
@@ -46,6 +47,8 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
   if (sla !== null && !/^\d+$/.test(sla)) return { error: "ה-SLA בימי עסקים הוא מספר שלם." };
   const every = text(f, "checkEveryDays");
   if (every !== null && !/^\d+$/.test(every)) return { error: "הבדיקה היא כל מספר שלם של ימים." };
+  const review = text(f, "reviewEveryDays");
+  if (review !== null && !/^\d+$/.test(review)) return { error: "הסקירה היא כל מספר שלם של ימים." };
   return {
     value: {
       title: String(f.get("title") ?? ""),
@@ -70,6 +73,7 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
       toResolve: text(f, "toResolve"),
       checkEveryDays: every === null ? null : Number(every),
       checkText: text(f, "checkText"),
+      reviewEveryDays: review === null ? null : Number(review),
       sources: refs,
     },
   };
@@ -98,7 +102,17 @@ export async function updateProcessAction(_prev: FormState | undefined, f: FormD
   const clientId = String(f.get("clientId") ?? "");
   const parsed = parseProcess(f);
   if (parsed.error || !parsed.value) return { error: parsed.error };
-  return run(clientId, () => updateProcess(user, String(f.get("id") ?? ""), parsed.value!));
+  // The entity and the external parties are what separation rules read:
+  // a change to them is a change to what the rules say about the process.
+  return run(clientId, async () => {
+    const p = await updateProcess(user, String(f.get("id") ?? ""), parsed.value!);
+    await rescanAfterRuleChange(clientId, `התהליך ${p.code} עודכן`);
+  });
+}
+
+export async function markProcessReviewedAction(processId: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => markProcessReviewed(user, processId));
 }
 
 export async function saveProcessVersionAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
