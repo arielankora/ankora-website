@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -6,8 +7,8 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, TARGET_LABELS, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, rejectProposalAction } from "./actions";
+import { ACTION_LABELS, MAX_BULK, TARGET_LABELS, bulkApproveBlocker, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -143,7 +144,31 @@ function RejectForm({ p }: { p: ReviewProposal }) {
   );
 }
 
-function ProposalRow({ p }: { p: ReviewProposal }) {
+function RejectManyForm({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(rejectProposalsAction, () => {
+    onDone();
+    close();
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      {ids.map((id) => (
+        <input key={id} type="hidden" name="id" value={id} />
+      ))}
+      <p className="text-sm text-appNavy">{ids.length === 1 ? "הצעה אחת נדחית." : `${ids.length} הצעות נדחות, עם אותה סיבה.`}</p>
+      <label className="block">
+        <span className="block text-xs font-medium text-appNavy/60">למה, בשורה אחת *</span>
+        <input name="reason" required placeholder="כבר בתיק מהחילוץ היומי" className={INPUT} />
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+        {pending ? "שומר..." : "דחייה"}
+      </button>
+    </form>
+  );
+}
+
+function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void }) {
   const { showToast } = useToast();
   const status = (str(p.payload.knowledgeStatus) || (p.payload.kind === "QUESTION" ? "MISSING" : "CONFIRMED")) as KnowledgeStatusLike;
   const kindLabel = targetLabel(p);
@@ -174,9 +199,18 @@ function ProposalRow({ p }: { p: ReviewProposal }) {
   }
 
   const doubtful = p.flags.some((f) => f.code === "DUPLICATE");
+  const alone = bulkApproveBlocker(p);
   return (
-    <li className="py-3.5">
+    <li className={`py-3.5 ${selected ? "bg-gold/[0.04]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={(e) => onSelect(e.target.checked)}
+          aria-label={`בחירה: ${p.headline.slice(0, 60)}`}
+          title={alone ? `אפשר לדחות יחד עם אחרות. לאשר: אחת אחת (${alone})` : undefined}
+          className="mt-1 h-4 w-4 shrink-0 accent-gold"
+        />
         <div className="min-w-0 flex-1">
           <p className="text-xs text-appNavy/50">
             {kindLabel}
@@ -243,7 +277,35 @@ export function ReviewBatch({
   droppedCount: number;
   proposals: ReviewProposal[];
 }) {
+  const { showToast } = useToast();
   const pending = proposals.filter((p) => p.state === "PENDING");
+  // What this person may decide here: not a sensitive item hidden from them.
+  const decidable = pending.filter((p) => !p.hiddenFor);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const chosen = decidable.filter((p) => selected.has(p.id));
+  const approvable = chosen.filter((p) => !bulkApproveBlocker(p));
+  const allTogether = decidable.filter((p) => !bulkApproveBlocker(p));
+  const select = (id: string, on: boolean) =>
+    setSelected((all) => {
+      const next = new Set(all);
+      if (on) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  const [busy, setBusy] = useState(false);
+
+  async function approveChosen() {
+    setBusy(true);
+    const r = await approveProposalsAction(approvable.slice(0, MAX_BULK).map((p) => p.id));
+    setBusy(false);
+    if (r.error) {
+      showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+      return;
+    }
+    setSelected(new Set((r.failed ?? []).map((f) => f.id)));
+    if (r.failed?.length) showToast({ tone: "error", title: `${r.done} נכנסו לתיק, ${r.failed.length} לא`, description: r.failed[0].error });
+    else showToast({ tone: "info", title: r.done === 1 ? "נכנס לתיק" : `${r.done} נכנסו לתיק` });
+  }
   const counts = Object.entries(
     pending.reduce<Record<string, number>>((acc, p) => {
       const k = targetLabel(p);
@@ -271,9 +333,46 @@ export function ReviewBatch({
           {droppedCount === 1 ? "פריט אחד לא נכנס להצעות" : `${droppedCount} פריטים לא נכנסו להצעות`} (סוד, ציטוט ממקור מוגבל או מבנה שגוי). מה שנדחה לא נשמר.
         </p>
       )}
+      {decidable.length > 1 && (
+        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-lineDark bg-white/95 px-3 py-2 text-xs backdrop-blur">
+          <label className="flex items-center gap-1.5 text-appNavy">
+            <input
+              type="checkbox"
+              checked={chosen.length > 0 && chosen.length === decidable.length}
+              onChange={(e) => setSelected(new Set(e.target.checked ? decidable.map((p) => p.id) : []))}
+              className="h-4 w-4 accent-gold"
+            />
+            הכול ({decidable.length})
+          </label>
+          {allTogether.length > 0 && allTogether.length < decidable.length && (
+            <button type="button" onClick={() => setSelected(new Set(allTogether.map((p) => p.id)))} className="text-gold-dim hover:underline">
+              רק מה שאפשר לאשר יחד ({allTogether.length})
+            </button>
+          )}
+          {chosen.length > 0 && (
+            <>
+              <span className="text-appNavy/50">נבחרו {chosen.length}</span>
+              <button
+                type="button"
+                onClick={approveChosen}
+                disabled={busy || approvable.length === 0}
+                className="rounded-full bg-gold-gradient px-3.5 py-1.5 font-medium text-navy disabled:opacity-40"
+              >
+                {busy ? "מאשר..." : `אישור ${approvable.length}`}
+              </button>
+              <Drawer triggerLabel={`דחיית ${chosen.length}`} title="דחיית הצעות" variant="link">
+                <RejectManyForm ids={chosen.map((p) => p.id)} onDone={() => setSelected(new Set())} />
+              </Drawer>
+              {approvable.length < chosen.length && (
+                <span className="text-appNavy/50">{chosen.length - approvable.length} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות.</span>
+              )}
+            </>
+          )}
+        </div>
+      )}
       <ul className="mt-3 divide-y divide-lineDark">
         {proposals.map((p) => (
-          <ProposalRow key={p.id} p={p} />
+          <ProposalRow key={p.id} p={p} selected={selected.has(p.id)} onSelect={(on) => select(p.id, on)} />
         ))}
       </ul>
     </section>

@@ -113,6 +113,22 @@ export const ACTION_LABELS: Record<ProposalActionLike, string> = {
 
 export type ProposalFlag = { code: string; message: string };
 
+/// The most proposals decided in one action.
+export const MAX_BULK = 60;
+
+/// Why a proposal is decided on its own and not approved with others, or
+/// null when it may be. Approving together is still a person approving on
+/// the screen (decision 1); what stays one at a time is what changes an
+/// item already in the file, what may already be there, and what is
+/// sensitive. Rejecting together is always allowed: nothing enters the
+/// file.
+export function bulkApproveBlocker(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown> }): string | null {
+  if (p.action !== "CREATE") return "משנה פריט שכבר בתיק";
+  if (p.flags.some((f) => f.code === "DUPLICATE")) return "ייתכן שכבר בתיק";
+  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return "מידע רגיש";
+  return null;
+}
+
 /// The line a proposal is known by, on its card and in a list.
 export function proposalHeadline(target: ProposalTargetLike, payload: Record<string, unknown>): string {
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : "");

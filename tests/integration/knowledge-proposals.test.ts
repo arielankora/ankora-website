@@ -7,6 +7,7 @@ import { addClientSource } from "@/lib/app-domain/client-sources";
 import {
   approveProposal,
   countPendingProposals,
+  decideProposals,
   listOpenBatches,
   proposeKnowledge,
   rejectProposal,
@@ -142,6 +143,41 @@ describe("knowledge proposals", () => {
     await expect(rejectProposal(user, p.id, " ")).rejects.toThrow("למה");
     const rejected = await rejectProposal(user, p.id, "כבר בתיק");
     expect(rejected.state).toBe("REJECTED");
+  });
+
+  it("decides several at once, each as on its own; what changes the file or may be there already waits for one at a time", async () => {
+    const { client, user } = await setup();
+    await addClientSource(user, { clientId: client.id, kind: "PERSON", title: "x" });
+    await addClientFact(user, { clientId: client.id, kind: "REQUIREMENT", body: "דוח שבועי לאורן", sources: [{ code: "S1" }] });
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", payload: { kind: "NOTE", body: "9 עובדים שכירים בישראל" } },
+        { target: "FACT", payload: { kind: "NOTE", body: "SOC 2 הושג" } },
+        { target: "FACT", payload: { kind: "REQUIREMENT", body: "דוח שבועי לאורן" } },
+        { target: "FACT", payload: { kind: "NOTE", body: "שיחת חולין" } },
+      ],
+    });
+    const [a, b, dup, chat] = (await listOpenBatches(user)).find((x) => x.id === r.batchId)!.proposals;
+
+    const approved = await decideProposals(user, [a.id, b.id, dup.id], { approve: true });
+    expect(approved.done.sort()).toEqual([a.id, b.id].sort());
+    expect(approved.failed).toEqual([{ id: dup.id, error: expect.stringContaining("אחת אחת") }]);
+    expect((await listClientFacts(user, client.id)).current.map((f) => f.body).sort()).toEqual(["9 עובדים שכירים בישראל", "SOC 2 הושג", "דוח שבועי לאורן"].sort());
+    const audit = await prisma.auditEvent.findFirst({ where: { entityId: a.id, action: "knowledge_proposal.approve" } });
+    expect(audit!.afterJson).toMatchObject({ bulk: true });
+
+    await expect(decideProposals(user, [dup.id, chat.id], { approve: false, reason: " " })).rejects.toThrow("למה");
+    const rejected = await decideProposals(user, [dup.id, chat.id, a.id], { approve: false, reason: "כבר בתיק, או לא לעבודה" });
+    expect(rejected.done.sort()).toEqual([dup.id, chat.id].sort());
+    expect(rejected.failed).toEqual([{ id: a.id, error: expect.stringContaining("כבר הוחלט") }]);
+    expect(await countPendingProposals(user, client.id)).toBe(0);
+
+    const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const other = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "עוד" } }] });
+    const [mine] = (await listOpenBatches(user)).find((x) => x.id === other.batchId)!.proposals;
+    expect((await decideProposals(stranger, [mine.id], { approve: true })).failed).toHaveLength(1);
   });
 
   it("is closed to anyone not assigned to the client, in both directions", async () => {

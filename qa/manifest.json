@@ -1433,7 +1433,7 @@
       "risk": "critical",
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
-      "riskReason": "Proposal rules: source required, secrets dropped with a task, topics-only quotes dropped, contradictions never overwrite, no approval without a person"
+      "riskReason": "Proposal rules: source required, secrets dropped with a task, topics-only quotes dropped, contradictions never overwrite, no approval without a person; bulk decisions run each item through the same checks, and changes, duplicates and sensitive items are approved one at a time"
     },
     "screen:/app/knowledge": {
       "kind": "screen",
