@@ -11,6 +11,7 @@ import {
   enrollmentOptionsForLogin,
   finishLoginEnrollment,
   passkeyOptionsForLogin,
+  redeemDeviceLinkCode,
   startPendingLogin,
   verifyLoginPasskey,
 } from "@/lib/app-auth/second-factor";
@@ -139,4 +140,21 @@ export async function enrollFinishAction(token: string, response: unknown, name:
     return { error: e.error };
   }
   return completeSignIn(String(token), safeCallbackUrl(callbackUrl, await selfOrigin()));
+}
+
+/// "This is a new device": the code from a device that is already signed
+/// in (lib/app-auth/device-link.ts). On success the browser goes on to
+/// enrol this device's own passkey with enrollOptionsAction. A mistyped
+/// code keeps the sign-in alive (`retry`); anything else ends it.
+export async function redeemDeviceCodeAction(
+  token: string,
+  code: string,
+): Promise<{ ok: true } | { ok: false; error: string; retry: boolean }> {
+  try {
+    await redeemDeviceLinkCode(String(token), code);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof SecondFactorError) return { ok: false, error: err.message, retry: !err.fatal };
+    throw err;
+  }
 }

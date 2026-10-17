@@ -260,6 +260,7 @@ model User {
   passkeys            Passkey[]
   webauthnChallenges  WebAuthnChallenge[]
   pendingLogins       PendingLogin[]
+  deviceLinkCode      DeviceLinkCode?
 
   // Employee agreements.
   employeeAgreements EmployeeAgreement[]
@@ -2507,6 +2508,9 @@ model PendingLogin {
   verifiedAt   DateTime?
   /// "none" or "passkey": which of the two set verifiedAt.
   secondFactor String?
+  /// Set when a code from an already signed-in device was typed here:
+  /// this sign-in may then enrol one more passkey (a new phone).
+  deviceLinkedAt DateTime?
   expiresAt  DateTime
   createdAt  DateTime  @default(now())
 
@@ -2514,6 +2518,23 @@ model PendingLogin {
 
   @@index([userId])
   @@map("pending_logins")
+}
+
+/// "Add a device" (17.10.2026): a six-digit code shown on a device that
+/// is already signed in, after a passkey check there, and typed on the new
+/// device right after its password. One live code per person, ten
+/// minutes, five tries, single use. Stored as a hash bound to the person.
+model DeviceLinkCode {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("device_link_codes")
 }
 
 /// One WebAuthn challenge, issued by the server and consumed once. Lives

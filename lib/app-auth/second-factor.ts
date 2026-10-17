@@ -6,6 +6,14 @@ import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { isProductionDeployment } from "@/lib/env";
 import type { AuthenticatedUser } from "@/lib/app-auth/authenticate";
+import { sendEmail } from "@/lib/email";
+import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
+import {
+  DEVICE_LINK_MAX_ATTEMPTS,
+  hashDeviceLinkCode,
+  normaliseDeviceLinkCode,
+  sameHash,
+} from "@/lib/app-auth/device-link";
 import {
   beginPasskeyEnrollmentAtLogin,
   beginPasskeyLogin,
@@ -45,9 +53,13 @@ import {
 export const PENDING_LOGIN_TTL_MS = 5 * 60_000;
 
 export class SecondFactorError extends Error {
-  constructor(message = "פג תוקף הכניסה. התחילו שוב מהסיסמה.") {
+  /// False when the pending sign-in is still alive and the person may try
+  /// again (a mistyped device code). Everything else ends the sign-in.
+  readonly fatal: boolean;
+  constructor(message = "פג תוקף הכניסה. התחילו שוב מהסיסמה.", { fatal = true }: { fatal?: boolean } = {}) {
     super(message);
     this.name = "SecondFactorError";
+    this.fatal = fatal;
   }
 }
 
@@ -130,24 +142,68 @@ export async function verifyLoginPasskey(raw: string, response: AuthenticationRe
   await prisma.pendingLogin.update({ where: { id: row.id }, data: { verifiedAt: new Date(), secondFactor: "passkey" } });
 }
 
-// ── The first passkey ─────────────────────────────────────────────────
+// ── A new device, vouched for by a signed-in one ──────────────────────
+//
+// lib/app-auth/device-link.ts issues the code. Here it is typed, right
+// after the password, on the device that has no passkey yet.
 
-async function assertMayEnroll(user: User) {
+export async function redeemDeviceLinkCode(raw: string, typed: unknown) {
+  const { row, user } = await livePending(raw);
   if (!secondFactorRequired(user)) throw new SecondFactorError();
+  const code = normaliseDeviceLinkCode(typed);
+  const link = await prisma.deviceLinkCode.findUnique({ where: { userId: user.id } });
+  if (!link || link.expiresAt.getTime() < Date.now()) {
+    throw new SecondFactorError("אין קוד בתוקף. הפיקו קוד חדש במכשיר שבו אתם מחוברים.", { fatal: false });
+  }
+  // The try is counted before the answer is looked at, so parallel guesses
+  // cannot each see the same count.
+  const counted = await prisma.deviceLinkCode.update({ where: { id: link.id }, data: { attempts: { increment: 1 } } });
+  const right = code.length === 6 && sameHash(hashDeviceLinkCode(user.id, code), link.codeHash);
+  if (!right || counted.attempts > DEVICE_LINK_MAX_ATTEMPTS) {
+    const exhausted = counted.attempts >= DEVICE_LINK_MAX_ATTEMPTS;
+    await recordAudit({
+      actorId: user.id,
+      action: "passkey.link_code_failure",
+      entityType: "User",
+      entityId: user.id,
+      after: { attempts: counted.attempts, exhausted },
+    });
+    if (exhausted) {
+      await prisma.deviceLinkCode.deleteMany({ where: { id: link.id } });
+      await abandon(row.id);
+      throw new SecondFactorError("יותר מדי ניסיונות. הפיקו קוד חדש והתחילו שוב מהסיסמה.");
+    }
+    throw new SecondFactorError("הקוד שגוי. נסו שוב.", { fatal: false });
+  }
+  // Single use: only the request that deletes it goes on.
+  const used = await prisma.deviceLinkCode.deleteMany({ where: { id: link.id } });
+  if (used.count !== 1) throw new SecondFactorError();
+  await prisma.pendingLogin.update({ where: { id: row.id }, data: { deviceLinkedAt: new Date() } });
+  await recordAudit({ actorId: user.id, action: "passkey.link_code_used", entityType: "User", entityId: user.id });
+}
+
+// ── Enrolling a passkey inside the sign-in ────────────────────────────
+
+/// The first passkey, or one more after a signed-in device vouched for
+/// this one. With a passkey on file and no code, a password alone never
+/// adds another: a lost device goes through an admin reset.
+async function assertMayEnroll(user: User, row: { deviceLinkedAt: Date | null }) {
+  if (!secondFactorRequired(user)) throw new SecondFactorError();
+  if (row.deviceLinkedAt) return;
   if ((await prisma.passkey.count({ where: { userId: user.id } })) > 0) {
-    throw new SecondFactorError("כבר יש passkey בחשבון. היכנסו איתו, או בקשו ממנהל מערכת לאפס אותו.");
+    throw new SecondFactorError("כבר יש passkey בחשבון. היכנסו איתו, או הוסיפו את המכשיר הזה עם קוד ממכשיר מחובר.");
   }
 }
 
 export async function enrollmentOptionsForLogin(raw: string, rp: RelyingParty) {
-  const { user } = await livePending(raw);
-  await assertMayEnroll(user);
+  const { row, user } = await livePending(raw);
+  await assertMayEnroll(user, row);
   return beginPasskeyEnrollmentAtLogin(user, rp);
 }
 
 export async function finishLoginEnrollment(raw: string, response: RegistrationResponseJSON, name: string, rp: RelyingParty) {
   const { row, user } = await livePending(raw);
-  await assertMayEnroll(user);
+  await assertMayEnroll(user, row);
   try {
     await finishPasskeyRegistration(user, response, name, rp);
   } catch (err) {
@@ -157,6 +213,29 @@ export async function finishLoginEnrollment(raw: string, response: RegistrationR
   // The registration was made with the fingerprint or the device PIN,
   // seconds after the password: that is this sign-in's second factor.
   await prisma.pendingLogin.update({ where: { id: row.id }, data: { verifiedAt: new Date(), secondFactor: "passkey" } });
+  if (row.deviceLinkedAt) await notifyDeviceAdded(user, name);
+}
+
+/// The person hears about every device added this way, by email, so a
+/// device they did not add does not go unnoticed. Best effort: the sign-in
+/// does not wait on the mail.
+async function notifyDeviceAdded(user: User, name: string) {
+  try {
+    const label = (name ?? "").trim().slice(0, 60) || "מכשיר חדש";
+    const { html, text } = renderActionEmail({
+      title: "נוסף מכשיר לחשבון",
+      body: [
+        `שלום ${user.name},`,
+        `המכשיר "${label}" נוסף עכשיו לכניסה לחשבון באנקורה, באישור ממכשיר שכבר היה מחובר.`,
+        "אם לא אתם הוספתם אותו, היכנסו לפרופיל, הסירו את המכשיר והחליפו סיסמה, או כתבו לנו ל-security@ankora.co.il.",
+      ],
+      buttonLabel: "למכשירים שלי",
+      url: `${appBaseUrl()}/app/profile#passkeys`,
+    });
+    await sendEmail({ to: [user.email], subject: "נוסף מכשיר לחשבון באנקורה", text, html });
+  } catch (err) {
+    console.error("[second-factor] device-added email failed:", err);
+  }
 }
 
 // ── Completion ────────────────────────────────────────────────────────

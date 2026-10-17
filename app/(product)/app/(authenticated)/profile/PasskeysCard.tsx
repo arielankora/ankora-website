@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Fingerprint } from "lucide-react";
+import { Fingerprint, Smartphone } from "lucide-react";
+import { startAuthentication } from "@simplewebauthn/browser";
 import { addPasskey, passkeysSupported } from "@/components/app/vault/webauthn-client";
-import { removePasskeyAction, setLoginPasskeyRequiredAction } from "./actions";
+import { deviceLinkIssueAction, deviceLinkOptionsAction, removePasskeyAction, setLoginPasskeyRequiredAction } from "./actions";
 
 // "Passkey (Touch ID)". For Ankora staff: the second step of every sign-in
 // and the identity check before a client's login is shown in "מערכות
@@ -37,6 +38,33 @@ export function PasskeysCard({
   const router = useRouter();
 
   useEffect(() => setSupported(passkeysSupported()), []);
+
+  // "Add a device" (lib/app-auth/device-link.ts): a passkey check here,
+  // then a six-digit code to type on the new device after its password.
+  const [link, setLink] = useState<{ code: string; until: string } | null>(null);
+  const [linking, setLinking] = useState(false);
+
+  async function onLink() {
+    setLinking(true);
+    setError(null);
+    const opts = await deviceLinkOptionsAction();
+    if (!opts.ok) {
+      setLinking(false);
+      return setError(opts.error);
+    }
+    let response;
+    try {
+      response = await startAuthentication({ optionsJSON: opts.options as any });
+    } catch {
+      setLinking(false);
+      return setError("האימות בוטל.");
+    }
+    const r = await deviceLinkIssueAction(response);
+    setLinking(false);
+    if (!r.ok) return setError(r.error);
+    const until = new Date(r.expiresAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
+    setLink({ code: r.code, until });
+  }
 
   async function onAdd(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -139,6 +167,35 @@ export function PasskeysCard({
         >
           הוספת passkey
         </button>
+      )}
+      {supported && passkeys.length > 0 && (
+        <div className="mt-5 border-t border-lineDark/70 pt-4">
+          <p className="flex items-center gap-1.5 text-sm text-appNavy">
+            <Smartphone size={15} strokeWidth={1.75} />
+            הוספת מכשיר
+          </p>
+          <p className="mt-1 text-xs text-appNavy/60">
+            לכניסה מטלפון או ממחשב אחר. מאשרים כאן בטביעת אצבע, ובמכשיר החדש מקלידים את הקוד אחרי הסיסמה, בלחיצה על
+            &quot;זה מכשיר חדש&quot;.
+          </p>
+          {link ? (
+            <div className="mt-3 rounded-lg bg-cream-dim p-4 text-center">
+              <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-appNavy">
+                {link.code.slice(0, 3)} {link.code.slice(3)}
+              </p>
+              <p className="mt-1.5 text-xs text-appNavy/60">תקף עד {link.until}, לשימוש אחד.</p>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={onLink}
+              disabled={linking}
+              className="mt-3 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5 disabled:opacity-50"
+            >
+              {linking ? "ממתין למכשיר..." : "הפקת קוד למכשיר חדש"}
+            </button>
+          )}
+        </div>
       )}
       {audience === "client" && passkeys.length > 0 && (
         <div className="mt-5 border-t border-lineDark/70 pt-4">

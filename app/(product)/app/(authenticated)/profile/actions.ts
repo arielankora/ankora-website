@@ -119,3 +119,38 @@ export async function setLoginPasskeyRequiredAction(enabled: boolean, password: 
   revalidatePath("/app/profile");
   return { ok: true };
 }
+
+// ── Add a device (lib/app-auth/device-link.ts) ────────────────────────
+
+export async function deviceLinkOptionsAction(): Promise<{ ok: true; options: unknown } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const { headers } = await import("next/headers");
+  const { relyingPartyFor, PasskeyError } = await import("@/lib/app-auth/passkeys");
+  const { StepUpLockedError } = await import("@/lib/app-auth/step-up");
+  const { deviceLinkOptions } = await import("@/lib/app-auth/device-link");
+  try {
+    return { ok: true, options: await deviceLinkOptions(user, relyingPartyFor(await headers())) };
+  } catch (err) {
+    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+export async function deviceLinkIssueAction(
+  response: unknown,
+): Promise<{ ok: true; code: string; expiresAt: string } | { ok: false; error: string }> {
+  const user = await requireUser();
+  const { headers } = await import("next/headers");
+  const { relyingPartyFor, PasskeyError } = await import("@/lib/app-auth/passkeys");
+  const { StepUpFailedError, StepUpLockedError } = await import("@/lib/app-auth/step-up");
+  const { issueDeviceLinkCode } = await import("@/lib/app-auth/device-link");
+  try {
+    const { code, expiresAt } = await issueDeviceLinkCode(user, response as any, relyingPartyFor(await headers()));
+    return { ok: true, code, expiresAt: expiresAt.toISOString() };
+  } catch (err) {
+    if (err instanceof StepUpFailedError) return { ok: false, error: "האימות נכשל." };
+    if (err instanceof PasskeyError || err instanceof StepUpLockedError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+

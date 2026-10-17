@@ -266,6 +266,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "passkey.create": "הוספת passkey",
   "passkey.delete": "הסרת passkey",
   "passkey.reset": "איפוס passkeys בידי מנהל",
+  "passkey.link_code": "הפקת קוד להוספת מכשיר",
+  "passkey.link_code_used": "הוספת מכשיר בקוד ממכשיר מחובר",
+  "passkey.link_code_failure": "קוד שגוי בהוספת מכשיר",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

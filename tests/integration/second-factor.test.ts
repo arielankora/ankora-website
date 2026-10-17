@@ -33,6 +33,9 @@ vi.mock("@simplewebauthn/server", async (importOriginal) => {
   };
 });
 
+const mail = vi.hoisted(() => ({ sendEmail: vi.fn(async () => ({ ok: true })) }));
+vi.mock("@/lib/email", () => mail);
+
 import {
   completePendingLogin,
   enrollmentOptionsForLogin,
@@ -42,11 +45,14 @@ import {
   setOwnLoginPasskeyRequired,
   startPendingLogin,
   verifyLoginPasskey,
+  redeemDeviceLinkCode,
   SecondFactorError,
   PENDING_LOGIN_TTL_MS,
 } from "@/lib/app-auth/second-factor";
 import { removeMyPasskey, resetPasskeysByAdmin } from "@/lib/app-auth/passkeys";
 import { StepUpFailedError } from "@/lib/app-auth/step-up";
+import { beginPasskeyStepUp } from "@/lib/app-auth/passkeys";
+import { DEVICE_LINK_MAX_ATTEMPTS, issueDeviceLinkCode } from "@/lib/app-auth/device-link";
 
 const RP = { rpID: "localhost", origin: "http://localhost:3100" };
 
@@ -250,5 +256,102 @@ describe("an admin reset after a lost device", () => {
     const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
     const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
     await expect(resetPasskeysByAdmin(employee, user.id)).rejects.toThrow();
+  });
+});
+
+describe("adding a device with a code from a signed-in one", () => {
+  async function codeFor(user: { id: string }) {
+    const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    await beginPasskeyStepUp(fresh, RP);
+    return issueDeviceLinkCode(fresh, { id: verifier.credentialId } as any, RP);
+  }
+
+  it("lets a second device enrol its own passkey, and signs in with it", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { code } = await codeFor(user);
+    expect(code).toMatch(/^\d{6}$/);
+
+    const phone = await startPendingLogin(user, "password");
+    expect(phone.step).toBe("passkey");
+    await redeemDeviceLinkCode(phone.token, code.slice(0, 3) + " " + code.slice(3));
+    verifier.credentialId = "phone-cred";
+    await enrollmentOptionsForLogin(phone.token, RP);
+    await finishLoginEnrollment(phone.token, { id: "phone-cred" } as any, "iPhone", RP);
+    expect(await completePendingLogin(phone.token)).toMatchObject({ id: user.id });
+    expect(await prisma.passkey.count({ where: { userId: user.id } })).toBe(2);
+    expect(await prisma.auditEvent.count({ where: { action: "passkey.link_code_used", actorId: user.id } })).toBe(1);
+    // The person hears about it.
+    expect(mail.sendEmail).toHaveBeenCalledWith(expect.objectContaining({ to: [user.email] }));
+  });
+
+  it("needs the passkey on the signed-in device to make a code", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const fresh = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    await beginPasskeyStepUp(fresh, RP);
+    verifier.ok = false;
+    await expect(issueDeviceLinkCode(fresh, { id: verifier.credentialId } as any, RP)).rejects.toBeInstanceOf(StepUpFailedError);
+    expect(await prisma.deviceLinkCode.count({ where: { userId: user.id } })).toBe(0);
+  });
+
+  it("is single use", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { code } = await codeFor(user);
+    const a = await startPendingLogin(user, "password");
+    await redeemDeviceLinkCode(a.token, code);
+    const b = await startPendingLogin(user, "password");
+    await expect(redeemDeviceLinkCode(b.token, code)).rejects.toBeInstanceOf(SecondFactorError);
+  });
+
+  it("is someone's own: another person's code does not work", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { user: other } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.passkey.create({
+      data: { userId: other.id, credentialId: "other-c", publicKey: Buffer.from([1]), name: "x", deviceType: "singleDevice" },
+    });
+    verifier.credentialId = "other-c";
+    const { code } = await codeFor(other);
+    const mine = await startPendingLogin(user, "password");
+    await expect(redeemDeviceLinkCode(mine.token, code)).rejects.toMatchObject({ fatal: false });
+    await expect(enrollmentOptionsForLogin(mine.token, RP)).rejects.toBeInstanceOf(SecondFactorError);
+  });
+
+  it("allows a retry on a wrong code, and ends everything after five", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { code } = await codeFor(user);
+    const wrong = code === "000000" ? "111111" : "000000";
+    const { token } = await startPendingLogin(user, "password");
+    for (let i = 1; i < DEVICE_LINK_MAX_ATTEMPTS; i++) {
+      await expect(redeemDeviceLinkCode(token, wrong)).rejects.toMatchObject({ fatal: false });
+    }
+    await expect(redeemDeviceLinkCode(token, wrong)).rejects.toMatchObject({ fatal: true });
+    expect(await prisma.deviceLinkCode.count({ where: { userId: user.id } })).toBe(0);
+    expect(await completePendingLogin(token)).toBeNull();
+  });
+
+  it("dies after ten minutes", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { code } = await codeFor(user);
+    await prisma.deviceLinkCode.updateMany({ where: { userId: user.id }, data: { expiresAt: new Date(Date.now() - 1) } });
+    const { token } = await startPendingLogin(user, "password");
+    await expect(redeemDeviceLinkCode(token, code)).rejects.toBeInstanceOf(SecondFactorError);
+  });
+
+  it("a code alone, without the password step, is nothing", async () => {
+    production();
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await withPasskey(user.id);
+    const { code } = await codeFor(user);
+    await expect(redeemDeviceLinkCode("not-a-token", code)).rejects.toBeInstanceOf(SecondFactorError);
   });
 });
