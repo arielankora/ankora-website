@@ -3,7 +3,19 @@ import { requireUser } from "@/lib/app-auth/session";
 import { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
 import { firefliesLink, proposalHeadline, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import {
+  batchMatches,
+  batchUrgent,
+  narrowsItems,
+  needsAttention,
+  parseReviewFilters,
+  proposalKindKey,
+  proposalKindLabel,
+  proposalMatches,
+  reviewFiltersHref,
+} from "@/lib/knowledge-review-filters";
 import { ReviewBatch, type ReviewProposal } from "./ReviewBatch";
+import { ReviewFilterBar, type FilterOption } from "./ReviewFilters";
 
 // Org brain, phase 2: "ממתין לאישור" (claude/org-brain-spec-2026-10-12.md,
 // 5.2; decision 1). Every proposal Claude sends lands here, one card per
@@ -16,10 +28,79 @@ function day(d: Date | null): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
 }
 
-export default async function KnowledgeReviewPage(props: { searchParams: Promise<{ clientId?: string }> }) {
-  const { clientId } = await props.searchParams;
+/// Options for one filter, most waiting first, with how many wait.
+function options(counts: Map<string, { label: string; n: number }>): FilterOption[] {
+  return [...counts.entries()].map(([value, { label, n }]) => ({ value, label, count: n })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, "he"));
+}
+
+function bump(m: Map<string, { label: string; n: number }>, key: string | null, label: string) {
+  if (!key) return;
+  const cur = m.get(key);
+  if (cur) cur.n += 1;
+  else m.set(key, { label, n: 1 });
+}
+
+export default async function KnowledgeReviewPage(props: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const filters = parseReviewFilters(await props.searchParams);
   const user = await requireUser();
-  const batches = await listOpenBatches(user, { clientId });
+  // The whole queue this person can see, filtered here: the counts beside
+  // each option come from the queue, not from what is left after filtering,
+  // so a person sees what exists without clearing anything.
+  const all = await listOpenBatches(user);
+  const now = new Date();
+
+  const view = all.map((b) => {
+    const fireflies =
+      b.source && Array.isArray(b.source.externalRefs)
+        ? ((b.source.externalRefs as { system?: string; id?: string }[]).find((r) => r?.system === "FIREFLIES")?.id ?? null)
+        : null;
+    const proposals: ReviewProposal[] = b.proposals.map((p) => {
+      const payload = p.payload as Record<string, unknown>;
+      const at = readSourceRefs(payload.sources)[0]?.at ?? null;
+      return {
+        id: p.id,
+        target: p.target as ProposalTargetLike,
+        action: p.action,
+        state: p.state,
+        headline: proposalHeadline(p.target as ProposalTargetLike, payload),
+        payload,
+        sources: readSourceRefs(payload.sources).map(formatSourceRef),
+        reason: p.reason,
+        quote: p.quote,
+        flags: (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string }[],
+        link: fireflies ? firefliesLink(fireflies, at) : null,
+        existing: p.existing ? { body: p.existing.body } : null,
+        rejectReason: p.rejectReason,
+        hiddenFor: p.hiddenFor,
+      };
+    });
+    return { b, meta: { clientId: b.client.id, sourceKind: b.source?.kind ?? null, createdById: b.createdById, createdAt: b.createdAt }, proposals };
+  });
+
+  const clients = new Map<string, { label: string; n: number }>();
+  const kinds = new Map<string, { label: string; n: number }>();
+  const sources = new Map<string, { label: string; n: number }>();
+  const people = new Map<string, { label: string; n: number }>();
+  let attention = 0;
+  for (const { b, meta, proposals } of view) {
+    for (const p of proposals) {
+      if (p.state !== "PENDING") continue;
+      bump(clients, meta.clientId, b.client.name);
+      const k = proposalKindKey(p);
+      bump(kinds, k, proposalKindLabel(k));
+      bump(sources, meta.sourceKind, meta.sourceKind ? SOURCE_KIND_LABELS[meta.sourceKind] : "");
+      bump(people, meta.createdById, b.createdByName ?? "לא ידוע");
+      if (needsAttention(p)) attention += 1;
+    }
+  }
+
+  const shown = view
+    .filter(({ meta }) => batchMatches(meta, filters, now))
+    .map((v) => ({ ...v, proposals: v.proposals.filter((p) => proposalMatches(p, filters)) }))
+    .filter((v) => v.proposals.some((p) => p.state === "PENDING") || (!narrowsItems(filters) && v.proposals.length > 0))
+    // Stable: within each group the query's newest-first order stays.
+    .sort((x, y) => Number(batchUrgent(y.proposals)) - Number(batchUrgent(x.proposals)));
+  const filtering = narrowsItems(filters);
 
   return (
     <div className="space-y-6">
@@ -30,60 +111,46 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
           <Link href="/app/extraction-guide" className="text-gold-dim hover:underline">
             הנחיות החילוץ
           </Link>
-          {clientId && (
-            <>
-              {" "}
-              <Link href="/app/knowledge" className="text-gold-dim hover:underline">
-                לכל הלקוחות
-              </Link>
-            </>
-          )}
         </p>
       </div>
 
-      {batches.length === 0 ? (
+      {all.length > 0 && (
+        <ReviewFilterBar
+          filters={filters}
+          clients={options(clients)}
+          kinds={options(kinds)}
+          sources={options(sources)}
+          people={options(people)}
+          attentionCount={attention}
+        />
+      )}
+
+      {all.length === 0 ? (
         <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">אין הצעות שממתינות לאישור.</div>
+      ) : shown.length === 0 ? (
+        <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+          אין הצעות שמתאימות לסינון.{" "}
+          {/* A plain anchor: a document navigation the router cannot drop (see TaskFilters). */}
+          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-gold-dim hover:underline">
+            ניקוי הסינון
+          </a>
+        </div>
       ) : (
-        batches.map((b) => {
-          const fireflies =
-            b.source && Array.isArray(b.source.externalRefs)
-              ? ((b.source.externalRefs as { system?: string; id?: string }[]).find((r) => r?.system === "FIREFLIES")?.id ?? null)
-              : null;
-          const proposals: ReviewProposal[] = b.proposals.map((p) => {
-            const payload = p.payload as Record<string, unknown>;
-            const at = readSourceRefs(payload.sources)[0]?.at ?? null;
-            return {
-              id: p.id,
-              target: p.target as ProposalTargetLike,
-              action: p.action,
-              state: p.state,
-              headline: proposalHeadline(p.target as ProposalTargetLike, payload),
-              payload,
-              sources: readSourceRefs(payload.sources).map(formatSourceRef),
-              reason: p.reason,
-              quote: p.quote,
-              flags: (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string }[],
-              link: fireflies ? firefliesLink(fireflies, at) : null,
-              existing: p.existing ? { body: p.existing.body } : null,
-              rejectReason: p.rejectReason,
-              hiddenFor: p.hiddenFor,
-            };
-          });
-          return (
-            <ReviewBatch
-              key={b.id}
-              clientId={b.client.id}
-              clientName={b.client.name}
-              sourceLabel={b.source ? `${b.source.code} ${b.source.title}` : "בלי מקור"}
-              sourceDetails={[b.source ? SOURCE_KIND_LABELS[b.source.kind] : null, b.source ? day(b.source.occurredAt) : null, b.source?.restriction === "TOPICS_ONLY" ? "נושאים בלבד" : null, b.createdByName ? `נשלח על ידי ${b.createdByName}` : null]
-                .filter(Boolean)
-                .join(" · ")}
-              note={b.note}
-              droppedCount={Array.isArray(b.dropped) ? b.dropped.length : 0}
-              proposals={proposals}
-            />
-          );
-        })
+        shown.map(({ b, proposals }) => (
+          <ReviewBatch
+            key={b.id}
+            clientId={b.client.id}
+            clientName={b.client.name}
+            sourceLabel={b.source ? `${b.source.code} ${b.source.title}` : "בלי מקור"}
+            sourceDetails={[b.source ? SOURCE_KIND_LABELS[b.source.kind] : null, b.source ? day(b.source.occurredAt) : null, b.source?.restriction === "TOPICS_ONLY" ? "נושאים בלבד" : null, b.createdByName ? `נשלח על ידי ${b.createdByName}` : null]
+              .filter(Boolean)
+              .join(" · ")}
+            note={b.note}
+            droppedCount={Array.isArray(b.dropped) ? b.dropped.length : 0}
+            proposals={proposals}
+            filtered={filtering}
+          />
+        ))
       )}
     </div>
   );

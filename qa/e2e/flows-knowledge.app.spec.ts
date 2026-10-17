@@ -48,4 +48,23 @@ test.describe("knowledge/actions", () => {
     await page.goto(`/app/clients/${CLIENT}/client-file`);
     await expect(page.getByText(edited).first(), "the approved proposal did not reach the file").toBeVisible({ timeout: 15_000 });
   });
+
+  // Filters (claude/knowledge-review-filters-spec-2026-10-17.md). The demo
+  // proposals are all notes, so a kind chip narrows to them, a narrowing
+  // filter hides decided rows, and a select change lands in the URL.
+  test("filters live in the URL and narrow to what matches", async ({ page }) => {
+    await page.goto(`/app/knowledge?clientId=${CLIENT}&kind=FACT.NOTE`);
+    const filters = page.getByRole("form", { name: "סינון הצעות" });
+    await expect(filters.getByRole("link", { name: /^הערה/ })).toHaveAttribute("aria-current", "true");
+    await expect(page.locator("li", { hasText: "[DEMO] הצעה" }).first()).toBeVisible();
+    await expect(page.locator("li", { hasText: /^(אושר|נדחה): / }), "decided rows show only when nothing narrows the items").toHaveCount(0);
+
+    await filters.getByText("עוד סינונים").click();
+    await filters.getByRole("combobox", { name: "ממתין" }).selectOption("7");
+    await expect(page).toHaveURL(/age=7/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/kind=FACT\.NOTE/);
+
+    await filters.getByRole("link", { name: "ניקוי הסינון" }).click();
+    await expect(page).toHaveURL(/\/app\/knowledge$/, { timeout: 30_000 });
+  });
 });
