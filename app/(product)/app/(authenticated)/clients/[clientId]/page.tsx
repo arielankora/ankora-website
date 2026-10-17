@@ -34,6 +34,9 @@ import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
 import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
 import { readReviewReason, reviewDueAt } from "@/lib/process-review";
+import { ControlLine } from "./ControlLine";
+import { controlFrom, controlParts } from "@/lib/client-control";
+import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
@@ -105,7 +108,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions, processes, warnings] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions, processes, warnings, daysSinceBatch] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -150,6 +153,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     listProcesses(user, client.id),
     // Where the client's rules disagree with the file (R8, R16).
     ruleWarnings(user, client.id),
+    // Spec 7.6: when the extraction last delivered.
+    daysSinceLastBatch(client.id),
   ]);
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
@@ -247,6 +252,19 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             </div>
           </div>
         </div>
+
+        <ControlLine
+          parts={controlParts(
+            controlFrom({
+              processes,
+              exceptions,
+              facts: facts.current,
+              otherItems: [...people.contacts, ...people.organizations, ...systems, ...entities, ...requestTypes, ...policies.filter((p) => p.status !== "RETIRED")],
+              systems,
+              daysSinceBatch,
+            })
+          )}
+        />
 
         <DisclosureBanner
           rules={policies

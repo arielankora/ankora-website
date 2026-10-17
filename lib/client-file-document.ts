@@ -40,6 +40,8 @@ export type ClientFileDoc = {
   /// nothing sensitive (spec 6.3).
   audience: "staff" | "ai";
   sections: DocSection[];
+  /// The control line (spec 7.6), in parts. Absent in older callers.
+  control?: { text: string; warn: boolean }[];
   legend: { code: string; title: string; details: string }[];
 };
 
@@ -81,6 +83,10 @@ export function toMarkdown(doc: ClientFileDoc): string {
   out.push(`# תיק לקוח: ${doc.clientName}`);
   out.push("");
   out.push(`הופק ב-${dateLabel(doc.generatedAt)}${doc.audience === "ai" ? ". גרסה ל-Claude: בלי פרטי קשר ובלי פריטים רגישים." : "."}`);
+  if (doc.control?.length) {
+    out.push("");
+    out.push(`**בקרה:** ${doc.control.map((p) => p.text).join(" · ")}`);
+  }
   out.push("");
   out.push("## איך לקרוא את התיק");
   out.push("");

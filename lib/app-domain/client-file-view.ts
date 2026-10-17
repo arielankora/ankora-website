@@ -18,6 +18,8 @@ import { listNarratives } from "@/lib/app-domain/client-narratives";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
+import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
+import { controlFrom, controlParts } from "@/lib/client-control";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
@@ -74,7 +76,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -94,6 +96,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     listOpenExceptions(actor, clientId),
     listProcesses(actor, clientId),
     ruleWarnings(actor, clientId),
+    daysSinceLastBatch(clientId),
   ]);
   const ownerIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
@@ -355,10 +358,24 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     items: audit.map((a) => ({ text: `${day(a.createdAt)}: ${ACTION_LABEL[a.action] ?? a.action}`, details: [a.actor?.name] })),
   });
 
+  // The same rows the sections show, so the line never counts what this
+  // reader cannot see.
+  const control = controlParts(
+    controlFrom({
+      processes: processes.filter(shown),
+      exceptions,
+      facts: current,
+      otherItems: [...contacts, ...orgs, ...systems.filter(shown), ...entities.filter(shown), ...requestTypes.filter(shown), ...rules],
+      systems: systems.filter(shown),
+      daysSinceBatch,
+    })
+  );
+
   return {
     clientName: client.name,
     generatedAt: now,
     audience: options.audience,
+    control,
     sections: sections.map((s) => ({
       ...s,
       items: s.items.filter((i) => i.text).map((i) => {

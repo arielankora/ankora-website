@@ -7,6 +7,7 @@ import { HOW_TO_READ, type DocItem } from "@/lib/client-file-document";
 import { KNOWLEDGE_STATUS_LABELS } from "@/lib/knowledge";
 import { extractPromptFor } from "@/lib/app-domain/extract-prompt-input";
 import { ExtractWithClaude } from "../ExtractWithClaude";
+import { ControlLine } from "../ControlLine";
 
 // Org brain, phase 2: the client file to read, top to bottom, in the order
 // of Hadas's file (claude/org-brain-spec-2026-10-12.md, 6.1). The client
@@ -62,6 +63,11 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
             הורדה כ-Markdown
           </a>
         </div>
+        {doc.control && (
+          <div className="mt-2">
+            <ControlLine parts={doc.control} />
+          </div>
+        )}
         <p className="mt-2 text-xs leading-relaxed text-appNavy/60">{HOW_TO_READ}</p>
         <div className="mt-3">
           <ExtractWithClaude prompt={extractPrompt} />

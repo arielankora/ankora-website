@@ -374,7 +374,7 @@
       "risk": "critical",
       "riskAssigned": true,
       "firstSeen": "2026-09-20",
-      "riskReason": "unattended reminders and escalations"
+      "riskReason": "unattended reminders and escalations; also tells the account manager once when a client's extraction is silent for more than 3 business days"
     },
     "domain:important-dates-recurrence": {
       "kind": "domain",
@@ -1401,7 +1401,7 @@
       "risk": "critical",
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
-      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items"
+      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items; the control line counts only rows the reader may see"
     },
     "screen:/app/clients/[clientId]/client-file": {
       "kind": "screen",
@@ -1690,8 +1690,24 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-16",
       "riskReason": "Public page where a short code is typed; must reveal nothing about whether a code exists"
+    },
+    "domain:client-control": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-17",
+      "riskReason": "Control line counts at the top of the client file and client screen; the daily notice to the account manager when a client's extraction is silent for more than 3 business days, once per silence"
+    },
+    "domain:process-review": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-17",
+      "riskReason": "Marks approved procedures for review when the client's rules change or the review period comes; notifies owners and comments open runs; never names a restricted rule"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-16"
+  "lastScan": "2026-10-17"
 }

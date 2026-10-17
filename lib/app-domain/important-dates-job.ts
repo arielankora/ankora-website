@@ -20,6 +20,7 @@ import { readSteps } from "@/lib/process-rules";
 import { runLeadBusinessDays } from "@/lib/process-runs";
 import { notifyDueProcessChecks } from "@/lib/app-domain/process-checks";
 import { reviewProcessesDaily } from "@/lib/app-domain/process-review";
+import { notifyStaleExtraction } from "@/lib/app-domain/client-control";
 import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
@@ -660,6 +661,7 @@ export async function reconcileImportantDates(now = new Date()) {
     processesFlagged: 0,
     processesCleared: 0,
     processReviewsDue: 0,
+    staleExtractions: 0,
     errors: [] as string[],
   };
 
@@ -699,6 +701,9 @@ export async function reconcileImportantDates(now = new Date()) {
         results.processReviewsDue = r.due;
       },
     ],
+    // A client whose extraction went quiet tells its account manager
+    // (spec 7.6, mapping gap 17).
+    ["notifyStaleExtraction", async () => { results.staleExtractions = (await notifyStaleExtraction(now)).notified; }],
   ];
 
   for (const [name, step] of steps) {
