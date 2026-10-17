@@ -57,7 +57,7 @@ export async function addPasskey(password: string, name: string): Promise<WebAut
     response = await startRegistration({ optionsJSON: opts.data });
   } catch (err) {
     if ((err as { name?: string })?.name === "InvalidStateError") {
-      return { ok: false, message: "ה-passkey של המכשיר הזה כבר רשום." };
+      return { ok: false, message: "המכשיר הזה כבר רשום. כדי להוסיף טלפון או מחשב אחר, לחצו \"הפקת קוד למכשיר חדש\"." };
     }
     return { ok: false, message: cancelled(err) ? "ההוספה בוטלה." : "המכשיר לא השלים את ההוספה." };
   }
