@@ -36,6 +36,7 @@ function parseRequestType(formData: FormData): { error?: string; value?: Omit<Re
       handling: String(formData.get("handling") ?? ""),
       routeToContactIds: formData.getAll("routeTo").map(String).filter(Boolean),
       entityId: text(formData, "entityId"),
+      processId: text(formData, "processId"),
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(formData, "toResolve"),
       sources: refs,

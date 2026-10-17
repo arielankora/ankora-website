@@ -483,6 +483,13 @@ model Client {
   /// as a client that does not exist (9.10.2026, Ariel).
   isInternal Boolean @default(false)
 
+  /// Org brain (spec 3.3): a business or a private person, and in a few
+  /// words what they do ("חברה, סטארטאפ AI"). One file template for both
+  /// (decision 7); the kind says which sections a reader expects to see
+  /// empty.
+  kind     ClientKind @default(BUSINESS)
+  industry String?
+
   /// Portal phase 2. Who at Ankora owns this client operationally. Shown
   /// on the portal's home screen and named on every decision, because a
   /// decision arrives from a person, not from a system - and because a
@@ -3181,6 +3188,12 @@ model ClientEntity {
 }
 
 /// Where a batch of proposals came from (spec 5.1).
+/// Spec 3.3.
+enum ClientKind {
+  BUSINESS
+  PRIVATE
+}
+
 enum KnowledgeBatchVia {
   /// propose_knowledge, from Claude.
   MCP
@@ -3296,6 +3309,9 @@ model RequestType {
   routeToContactIds String[] @default([])
   /// When it belongs to one entity (an Inc invoice).
   entityId   String?
+  /// The process this kind of request sets off (spec 3.7): "an employee's
+  /// trip" starts P6. Same client only.
+  processId  String?
 
   // Knowledge fields (spec 3.1).
   knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
@@ -3322,6 +3338,7 @@ model RequestType {
 
   client Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
   entity ClientEntity? @relation(fields: [entityId], references: [id], onDelete: SetNull)
+  process Process?     @relation(fields: [processId], references: [id], onDelete: SetNull)
 
   @@index([clientId, deletedAt])
   @@map("request_types")
@@ -3669,6 +3686,7 @@ model Process {
 
   client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   versions ProcessVersion[]
+  requestTypes RequestType[]
   dates    ImportantDate[]
   checks   ProcessCheck[]
 

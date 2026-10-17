@@ -10,6 +10,7 @@ import {
   closeTemporaryFact,
   confirmClientFact,
   listClientFacts,
+  factToTask,
   questionToTask,
   supersedeClientFact,
 } from "@/lib/app-domain/client-facts";
@@ -101,6 +102,26 @@ describe("client facts", () => {
     expect(task.title).toContain("האם יש הסכם עם Dell?");
     expect(task.assignedToId).toBe(user.id);
     await expect(questionToTask(user, q.id)).rejects.toThrow("כבר יש משימה");
+  });
+
+  it("temporary information keeps who owns it, becomes one task, and not once closed", async () => {
+    const { client, user } = await setup();
+    const t = await addClientFact(user, { clientId: client.id, kind: "TEMPORARY", body: "פער של 6,000$ מול רשות המס", validUntilEvent: "עד ההחזר", assigneeId: user.id, sources: S1 });
+    expect(t.assigneeId).toBe(user.id);
+    // An assignee means something only where someone chases the item.
+    const note = await addClientFact(user, { clientId: client.id, kind: "NOTE", body: "הערה", assigneeId: user.id, sources: S1 });
+    expect(note.assigneeId).toBeNull();
+
+    const { task } = await factToTask(user, t.id);
+    expect(task.title).toBe("מידע זמני: פער של 6,000$ מול רשות המס");
+    expect(task.description).toContain("עד ההחזר");
+    expect(task.assignedToId).toBe(user.id);
+    await expect(factToTask(user, t.id)).rejects.toThrow("כבר יש משימה");
+
+    const other = await addClientFact(user, { clientId: client.id, kind: "TEMPORARY", body: "עוד דבר", validUntilEvent: "עד הצירוף", sources: S1 });
+    await closeTemporaryFact(user, other.id);
+    await expect(factToTask(user, other.id)).rejects.toThrow("כבר נסגר");
+    await expect(factToTask(user, note.id)).rejects.toThrow("רק שאלה פתוחה או מידע זמני");
   });
 
   it("Ankora's own document never confirms a fact (R14)", async () => {

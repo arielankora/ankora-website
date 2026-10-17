@@ -34,9 +34,14 @@ test.describe("authenticated screens", () => {
       expect(new URL(page.url()).pathname, `${route} did not bounce to login`).not.toBe("/app/login");
 
       // Next.js renders a thrown server error as a generic error page.
-      // Catching it by its text is crude but it is what a user sees.
+      // Catching it by its text is crude but it is what a user sees. The
+      // page's own words, and "500" only as a line by itself (the error
+      // page's heading): a bare /500/ also matches an amount or a total
+      // on any screen with numbers (five time screens failed on it on
+      // 17.10.2026). A real server error still fails the console check
+      // below.
       const body = await page.locator("body").innerText();
-      expect(body, `${route} error boundary`).not.toMatch(/Application error|Internal Server Error|500/);
+      expect(body, `${route} error boundary`).not.toMatch(/Application error|Internal Server Error|^\s*500\s*$/m);
 
       expect(errors, `${route} console`).toEqual([]);
     });

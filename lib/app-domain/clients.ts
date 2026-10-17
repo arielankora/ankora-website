@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import type { User, ClientStatus } from "@prisma/client";
+import type { User, ClientStatus, ClientKind } from "@prisma/client";
 import { ensureDefaultAlertRules } from "@/lib/app-domain/alerts";
 
 export async function listClients() {
@@ -90,6 +90,9 @@ export async function updateClient(
     /// Ankora's own work, kept out of the home-page hours chart. See
     /// Client.isInternal.
     isInternal?: boolean;
+    /// Org brain (spec 3.3).
+    kind?: ClientKind;
+    industry?: string | null;
   }
 ) {
   assertCan(actor.role, "client.manage");
@@ -125,6 +128,8 @@ export async function updateClient(
       preferenceMatters: input.preferenceMatters === null ? null : input.preferenceMatters?.trim() || undefined,
       preferenceNever: input.preferenceNever === null ? null : input.preferenceNever?.trim() || undefined,
       isInternal: input.isInternal,
+      kind: input.kind,
+      industry: input.industry === null ? null : input.industry?.trim() || undefined,
       // Only stamp the editor when a preference actually moved, so the
       // client's screen does not report "עודכן לאחרונה" because somebody
       // changed the timezone.

@@ -166,8 +166,8 @@ function FactForm({
           </Field>
         </div>
       )}
-      {question && (
-        <Field label="מי אחראי לברר">
+      {(question || kind === "TEMPORARY") && (
+        <Field label={question ? "מי אחראי לברר" : "מי אחראי לבדוק שעדיין נכון"}>
           <select name="assigneeId" defaultValue={existing?.assigneeId ?? ""} className={INPUT}>
             <option value="">לא נקבע</option>
             {staff.map((s) => (
@@ -295,7 +295,7 @@ function FactRow({
     fact.referTo ? `מפנים ל: ${fact.referTo}` : null,
     fact.kind === "TEMPORARY" ? `בתוקף עד ${dateLabel(fact.validUntil) ?? fact.validUntilEvent}` : null,
     fact.kind === "ONE_OFF_DECISION" ? [dateLabel(fact.decidedAt), fact.decidedBy].filter(Boolean).join(", ") : null,
-    fact.kind === "QUESTION" && fact.assigneeName ? `אחראי: ${fact.assigneeName}` : null,
+    (fact.kind === "QUESTION" || fact.kind === "TEMPORARY") && fact.assigneeName ? `אחראי: ${fact.assigneeName}` : null,
     fact.lowImportance ? "לא קריטי" : null,
   ].filter(Boolean);
 
@@ -351,6 +351,11 @@ function FactRow({
             <Drawer triggerLabel="אישור" title="אישור פריט" variant="link">
               <ConfirmForm clientId={clientId} fact={fact} sourceOptions={sourceOptions} />
             </Drawer>
+          )}
+          {fact.kind === "TEMPORARY" && !closed && !fact.taskId && (
+            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-gold-dim hover:underline">
+              למשימה
+            </button>
           )}
           {fact.kind === "TEMPORARY" && !closed && (
             <button type="button" onClick={() => act(() => closeTemporaryFactAction(fact.id, clientId), "נסגר")} className="text-appNavy/60 hover:text-appNavy">

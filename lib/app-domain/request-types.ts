@@ -25,10 +25,18 @@ export interface RequestTypeInput extends KnowledgeInput {
   handling: string;
   routeToContactIds?: string[];
   entityId?: string | null;
+  /// The process this request sets off (spec 3.7). Same client only.
+  processId?: string | null;
 }
 
 function clean(v: string | null | undefined): string | null {
   return v?.trim() || null;
+}
+
+async function assertProcessBelongs(clientId: string, processId: string | null | undefined) {
+  if (!processId) return;
+  const found = await prisma.process.count({ where: { id: processId, clientId, deletedAt: null } });
+  if (!found) throw new Error("התהליך שנבחר לא נמצא אצל הלקוח הזה.");
 }
 
 async function assertRoutes(clientId: string, ids: string[] | undefined) {
@@ -48,6 +56,7 @@ export async function addRequestType(actor: User, input: RequestTypeInput) {
   if (!handling) throw new Error("צריך לכתוב איך עונים ולאן מעבירים.");
   assertResolvable(input.knowledgeStatus, input.toResolve);
   await assertEntityBelongs(input.clientId, input.entityId);
+  await assertProcessBelongs(input.clientId, input.processId);
   const routes = await assertRoutes(input.clientId, input.routeToContactIds);
   const sourced = await sourcedFields(input.clientId, input, [handling]);
   const row = await prisma.requestType.create({
@@ -59,6 +68,7 @@ export async function addRequestType(actor: User, input: RequestTypeInput) {
       handling,
       routeToContactIds: routes,
       entityId: input.entityId || null,
+      processId: input.processId || null,
       createdById: actor.id,
       ...knowledgeData(input),
       ...sourced,
@@ -77,6 +87,7 @@ export async function updateRequestType(actor: User, id: string, input: Partial<
   if (input.handling !== undefined && !clean(input.handling)) throw new Error("צריך לכתוב איך עונים ולאן מעבירים.");
   assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
   if (input.entityId !== undefined) await assertEntityBelongs(before.clientId, input.entityId);
+  if (input.processId !== undefined) await assertProcessBelongs(before.clientId, input.processId);
   const routes = input.routeToContactIds !== undefined ? await assertRoutes(before.clientId, input.routeToContactIds) : undefined;
   const sourced = await sourcedFields(before.clientId, input, [input.handling !== undefined ? input.handling : before.handling], before);
   const updated = await prisma.requestType.update({
@@ -88,6 +99,7 @@ export async function updateRequestType(actor: User, id: string, input: Partial<
       handling: input.handling !== undefined ? clean(input.handling)! : undefined,
       routeToContactIds: routes,
       entityId: input.entityId !== undefined ? input.entityId || null : undefined,
+      processId: input.processId !== undefined ? input.processId || null : undefined,
       ...knowledgeData(input),
       ...sourced,
     },

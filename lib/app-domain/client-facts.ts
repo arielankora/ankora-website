@@ -86,7 +86,9 @@ async function prepare(clientId: string, input: Omit<ClientFactInput, "clientId"
     validUntilEvent: input.kind === "TEMPORARY" ? clean(input.validUntilEvent) : null,
     decidedAt: input.kind === "ONE_OFF_DECISION" ? input.decidedAt ?? null : null,
     decidedBy: input.kind === "ONE_OFF_DECISION" ? clean(input.decidedBy) : null,
-    assigneeId: question ? input.assigneeId || null : null,
+    // Who chases it: a question's answer, or whether temporary information
+    // is still true (spec 3.4, gap 11).
+    assigneeId: question || input.kind === "TEMPORARY" ? input.assigneeId || null : null,
     ...knowledgeData(knowledge),
     ...sourced,
   };
@@ -251,20 +253,30 @@ export async function answerClientQuestion(actor: User, id: string, input: { ans
 }
 
 /// "Make it a task" (spec 3.4): a question stays a question, and the work
-/// of chasing it goes where work goes. One task per question.
-export async function questionToTask(actor: User, id: string) {
+/// of chasing it goes where work goes. The same for temporary information
+/// that is also work (gap 11: "a 6,000$ gap with the tax authority, Ariel
+/// is on it"): the fact stays in the file, the work sits in a task linked
+/// to it. One task per fact.
+export async function factToTask(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const fact = await findLive(id);
   await assertClientAccess(actor, fact.clientId);
   assertCurrent(fact);
-  if (!isQuestion(fact.kind)) throw new Error("רק שאלה פתוחה הופכת למשימה מכאן.");
+  const temporary = fact.kind === "TEMPORARY";
+  if (!isQuestion(fact.kind) && !temporary) throw new Error("רק שאלה פתוחה או מידע זמני הופכים למשימה מכאן.");
   if (fact.answeredAt) throw new Error("השאלה כבר נענתה.");
-  if (fact.taskId) throw new Error("כבר יש משימה לשאלה הזו.");
+  if (fact.closedAt) throw new Error("המידע הזמני כבר נסגר.");
+  if (fact.taskId) throw new Error(temporary ? "כבר יש משימה למידע הזה." : "כבר יש משימה לשאלה הזו.");
   const title = fact.body.length > 120 ? `${fact.body.slice(0, 117)}...` : fact.body;
+  const until = fact.validUntil ? new Intl.DateTimeFormat("he-IL", { timeZone: "UTC" }).format(fact.validUntil) : fact.validUntilEvent;
   const task = await createTask(actor, {
     clientId: fact.clientId,
-    title: `שאלה פתוחה: ${title}`,
-    description: fact.toResolve ? `מה יסגור אותה: ${fact.toResolve}` : null,
+    title: temporary ? `מידע זמני: ${title}` : `שאלה פתוחה: ${title}`,
+    description: temporary
+      ? [until ? `בתוקף עד ${until}.` : null, fact.toResolve ? `מה יסגור אותו: ${fact.toResolve}` : null].filter(Boolean).join(" ") || null
+      : fact.toResolve
+        ? `מה יסגור אותה: ${fact.toResolve}`
+        : null,
     assignedToId: fact.assigneeId ?? actor.id,
   });
   const updated = await prisma.clientFact.update({ where: { id }, data: { taskId: task.id } });
@@ -335,3 +347,7 @@ export async function listClientFacts(actor: User, clientId: string) {
     superseded: visible.filter((f) => f.knowledgeStatus === "SUPERSEDED"),
   };
 }
+
+/// The name the first callers used, from when only a question could
+/// become a task.
+export const questionToTask = factToTask;

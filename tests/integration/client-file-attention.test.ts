@@ -90,4 +90,16 @@ describe("client file attention", () => {
     await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "שאלה בלי אחראי" });
     expect(await notifyClientFileAttention(morning())).toEqual({ notified: 0, unowned: 1 });
   });
+
+  it("whoever owns a temporary item hears when it expired, with only their own items", async () => {
+    const { client, manager, hadas } = await setup();
+    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "פער מול רשות המס", validUntil: day(morning(-3)), assigneeId: hadas.id, sources: S1 });
+    await addClientFact(hadas, { clientId: client.id, kind: "TEMPORARY", body: "Anthropic בכרטיס הפרטי", validUntil: day(morning(-2)), sources: S1 });
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 2, unowned: 0 });
+    const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
+    expect(toHadas.body).toContain("עבר את התוקף");
+    expect(toHadas.body).not.toContain("2");
+    const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
+    expect(toManager.body).toContain("2");
+  });
 });
