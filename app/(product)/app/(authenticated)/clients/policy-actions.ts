@@ -39,6 +39,14 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
   const kind = String(formData.get("kind") ?? "");
   if (!(POLICY_KINDS as string[]).includes(kind)) return { error: "צריך לבחור את סוג הכלל." };
   const status = String(formData.get("knowledgeStatus") ?? "");
+  let params: unknown = {};
+  let interimParams: unknown = {};
+  try {
+    params = JSON.parse(String(formData.get("params") ?? "{}"));
+    interimParams = JSON.parse(String(formData.get("interimParams") ?? "{}"));
+  } catch {
+    return { error: "מה שנבדק בכלל לא נקרא. רעננו ונסו שוב." };
+  }
   return {
     value: {
       kind: kind as PolicyKind,
@@ -46,6 +54,8 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
       statement: String(formData.get("statement") ?? ""),
       rationale: text(formData, "rationale"),
       interimStatement: text(formData, "interimStatement"),
+      params,
+      interimParams,
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(formData, "toResolve"),
       sources: refs,

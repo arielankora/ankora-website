@@ -1521,7 +1521,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
-      "riskReason": "A rule binds only once approved; changing an approved rule's text sends it back; data-handling rules reach every extraction"
+      "riskReason": "A rule binds only once approved; changing an approved rule's text or checked parameters sends it back; data-handling rules reach every extraction"
     },
     "domain:policy-exceptions": {
       "kind": "domain",
@@ -1553,7 +1553,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
-      "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 at approval; completeness and gaps"
+      "riskReason": "Versioned procedures with stale-save refusal; blocking checks R1 to R4 and the client's checkable rules (R2 thresholds, R7 to R10 and R15 needing an exception) at approval; completeness and gaps"
     },
     "domain:process-runs": {
       "kind": "domain",

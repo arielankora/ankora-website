@@ -3443,6 +3443,13 @@ model ClientPolicy {
   /// ("every expense goes to Oren" until "software up to $3,000 a year is
   /// approved" is).
   interimStatement String?
+  /// What the server checks, when the rule says something it can check
+  /// (lib/policy-params.ts): a threshold's amount, the tags it is about,
+  /// the allowed channels. Empty: read by people and by Claude only.
+  params           Json    @default("{}")
+  /// The same for the interim rule, while proposed. Empty with an interim
+  /// statement: a proposed threshold is read as zero.
+  interimParams    Json    @default("{}")
 
   approvedById String?
   approvedAt   DateTime?

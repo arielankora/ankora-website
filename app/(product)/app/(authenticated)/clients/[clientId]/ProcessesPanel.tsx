@@ -8,11 +8,15 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import {
   ACTION_TAGS,
   ACTION_TAG_LABELS,
+  CHANNELS,
+  CHANNEL_LABELS,
   MAX_PROCESS_STEPS,
+  MONEY_TAGS,
   STEP_MODE_LABELS,
   TRANSITION_LABELS,
   TRIGGER_LABELS,
   type ActionTag,
+  type Channel,
   type ProcessStep,
   type StepModeLike,
   type TransitionLike,
@@ -29,6 +33,7 @@ import {
   updateProcessAction,
 } from "../process-actions";
 import Link from "next/link";
+import { formatAmount } from "@/lib/policy-params";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
@@ -74,8 +79,8 @@ export type PanelProcess = {
   nextDate: string | null;
   dateIds: string[];
   latestVersion: number;
-  current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null } | null;
-  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: { code: string; message: string }[] } | null;
+  current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[] } | null;
+  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[] } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
@@ -85,6 +90,23 @@ export type PanelProcess = {
   routine: boolean;
   checks: { id: string; outcome: "OK" | "ISSUE"; note: string | null; createdAt: string; checkedByName: string | null; taskId: string | null }[];
 };
+
+/// A check a procedure faces (R1 to R4, and the client's rules). BLOCK
+/// never passes; EXCEPTION passes while the rule has an approved exception.
+export type PanelCheck = { code: string; message: string; severity: "BLOCK" | "EXCEPTION"; excepted?: boolean };
+
+function CheckLines({ checks }: { checks: PanelCheck[] }) {
+  return (
+    <>
+      {checks.map((c, i) => (
+        <p key={i} className={`mt-1 text-xs ${c.excepted ? "text-appNavy/50" : "text-red-700"}`}>
+          {c.message}
+          {c.severity === "EXCEPTION" && (c.excepted ? " (יש חריגה מאושרת לכלל.)" : " אפשר לאשר רק עם חריגה מאושרת לכלל.")}
+        </p>
+      ))}
+    </>
+  );
+}
 
 const TONE: Record<TransitionLike, "green" | "amber" | "gray"> = { WITH_ANKORA: "green", IN_HANDOVER: "amber", WITH_CLIENT: "gray", NOT_PLANNED: "gray" };
 
@@ -246,7 +268,7 @@ function ProcessForm({
   );
 }
 
-const EMPTY_STEP: ProcessStep = { title: "", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false };
+const EMPTY_STEP: ProcessStep = { title: "", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false, amountMaxMinor: null, currency: null, channel: null };
 
 function ProcedureEditor({ clientId, process, systems }: { clientId: string; process: PanelProcess; systems: Option[] }) {
   const close = useDrawerClose();
@@ -335,6 +357,39 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
               </div>
             )}
             <input value={st.output ?? ""} onChange={(e) => set(i, { output: e.target.value || null })} placeholder="מה נוצר בסוף השלב" className={INPUT} />
+            {st.actionTags.some((t) => MONEY_TAGS.includes(t)) && (
+              <div className="mt-2 grid grid-cols-[1fr_6rem] gap-2">
+                <input
+                  aria-label={`שלב ${i + 1}: סכום מרבי`}
+                  inputMode="decimal"
+                  value={st.amountMaxMinor === null ? "" : String(st.amountMaxMinor / 100)}
+                  onChange={(e) => {
+                    const n = Number(e.target.value.replace(/,/g, ""));
+                    set(i, { amountMaxMinor: e.target.value.trim() && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null });
+                  }}
+                  placeholder="סכום מרבי, אם ידוע"
+                  className={INPUT}
+                />
+                <select aria-label={`שלב ${i + 1}: מטבע`} value={st.currency ?? ""} onChange={(e) => set(i, { currency: e.target.value || null })} className={INPUT}>
+                  <option value="">מטבע</option>
+                  {["ILS", "USD", "EUR"].map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {st.actionTags.includes("CLIENT_MESSAGE") && (
+              <select aria-label={`שלב ${i + 1}: ערוץ`} value={st.channel ?? ""} onChange={(e) => set(i, { channel: (e.target.value || null) as Channel | null })} className={`mt-2 ${INPUT}`}>
+                <option value="">באיזה ערוץ ההודעה יוצאת</option>
+                {CHANNELS.map((c) => (
+                  <option key={c} value={c}>
+                    {CHANNEL_LABELS[c]}
+                  </option>
+                ))}
+              </select>
+            )}
             {st.mode === "AUTOMATED" && (
               <input value={st.verification ?? ""} onChange={(e) => set(i, { verification: e.target.value || null })} placeholder="איך אדם מוודא שזה קרה *" className={INPUT} />
             )}
@@ -419,6 +474,8 @@ function StepList({ steps, systemName }: { steps: ProcessStep[]; systemName: Map
             {st.offsetBusinessDays !== null && ` · ${st.offsetBusinessDays >= 0 ? `+${st.offsetBusinessDays}` : st.offsetBusinessDays} ימי עסקים`}
             {st.actionTags.length > 0 && ` · ${st.actionTags.map((t) => ACTION_TAG_LABELS[t]).join(", ")}`}
             {st.systemIds.length > 0 && ` · ${st.systemIds.map((id) => systemName.get(id) ?? "מערכת שהוסרה").join(", ")}`}
+            {st.amountMaxMinor !== null && st.currency && ` · עד ${formatAmount(st.amountMaxMinor, st.currency)}`}
+            {st.channel && ` · ב${CHANNEL_LABELS[st.channel]}`}
             {st.requiresApproval && " · דורש אישור"}
           </span>
           {st.verification && <span className="block text-appNavy/50">אימות: {st.verification}</span>}
@@ -527,6 +584,12 @@ export function ProcessesPanel({
                       </p>
                       <StepList steps={p.current.steps} systemName={systemName} />
                       {p.current.highlights && <p className="mt-1 text-xs text-appNavy/60">דגשים: {p.current.highlights}</p>}
+                      {p.current.checks.some((c) => !c.excepted) && (
+                        <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2">
+                          <p className="text-xs font-medium text-red-800">הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.</p>
+                          <CheckLines checks={p.current.checks.filter((c) => !c.excepted)} />
+                        </div>
+                      )}
                     </div>
                   ) : (
                     !p.draft && <p className="mt-2 text-xs text-appNavy/50">עוד אין נוהל.</p>
@@ -586,12 +649,8 @@ export function ProcessesPanel({
                         {p.draft.changeNote && `: ${p.draft.changeNote}`}
                       </p>
                       <StepList steps={p.draft.steps} systemName={systemName} />
-                      {p.draft.checks.map((c, i) => (
-                        <p key={i} className="mt-1 text-xs text-red-700">
-                          {c.message}
-                        </p>
-                      ))}
-                      {canApprove && p.draft.checks.length === 0 && (
+                      <CheckLines checks={p.draft.checks} />
+                      {canApprove && p.draft.checks.every((c) => c.excepted) && (
                         <button
                           type="button"
                           onClick={() => act(() => approveProcessVersionAction(p.id, p.draft!.version, clientId), "הנוהל אושר")}

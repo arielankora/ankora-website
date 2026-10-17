@@ -77,6 +77,35 @@ describe("client policies", () => {
     expect(audit).not.toBeNull();
   });
 
+  it("what the server checks is part of the rule: raising a threshold reopens it, and entities must be the client's", async () => {
+    const { client, employee, manager } = await setup();
+    const p = await addClientPolicy(employee, {
+      clientId: client.id,
+      kind: "THRESHOLD",
+      title: "תוכנה",
+      statement: "תוכנה עד 3,000$ בשנה מאושרת",
+      interimStatement: "כל הוצאה עוברת לאורן",
+      params: { amountMinor: 300000, currency: "USD", channels: ["EMAIL"] },
+      sources: S1,
+    });
+    // Keys the kind does not take are dropped.
+    expect(p.params).toEqual({ amountMinor: 300000, currency: "USD" });
+    await approveClientPolicy(manager, p.id);
+    const same = await updateClientPolicy(employee, p.id, { params: { currency: "USD", amountMinor: 300000 } });
+    expect(same).toMatchObject({ status: "ACTIVE", version: 1 });
+    const raised = await updateClientPolicy(employee, p.id, { params: { amountMinor: 900000, currency: "USD" } });
+    expect(raised).toMatchObject({ status: "PROPOSED", version: 2 });
+
+    await expect(
+      addClientPolicy(employee, { clientId: client.id, kind: "THRESHOLD", title: "x", statement: "x", interimStatement: "x", params: { amountMinor: 100 }, sources: S1 })
+    ).rejects.toThrow("מטבע");
+    const other = await createTestClient({ name: "Other" });
+    const foreign = await prisma.clientEntity.create({ data: { clientId: other.id, name: "Inc" } });
+    await expect(
+      addClientPolicy(employee, { clientId: client.id, kind: "FORBIDDEN", title: "x", statement: "x", params: { appliesToTags: ["PAYMENT"], entityId: foreign.id }, sources: S1 })
+    ).rejects.toThrow("ישות");
+  });
+
   it("an approved rule is retired, never deleted; a proposed one written by mistake can be removed", async () => {
     const { client, employee, manager } = await setup();
     const a = await addClientPolicy(employee, { clientId: client.id, kind: "INFO", title: "א", statement: "x", sources: S1 });

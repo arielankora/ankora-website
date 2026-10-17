@@ -14,6 +14,9 @@ const step = (over: Partial<ProcessStep>): ProcessStep => ({
   output: null,
   verification: null,
   requiresApproval: false,
+  amountMaxMinor: null,
+  currency: null,
+  channel: null,
   ...over,
 });
 

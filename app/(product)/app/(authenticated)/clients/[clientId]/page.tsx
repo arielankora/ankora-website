@@ -32,10 +32,11 @@ import { EntitiesPanel } from "./EntitiesPanel";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
+import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
-import { listProcesses } from "@/lib/app-domain/processes";
+import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { listProcessRuns } from "@/lib/app-domain/process-runs";
 import { listProcessChecks } from "@/lib/app-domain/process-checks";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -103,7 +104,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   // Portal phase 2: the decisions panel and the account-manager picker.
   // Portal phase 3: the documents and the monthly summary.
-  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions, processes] = await Promise.all([
+  const [decisions, staff, documents, summaries, taskOverview, allCategories, composer, people, organizationNames, sources, domains, systems, vault, facts, entities, pendingProposals, requestTypes, narratives, policies, exceptions, ruleApprovers, canDecideExceptions, processes, warnings] = await Promise.all([
     listDecisionsForClient(user, client.id),
     listStaffForAssignment(),
     listClientDocuments(user, client.id),
@@ -146,6 +147,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     canApproveForClient(user, client.id),
     // Phase 1, spec 3.8 and 3.9: processes and their procedures.
     listProcesses(user, client.id),
+    // Where the client's rules disagree with the file (R8, R16).
+    ruleWarnings(user, client.id),
   ]);
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
@@ -413,6 +416,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                       highlights: p.current.highlights,
                       outputs: p.current.outputs,
                       approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
+                      checks: p.current.checks,
                     }
                   : null,
                 runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
@@ -461,6 +465,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               canDecideExceptions={canDecideExceptions}
               viewerId={user.id}
               maxExceptionDays={EXCEPTION_MAX_DAYS}
+              entities={entityOptions}
               policies={policies.map((p) => ({
                 id: p.id,
                 kind: p.kind,
@@ -470,6 +475,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 statement: p.statement,
                 rationale: p.rationale,
                 interimStatement: p.interimStatement,
+                params: readParams(p.kind, p.params),
+                interimParams: readParams(p.kind, p.interimParams),
+                checked: paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? "ישות שהוסרה"),
                 approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
@@ -480,6 +488,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
             <RequestTypesPanel
               clientId={client.id}
+              ruleWarnings={warnings.requestTypes}
               sourceOptions={sourceOptions}
               entities={entityOptions}
               contacts={people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" }))}
@@ -501,6 +510,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
             <SystemsPanel
               clientId={client.id}
+              ruleWarnings={warnings.systems}
               sourceOptions={sourceOptions}
               vault={vault ? vault.map((v) => ({ id: v.id, systemName: v.systemName })) : null}
               entities={entityOptions}

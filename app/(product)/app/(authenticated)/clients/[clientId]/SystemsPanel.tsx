@@ -215,12 +215,15 @@ export function SystemsPanel({
   sourceOptions,
   vault,
   entities,
+  ruleWarnings = {},
 }: {
   clientId: string;
   systems: PanelSystem[];
   sourceOptions: SourceOption[];
   vault: VaultOption[] | null;
   entities: EntityOption[];
+  /// Where a client's rule disagrees with the system (R16), by system id.
+  ruleWarnings?: Record<string, string[]>;
 }) {
   const { showToast } = useToast();
   const gaps = systems.filter((s) => isAccessGap(s.accessStatus)).length;
@@ -287,6 +290,11 @@ export function SystemsPanel({
                     </p>
                   )}
                   {s.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {s.doNotDisclose}</p>}
+                  {(ruleWarnings[s.id] ?? []).map((w, i) => (
+                    <p key={i} className="mt-1 text-xs text-warning">
+                      {w}
+                    </p>
+                  ))}
                   <StatusLine status={s.status} toResolve={s.toResolve} />
                   <SourceCodes sources={s.sources} options={sourceOptions} />
                 </div>

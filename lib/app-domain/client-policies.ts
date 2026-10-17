@@ -4,6 +4,8 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { changesSubstance, policyShapeError, type PolicyKindLike } from "@/lib/client-policies";
+import { entityIdsIn, paramsError, paramsKey, readParams, type PolicyParams } from "@/lib/policy-params";
+import { Prisma } from "@prisma/client";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import type { ClientPolicy, PolicyKind, User } from "@prisma/client";
@@ -30,6 +32,10 @@ export interface ClientPolicyInput extends KnowledgeInput {
   statement: string;
   rationale?: string | null;
   interimStatement?: string | null;
+  /// What the server can check (lib/policy-params.ts). Read for the kind;
+  /// keys the kind does not take are dropped.
+  params?: unknown;
+  interimParams?: unknown;
 }
 
 function clean(v: string | null | undefined): string | null {
@@ -39,6 +45,22 @@ function clean(v: string | null | undefined): string | null {
 function assertManager(actor: User) {
   if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר או מבטל כלל של לקוח.");
 }
+
+/// The parameters as stored: read for the kind, complete, and pointing
+/// only at this client's entities.
+async function checkedParams(clientId: string, kind: PolicyKindLike, value: unknown, what: string): Promise<PolicyParams> {
+  const p = readParams(kind, value);
+  const error = paramsError(kind, p);
+  if (error) throw new Error(what === "interim" ? `בכלל הביניים: ${error}` : error);
+  const ids = entityIdsIn(p);
+  if (ids.length) {
+    const found = await prisma.clientEntity.count({ where: { id: { in: ids }, clientId, deletedAt: null } });
+    if (found !== ids.length) throw new Error("ישות שנבחרה בכלל לא נמצאת בתיק של הלקוח.");
+  }
+  return p;
+}
+
+const json = (p: PolicyParams) => p as unknown as Prisma.InputJsonValue;
 
 async function findPolicy(actor: User, id: string) {
   const row = await prisma.clientPolicy.findUnique({ where: { id } });
@@ -54,6 +76,8 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
   if (shapeError) throw new Error(shapeError);
   assertResolvable(input.knowledgeStatus, input.toResolve);
   const sourced = await sourcedFields(input.clientId, input, [input.statement, input.rationale, input.interimStatement]);
+  const params = await checkedParams(input.clientId, input.kind as PolicyKindLike, input.params, "rule");
+  const interimParams = await checkedParams(input.clientId, input.kind as PolicyKindLike, input.interimParams, "interim");
   const row = await prisma.clientPolicy.create({
     data: {
       clientId: input.clientId,
@@ -63,6 +87,8 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
       statement: input.statement.trim(),
       rationale: clean(input.rationale),
       interimStatement: clean(input.interimStatement),
+      params: json(params),
+      interimParams: json(interimParams),
       createdById: actor.id,
       ...knowledgeData(input),
       ...sourced,
@@ -76,12 +102,21 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
   assertCan(actor.role, "time_entry.create_self");
   const before = await findPolicy(actor, id);
   if (before.status === "RETIRED") throw new Error("כלל שבוטל לא נערך. כותבים כלל חדש.");
-  const substantive = changesSubstance(before, {
-    kind: input.kind,
-    title: input.title,
-    statement: input.statement,
-    interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
-  });
+  const kind = (input.kind ?? before.kind) as PolicyKindLike;
+  // A change of kind rereads the stored parameters for the new kind.
+  const params = await checkedParams(before.clientId, kind, input.params !== undefined ? input.params : before.params, "rule");
+  const interimParams = await checkedParams(before.clientId, kind, input.interimParams !== undefined ? input.interimParams : before.interimParams, "interim");
+  // What the server checks is part of what the rule says: raising a
+  // threshold is softening it, and goes back to a manager like any edit.
+  const substantive =
+    changesSubstance(before, {
+      kind: input.kind,
+      title: input.title,
+      statement: input.statement,
+      interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
+    }) ||
+    paramsKey(params) !== paramsKey(readParams(before.kind as PolicyKindLike, before.params)) ||
+    paramsKey(interimParams) !== paramsKey(readParams(before.kind as PolicyKindLike, before.interimParams));
   const next = {
     kind: (input.kind ?? before.kind) as PolicyKindLike,
     status: substantive ? ("PROPOSED" as const) : before.status,
@@ -101,6 +136,8 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
       statement: input.statement !== undefined ? input.statement.trim() : undefined,
       rationale: input.rationale !== undefined ? clean(input.rationale) : undefined,
       interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
+      params: json(params),
+      interimParams: json(interimParams),
       // What it says changed: a new version, and back to a manager.
       ...(substantive
         ? { version: before.version + 1, status: "PROPOSED" as const, approvedById: null, approvedAt: null }

@@ -27,6 +27,8 @@ import {
   withdrawExceptionAction,
 } from "../policy-actions";
 import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
+import { PolicyParamsFields } from "./PolicyParamsFields";
+import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
 
 // Org brain, phase 3: the client's own rules, sections 6 and 14 of the
 // client file (claude/org-brain-spec-2026-10-12.md, 3.11).
@@ -45,6 +47,10 @@ export type PanelPolicy = {
   statement: string;
   rationale: string | null;
   interimStatement: string | null;
+  params: PolicyParams;
+  interimParams: PolicyParams;
+  /// What the server checks now, in a line; null when nothing.
+  checked: string | null;
   approvedByName: string | null;
   approvedAt: string | null;
   knowledgeStatus: KnowledgeStatusLike;
@@ -143,7 +149,17 @@ function ApproversForm({ clientId, staff, selected }: { clientId: string; staff:
 
 const STATUS_TONE: Record<PolicyStatusLike, "green" | "amber" | "gray"> = { ACTIVE: "green", PROPOSED: "amber", RETIRED: "gray" };
 
-function PolicyForm({ clientId, sourceOptions, existing }: { clientId: string; sourceOptions: SourceOption[]; existing?: PanelPolicy }) {
+function PolicyForm({
+  clientId,
+  sourceOptions,
+  entities,
+  existing,
+}: {
+  clientId: string;
+  sourceOptions: SourceOption[];
+  entities: { id: string; name: string }[];
+  existing?: PanelPolicy;
+}) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updatePolicyAction : addPolicyAction, close);
   const [kind, setKind] = useState<PolicyKindLike>(existing?.kind ?? "INFO");
@@ -154,7 +170,7 @@ function PolicyForm({ clientId, sourceOptions, existing }: { clientId: string; s
       {existing && <input type="hidden" name="id" value={existing.id} />}
       {existing?.status === "ACTIVE" && (
         <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
-          הכלל בתוקף. שינוי בשם, בסוג או בנוסח מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
+          הכלל בתוקף. שינוי בשם, בסוג, בנוסח או במה שנבדק מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
         </p>
       )}
       <Field label="סוג הכלל *">
@@ -184,6 +200,13 @@ function PolicyForm({ clientId, sourceOptions, existing }: { clientId: string; s
         />
       </Field>
       <p className="-mt-2 text-[11px] text-appNavy/50">הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.</p>
+      <PolicyParamsFields
+        key={kind}
+        kind={kind}
+        initial={existing?.kind === kind ? existing.params : undefined}
+        initialInterim={existing?.kind === kind ? existing.interimParams : undefined}
+        entities={entities}
+      />
       <Field label="למה">
         <input name="rationale" defaultValue={existing?.rationale ?? ""} className={INPUT} />
       </Field>
@@ -239,6 +262,7 @@ export function PoliciesPanel({
   canDecideExceptions,
   viewerId,
   maxExceptionDays,
+  entities,
 }: {
   clientId: string;
   policies: PanelPolicy[];
@@ -253,6 +277,7 @@ export function PoliciesPanel({
   canDecideExceptions: boolean;
   viewerId: string;
   maxExceptionDays: number;
+  entities: { id: string; name: string }[];
 }) {
   const { showToast } = useToast();
   const live = policies.filter((p) => p.status !== "RETIRED");
@@ -284,7 +309,7 @@ export function PoliciesPanel({
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-appNavy">כללים של הלקוח ({live.length})</h2>
         <Drawer triggerLabel="+ כלל" title="כלל של הלקוח" variant="link">
-          <PolicyForm clientId={clientId} sourceOptions={sourceOptions} />
+          <PolicyForm clientId={clientId} sourceOptions={sourceOptions} entities={entities} />
         </Drawer>
       </div>
       <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-appNavy/50">
@@ -327,6 +352,14 @@ export function PoliciesPanel({
                   <p className="mt-1 text-xs text-appNavy/80">{p.statement}</p>
                 )}
                 {p.rationale && <p className="mt-0.5 text-xs text-appNavy/55">למה: {p.rationale}</p>}
+                {p.checked ? (
+                  <p className="mt-0.5 text-xs text-appNavy/70">
+                    <span className="font-medium">נבדק מול הנהלים: </span>
+                    {p.checked}
+                  </p>
+                ) : (
+                  kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-appNavy/45">טקסט בלבד: השרת לא בודק את הכלל הזה.</p>
+                )}
                 {p.status === "ACTIVE" && p.approvedByName && (
                   <p className="mt-0.5 text-[11px] text-appNavy/45">
                     אושר על ידי {p.approvedByName}
@@ -379,7 +412,7 @@ export function PoliciesPanel({
                   </button>
                 )}
                 <Drawer triggerLabel="עריכה" title={`עריכה: ${p.title}`} variant="link">
-                  <PolicyForm clientId={clientId} sourceOptions={sourceOptions} existing={p} />
+                  <PolicyForm clientId={clientId} sourceOptions={sourceOptions} entities={entities} existing={p} />
                 </Drawer>
                 <Drawer triggerLabel="בקשת חריגה" title={`בקשת חריגה: ${p.title}`} variant="link">
                   <ExceptionForm clientId={clientId} policy={p} maxDays={maxExceptionDays} />
