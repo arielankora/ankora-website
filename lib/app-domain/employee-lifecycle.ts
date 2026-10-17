@@ -479,6 +479,10 @@ export async function onConfidentialitySigned(userId: string): Promise<void> {
         ? `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה, ו-passkey כבר מוגדר. השלב נסגר.`
         : `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה. ה-passkey עדיין לא הוגדר, ולכן השלב נשאר פתוח.`,
     );
+
+    // The PDF may have been recorded first; then this signature is the
+    // one that completes the PDF step.
+    await closePdfStepIfBothSigned(userId, "confidentiality_app_signed_after_pdf");
   } catch (err) {
     await recordFailure(null, userId, "onboarding_sign_hook", err);
   }
@@ -530,23 +534,41 @@ export async function onPdfSignatureRecorded(
       return;
     }
 
-    if (!(await hasSignedCurrent(userId, "CONFIDENTIALITY", "APP"))) return;
-    const task = await openLifecycleTaskFor(userId, "ONBOARDING");
-    if (!task) return;
-    const step = await prisma.task.findFirst({
-      where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_PDF_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
-      select: { id: true },
-    });
-    if (!step) return;
-    if (await completeStepAsSystem(step.id, "confidentiality_pdf_recorded")) {
-      await systemComment(
-        task.id,
-        task.clientId,
-        `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) חתומה בשני הערוצים: באפליקציה וב-PDF. השלב נסגר.`,
-      );
-    }
+    await closePdfStepIfBothSigned(userId, "confidentiality_pdf_recorded");
   } catch (err) {
     await recordFailure(null, userId, "pdf_signature_hook", err);
+  }
+}
+
+/// Onboarding step 5 ("the signed PDF received, version checked, filed")
+/// closes once the current confidentiality version is signed in BOTH
+/// channels, whichever came second. It used to be checked only when the
+/// PDF was recorded, so a PDF recorded first and an in-app signature that
+/// came later left the step open for good (dry run, 16.10.2026). Called
+/// from both events now.
+///
+/// Idempotent: a step already closed is not found, completeStepAsSystem
+/// refuses a closed step, and the comment is written only when this call
+/// is the one that closed it.
+async function closePdfStepIfBothSigned(userId: string, reason: string): Promise<void> {
+  const [app, pdf] = await Promise.all([
+    hasSignedCurrent(userId, "CONFIDENTIALITY", "APP"),
+    hasSignedCurrent(userId, "CONFIDENTIALITY", "EMAIL_PDF"),
+  ]);
+  if (!app || !pdf) return;
+  const task = await openLifecycleTaskFor(userId, "ONBOARDING");
+  if (!task) return;
+  const step = await prisma.task.findFirst({
+    where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_PDF_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
+    select: { id: true },
+  });
+  if (!step) return;
+  if (await completeStepAsSystem(step.id, reason)) {
+    await systemComment(
+      task.id,
+      task.clientId,
+      `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) חתומה בשני הערוצים: באפליקציה וב-PDF. השלב נסגר.`,
+    );
   }
 }
 

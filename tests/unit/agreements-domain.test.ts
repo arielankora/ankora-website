@@ -191,6 +191,16 @@ describe("signWithLink", () => {
     expect(onDeletionDeclarationSigned).toHaveBeenCalledWith("u1", "a1");
   });
 
+  it("treats a confidentiality signature through a link as an in-app signature for the onboarding task", async () => {
+    db.agreementSignLink.findUnique.mockResolvedValue(
+      link({ kind: "CONFIDENTIALITY", version: CURRENT_AGREEMENTS.CONFIDENTIALITY })
+    );
+    db.agreementSignLink.updateMany.mockResolvedValue({ count: 1 });
+    await signWithLink("t", signInput());
+    expect(onConfidentialitySigned).toHaveBeenCalledWith("u1");
+    expect(onDeletionDeclarationSigned).not.toHaveBeenCalled();
+  });
+
   it("writes nothing when a second submit loses the race for the link", async () => {
     db.agreementSignLink.findUnique.mockResolvedValue(link());
     db.agreementSignLink.updateMany.mockResolvedValue({ count: 0 });
