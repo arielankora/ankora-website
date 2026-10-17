@@ -56,6 +56,7 @@ const portalExport = await import("@/app/api/portal/export/route");
 const reportsExport = await import("@/app/api/reports/export/route");
 const timeEntriesExport = await import("@/app/api/time-entries/export/route");
 const auditExport = await import("@/app/api/audit-log/export/route");
+const clientFileExport = await import("@/app/api/clients/[clientId]/client-file/route");
 const { PORTAL_PREVIEW_COOKIE } = await import("@/lib/app-domain/client-portal");
 
 beforeEach(() => {
@@ -462,5 +463,29 @@ describe("GET /api/audit-log/export - Super Admin only", () => {
     // The entityType filter is applied: the System row is not in the file.
     expect(text).not.toContain("system.tick");
     expect(csvCells(text)).toContain("'=1+1");
+  });
+});
+
+describe("GET /api/clients/[clientId]/client-file - the client file", () => {
+  it("downloads as Markdown or as PDF, and is a 404 to someone not assigned", async () => {
+    const client = await createTestClient({ name: "לקוח התיק" });
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: user.id, clientId: client.id } });
+    const params = Promise.resolve({ clientId: client.id });
+    currentUser = user;
+
+    const md = await clientFileExport.GET(new Request(`${BASE}/api/clients/${client.id}/client-file`), { params });
+    expect(md.headers.get("content-type")).toContain("text/markdown");
+    expectAttachment(md);
+    expect(await md.text()).toContain("# תיק לקוח: לקוח התיק");
+
+    const pdf = await clientFileExport.GET(new Request(`${BASE}/api/clients/${client.id}/client-file?format=pdf`), { params });
+    expect(pdf.headers.get("content-type")).toBe("application/pdf");
+    expectAttachment(pdf);
+    expectPdf(await bytesOf(pdf));
+
+    currentUser = (await createTestUser({ role: "ANKORA_EMPLOYEE" })).user;
+    const denied = await clientFileExport.GET(new Request(`${BASE}/api/clients/${client.id}/client-file?format=pdf`), { params: Promise.resolve({ clientId: client.id }) });
+    expect(denied.status).toBe(404);
   });
 });

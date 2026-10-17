@@ -1393,7 +1393,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
-      "riskReason": "Exports a whole client file as Markdown; must 404 for anyone not assigned"
+      "riskReason": "Exports a whole client file as Markdown or PDF; must 404 for anyone not assigned"
     },
     "domain:client-file-view": {
       "kind": "domain",
@@ -1401,7 +1401,7 @@
       "risk": "critical",
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
-      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items; the control line counts only rows the reader may see"
+      "riskReason": "Assembles the client file for staff and for Claude; the ai version must carry no contact details or sensitive items; the control line counts only rows the reader may see; rules by section (6, 8, 9, 14), one-off suppliers from tasks in 7.2, batches in 16; Markdown and PDF downloads"
     },
     "screen:/app/clients/[clientId]/client-file": {
       "kind": "screen",

@@ -189,6 +189,19 @@ export function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: nu
 //      RTL run are mirrored, which is what makes "(שעון ישראל)" close on
 //      the correct side.
 //
+// Three refinements came with the client file (17.10.2026), whose lines
+// mix Hebrew with names like "NUX Inc" and amounts like "25,000$":
+//
+//   a. A bracket pair takes one direction for both brackets (UBA rule
+//      N0): RTL when it holds Hebrew, LTR when it holds only Latin and
+//      the text before it is Latin, RTL otherwise. "NUX (NUX.AI Ltd)" no
+//      longer loses its closing bracket to the paragraph.
+//   b. A currency or percent sign next to a digit is part of the number,
+//      so "25,000$" stays together.
+//   c. RIGHT-TO-LEFT MARK (U+200F) is strong RTL and is not drawn. A
+//      caller puts it around a separator to keep two Latin details from
+//      reading as one run ("Claude · 138").
+//
 // The visual string is then cut into font segments for drawing. A Hebrew
 // segment is handed to pdfkit in LOGICAL order, because fontkit reverses
 // any Hebrew-script text it is given (the header comment above records
@@ -196,7 +209,12 @@ export function drawCell(doc: PDFKit.PDFDocument, text: string, x: number, y: nu
 
 type BidiClass = "R" | "L" | "N";
 
+const RLM = "\u200F";
+const NUMBER_SIGNS = /[$%₪€£°#+]/;
+const OPEN_BRACKETS: Record<string, string> = { "(": ")", "[": "]", "{": "}" };
+
 function bidiClass(ch: string): BidiClass {
+  if (ch === RLM) return "R";
   if (HEBREW_RANGE.test(ch)) return "R";
   if (/[\p{L}\p{N}]/u.test(ch)) return "L";
   return "N";
@@ -209,6 +227,34 @@ const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[",
 export function visualSegments(text: string): { font: string; text: string }[] {
   const chars = Array.from(text);
   const cls = chars.map(bidiClass);
+  const isDigit = (i: number) => i >= 0 && i < chars.length && /\p{N}/u.test(chars[i]);
+
+  // (b) A sign beside a number belongs to it.
+  chars.forEach((ch, i) => {
+    if (cls[i] === "N" && NUMBER_SIGNS.test(ch) && (isDigit(i - 1) || isDigit(i + 1))) cls[i] = "L";
+  });
+
+  // (a) Bracket pairs, innermost first, resolved before the neutrals.
+  const stack: number[] = [];
+  const pairs: [number, number][] = [];
+  chars.forEach((ch, i) => {
+    if (OPEN_BRACKETS[ch]) stack.push(i);
+    else if (Object.values(OPEN_BRACKETS).includes(ch)) {
+      const o = stack.length && OPEN_BRACKETS[chars[stack[stack.length - 1]]] === ch ? stack.pop()! : -1;
+      if (o >= 0) pairs.push([o, i]);
+    }
+  });
+  for (const [o, c] of pairs) {
+    const inside = cls.slice(o + 1, c);
+    let d: "R" | "L" | null = null;
+    if (inside.includes("R")) d = "R";
+    else if (inside.includes("L")) {
+      let before: BidiClass = "R";
+      for (let k = o - 1; k >= 0; k--) if (cls[k] !== "N") { before = cls[k]; break; }
+      d = before === "L" ? "L" : "R";
+    }
+    if (d) cls[o] = cls[c] = d;
+  }
 
   // Resolve neutrals.
   const dir: ("R" | "L")[] = new Array(chars.length);
@@ -239,6 +285,8 @@ export function visualSegments(text: string): { font: string; text: string }[] {
     if (run.dir === "L") visual.push(...run.chars);
     else visual.push(...run.chars.reverse().map((ch) => MIRROR[ch] ?? ch));
   }
+  // (c) The mark has done its work; it has no glyph to draw.
+  for (let i = visual.length - 1; i >= 0; i--) if (visual[i] === RLM) visual.splice(i, 1);
 
   // Font segments, left to right.
   const segments: { font: string; text: string }[] = [];
