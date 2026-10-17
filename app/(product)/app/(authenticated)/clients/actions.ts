@@ -73,6 +73,9 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       // A checkbox sends nothing when unchecked, and it is always on the
       // form, so absent means "not internal".
       isInternal: formData.get("isInternal") === "on",
+      // Org brain (spec 3.3). Always on the form.
+      kind: formData.get("kind") === "PRIVATE" ? "PRIVATE" : "BUSINESS",
+      industry: String(formData.get("industry") || "") || null,
     });
   } catch (err) {
     return { error: friendlyError(err) };

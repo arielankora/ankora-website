@@ -78,7 +78,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
   const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, batches] = await Promise.all([
-    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true } }),
+    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
     listClientFacts(actor, clientId),
@@ -113,7 +113,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       select: { createdAt: true, via: true, note: true, sourceId: true, proposals: { select: { state: true } } },
     }),
   ]);
-  const ownerIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
+  const ownerIds = [...new Set([...processes.flatMap((p) => [p.ownerId, p.backupOwnerId]), ...facts.current.map((f) => f.assigneeId)].filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
@@ -140,6 +140,8 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       f.kind === "TEMPORARY" && isPastValidity(f, now) ? "עבר התוקף, לבדוק שעדיין נכון" : null,
       f.kind === "ONE_OFF_DECISION" ? [day(f.decidedAt), f.decidedBy].filter(Boolean).join(", ") : null,
       f.answer ? `תשובה: ${f.answer}` : null,
+      (f.kind === "QUESTION" || f.kind === "TEMPORARY") && f.assigneeId && ownerName.get(f.assigneeId) ? `אחראי: ${ownerName.get(f.assigneeId)}` : null,
+      f.taskId ? "יש משימה" : null,
       ...(Array.isArray(f.alternatives) ? (f.alternatives as { value?: unknown; sources?: unknown }[]) : [])
         .filter((a) => typeof a?.value === "string")
         .map((a) => `גרסה אחרת: ${a.value as string}${readSourceRefs(a.sources).length ? ` [${readSourceRefs(a.sources).map(formatSourceRef).join(", ")}]` : ""}`),
@@ -185,7 +187,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       title: "זהות הלקוח",
       empty: "",
       items: [
-        { text: client.legalName ? `${client.name} (${client.legalName})` : client.name },
+        { text: client.legalName ? `${client.name} (${client.legalName})` : client.name, details: [client.kind === "PRIVATE" ? "לקוח פרטי" : "לקוח עסקי", client.industry] },
         ...(primary ? [{ text: `איש קשר ראשי: ${primary.person.name ?? primary.role}`, details: [primary.role] }] : []),
         ...entities.filter(shown).map((e) => ({
           text: `ישות: ${e.name}`,
@@ -319,7 +321,19 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "עוד לא נכתב מה מגיע, ממי ואיך עונים.",
       items: requestTypes.filter(shown).map((r) => ({
         text: r.title,
-        details: [r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entity?.name, r.handling, routeNames(r.routeToContactIds, contactName), ...(warnings.requestTypes[r.id] ?? [])],
+        details: [
+          r.fromWho ? `מ: ${r.fromWho}` : null,
+          r.arrivesVia ? `דרך: ${r.arrivesVia}` : null,
+          r.entity?.name,
+          r.handling,
+          routeNames(r.routeToContactIds, contactName),
+          // Named only from the processes this version shows.
+          (() => {
+            const p = processes.filter(shown).find((x) => x.id === r.processId);
+            return p ? `מפעיל: ${p.code} ${p.title}` : null;
+          })(),
+          ...(warnings.requestTypes[r.id] ?? []),
+        ],
         ...knowledge(r),
       })),
     },

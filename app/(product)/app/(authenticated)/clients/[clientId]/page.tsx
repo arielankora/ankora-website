@@ -513,6 +513,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               ruleWarnings={warnings.requestTypes}
               sourceOptions={sourceOptions}
               entities={entityOptions}
+              processes={processes.map((p) => ({ id: p.id, name: `${p.code} ${p.title}` }))}
               contacts={people.contacts.map((c) => ({ id: c.id, name: c.person.name ?? c.role ?? "" }))}
               requestTypes={requestTypes.map((r) => ({
                 id: r.id,
@@ -524,6 +525,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 routeToNames: r.routeToNames,
                 entityId: r.entityId,
                 entityName: r.entity?.name ?? null,
+                processId: r.processId,
+                processName: (() => {
+                  const p = processes.find((x) => x.id === r.processId);
+                  return p ? `${p.code} ${p.title}` : null;
+                })(),
                 status: effectiveStatus(r.knowledgeStatus, parseFieldStatus(r.fieldStatus)),
                 toResolve: r.toResolve,
                 sources: readSourceRefs(r.sources).map(formatSourceRef),

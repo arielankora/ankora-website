@@ -77,6 +77,27 @@ export function EditClientForm({
         </select>
       </div>
 
+      <div>
+        <label className="block text-xs font-medium text-appNavy/60">סוג לקוח</label>
+        <select
+          name="kind"
+          defaultValue={client.kind}
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        >
+          <option value="BUSINESS">עסקי</option>
+          <option value="PRIVATE">פרטי</option>
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-appNavy/60">תחום</label>
+        <input
+          name="industry"
+          defaultValue={client.industry ?? ""}
+          placeholder="חברה, סטארטאפ AI"
+          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        />
+      </div>
+
       <label className="flex items-start gap-3 sm:col-span-2">
         <input
           type="checkbox"

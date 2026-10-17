@@ -8,6 +8,8 @@ import { addRequestType, listRequestTypes, updateRequestType } from "@/lib/app-d
 import { NarrativeConflictError, listNarratives, saveNarrative } from "@/lib/app-domain/client-narratives";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
+import { addProcess } from "@/lib/app-domain/processes";
+import { updateClient } from "@/lib/app-domain/clients";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 3.3 and 3.7).
 //
@@ -54,6 +56,29 @@ describe("request types", () => {
     const edited = await updateRequestType(user, rt.id, { routeToContactIds: [] });
     expect(edited.routeToContactIds).toEqual([]);
     expect(toMarkdown(await buildClientFile(user, client.id, { audience: "ai" }))).toContain("## 7.5. סוגי פניות ודרכי מענה");
+  });
+});
+
+describe("what a request sets off, and who the client is", () => {
+  it("a request type names a process of this client only, and the file says so", async () => {
+    const { client, user } = await setup();
+    const trip = await addProcess(user, { clientId: client.id, title: "נסיעת עובד", triggerKinds: ["EVENT"], sources: S1 });
+    const other = await createTestClient({ name: "אחר" });
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const foreign = await addProcess(admin, { clientId: other.id, title: "תהליך זר", triggerKinds: ["EVENT"], knowledgeStatus: "MISSING", toResolve: "לברר" });
+
+    const rt = await addRequestType(user, { clientId: client.id, title: "עובד טס", handling: "פותחים את תהליך הנסיעה", processId: trip.id, sources: S1 });
+    expect(rt.processId).toBe(trip.id);
+    await expect(updateRequestType(user, rt.id, { processId: foreign.id })).rejects.toThrow("לא נמצא אצל הלקוח");
+    expect(toMarkdown(await buildClientFile(user, client.id, { audience: "staff" }))).toContain(`מפעיל: ${trip.code} נסיעת עובד`);
+  });
+
+  it("a private client says so in section 1, with what they do", async () => {
+    const { client, user } = await setup();
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    await updateClient(admin, client.id, { kind: "PRIVATE", industry: "משפחה, שני ילדים" });
+    const doc = await buildClientFile(user, client.id, { audience: "staff" });
+    expect(doc.sections[0].items[0].details).toEqual(["לקוח פרטי", "משפחה, שני ילדים"]);
   });
 });
 

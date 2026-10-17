@@ -8,7 +8,7 @@ import {
   supersedeClientFact,
   confirmClientFact,
   answerClientQuestion,
-  questionToTask,
+  factToTask,
   closeTemporaryFact,
   removeClientFact,
   type ClientFactInput,
@@ -132,7 +132,7 @@ export async function answerClientQuestionAction(_prev: FormState | undefined, f
 
 export async function questionToTaskAction(id: string, clientId: string): Promise<FormState> {
   const user = await requireUser();
-  return run(clientId, () => questionToTask(user, id));
+  return run(clientId, () => factToTask(user, id));
 }
 
 export async function closeTemporaryFactAction(id: string, clientId: string): Promise<FormState> {

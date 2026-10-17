@@ -22,8 +22,9 @@ import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
 // true?" is a question with a date on it.
 //
 // Who hears: the client's account manager, about everything; whoever
-// chases an open question, about their questions. A client with no
-// account manager and no assignee is counted, not silently skipped.
+// chases an open question or owns a temporary item, about theirs. A
+// client with no account manager and no assignee is counted, not
+// silently skipped.
 
 export const ATTENTION_TYPE = "client_file.attention";
 
@@ -52,9 +53,10 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     prisma.clientEntity.findMany({ where: { ...live, knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } }, select: { clientId: true, knowledgeStatus: true, updatedAt: true } }),
   ]);
 
-  // Per client: the counts for the account manager, the questions per
-  // assignee, and the latest expiry (to know whether it is news).
-  type Bucket = { all: Attention; byAssignee: Map<string, number>; latestExpiry: Date | null };
+  // Per client: the counts for the account manager, each assignee's own
+  // questions and expired items, and the latest expiry (to know whether
+  // it is news).
+  type Bucket = { all: Attention; byAssignee: Map<string, Attention>; latestExpiry: Date | null };
   const buckets = new Map<string, Bucket>();
   const bucket = (clientId: string) => {
     let b = buckets.get(clientId);
@@ -64,13 +66,19 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
 
   for (const f of facts) {
     const b = bucket(f.clientId);
+    const mine = () => {
+      let a = b.byAssignee.get(f.assigneeId!);
+      if (!a) b.byAssignee.set(f.assigneeId!, (a = { ...ZERO }));
+      return a;
+    };
     if (isPastValidity(f, now)) {
       b.all.pastValidity++;
+      if (f.assigneeId) mine().pastValidity++;
       if (!b.latestExpiry || f.validUntil! > b.latestExpiry) b.latestExpiry = f.validUntil;
     }
     if (f.kind === "QUESTION" && !f.answeredAt) {
       b.all.openQuestions++;
-      if (f.assigneeId) b.byAssignee.set(f.assigneeId, (b.byAssignee.get(f.assigneeId) ?? 0) + 1);
+      if (f.assigneeId) mine().openQuestions++;
     } else if (isStaleUncertain(f, now)) {
       b.all.staleUncertain++;
     }
@@ -96,8 +104,8 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
 
     const recipients = new Map<string, Attention>();
     if (manager) recipients.set(manager, b.all);
-    for (const [assignee, count] of b.byAssignee) {
-      if (assignee !== manager) recipients.set(assignee, { ...ZERO, openQuestions: count });
+    for (const [assignee, theirs] of b.byAssignee) {
+      if (assignee !== manager) recipients.set(assignee, theirs);
     }
     if (recipients.size === 0) {
       unowned++;

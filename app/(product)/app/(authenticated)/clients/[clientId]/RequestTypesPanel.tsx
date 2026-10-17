@@ -20,23 +20,30 @@ export type PanelRequestType = {
   routeToNames: string[];
   entityId: string | null;
   entityName: string | null;
+  processId: string | null;
+  /// "P6 נסיעת עובד", or null when there is none or this person may not
+  /// see it.
+  processName: string | null;
   status: KnowledgeStatusLike;
   toResolve: string | null;
   sources: string[];
 };
 
 type ContactOption = { id: string; name: string };
+type ProcessOption = { id: string; name: string };
 
 function RequestTypeForm({
   clientId,
   contacts,
   entities,
+  processes,
   sourceOptions,
   existing,
 }: {
   clientId: string;
   contacts: ContactOption[];
   entities: EntityOption[];
+  processes: ProcessOption[];
   sourceOptions: SourceOption[];
   existing?: PanelRequestType;
 }) {
@@ -75,6 +82,18 @@ function RequestTypeForm({
         </fieldset>
       )}
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
+      {processes.length > 0 && (
+        <Field label="מפעיל תהליך">
+          <select name="processId" defaultValue={existing?.processId ?? ""} className={INPUT}>
+            <option value="">לא מפעיל תהליך</option>
+            {processes.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
       <Field label="סטטוס">
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
           <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
@@ -101,6 +120,7 @@ export function RequestTypesPanel({
   requestTypes,
   contacts,
   entities,
+  processes = [],
   sourceOptions,
   ruleWarnings = {},
 }: {
@@ -108,6 +128,8 @@ export function RequestTypesPanel({
   requestTypes: PanelRequestType[];
   contacts: ContactOption[];
   entities: EntityOption[];
+  /// The client's processes this person may see, for "מפעיל תהליך".
+  processes?: ProcessOption[];
   sourceOptions: SourceOption[];
   /// Where a client's separation rule disagrees with the routing (R8).
   ruleWarnings?: Record<string, string[]>;
@@ -123,7 +145,7 @@ export function RequestTypesPanel({
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-appNavy">סוגי פניות ודרכי מענה ({requestTypes.length})</h2>
         <Drawer triggerLabel="+ סוג פנייה" title="סוג פנייה" variant="link">
-          <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} sourceOptions={sourceOptions} />
+          <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} />
         </Drawer>
       </div>
       {requestTypes.length === 0 ? (
@@ -137,6 +159,7 @@ export function RequestTypesPanel({
                 <p className="text-xs text-appNavy/60">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
                 <p className="mt-1 text-xs text-appNavy/80">{r.handling}</p>
                 {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-appNavy/60">מפנים ל: {r.routeToNames.join(", ")}</p>}
+                {r.processName && <p className="mt-1 text-xs text-appNavy/60">מפעיל: {r.processName}</p>}
                 {(ruleWarnings[r.id] ?? []).map((w, i) => (
                   <p key={i} className="mt-1 text-xs text-red-700">
                     {w}
@@ -147,7 +170,7 @@ export function RequestTypesPanel({
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
                 <Drawer triggerLabel="עריכה" title={`עריכה: ${r.title}`} variant="link">
-                  <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} sourceOptions={sourceOptions} existing={r} />
+                  <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} existing={r} />
                 </Drawer>
                 <button type="button" onClick={() => remove(r)} className="text-appNavy/50 hover:text-red-600">
                   הסרה
