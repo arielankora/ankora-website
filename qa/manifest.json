@@ -1714,6 +1714,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-17",
       "riskReason": "list_processes, get_process and list_policies for Claude: never more than the client file for Claude carries, no sensitive item, no restricted item unless the asker is named on it"
+    },
+    "domain:process-lessons": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-17",
+      "riskReason": "One answer per closed run about its procedure; a remark reaches the owner (or backup) and waits until the owner or a manager applies or dismisses it with a line; no secrets"
     }
   },
   "waivers": {},

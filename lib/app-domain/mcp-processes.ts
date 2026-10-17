@@ -108,6 +108,13 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
       : null,
     draftVersion: p.draft?.version ?? null,
     recentRuns: runs.map((r) => ({ taskId: r.id, title: r.title, status: r.status, due: day(r.dueDate) })),
+    // Spec 5.4: what people who closed runs said, still waiting for the
+    // next version. Read them before drafting one.
+    openLessons: (await prisma.processLesson.findMany({ where: { processId: p.id, status: "OPEN" }, orderBy: { createdAt: "asc" }, select: { body: true, version: true, createdAt: true } })).map((l) => ({
+      lesson: l.body,
+      fromVersion: l.version,
+      on: day(l.createdAt),
+    })),
   };
 }
 

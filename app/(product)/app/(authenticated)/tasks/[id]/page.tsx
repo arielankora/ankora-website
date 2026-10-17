@@ -24,6 +24,10 @@ import { getTaskPlans, type TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import { AdvanceWithClaude } from "./AdvanceWithClaude";
 import { NewPlanEditor, TaskPlanPanel, type PlanView } from "./TaskPlanPanel";
+import { RunLessonCard } from "./RunLessonCard";
+import { runLesson } from "@/lib/app-domain/process-lessons";
+import { asksForLesson } from "@/lib/process-lessons";
+import { prisma } from "@/lib/prisma";
 
 function planView(p: TaskPlanRow): PlanView {
   return {
@@ -117,6 +121,13 @@ export default async function TaskDetailPage(props: {
   // lessons instead.
   const advanceMode = isClosed ? ("lessons" as const) : ("plan" as const);
   const advancePrompt = isStep ? null : await advancePromptFor(user, detail, currentPlan, advanceMode);
+
+  // Learning from runs (spec 5.4): a closed run asks once about its
+  // procedure.
+  const lessonProcess =
+    task.processId && asksForLesson(task, !!(await runLesson(task.id)))
+      ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } })
+      : null;
 
   const [composer, people, allCategories, activeTimers] = await Promise.all([
     messageComposerProps({
@@ -237,6 +248,8 @@ export default async function TaskDetailPage(props: {
           {!isStep && !isClosed && !currentPlan && <NewPlanEditor taskId={task.id} />}
         </div>
       )}
+
+      {lessonProcess && <RunLessonCard taskId={task.id} processName={`${lessonProcess.code} ${lessonProcess.title}`} />}
 
       {currentPlan && plans && (
         <TaskPlanPanel

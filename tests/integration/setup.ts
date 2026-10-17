@@ -48,6 +48,7 @@ const TABLES = [
   "extraction_guides",
   "request_types",
   "process_checks",
+  "process_lessons",
   "process_versions",
   "processes",
   "policy_exceptions",

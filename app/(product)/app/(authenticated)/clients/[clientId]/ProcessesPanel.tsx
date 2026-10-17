@@ -28,6 +28,7 @@ import {
   linkProcessDatesAction,
   markProcessReviewedAction,
   removeProcessAction,
+  resolveLessonAction,
   saveProcessVersionAction,
   setProcessStatusAction,
   startProcessRunAction,
@@ -38,6 +39,7 @@ import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
+import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
 
 // Org brain, phase 1: processes and their procedures, section 7.4 of the
@@ -95,7 +97,98 @@ export type PanelProcess = {
   checkDue: { key: string; state: CheckState } | null;
   routine: boolean;
   checks: { id: string; outcome: "OK" | "ISSUE"; note: string | null; createdAt: string; checkedByName: string | null; taskId: string | null }[];
+  /// Spec 5.4: what people who closed runs said about the procedure.
+  lessons: PanelLesson[];
 };
+
+export type PanelLesson = {
+  id: string;
+  status: LessonStatusLike;
+  body: string | null;
+  version: number | null;
+  taskId: string;
+  runTitle: string | null;
+  authorName: string | null;
+  createdAt: string;
+  resolution: string | null;
+  resolvedByName: string | null;
+};
+
+function ResolveLessonForm({ clientId, lesson }: { clientId: string; lesson: PanelLesson }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(resolveLessonAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="id" value={lesson.id} />
+      <p className="text-sm text-appNavy">{lesson.body}</p>
+      <Field label="מה קרה איתה">
+        <select name="status" defaultValue="APPLIED" className={INPUT}>
+          <option value="APPLIED">{LESSON_STATUS_LABELS.APPLIED}</option>
+          <option value="DISMISSED">{LESSON_STATUS_LABELS.DISMISSED}</option>
+        </select>
+      </Field>
+      <Field label="במשפט אחד *">
+        <input name="resolution" required placeholder="גרסה 4, שלב 2" className={INPUT} />
+      </Field>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+        {pending ? "שומר..." : "שמירה"}
+      </button>
+    </form>
+  );
+}
+
+function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons: PanelLesson[]; canResolve: boolean }) {
+  const open = lessons.filter((l) => l.status === "OPEN");
+  const done = lessons.filter((l) => l.status !== "OPEN");
+  if (lessons.length === 0) return null;
+  return (
+    <div className="mt-2">
+      {open.length > 0 && (
+        <div className="rounded-lg border border-gold/40 bg-gold/[0.04] p-2.5">
+          <p className="text-xs font-medium text-appNavy">{open.length === 1 ? "הערה אחת מריצות, לגרסה הבאה" : `${open.length} הערות מריצות, לגרסה הבאה`}</p>
+          <ul className="mt-1.5 space-y-1.5">
+            {open.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-start justify-between gap-2 text-xs">
+                <span className="min-w-0 flex-1 text-appNavy/80">
+                  {l.body}
+                  <span className="text-appNavy/45">
+                    {" "}
+                    ({[l.authorName, day(l.createdAt), l.version ? `גרסה ${l.version}` : null].filter(Boolean).join(" · ")},{" "}
+                    <Link href={`/app/tasks/${l.taskId}`} className="text-gold-dim hover:underline">
+                      לריצה
+                    </Link>
+                    )
+                  </span>
+                </span>
+                {canResolve && (
+                  <Drawer triggerLabel="החלטה" title="הערה על הנוהל" variant="link">
+                    <ResolveLessonForm clientId={clientId} lesson={l} />
+                  </Drawer>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {done.length > 0 && (
+        <details className="mt-1.5 text-xs text-appNavy/55">
+          <summary className="cursor-pointer">{done.length === 1 ? "הערה אחת שטופלה" : `${done.length} הערות שטופלו`}</summary>
+          <ul className="mt-1 space-y-1">
+            {done.map((l) => (
+              <li key={l.id}>
+                {l.body} · {LESSON_STATUS_LABELS[l.status]}
+                {l.resolution && `: ${l.resolution}`}
+                {l.resolvedByName && ` (${l.resolvedByName})`}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
 
 /// A check a procedure faces (R1 to R4, and the client's rules). BLOCK
 /// never passes; EXCEPTION passes while the rule has an approved exception.
@@ -505,8 +598,11 @@ export function ProcessesPanel({
   entities,
   sourceOptions,
   canApprove,
+  userId,
 }: {
   clientId: string;
+  /// Who is looking: a process's owner decides on its lessons.
+  userId?: string;
   processes: PanelProcess[];
   staff: Option[];
   contacts: Option[];
@@ -635,6 +731,8 @@ export function ProcessesPanel({
                       ))}
                     </p>
                   )}
+
+                  <Lessons clientId={clientId} lessons={p.lessons} canResolve={canApprove || (!!userId && p.ownerId === userId)} />
 
                   {p.checkEvery && (
                     <p className="mt-1.5 text-xs text-appNavy/70">
