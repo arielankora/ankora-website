@@ -72,7 +72,7 @@ export default async function PortalFilePage() {
     throw err;
   }
 
-  const { client, canEdit, preferences, digest, suppliers, documents, dates } = file;
+  const { client, canEdit, preferences, digest, suppliers, documents, dates, knowledge } = file;
 
   return (
     <div className="space-y-4">
@@ -102,6 +102,31 @@ export default async function PortalFilePage() {
       <Block title="כל כמה זמן לעדכן אותך" subtitle="לא נשלח יותר מזה, וגם לא פחות כשמשהו מחכה להחלטה שלך.">
         <DigestForm digest={digest} canEdit={canEdit} />
       </Block>
+
+      {/* The client file, as far as it is the client's to see (lib/portal-knowledge.ts). */}
+      {knowledge.map((g) => (
+        <Block key={g.key} title={g.title} subtitle={g.subtitle}>
+          <ul className="divide-y divide-lineDark/60" data-testid={`portal-knowledge-${g.key}`}>
+            {g.items.map((i, n) => (
+              <li key={n} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
+                <span className="text-sm text-appNavy">
+                  {i.text}
+                  {i.detail && <span className="text-appNavy/55"> · {i.detail}</span>}
+                </span>
+                <span className="flex items-center gap-2">
+                  {i.askToConfirm && (
+                    <span className="rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-[11px] text-warning">נשמח לאישור שלך</span>
+                  )}
+                  {i.tag && <span className="rounded-full border border-lineDark bg-appNavy/5 px-2.5 py-1 text-[11px] text-appNavy/70">{i.tag}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {g.items.some((i) => i.askToConfirm) && (
+            <p className="mt-3 text-[11.5px] text-appNavy/50">משהו לא מדויק, או מסומן לאישור? כתוב למנהל התיק שלך, ונעדכן.</p>
+          )}
+        </Block>
+      ))}
 
       <Block title="ספקים וגורמים" subtitle="מי טיפל במה, מתי, ואיך היה.">
         {suppliers.length === 0 ? (

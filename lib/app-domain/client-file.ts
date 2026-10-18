@@ -5,6 +5,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { resolvePortalClient, assertPortalWritable } from "@/lib/app-domain/client-portal";
 import { sendEmail } from "@/lib/email";
+import { portalKnowledge, type PortalKnowledgeGroup } from "@/lib/portal-knowledge";
 import { appBaseUrl, renderActionEmail } from "@/lib/email-templates";
 import type { Client, ClientDocumentKind, PortalDigest, SupplierExperience, User } from "@prisma/client";
 
@@ -71,6 +72,9 @@ export interface PortalFile {
   suppliers: PortalSupplier[];
   documents: PortalDocument[];
   dates: PortalRecurringDate[];
+  /// The client file's items someone marked visible to the client
+  /// (lib/portal-knowledge.ts), grouped for the screen.
+  knowledge: PortalKnowledgeGroup[];
 }
 
 const SUPPLIER_TAKE = 30;
@@ -82,6 +86,40 @@ const DATE_TAKE = 30;
 /// Four reads rather than four screens: this is a reference page, the
 /// client opens it rarely, and the parts are small enough that paging any
 /// of them would cost more in navigation than it saves in bytes.
+/// The file's items for the portal. Filtered in the query by what may be
+/// shown at all, and again by portalKnowledge (lib/portal-knowledge.ts).
+async function portalKnowledgeFor(clientId: string): Promise<PortalKnowledgeGroup[]> {
+  const shown = { clientId, deletedAt: null, clientVisible: true, sensitivity: "NORMAL" as const, audience: "ALL_STAFF" as const, knowledgeStatus: { not: "SUPERSEDED" as const } };
+  const k = { clientVisible: true, knowledgeStatus: true, sensitivity: true, audience: true, doNotDisclose: true } as const;
+  const [processes, policies, requestTypes, systems, facts, contacts, organizations, entities] = await Promise.all([
+    prisma.process.findMany({ where: { ...shown, status: { not: "RETIRED" } }, orderBy: { seq: "asc" }, select: { ...k, id: true, code: true, title: true, purpose: true, transitionStatus: true, status: true } }),
+    prisma.clientPolicy.findMany({ where: { ...shown, status: { not: "RETIRED" } }, orderBy: { createdAt: "asc" }, select: { ...k, title: true, statement: true, status: true, effectiveFrom: true } }),
+    prisma.requestType.findMany({ where: shown, orderBy: { createdAt: "asc" }, select: { ...k, title: true, handling: true } }),
+    prisma.systemAccess.findMany({ where: shown, orderBy: { systemName: "asc" }, select: { ...k, systemName: true, purpose: true, accessStatus: true } }),
+    prisma.clientFact.findMany({ where: { ...shown, closedAt: null, kind: { not: "QUESTION" } }, orderBy: { createdAt: "asc" }, select: { ...k, kind: true, body: true, closedAt: true } }),
+    prisma.clientContact.findMany({ where: shown, orderBy: { createdAt: "asc" }, select: { ...k, role: true, person: { select: { name: true } } } }),
+    prisma.clientOrganization.findMany({ where: shown, orderBy: { createdAt: "asc" }, select: { ...k, role: true, organization: { select: { name: true } } } }),
+    prisma.clientEntity.findMany({ where: shown, orderBy: { createdAt: "asc" }, select: { ...k, name: true, legalName: true, country: true } }),
+  ]);
+  // A process's next date: the nearest of the dates that start it.
+  const next = await prisma.importantDate.groupBy({
+    by: ["processId"],
+    where: { processId: { in: processes.map((p) => p.id) }, deletedAt: null, sensitivity: "NORMAL", nextOccurrenceAt: { not: null } },
+    _min: { nextOccurrenceAt: true },
+  });
+  const nextOf = new Map(next.map((n) => [n.processId, n._min.nextOccurrenceAt]));
+  return portalKnowledge({
+    processes: processes.map((p) => ({ ...p, nextDate: nextOf.get(p.id) ?? null })),
+    policies,
+    requestTypes,
+    systems,
+    facts,
+    contacts: contacts.map((c) => ({ ...c, name: c.person.name })),
+    organizations: organizations.map((o) => ({ ...o, name: o.organization.name })),
+    entities,
+  });
+}
+
 export async function getPortalFile(actor: User): Promise<PortalFile> {
   const { client, clientUserRole, isStaffPreview } = await resolvePortalClient(actor);
 
@@ -163,6 +201,7 @@ export async function getPortalFile(actor: User): Promise<PortalFile> {
       addedAt: d.createdAt,
     })),
     dates: dates.map((d) => ({ id: d.id, title: d.title, nextAt: d.nextOccurrenceAt })),
+    knowledge: await portalKnowledgeFor(client.id),
   };
 }
 
