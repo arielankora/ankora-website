@@ -154,7 +154,10 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   if (typeof item.payload.ownerName === "string" && item.payload.ownerName.trim() && !(await ownerByName(item.payload.ownerName))) {
     flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.ownerName.trim()}". הפריט ייכנס בלי בעלים, אלא אם מתקנים את השם.` });
   }
-  if (sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
+  if (item.target === "TASK" && typeof item.payload.assigneeName === "string" && item.payload.assigneeName.trim() && !(await ownerByName(item.payload.assigneeName))) {
+    flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.assigneeName.trim()}". המשימה תיפתח על מי שמאשר, אלא אם מתקנים את השם.` });
+  }
+  if (item.target !== "TASK" && sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
   }
   if (item.target === "FACT" && item.action === "CREATE") {
@@ -458,7 +461,11 @@ export async function ownerByName(name: unknown): Promise<string | null> {
   return found.length === 1 ? found[0].id : null;
 }
 
-async function apply(actor: User, p: { clientId: string; target: string; action: string; targetId: string | null }, payload: Record<string, unknown>) {
+async function apply(
+  actor: User,
+  p: { clientId: string; target: string; action: string; targetId: string | null; batchId: string; reason: string | null; quote: string | null },
+  payload: Record<string, unknown>
+) {
   const date = (v: unknown) => (typeof v === "string" && v ? new Date(`${v}T00:00:00Z`) : null);
   const sources = readSourceRefs(payload.sources);
   const ownerId = await ownerByName(payload.ownerName);
@@ -513,6 +520,24 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
     return process.id;
   }
   if (p.target === "DOMAIN") return (await addClientDomain(actor, { ...PAYLOADS.DOMAIN.parse(payload), clientId: p.clientId })).id;
+  // Something to do: a task on the client, with where it came from, so it
+  // can be done without going back to the meeting.
+  if (p.target === "TASK") {
+    const parsed = PAYLOADS.TASK.safeParse(payload);
+    if (!parsed.success) throw new Error(`המשימה לא בנויה נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}`);
+    const t = parsed.data;
+    const draft = await draftFor({ ...p, payload: payload as Prisma.JsonValue });
+    const assignee = await ownerByName(t.assigneeName);
+    const task = await createTask(actor, {
+      clientId: p.clientId,
+      title: draft.title,
+      description: draft.description,
+      assignedToId: assignee ?? actor.id,
+      dueDate: date(t.dueDate),
+      ...(t.priority ? { priority: t.priority } : {}),
+    });
+    return task.id;
+  }
   throw new Error("סוג פריט לא מוכר.");
 }
 
@@ -609,7 +634,7 @@ export async function proposalToTask(
 ) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
-  const blocker = taskBlocker({ payload: (proposal.payload ?? {}) as Record<string, unknown> });
+  const blocker = taskBlocker({ target: proposal.target as ProposalTargetLike, payload: (proposal.payload ?? {}) as Record<string, unknown> });
   if (blocker) throw new Error(blocker);
   const draft = await draftFor(proposal);
   const title = (input.title?.trim() || draft.title).slice(0, TASK_TITLE_MAX);

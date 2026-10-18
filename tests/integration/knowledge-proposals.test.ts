@@ -359,3 +359,36 @@ describe("a proposal that is a task", () => {
     await expect(proposalToTask(user, p.id)).rejects.toThrow("כבר הוחלט");
   });
 });
+
+describe("a task Claude proposes", () => {
+  it("opens a task when approved, on the person named, and never enters the file", async () => {
+    const { client, user } = await setup();
+    const { user: hadas } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.user.update({ where: { id: hadas.id }, data: { name: "הדס בדיקה" } });
+    await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: client.id } });
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "TASK", reason: "אורן ביקש בסוף הפגישה", payload: { title: "לשלוח לדנה את החוזה המעודכן", dueDate: "2026-10-22", assigneeName: "הדס בדיקה", priority: "HIGH" }, at: "01:00" },
+        { target: "TASK", reason: "נאמר בפגישה", payload: { title: "לתאם שיחה עם רואה החשבון", assigneeName: "אין כזה" } },
+      ],
+    });
+    expect(r.proposed).toBe(2);
+    const [send, call] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    expect(send.flags).toEqual([]);
+    expect(call.flags).toEqual([expect.objectContaining({ code: "OWNER" })]);
+
+    const approved = await approveProposal(user, send.id);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: approved.resultId! } });
+    expect(task).toMatchObject({ clientId: client.id, title: "לשלוח לדנה את החוזה המעודכן", assignedToId: hadas.id, priority: "HIGH" });
+    expect(task.dueDate?.toISOString()).toBe("2026-10-22T00:00:00.000Z");
+    expect(task.description).toContain("ברגע בשיחה: https://app.fireflies.ai/view/ff-123?t=60");
+    expect((await listClientFacts(user, client.id)).current).toHaveLength(0);
+
+    // A name that is nobody: the task is the approver's.
+    const second = await approveProposal(user, call.id, { title: "לתאם שיחה עם רואה החשבון של NUX" });
+    expect(await prisma.task.findUniqueOrThrow({ where: { id: second.resultId! } })).toMatchObject({ title: "לתאם שיחה עם רואה החשבון של NUX", assignedToId: user.id });
+    await expect(proposalToTask(user, call.id)).rejects.toThrow("כבר הוחלט");
+  });
+});

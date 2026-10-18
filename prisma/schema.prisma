@@ -3212,6 +3212,8 @@ enum ProposalTarget {
   NARRATIVE
   PROCESS
   DOMAIN
+  /// Something to do, not to know: approving it opens a task.
+  TASK
 }
 
 /// What approving a proposal does.

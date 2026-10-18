@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf, taskBlocker, taskFromProposal } from "@/lib/knowledge-proposals";
+import { FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf, taskBlocker, taskFromProposal, TaskPayload, missingRequired, proposalDetails } from "@/lib/knowledge-proposals";
 
 describe("knowledge proposals, pure parts", () => {
   it("opens a recording at the minute", () => {
@@ -113,5 +113,31 @@ describe("a proposal that is a task", () => {
     expect(taskBlocker({ payload: { sensitivity: "SENSITIVE" } })).toContain("רגיש");
     expect(taskBlocker({ payload: { audience: "RESTRICTED" } })).toContain("חלק מהצוות");
     expect(taskBlocker({ payload: { audience: "ALL_STAFF" } })).toBeNull();
+  });
+});
+
+describe("a task proposed by Claude", () => {
+  it("is an action with a reason, and no knowledge fields", () => {
+    const parsed = TaskPayload.parse({ title: "לשלוח לדנה את החוזה", dueDate: "2026-10-22", assigneeName: "הדס", knowledgeStatus: "CONFIRMED", sensitivity: "SENSITIVE" });
+    expect(parsed).toEqual({ title: "לשלוח לדנה את החוזה", dueDate: "2026-10-22", assigneeName: "הדס" });
+    expect(TaskPayload.safeParse({ title: "x", dueDate: "22.10" }).success).toBe(false);
+    expect(missingRequired("TASK", { title: "x" }, "אורן ביקש")).toBeNull();
+    expect(missingRequired("TASK", { title: "x" }, "")).toContain("סיבה");
+  });
+
+  it("reads as what to do, by when and by whom", () => {
+    expect(proposalHeadline("TASK", { title: "לשלוח לדנה את החוזה" })).toBe("לשלוח לדנה את החוזה");
+    expect(proposalDetails("TASK", { title: "x", description: "הגרסה מ-12.10", dueDate: "2026-10-22", assigneeName: "הדס", priority: "HIGH" })).toEqual([
+      "הגרסה מ-12.10",
+      "תאריך יעד: 2026-10-22",
+      "אחראי: הדס",
+      "עדיפות: גבוהה",
+    ]);
+  });
+
+  it("is not turned into a task again, and its description leads the task", () => {
+    expect(taskBlocker({ target: "TASK", payload: { title: "x" } })).toContain("כבר משימה");
+    const t = taskFromProposal({ target: "TASK", payload: { title: "לשלוח חוזה", description: "הגרסה מ-12.10" }, reason: "אורן ביקש", quote: null, source: null, link: null });
+    expect(t.description.split("\n\n").slice(0, 2)).toEqual(["הגרסה מ-12.10", "למה: אורן ביקש"]);
   });
 });

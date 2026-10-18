@@ -99,6 +99,12 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
     { key: "triggerText", label: "מה מפעיל אותו" },
   ],
   DOMAIN: [{ key: "domain", label: "דומיין" }],
+  TASK: [
+    { key: "title", label: "מה עושים" },
+    { key: "description", label: "פירוט", long: true },
+    { key: "assigneeName", label: "אחראי באנקורה (שם)" },
+    { key: "dueDate", label: "תאריך יעד (2026-10-22)" },
+  ],
 };
 
 function str(v: unknown): string {
@@ -125,7 +131,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
             )}
           </label>
         ))}
-      {p.target !== "FACT" || p.payload.kind !== "QUESTION" ? (
+      {p.target !== "TASK" && (p.target !== "FACT" || p.payload.kind !== "QUESTION") ? (
         <>
           <label className="block">
             <span className="block text-xs font-medium text-appNavy/60">סטטוס</span>
@@ -141,7 +147,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
           </label>
         </>
       ) : null}
-      {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && (
+      {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && (
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="block text-xs font-medium text-appNavy/60">בעלים באנקורה (שם)</span>
@@ -158,7 +164,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
-        {pending ? "שומר..." : "אישור עם השינויים"}
+        {pending ? "שומר..." : p.target === "TASK" ? "פתיחת המשימה" : "אישור עם השינויים"}
       </button>
     </form>
   );
@@ -267,16 +273,16 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   async function approve() {
     const r = await approveProposalAction(p.id);
     if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast({ tone: "info", title: "נכנס לתיק", description: p.headline.slice(0, 80) });
+    else showToast({ tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
   }
 
   if (p.state !== "PENDING") {
     return (
       <li className="py-2.5 text-xs text-appNavy/45">
-        {p.state === "APPROVED" ? "אושר: " : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
+        {p.state === "APPROVED" ? (p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
-        {p.state === "TASK" && p.taskId && (
+        {p.taskId && (
           <a href={`/app/tasks/${p.taskId}`} className="ms-1.5 text-gold-dim hover:underline">
             למשימה
           </a>
