@@ -33,7 +33,10 @@ export type ControlData = {
   daysSinceBatch: number | null;
 };
 
-export type ControlPart = { text: string; warn: boolean };
+/// `key` names what is behind the count (controlDetails), when something is.
+export type ControlPart = { text: string; warn: boolean; key?: ControlKey };
+
+export type ControlKey = "processes" | "completeness" | "needsReview" | "noBackup" | "exceptionsInForce" | "exceptionsRequested" | "uncertain" | "openQuestions" | "clientVisible" | "noOwner" | "systemsWithoutAccess";
 
 /// Business days after `fromKey` up to and including `toKey`. Same day: 0.
 export function businessDaysBetween(fromKey: string, toKey: string, calendar: BusinessCalendarKey = "IL"): number {
@@ -57,18 +60,18 @@ export function controlParts(d: ControlData): ControlPart[] {
     parts.push({ text: "אין עדיין תהליכים", warn: false });
   } else {
     const where = [d.withAnkora ? `${d.withAnkora} אצלנו` : null, d.inHandover ? `${d.inHandover} בחפיפה` : null].filter(Boolean).join(" ו-");
-    parts.push({ text: `${plural(d.processes, "תהליך אחד", "תהליכים")}${where ? `, ${where}` : ""}`, warn: false });
-    if (d.avgCompleteness !== null) parts.push({ text: `שלמות ממוצעת ${d.avgCompleteness} מתוך 9`, warn: d.avgCompleteness < 8 });
+    parts.push({ text: `${plural(d.processes, "תהליך אחד", "תהליכים")}${where ? `, ${where}` : ""}`, warn: false, key: "processes" });
+    if (d.avgCompleteness !== null) parts.push({ text: `שלמות ממוצעת ${d.avgCompleteness} מתוך 9`, warn: d.avgCompleteness < 8, key: "completeness" });
   }
-  if (d.needsReview) parts.push({ text: d.needsReview === 1 ? "תהליך אחד דורש סקירה" : `${d.needsReview} תהליכים דורשים סקירה`, warn: true });
-  if (d.noBackup) parts.push({ text: `${plural(d.noBackup, "תהליך אחד", "תהליכים")} בלי מחליף`, warn: true });
-  if (d.exceptionsInForce) parts.push({ text: `${plural(d.exceptionsInForce, "חריגה אחת", "חריגות")} בתוקף`, warn: false });
-  if (d.exceptionsRequested) parts.push({ text: d.exceptionsRequested === 1 ? "בקשת חריגה אחת ממתינה" : `${d.exceptionsRequested} בקשות חריגה ממתינות`, warn: true });
-  if (d.uncertain) parts.push({ text: d.uncertain === 1 ? "פריט אחד לא ודאי" : `${d.uncertain} פריטים לא ודאיים`, warn: false });
-  if (d.openQuestions) parts.push({ text: `${plural(d.openQuestions, "שאלה פתוחה אחת", "שאלות פתוחות")}`, warn: false });
-  if (d.clientVisible) parts.push({ text: d.clientVisible === 1 ? "פריט אחד גלוי ללקוח" : `${d.clientVisible} פריטים גלויים ללקוח`, warn: false });
-  if (d.noOwner) parts.push({ text: `${plural(d.noOwner, "פריט אחד", "פריטים")} בלי בעלים`, warn: false });
-  if (d.systemsWithoutAccess) parts.push({ text: `${plural(d.systemsWithoutAccess, "מערכת אחת", "מערכות")} בלי גישה`, warn: true });
+  if (d.needsReview) parts.push({ text: d.needsReview === 1 ? "תהליך אחד דורש סקירה" : `${d.needsReview} תהליכים דורשים סקירה`, warn: true, key: "needsReview" });
+  if (d.noBackup) parts.push({ text: `${plural(d.noBackup, "תהליך אחד", "תהליכים")} בלי מחליף`, warn: true, key: "noBackup" });
+  if (d.exceptionsInForce) parts.push({ text: `${plural(d.exceptionsInForce, "חריגה אחת", "חריגות")} בתוקף`, warn: false, key: "exceptionsInForce" });
+  if (d.exceptionsRequested) parts.push({ text: d.exceptionsRequested === 1 ? "בקשת חריגה אחת ממתינה" : `${d.exceptionsRequested} בקשות חריגה ממתינות`, warn: true, key: "exceptionsRequested" });
+  if (d.uncertain) parts.push({ text: d.uncertain === 1 ? "פריט אחד לא ודאי" : `${d.uncertain} פריטים לא ודאיים`, warn: false, key: "uncertain" });
+  if (d.openQuestions) parts.push({ text: `${plural(d.openQuestions, "שאלה פתוחה אחת", "שאלות פתוחות")}`, warn: false, key: "openQuestions" });
+  if (d.clientVisible) parts.push({ text: d.clientVisible === 1 ? "פריט אחד גלוי ללקוח" : `${d.clientVisible} פריטים גלויים ללקוח`, warn: false, key: "clientVisible" });
+  if (d.noOwner) parts.push({ text: `${plural(d.noOwner, "פריט אחד", "פריטים")} בלי בעלים`, warn: false, key: "noOwner" });
+  if (d.systemsWithoutAccess) parts.push({ text: `${plural(d.systemsWithoutAccess, "מערכת אחת", "מערכות")} בלי גישה`, warn: true, key: "systemsWithoutAccess" });
   parts.push(
     d.daysSinceBatch === null
       ? { text: "עוד לא הגיעה אצווה מהחילוץ", warn: false }
@@ -126,4 +129,48 @@ export function controlFrom(input: {
     systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").length,
     daysSinceBatch: input.daysSinceBatch,
   };
+}
+
+// ---------------------------------------------------------------------------
+// What is behind each count (spec 7.6): the same rows, by name, so a person
+// who reads "3 processes need review" can see which without opening every
+// section.
+// ---------------------------------------------------------------------------
+
+/// The most names shown behind one count. The section has the rest.
+export const CONTROL_DETAIL_LIMIT = 30;
+
+export type DetailInput = {
+  processes: { code: string; title: string; transitionStatus: string; completeness: { score: number }; needsReview: boolean; reviewLabel?: string | null; backupOwnerId: string | null; status: string; clientVisible?: boolean }[];
+  exceptions: { status: string; what: string; ruleTitle?: string | null }[];
+  facts: (Item & { kind: string; body: string; answeredAt: Date | null; closedAt: Date | null })[];
+  otherItems: (Item & { label: string })[];
+  systems: { systemName: string; accessStatus: string }[];
+};
+
+export function controlDetails(input: DetailInput): Partial<Record<ControlKey, string[]>> {
+  const live = input.processes.filter((p) => p.status !== "RETIRED");
+  const name = (p: { code: string; title: string }) => `${p.code} ${p.title}`;
+  const facts = input.facts.filter((f) => f.kind !== "QUESTION" && !f.closedAt).map((f) => ({ ...f, label: f.body }));
+  const items = [...facts, ...input.otherItems];
+  const uncertain = (i: Item) => {
+    const s = effectiveStatus(i.knowledgeStatus, parseFieldStatus(i.fieldStatus));
+    return s === "UNCERTAIN" || s === "MISSING";
+  };
+  const cap = (xs: string[]) => (xs.length > CONTROL_DETAIL_LIMIT ? [...xs.slice(0, CONTROL_DETAIL_LIMIT), `ועוד ${xs.length - CONTROL_DETAIL_LIMIT}`] : xs);
+  const out: Partial<Record<ControlKey, string[]>> = {
+    processes: live.map(name),
+    completeness: live.filter((p) => p.completeness.score < 9).sort((a, b) => a.completeness.score - b.completeness.score).map((p) => `${name(p)}: ${p.completeness.score} מתוך 9`),
+    needsReview: live.filter((p) => p.needsReview).map((p) => (p.reviewLabel ? `${name(p)}: ${p.reviewLabel}` : name(p))),
+    noBackup: live.filter((p) => !p.backupOwnerId).map(name),
+    exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").map((e) => (e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what)),
+    exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").map((e) => (e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what)),
+    uncertain: items.filter(uncertain).map((i) => i.label),
+    openQuestions: input.facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).map((f) => f.body),
+    clientVisible: [...live.filter((p) => p.clientVisible).map(name), ...items.filter((i) => i.clientVisible).map((i) => i.label)],
+    noOwner: items.filter((i) => !i.ownerId).map((i) => i.label),
+    systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").map((s) => s.systemName),
+  };
+  for (const k of Object.keys(out) as ControlKey[]) out[k] = cap(out[k]!.map((x) => (x.length > 140 ? `${x.slice(0, 139)}…` : x)));
+  return out;
 }

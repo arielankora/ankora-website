@@ -34,9 +34,9 @@ import { listClientEntities } from "@/lib/app-domain/client-entities";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { RequestTypesPanel } from "./RequestTypesPanel";
 import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
-import { readReviewReason, reviewDueAt } from "@/lib/process-review";
+import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { ControlLine } from "./ControlLine";
-import { controlFrom, controlParts } from "@/lib/client-control";
+import { controlDetails, controlFrom, controlParts } from "@/lib/client-control";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
@@ -268,6 +268,21 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               daysSinceBatch,
             })
           )}
+          clientId={client.id}
+          details={controlDetails({
+            processes: processes.map((p) => ({ ...p, reviewLabel: readReviewReason(p.reviewReason) ? REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!] : null })),
+            exceptions: exceptions.map((e) => ({ status: e.status, what: e.what, ruleTitle: policies.find((r) => r.id === e.policyId)?.title ?? null })),
+            facts: facts.current,
+            otherItems: [
+              ...people.contacts.map((c) => ({ ...c, label: c.person.name ?? c.role ?? "איש קשר" })),
+              ...people.organizations.map((o) => ({ ...o, label: o.organization.name })),
+              ...systems.map((x) => ({ ...x, label: x.systemName })),
+              ...entities.map((e) => ({ ...e, label: e.name })),
+              ...requestTypes.map((r) => ({ ...r, label: r.title })),
+              ...policies.filter((r) => r.status !== "RETIRED").map((r) => ({ ...r, label: r.title })),
+            ],
+            systems,
+          })}
         />
 
         <DisclosureBanner
