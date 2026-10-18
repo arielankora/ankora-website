@@ -83,6 +83,9 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       // (assignableUsers), so a stale or forged id is refused there.
       assignedToId,
       supervisorId,
+      description: String(formData.get("description") || "").trim() || null,
+      // Urgent sends the assignee a message now (urgent-tasks.ts).
+      priority: formData.get("urgent") === "on" ? "URGENT" : undefined,
     });
   } catch (err) {
     return { error: friendlyError(err) };

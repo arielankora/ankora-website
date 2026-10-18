@@ -15,6 +15,7 @@ import type {
 } from "@prisma/client";
 import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
+import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -929,6 +930,8 @@ export async function createTask(
     { assignedToId: null, supervisorId: null },
     task
   );
+  // Urgent work does not wait for the morning. See urgent-tasks.ts.
+  await alertIfUrgentLanded(actor, task, client?.name ?? "", null);
   return task;
 }
 
@@ -1452,6 +1455,9 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // "somebody newly named" answerable at all: a patch that renames a
   // task must not re-announce an assignee who has had it for a week.
   await notifyTaskPeople(actor.id, updated, taskClientName, task, updated);
+  // And urgent work that just became this person's does not wait for the
+  // morning: raised to urgent, or an urgent task handed over.
+  await alertIfUrgentLanded(actor, updated, taskClientName, task);
   return updated;
 }
 
@@ -1680,6 +1686,9 @@ export async function addTaskComment(actor: User, taskId: string, body: string) 
     clientId: task.clientId,
     after: { commentId: comment.id },
   });
+  // A comment on urgent work reaches its owner the same day, at most
+  // once an hour per task. Everything else waits for the digest.
+  await alertIfUrgentComment(actor, task.id, text);
   return comment;
 }
 

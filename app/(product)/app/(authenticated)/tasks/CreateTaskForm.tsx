@@ -66,6 +66,8 @@ export function CreateTaskForm({
   const [peopleError, setPeopleError] = useState<string | null>(null);
   const [assignedToId, setAssignedToId] = useState("");
   const [supervisorId, setSupervisorId] = useState("");
+  const [urgent, setUrgent] = useState(false);
+  const assigneeName = people.find((p) => p.id === assignedToId)?.name ?? null;
 
   useEffect(() => {
     setAssignedToId("");
@@ -138,6 +140,20 @@ export function CreateTaskForm({
           className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
         />
       </div>
+      {/* 7.10.2026. A task handed to somebody arrives with what they need
+          to start, not with a title and a comment hidden below it. */}
+      <div>
+        <label htmlFor="create-task-description" className="block text-xs font-medium text-appNavy/60">
+          פרטים
+        </label>
+        <textarea
+          id="create-task-description"
+          name="description"
+          rows={3}
+          placeholder="מה צריך לדעת כדי להתחיל: מה ביקשו, ממי, ומה כבר נעשה"
+          className="mt-1.5 w-full resize-y rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        />
+      </div>
 
       {/* Side by side from the small breakpoint up, stacked on a phone:
           two selects in one row at 360px leave each about 150px, which
@@ -185,6 +201,29 @@ export function CreateTaskForm({
         </div>
       </div>
       {peopleError && <p className="-mt-2 text-xs text-red-600">{peopleError}</p>}
+
+      {/* Urgent is the one thing that does not wait for the morning
+          digest, so the person choosing it is told what it will do, and
+          the person not choosing it is told when it will be seen. */}
+      <div>
+        <label className="flex items-center gap-2.5 text-sm text-appNavy">
+          <input
+            type="checkbox"
+            name="urgent"
+            checked={urgent}
+            onChange={(e) => setUrgent(e.target.checked)}
+            className="h-4 w-4 rounded border-lineDark accent-gold"
+          />
+          דחופה
+        </label>
+        {assigneeName && (
+          <p className="mt-1.5 text-xs text-appNavy/55">
+            {urgent
+              ? `${assigneeName} יקבל/תקבל הודעה עכשיו, עם קישור למשימה.`
+              : `${assigneeName} יראה/תראה אותה בתקציר הבוקר הבא.`}
+          </p>
+        )}
+      </div>
 
       {/* Portal phase 1. Off by default: an internal task stays internal
           unless someone says otherwise, which is the safe direction for a
