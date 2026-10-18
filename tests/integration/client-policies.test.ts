@@ -198,4 +198,18 @@ describe("where the rules act", () => {
     const dup = (await listOpenBatches(employee)).find((x) => x.id === again.batchId)!.proposals[0];
     expect((dup.flags as { code: string }[]).map((f) => f.code)).toContain("DUPLICATE");
   });
+
+  it("spec 3.11: a start date and a review date; moving the start of an approved rule sends it back", async () => {
+    const { client, employee, manager } = await setup();
+    const from = new Date(Date.now() + 60 * 86_400_000);
+    const p = await addClientPolicy(employee, { clientId: client.id, kind: "DATA_HANDLING", title: "פגישות הנהלה", statement: "נושאים בלבד", sources: S1, effectiveFrom: from, reviewBy: new Date(Date.now() - 86_400_000) });
+    expect(p).toMatchObject({ effectiveFrom: from });
+    await approveClientPolicy(manager, p.id);
+    // The review date is not what the rule says: still in force.
+    const reviewed = await updateClientPolicy(employee, p.id, { reviewBy: new Date(Date.now() + 365 * 86_400_000) });
+    expect(reviewed.status).toBe("ACTIVE");
+    // When it starts is.
+    const moved = await updateClientPolicy(employee, p.id, { effectiveFrom: new Date(from.getTime() + 30 * 86_400_000) });
+    expect(moved).toMatchObject({ status: "PROPOSED", version: 2 });
+  });
 });

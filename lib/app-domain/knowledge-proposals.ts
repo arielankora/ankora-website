@@ -473,7 +473,10 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...withoutOwnerName(PAYLOADS.REQUEST_TYPE.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
   // A rule enters the file as "proposed": approving the proposal records
   // what the client said; making it binding is a manager's separate step.
-  if (p.target === "POLICY") return (await addClientPolicy(actor, { ...withoutOwnerName(PAYLOADS.POLICY.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "POLICY") {
+    const r = withoutOwnerName(PAYLOADS.POLICY.parse(payload));
+    return (await addClientPolicy(actor, { ...r, effectiveFrom: date(r.effectiveFrom), reviewBy: date(r.reviewBy), ...owner, sources, clientId: p.clientId })).id;
+  }
   if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...withoutOwnerName(PAYLOADS.SYSTEM.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
   if (p.target === "ENTITY") {
     const { parentName, ownerName: _o, ...e } = PAYLOADS.ENTITY.parse(payload);

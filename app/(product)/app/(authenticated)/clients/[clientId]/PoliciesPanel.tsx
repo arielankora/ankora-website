@@ -51,6 +51,11 @@ export type PanelPolicy = {
   interimStatement: string | null;
   params: PolicyParams;
   interimParams: PolicyParams;
+  /// Spec 3.11: YYYY-MM-DD, and the two as a line.
+  effectiveFrom?: string | null;
+  reviewBy?: string | null;
+  datesLine?: string | null;
+  reviewDue?: boolean;
   /// What the server checks now, in a line; null when nothing.
   checked: string | null;
   approvedByName: string | null;
@@ -212,6 +217,15 @@ function PolicyForm({
       <Field label="למה">
         <input name="rationale" defaultValue={existing?.rationale ?? ""} className={INPUT} />
       </Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="נכנס לתוקף ב-">
+          <input type="date" name="effectiveFrom" defaultValue={existing?.effectiveFrom ?? ""} className={INPUT} />
+        </Field>
+        <Field label="לסקירה עד">
+          <input type="date" name="reviewBy" defaultValue={existing?.reviewBy ?? ""} className={INPUT} />
+        </Field>
+      </div>
+      <p className="-mt-2 text-[11px] text-appNavy/50">ריק: חל מיד, בלי מועד סקירה. שינוי של יום הכניסה לתוקף בכלל שבתוקף מחזיר אותו לאישור מנהל.</p>
       <Field label="מה ידוע על הכלל">
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
           <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
@@ -362,6 +376,11 @@ export function PoliciesPanel({
                   </p>
                 ) : (
                   kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-appNavy/45">טקסט בלבד: השרת לא בודק את הכלל הזה.</p>
+                )}
+                {p.datesLine && (
+                  <p className={`mt-0.5 text-[11px] ${p.reviewDue ? "text-warning" : "text-appNavy/55"}`} data-testid="policy-dates">
+                    {p.datesLine}
+                  </p>
                 )}
                 {p.status === "ACTIVE" && p.approvedByName && (
                   <p className="mt-0.5 text-[11px] text-appNavy/45">

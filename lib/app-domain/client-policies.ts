@@ -38,6 +38,9 @@ export interface ClientPolicyInput extends KnowledgeInput {
   /// keys the kind does not take are dropped.
   params?: unknown;
   interimParams?: unknown;
+  /// Spec 3.11: the day it starts to bind, and the day it is looked at again.
+  effectiveFrom?: Date | null;
+  reviewBy?: Date | null;
 }
 
 function clean(v: string | null | undefined): string | null {
@@ -91,6 +94,8 @@ export async function addClientPolicy(actor: User, input: ClientPolicyInput) {
       interimStatement: clean(input.interimStatement),
       params: json(params),
       interimParams: json(interimParams),
+      effectiveFrom: input.effectiveFrom ?? null,
+      reviewBy: input.reviewBy ?? null,
       createdById: actor.id,
       ...knowledgeData(input),
       ...sourced,
@@ -117,6 +122,7 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
       title: input.title,
       statement: input.statement,
       interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
+      effectiveFrom: input.effectiveFrom,
     }) ||
     paramsKey(params) !== paramsKey(readParams(before.kind as PolicyKindLike, before.params)) ||
     paramsKey(interimParams) !== paramsKey(readParams(before.kind as PolicyKindLike, before.interimParams));
@@ -141,6 +147,8 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
       interimStatement: input.interimStatement !== undefined ? clean(input.interimStatement) : undefined,
       params: json(params),
       interimParams: json(interimParams),
+      effectiveFrom: input.effectiveFrom !== undefined ? input.effectiveFrom : undefined,
+      reviewBy: input.reviewBy !== undefined ? input.reviewBy : undefined,
       // What it says changed: a new version, and back to a manager.
       ...(substantive
         ? { version: before.version + 1, status: "PROPOSED" as const, approvedById: null, approvedAt: null }

@@ -11,6 +11,7 @@ import {
   type Attention,
 } from "@/lib/client-file-attention";
 import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
+import { ruleReviewDue } from "@/lib/client-policies";
 
 // Org brain, phase 2: the daily look at every client file
 // (claude/org-brain-spec-2026-10-12.md, 3.4 and 5.4). Runs on the existing
@@ -33,7 +34,7 @@ import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
 
 export const ATTENTION_TYPE = "client_file.attention";
 
-const ZERO: Attention = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 };
+const ZERO: Attention = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0, rulesDueReview: 0 };
 
 export async function notifyClientFileAttention(now = new Date()): Promise<{ notified: number; unowned: number }> {
   const staleBefore = new Date(now.getTime() - UNCERTAIN_REMINDER_DAYS * DAY_MS);
@@ -62,8 +63,8 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     prisma.requestType.findMany({ where: { ...live, ...stale }, select: row }),
     prisma.process.findMany({ where: { ...live, ...stale, status: { not: "RETIRED" } }, select: row }),
     prisma.clientPolicy.findMany({
-      where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: staleBefore } }] },
-      select: { ...row, status: true, createdAt: true },
+      where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: staleBefore } }, { reviewBy: { lte: now } }] },
+      select: { ...row, status: true, createdAt: true, reviewBy: true },
     }),
   ]);
 
@@ -115,6 +116,16 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
   // manager's to chase.
   for (const rule of policies) {
     if (isStaleProposedRule(rule, now)) bucket(rule.clientId).all.staleProposedRules++;
+    // Spec 3.11: its review date passed. The manager and its owner hear,
+    // every week, until someone reviews it and sets the next date.
+    if (ruleReviewDue(rule, now)) {
+      const b = bucket(rule.clientId);
+      b.all.rulesDueReview = (b.all.rulesDueReview ?? 0) + 1;
+      if (rule.ownerId) {
+        const t = theirs(b, rule.ownerId);
+        t.rulesDueReview = (t.rulesDueReview ?? 0) + 1;
+      }
+    }
   }
 
   const clients = await prisma.client.findMany({

@@ -6,7 +6,7 @@ import { listProcesses } from "@/lib/app-domain/processes";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { ACTION_TAG_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, type ProcessStep } from "@/lib/process-rules";
-import { POLICY_KIND_LABELS, ruleInForce } from "@/lib/client-policies";
+import { POLICY_KIND_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
@@ -163,7 +163,9 @@ export async function mcpListPolicies(actor: User, clientId: string) {
           kind: POLICY_KIND_LABELS[r.kind],
           title: r.title,
           rule: inForce.text,
-          status: r.status === "ACTIVE" ? "בתוקף" : inForce.interim ? "מוצע: חל כלל הביניים" : "מוצע",
+          status: inForce.startsOn ? "נכנס לתוקף בהמשך: לא חל עדיין" : r.status === "ACTIVE" ? "בתוקף" : inForce.interim ? "מוצע: חל כלל הביניים" : "מוצע",
+          // Spec 3.11: when it starts to bind, and when it is reviewed.
+          dates: ruleDatesLine(r),
           proposedRule: r.status === "PROPOSED" && inForce.interim ? r.statement : null,
           checkedAgainstProcedures: paramsSummary(r.kind, paramsInForce(r), (id) => entityName.get(id) ?? "ישות שהוסרה"),
           rationale: r.rationale,

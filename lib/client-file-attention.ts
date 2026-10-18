@@ -19,6 +19,8 @@ export type Attention = {
   openQuestions: number;
   /// Rules proposed more than two weeks ago and still not approved.
   staleProposedRules: number;
+  /// Rules whose review date has passed (spec 3.11).
+  rulesDueReview?: number;
 };
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -32,7 +34,7 @@ export function isStaleUncertain(item: { knowledgeStatus: string; updatedAt: Dat
 }
 
 export function hasAttention(a: Attention): boolean {
-  return a.pastValidity + a.staleUncertain + a.openQuestions + a.staleProposedRules > 0;
+  return a.pastValidity + a.staleUncertain + a.openQuestions + a.staleProposedRules + (a.rulesDueReview ?? 0) > 0;
 }
 
 /// One sentence, the counts that are not zero, in order of urgency.
@@ -53,6 +55,9 @@ export function attentionSentence(a: Attention): string {
         ? `כלל מוצע אחד מחכה לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חל רק כלל הביניים.`
         : `${a.staleProposedRules} כללים מוצעים מחכים לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חלים רק כללי הביניים.`
     );
+  }
+  if (a.rulesDueReview) {
+    parts.push(a.rulesDueReview === 1 ? "הגיע מועד הסקירה של כלל אחד." : `הגיע מועד הסקירה של ${a.rulesDueReview} כללים.`);
   }
   return parts.join(" ");
 }

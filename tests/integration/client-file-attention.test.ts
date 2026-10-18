@@ -117,4 +117,14 @@ describe("client file attention", () => {
     const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
     expect(toHadas.body).toBe("פריט אחד לא ודאי כבר יותר מ-14 יום.");
   });
+
+  it("spec 3.11: a rule past its review date tells the manager and its owner", async () => {
+    const { client, manager, hadas } = await setup();
+    await prisma.clientPolicy.create({ data: { clientId: client.id, kind: "INFO", title: "דוחות", statement: "רבעוני", status: "ACTIVE", reviewBy: morning(-2), ownerId: hadas.id } });
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 2, unowned: 0 });
+    const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
+    expect(toManager.body).toBe("הגיע מועד הסקירה של כלל אחד.");
+    const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
+    expect(toHadas.body).toBe("הגיע מועד הסקירה של כלל אחד.");
+  });
 });

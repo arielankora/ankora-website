@@ -92,6 +92,9 @@ export const PolicyPayload = z.object({
   statement: z.string().min(1).max(2000),
   rationale: z.string().max(1000).nullish(),
   interimStatement: z.string().max(1000).nullish(),
+  /// Spec 3.11: from when it binds, and when it is looked at again.
+  effectiveFrom: day,
+  reviewBy: day,
   ...knowledge,
 });
 
@@ -379,6 +382,7 @@ function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown
   if (target === "ENTITY") {
     return [s("registrationNumber"), s("country"), s("currency"), s("parentName") && `בת של ${s("parentName")}`].filter((x): x is string => !!x);
   }
+  if (target === "POLICY") return [s("effectiveFrom") && `נכנס לתוקף ב-${s("effectiveFrom")}`, s("reviewBy") && `לסקירה עד ${s("reviewBy")}`].filter((x): x is string => !!x);
   if (target === "NARRATIVE") return s("body").length > 160 ? [s("body")] : [];
   if (target === "DOMAIN") return [payload.kind === "PARTNER" ? "דומיין של שותף" : "דומיין של הלקוח"];
   return [];

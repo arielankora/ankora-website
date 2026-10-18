@@ -3489,6 +3489,13 @@ model ClientPolicy {
   /// The same for the interim rule, while proposed. Empty with an interim
   /// statement: a proposed threshold is read as zero.
   interimParams    Json    @default("{}")
+  /// Spec 3.11: the day it starts to bind ("from 1.1.2027"). Before it, it
+  /// is read and checked against nothing. Moving it is a change to what
+  /// the rule says, and goes back to a manager.
+  effectiveFrom    DateTime?
+  /// Spec 3.11: the day someone looks at it again. Past it, the weekly
+  /// reminder says so until the next date is set.
+  reviewBy         DateTime?
 
   approvedById String?
   approvedAt   DateTime?

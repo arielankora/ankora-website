@@ -49,7 +49,7 @@ import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { checkDueKey, checkEveryText, checkState, isRoutine } from "@/lib/process-checks";
 import { ProcessesPanel } from "./ProcessesPanel";
 import { canApproveForClient, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
-import { EXCEPTION_MAX_DAYS } from "@/lib/client-policies";
+import { EXCEPTION_MAX_DAYS, ruleDatesLine, ruleReviewDue } from "@/lib/client-policies";
 import { ruleInForce } from "@/lib/client-policies";
 import { NarrativesPanel } from "./NarrativesPanel";
 import { listRequestTypes } from "@/lib/app-domain/request-types";
@@ -521,6 +521,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 interimStatement: p.interimStatement,
                 params: readParams(p.kind, p.params),
                 interimParams: readParams(p.kind, p.interimParams),
+                effectiveFrom: p.effectiveFrom ? p.effectiveFrom.toISOString().slice(0, 10) : null,
+                reviewBy: p.reviewBy ? p.reviewBy.toISOString().slice(0, 10) : null,
+                datesLine: ruleDatesLine(p),
+                reviewDue: ruleReviewDue(p),
                 checked: paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? "ישות שהוסרה"),
                 approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
