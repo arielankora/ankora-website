@@ -101,6 +101,17 @@ export function canSendToAi(
   return true;
 }
 
+/// What may be shown to the client (spec 3.1): an item a person marked
+/// "visible to the client", that every one of us may read, and that is
+/// neither sensitive nor carries a "do not tell". Null when it may; why
+/// not, otherwise. The portal will show only what passes this.
+export function clientVisibleBlocker(item: { sensitivity?: string | null; audience?: KnowledgeAudienceLike | null; doNotDisclose?: string | null }): string | null {
+  if (item.sensitivity === "SENSITIVE") return "פריט רגיש לא מוצג ללקוח.";
+  if (item.audience && item.audience !== "ALL_STAFF") return "פריט שרק חלק מהצוות רואה לא מוצג ללקוח.";
+  if (item.doNotDisclose?.trim()) return "לפריט יש \"לא לספר\", ולכן הוא לא מוצג ללקוח.";
+  return null;
+}
+
 /// Rule 4: what may be written into a task. A task is read by everyone on
 /// the client and goes to Claude whole ("קדם עם קלוד", get_task), so only
 /// an item meant for all of them, and not sensitive, is copied into one.

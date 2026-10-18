@@ -131,6 +131,21 @@ function EditForm({ p }: { p: ReviewProposal }) {
           </label>
         </>
       ) : null}
+      {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && (
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block">
+            <span className="block text-xs font-medium text-appNavy/60">בעלים באנקורה (שם)</span>
+            <input name="ownerName" defaultValue={str(p.payload.ownerName)} className={INPUT} />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-appNavy/60">גלוי ללקוח</span>
+            <select name="clientVisible" defaultValue={p.payload.clientVisible === true ? "yes" : "no"} className={INPUT}>
+              <option value="no">לא</option>
+              <option value="yes">כן</option>
+            </select>
+          </label>
+        </div>
+      )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
         {pending ? "שומר..." : "אישור עם השינויים"}

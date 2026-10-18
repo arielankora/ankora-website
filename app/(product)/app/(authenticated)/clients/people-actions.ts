@@ -13,6 +13,7 @@ import {
 import { normalizeEmail, normalizePhone, parseList } from "@/lib/contact-normalize";
 import { parseSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import type { ContactRelationship, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 2: the people and organizations panel on the client
 // screen (spec 3.5).
@@ -57,6 +58,7 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
   if (sources.error) return { error: sources.error };
   return {
     value: {
+      ...itemExtrasFrom(formData),
       clientId: String(formData.get("clientId") ?? ""),
       name: text(formData, "name"),
       role: text(formData, "role"),
@@ -137,6 +139,7 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
   if (sources.error) return { error: sources.error };
   try {
     await addClientOrganization(user, {
+      ...itemExtrasFrom(formData),
       clientId,
       name: String(formData.get("name") ?? ""),
       domains: String(formData.get("domains") ?? "")

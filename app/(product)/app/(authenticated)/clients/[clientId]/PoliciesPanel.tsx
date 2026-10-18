@@ -26,7 +26,7 @@ import {
   updatePolicyAction,
   withdrawExceptionAction,
 } from "../policy-actions";
-import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
+import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { PolicyParamsFields } from "./PolicyParamsFields";
 import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
 
@@ -39,6 +39,8 @@ import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
 // client has not confirmed.
 
 export type PanelPolicy = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   kind: PolicyKindLike;
   status: PolicyStatusLike;
@@ -218,6 +220,7 @@ function PolicyForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -367,6 +370,7 @@ export function PoliciesPanel({
                   </p>
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
+                <ItemTags item={p} />
                 <SourceCodes sources={p.sources} options={sourceOptions} />
                 {exceptions
                   .filter((e) => e.policyId === p.id)

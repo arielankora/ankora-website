@@ -40,7 +40,7 @@ import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
-import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
 
 // Org brain, phase 1: processes and their procedures, section 7.4 of the
@@ -55,6 +55,7 @@ import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-cal
 type Option = { id: string; name: string };
 
 export type PanelProcess = {
+  clientVisible?: boolean;
   id: string;
   code: string;
   title: string;
@@ -392,6 +393,7 @@ function ProcessForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} owner={false} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -731,6 +733,7 @@ export function ProcessesPanel({
                     </ul>
                   )}
                   <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
+                  <ItemTags item={{ clientVisible: p.clientVisible }} />
                   <SourceCodes sources={p.sources} options={sourceOptions} />
 
                   {p.current ? (

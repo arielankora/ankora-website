@@ -23,7 +23,7 @@ import {
   closeTemporaryFactAction,
   removeClientFactAction,
 } from "../fact-actions";
-import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption } from "./knowledge-ui";
+import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 
 // Org brain, phase 2: the facts of the client file, sections 2, 4, 5, 7.3,
 // 8, 11, 12 and 13 of Hadas's file (claude/org-brain-spec-2026-10-12.md,
@@ -35,6 +35,8 @@ import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption 
 // "היסטוריה", so the file can always say what we thought before.
 
 export type PanelFact = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   kind: FactKindLike;
   topic: FactTopicLike | null;
@@ -200,6 +202,7 @@ function FactForm({
         </div>
       )}
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={question ? "MISSING" : status} />
+      <ItemExtras existing={existing} />
       {(question || status !== "CONFIRMED") && (
         <Field label={question ? "מה יסגור אותה" : "מה יסגור את זה *"}>
           <input name="toResolve" required={!question} defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -331,6 +334,7 @@ function FactRow({
           )}
           {fact.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {fact.doNotDisclose}</p>}
           {fact.kind !== "QUESTION" && <StatusLine status={fact.status} toResolve={fact.toResolve} />}
+          <ItemTags item={fact} />
           {fact.kind === "QUESTION" && !answered && fact.toResolve && fact.toResolve !== "תשובה לשאלה." && (
             <p className="mt-1 text-xs text-appNavy/60">{fact.toResolve}</p>
           )}

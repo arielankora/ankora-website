@@ -18,7 +18,7 @@ import {
   type SystemPermissionLike,
 } from "@/lib/system-map";
 import { addSystemAccessAction, updateSystemAccessAction, removeSystemAccessAction } from "../system-actions";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 
 // Org brain, phase 2: the system map, section 7.1 of the client file
 // (claude/org-brain-spec-2026-10-12.md, 3.6).
@@ -29,6 +29,8 @@ import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type
 // before they reach for it.
 
 export type PanelSystem = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   systemName: string;
   purpose: string | null;
@@ -193,6 +195,7 @@ function SystemForm({
         </Field>
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -296,6 +299,7 @@ export function SystemsPanel({
                     </p>
                   ))}
                   <StatusLine status={s.status} toResolve={s.toResolve} />
+                  <ItemTags item={s} />
                   <SourceCodes sources={s.sources} options={sourceOptions} />
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-xs">
