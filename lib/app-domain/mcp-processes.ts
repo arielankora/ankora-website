@@ -26,7 +26,7 @@ const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : 
 type Processes = Awaited<ReturnType<typeof listProcesses>>;
 
 async function namesFor(processes: Processes, clientId: string) {
-  const userIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId]).filter((x): x is string => !!x))];
+  const userIds = [...new Set(processes.flatMap((p) => [p.ownerId, p.backupOwnerId, p.approverUserId]).filter((x): x is string => !!x))];
   const [users, systems] = await Promise.all([
     prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } }),
     prisma.systemAccess.findMany({ where: { clientId, deletedAt: null }, select: { id: true, systemName: true } }),
@@ -92,7 +92,18 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     ...summary(p, user),
     sla: p.slaText,
     executorToday: p.executorText,
-    approver: p.approverText,
+    // Who signs an approval step: at Ankora in the product, at the client
+    // by name (a contact Claude may not see is not named).
+    approver: await (async () => {
+      const contact = p.approverContactId
+        ? await prisma.clientContact.findFirst({ where: { id: p.approverContactId, deletedAt: null }, select: { role: true, sensitivity: true, audience: true, audienceUserIds: true, person: { select: { name: true } } } })
+        : null;
+      return {
+        atAnkora: p.approverUserId ? (user.get(p.approverUserId) ?? null) : null,
+        atClient: contact && canSendToAi(contact, actor.id) ? (contact.person.name ?? contact.role) : null,
+        inWords: p.approverText,
+      };
+    })(),
     approvals: p.approvalText,
     externalParty: p.externalPartyText,
     exceptionPlaybook: p.exceptionPlaybook,

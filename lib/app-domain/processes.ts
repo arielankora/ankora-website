@@ -53,6 +53,8 @@ export interface ProcessInput extends KnowledgeInput {
   requiredSystemIds?: string[];
   approverText?: string | null;
   approverContactId?: string | null;
+  /// Spec 5.3: who at Ankora signs an approval step, in the product.
+  approverUserId?: string | null;
   approvalPolicyIds?: string[];
   approvalText?: string | null;
   exceptionPlaybook?: string | null;
@@ -88,6 +90,14 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
     const ok = await prisma.user.count({ where: { id, deletedAt: null, role: { not: "CLIENT_USER" } } });
     if (!ok) throw new Error("אחראי או מחליף צריכים להיות אנשי צוות של אנקורה.");
   }
+  // The approver signs a step on this client's task: someone on the
+  // client, or a manager, who reaches every client.
+  if (input.approverUserId) {
+    const ok = await prisma.user.count({
+      where: { id: input.approverUserId, deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" }, OR: [{ role: { in: (["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE"] as const).filter((r) => canManageClients(r)) } }, { clientAccess: { some: { clientId } } }] },
+    });
+    if (!ok) throw new Error("המאשר באנקורה צריך להיות איש צוות פעיל שמשויך ללקוח, או מנהל.");
+  }
   if (input.entityId !== undefined) await assertEntityBelongs(clientId, input.entityId);
   return { contacts, systems, policies };
 }
@@ -112,6 +122,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     requiredSystemIds: ids.systems,
     approverText: input.approverText !== undefined ? clean(input.approverText) : undefined,
     approverContactId: input.approverContactId !== undefined ? input.approverContactId || null : undefined,
+    approverUserId: input.approverUserId !== undefined ? input.approverUserId || null : undefined,
     approvalPolicyIds: ids.policies,
     approvalText: input.approvalText !== undefined ? clean(input.approvalText) : undefined,
     exceptionPlaybook: input.exceptionPlaybook !== undefined ? clean(input.exceptionPlaybook) : undefined,

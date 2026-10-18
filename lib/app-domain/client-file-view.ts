@@ -115,7 +115,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       select: { createdAt: true, via: true, note: true, sourceId: true, proposals: { select: { state: true } } },
     }),
   ]);
-  const ownerIds = [...new Set([...processes.flatMap((p) => [p.ownerId, p.backupOwnerId]), ...facts.current.map((f) => f.assigneeId)].filter((x): x is string => !!x))];
+  const ownerIds = [...new Set([...processes.flatMap((p) => [p.ownerId, p.backupOwnerId, p.approverUserId]), ...facts.current.map((f) => f.assigneeId)].filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;
 
@@ -302,6 +302,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           TRANSITION_LABELS[p.transitionStatus],
           p.executorText ? `מבצע היום: ${p.executorText}` : null,
           p.slaText ? `SLA: ${p.slaText}` : null,
+          (() => {
+            const who = [p.approverUserId ? ownerName.get(p.approverUserId) : null, p.approverContactId ? contactName.get(p.approverContactId) : null, p.approverText].filter(Boolean);
+            return who.length ? `מאשר: ${[...new Set(who)].join(", ")}` : null;
+          })(),
           p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
           p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
           readReviewReason(p.reviewReason) ? `דורש סקירה: ${REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!]}` : null,

@@ -256,49 +256,11 @@ test.describe("alerts/actions", () => {
   });
 });
 
-test.describe("hour-banks/actions", () => {
-  // This was `fixme` with a note asking for one thing before it came back:
-  // understand why the submit button was still disabled sixty seconds after
-  // a form that validated. It was never this action being slow. The form was
-  // held pending until the revalidated re-render landed, not until the action
-  // answered - the same coupling that made every write screen in the app look
-  // slow, and that useActionForm removed. The measurement is in that file.
-  //
-  // So the flow comes back unchanged. What changes is the wait: see the
-  // helper's own note on why a timeout raised for a reason has to fall when
-  // that reason does.
-  test("opening a cycle for a client shows its purchased hours", async ({ page }) => {
-    await page.goto(`/app/hour-banks?clientId=${CLIENT}`);
-
-    // The opener lives in a drawer, and only once a client is selected.
-    const trigger = page.getByRole("button", { name: "פתיחת מחזור חדש" }).first();
-    await expect(trigger, "no client context on the hour-banks screen").toBeVisible();
-    await trigger.click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await dialog.locator('input[name="cycleStart"]').fill(isoDay(-1));
-    await dialog.locator('input[name="cycleEnd"]').fill(isoDay(27));
-    await dialog.locator('input[name="purchasedHours"]').fill("10");
-    await dialog.locator('select[name="rolloverMode"]').selectOption("NONE");
-    await dialog.getByRole("button", { name: "פתיחת מחזור חדש" }).click();
-
-    // The default, like every other drawer here. The 60s this used to carry
-    // was measuring a form waiting for a screen refresh, not an action
-    // writing rows; with that gone, 60s would only absorb a real regression
-    // in silence.
-    await expectDrawerClosed(page, "opening an hour-bank cycle");
-    await page.reload();
-
-    // Ten hours; the screen renders banks in decimal hours, so the
-    // assertion is on the cycle being open at all rather than on a format
-    // this test should not be pinning.
-    await expect(
-      page.getByText(/10\.00|10:00|600/).first(),
-      "the opened cycle is not visible on the screen",
-    ).toBeVisible({ timeout: 15_000 });
-  });
-});
+// hour-banks/actions: covered in flows-hourbanks.super.spec.ts, where each
+// test opens its cycle on a client of its own. The test that was here
+// opened one on the shared demo client with yesterday as its start, so any
+// attempt that wrote the row and then failed made every retry hit the
+// unique key (client, cycle start): QA on PR #247, 18.10.2026.
 
 test.describe("important-dates/actions", () => {
   test("a date created from the drawer appears in the catalogue", async ({ page }) => {

@@ -69,6 +69,8 @@ export type PanelProcess = {
   externalPartyText: string | null;
   requiredSystemIds: string[];
   approverText: string | null;
+  approverUserId: string | null;
+  approverContactId: string | null;
   approvalPolicyIds: string[];
   approvalText: string | null;
   exceptionPlaybook: string | null;
@@ -312,9 +314,29 @@ function ProcessForm({
         <Checks name="externalPartyContactIds" options={contacts} selected={existing?.externalPartyContactIds ?? []} />
         <input name="externalPartyText" defaultValue={existing?.externalPartyText ?? ""} placeholder='Nextage, או "אין"' className={INPUT} />
       </div>
-      <Field label="מי מאשר">
-        <input name="approverText" defaultValue={existing?.approverText ?? ""} placeholder="מורשה חתימה בבנק" className={INPUT} />
-      </Field>
+      <div>
+        <span className={LABEL}>מי מאשר שלב שדורש אישור</span>
+        <div className="grid grid-cols-2 gap-3">
+          <select name="approverUserId" defaultValue={existing?.approverUserId ?? ""} aria-label="מאשר באנקורה" className={INPUT}>
+            <option value="">אף אחד באנקורה</option>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} (מאשר במערכת)
+              </option>
+            ))}
+          </select>
+          <select name="approverContactId" defaultValue={existing?.approverContactId ?? ""} aria-label="מאשר אצל הלקוח" className={INPUT}>
+            <option value="">אף אחד אצל הלקוח</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="mt-1 text-[11px] text-appNavy/50">מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.</p>
+        <input name="approverText" defaultValue={existing?.approverText ?? ""} placeholder="או במילים: מורשה חתימה בבנק" className={INPUT} />
+      </div>
       <div>
         <span className={LABEL}>ספי אישור</span>
         <Checks name="approvalPolicyIds" options={rules} selected={existing?.approvalPolicyIds ?? []} />

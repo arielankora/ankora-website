@@ -1352,6 +1352,17 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     !OPEN_STATUSES.includes(data.status) &&
     OPEN_STATUSES.includes(task.status);
 
+  // Closing work closes its steps, except one that waits for a
+  // signature: closing the run around it would sign it for nobody (org
+  // brain spec 5.3). It is signed first, or the work is archived.
+  if (closing && data.status === "DONE" && !task.parentId) {
+    const waiting = await prisma.task.findFirst({
+      where: { parentId: taskId, deletedAt: null, requiresApproval: true, status: { in: OPEN_STATUSES } },
+      select: { title: true, supervisor: { select: { name: true } } },
+    });
+    if (waiting) throw new Error(`השלב "${waiting.title}" מחכה לאישור${waiting.supervisor ? ` של ${waiting.supervisor.name}` : ""}. אחרי שהוא מאושר, אפשר לסגור.`);
+  }
+
   const [updated, closedSteps] = await prisma.$transaction(async (tx) => {
     const row = await tx.task.update({ where: { id: taskId }, data });
     if (!closing || task.parentId) return [row, [] as { id: string; title: string }[]] as const;
@@ -1876,6 +1887,8 @@ export async function getTaskDetail(actor: User, taskId: string) {
         status: true,
         dueDate: true,
         assignedTo: { select: { id: true, name: true } },
+        requiresApproval: true,
+        supervisor: { select: { id: true, name: true } },
       },
     }),
   ]);
@@ -1940,4 +1953,45 @@ export async function getTaskDetail(actor: User, taskId: string) {
     /// zero, which is a different sentence from "nothing happened".
     commentCount: comments.length,
   };
+}
+
+export const STEP_APPROVAL_REQUESTED = "task.approval_requested";
+
+/// A step ticked on its parent's screen (Tasks phase 5, org brain spec
+/// 5.3). A step that waits for a signature cannot simply be ticked done:
+/// whoever did the work sends it to the approver, who is notified, and the
+/// approver's tick is the signature. Everything else goes through
+/// updateTask as before, with all its rules.
+export async function setStepDone(actor: User, stepId: string, done: boolean): Promise<"done" | "reopened" | "sent" | "approved"> {
+  if (!done) {
+    await updateTask(actor, stepId, { status: "OPEN" });
+    return "reopened";
+  }
+  const step = await prisma.task.findFirst({
+    where: { id: stepId, deletedAt: null },
+    select: { id: true, title: true, status: true, requiresApproval: true, supervisorId: true, parentId: true, supervisor: { select: { name: true } } },
+  });
+  if (!step || !step.requiresApproval || !step.supervisorId) {
+    await updateTask(actor, stepId, { status: "DONE" });
+    return "done";
+  }
+  if (actor.id === step.supervisorId) {
+    // The approver's own tick signs it, from wherever it stands.
+    if (step.status !== "PENDING_APPROVAL") await updateTask(actor, stepId, { status: "PENDING_APPROVAL" });
+    await updateTask(actor, stepId, { status: "DONE" });
+    return "approved";
+  }
+  if (step.status === "PENDING_APPROVAL") throw new Error(`השלב כבר מחכה לאישור של ${step.supervisor?.name ?? "המאשר"}.`);
+  await updateTask(actor, stepId, { status: "PENDING_APPROVAL" });
+  await prisma.notification.create({
+    data: {
+      userId: step.supervisorId,
+      type: STEP_APPROVAL_REQUESTED,
+      title: `מחכה לאישור שלך: ${step.title}`.slice(0, 200),
+      body: `${actor.name} סיים/ה את השלב ושלח/ה אותו לאישור שלך. אחרי האישור אפשר לסגור את המשימה.`,
+      entityType: "Task",
+      entityId: step.parentId ?? step.id,
+    },
+  });
+  return "sent";
 }

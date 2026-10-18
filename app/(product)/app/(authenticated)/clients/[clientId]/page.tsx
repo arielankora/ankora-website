@@ -418,6 +418,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 externalPartyText: p.externalPartyText,
                 requiredSystemIds: p.requiredSystemIds,
                 approverText: p.approverText,
+                approverUserId: p.approverUserId,
+                approverContactId: p.approverContactId,
                 approvalPolicyIds: p.approvalPolicyIds,
                 approvalText: p.approvalText,
                 exceptionPlaybook: p.exceptionPlaybook,

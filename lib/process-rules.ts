@@ -196,6 +196,7 @@ export type CompletenessInput = {
   systemsWithoutAccess: string[];
   approverText: string | null;
   approverContactId: string | null;
+  approverUserId?: string | null;
   approvalPolicyIds: string[];
   approvalText: string | null;
   externalPartyContactIds: string[];
@@ -228,7 +229,7 @@ export function completeness(p: CompletenessInput): { score: number; of: 9; miss
     systems: p.requiredSystemIds.length > 0,
     // No systems, nothing to have access to: the "systems" gap says it.
     permissions: p.requiredSystemIds.length > 0 && p.systemsWithoutAccess.length === 0,
-    approvals: (!!p.approverText?.trim() || !!p.approverContactId) && (p.approvalPolicyIds.length > 0 || !!p.approvalText?.trim()),
+    approvals: (!!p.approverText?.trim() || !!p.approverContactId || !!p.approverUserId) && (p.approvalPolicyIds.length > 0 || !!p.approvalText?.trim()),
     external: p.externalPartyContactIds.length > 0 || !!p.externalPartyText?.trim(),
     exceptions: !!p.exceptionPlaybook?.trim(),
     // Only a scheduled process has a next date to know.

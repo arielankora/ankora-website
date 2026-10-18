@@ -95,7 +95,14 @@ export async function openProcessRun(input: OpenRunInput) {
   // works it is about to follow a procedure someone has to look at.
   const review = readReviewReason(process.reviewReason);
   if (review) gaps.unshift(`הנוהל דורש סקירה: ${REVIEW_REASON_LABELS[review]}. לבדוק מול כללי הלקוח בתיק לפני שמבצעים.`);
-  const approverText = process.approverText;
+  // Who signs an approval step, by name (spec 5.3). Someone at Ankora is
+  // a signature in the product: the step waits for them. A contact at the
+  // client is named, and the approval is collected from them outside.
+  const [approverUser, approverContact] = await Promise.all([
+    process.approverUserId ? prisma.user.findFirst({ where: { id: process.approverUserId, deletedAt: null, status: "ACTIVE" }, select: { id: true, name: true } }) : null,
+    process.approverContactId ? prisma.clientContact.findFirst({ where: { id: process.approverContactId, deletedAt: null }, select: { role: true, person: { select: { name: true } } } }) : null,
+  ]);
+  const approverText = approverUser?.name ?? approverContact?.person.name ?? approverContact?.role ?? process.approverText;
 
   const assignee = process.ownerId ?? input.fallbackAssigneeId ?? null;
   const description = runDescription({
@@ -143,6 +150,9 @@ export async function openProcessRun(input: OpenRunInput) {
         stepMode: step.mode as ProcessStepMode,
         processId: process.id,
         processVersionId: version.id,
+        // An approval step with an approver at Ankora: it reaches done only
+        // through their signature (the task gate, assertApprovable).
+        ...(step.requiresApproval && approverUser ? { requiresApproval: true, supervisorId: approverUser.id } : {}),
       },
     });
   }

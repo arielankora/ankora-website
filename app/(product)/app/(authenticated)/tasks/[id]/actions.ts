@@ -1,7 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
-import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, updateTask } from "@/lib/app-domain/tasks";
+import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setStepDone, updateTask } from "@/lib/app-domain/tasks";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
   getActiveTimers,
@@ -285,11 +285,11 @@ export async function addTaskStepAction(input: { taskId: string; clientId: strin
 export async function setTaskStepDoneAction(input: { stepId: string; parentId: string; done: boolean }) {
   const user = await requireUser();
   try {
-    await updateTask(user, input.stepId, { status: input.done ? "DONE" : "OPEN" });
+    const outcome = await setStepDone(user, input.stepId, input.done);
     revalidatePath(`/app/tasks/${input.parentId}`);
     revalidatePath(`/app/tasks/${input.stepId}`);
     revalidatePath("/app/tasks");
-    return { ok: true as const };
+    return { ok: true as const, outcome };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }
