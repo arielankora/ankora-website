@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { approveProposal, decideProposals, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
 // approve, reject with a reason. Nothing else writes a proposal into a
@@ -114,4 +115,25 @@ export async function rejectProposalsAction(_prev: BulkState | undefined, formDa
   } catch (err) {
     return { error: friendlyError(err) };
   }
+}
+
+/// "ממתין לשיוך" (spec 5.1, step 3): whose meeting it was.
+export async function assignBatchAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await assignBatch(user, String(formData.get("batchId") ?? ""), String(formData.get("clientId") ?? ""));
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+export async function discardAwaitingAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await discardAwaiting(user, String(formData.get("batchId") ?? ""), String(formData.get("why") ?? ""));
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
 }

@@ -12,7 +12,7 @@ export const EXTRACTION_STALE = "client.extraction_stale";
 /// Business days (Israel) since the client's last batch of proposals, or
 /// null when there was never one.
 export async function daysSinceLastBatch(clientId: string, now = new Date()): Promise<number | null> {
-  const last = await prisma.knowledgeBatch.findFirst({ where: { clientId }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+  const last = await prisma.knowledgeBatch.findFirst({ where: { clientId, awaitingAssignment: false }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
   if (!last) return null;
   return businessDaysBetween(localDateKey(last.createdAt, TIMEZONE), localDateKey(now, TIMEZONE));
 }
@@ -28,7 +28,7 @@ export async function notifyStaleExtraction(now = new Date()): Promise<{ notifie
   });
   let notified = 0;
   for (const c of clients) {
-    const last = await prisma.knowledgeBatch.findFirst({ where: { clientId: c.id }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
+    const last = await prisma.knowledgeBatch.findFirst({ where: { clientId: c.id, awaitingAssignment: false }, orderBy: { createdAt: "desc" }, select: { createdAt: true } });
     if (!last) continue;
     const days = businessDaysBetween(localDateKey(last.createdAt, TIMEZONE), localDateKey(now, TIMEZONE));
     if (days <= STALE_BUSINESS_DAYS) continue;

@@ -109,7 +109,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     prisma.processLesson.groupBy({ by: ["processId"], where: { clientId, status: "OPEN" }, _count: true }),
     // Section 16: what the extraction delivered, and what became of it.
     prisma.knowledgeBatch.findMany({
-      where: { clientId },
+      where: { clientId, awaitingAssignment: false },
       orderBy: { createdAt: "desc" },
       take: 20,
       select: { createdAt: true, via: true, note: true, sourceId: true, proposals: { select: { state: true } } },

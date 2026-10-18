@@ -203,7 +203,14 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   return flags;
 }
 
-export async function proposeKnowledge(actor: User, input: ProposeInput): Promise<ProposeResult> {
+/// `options` is for a batch that waited for a person to pick its client
+/// (lib/app-domain/batch-assignment.ts): who sent it, what was dropped
+/// before it waited, and each item's index in what was sent.
+export async function proposeKnowledge(
+  actor: User,
+  input: ProposeInput,
+  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[] } = {}
+): Promise<ProposeResult> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
   if (input.items.length === 0) throw new Error("אין פריטים באצווה.");
@@ -211,10 +218,11 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
 
   const source = await resolveSource(actor, input.clientId, input.source);
   const codes = await registerCodes(input.clientId);
-  const dropped: ProposeResult["dropped"] = [];
+  const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
 
-  for (const [index, raw] of input.items.entries()) {
+  for (const [i, raw] of input.items.entries()) {
+    const index = options.indexes?.[i] ?? i;
     const item = { ...raw, action: raw.action ?? "CREATE" };
     // Secrets first, on everything the item carries, before anything else
     // looks at it: a refused item's text is never stored anywhere.
@@ -264,7 +272,8 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
   }
 
   let secretTaskId: string | null = null;
-  if (dropped.some((d) => d.reason.startsWith("נמצא"))) {
+  // A secret dropped before the batch waited for its client already has its task.
+  if (dropped.slice(options.dropped?.length ?? 0).some((d) => d.reason.startsWith("נמצא"))) {
     // The secret was said; it has to be changed. The task says where, never what.
     const task = await createTask(actor, {
       clientId: input.clientId,
@@ -288,7 +297,7 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
       note: input.note?.trim() || null,
       // Only the index and the reason: never the dropped text.
       dropped: dropped as Prisma.InputJsonValue,
-      createdById: actor.id,
+      createdById: options.createdById === undefined ? actor.id : options.createdById,
       proposals: {
         create: accepted.map(({ item, payload, flags }) => ({
           clientId: input.clientId,
@@ -335,7 +344,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   const clientIds = filter.clientId ? accessible.filter((id) => id === filter.clientId) : accessible;
   if (clientIds.length === 0) return [];
   const batches = await prisma.knowledgeBatch.findMany({
-    where: { clientId: { in: clientIds }, closedAt: null },
+    where: { clientId: { in: clientIds }, closedAt: null, awaitingAssignment: false },
     orderBy: { createdAt: "desc" },
     include: {
       client: { select: { id: true, name: true } },
@@ -386,9 +395,15 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
 
 export async function countPendingProposals(actor: User, clientId?: string): Promise<number> {
   const accessible = (await listAccessibleClients(actor)).map((c) => c.id);
-  return prisma.knowledgeProposal.count({
+  const proposals = await prisma.knowledgeProposal.count({
     where: { state: "PENDING", clientId: clientId ? { in: accessible.filter((id) => id === clientId) } : { in: accessible } },
   });
+  if (clientId) return proposals;
+  // A meeting waiting for a person to say whose it is counts as one, for
+  // whoever may see it: someone with every candidate client.
+  const waiting = await prisma.knowledgeBatch.findMany({ where: { awaitingAssignment: true }, select: { candidateClientIds: true } });
+  const mine = new Set(accessible);
+  return proposals + waiting.filter((b) => b.candidateClientIds.every((id) => mine.has(id))).length;
 }
 
 async function findPending(actor: User, id: string) {

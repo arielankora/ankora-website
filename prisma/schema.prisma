@@ -3245,6 +3245,18 @@ model KnowledgeBatch {
   /// only counted) and quotes from a topics-only source.
   dropped  Json              @default("[]")
 
+  /// Spec 5.1, step 3: a meeting with a partner who serves several of
+  /// Ankora's clients, with nobody on it who decides whose it is. Claude
+  /// proposes `clientId` among `candidateClientIds`, with
+  /// `assignmentReason`. The items wait in `pendingInput`: no proposal is
+  /// made and no source registered in any file until a person picks the
+  /// client. Then the batch is proposed to that client as if sent there,
+  /// and this row is removed.
+  awaitingAssignment Boolean  @default(false)
+  candidateClientIds String[] @default([])
+  assignmentReason   String?
+  pendingInput       Json?
+
   createdById String?
   createdAt   DateTime  @default(now())
   closedAt    DateTime?
@@ -3253,6 +3265,7 @@ model KnowledgeBatch {
   proposals KnowledgeProposal[]
 
   @@index([clientId, closedAt])
+  @@index([awaitingAssignment])
   @@map("knowledge_batches")
 }
 
