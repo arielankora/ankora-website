@@ -24,6 +24,10 @@ export type ControlData = {
   uncertain: number;
   openQuestions: number;
   systemsWithoutAccess: number;
+  /// Spec 3.1: items the client may see in the portal, and items nobody at
+  /// Ankora keeps.
+  clientVisible: number;
+  noOwner: number;
   /// Business days since the last batch of proposals; null when there was
   /// never one.
   daysSinceBatch: number | null;
@@ -62,6 +66,8 @@ export function controlParts(d: ControlData): ControlPart[] {
   if (d.exceptionsRequested) parts.push({ text: d.exceptionsRequested === 1 ? "בקשת חריגה אחת ממתינה" : `${d.exceptionsRequested} בקשות חריגה ממתינות`, warn: true });
   if (d.uncertain) parts.push({ text: d.uncertain === 1 ? "פריט אחד לא ודאי" : `${d.uncertain} פריטים לא ודאיים`, warn: false });
   if (d.openQuestions) parts.push({ text: `${plural(d.openQuestions, "שאלה פתוחה אחת", "שאלות פתוחות")}`, warn: false });
+  if (d.clientVisible) parts.push({ text: d.clientVisible === 1 ? "פריט אחד גלוי ללקוח" : `${d.clientVisible} פריטים גלויים ללקוח`, warn: false });
+  if (d.noOwner) parts.push({ text: `${plural(d.noOwner, "פריט אחד", "פריטים")} בלי בעלים`, warn: false });
   if (d.systemsWithoutAccess) parts.push({ text: `${plural(d.systemsWithoutAccess, "מערכת אחת", "מערכות")} בלי גישה`, warn: true });
   parts.push(
     d.daysSinceBatch === null
@@ -80,7 +86,7 @@ export function controlLine(d: ControlData): string {
     .join(" · ");
 }
 
-type Item = { knowledgeStatus: KnowledgeStatusLike; fieldStatus: unknown };
+type Item = { knowledgeStatus: KnowledgeStatusLike; fieldStatus: unknown; clientVisible?: boolean; ownerId?: string | null };
 
 /// Items not confirmed, weakest field first (rule 1), across the file.
 export function countUncertain(items: Item[]): number {
@@ -93,7 +99,7 @@ export function countUncertain(items: Item[]): number {
 /// The numbers from what the screens already load: the same rows, so the
 /// line never counts what this person cannot see.
 export function controlFrom(input: {
-  processes: { transitionStatus: string; completeness: { score: number }; needsReview: boolean; backupOwnerId: string | null; status: string }[];
+  processes: { transitionStatus: string; completeness: { score: number }; needsReview: boolean; backupOwnerId: string | null; status: string; clientVisible?: boolean }[];
   exceptions: { status: string }[];
   facts: (Item & { kind: string; answeredAt: Date | null; closedAt: Date | null })[];
   otherItems: Item[];
@@ -101,6 +107,8 @@ export function controlFrom(input: {
   daysSinceBatch: number | null;
 }): ControlData {
   const live = input.processes.filter((p) => p.status !== "RETIRED");
+  // The items of the file, as they stand now: not a question, not history.
+  const items = [...input.facts.filter((f) => f.kind !== "QUESTION" && !f.closedAt), ...input.otherItems];
   return {
     processes: live.length,
     withAnkora: live.filter((p) => p.transitionStatus === "WITH_ANKORA").length,
@@ -111,8 +119,10 @@ export function controlFrom(input: {
     exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").length,
     exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").length,
     // A question is its own count; an answered or closed fact is history.
-    uncertain: countUncertain([...input.facts.filter((f) => f.kind !== "QUESTION" && !f.closedAt), ...input.otherItems]),
+    uncertain: countUncertain(items),
     openQuestions: input.facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).length,
+    clientVisible: live.filter((p) => p.clientVisible).length + items.filter((i) => i.clientVisible).length,
+    noOwner: items.filter((i) => !i.ownerId).length,
     systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").length,
     daysSinceBatch: input.daysSinceBatch,
   };

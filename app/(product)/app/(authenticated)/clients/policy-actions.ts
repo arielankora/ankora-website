@@ -15,6 +15,7 @@ import {
 import { approveException, rejectException, requestException, withdrawException } from "@/lib/app-domain/policy-exceptions";
 import { setClientRuleApprovers } from "@/lib/app-domain/rule-approvals";
 import type { KnowledgeStatus, PolicyKind } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 3: the client's own rules on the client screen
 // (claude/org-brain-spec-2026-10-12.md, 3.11).
@@ -49,6 +50,7 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
   }
   return {
     value: {
+      ...itemExtrasFrom(formData),
       kind: kind as PolicyKind,
       title: String(formData.get("title") ?? ""),
       statement: String(formData.get("statement") ?? ""),

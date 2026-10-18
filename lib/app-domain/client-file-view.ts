@@ -62,12 +62,15 @@ function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
 }
 
-function knowledge(row: { knowledgeStatus: DocItem["status"]; fieldStatus: unknown; toResolve: string | null; sources: unknown; doNotDisclose: string | null }): Pick<DocItem, "status" | "toResolve" | "sources" | "doNotDisclose"> {
+function knowledge(row: { knowledgeStatus: DocItem["status"]; fieldStatus: unknown; toResolve: string | null; sources: unknown; doNotDisclose: string | null; clientVisible?: boolean; ownerId?: string | null }): Pick<DocItem, "status" | "toResolve" | "sources" | "doNotDisclose" | "clientVisible" | "owner"> {
   return {
     status: effectiveStatus(row.knowledgeStatus!, parseFieldStatus(row.fieldStatus)),
     toResolve: row.toResolve,
     sources: readSourceRefs(row.sources).map(formatSourceRef),
     doNotDisclose: row.doNotDisclose,
+    clientVisible: row.clientVisible || undefined,
+    // An id here; named once, when the document is assembled.
+    owner: row.ownerId ?? null,
   };
 }
 
@@ -322,7 +325,8 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           ...(p.current?.checks ?? []).filter((c) => !c.excepted).map((c) => `לא עומד בכללים: ${c.message}`),
           p.exceptionPlaybook ? `נוהל חריגים: ${p.exceptionPlaybook}` : null,
         ],
-        ...knowledge(p),
+        // Its owner is already in the details.
+        ...knowledge({ ...p, ownerId: null }),
       })),
     },
     {
@@ -421,6 +425,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     })
   );
 
+  // Spec 3.1: the owners, by name.
+  const keeperIds = [...new Set(sections.flatMap((x) => x.items.map((i) => i.owner)).filter((x): x is string => !!x))];
+  const keeperName = new Map((await prisma.user.findMany({ where: { id: { in: keeperIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
+
   return {
     clientName: client.name,
     generatedAt: now,
@@ -430,7 +438,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       ...s,
       items: s.items.filter((i) => i.text).map((i) => {
         const { proposed: _proposed, ...item } = i as typeof i & { proposed?: boolean };
-        return item;
+        return { ...item, owner: item.owner ? (keeperName.get(item.owner) ?? null) : null };
       }),
     })),
     legend: sources.map((s) => ({

@@ -19,6 +19,7 @@ import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 1: processes and their procedures on the client screen
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9).
@@ -52,6 +53,7 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
   if (review !== null && !/^\d+$/.test(review)) return { error: "הסקירה היא כל מספר שלם של ימים." };
   return {
     value: {
+      ...itemExtrasFrom(f),
       title: String(f.get("title") ?? ""),
       purpose: text(f, "purpose"),
       triggerKinds: list(f, "triggerKinds").filter((t): t is ProcessTrigger => (TRIGGERS as string[]).includes(t)),

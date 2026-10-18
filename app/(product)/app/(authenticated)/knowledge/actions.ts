@@ -38,6 +38,8 @@ const EDITABLE = new Set([
   "registrationNumber",
   "triggerText",
   "domain",
+  "ownerName",
+  "clientVisible",
 ]);
 
 function friendlyError(err: unknown): string {
@@ -70,6 +72,11 @@ export async function approveEditedProposalAction(_prev: FormState | undefined, 
     const v = String(value).trim();
     // A choice left empty is no change, not a cleared value.
     if (!v && (key === "knowledgeStatus" || key === "accessStatus")) continue;
+    // Spec 3.1: a yes or a no, never a string.
+    if (key === "clientVisible") {
+      edits.clientVisible = v === "yes";
+      continue;
+    }
     edits[key] = v || null;
   }
   try {

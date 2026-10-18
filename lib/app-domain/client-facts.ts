@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { canSeeKnowledgeItem } from "@/lib/knowledge";
+import { canSeeKnowledgeItem, clientVisibleBlocker } from "@/lib/knowledge";
 import { factShapeError, isQuestion } from "@/lib/client-facts";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
@@ -129,7 +129,13 @@ export async function supersedeClientFact(actor: User, id: string, input: Omit<C
   await assertClientAccess(actor, old.clientId);
   assertCurrent(old);
   if (input.kind !== old.kind) throw new Error("החלפה היא של אותו סוג פריט. סוג אחר הוא פריט חדש.");
-  const data = await prepare(old.clientId, input);
+  // The new version keeps who keeps it, and whether the client sees it,
+  // unless it says otherwise (and visibility still has to be allowed).
+  const data = await prepare(old.clientId, {
+    ...input,
+    ownerId: input.ownerId !== undefined ? input.ownerId : old.ownerId,
+    clientVisible: input.clientVisible ?? (old.clientVisible && !clientVisibleBlocker({ sensitivity: input.sensitivity ?? old.sensitivity, audience: input.audience ?? old.audience, doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose : old.doNotDisclose })),
+  });
 
   const now = new Date();
   const [replacement] = await prisma.$transaction(async (tx) => {

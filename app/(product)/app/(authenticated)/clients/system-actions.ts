@@ -17,6 +17,7 @@ import type {
   SystemAccessStatus,
   SystemPermission,
 } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 2: the system map on the client screen (spec 3.6).
 
@@ -109,6 +110,7 @@ function parseSystem(formData: FormData): {
     audience: pick(formData.get("audience"), AUDIENCES),
     doNotDisclose: text(formData, "doNotDisclose"),
     sources: refs,
+    ...itemExtrasFrom(formData),
   };
   // The vault picker is shown only to people who may open the vault. A
   // form without it leaves the link as it is, rather than clearing it.

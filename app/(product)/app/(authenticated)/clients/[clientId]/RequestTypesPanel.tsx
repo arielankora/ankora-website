@@ -5,12 +5,14 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { addRequestTypeAction, updateRequestTypeAction, removeRequestTypeAction } from "../file-text-actions";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 
 // Org brain, phase 2: request types and how they are answered, section
 // 7.5 of the client file (claude/org-brain-spec-2026-10-12.md, 3.7).
 
 export type PanelRequestType = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   title: string;
   fromWho: string | null;
@@ -102,6 +104,7 @@ function RequestTypeForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -166,6 +169,7 @@ export function RequestTypesPanel({
                   </p>
                 ))}
                 <StatusLine status={r.status} toResolve={r.toResolve} />
+                <ItemTags item={r} />
                 <SourceCodes sources={r.sources} options={sourceOptions} />
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">

@@ -6,6 +6,7 @@ import { parseSourceRefs } from "@/lib/knowledge-sources";
 import { addRequestType, updateRequestType, removeRequestType, type RequestTypeInput } from "@/lib/app-domain/request-types";
 import { saveNarrative, NARRATIVE_KINDS } from "@/lib/app-domain/client-narratives";
 import type { KnowledgeStatus, NarrativeKind } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 2: request types (spec 3.7) and the file's free text
 // (spec 3.3) on the client screen.
@@ -30,6 +31,7 @@ function parseRequestType(formData: FormData): { error?: string; value?: Omit<Re
   const status = String(formData.get("knowledgeStatus") ?? "");
   return {
     value: {
+      ...itemExtrasFrom(formData),
       title: String(formData.get("title") ?? ""),
       fromWho: text(formData, "fromWho"),
       arrivesVia: text(formData, "arrivesVia"),

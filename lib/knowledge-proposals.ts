@@ -8,6 +8,7 @@ import { citedCodes } from "@/lib/knowledge-sources";
 import { factShapeError } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
 import { blockingChecks, readSteps } from "@/lib/process-rules";
+import { clientVisibleBlocker } from "@/lib/knowledge";
 
 const knowledge = {
   knowledgeStatus: z.enum(["CONFIRMED", "UNCERTAIN", "MISSING"]).optional(),
@@ -15,6 +16,11 @@ const knowledge = {
   importance: z.enum(["NORMAL", "LOW"]).optional(),
   sensitivity: z.enum(["NORMAL", "SENSITIVE"]).optional(),
   doNotDisclose: z.string().max(500).nullish(),
+  /// Spec 3.1: shown to the client in the portal, only when the client said
+  /// it may be (it is theirs, or it was agreed with them).
+  clientVisible: z.boolean().optional(),
+  /// Spec 3.1: who at Ankora keeps the item right, by name.
+  ownerName: z.string().max(200).nullish(),
 };
 
 const day = z
@@ -215,6 +221,11 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
   if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
     out.push({ code: "SHAPE", block: true, message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים "עד שיאושר" בעריכה, או דוחים.' });
   }
+  // Spec 3.1: shown to the client only when nothing forbids it.
+  if (payload.clientVisible === true) {
+    const why = clientVisibleBlocker({ sensitivity: s("sensitivity"), doNotDisclose: s("doNotDisclose") });
+    if (why) out.push({ code: "VISIBLE", block: true, message: `${why} מורידים את "גלוי ללקוח" בעריכה, או דוחים.` });
+  }
   if (target === "PROCESS" && Array.isArray(payload.steps) && payload.steps.length) {
     for (const c of blockingChecks({ steps: readSteps(payload.steps) }, [])) out.push({ code: c.code, message: `${c.message} (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)` });
   }
@@ -268,6 +279,12 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
 /// What a reviewer needs beyond the headline to decide: a process's steps,
 /// an entity's identifiers, the whole of a long text. Empty for the rest.
 export function proposalDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
+  // Spec 3.1, on every kind of item.
+  const common = [payload.clientVisible === true ? "גלוי ללקוח" : "", typeof payload.ownerName === "string" && payload.ownerName.trim() ? `בעלים: ${payload.ownerName.trim()}` : ""].filter(Boolean);
+  return [...itemDetails(target, payload), ...common];
+}
+
+function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : "");
   if (target === "PROCESS") {
     const steps = Array.isArray(payload.steps) ? (payload.steps as { title?: unknown; requiresApproval?: unknown }[]) : [];

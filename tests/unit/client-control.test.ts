@@ -15,6 +15,8 @@ const base: ControlData = {
   uncertain: 0,
   openQuestions: 0,
   systemsWithoutAccess: 0,
+  clientVisible: 0,
+  noOwner: 0,
   daysSinceBatch: null,
 };
 
@@ -85,5 +87,26 @@ describe("controlFrom", () => {
       daysSinceBatch: 1,
     });
     expect(d).toMatchObject({ processes: 2, withAnkora: 1, inHandover: 1, avgCompleteness: 7.5, needsReview: 1, noBackup: 1, exceptionsInForce: 1, exceptionsRequested: 1, uncertain: 2, openQuestions: 1, systemsWithoutAccess: 1 });
+  });
+});
+
+describe("visible to the client and owner (spec 3.1)", () => {
+  it("counts what the client may see, and what nobody keeps, without warning", () => {
+    const d = controlFrom({
+      processes: [{ transitionStatus: "WITH_CLIENT", completeness: { score: 5 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE", clientVisible: true }],
+      exceptions: [],
+      facts: [
+        { kind: "NOTE", answeredAt: null, closedAt: null, knowledgeStatus: "CONFIRMED", fieldStatus: {}, clientVisible: true, ownerId: "u" },
+        { kind: "QUESTION", answeredAt: null, closedAt: null, knowledgeStatus: "MISSING", fieldStatus: {}, clientVisible: true },
+      ],
+      otherItems: [{ knowledgeStatus: "CONFIRMED", fieldStatus: {} }],
+      systems: [],
+      daysSinceBatch: null,
+    });
+    expect(d).toMatchObject({ clientVisible: 2, noOwner: 1 });
+    const parts = controlParts(d).map((p) => p.text);
+    expect(parts).toContain("2 פריטים גלויים ללקוח");
+    expect(parts).toContain("פריט אחד בלי בעלים");
+    expect(controlParts({ ...base, clientVisible: 1 }).map((p) => p.text)).toContain("פריט אחד גלוי ללקוח");
   });
 });

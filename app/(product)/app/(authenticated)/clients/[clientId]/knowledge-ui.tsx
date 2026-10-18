@@ -1,4 +1,5 @@
 "use client";
+import { createContext, useContext } from "react";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 
@@ -92,5 +93,57 @@ export function EntitySelect({ entities, defaultValue }: { entities: EntityOptio
         ))}
       </select>
     </Field>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Spec 3.1: who keeps an item right, and whether the client sees it. The
+// same two fields on every kind of item, so the staff list is given once.
+// ---------------------------------------------------------------------------
+
+export type StaffOption = { id: string; name: string };
+const StaffContext = createContext<StaffOption[]>([]);
+
+export function ItemStaffProvider({ staff, children }: { staff: StaffOption[]; children: React.ReactNode }) {
+  return <StaffContext.Provider value={staff}>{children}</StaffContext.Provider>;
+}
+
+/// The two fields in an item's form. `owner` false for a process, whose
+/// form already asks for its owner.
+export function ItemExtras({ existing, owner = true }: { existing?: { clientVisible?: boolean; ownerId?: string | null } | null; owner?: boolean }) {
+  const staff = useContext(StaffContext);
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <input type="hidden" name="itemExtras" value="1" />
+      {owner && (
+        <Field label="בעלים באנקורה">
+          <select name="itemOwnerId" defaultValue={existing?.ownerId ?? ""} className={INPUT}>
+            <option value="">בלי בעלים</option>
+            {staff.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      <label className="flex items-center gap-2 self-end pb-2 text-sm text-appNavy">
+        <input type="checkbox" name="clientVisible" defaultChecked={!!existing?.clientVisible} className="h-4 w-4 accent-gold" />
+        גלוי ללקוח
+      </label>
+    </div>
+  );
+}
+
+/// The two, as a line on the item. Nothing when neither is set.
+export function ItemTags({ item }: { item: { clientVisible?: boolean; ownerId?: string | null } }) {
+  const staff = useContext(StaffContext);
+  const owner = item.ownerId ? staff.find((u) => u.id === item.ownerId)?.name : null;
+  if (!item.clientVisible && !owner) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60" data-testid="item-tags">
+      {item.clientVisible && <StatusBadge label="גלוי ללקוח" tone="green" />}
+      {owner && <span>בעלים: {owner}</span>}
+    </div>
   );
 }

@@ -19,6 +19,9 @@ export type DocItem = {
   toResolve?: string | null;
   sources?: string[];
   doNotDisclose?: string | null;
+  /// Spec 3.1: shown to the client in the portal, and who keeps it right.
+  clientVisible?: boolean;
+  owner?: string | null;
 };
 
 export type DocSection = {
@@ -63,6 +66,8 @@ export function itemLine(item: DocItem): string {
   const status = statusNote(item);
   if (status) parts.push(`**${status}**`);
   if (item.doNotDisclose) parts.push(`**לא לספר: ${item.doNotDisclose}**`);
+  const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner ? `בעלים: ${item.owner}` : null].filter(Boolean);
+  if (kept.length) parts.push(`{${kept.join(" · ")}}`);
   if (item.sources?.length) parts.push(`[${item.sources.join(", ")}]`);
   return parts.join(" ");
 }

@@ -12,6 +12,7 @@ import {
   type EntityField,
 } from "@/lib/app-domain/client-entities";
 import type { KnowledgeStatus } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 2: the legal entities panel on the client screen
 // (spec 3.3).
@@ -36,6 +37,7 @@ function parseEntity(formData: FormData): { error?: string; value?: Omit<ClientE
   const status = String(formData.get("knowledgeStatus") ?? "");
   return {
     value: {
+      ...itemExtrasFrom(formData),
       name: String(formData.get("name") ?? ""),
       legalName: text(formData, "legalName"),
       registrationNumber: text(formData, "registrationNumber"),

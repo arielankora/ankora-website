@@ -14,6 +14,7 @@ import {
   type ClientFactInput,
 } from "@/lib/app-domain/client-facts";
 import type { FactKind, FactTopic, KnowledgeAudience, KnowledgeStatus } from "@prisma/client";
+import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 2: the facts panel on the client screen (spec 3.4).
 
@@ -65,6 +66,7 @@ function parseFact(formData: FormData): { error?: string; value?: Omit<ClientFac
   const subject = String(formData.get("subject") ?? "");
   return {
     value: {
+      ...itemExtrasFrom(formData),
       kind,
       body: String(formData.get("body") ?? ""),
       topic: pick(formData.get("topic"), TOPICS) ?? null,

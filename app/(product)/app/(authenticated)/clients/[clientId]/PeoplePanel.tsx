@@ -5,7 +5,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { formatMinor } from "@/lib/money";
 import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import {
   addClientContactAction,
   updateClientContactAction,
@@ -36,6 +36,8 @@ const RELATIONSHIP_LABELS: Record<Relationship, string> = {
 export type { SourceOption };
 
 export type PanelContact = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   name: string | null;
   role: string | null;
@@ -60,6 +62,8 @@ export type PanelContact = {
 };
 
 export type PanelOrganization = {
+  clientVisible?: boolean;
+  ownerId?: string | null;
   id: string;
   name: string;
   domains: string[];
@@ -180,6 +184,7 @@ function ContactForm({
         </Field>
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} placeholder="לבקש מגיא את המייל" className={INPUT} />
@@ -258,6 +263,7 @@ function OrganizationForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} status={status} />
+      <ItemExtras />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required className={INPUT} />
@@ -333,6 +339,7 @@ export function PeoplePanel({
                     {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-appNavy/50">ערוצים: {c.channelOrder.join(", ")}</p>}
                     {c.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {c.doNotDisclose}</p>}
                     <StatusLine status={c.status} toResolve={c.toResolve} />
+                    <ItemTags item={c} />
                     <SourceCodes sources={c.sources} options={sourceOptions} />
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-xs">
@@ -375,6 +382,7 @@ export function PeoplePanel({
                   )}
                   {o.notes && <p className="mt-1 text-xs text-appNavy/70">{o.notes}</p>}
                   <StatusLine status={o.status} toResolve={o.toResolve} />
+                  <ItemTags item={o} />
                   <SourceCodes sources={o.sources} options={sourceOptions} />
                 </div>
                 <button type="button" onClick={() => removeOrganization(o)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">

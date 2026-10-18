@@ -1,5 +1,6 @@
 import "server-only";
-import { parseFieldStatus, type FieldStatusMap } from "@/lib/knowledge";
+import { clientVisibleBlocker, parseFieldStatus, type FieldStatusMap } from "@/lib/knowledge";
+import { prisma } from "@/lib/prisma";
 import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import { resolveItemSources } from "@/lib/app-domain/client-sources";
 import type { KnowledgeStatus, KnowledgeAudience, KnowledgeSensitivity, KnowledgeImportance, Prisma } from "@prisma/client";
@@ -21,6 +22,12 @@ export interface KnowledgeInput {
   /// Codes in the client's source register (spec 3.2). Required unless
   /// the item is "missing".
   sources?: SourceRef[];
+  /// Spec 3.1: shown to the client in the portal. Off unless a person turns
+  /// it on, and never for what is sensitive, restricted or not to be told.
+  clientVisible?: boolean;
+  /// Spec 3.1: the person at Ankora who keeps the item right. A process's
+  /// owner is the same field.
+  ownerId?: string | null;
 }
 
 export function knowledgeData(input: KnowledgeInput) {
@@ -43,7 +50,7 @@ export async function sourcedFields(
   clientId: string,
   input: KnowledgeInput,
   texts: (string | null | undefined)[],
-  before?: { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null }
+  before?: Before
 ) {
   const resolved = await resolveItemSources(clientId, {
     status: input.knowledgeStatus ?? before?.knowledgeStatus ?? "CONFIRMED",
@@ -55,7 +62,40 @@ export async function sourcedFields(
     sources: resolved.sources as Prisma.InputJsonValue,
     knowledgeStatus: resolved.knowledgeStatus,
     toResolve: resolved.toResolve,
+    ...(await visibilityAndOwner(input, before)),
   };
+}
+
+type Before = { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null; clientVisible?: boolean; sensitivity?: string; audience?: KnowledgeAudience; doNotDisclose?: string | null };
+
+/// Spec 3.1: who keeps the item, and whether the client may see it. Only
+/// the keys that change are returned: a key left out is left as it is (a
+/// process's owner is written by its own form).
+async function visibilityAndOwner(input: KnowledgeInput, before?: Before): Promise<{ clientVisible?: boolean; ownerId?: string | null }> {
+  const out: { clientVisible?: boolean; ownerId?: string | null } = {};
+  const after = {
+    sensitivity: input.sensitivity ?? before?.sensitivity,
+    audience: input.audience ?? before?.audience,
+    doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose : before?.doNotDisclose,
+  };
+  const blocker = clientVisibleBlocker(after);
+  if (input.clientVisible === true) {
+    if (blocker) throw new Error(blocker);
+    out.clientVisible = true;
+  } else if (input.clientVisible === false) {
+    out.clientVisible = false;
+  } else if (before?.clientVisible && blocker) {
+    // It became sensitive, restricted or not to be told: it stops being shown.
+    out.clientVisible = false;
+  }
+  if (input.ownerId !== undefined) {
+    if (input.ownerId) {
+      const ok = await prisma.user.count({ where: { id: input.ownerId, deletedAt: null, role: { not: "CLIENT_USER" } } });
+      if (!ok) throw new Error("הבעלים של פריט צריך להיות איש צוות של אנקורה.");
+    }
+    out.ownerId = input.ownerId || null;
+  }
+  return out;
 }
 
 /// A status other than "confirmed" has to say what would confirm it. That

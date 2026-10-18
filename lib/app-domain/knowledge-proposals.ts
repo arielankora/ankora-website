@@ -142,6 +142,9 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   // What would stop it from entering the file first: the reviewer reads
   // these before anything else.
   const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes);
+  if (typeof item.payload.ownerName === "string" && item.payload.ownerName.trim() && !(await ownerByName(item.payload.ownerName))) {
+    flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.ownerName.trim()}". הפריט ייכנס בלי בעלים, אלא אם מתקנים את השם.` });
+  }
   if (sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
   }
@@ -421,32 +424,54 @@ async function closeIfDone(batchId: string) {
 
 /// Writes the proposal into the file, as the person approving it, through
 /// the file's own functions. `edits` are the fields the person changed.
+function withoutOwnerName<T extends { ownerName?: unknown }>(v: T): Omit<T, "ownerName"> {
+  const { ownerName: _o, ...rest } = v;
+  return rest;
+}
+
+/// Spec 3.1: the owner a proposal names, as a person at Ankora. A name
+/// that is nobody, or more than one person, is no owner: the item enters
+/// without one, and its flag said so when it arrived.
+export async function ownerByName(name: unknown): Promise<string | null> {
+  if (typeof name !== "string" || !name.trim()) return null;
+  const found = await prisma.user.findMany({
+    where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" }, name: { equals: name.trim(), mode: "insensitive" } },
+    select: { id: true },
+    take: 2,
+  });
+  return found.length === 1 ? found[0].id : null;
+}
+
 async function apply(actor: User, p: { clientId: string; target: string; action: string; targetId: string | null }, payload: Record<string, unknown>) {
   const date = (v: unknown) => (typeof v === "string" && v ? new Date(`${v}T00:00:00Z`) : null);
   const sources = readSourceRefs(payload.sources);
+  const ownerId = await ownerByName(payload.ownerName);
+  // Named, or nothing: an item without an owner keeps the one it has.
+  const owner = ownerId ? { ownerId } : {};
   if (p.target === "FACT") {
     const f = PAYLOADS.FACT.parse(payload);
-    const input = { ...f, sources, validUntil: date(f.validUntil), decidedAt: date(f.decidedAt) };
+    const { ownerName: _o, ...fact } = f;
+    const input = { ...fact, ...owner, sources, validUntil: date(f.validUntil), decidedAt: date(f.decidedAt) };
     if (p.action === "SUPERSEDE") return (await supersedeClientFact(actor, p.targetId!, input)).id;
     if (p.action === "CONTRADICT") return (await recordContradiction(actor, p.targetId!, { value: f.body, sources })).id;
     return (await addClientFact(actor, { ...input, clientId: p.clientId })).id;
   }
-  if (p.target === "CONTACT") return (await addClientContact(actor, { ...PAYLOADS.CONTACT.parse(payload), sources, clientId: p.clientId })).id;
-  if (p.target === "ORGANIZATION") return (await addClientOrganization(actor, { ...PAYLOADS.ORGANIZATION.parse(payload), sources, clientId: p.clientId })).id;
-  if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...PAYLOADS.REQUEST_TYPE.parse(payload), sources, clientId: p.clientId })).id;
+  if (p.target === "CONTACT") return (await addClientContact(actor, { ...withoutOwnerName(PAYLOADS.CONTACT.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "ORGANIZATION") return (await addClientOrganization(actor, { ...withoutOwnerName(PAYLOADS.ORGANIZATION.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...withoutOwnerName(PAYLOADS.REQUEST_TYPE.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
   // A rule enters the file as "proposed": approving the proposal records
   // what the client said; making it binding is a manager's separate step.
-  if (p.target === "POLICY") return (await addClientPolicy(actor, { ...PAYLOADS.POLICY.parse(payload), sources, clientId: p.clientId })).id;
-  if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...PAYLOADS.SYSTEM.parse(payload), sources, clientId: p.clientId })).id;
+  if (p.target === "POLICY") return (await addClientPolicy(actor, { ...withoutOwnerName(PAYLOADS.POLICY.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...withoutOwnerName(PAYLOADS.SYSTEM.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
   if (p.target === "ENTITY") {
-    const { parentName, ...e } = PAYLOADS.ENTITY.parse(payload);
+    const { parentName, ownerName: _o, ...e } = PAYLOADS.ENTITY.parse(payload);
     let parentId: string | null = null;
     if (parentName?.trim()) {
       const parent = await prisma.clientEntity.findFirst({ where: { clientId: p.clientId, deletedAt: null, name: { equals: parentName.trim(), mode: "insensitive" } }, select: { id: true } });
       if (!parent) throw new Error(`ישות האם "${parentName}" לא נמצאת בתיק. מוסיפים אותה קודם, או מוחקים את השם בעריכה.`);
       parentId = parent.id;
     }
-    return (await addClientEntity(actor, { ...e, parentId, sources, clientId: p.clientId })).id;
+    return (await addClientEntity(actor, { ...e, ...owner, parentId, sources, clientId: p.clientId })).id;
   }
   if (p.target === "NARRATIVE") {
     const n = PAYLOADS.NARRATIVE.parse(payload);
@@ -463,8 +488,8 @@ async function apply(actor: User, p: { clientId: string; target: string; action:
   // approving the proposal records what was described; a manager approves
   // the procedure separately, after the checks (spec 3.9, decision 1).
   if (p.target === "PROCESS") {
-    const { steps, highlights, outputs, ...proc } = PAYLOADS.PROCESS.parse(payload);
-    const process = await addProcess(actor, { ...proc, sources, clientId: p.clientId });
+    const { steps, highlights, outputs, ownerName: _o, ...proc } = PAYLOADS.PROCESS.parse(payload);
+    const process = await addProcess(actor, { ...proc, ...owner, sources, clientId: p.clientId });
     if (steps?.length) await saveProcessVersion(actor, process.id, { steps, highlights, outputs, baseVersion: 0 });
     return process.id;
   }
@@ -477,7 +502,10 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
   const proposal = await findPending(actor, id);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
   const original = proposal.payload as Record<string, unknown>;
-  const changed = Object.entries(edits).filter(([k, v]) => k !== "sources" && JSON.stringify(original[k] ?? null) !== JSON.stringify(v ?? null));
+  // "Not visible to the client" is what an item without the field means:
+  // leaving it as it was is no edit.
+  const was = (k: string) => original[k] ?? (k === "clientVisible" ? false : null);
+  const changed = Object.entries(edits).filter(([k, v]) => k !== "sources" && JSON.stringify(was(k)) !== JSON.stringify(v ?? null));
   const payload = { ...original, ...Object.fromEntries(changed) };
   // An edit is checked for secrets like the original was.
   if (changed.length > 0 && findSecrets(payloadText(Object.fromEntries(changed))).length > 0) {
