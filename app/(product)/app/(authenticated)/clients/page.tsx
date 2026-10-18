@@ -1,11 +1,12 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
-import { listClients } from "@/lib/app-domain/clients";
+import { listClients, listArchivedClients } from "@/lib/app-domain/clients";
 import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
 import { ClientsGrid, type ClientCard } from "./ClientsGrid";
+import { RestoreClientButton } from "./RestoreClientButton";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -30,7 +31,7 @@ export default async function ClientsPage() {
 
   const canManageBanks = can(user.role, "hour_bank.manage");
   const canViewReports = can(user.role, "report.internal.view");
-  const clients = await listClients();
+  const [clients, archived] = await Promise.all([listClients(), listArchivedClients(user)]);
 
   // One batched lookup for the whole list.
   //
@@ -68,7 +69,31 @@ export default async function ClientsPage() {
           </Drawer>
         </div>
 
-        <ClientsGrid cards={cards} canManageBanks={canManageBanks} canViewReports={canViewReports} />
+        {/* Keyed on the roster, so a client restored below appears in the
+            grid (which keeps its own copy of the list for the archive
+            toast's undo) as soon as the screen refreshes. */}
+        <ClientsGrid
+          key={cards.map((c) => c.id).join(",")}
+          cards={cards}
+          canManageBanks={canManageBanks}
+          canViewReports={canViewReports}
+        />
+
+        {archived.length > 0 && (
+          <details className="rounded-2xl border border-lineDark bg-white p-5">
+            <summary className="cursor-pointer text-sm font-medium text-appNavy">
+              בארכיון ({archived.length})
+            </summary>
+            <ul className="mt-3 divide-y divide-lineDark">
+              {archived.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                  <span className="text-sm text-appNavy">{c.name}</span>
+                  <RestoreClientButton clientId={c.id} />
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </div>
     </>
   );

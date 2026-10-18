@@ -113,9 +113,18 @@ export async function updateClient(
     if (!manager) throw new Error("מנהל התיק שנבחר אינו משתמש פעיל של Ankora.");
   }
 
+  // Archiving from the settings form is the same act as the archive
+  // button on the client list (archiveClient): the client leaves the list,
+  // the pickers and the portal together. Until 18.10.2026 the form set the
+  // status alone, which left a client on the list whose screen could not
+  // open (every panel reads through listAccessibleClients, active only) and
+  // whose portal users kept their access (the portal checks deletedAt).
+  const archiving = input.status === "ARCHIVED" && !before.deletedAt;
+
   const client = await prisma.client.update({
     where: { id: clientId },
     data: {
+      ...(archiving ? { deletedAt: new Date() } : {}),
       name: input.name?.trim(),
       legalName: input.legalName?.trim(),
       status: input.status,
@@ -147,6 +156,15 @@ export async function updateClient(
     before,
     after: client,
   });
+  if (archiving) {
+    await recordAudit({
+      actorId: actor.id,
+      action: "client.archive",
+      entityType: "Client",
+      entityId: clientId,
+      clientId,
+    });
+  }
   return client;
 }
 
@@ -192,6 +210,17 @@ export async function restoreClient(actor: User, clientId: string) {
     clientId,
   });
   return client;
+}
+
+/// The archived clients, for the list's "בארכיון" section: the only way
+/// back to a client once the undo on the archive toast has gone.
+export async function listArchivedClients(actor: User) {
+  assertCan(actor.role, "client.manage");
+  return prisma.client.findMany({
+    where: { status: "ARCHIVED", deletedAt: { not: null } },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, deletedAt: true },
+  });
 }
 
 /// Portal phase 2: who may be named as a client's account manager.

@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { createClient, updateClient, archiveClient, restoreClient } from "@/lib/app-domain/clients";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -83,6 +84,10 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
 
   revalidatePath("/app/clients");
   revalidatePath(`/app/clients/${clientId}`);
+  // An archived client has no screen of its own any more (getClient skips
+  // it), so the person who archived it lands on the list, where the
+  // "בארכיון" section shows it and offers the way back.
+  if (formData.get("status") === "ARCHIVED") redirect("/app/clients");
   return { ok: true };
 }
 
@@ -109,6 +114,7 @@ export async function restoreClientAction(clientId: string) {
     return { ok: false as const, error: friendlyError(err) };
   }
   revalidatePath("/app/clients");
+  revalidatePath(`/app/clients/${clientId}`);
   return { ok: true as const };
 }
 
