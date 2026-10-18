@@ -1561,7 +1561,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-15",
-      "riskReason": "Opens runs from dates and by hand: only an active process with an approved procedure, once per occurrence, steps on business days"
+      "riskReason": "Opens runs from dates and by hand: only an active process with an approved procedure, once per occurrence, steps on business days; an approval step with an approver at Ankora waits for their signature, and the run cannot close around it"
     },
     "api:/api/cron/vault-rewrap": {
       "kind": "api",

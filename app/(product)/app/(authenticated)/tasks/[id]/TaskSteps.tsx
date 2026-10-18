@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useActionForm } from "@/components/app/useActionForm";
+import { useToast } from "@/components/app/toast/ToastProvider";
 import { addTaskStepAction, applyTaskTemplateAction, setTaskStepDoneAction } from "./actions";
 import type { TaskStatus } from "@prisma/client";
 
@@ -32,6 +33,8 @@ export type Step = {
   status: TaskStatus;
   dueDate: string | null;
   assignedToName: string | null;
+  /// Spec 5.3: a step that waits for a signature, and whose.
+  approverName?: string | null;
 };
 
 const OPEN: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL"];
@@ -95,6 +98,7 @@ export function TaskSteps({
 
 function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; listQuery: string }) {
   const isDone = !OPEN.includes(step.status);
+  const { showToast } = useToast();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,6 +108,8 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
     setError(null);
     const result = await setTaskStepDoneAction({ stepId: step.id, parentId, done: !isDone });
     if (!result.ok) setError(result.error);
+    else if (result.outcome === "sent") showToast({ tone: "success", title: "נשלח לאישור", description: step.approverName ? `${step.approverName} קיבל/ה התראה.` : undefined });
+    else if (result.outcome === "approved") showToast({ tone: "success", title: "אושר" });
     setPending(false);
   }
 
@@ -129,6 +135,11 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
         >
           {step.title}
         </Link>
+        {step.approverName && (
+          <p className={`mt-0.5 text-[11.5px] ${step.status === "PENDING_APPROVAL" ? "font-medium text-warning" : "text-appNavy/50"}`}>
+            {step.status === "PENDING_APPROVAL" ? `מחכה לאישור של ${step.approverName}` : isDone ? `אושר` : `דורש אישור של ${step.approverName}`}
+          </p>
+        )}
         {(step.assignedToName || step.dueDate) && (
           <p className="mt-0.5 text-[11.5px] text-appNavy/50">
             {[step.assignedToName, step.dueDate ? formatDay(step.dueDate) : null].filter(Boolean).join(" · ")}

@@ -286,6 +286,7 @@ export default async function TaskDetailPage(props: {
           status: s.status,
           dueDate: s.dueDate?.toISOString() ?? null,
           assignedToName: s.assignedTo?.name ?? null,
+          approverName: s.requiresApproval ? (s.supervisor?.name ?? null) : null,
         }))}
       />
 

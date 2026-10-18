@@ -3632,6 +3632,10 @@ model Process {
   /// Who approves: in words, and the contact when known.
   approverText      String?
   approverContactId String?
+  /// Org brain (spec 5.3): who at Ankora signs an approval step of a run
+  /// in the product. The step waits for them; the run does not close
+  /// before they sign.
+  approverUserId    String?
   /// The approval thresholds that apply: client rules, and the same in
   /// words ("new supplier: the accountant approves"; "none").
   approvalPolicyIds String[] @default([])
