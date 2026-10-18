@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { businessDaysBetween, controlFrom, controlLine, controlParts, type ControlData } from "@/lib/client-control";
+import { CONTROL_DETAIL_LIMIT, businessDaysBetween, controlDetails, controlFrom, controlLine, controlParts, type ControlData } from "@/lib/client-control";
 
 // The control line at the top of a client's file (spec 7.6).
 
@@ -108,5 +108,46 @@ describe("visible to the client and owner (spec 3.1)", () => {
     expect(parts).toContain("2 פריטים גלויים ללקוח");
     expect(parts).toContain("פריט אחד בלי בעלים");
     expect(controlParts({ ...base, clientVisible: 1 }).map((p) => p.text)).toContain("פריט אחד גלוי ללקוח");
+  });
+});
+
+describe("what is behind each count (spec 7.6)", () => {
+  it("each count that has names says which key it opens", () => {
+    const keys = controlParts({ ...base, processes: 2, avgCompleteness: 7, needsReview: 1, uncertain: 3, daysSinceBatch: 0 }).map((p) => p.key);
+    expect(keys).toEqual(["processes", "completeness", "needsReview", "uncertain", undefined]);
+  });
+
+  it("names the same rows the counts come from", () => {
+    const d = controlDetails({
+      processes: [
+        { code: "P1", title: "תשלומי ספקים", transitionStatus: "WITH_ANKORA", completeness: { score: 9 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
+        { code: "P2", title: "דוח רבעוני", transitionStatus: "IN_HANDOVER", completeness: { score: 6 }, needsReview: true, reviewLabel: "כלל השתנה", backupOwnerId: null, status: "ACTIVE", clientVisible: true },
+        { code: "P3", title: "ישן", transitionStatus: "WITH_CLIENT", completeness: { score: 1 }, needsReview: true, backupOwnerId: null, status: "RETIRED" },
+      ],
+      exceptions: [{ status: "REQUESTED", what: "תשלום בלי אישור", ruleTitle: "סף" }],
+      facts: [
+        { kind: "NOTE", body: "מגבלת Justworks", answeredAt: null, closedAt: null, knowledgeStatus: "UNCERTAIN", fieldStatus: {}, ownerId: "u" },
+        { kind: "QUESTION", body: "מי מורשה החתימה?", answeredAt: null, closedAt: null, knowledgeStatus: "MISSING", fieldStatus: {} },
+      ],
+      otherItems: [{ label: "Mercury", knowledgeStatus: "CONFIRMED", fieldStatus: {}, clientVisible: true }],
+      systems: [{ systemName: "Doka", accessStatus: "PENDING" }],
+    });
+    expect(d.processes).toEqual(["P1 תשלומי ספקים", "P2 דוח רבעוני"]);
+    expect(d.completeness).toEqual(["P2 דוח רבעוני: 6 מתוך 9"]);
+    expect(d.needsReview).toEqual(["P2 דוח רבעוני: כלל השתנה"]);
+    expect(d.noBackup).toEqual(["P2 דוח רבעוני"]);
+    expect(d.exceptionsRequested).toEqual(["סף: תשלום בלי אישור"]);
+    expect(d.uncertain).toEqual(["מגבלת Justworks"]);
+    expect(d.openQuestions).toEqual(["מי מורשה החתימה?"]);
+    expect(d.clientVisible).toEqual(["P2 דוח רבעוני", "Mercury"]);
+    expect(d.noOwner).toEqual(["Mercury"]);
+    expect(d.systemsWithoutAccess).toEqual(["Doka"]);
+  });
+
+  it("a long list stops, and says how many more", () => {
+    const many = Array.from({ length: CONTROL_DETAIL_LIMIT + 5 }, (_, i) => ({ label: `פריט ${i}`, knowledgeStatus: "CONFIRMED" as const, fieldStatus: {} }));
+    const d = controlDetails({ processes: [], exceptions: [], facts: [], otherItems: many, systems: [] });
+    expect(d.noOwner).toHaveLength(CONTROL_DETAIL_LIMIT + 1);
+    expect(d.noOwner!.at(-1)).toBe("ועוד 5");
   });
 });
