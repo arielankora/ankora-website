@@ -14,6 +14,8 @@ import {
   listAccessibleClients,
   archiveClient,
   restoreClient,
+  updateClient,
+  listArchivedClients,
   listStaffForAssignment,
 } from "@/lib/app-domain/clients";
 import { listCategories, getCategoryMonthlyHours, updateCategory, archiveCategory } from "@/lib/app-domain/categories";
@@ -153,6 +155,55 @@ describe("archiveClient() / restoreClient() - who may, and what employees see", 
     const entry = await startTimer(employee, { clientId: client.id, categoryId: category.id });
     expect(entry.clientId).toBe(client.id);
     expect(entry.endAt).toBeNull();
+  });
+});
+
+// 18.10.2026: a client set to "בארכיון" from its settings form kept
+// deletedAt NULL. It stayed on the list, its screen failed (every panel
+// reads through listAccessibleClients, active only), and its portal users
+// kept their access. The form and the archive button now do the same thing.
+describe("archiving from the settings form", () => {
+  it("is the same as the archive button: off the list and the pickers, audited, listed as archived", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient({ name: "Did Not Sign" });
+    const employee = await assignedEmployee(client.id);
+
+    const archived = await updateClient(admin, client.id, { status: "ARCHIVED" });
+    expect(archived.status).toBe("ARCHIVED");
+    expect(archived.deletedAt).not.toBeNull();
+
+    expect(await getClient(client.id)).toBeNull();
+    expect((await listClients()).map((c) => c.id)).not.toContain(client.id);
+    expect((await listAccessibleClients(employee)).map((c) => c.id)).not.toContain(client.id);
+    expect((await listArchivedClients(admin)).map((c) => c.name)).toEqual(["Did Not Sign"]);
+
+    const actions = (await prisma.auditEvent.findMany({ where: { entityId: client.id } })).map((a) => a.action).sort();
+    expect(actions).toEqual(["client.archive", "client.settings_change"]);
+
+    await restoreClient(admin, client.id);
+    expect(await getClient(client.id)).not.toBeNull();
+    expect(await listArchivedClients(admin)).toEqual([]);
+    expect((await listAccessibleClients(employee)).map((c) => c.id)).toEqual([client.id]);
+  });
+
+  it("does not stamp a second archive on a client that is already archived, and a pause stays on the list", async () => {
+    const { user: admin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const gone = await createTestClient();
+    await archiveClient(admin, gone.id);
+    const first = (await prisma.client.findUniqueOrThrow({ where: { id: gone.id } })).deletedAt;
+    await updateClient(admin, gone.id, { status: "ARCHIVED" });
+    expect((await prisma.client.findUniqueOrThrow({ where: { id: gone.id } })).deletedAt).toEqual(first);
+    expect(await prisma.auditEvent.count({ where: { entityId: gone.id, action: "client.archive" } })).toBe(1);
+
+    const paused = await createTestClient();
+    await updateClient(admin, paused.id, { status: "PAUSED" });
+    expect(await getClient(paused.id)).not.toBeNull();
+    expect((await listArchivedClients(admin)).map((c) => c.id)).not.toContain(paused.id);
+  });
+
+  it.each(["ANKORA_EMPLOYEE", "CLIENT_USER"] as const)("%s may not list the archived clients", async (role) => {
+    const who = await actor(role);
+    await expect(listArchivedClients(who)).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 

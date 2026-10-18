@@ -17,6 +17,7 @@ import {
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { EditClientForm } from "./EditClientForm";
+import { RestoreClientButton } from "../RestoreClientButton";
 import { DecisionsPanel } from "./DecisionsPanel";
 import { DocumentsPanel, SummaryPanel } from "./FilePanel";
 import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
@@ -101,6 +102,43 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
   const client = await getClient(params.clientId);
   if (!client) notFound();
+
+  // A client that is not active is in nobody's working set:
+  // listAccessibleClients() returns active clients only, and every panel
+  // below reads through it, so each one refuses this client and the whole
+  // screen used to fail (18.10.2026, a client set to "בארכיון" from the
+  // form below). What such a client needs is its settings and the way
+  // back, so that is all this screen shows until it is active again.
+  if (client.status !== "ACTIVE") {
+    const staff = await listStaffForAssignment();
+    const paused = client.status === "PAUSED";
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link href="/app/clients" className="text-xs text-appNavy/50 hover:text-gold-dim">
+            ← חזרה לרשימת הלקוחות
+          </Link>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
+            <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
+          </div>
+        </div>
+
+        <div className="space-y-4 rounded-2xl border border-lineDark bg-white p-6">
+          <p className="text-sm text-appNavy/70">
+            {paused
+              ? "הלקוח מושהה, ולכן המשימות, התיק והמסמכים שלו לא מוצגים כאן, והוא לא מופיע ברשימות העבודה. שום דבר לא נמחק: הכול חוזר כשהלקוח חוזר לפעיל."
+              : "הלקוח בארכיון. שום דבר לא נמחק: המשימות, התיק והשעות חוזרים כשהלקוח חוזר לפעיל."}
+          </p>
+          <RestoreClientButton clientId={client.id} />
+        </div>
+
+        <div className="rounded-2xl border border-lineDark bg-white p-6">
+          <EditClientForm client={client} staff={staff} />
+        </div>
+      </div>
+    );
+  }
 
   // Phase 10 ("מועדים חשובים") client-detail "Dates" section - reuses
   // listImportantDates' own access scoping (this page is already gated on
