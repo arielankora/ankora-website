@@ -355,8 +355,923 @@ erDiagram
 
 Phases 5, 7 and 11 (internal dashboards/reports/exports; PWA/mobile/
 performance/security hardening; the nightly Excel report + JSON backup
-email) added no new tables — they built screens, jobs and infrastructure on
+email) added no new tables: they built screens, jobs and infrastructure on
 top of the models above.
+
+Development stopped being numbered after that. Everything added since the
+credentials vault (6.10.2026) is listed in "Entities added after Phase 12"
+below, grouped by area rather than by phase.
+
+## Entities added after Phase 12 (credentials vault, client file, processes, portal phase 3)
+
+The diagram above covers Phases 0 to 12 and is kept as written. The
+sections below are generated from `prisma/schema.prisma` and cover the
+models added since, grouped by the area they belong to rather than by a
+phase number: the work stopped being numbered once the client file
+("המוח הארגוני") became the main line of development. Relationship lines
+show only the one-to-many edges declared inside each group; cross-group
+edges, nearly all of which hang off `Client` or `User`, are left out to
+keep each diagram readable.
+
+### Client portal access and sign-in
+
+```mermaid
+erDiagram
+    PortalLoginToken {
+        string id PK
+        string userId FK
+        string tokenHash
+        datetime expiresAt
+        datetime usedAt "nullable"
+        datetime createdAt
+    }
+
+    PendingLogin {
+        string id PK
+        string userId FK
+        string tokenHash
+        string method
+        datetime verifiedAt "nullable"
+        string secondFactor "nullable"
+        datetime deviceLinkedAt "nullable"
+        datetime expiresAt
+        datetime createdAt
+    }
+
+    DeviceLinkCode {
+        string id PK
+        string userId FK
+        string codeHash
+        int attempts
+        datetime expiresAt
+        datetime createdAt
+    }
+
+    WebAuthnChallenge {
+        string id PK
+        string userId FK
+        string purpose
+        string challenge
+        datetime expiresAt
+        datetime createdAt
+    }
+
+    Passkey {
+        string id PK
+        string userId FK
+        string credentialId
+        bytes publicKey
+        int counter
+        string transports "(list)"
+        string name
+        string deviceType
+        boolean backedUp
+        datetime createdAt
+        datetime lastUsedAt "nullable"
+    }
+
+    StepUpGrant {
+        string id PK
+        string userId FK
+        int tokenVersion
+        string method
+        datetime expiresAt
+        datetime createdAt
+    }
+```
+
+### MCP and OAuth
+
+```mermaid
+erDiagram
+    OAuthClient ||--o{ OAuthAuthorizationCode : "has"
+    OAuthClient ||--o{ OAuthToken : "has"
+
+    McpAccessToken {
+        string id PK
+        string userId FK
+        string label
+        string tokenHash
+        int tokenVersion
+        datetime lastUsedAt "nullable"
+        datetime expiresAt
+        datetime revokedAt "nullable"
+        datetime createdAt
+    }
+
+    OAuthClient {
+        string id PK
+        string clientId
+        string clientSecretHash "nullable"
+        string clientName
+        string redirectUris "(list)"
+        string grantTypes "(list)"
+        string scopes "(list)"
+        datetime createdAt
+        datetime lastUsedAt "nullable"
+    }
+
+    OAuthAuthorizationCode {
+        string id PK
+        string codeHash
+        string clientId FK
+        string userId FK
+        string redirectUri
+        string scope
+        string codeChallenge
+        string codeChallengeMethod
+        string resource "nullable"
+        datetime expiresAt
+        datetime consumedAt "nullable"
+        datetime createdAt
+    }
+
+    OAuthToken {
+        string id PK
+        string clientId FK
+        string userId FK
+        string accessTokenHash
+        string refreshTokenHash "nullable"
+        string scope
+        string resource "nullable"
+        int tokenVersion
+        datetime accessExpiresAt
+        datetime refreshExpiresAt "nullable"
+        datetime revokedAt "nullable"
+        string rotatedToId "nullable"
+        datetime lastUsedAt "nullable"
+        datetime createdAt
+    }
+
+    McpFileTicket {
+        string id PK
+        string tokenHash
+        string purpose
+        string userId
+        int tokenVersion
+        string clientId
+        string documentId "nullable"
+        string taskId "nullable"
+        string title "nullable"
+        string kind "enum ClientDocumentKind, nullable"
+        string fileName "nullable"
+        string mimeType "nullable"
+        boolean clientVisible
+        datetime expiresAt
+        datetime usedAt "nullable"
+        datetime createdAt
+    }
+```
+
+### Tasks, decisions and portal content
+
+```mermaid
+erDiagram
+    Decision ||--o{ DecisionOption : "has"
+    DecisionOption ||--o{ DecisionResponse : "has"
+
+    TaskComment {
+        string id PK
+        string taskId FK
+        string authorId FK "nullable"
+        string body
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    Decision {
+        string id PK
+        string clientId FK
+        string taskId FK "nullable"
+        string question
+        string background "nullable"
+        int amountMinor "nullable"
+        int ceilingMinorAtCreation "nullable"
+        datetime dueAt "nullable"
+        string status "enum DecisionStatus"
+        string createdById FK
+        datetime createdAt
+        datetime updatedAt
+        datetime cancelledAt "nullable"
+    }
+
+    DecisionOption {
+        string id PK
+        string decisionId FK
+        string label
+        string detail "nullable"
+        int amountMinor "nullable"
+        boolean recommended
+        int position
+    }
+
+    DecisionResponse {
+        string id PK
+        string decisionId FK
+        string optionId FK
+        string respondedById FK
+        datetime respondedAt
+        string questionSnapshot
+        string optionLabelSnapshot
+        int amountMinorSnapshot "nullable"
+    }
+
+    ClientDocument {
+        string id PK
+        string clientId FK
+        string taskId FK "nullable"
+        string title
+        string kind "enum ClientDocumentKind"
+        string driveFileId
+        string mimeType
+        int sizeBytes "nullable"
+        boolean clientVisible
+        string uploadedById FK "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    PortalSummary {
+        string id PK
+        string clientId FK
+        datetime periodStart
+        datetime periodEnd
+        string draft
+        string status "enum PortalSummaryStatus"
+        string sourceTaskIds "(list)"
+        string sourceDecisionIds "(list)"
+        datetime generatedAt
+        string approvedById FK "nullable"
+        datetime approvedAt "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+```
+
+### Credentials vault
+
+```mermaid
+erDiagram
+    ClientCredential ||--o{ SystemAccess : "has"
+
+    ClientCredential {
+        string id PK
+        string clientId FK
+        string systemName
+        string url "nullable"
+        bytes secretCiphertext "nullable"
+        bytes secretIv "nullable"
+        bytes secretTag "nullable"
+        bytes wrappedDek "nullable"
+        string kekRef "nullable"
+        int encVersion
+        boolean hasUsername
+        boolean hasPassword
+        boolean hasNotes
+        datetime secretUpdatedAt "nullable"
+        datetime lastRevealedAt "nullable"
+        string lastRevealedById FK "nullable"
+        string createdById FK
+        string updatedById FK
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+```
+
+### Website leads
+
+```mermaid
+erDiagram
+    WebsiteLead {
+        string id PK
+        datetime createdAt
+        string name
+        string email
+        string phone "nullable"
+        string areas "(list)"
+        string message "nullable"
+        string company "nullable"
+        string locale "nullable"
+        string source "nullable"
+        string firstSource "nullable"
+        string landingPage "nullable"
+        string referrer "nullable"
+        string utmSource "nullable"
+        string utmMedium "nullable"
+        string utmCampaign "nullable"
+        string utmTerm "nullable"
+        string utmContent "nullable"
+        string gclid "nullable"
+        int visitNumber "nullable"
+        datetime firstSeenAt "nullable"
+        datetime visitStartedAt "nullable"
+        string gaClientId "nullable"
+        string gaSessionId "nullable"
+        string country "nullable"
+        string region "nullable"
+        string city "nullable"
+        string deviceType "nullable"
+        string os "nullable"
+        string browser "nullable"
+        string userAgent "nullable"
+        json attribution "nullable"
+        string emailStatus
+    }
+```
+
+### Client file: identity and people
+
+```mermaid
+erDiagram
+    Organization ||--o{ ClientDomain : "has"
+    Organization ||--o{ ClientOrganization : "has"
+    Organization ||--o{ Person : "has"
+    Person ||--o{ ClientContact : "has"
+
+    Organization {
+        string id PK
+        string name
+        string domains "(list)"
+        string website "nullable"
+        string notes "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    Person {
+        string id PK
+        string name "nullable"
+        string emails "(list)"
+        string phones "(list)"
+        string organizationId FK "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientContact {
+        string id PK
+        string clientId FK
+        string personId FK
+        string role "nullable"
+        string relationship "enum ContactRelationship"
+        string entityId FK "nullable"
+        string context "nullable"
+        string channelOrder "(list)"
+        boolean isPrimary
+        boolean isDecisionMaker
+        string userId "nullable"
+        string clientSideAddress "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientOrganization {
+        string id PK
+        string clientId FK
+        string organizationId FK
+        string role "nullable"
+        string relationship "enum ContactRelationship"
+        int monthlyCostMinor "nullable"
+        string currency "nullable"
+        string notes "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientSource {
+        string id PK
+        string clientId FK
+        int seq
+        string code
+        string kind "enum SourceKind"
+        string weight "enum SourceWeight"
+        string title
+        datetime occurredAt "nullable"
+        string participants "(list)"
+        json externalRefs
+        string restriction "enum SourceRestriction"
+        string notes "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientDomain {
+        string id PK
+        string clientId FK
+        string domain
+        string kind "enum ClientDomainKind"
+        string organizationId FK "nullable"
+        string notes "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime deletedAt "nullable"
+    }
+
+    SystemAccess {
+        string id PK
+        string clientId FK
+        string systemName
+        string purpose "nullable"
+        string entityId FK "nullable"
+        string url "nullable"
+        string accountUsed "nullable"
+        string ourPermission "enum SystemPermission"
+        string accessStatus "enum SystemAccessStatus"
+        string blocker "nullable"
+        string clientAdmin "nullable"
+        string credentialId FK "nullable"
+        string billingCycle "enum BillingCycle, nullable"
+        int billingCostMinor "nullable"
+        string billingCurrency "nullable"
+        string cardLast4 "nullable"
+        string invoiceTo "nullable"
+        string notes "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+```
+
+### Client file: knowledge
+
+```mermaid
+erDiagram
+    ClientEntity ||--o{ ClientContact : "has"
+    ClientEntity ||--o{ ClientEntity : "has"
+    ClientEntity ||--o{ RequestType : "has"
+    ClientEntity ||--o{ SystemAccess : "has"
+    KnowledgeBatch ||--o{ KnowledgeProposal : "has"
+
+    ClientFact {
+        string id PK
+        string clientId FK
+        string kind "enum FactKind"
+        string topic "enum FactTopic, nullable"
+        string body
+        string subjectContactId "nullable"
+        string subjectOrgId "nullable"
+        string referTo "nullable"
+        datetime validUntil "nullable"
+        string validUntilEvent "nullable"
+        datetime closedAt "nullable"
+        datetime decidedAt "nullable"
+        string decidedBy "nullable"
+        string assigneeId "nullable"
+        datetime answeredAt "nullable"
+        string answer "nullable"
+        string taskId "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientEntity {
+        string id PK
+        string clientId FK
+        string name
+        string legalName "nullable"
+        string registrationNumber "nullable"
+        string country "nullable"
+        string currency "nullable"
+        string billingAddress "nullable"
+        string parentId FK "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    KnowledgeBatch {
+        string id PK
+        string clientId FK
+        string sourceId "nullable"
+        string via "enum KnowledgeBatchVia"
+        string note "nullable"
+        json dropped
+        string createdById "nullable"
+        datetime createdAt
+        datetime closedAt "nullable"
+    }
+
+    KnowledgeProposal {
+        string id PK
+        string batchId FK
+        string clientId
+        string target "enum ProposalTarget"
+        string action "enum ProposalAction"
+        string targetId "nullable"
+        json payload
+        string reason "nullable"
+        string quote "nullable"
+        json flags
+        string state "enum ProposalState"
+        string decidedById "nullable"
+        datetime decidedAt "nullable"
+        string rejectReason "nullable"
+        boolean edited
+        string resultId "nullable"
+        datetime createdAt
+    }
+
+    RequestType {
+        string id PK
+        string clientId FK
+        string title
+        string fromWho "nullable"
+        string arrivesVia "nullable"
+        string handling
+        string routeToContactIds "(list)"
+        string entityId FK "nullable"
+        string processId FK "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ClientNarrative {
+        string id PK
+        string clientId FK
+        string kind "enum NarrativeKind"
+        int version
+        string body
+        string createdById "nullable"
+        datetime createdAt
+    }
+
+    ExtractionGuide {
+        string id PK
+        int version
+        string body
+        string note "nullable"
+        string state "enum GuideState"
+        string createdById "nullable"
+        datetime createdAt
+        string decidedById "nullable"
+        datetime decidedAt "nullable"
+        string rejectReason "nullable"
+    }
+```
+
+### Client file: rules and processes
+
+```mermaid
+erDiagram
+    ClientPolicy ||--o{ PolicyException : "has"
+    Process ||--o{ ImportantDate : "has"
+    Process ||--o{ ProcessCheck : "has"
+    Process ||--o{ ProcessLesson : "has"
+    Process ||--o{ ProcessVersion : "has"
+    Process ||--o{ RequestType : "has"
+
+    ClientPolicy {
+        string id PK
+        string clientId FK
+        string kind "enum PolicyKind"
+        string status "enum PolicyStatus"
+        int version
+        string title
+        string statement
+        string rationale "nullable"
+        string interimStatement "nullable"
+        json params
+        json interimParams
+        string approvedById "nullable"
+        datetime approvedAt "nullable"
+        datetime retiredAt "nullable"
+        string retiredById "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        string ownerId "nullable"
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    PolicyException {
+        string id PK
+        string clientId FK
+        string policyId FK
+        string what
+        string reason
+        datetime validUntil
+        string status "enum PolicyExceptionStatus"
+        string requestedById
+        string decidedById "nullable"
+        datetime decidedAt "nullable"
+        string decisionNote "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Process {
+        string id PK
+        string clientId FK
+        int seq
+        string code
+        string title
+        string purpose "nullable"
+        string triggerKinds "enum ProcessTrigger (list)"
+        string triggerText "nullable"
+        string ownerId "nullable"
+        string backupOwnerId "nullable"
+        string slaText "nullable"
+        int slaBusinessDays "nullable"
+        string externalPartyContactIds "(list)"
+        string externalPartyText "nullable"
+        string requiredSystemIds "(list)"
+        string approverText "nullable"
+        string approverContactId "nullable"
+        string approvalPolicyIds "(list)"
+        string approvalText "nullable"
+        string exceptionPlaybook "nullable"
+        string entityId "nullable"
+        string executorText "nullable"
+        string transitionStatus "enum ProcessTransition"
+        string status "enum ProcessStatus"
+        string categoryId "nullable"
+        int reviewEveryDays "nullable"
+        datetime lastReviewedAt "nullable"
+        datetime lastRunAt "nullable"
+        boolean needsReview
+        string reviewReason "nullable"
+        int checkEveryDays "nullable"
+        string checkText "nullable"
+        datetime lastCheckedAt "nullable"
+        string knowledgeStatus "enum KnowledgeStatus"
+        json fieldStatus
+        json sources
+        json externalRefs
+        json alternatives
+        string toResolve "nullable"
+        string importance "enum KnowledgeImportance"
+        string audience "enum KnowledgeAudience"
+        string audienceUserIds "(list)"
+        string doNotDisclose "nullable"
+        string sensitivity "enum KnowledgeSensitivity"
+        boolean clientVisible
+        datetime verifiedAt "nullable"
+        string supersededById "nullable"
+        datetime supersededAt "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        datetime updatedAt
+        datetime deletedAt "nullable"
+    }
+
+    ProcessVersion {
+        string id PK
+        string processId FK
+        int version
+        string status "enum ProcessVersionStatus"
+        json steps
+        string highlights "nullable"
+        string outputs "nullable"
+        string changeNote "nullable"
+        string createdById "nullable"
+        datetime createdAt
+        string approvedById "nullable"
+        datetime approvedAt "nullable"
+    }
+
+    ProcessCheck {
+        string id PK
+        string processId FK
+        string clientId
+        string checkedById "nullable"
+        string outcome "enum ProcessCheckOutcome"
+        string note "nullable"
+        string taskId "nullable"
+        datetime createdAt
+    }
+
+    ProcessLesson {
+        string id PK
+        string processId FK
+        string clientId
+        string taskId
+        int version "nullable"
+        string status "enum ProcessLessonStatus"
+        string body "nullable"
+        string authorId "nullable"
+        datetime createdAt
+        string resolvedById "nullable"
+        datetime resolvedAt "nullable"
+        string resolution "nullable"
+    }
+```
+
+### Internal suppliers: agreements
+
+```mermaid
+erDiagram
+    EmployeeAgreement {
+        string id PK
+        string userId FK
+        string kind "enum AgreementKind"
+        string version
+        string channel "enum AgreementChannel"
+        datetime signedAt
+        string signedName
+        string ip "nullable"
+        string userAgent "nullable"
+        string contentHash
+        string driveFileId "nullable"
+        string recordedById "nullable"
+        datetime createdAt
+    }
+
+    AgreementSignLink {
+        string id PK
+        string userId FK
+        string kind "enum AgreementKind"
+        string version
+        string purpose "enum AgreementLinkPurpose"
+        string tokenHash
+        datetime expiresAt
+        datetime usedAt "nullable"
+        string documentId "nullable"
+        datetime reviewedAt "nullable"
+        string reviewedById "nullable"
+        string createdById
+        datetime createdAt
+    }
+```
+
+### Enums added in the same period
+
+| Enum | Values |
+| --- | --- |
+| `AgreementChannel` | `APP`, `EMAIL_PDF` |
+| `AgreementKind` | `CONFIDENTIALITY`, `DELETION_DECLARATION` |
+| `AgreementLinkPurpose` | `APP_SIGN`, `PDF_UPLOAD` |
+| `BillingCycle` | `MONTHLY`, `ANNUAL`, `OTHER` |
+| `ClientDocumentKind` | `POLICY`, `CERTIFICATE`, `CONTRACT`, `INVOICE`, `OTHER` |
+| `ClientDomainKind` | `CLIENT`, `PARTNER` |
+| `ClientKind` | `BUSINESS`, `PRIVATE` |
+| `ContactRelationship` | `CLIENT_STAFF`, `PROVIDER`, `ADVISOR`, `INVESTOR`, `SUPPLIER`, `ANKORA` |
+| `DatePrecision` | `EXACT`, `APPROXIMATE`, `UNKNOWN` |
+| `DecisionStatus` | `OPEN`, `ANSWERED`, `CANCELLED` |
+| `EmployeeLifecycleKind` | `ONBOARDING`, `OFFBOARDING` |
+| `EntryOrigin` | `APP`, `MCP` |
+| `FactKind` | `SCOPE_IN`, `SCOPE_OUT`, `PREFERENCE`, `REQUIREMENT`, `LOCATION`, `FINANCE`, `TEMPORARY`, `ONE_OFF_DECISION`, `QUESTION`, `NOTE` |
+| `FactTopic` | `COMMUNICATION`, `REPORTING`, `DOCUMENTS`, `AUTOMATION`, `ADMINS`, `PAYMENTS`, `SUPPLIERS`, `OTHER` |
+| `GuideState` | `DRAFT`, `APPROVED`, `REJECTED` |
+| `HourBankKind` | `CYCLE`, `PREPAID` |
+| `KnowledgeAudience` | `ALL_STAFF`, `ACCOUNT_TEAM`, `RESTRICTED` |
+| `KnowledgeBatchVia` | `MCP`, `SCREEN` |
+| `KnowledgeImportance` | `NORMAL`, `LOW` |
+| `KnowledgeSensitivity` | `NORMAL`, `SENSITIVE` |
+| `KnowledgeStatus` | `CONFIRMED`, `UNCERTAIN`, `MISSING`, `SUPERSEDED` |
+| `LeadUnit` | `CALENDAR_DAYS`, `BUSINESS_DAYS` |
+| `NarrativeKind` | `OVERVIEW`, `BACKGROUND`, `OUR_ROLE` |
+| `PolicyExceptionStatus` | `REQUESTED`, `APPROVED`, `REJECTED`, `WITHDRAWN` |
+| `PolicyKind` | `DATA_HANDLING`, `DISCLOSURE`, `COMMUNICATION`, `SEPARATION`, `APPROVAL_REQUIRED`, `THRESHOLD`, `REQUIRED_STEP`, `TIMING`, `FORBIDDEN`, `INFO` |
+| `PolicyStatus` | `PROPOSED`, `ACTIVE`, `RETIRED` |
+| `PortalDigest` | `EVERY_DECISION`, `WEEKLY`, `MONTHLY` |
+| `PortalSummaryStatus` | `DRAFT`, `APPROVED`, `DISCARDED` |
+| `ProcessCheckOutcome` | `OK`, `ISSUE` |
+| `ProcessLessonStatus` | `NOTHING`, `OPEN`, `APPLIED`, `DISMISSED` |
+| `ProcessStatus` | `DRAFT`, `ACTIVE`, `PAUSED`, `RETIRED` |
+| `ProcessStepMode` | `MANUAL`, `ASSISTED`, `AUTOMATED` |
+| `ProcessTransition` | `WITH_CLIENT`, `IN_HANDOVER`, `WITH_ANKORA`, `NOT_PLANNED` |
+| `ProcessTrigger` | `SCHEDULED`, `EVENT`, `ON_DEMAND`, `CONTINUOUS` |
+| `ProcessVersionStatus` | `DRAFT`, `APPROVED`, `SUPERSEDED` |
+| `ProposalAction` | `CREATE`, `SUPERSEDE`, `CONTRADICT` |
+| `ProposalState` | `PENDING`, `APPROVED`, `REJECTED` |
+| `ProposalTarget` | `FACT`, `CONTACT`, `ORGANIZATION`, `SYSTEM`, `REQUEST_TYPE`, `POLICY`, `ENTITY`, `NARRATIVE`, `PROCESS`, `DOMAIN` |
+| `RollConvention` | `NONE`, `PREVIOUS_BUSINESS_DAY`, `NEXT_BUSINESS_DAY` |
+| `SourceKind` | `TRANSCRIPT`, `CLIENT_DOCUMENT`, `TASK`, `PERSON`, `ANKORA_DOCUMENT` |
+| `SourceRestriction` | `NONE`, `TOPICS_ONLY` |
+| `SourceWeight` | `PRIMARY`, `SECONDARY` |
+| `SupplierExperience` | `GOOD`, `OK`, `AVOID` |
+| `SystemAccessStatus` | `HAS_ACCESS`, `PENDING`, `NO_ACCESS`, `NOT_NEEDED` |
+| `SystemPermission` | `NONE`, `VIEWER`, `USER`, `BILLING`, `ADMIN`, `OWNER` |
+| `TaskBlocker` | `CLIENT`, `SUPPLIER`, `INTERNAL`, `OTHER` |
+| `TaskPriority` | `LOW`, `NORMAL`, `HIGH`, `URGENT` |
 
 ## Notes on relationships not enforced by a Prisma `@relation`
 

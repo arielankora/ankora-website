@@ -1,6 +1,6 @@
 # Ankora Website
 
-Next.js 14 (App Router) + TypeScript + Tailwind + Framer Motion. Bilingual (Hebrew default/RTL, English toggle) per the approved strategic plan.
+Next.js 16 (App Router) + React 19 + TypeScript + Tailwind + Framer Motion. Bilingual (Hebrew default/RTL, English toggle) per the approved strategic plan.
 
 ## Run locally
 
@@ -35,15 +35,20 @@ Phases 0-5 of `docs/adr/0001-time-tracking-app-architecture.md`'s plan
 are built: audit/schema/environments (0), auth/roles/users/clients/
 categories (1), timer + manual time entries + audit revisions (2),
 billing policy + hour banks (3), alerts + email delivery (4), and
-internal dashboards/reports/CSV export (5). Client Portal + scheduled
-reports (Phase 6) and later phases are not built yet - see the ADR's
-phased plan for what's still ahead, and don't start it without a fresh
-go-ahead.
+internal dashboards/reports/CSV export (5), client portal + scheduled
+reports (6), integrations (8), tasks/profile/notifications (9), and
+important dates (10). Everything after that stopped being numbered: the
+credentials vault, two-factor sign-in with passkeys, the client file
+("המוח הארגוני") with its processes, rules and knowledge extraction, and
+internal-supplier onboarding. See the ADR's phased plan for the numbered
+part and `docs/erd.md` for what the schema looks like today.
 
 ### Stack
 
 Postgres (Prisma ORM) + Auth.js v5 (Credentials, JWT sessions, bcrypt) +
-Server Actions. Fully separate from the marketing site's stack (which has
+Server Actions. Sign-in is two-step: the password only creates a
+short-lived `PendingLogin`, and the session is issued after a WebAuthn
+passkey check (`@simplewebauthn/*`). See `lib/app-auth/second-factor.ts`. Fully separate from the marketing site's stack (which has
 no database) - see the ADR for why it lives at `/app` instead of a
 subdomain.
 
@@ -57,7 +62,10 @@ npm run db:seed              # optional - loads demo fixtures, see below
 npm run dev
 ```
 
-Then set `DATABASE_URL` and `AUTH_SECRET` per `.env.example`. Visit
+Then set `DATABASE_URL`, `DATABASE_URL_UNPOOLED` (migrations run through
+it, not through the pooler), `AUTH_SECRET` and `VAULT_KEK` (without it
+every "מערכות וגישות" screen throws `VaultUnavailableError`) per
+`.env.example`, and `RESEND_API_KEY` if you need outgoing mail. Visit
 `/app/login`.
 
 **Deploy-time migrations:** `npm run build` runs `prisma generate && prisma
@@ -105,9 +113,12 @@ Four roles (`prisma/schema.prisma`'s `UserRole`): `SUPER_ADMIN` (every
 permission, including the three Super-Admin-only screens - Hour Banks,
 Alerts, and Integrations), `ANKORA_ADMIN` (clients + categories + time entries + internal
 reports, not users, the audit log, hour banks, or alerts), `ANKORA_EMPLOYEE`
-(own timer/entries only: `time_entry.create_self` + `time_entry.edit_self`,
+(own timer/entries: `time_entry.create_self` + `time_entry.edit_self`,
 never `edit_others`), and `CLIENT_USER` (no admin permissions and no
-`time_entry.*` at all - client-facing screens are Phase 6). Note that
+`time_entry.*` at all, but `report.client.view`, which gates every live
+client-portal screen). All three internal roles also hold the three
+`credential.*` vault permissions, narrowed per client and gated by a
+step-up identity check. Note that
 `report.internal.view` (Phase 5) is deliberately granted to `ANKORA_ADMIN`
 too, unlike `hour_bank.manage` (Phase 3) and `alert.manage` (Phase 4) which
 are Super-Admin-only - spec section 4's role table explicitly lists
@@ -135,8 +146,8 @@ Phase 0/1: `User` (internal staff + client-portal users share one table;
 role or per-client `ClientUser` membership determines authority),
 `Client`, `Category` (global or client-specific), `UserClientAccess`
 (which clients an employee may work with), `ClientUser` (a client-portal
-user's membership + role in one client - not yet wired to any UI,
-reserved for Phase 6), `PasswordResetToken`, `AuditEvent` (append-only).
+user's membership + role in one client; it is what identifies the client
+on every portal screen), `PasswordResetToken`, `AuditEvent` (append-only).
 
 Phase 2 (spec 23: "Timer + TimeEntry + manual entry + audit revisions"):
 `Task` (free-text-first per spec 6.1; only enough is modeled for
@@ -167,9 +178,15 @@ rationale.
 
 ```bash
 npm run test              # unit tests only - no database needed
+npm run test:unit         # the same, named explicitly
 npm run test:integration  # needs a real DATABASE_URL + generated Prisma Client
 npm run test:all          # both
 ```
+
+The regression suite lives in `qa/`: `npm run qa` runs all three levels
+(`qa:1`, `qa:2`, `qa:3` run one each), `npm run qa:scan` checks the suite
+against the code, and `npm run qa:e2e` runs the Playwright pack
+(`qa:e2e:ui` opens its UI).
 
 Unit tests (`tests/unit/`) cover password policy, permission checks, and
 lockout-window logic - pure functions, no I/O. Integration tests
@@ -241,14 +258,23 @@ existed.
 
 ### Claude Desktop (MCP)
 
-`/api/mcp` exposes the Time Tracking app to an employee's Claude Desktop
-over the Model Context Protocol. Ten tools:
+`/api/mcp` exposes the Time Tracking app to a staff member's Claude over
+the Model Context Protocol. 44 tools, by family:
 
 | | |
 | --- | --- |
-| Read (own) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries` |
-| Write (own) | `start_timer`, `stop_timer`, `update_timer_note`, `create_time_entry` |
+| Time (`lib/mcp/tools.ts`, 14) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `update_timer_note`, `create_time_entry`, `list_tasks`, `get_task`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
 | Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
+| Tasks (`task-extra-tools.ts`, 10) | task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `create_decision`, `list_my_routines`, `record_process_check` |
+| Client file (`client-file-tools.ts`, 11) | `get_client_file`, `list_processes`, `get_process`, `start_process`, `record_run_lesson`, `list_policies`, `propose_knowledge`, `get_extraction_brief`, `lookup_contact` and related reads |
+| Documents (`document-tools.ts`, 4) | `list_documents`, `read_document`, `start_document_upload`, `upload_document` |
+| Internal suppliers (`employee-tools.ts`, 5) | `get_employee_status`, `get_blank_agreement_pdf`, `issue_agreement_upload_code`, `record_pdf_signature`, `dismiss_pdf_upload` |
+
+A second, separate server at `/api/mcp/portal` (`portal-tools.ts`) serves
+client-portal users with 7 read-mostly tools: `get_status`, `list_tasks`,
+`list_decisions`, `answer_decision`, `weekly_report`, `monthly_report`,
+`hour_bank`. It sees only what the portal already shows, and only a client
+admin can answer a decision through it.
 
 Entries created through MCP carry `createdVia = MCP`, so they are always
 distinguishable from ones typed into the app. Nothing here deletes, and
