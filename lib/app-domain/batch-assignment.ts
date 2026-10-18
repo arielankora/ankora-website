@@ -7,7 +7,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { createTask } from "@/lib/app-domain/tasks";
 import { findSecrets } from "@/lib/secret-scan";
-import { payloadText, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { missingRequired, payloadText, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { assignmentReasonError, candidatesError, itemsForClient, waitingItemLine } from "@/lib/batch-assignment";
 import { proposeKnowledge, type ProposalItemInput, type ProposeResult } from "@/lib/app-domain/knowledge-proposals";
 
@@ -78,6 +78,12 @@ export async function proposeAwaitingAssignment(actor: User, input: AwaitingInpu
     }
     if (input.source.restriction === "TOPICS_ONLY" && item.quote?.trim()) {
       dropped.push({ index, reason: "המקור מוגבל לנושאים בלבד, ואסור לצטט ממנו." });
+      continue;
+    }
+    // Spec 5.2: said now, not once a person has picked the client.
+    const missing = missingRequired(item.target as ProposalTargetLike, item.payload ?? {}, item.reason);
+    if (missing) {
+      dropped.push({ index, reason: missing });
       continue;
     }
     kept.push({ index, item });

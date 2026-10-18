@@ -180,7 +180,7 @@ describe("where the rules act", () => {
     const r = await proposeKnowledge(employee, {
       clientId: client.id,
       source: { kind: "TRANSCRIPT", title: "פגישת הנהלה", externalIds: ["ff-9"] },
-      items: [{ target: "POLICY", payload: { kind: "DISCLOSURE", title: "עזיבת גיא", statement: "לא מספרים לעובדים עד הודעה של אורן" }, at: "03:10" }],
+      items: [{ target: "POLICY", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "DISCLOSURE", title: "עזיבת גיא", statement: "לא מספרים לעובדים עד הודעה של אורן" }, at: "03:10" }],
     });
     const p = (await listOpenBatches(employee)).find((x) => x.id === r.batchId)!.proposals[0];
     expect((p.flags as { code: string }[]).map((f) => f.code)).toContain("POLICY");
@@ -193,7 +193,7 @@ describe("where the rules act", () => {
     const again = await proposeKnowledge(employee, {
       clientId: client.id,
       source: { code: "S2" },
-      items: [{ target: "POLICY", payload: { kind: "DISCLOSURE", title: "עזיבת גיא", statement: "לא מספרים" } }],
+      items: [{ target: "POLICY", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "DISCLOSURE", title: "עזיבת גיא", statement: "לא מספרים" } }],
     });
     const dup = (await listOpenBatches(employee)).find((x) => x.id === again.batchId)!.proposals[0];
     expect((dup.flags as { code: string }[]).map((f) => f.code)).toContain("DUPLICATE");

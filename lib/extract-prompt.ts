@@ -71,7 +71,7 @@ export const DEFAULT_EXTRACTION_GUIDE_LINES = [
   "סיסמה, מפתח, טוקן או מספר כרטיס שנאמרו: לא לכתוב אותם בשום שדה. רק לציין לי שנאמר סוד, כדי שנחליף אותו. השרת מוחק פריט כזה בכל מקרה.",
   'מקור שמסומן "נושאים בלבד": רק הנושאים שעלו, בלי ציטוטים ובלי פרטים.',
   "לא דורסים. אם הלקוח שינה משהו שכבר בתיק: action SUPERSEDE עם targetId. אם מישהו אמר אחרת ולא ברור מה נכון: action CONTRADICT עם targetId.",
-  "לכל פריט: at (הדקה בהקלטה, 08:13), ו-reason במשפט אחד. quote קצר רק כשהוא באמת עוזר.",
+  "לכל פריט: at (הדקה בהקלטה, 08:13), reason במשפט אחד, knowledgeStatus, ו-confidence (HIGH, MEDIUM או LOW): עד כמה אתה בטוח. פריט בלי reason או בלי סטטוס נדחה כשהוא מגיע. quote קצר רק כשהוא באמת עוזר.",
 ];
 
 export function buildExtractPrompt(input: ExtractPromptInput): string {

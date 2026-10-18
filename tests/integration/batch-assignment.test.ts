@@ -31,8 +31,8 @@ describe("batch waiting for its client", () => {
       reason: "הדיון היה על דוחות Justworks, ורק ל-NUX יש",
       source: MEETING,
       items: [
-        { target: "FACT", payload: { kind: "NOTE", body: "הדוח הרבעוני נשלח עד ה-15" }, at: "03:10" },
-        { target: "FACT", payload: { kind: "NOTE", body: "קוד הכניסה 4417", }, reason: "password: Hunter2pass!" },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "הדוח הרבעוני נשלח עד ה-15" }, at: "03:10" },
+        { target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "קוד הכניסה 4417", }, reason: "password: Hunter2pass!" },
       ],
     });
     expect(sent.waiting).toBe(1);
@@ -51,7 +51,7 @@ describe("batch waiting for its client", () => {
     expect(waiting.candidates.map((c) => c.name).sort()).toEqual(["NUX", "Zest"]);
 
     // The same recording again, while it waits.
-    await expect(proposeAwaitingAssignment(user, { proposedClientId: nux.id, candidateClientIds: [nux.id, other.id], reason: "שוב", source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] })).rejects.toThrow("כבר ממתינה");
+    await expect(proposeAwaitingAssignment(user, { proposedClientId: nux.id, candidateClientIds: [nux.id, other.id], reason: "שוב", source: MEETING, items: [{ target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] })).rejects.toThrow("כבר ממתינה");
 
     const assigned = await assignBatch(user, sent.batchId!, nux.id);
     expect(assigned).toMatchObject({ clientId: nux.id, sourceCode: "S1", proposed: 1 });
@@ -65,7 +65,7 @@ describe("batch waiting for its client", () => {
     await expect(assignBatch(user, sent.batchId!, nux.id)).rejects.toThrow("כבר שויכה");
 
     // Now it is registered: sending it again as uncertain is refused.
-    await expect(proposeAwaitingAssignment(user, { proposedClientId: other.id, candidateClientIds: [nux.id, other.id], reason: "שוב", source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] })).rejects.toThrow("כבר רשומה אצל NUX");
+    await expect(proposeAwaitingAssignment(user, { proposedClientId: other.id, candidateClientIds: [nux.id, other.id], reason: "שוב", source: MEETING, items: [{ target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] })).rejects.toThrow("כבר רשומה אצל NUX");
   });
 
   it("to another client, a change to a fact of the proposed client does not travel", async () => {
@@ -77,8 +77,8 @@ describe("batch waiting for its client", () => {
       reason: "נשמע כמו NUX",
       source: { ...MEETING, externalIds: ["ff-778"] },
       items: [
-        { target: "FACT", payload: { kind: "NOTE", body: "חדש" }, alsoSources: ["S4"] },
-        { target: "FACT", action: "SUPERSEDE", targetId: fact.id, payload: { kind: "NOTE", body: "הדוח נשלח עד ה-15" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "חדש" }, alsoSources: ["S4"] },
+        { target: "FACT", reason: "נאמר בפגישה", action: "SUPERSEDE", targetId: fact.id, payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "הדוח נשלח עד ה-15" } },
       ],
     });
     const assigned = await assignBatch(user, sent.batchId!, other.id);
@@ -98,13 +98,13 @@ describe("batch waiting for its client", () => {
       candidateClientIds: [nux.id, other.id],
       reason: "הכותרת",
       source: { ...MEETING, externalIds: [] },
-      items: [{ target: "FACT", payload: { kind: "NOTE", body: "משהו" } }],
+      items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "משהו" } }],
     });
     expect(await listAwaitingAssignment(onlyNux)).toHaveLength(0);
     expect(await countPendingProposals(onlyNux)).toBe(0);
     await expect(assignBatch(onlyNux, sent.batchId!, nux.id)).rejects.toThrow();
     // Someone who cannot see a candidate cannot send it to one either.
-    await expect(proposeAwaitingAssignment(onlyNux, { proposedClientId: nux.id, candidateClientIds: [nux.id, other.id], reason: "x", source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] })).rejects.toThrow();
+    await expect(proposeAwaitingAssignment(onlyNux, { proposedClientId: nux.id, candidateClientIds: [nux.id, other.id], reason: "x", source: MEETING, items: [{ target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] })).rejects.toThrow();
 
     await expect(discardAwaiting(user, sent.batchId!, " ")).rejects.toThrow("בשורה אחת");
     await discardAwaiting(user, sent.batchId!, "שיחה של הספק עם לקוח אחר שלו");

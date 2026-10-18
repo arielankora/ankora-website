@@ -141,8 +141,8 @@ describe("sensitive proposals (R6)", () => {
       clientId: client.id,
       source: { kind: "TRANSCRIPT", title: "שיחה עם אורן", externalIds: ["ff-77"] },
       items: [
-        { target: "FACT", payload: { kind: "TEMPORARY", body: "אורן בטיפול רפואי עד סוף החודש", validUntilEvent: "סוף החודש", sensitivity: "SENSITIVE" }, reason: "אורן סיפר" },
-        { target: "FACT", payload: { kind: "NOTE", body: "שגרה" } },
+        { target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "TEMPORARY", body: "אורן בטיפול רפואי עד סוף החודש", validUntilEvent: "סוף החודש", sensitivity: "SENSITIVE" }, reason: "אורן סיפר" },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "שגרה" } },
       ],
     });
     expect(await prisma.notification.count({ where: { userId: hadas.id, type: "knowledge.sensitive_proposed" } })).toBe(1);

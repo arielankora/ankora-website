@@ -221,6 +221,10 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
   if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
     out.push({ code: "SHAPE", block: true, message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים "עד שיאושר" בעריכה, או דוחים.' });
   }
+  // Rule 1: anything short of confirmed says what would confirm it.
+  if ((payload.knowledgeStatus === "UNCERTAIN" || payload.knowledgeStatus === "MISSING") && !s("toResolve")?.trim()) {
+    out.push({ code: "SHAPE", block: true, message: 'לא ודאי או חסר, בלי "מה יסגור את זה". משלימים בעריכה, או דוחים.' });
+  }
   // Spec 3.1: shown to the client only when nothing forbids it.
   if (payload.clientVisible === true) {
     const why = clientVisibleBlocker({ sensitivity: s("sensitivity"), doNotDisclose: s("doNotDisclose") });
@@ -247,6 +251,84 @@ export function bulkApproveBlocker(p: { action: ProposalActionLike; flags: Propo
   if (p.flags.some((f) => f.code === "DUPLICATE")) return "ייתכן שכבר בתיק";
   if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return "מידע רגיש";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Reviewing fast (spec 5.2: a normal batch in under five minutes)
+// ---------------------------------------------------------------------------
+
+/// Items that carry the knowledge fields (spec 3.1). A free text and a
+/// domain are not "confirmed" or "uncertain": they are only approved.
+const HAS_STATUS: ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE", "POLICY", "ENTITY", "PROCESS"];
+
+/// What a proposal must say before anyone reads it, or null. Refused when
+/// it arrives, with this line back to Claude: the reviewer should never
+/// have to guess why, or how sure.
+export function missingRequired(target: ProposalTargetLike, payload: Record<string, unknown>, reason: string | null | undefined): string | null {
+  if (!reason?.trim()) return "חסרה סיבה: משפט אחד, למה זה נכון ומאיפה.";
+  const question = target === "FACT" && payload.kind === "QUESTION";
+  if (HAS_STATUS.includes(target) && !question && !payload.knowledgeStatus) return "חסר סטטוס: CONFIRMED, UNCERTAIN או MISSING.";
+  return null;
+}
+
+export type ConfidenceLike = "HIGH" | "MEDIUM" | "LOW";
+export const CONFIDENCE_LEVELS: readonly ConfidenceLike[] = ["HIGH", "MEDIUM", "LOW"] as const;
+export const CONFIDENCE_LABELS: Record<ConfidenceLike, string> = { HIGH: "ביטחון גבוה", MEDIUM: "ביטחון בינוני", LOW: "ביטחון נמוך" };
+
+const lower = (c: ConfidenceLike): ConfidenceLike => (c === "HIGH" ? "MEDIUM" : "LOW");
+
+/// How sure the proposal is, as the reviewer should read it: what Claude
+/// said (medium when it said nothing), one level lower for each thing the
+/// server can see that weakens it. With the reasons, so a lower level is
+/// never a mystery.
+export function reviewConfidence(p: {
+  confidence?: string | null;
+  flags: ProposalFlag[];
+  payload: Record<string, unknown>;
+  /// The recording minute, when there is one.
+  at?: string | null;
+  sourceKind?: string | null;
+  sourceRestriction?: string | null;
+}): { level: ConfidenceLike; why: string[] } {
+  let level: ConfidenceLike = CONFIDENCE_LEVELS.includes(p.confidence as ConfidenceLike) ? (p.confidence as ConfidenceLike) : "MEDIUM";
+  const why: string[] = [];
+  if (!p.confidence) why.push("Claude לא ציין עד כמה הוא בטוח");
+  if (p.sourceKind === "TRANSCRIPT" && !p.at) {
+    level = lower(level);
+    why.push("בלי דקה בהקלטה");
+  }
+  if (p.sourceRestriction === "TOPICS_ONLY") {
+    level = lower(level);
+    why.push("מקור של נושאים בלבד");
+  }
+  if (p.flags.some((f) => f.code === "R14")) {
+    level = lower(level);
+    why.push("מקור משני");
+  }
+  if (p.payload.knowledgeStatus === "UNCERTAIN" || p.payload.knowledgeStatus === "MISSING") {
+    level = lower(level);
+    why.push("לא ודאי לפי Claude");
+  }
+  return { level, why };
+}
+
+/// The order on the card: what stops approval first, then what is decided
+/// one at a time, then by how sure it is. The easy ones end up together at
+/// the bottom, to be approved in one go.
+export function reviewRank(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown>; level: ConfidenceLike }): number {
+  if (p.flags.some((f) => f.block)) return 0;
+  if (bulkApproveBlocker(p)) return 1;
+  return p.level === "LOW" ? 2 : p.level === "MEDIUM" ? 3 : 4;
+}
+
+/// The line on top of a card: how much of it can go together.
+export function reviewSummary(ranks: number[]): string | null {
+  if (ranks.length === 0) return null;
+  const together = ranks.filter((r) => r >= 2).length;
+  const alone = ranks.length - together;
+  if (alone === 0) return together === 1 ? "הצעה אחת, אפשר לאשר ישר." : `אפשר לאשר את כל ה-${together} יחד.`;
+  if (together === 0) return alone === 1 ? "הצעה אחת לבדוק לבד." : `${alone} הצעות לבדוק אחת אחת.`;
+  return `${alone === 1 ? "אחת לבדוק לבד" : `${alone} לבדוק אחת אחת`}, ${together === 1 ? "ואחת אפשר לאשר יחד" : `ו-${together} אפשר לאשר יחד`}.`;
 }
 
 /// The line a proposal is known by, on its card and in a list.
