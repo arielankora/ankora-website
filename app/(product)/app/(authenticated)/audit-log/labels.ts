@@ -252,6 +252,7 @@ export const ACTION_LABEL: Record<string, string> = {
   // shipped, unlabelled until this pass.
   "important_date.create": "יצירת מועד חשוב",
   "important_date.update": "עדכון מועד חשוב",
+  "important_date.calendar": "מועד עבר ללוח ימי העבודה של התהליך שלו",
   "important_date.status_change": "שינוי סטטוס מועד חשוב",
   "important_date.snooze": "דחיית מועד חשוב",
   "important_date.delete": "מחיקת מועד חשוב",

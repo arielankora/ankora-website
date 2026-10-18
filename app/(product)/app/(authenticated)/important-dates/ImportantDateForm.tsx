@@ -37,6 +37,8 @@ export interface ExistingImportantDate {
   leadUnit: "CALENDAR_DAYS" | "BUSINESS_DAYS";
   rollConvention: "NONE" | "PREVIOUS_BUSINESS_DAY" | "NEXT_BUSINESS_DAY";
   businessCalendar: string;
+  /// Set when the date starts a process that decides its calendar: why.
+  calendarLockedBy?: string | null;
   precision: "EXACT" | "APPROXIMATE" | "UNKNOWN";
   dayAlternatives: number[];
   conditionText: string | null;
@@ -393,10 +395,17 @@ export function ImportantDateForm({
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-xs font-medium text-appNavy/60">ימי עבודה לפי</label>
-          <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? "IL"} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold">
-            <option value="IL">ישראל (ראשון עד חמישי)</option>
-            <option value="US">ארה&quot;ב (שני עד שישי)</option>
-          </select>
+          {existing?.calendarLockedBy ? (
+            <>
+              <input type="hidden" name="businessCalendar" value={existing.businessCalendar} />
+              <p className="mt-1.5 text-sm text-appNavy" data-testid="calendar-locked">{existing.calendarLockedBy}</p>
+            </>
+          ) : (
+            <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? "IL"} className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold">
+              <option value="IL">ישראל (ראשון עד חמישי)</option>
+              <option value="US">ארה&quot;ב (שני עד שישי)</option>
+            </select>
+          )}
         </div>
         <div>
           <label className="block text-xs font-medium text-appNavy/60">מועד שנופל ביום שאינו יום עבודה</label>

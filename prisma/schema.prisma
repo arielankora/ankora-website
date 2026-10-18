@@ -1895,8 +1895,9 @@ model ImportantDate {
   /// Which business days: "IL" (Sunday to Thursday, Israeli rest days) or
   /// "US" (Monday to Friday, federal holidays). A free string, like `type`:
   /// a new calendar is an entry in lib/business-calendar.ts, never a
-  /// migration. The org-brain spec makes the entity's country the default
-  /// once entities exist; until then a person picks it.
+  /// migration. A date that starts a process follows the process's
+  /// calendar, or its entity's country (lib/app-domain/date-calendars.ts);
+  /// otherwise a person picks it.
   businessCalendar String @default("IL")
   /// How well the day is known. EXACT keeps every existing date's meaning.
   precision DatePrecision @default(EXACT)
@@ -3658,6 +3659,11 @@ model Process {
   exceptionPlaybook String?
 
   entityId String?
+  /// Org-brain decision 6: the business calendar its runs and its dates
+  /// use ("IL", "US"). Null: its entity's country decides, and with no
+  /// country each date keeps its own (lib/business-calendar.ts,
+  /// processCalendar).
+  businessCalendar String?
 
   /// Who runs it today, in words ("Guy", "Nextage").
   executorText     String?

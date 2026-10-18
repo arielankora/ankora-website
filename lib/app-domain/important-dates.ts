@@ -1,4 +1,5 @@
 import "server-only";
+import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
 import { timed } from "@/lib/slow-log";
 import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, canManageClients } from "@/lib/app-auth/permissions";
@@ -426,7 +427,9 @@ export async function updateImportantDate(
     recurrence === "MONTHLY" ? (input.intervalMonths !== undefined ? input.intervalMonths : before.intervalMonths) : null;
   const leadUnit = input.leadUnit ?? before.leadUnit;
   const rollConvention = input.rollConvention ?? before.rollConvention;
-  const businessCalendar = input.businessCalendar || before.businessCalendar;
+  // Decision 6: a date that starts a process is on the process's calendar,
+  // whatever the form sent.
+  const businessCalendar = (await lockedCalendarFor(before.processId))?.key ?? (input.businessCalendar || before.businessCalendar);
   assertValidSchedule({ calendarType, recurrence, weekday, intervalMonths, businessCalendar });
   const resolved = resolvePrecision({
     precision: input.precision ?? before.precision,

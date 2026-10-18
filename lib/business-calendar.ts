@@ -34,6 +34,28 @@ export function isBusinessCalendarKey(value: unknown): value is BusinessCalendar
   return value === "IL" || value === "US";
 }
 
+/// A country's calendar, when there is one ("US" for NUX Inc). A country
+/// with no calendar here is not guessed into one.
+export function calendarForCountry(country: string | null | undefined): BusinessCalendarKey | null {
+  const c = country?.trim().toUpperCase();
+  return isBusinessCalendarKey(c) ? c : null;
+}
+
+/// Org-brain decision 6: the calendar a process runs on, and so the
+/// calendar of every date that starts it. Set on the process, it wins;
+/// otherwise its entity's country; otherwise none, and a date keeps its own.
+export function processCalendar(process: { businessCalendar?: string | null; entity?: { name: string; country: string | null } | null }): { key: BusinessCalendarKey; by: "PROCESS" | "ENTITY"; entityName: string | null } | null {
+  if (isBusinessCalendarKey(process.businessCalendar)) return { key: process.businessCalendar, by: "PROCESS", entityName: null };
+  const fromEntity = calendarForCountry(process.entity?.country);
+  return fromEntity ? { key: fromEntity, by: "ENTITY", entityName: process.entity!.name } : null;
+}
+
+/// How a date's calendar reads when its process decides it.
+export function calendarSourceLine(code: string, title: string, c: { key: BusinessCalendarKey; by: "PROCESS" | "ENTITY"; entityName: string | null }): string {
+  const label = BUSINESS_CALENDAR_LABELS[c.key];
+  return c.by === "PROCESS" ? `${label}, כפי שנקבע בתהליך ${code} ${title}` : `${label}, לפי הישות ${c.entityName} של התהליך ${code} ${title}`;
+}
+
 // ---------------------------------------------------------------------------
 // Date-key helpers
 // ---------------------------------------------------------------------------

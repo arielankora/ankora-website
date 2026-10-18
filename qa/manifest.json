@@ -1738,6 +1738,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-18",
       "riskReason": "A meeting whose client is not clear waits in no file or register until a person picks; only someone with every candidate client sees it, and a different pick carries nothing that pointed into the proposed client's file"
+    },
+    "domain:date-calendars": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-18",
+      "riskReason": "A date that starts a process moves to the process's business calendar (set on it, or its entity's country) and its day is recomputed; a wrong calendar means a filing scheduled on the wrong day"
     }
   },
   "waivers": {},

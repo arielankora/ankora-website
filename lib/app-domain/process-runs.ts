@@ -5,6 +5,7 @@ import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
 import { isBusinessCalendarKey, type BusinessCalendarKey } from "@/lib/business-calendar";
+import { calendarOfProcess } from "@/lib/app-domain/date-calendars";
 import { processGaps, readSteps } from "@/lib/process-rules";
 import { ruleLine, isExceptionInForce } from "@/lib/client-policies";
 import { canCopyIntoTask } from "@/lib/knowledge";
@@ -24,14 +25,12 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 
 export const RUN_OPENED = "process.run_opened";
 
-/// The business calendar of a run: the process's entity's country when it
-/// has one ("US" for NUX Inc), otherwise the date's, otherwise Israel.
-async function calendarFor(entityId: string | null, fallback: string | null | undefined): Promise<BusinessCalendarKey> {
-  if (entityId) {
-    const entity = await prisma.clientEntity.findUnique({ where: { id: entityId }, select: { country: true } });
-    if (entity?.country?.toUpperCase() === "US") return "US";
-    if (entity?.country?.toUpperCase() === "IL") return "IL";
-  }
+/// The business calendar of a run (decision 6): the one set on the
+/// process, otherwise its entity's country ("US" for NUX Inc), otherwise
+/// the date's, otherwise Israel.
+async function calendarFor(process: { code: string; title: string; businessCalendar: string | null; entityId: string | null }, fallback: string | null | undefined): Promise<BusinessCalendarKey> {
+  const c = await calendarOfProcess(process);
+  if (c) return c.key;
   return isBusinessCalendarKey(fallback) ? fallback : "IL";
 }
 
@@ -66,7 +65,7 @@ export async function openProcessRun(input: OpenRunInput) {
   const version = process.versions[0];
   if (!version) return null;
   const steps = readSteps(version.steps);
-  const calendar = await calendarFor(process.entityId, input.dateCalendar);
+  const calendar = await calendarFor(process, input.dateCalendar);
   const runKey = localDateKey(input.occurrence, TIMEZONE);
   const now = new Date();
 
