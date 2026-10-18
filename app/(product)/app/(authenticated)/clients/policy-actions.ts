@@ -48,9 +48,21 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
   } catch {
     return { error: "מה שנבדק בכלל לא נקרא. רעננו ונסו שוב." };
   }
+  // Spec 3.11: two optional days. A form without them leaves them alone.
+  const dayOf = (name: string): Date | null | undefined | "bad" => {
+    if (!formData.has(name)) return undefined;
+    const raw = String(formData.get(name) ?? "").trim();
+    if (!raw) return null;
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? new Date(`${raw}T00:00:00Z`) : "bad";
+  };
+  const effectiveFrom = dayOf("effectiveFrom");
+  const reviewBy = dayOf("reviewBy");
+  if (effectiveFrom === "bad" || reviewBy === "bad") return { error: "תאריך לא תקין." };
   return {
     value: {
       ...itemExtrasFrom(formData),
+      effectiveFrom,
+      reviewBy,
       kind: kind as PolicyKind,
       title: String(formData.get("title") ?? ""),
       statement: String(formData.get("statement") ?? ""),

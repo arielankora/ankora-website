@@ -6,7 +6,7 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
 import { findSecrets } from "@/lib/secret-scan";
-import { isExceptionInForce, ruleInForce, type PolicyKindLike } from "@/lib/client-policies";
+import { isExceptionInForce, ruleBindsNow, type PolicyKindLike } from "@/lib/client-policies";
 import { hasParams, invoiceGaps, paramsInForce, requestTypeConflicts, ruleChecks, type RuleForCheck, type RuleSeverity } from "@/lib/policy-params";
 import { checkEveryError } from "@/lib/process-checks";
 import { reviewEveryError } from "@/lib/process-review";
@@ -319,7 +319,8 @@ export async function ruleContext(
   const rules: RuleForCheck[] = [];
   const textOnlyApprovals: string[] = [];
   for (const r of policies) {
-    if (!ruleInForce(r)) continue;
+    // A rule that starts later is not checked yet (spec 3.11).
+    if (!ruleBindsNow(r)) continue;
     const title = !options.canSee || options.canSee(r) ? r.title : HIDDEN_RULE_TITLE;
     const params = paramsInForce({ ...r, kind: r.kind as PolicyKindLike });
     if (hasParams(params)) rules.push({ id: r.id, title, kind: r.kind as PolicyKindLike, params });

@@ -94,29 +94,63 @@ export function policyShapeError(p: PolicyShape): string | null {
 /// applies through its interim rule when it has one; without one, as
 /// written, because a restriction the client asked for is followed before
 /// anyone approves it. A retired rule applies to nothing.
-export function ruleInForce(p: { status: PolicyStatusLike; statement: string; interimStatement: string | null }): { text: string; interim: boolean } | null {
+export function ruleInForce(
+  p: { status: PolicyStatusLike; statement: string; interimStatement: string | null; effectiveFrom?: Date | null },
+  now: Date = new Date()
+): { text: string; interim: boolean; startsOn?: Date } | null {
   if (p.status === "RETIRED") return null;
   if (p.status === "PROPOSED" && p.interimStatement?.trim()) return { text: p.interimStatement.trim(), interim: true };
+  // Spec 3.11: a rule that starts on a date says so, and binds nothing
+  // before it.
+  if (p.effectiveFrom && p.effectiveFrom.getTime() > now.getTime()) return { text: p.statement.trim(), interim: false, startsOn: p.effectiveFrom };
   return { text: p.statement.trim(), interim: false };
+}
+
+/// Spec 3.11: whether a rule binds today. A rule that starts later is
+/// read, and checked against nothing yet.
+export function ruleBindsNow(p: { status: PolicyStatusLike; statement: string; interimStatement: string | null; effectiveFrom?: Date | null }, now: Date = new Date()): boolean {
+  const r = ruleInForce(p, now);
+  return !!r && !r.startsOn;
+}
+
+/// Spec 3.11: a rule whose review date has passed, until someone reviews
+/// it and sets the next one.
+export function ruleReviewDue(p: { status: PolicyStatusLike; reviewBy?: Date | null }, now: Date = new Date()): boolean {
+  return p.status !== "RETIRED" && !!p.reviewBy && p.reviewBy.getTime() <= now.getTime();
+}
+
+const dayLabel = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d);
+
+/// The two dates as people read them, for the panel, the file and Claude.
+export function ruleDatesLine(p: { status: PolicyStatusLike; effectiveFrom?: Date | null; reviewBy?: Date | null }, now: Date = new Date()): string | null {
+  const parts: string[] = [];
+  if (p.effectiveFrom) parts.push(p.effectiveFrom.getTime() > now.getTime() ? `נכנס לתוקף ב-${dayLabel(p.effectiveFrom)}` : `בתוקף מ-${dayLabel(p.effectiveFrom)}`);
+  if (p.reviewBy) parts.push(ruleReviewDue(p, now) ? `מועד הסקירה עבר (${dayLabel(p.reviewBy)})` : `לסקירה עד ${dayLabel(p.reviewBy)}`);
+  return parts.length ? parts.join(" · ") : null;
 }
 
 /// The rule as one line for a reader who has nothing else: Claude in an
 /// extraction prompt, or the file's section 6.
-export function ruleLine(p: { title: string; status: PolicyStatusLike; statement: string; interimStatement: string | null }): string | null {
+export function ruleLine(p: { title: string; status: PolicyStatusLike; statement: string; interimStatement: string | null; effectiveFrom?: Date | null }): string | null {
   const now = ruleInForce(p);
   if (!now) return null;
   if (now.interim) return `${p.title}: עד שהכלל יאושר, ${now.text} (הכלל המוצע: ${p.statement.trim()})`;
+  if (now.startsOn) return `${p.title}: מ-${dayLabel(now.startsOn)}, ${now.text}${p.status === "PROPOSED" ? " (מוצע, עוד לא אושר)" : ""}`;
   return `${p.title}: ${now.text}${p.status === "PROPOSED" ? " (מוצע, עוד לא אושר)" : ""}`;
 }
 
 /// A change to what a rule says, as opposed to its sources or status
 /// note. Such a change to an approved rule sends it back for approval.
 export function changesSubstance(
-  before: { kind: string; title: string; statement: string; interimStatement: string | null },
-  after: { kind?: string; title?: string; statement?: string; interimStatement?: string | null }
+  before: { kind: string; title: string; statement: string; interimStatement: string | null; effectiveFrom?: Date | null },
+  after: { kind?: string; title?: string; statement?: string; interimStatement?: string | null; effectiveFrom?: Date | null }
 ): boolean {
   const norm = (s: string | null | undefined) => (s ?? "").trim().replace(/\s+/g, " ");
+  // When it starts is part of what it says: moving a stricter rule later
+  // softens it.
+  const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : "");
   return (
+    (after.effectiveFrom !== undefined && day(after.effectiveFrom) !== day(before.effectiveFrom)) ||
     (after.kind !== undefined && after.kind !== before.kind) ||
     (after.title !== undefined && norm(after.title) !== norm(before.title)) ||
     (after.statement !== undefined && norm(after.statement) !== norm(before.statement)) ||

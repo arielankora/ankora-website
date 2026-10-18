@@ -141,13 +141,17 @@ export function paramsKey(p: PolicyParams): string {
 /// parameters, and when there are none, the careful reading of the
 /// proposed ones: a proposed threshold is a threshold of zero, because the
 /// permission it grants is the part not yet approved. Retired: nothing.
-export function paramsInForce(r: {
-  kind: PolicyKindLike;
-  status: PolicyStatusLike;
-  interimStatement: string | null;
-  params: unknown;
-  interimParams: unknown;
-}): PolicyParams {
+export function paramsInForce(
+  r: {
+    kind: PolicyKindLike;
+    status: PolicyStatusLike;
+    interimStatement: string | null;
+    params: unknown;
+    interimParams: unknown;
+    effectiveFrom?: Date | null;
+  },
+  now: Date = new Date()
+): PolicyParams {
   if (r.status === "RETIRED") return {};
   const params = readParams(r.kind, r.params);
   if (r.status === "PROPOSED" && r.interimStatement?.trim()) {
@@ -155,6 +159,8 @@ export function paramsInForce(r: {
     if (hasParams(interim)) return interim;
     if (r.kind === "THRESHOLD" && hasParams(params)) return { ...params, amountMinor: 0 };
   }
+  // Spec 3.11: before its start date, the rule checks nothing.
+  if (r.effectiveFrom && r.effectiveFrom.getTime() > now.getTime()) return {};
   return params;
 }
 

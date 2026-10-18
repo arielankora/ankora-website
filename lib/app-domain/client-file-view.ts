@@ -25,7 +25,7 @@ import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
 import { checkEveryText } from "@/lib/process-checks";
-import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleInForce } from "@/lib/client-policies";
+import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 
@@ -168,6 +168,8 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       details: [
         p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
         p.rationale ? `למה: ${p.rationale}` : null,
+        // Spec 3.11: when it starts, and when it is looked at again.
+        ruleDatesLine(p),
         (() => {
           const checked = paramsSummary(p.kind, paramsInForce(p), (id) => entityName.get(id) ?? "ישות שהוסרה");
           return checked ? `נבדק מול הנהלים: ${checked}` : null;
