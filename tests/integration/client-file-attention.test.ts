@@ -102,4 +102,19 @@ describe("client file attention", () => {
     const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
     expect(toManager.body).toContain("2");
   });
+
+  it("every kind of item counts, its owner hears about theirs, and a rule waiting for approval tells the manager", async () => {
+    const { client, manager, hadas } = await setup();
+    const old = morning(-45);
+    await prisma.requestType.create({ data: { clientId: client.id, title: "חשבונית ספק", handling: "מעבירים לאיילה", knowledgeStatus: "UNCERTAIN", toResolve: "לשאול", ownerId: hadas.id, updatedAt: old } });
+    await prisma.process.create({ data: { clientId: client.id, seq: 1, code: "P1", title: "תשלומי ספקים", knowledgeStatus: "UNCERTAIN", toResolve: "לשאול", updatedAt: old } });
+    await prisma.clientPolicy.create({ data: { clientId: client.id, kind: "THRESHOLD", title: "סף", statement: "מעל 5,000 באישור", interimStatement: "הכול באישור", status: "PROPOSED", createdAt: old, updatedAt: old } });
+
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 2, unowned: 0 });
+    const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
+    expect(toManager.body).toBe("2 פריטים לא ודאיים כבר יותר מ-14 יום. כלל מוצע אחד מחכה לאישור כבר יותר מ-14 יום, ועד אז חל רק כלל הביניים.");
+    // The owner hears only about what they keep.
+    const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
+    expect(toHadas.body).toBe("פריט אחד לא ודאי כבר יותר מ-14 יום.");
+  });
 });
