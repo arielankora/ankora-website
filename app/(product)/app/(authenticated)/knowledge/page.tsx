@@ -3,7 +3,8 @@ import { requireUser } from "@/lib/app-auth/session";
 import { listOpenBatches, proposalQuality } from "@/lib/app-domain/knowledge-proposals";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { DECISION_1_DAYS, firefliesLink, proposalHeadline, qualityLine, reviewConfidence, reviewRank, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { DECISION_1_DAYS, firefliesLink, proposalHeadline, qualityLine, reviewConfidence, reviewRank, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { listStaffForAssignment } from "@/lib/app-domain/clients";
 import {
   batchMatches,
   batchUrgent,
@@ -48,7 +49,7 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
   // The whole queue this person can see, filtered here: the counts beside
   // each option come from the queue, not from what is left after filtering,
   // so a person sees what exists without clearing anything.
-  const [all, awaiting] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user)]);
+  const [all, awaiting, staff] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user), listStaffForAssignment()]);
   const now = new Date();
   // Decision 1's measure, for whoever makes that decision.
   const quality = canManageClients(user.role) ? qualityLine(await proposalQuality(user, new Date(now.getTime() - DECISION_1_DAYS * 86_400_000)), now) : null;
@@ -82,6 +83,16 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
         existing: p.existing ? { body: p.existing.body } : null,
         rejectReason: p.rejectReason,
         hiddenFor: p.hiddenFor,
+        task: taskFromProposal({
+          target: p.target as ProposalTargetLike,
+          payload,
+          reason: p.reason,
+          quote: p.quote,
+          source: b.source ? { code: b.source.code, title: b.source.title } : null,
+          link: fireflies ? firefliesLink(fireflies, at) : null,
+        }),
+        taskBlocked: taskBlocker({ payload }),
+        taskId: p.state === "TASK" ? p.resultId : null,
       };
     });
     // Pending first, in the order they should be read; decided ones after.
@@ -185,6 +196,8 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
             droppedCount={Array.isArray(b.dropped) ? b.dropped.length : 0}
             proposals={proposals}
             filtered={filtering}
+            staff={staff}
+            meId={user.id}
           />
         ))
       )}

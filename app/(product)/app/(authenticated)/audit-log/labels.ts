@@ -117,6 +117,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge_batch.discard": "שיחה שממתינה לשיוך הוסרה",
   "knowledge_proposal.approve": "אישור הצעה לתיק הלקוח",
   "knowledge_proposal.reject": "דחיית הצעה לתיק הלקוח",
+  "knowledge_proposal.to_task": "הצעה לתיק הלקוח הפכה למשימה",
   "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",
   "request_type.remove": "הסרת סוג פנייה מתיק הלקוח",

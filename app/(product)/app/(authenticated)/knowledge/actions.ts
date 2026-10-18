@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { approveProposal, decideProposals, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, decideProposals, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
@@ -95,6 +95,26 @@ export async function rejectProposalAction(_prev: FormState | undefined, formDat
     return { error: friendlyError(err) };
   }
   return done();
+}
+
+/// Something to do, not to know: the proposal opens a task instead.
+export async function proposalToTaskAction(_prev: (FormState & { taskId?: string }) | undefined, formData: FormData): Promise<FormState & { taskId?: string }> {
+  const user = await requireUser();
+  const due = String(formData.get("dueDate") ?? "").trim();
+  const priority = String(formData.get("priority") ?? "").trim();
+  try {
+    const r = await proposalToTask(user, String(formData.get("id") ?? ""), {
+      title: String(formData.get("title") ?? ""),
+      description: String(formData.get("description") ?? ""),
+      assignedToId: String(formData.get("assignedToId") ?? "") || null,
+      dueDate: /^\d{4}-\d{2}-\d{2}$/.test(due) ? new Date(due) : null,
+      priority: priority === "LOW" || priority === "NORMAL" || priority === "HIGH" || priority === "URGENT" ? priority : null,
+    });
+    revalidatePath("/app/tasks");
+    return { ...done(), taskId: r.taskId };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }
 
 /// Several proposals of one batch at once (spec 5.2): each is decided as on

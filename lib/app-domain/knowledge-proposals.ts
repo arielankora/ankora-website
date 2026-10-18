@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, User, SourceKind, SourceRestriction } from "@prisma/client";
+import type { Prisma, User, SourceKind, SourceRestriction, TaskPriority } from "@prisma/client";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -21,6 +21,10 @@ import {
   missingRequired,
   CONFIDENCE_LEVELS,
   type ConfidenceLike,
+  firefliesLink,
+  taskBlocker,
+  taskFromProposal,
+  TASK_TITLE_MAX,
 } from "@/lib/knowledge-proposals";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity } from "@/lib/app-domain/client-entities";
@@ -575,6 +579,66 @@ export async function rejectProposal(actor: User, id: string, reason: string, op
     after: { reason: why, ...(options.bulk ? { bulk: true } : {}) },
   });
   return updated;
+}
+
+async function draftFor(proposal: { batchId: string; target: string; payload: Prisma.JsonValue; reason: string | null; quote: string | null }) {
+  const batch = await prisma.knowledgeBatch.findUnique({ where: { id: proposal.batchId }, select: { sourceId: true } });
+  const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { code: true, title: true, externalRefs: true } }) : null;
+  const payload = (proposal.payload ?? {}) as Record<string, unknown>;
+  const refs = source && Array.isArray(source.externalRefs) ? (source.externalRefs as { system?: string; id?: string }[]) : [];
+  const fireflies = refs.find((r) => r?.system === "FIREFLIES")?.id ?? null;
+  const at = readSourceRefs(payload.sources)[0]?.at ?? null;
+  return taskFromProposal({
+    target: proposal.target as ProposalTargetLike,
+    payload,
+    reason: proposal.reason,
+    quote: proposal.quote,
+    source: source ? { code: source.code, title: source.title } : null,
+    link: fireflies ? firefliesLink(fireflies, at) : null,
+  });
+}
+
+/// A proposal that is something to do, not something to know: it opens a
+/// task on the client and is closed as "became a task", so it neither
+/// enters the file nor counts as a wrong extraction. The person may change
+/// the title and description; empty ones take the draft.
+export async function proposalToTask(
+  actor: User,
+  id: string,
+  input: { title?: string | null; description?: string | null; assignedToId?: string | null; dueDate?: Date | null; priority?: TaskPriority | null } = {}
+) {
+  assertCan(actor.role, "time_entry.create_self");
+  const proposal = await findPending(actor, id);
+  const blocker = taskBlocker({ payload: (proposal.payload ?? {}) as Record<string, unknown> });
+  if (blocker) throw new Error(blocker);
+  const draft = await draftFor(proposal);
+  const title = (input.title?.trim() || draft.title).slice(0, TASK_TITLE_MAX);
+  const description = input.description?.trim() || draft.description;
+  // The same check as on the way in: what the person typed is not saved
+  // if it holds a password, a key or a card number.
+  if (findSecrets(`${title}\n${description}`).length > 0) throw new Error("בטקסט יש סיסמה, מפתח או מספר כרטיס. צריך להסיר אותם לפני שפותחים משימה.");
+  const task = await createTask(actor, {
+    clientId: proposal.clientId,
+    title,
+    description,
+    assignedToId: input.assignedToId || actor.id,
+    dueDate: input.dueDate ?? null,
+    ...(input.priority ? { priority: input.priority } : {}),
+  });
+  const updated = await prisma.knowledgeProposal.update({
+    where: { id },
+    data: { state: "TASK", decidedById: actor.id, decidedAt: new Date(), resultId: task.id },
+  });
+  await closeIfDone(proposal.batchId);
+  await recordAudit({
+    actorId: actor.id,
+    action: "knowledge_proposal.to_task",
+    entityType: "KnowledgeProposal",
+    entityId: id,
+    clientId: proposal.clientId,
+    after: { taskId: task.id, title },
+  });
+  return { proposal: updated, taskId: task.id };
 }
 
 export type BulkResult = { done: string[]; failed: { id: string; error: string }[] };

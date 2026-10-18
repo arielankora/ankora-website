@@ -445,3 +445,43 @@ export function normalizeForMatch(s: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/// Not every extraction is knowledge: "to send Dana the contract" is
+/// something to do, not something to know about the client. Such a
+/// proposal becomes a task instead of being rejected or squeezed into the
+/// file. A task is read by everyone on the client and by Claude, so what
+/// only some may read stays a proposal.
+export function taskBlocker(p: { payload: Record<string, unknown> }): string | null {
+  if (p.payload.sensitivity === "SENSITIVE") return "פריט רגיש לא הופך למשימה: משימה גלויה לכל מי שעובד על הלקוח.";
+  if (p.payload.audience && p.payload.audience !== "ALL_STAFF") return "פריט שרק חלק מהצוות רואה לא הופך למשימה.";
+  return null;
+}
+
+export const TASK_TITLE_MAX = 200;
+
+/// The task a proposal would open, before the person edits it: its line
+/// as the title, and in the description why, the quote, where it is from
+/// and the moment in the recording, so the task can be done without
+/// going back to the meeting.
+export function taskFromProposal(p: {
+  target: ProposalTargetLike;
+  payload: Record<string, unknown>;
+  reason: string | null;
+  quote: string | null;
+  source: { code: string; title: string } | null;
+  link: string | null;
+}): { title: string; description: string } {
+  const headline = proposalHeadline(p.target, p.payload).trim() || "משימה מהצעה";
+  const title = headline.length > TASK_TITLE_MAX ? `${headline.slice(0, TASK_TITLE_MAX - 3)}...` : headline;
+  const s = (k: string) => (typeof p.payload[k] === "string" ? (p.payload[k] as string).trim() : "");
+  const lines = [
+    headline.length > TASK_TITLE_MAX ? headline : null,
+    p.reason?.trim() ? `למה: ${p.reason.trim()}` : null,
+    p.quote?.trim() ? `"${p.quote.trim()}"` : null,
+    s("doNotDisclose") ? `לא לספר: ${s("doNotDisclose")}` : null,
+    p.source ? `מקור: ${p.source.code} ${p.source.title}` : null,
+    p.link ? `ברגע בשיחה: ${p.link}` : null,
+    "נפתחה מהצעה של Claude בממתין לאישור.",
+  ];
+  return { title, description: lines.filter(Boolean).join("\n\n") };
+}

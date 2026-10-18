@@ -3229,6 +3229,9 @@ enum ProposalState {
   PENDING
   APPROVED
   REJECTED
+  /// Something to do, not to know: it opened a task (resultId) instead of
+  /// entering the file.
+  TASK
 }
 
 /// One delivery of proposals: usually one meeting or one document (spec

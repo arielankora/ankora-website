@@ -8,7 +8,7 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, rejectProposalAction, rejectProposalsAction } from "./actions";
+import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -19,7 +19,7 @@ export type ReviewProposal = {
   id: string;
   target: ProposalTargetLike;
   action: ProposalActionLike;
-  state: "PENDING" | "APPROVED" | "REJECTED";
+  state: "PENDING" | "APPROVED" | "REJECTED" | "TASK";
   headline: string;
   payload: Record<string, unknown>;
   sources: string[];
@@ -34,7 +34,14 @@ export type ReviewProposal = {
   /// Spec 5.2: how sure, with why it is lower, and its place on the card.
   confidence: { level: ConfidenceLike; why: string[] };
   rank: number;
+  /// Something to do, not to know: the task it would open, why it cannot
+  /// (taskBlocker), and the task it opened once it did.
+  task: { title: string; description: string };
+  taskBlocked: string | null;
+  taskId: string | null;
 };
+
+export type ReviewStaff = { id: string; name: string }[];
 
 const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
 
@@ -176,6 +183,58 @@ function RejectForm({ p }: { p: ReviewProposal }) {
   );
 }
 
+function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; meId: string }) {
+  const close = useDrawerClose();
+  const { showToast } = useToast();
+  const { onSubmit, pending, error } = useActionForm(proposalToTaskAction, () => {
+    showToast({ tone: "info", title: "נפתחה משימה", description: p.task.title.slice(0, 80) });
+    close();
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="proposal-task-form">
+      <input type="hidden" name="id" value={p.id} />
+      <p className="text-xs text-appNavy/60">ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן &quot;הפכה למשימה&quot;.</p>
+      <label className="block">
+        <span className="block text-xs font-medium text-appNavy/60">כותרת המשימה *</span>
+        <input name="title" required maxLength={200} defaultValue={p.task.title} className={INPUT} />
+      </label>
+      <label className="block">
+        <span className="block text-xs font-medium text-appNavy/60">תיאור</span>
+        <textarea name="description" rows={6} defaultValue={p.task.description} className={INPUT} />
+      </label>
+      <div className="grid grid-cols-2 gap-3">
+        <label className="block">
+          <span className="block text-xs font-medium text-appNavy/60">אחראי</span>
+          <select name="assignedToId" defaultValue={meId} className={INPUT}>
+            {staff.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
+          <span className="block text-xs font-medium text-appNavy/60">תאריך יעד</span>
+          <input type="date" name="dueDate" className={INPUT} />
+        </label>
+      </div>
+      <label className="block">
+        <span className="block text-xs font-medium text-appNavy/60">עדיפות</span>
+        <select name="priority" defaultValue="NORMAL" className={INPUT}>
+          <option value="LOW">נמוכה</option>
+          <option value="NORMAL">רגילה</option>
+          <option value="HIGH">גבוהה</option>
+          <option value="URGENT">דחופה</option>
+        </select>
+      </label>
+      {error && <p className="text-sm text-red-600">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+        {pending ? "פותח..." : "פתיחת משימה"}
+      </button>
+    </form>
+  );
+}
+
 function RejectManyForm({ ids, onDone }: { ids: string[]; onDone: () => void }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(rejectProposalsAction, () => {
@@ -200,7 +259,7 @@ function RejectManyForm({ ids, onDone }: { ids: string[]; onDone: () => void }) 
   );
 }
 
-function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void }) {
+function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void; staff: ReviewStaff; meId: string }) {
   const { showToast } = useToast();
   const status = (str(p.payload.knowledgeStatus) || (p.payload.kind === "QUESTION" ? "MISSING" : "CONFIRMED")) as KnowledgeStatusLike;
   const kindLabel = targetLabel(p);
@@ -214,9 +273,14 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
   if (p.state !== "PENDING") {
     return (
       <li className="py-2.5 text-xs text-appNavy/45">
-        {p.state === "APPROVED" ? "אושר: " : "נדחה: "}
+        {p.state === "APPROVED" ? "אושר: " : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
+        {p.state === "TASK" && p.taskId && (
+          <a href={`/app/tasks/${p.taskId}`} className="ms-1.5 text-gold-dim hover:underline">
+            למשימה
+          </a>
+        )}
       </li>
     );
   }
@@ -299,6 +363,13 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
           <Drawer triggerLabel="עריכה ואישור" title="עריכה לפני אישור" variant="link">
             <EditForm p={p} />
           </Drawer>
+          {/* Not knowledge but something to do: a task, not a rejection
+              and not an item forced into the file. */}
+          {!p.taskBlocked ? (
+            <Drawer triggerLabel="למשימה" title="הצעה שהיא משימה" variant="link">
+              <TaskForm p={p} staff={staff} meId={meId} />
+            </Drawer>
+          ) : null}
           <Drawer triggerLabel="דחייה" title="דחיית הצעה" variant="link">
             <RejectForm p={p} />
           </Drawer>
@@ -317,6 +388,8 @@ export function ReviewBatch({
   droppedCount,
   proposals,
   filtered = false,
+  staff,
+  meId,
 }: {
   clientId: string;
   clientName: string;
@@ -328,6 +401,9 @@ export function ReviewBatch({
   /// The screen is filtered, and `proposals` is only what matches. Said
   /// on the select-all, so "all" never reads as the whole batch.
   filtered?: boolean;
+  /// Who a task opened from a proposal may go to, and who it goes to by default.
+  staff: ReviewStaff;
+  meId: string;
 }) {
   const { showToast } = useToast();
   const pending = proposals.filter((p) => p.state === "PENDING");
@@ -433,7 +509,7 @@ export function ReviewBatch({
       )}
       <ul className="mt-3 divide-y divide-lineDark">
         {proposals.map((p) => (
-          <ProposalRow key={p.id} p={p} selected={selected.has(p.id)} onSelect={(on) => select(p.id, on)} />
+          <ProposalRow key={p.id} p={p} selected={selected.has(p.id)} onSelect={(on) => select(p.id, on)} staff={staff} meId={meId} />
         ))}
       </ul>
     </section>

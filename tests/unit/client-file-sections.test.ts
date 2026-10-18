@@ -54,6 +54,13 @@ describe("batchItem", () => {
     expect(item.details).toEqual(["מ-Claude", "4 הצעות", "2 אושרו", "1 נדחו", "1 ממתינות", "בלי חלק המחירים"]);
     expect(item.sources).toEqual(["S5"]);
   });
+
+  it("counts what became a task", () => {
+    const one = batchItem({ createdAt: new Date("2026-10-17T09:00:00Z"), via: "MCP", note: null, source: null, states: ["TASK", "APPROVED"] }, day);
+    expect(one.details).toContain("אחת הפכה למשימה");
+    const two = batchItem({ createdAt: new Date("2026-10-17T09:00:00Z"), via: "MCP", note: null, source: null, states: ["TASK", "TASK"] }, day);
+    expect(two.details).toContain("2 הפכו למשימות");
+  });
 });
 
 const sample: ClientFileDoc = {
