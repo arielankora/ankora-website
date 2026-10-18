@@ -25,7 +25,7 @@ export type ReviewProposal = {
   sources: string[];
   reason: string | null;
   quote: string | null;
-  flags: { code: string; message: string }[];
+  flags: { code: string; message: string; block?: boolean }[];
   link: string | null;
   existing: { body: string } | null;
   rejectReason: string | null;
@@ -50,6 +50,7 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
     { key: "body", label: "מה", long: true },
     { key: "validUntilEvent", label: "בתוקף עד אירוע" },
     { key: "decidedBy", label: "מי החליט" },
+    { key: "decidedAt", label: "תאריך ההחלטה (2026-10-17)" },
   ],
   CONTACT: [
     { key: "name", label: "שם" },
@@ -103,7 +104,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
       <input type="hidden" name="id" value={p.id} />
       {EDIT_FIELDS[p.target]
         .filter((f) => f.key !== "validUntilEvent" || p.payload.kind === "TEMPORARY")
-        .filter((f) => f.key !== "decidedBy" || p.payload.kind === "ONE_OFF_DECISION")
+        .filter((f) => (f.key !== "decidedBy" && f.key !== "decidedAt") || p.payload.kind === "ONE_OFF_DECISION")
         .map((f) => (
           <label key={f.key} className="block">
             <span className="block text-xs font-medium text-appNavy/60">{f.label}</span>
@@ -212,6 +213,7 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
   }
 
   const doubtful = p.flags.some((f) => f.code === "DUPLICATE");
+  const blocked = p.flags.some((f) => f.block);
   const alone = bulkApproveBlocker(p);
   return (
     <li className={`py-3.5 ${selected ? "bg-gold/[0.04]" : ""}`}>
@@ -253,19 +255,23 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
           {p.reason && <p className="mt-1 text-xs text-appNavy/60">למה: {p.reason}</p>}
           {p.quote && <p className="mt-1 border-s-2 border-lineDark ps-2 text-xs italic text-appNavy/60">{p.quote}</p>}
           {p.flags.map((f, i) => (
-            <p key={i} className="mt-1 text-xs text-warning">
+            <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-red-700" : "text-warning"}`}>
               {f.message}
             </p>
           ))}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs">
-          <button
-            type="button"
-            onClick={approve}
-            className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful ? "border border-lineDark text-appNavy/60" : "bg-gold-gradient text-navy"}`}
-          >
-            אישור
-          </button>
+          {/* A problem that blocks approval (spec 5.2) is fixed in the edit,
+              where the server checks the approved text again. */}
+          {!blocked && (
+            <button
+              type="button"
+              onClick={approve}
+              className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful ? "border border-lineDark text-appNavy/60" : "bg-gold-gradient text-navy"}`}
+            >
+              אישור
+            </button>
+          )}
           <Drawer triggerLabel="עריכה ואישור" title="עריכה לפני אישור" variant="link">
             <EditForm p={p} />
           </Drawer>

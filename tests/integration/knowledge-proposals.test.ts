@@ -259,6 +259,29 @@ describe("request types and the extraction brief", () => {
     expect(versions.map((v) => v.body)).toEqual(["גרסה ראשונה", "אנחנו מנהלים את התפעול השוטף"]);
   });
 
+  it("what breaks a rule is said on the card and blocks approval until the edit fixes it", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", payload: { kind: "TEMPORARY", body: "Anthropic משולם מהכרטיס הפרטי של אורן" } },
+        { target: "FACT", payload: { kind: "NOTE", body: "לפי הסיכום [S7] הם עוברים לבנק אחר" } },
+      ],
+    });
+    const [temporary, cited] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    expect((temporary.flags as { block?: boolean }[]).some((f) => f.block)).toBe(true);
+    await expect(approveProposal(user, temporary.id)).rejects.toThrow("מידע זמני צריך תוקף");
+    const fixed = await approveProposal(user, temporary.id, { validUntilEvent: "עד הצירוף לארגון" });
+    expect((await prisma.clientFact.findUniqueOrThrow({ where: { id: fixed.resultId! } })).validUntilEvent).toBe("עד הצירוף לארגון");
+
+    await expect(approveProposal(user, cited.id)).rejects.toThrow("S7");
+    // Approving several together leaves it out, with the reason.
+    const bulk = await decideProposals(user, [cited.id], { approve: true });
+    expect(bulk.done).toEqual([]);
+    expect(bulk.failed[0].error).toContain("חוסם");
+  });
+
   it("lists the user's clients with their domains, and the recordings already proposed", async () => {
     const { extractionBrief } = await import("@/lib/app-domain/extraction-brief");
     const { addClientDomain } = await import("@/lib/app-domain/client-sources");

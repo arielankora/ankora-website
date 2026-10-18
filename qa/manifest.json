@@ -1441,7 +1441,7 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-13",
-      "riskReason": "Review screen for proposals to client files"
+      "riskReason": "Review screen for proposals to client files; a proposal that breaks a rule is shown in red and cannot be approved as it stands; decision 1 measure for managers"
     },
     "domain:extract-prompt-input": {
       "kind": "domain",
@@ -1722,8 +1722,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-17",
       "riskReason": "One answer per closed run about its procedure; a remark reaches the owner (or backup) and waits until the owner or a manager applies or dismisses it with a line; no secrets"
+    },
+    "domain:date-questions": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-18",
+      "riskReason": "Unknown and conditional dates become open questions in the client file, once per date or occurrence, for the date's owner; a sensitive date asks a restricted, sensitive question"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-17"
+  "lastScan": "2026-10-18"
 }

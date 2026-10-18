@@ -21,6 +21,7 @@ import { runLeadBusinessDays } from "@/lib/process-runs";
 import { notifyDueProcessChecks } from "@/lib/app-domain/process-checks";
 import { reviewProcessesDaily } from "@/lib/app-domain/process-review";
 import { notifyStaleExtraction } from "@/lib/app-domain/client-control";
+import { askCondition, askUnknownDates } from "@/lib/app-domain/date-questions";
 import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
@@ -480,6 +481,10 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
     // for work that may not exist. Once per occurrence: a question created
     // since this occurrence's lead day is the same question.
     if (date.conditionText) {
+      // And in the client's file, as an open question that waits for an
+      // answer (spec 5.3), once per occurrence.
+      const occurrenceDay = localDateKey(date.nextOccurrenceAt, TIMEZONE);
+      await askCondition(date, occurrenceDay, occurrenceDay.split("-").reverse().join("/"));
       const alreadyAsked = await prisma.notification.findFirst({
         where: { type: "important_date.condition_check", entityId: date.id, createdAt: { gte: dueAt } },
         select: { id: true },
@@ -662,6 +667,7 @@ export async function reconcileImportantDates(now = new Date()) {
     processesCleared: 0,
     processReviewsDue: 0,
     staleExtractions: 0,
+    unknownDatesAsked: 0,
     errors: [] as string[],
   };
 
@@ -704,6 +710,9 @@ export async function reconcileImportantDates(now = new Date()) {
     // A client whose extraction went quiet tells its account manager
     // (spec 7.6, mapping gap 17).
     ["notifyStaleExtraction", async () => { results.staleExtractions = (await notifyStaleExtraction(now)).notified; }],
+    // A date whose day is unknown is an open question in its client's
+    // file (spec 3.10).
+    ["askUnknownDates", async () => { results.unknownDatesAsked = (await askUnknownDates()).asked; }],
   ];
 
   for (const [name, step] of steps) {
