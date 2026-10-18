@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
-import { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
+import { listOpenBatches, proposalQuality } from "@/lib/app-domain/knowledge-proposals";
+import { canManageClients } from "@/lib/app-auth/permissions";
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { firefliesLink, proposalHeadline, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { DECISION_1_DAYS, firefliesLink, proposalHeadline, qualityLine, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import {
   batchMatches,
   batchUrgent,
@@ -47,6 +48,8 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
   // so a person sees what exists without clearing anything.
   const all = await listOpenBatches(user);
   const now = new Date();
+  // Decision 1's measure, for whoever makes that decision.
+  const quality = canManageClients(user.role) ? qualityLine(await proposalQuality(user, new Date(now.getTime() - DECISION_1_DAYS * 86_400_000)), now) : null;
 
   const view = all.map((b) => {
     const fireflies =
@@ -66,7 +69,7 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
         sources: readSourceRefs(payload.sources).map(formatSourceRef),
         reason: p.reason,
         quote: p.quote,
-        flags: (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string }[],
+        flags: (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string; block?: boolean }[],
         link: fireflies ? firefliesLink(fireflies, at) : null,
         existing: p.existing ? { body: p.existing.body } : null,
         rejectReason: p.rejectReason,
@@ -111,6 +114,11 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
             הנחיות החילוץ
           </Link>
         </p>
+        {quality && (
+          <p className={`mt-1.5 text-xs ${quality.tone === "warn" ? "text-warning" : quality.tone === "good" ? "text-success" : "text-appNavy/55"}`} data-testid="proposal-quality">
+            {quality.text}
+          </p>
+        )}
       </div>
 
       {all.length > 0 && (

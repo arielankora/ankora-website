@@ -12,6 +12,7 @@ import {
   normalizeForMatch,
   payloadText,
   proposalHeadline,
+  proposalProblems,
   type ProposalActionLike,
   type ProposalFlag,
   type ProposalTargetLike,
@@ -132,8 +133,15 @@ async function resolveSource(actor: User, clientId: string, source: BatchSourceI
 
 /// What the reviewer should know before approving, found without asking
 /// anybody: it is already in the file, or it will not be confirmed.
-async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string): Promise<ProposalFlag[]> {
-  const flags: ProposalFlag[] = [];
+/// The client's source codes, for R17.
+async function registerCodes(clientId: string): Promise<string[]> {
+  return (await prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, select: { code: true } })).map((s) => s.code);
+}
+
+async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[]): Promise<ProposalFlag[]> {
+  // What would stop it from entering the file first: the reviewer reads
+  // these before anything else.
+  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes);
   if (sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
   }
@@ -202,6 +210,7 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
   if (input.items.length > MAX_ITEMS) throw new Error(`עד ${MAX_ITEMS} פריטים באצווה. מחלקים לכמה אצוות.`);
 
   const source = await resolveSource(actor, input.clientId, input.source);
+  const codes = await registerCodes(input.clientId);
   const dropped: ProposeResult["dropped"] = [];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
 
@@ -251,7 +260,7 @@ export async function proposeKnowledge(actor: User, input: ProposeInput): Promis
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    accepted.push({ item, payload, flags: await flagsFor(input.clientId, { ...item, payload }, source.weight) });
+    accepted.push({ item, payload, flags: await flagsFor(input.clientId, { ...item, payload }, source.weight, codes) });
   }
 
   let secretTaskId: string | null = null;
@@ -459,6 +468,10 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
   if (changed.length > 0 && findSecrets(payloadText(Object.fromEntries(changed))).length > 0) {
     throw new Error("בעריכה יש סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
   }
+  // The same checks the card showed, on the text as approved: an edit can
+  // fix a problem, and one cannot sneak one in.
+  const blocking = proposalProblems(proposal.target, payload, await registerCodes(proposal.clientId)).filter((f) => f.block);
+  if (blocking.length) throw new Error(blocking[0].message);
   const resultId = await apply(actor, proposal, payload);
   const updated = await prisma.knowledgeProposal.update({
     where: { id },
@@ -558,5 +571,7 @@ export async function proposalQuality(actor: User, since: Date) {
   const count = (state: string, edited?: boolean) =>
     rows.filter((r) => r.state === state && (edited === undefined || r.edited === edited)).reduce((a, r) => a + r._count._all, 0);
   const approved = count("APPROVED");
-  return { approved, editedBeforeApproval: count("APPROVED", true), rejected: count("REJECTED") };
+  // When the first month started: decision 1 is decided after it.
+  const first = await prisma.knowledgeProposal.findFirst({ where: { decidedAt: { not: null } }, orderBy: { decidedAt: "asc" }, select: { decidedAt: true } });
+  return { approved, editedBeforeApproval: count("APPROVED", true), rejected: count("REJECTED"), firstDecidedAt: first?.decidedAt ?? null };
 }

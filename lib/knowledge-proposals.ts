@@ -4,6 +4,10 @@
 // definition of what a proposal may say.
 
 import { z } from "zod";
+import { citedCodes } from "@/lib/knowledge-sources";
+import { factShapeError } from "@/lib/client-facts";
+import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
+import { blockingChecks, readSteps } from "@/lib/process-rules";
 
 const knowledge = {
   knowledgeStatus: z.enum(["CONFIRMED", "UNCERTAIN", "MISSING"]).optional(),
@@ -182,7 +186,40 @@ export const ACTION_LABELS: Record<ProposalActionLike, string> = {
   CONTRADICT: "סותר פריט קיים",
 };
 
-export type ProposalFlag = { code: string; message: string };
+/// `block`: approving it as it stands would break a rule that is not
+/// waived (spec 5.2: "הפרה של כלל חובה: האישור חסום"). It can be edited
+/// and approved, or rejected. Everything else is advice for the reviewer.
+export type ProposalFlag = { code: string; message: string; block?: boolean };
+
+/// What stops a proposal from entering the file as it stands, found
+/// without asking anybody (spec 5.2, 7.2). The same checks the file's own
+/// functions make when it is written, said on the card before anyone
+/// presses approve, and made again on the approved text after any edit:
+/// - R17: a source code cited in the text that is not in the register.
+/// - The item's own shape: temporary information without an end, a
+///   one-off decision without a date, a proposed approval rule without
+///   the interim rule that applies until it is approved.
+/// A process enters as a draft, so what its procedure fails (R1, R3, R4)
+/// is said here but does not block the proposal: it blocks the procedure's
+/// approval, on the processes screen.
+export function proposalProblems(target: ProposalTargetLike, payload: Record<string, unknown>, registerCodes: string[]): ProposalFlag[] {
+  const out: ProposalFlag[] = [];
+  const known = new Set(registerCodes);
+  const unknown = [...new Set(Object.values(payload).flatMap((v) => (typeof v === "string" ? citedCodes(v) : [])))].filter((c) => !known.has(c));
+  if (unknown.length) out.push({ code: "R17", block: true, message: `הטקסט מצטט ${unknown.join(", ")}, ${unknown.length === 1 ? "שלא קיים" : "שלא קיימים"} במרשם המקורות של הלקוח. מתקנים את הקוד בעריכה, או דוחים.` });
+  const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : null);
+  if (target === "FACT") {
+    const shape = factShapeError({ kind: payload.kind as never, body: s("body") ?? "", validUntil: s("validUntil") ? new Date(s("validUntil")!) : null, validUntilEvent: s("validUntilEvent"), decidedAt: s("decidedAt") ? new Date(s("decidedAt")!) : null });
+    if (shape) out.push({ code: "SHAPE", block: true, message: `${shape} משלימים בעריכה, או דוחים.` });
+  }
+  if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
+    out.push({ code: "SHAPE", block: true, message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים "עד שיאושר" בעריכה, או דוחים.' });
+  }
+  if (target === "PROCESS" && Array.isArray(payload.steps) && payload.steps.length) {
+    for (const c of blockingChecks({ steps: readSteps(payload.steps) }, [])) out.push({ code: c.code, message: `${c.message} (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)` });
+  }
+  return out;
+}
 
 /// The most proposals decided in one action.
 export const MAX_BULK = 60;
@@ -194,6 +231,7 @@ export const MAX_BULK = 60;
 /// sensitive. Rejecting together is always allowed: nothing enters the
 /// file.
 export function bulkApproveBlocker(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown> }): string | null {
+  if (p.flags.some((f) => f.block)) return "יש בה משהו שחוסם אישור";
   if (p.action !== "CREATE") return "משנה פריט שכבר בתיק";
   if (p.flags.some((f) => f.code === "DUPLICATE")) return "ייתכן שכבר בתיק";
   if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return "מידע רגיש";
@@ -245,6 +283,30 @@ export function proposalDetails(target: ProposalTargetLike, payload: Record<stri
   if (target === "NARRATIVE") return s("body").length > 160 ? [s("body")] : [];
   if (target === "DOMAIN") return [payload.kind === "PARTNER" ? "דומיין של שותף" : "דומיין של הלקוח"];
   return [];
+}
+
+/// Decision 1: after the first month, if fewer than 10% of approved
+/// proposals were edited first, light items may be approved in
+/// conversation too. The line a manager reads on the review screen.
+export const DECISION_1_LIMIT = 0.1;
+export const DECISION_1_DAYS = 30;
+
+export function qualityLine(
+  q: { approved: number; editedBeforeApproval: number; rejected: number; firstDecidedAt: Date | null },
+  now: Date
+): { text: string; tone: "neutral" | "good" | "warn" } {
+  if (q.approved === 0 && q.rejected === 0) return { text: `עוד לא הוחלט על הצעות ב-${DECISION_1_DAYS} הימים האחרונים.`, tone: "neutral" };
+  const share = q.approved ? q.editedBeforeApproval / q.approved : 0;
+  const pct = Math.round(share * 1000) / 10;
+  const head = `ב-${DECISION_1_DAYS} הימים האחרונים: ${q.approved} אושרו, ${q.editedBeforeApproval} מהן אחרי עריכה (${pct}%), ${q.rejected} נדחו.`;
+  const monthEnds = q.firstDecidedAt ? new Date(q.firstDecidedAt.getTime() + DECISION_1_DAYS * 86_400_000) : null;
+  if (monthEnds && monthEnds.getTime() > now.getTime()) {
+    const d = new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(monthEnds);
+    return { text: `${head} החודש הראשון נגמר ב-${d}. אז מחליטים אם אפשר לאשר פריטים קלים גם בשיחה (היעד: פחות מ-10% עם עריכה).`, tone: "neutral" };
+  }
+  return share < DECISION_1_LIMIT
+    ? { text: `${head} פחות מ-10% תוקנו: לפי החלטה 1 אפשר לשקול לאשר פריטים קלים גם בשיחה.`, tone: "good" }
+    : { text: `${head} יותר מ-10% תוקנו: ממשיכים לאשר רק כאן.`, tone: "warn" };
 }
 
 /// Every string a proposal carries, for the secret scan: a secret in a
