@@ -22,6 +22,8 @@ import {
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
+import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
+import { isBusinessCalendarKey } from "@/lib/business-calendar";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -59,6 +61,8 @@ export interface ProcessInput extends KnowledgeInput {
   approvalText?: string | null;
   exceptionPlaybook?: string | null;
   entityId?: string | null;
+  /// "IL", "US", or null for the entity's country (decision 6).
+  businessCalendar?: string | null;
   executorText?: string | null;
   transitionStatus?: ProcessTransition;
   /// An ongoing process only: a check every N days, and what is checked.
@@ -105,6 +109,7 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
 function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; systems?: string[]; policies?: string[] }) {
   const reviewError = reviewEveryError(input.reviewEveryDays);
   if (reviewError) throw new Error(reviewError);
+  if (input.businessCalendar && !isBusinessCalendarKey(input.businessCalendar)) throw new Error("לוח ימי העבודה לא מוכר.");
   if (input.slaBusinessDays !== undefined && input.slaBusinessDays !== null && (!Number.isInteger(input.slaBusinessDays) || input.slaBusinessDays < 0 || input.slaBusinessDays > 60)) {
     throw new Error("ה-SLA בימי עסקים הוא מספר שלם בין 0 ל-60.");
   }
@@ -127,6 +132,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     approvalText: input.approvalText !== undefined ? clean(input.approvalText) : undefined,
     exceptionPlaybook: input.exceptionPlaybook !== undefined ? clean(input.exceptionPlaybook) : undefined,
     entityId: input.entityId !== undefined ? input.entityId || null : undefined,
+    businessCalendar: input.businessCalendar !== undefined ? input.businessCalendar || null : undefined,
     executorText: input.executorText !== undefined ? clean(input.executorText) : undefined,
     transitionStatus: input.transitionStatus ?? undefined,
     checkEveryDays: input.checkEveryDays !== undefined ? input.checkEveryDays : undefined,
@@ -203,6 +209,8 @@ export async function updateProcess(actor: User, id: string, input: Partial<Omit
   const sourced = await sourcedFields(before.clientId, input, [input.purpose ?? before.purpose, input.triggerText ?? before.triggerText], before);
   const updated = await prisma.process.update({ where: { id }, data: { ...fields(input, ids), ...knowledgeData(input), ...sourced } });
   await recordAudit({ actorId: actor.id, action: "process.update", entityType: "Process", entityId: id, clientId: before.clientId, before, after: updated });
+  // Decision 6: its dates follow its calendar.
+  if (updated.businessCalendar !== before.businessCalendar || updated.entityId !== before.entityId) await syncDateCalendars({ processId: id });
   return updated;
 }
 
@@ -245,6 +253,7 @@ export async function linkProcessDates(actor: User, processId: string, dateIds: 
     prisma.importantDate.updateMany({ where: { id: { in: unique } }, data: { processId } }),
   ]);
   await recordAudit({ actorId: actor.id, action: "process.dates", entityType: "Process", entityId: processId, clientId: process.clientId, after: { dateIds: unique } });
+  await syncDateCalendars({ processId });
 }
 
 // ---------------------------------------------------------------------------

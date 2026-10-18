@@ -22,6 +22,7 @@ import { notifyDueProcessChecks } from "@/lib/app-domain/process-checks";
 import { reviewProcessesDaily } from "@/lib/app-domain/process-review";
 import { notifyStaleExtraction } from "@/lib/app-domain/client-control";
 import { askCondition, askUnknownDates } from "@/lib/app-domain/date-questions";
+import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import type { ImportantDate } from "@prisma/client";
 
 // Phase 10: Important Dates ("מועדים חשובים") - daily job. Extends the
@@ -668,6 +669,7 @@ export async function reconcileImportantDates(now = new Date()) {
     processReviewsDue: 0,
     staleExtractions: 0,
     unknownDatesAsked: 0,
+    datesCalendarSynced: 0,
     errors: [] as string[],
   };
 
@@ -676,6 +678,9 @@ export async function reconcileImportantDates(now = new Date()) {
   // running, matching reconcileAllClientAlerts()'s per-client isolation.
   const steps: Array<[string, () => Promise<void>]> = [
     ["seedHolidayOccurrences", async () => { results.holidaysSeeded = (await seedHolidayOccurrences(now)).created; }],
+    // Decision 6: a date that starts a process is on its calendar, before
+    // anything is computed from it.
+    ["syncDateCalendars", async () => { results.datesCalendarSynced = (await syncDateCalendars({}, now)).changed; }],
     ["recomputeOccurrences", async () => { results.occurrencesRecomputed = (await recomputeOccurrences(now)).updated; }],
     ["flagOverdueDates", async () => { results.flaggedOverdue = (await flagOverdueDates(now)).flagged; }],
     ["createDueReminderOccurrences", async () => { results.remindersCreated = (await createDueReminderOccurrences(now)).created; }],

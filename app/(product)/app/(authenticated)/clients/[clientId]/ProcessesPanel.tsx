@@ -41,6 +41,7 @@ import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption } from "./knowledge-ui";
+import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
 
 // Org brain, phase 1: processes and their procedures, section 7.4 of the
 // client file (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9).
@@ -75,6 +76,7 @@ export type PanelProcess = {
   approvalText: string | null;
   exceptionPlaybook: string | null;
   entityId: string | null;
+  businessCalendar: string | null;
   executorText: string | null;
   transitionStatus: TransitionLike;
   knowledgeStatus: KnowledgeStatusLike;
@@ -357,6 +359,17 @@ function ProcessForm({
         <textarea name="exceptionPlaybook" rows={3} defaultValue={existing?.exceptionPlaybook ?? ""} placeholder="מה עושים כשמשהו חורג" className={INPUT} />
       </Field>
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
+      <Field label="לוח ימי עבודה">
+        <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? ""} aria-label="לוח ימי עבודה" className={INPUT}>
+          <option value="">לפי המדינה של הישות</option>
+          {BUSINESS_CALENDARS.map((c) => (
+            <option key={c} value={c}>
+              {BUSINESS_CALENDAR_LABELS[c]}
+            </option>
+          ))}
+        </select>
+        <span className="mt-1 block text-xs text-appNavy/50">הריצות והמועדים שפותחים את התהליך נספרים לפיו.</span>
+      </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="מי מבצע היום">
           <input name="executorText" defaultValue={existing?.executorText ?? ""} placeholder="גיא" className={INPUT} />

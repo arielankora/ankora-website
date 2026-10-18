@@ -1,4 +1,5 @@
 import "server-only";
+import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -156,6 +157,8 @@ export async function updateClientEntity(actor: User, id: string, input: Partial
     before,
     after: updated,
   });
+  // Decision 6: the dates of its processes follow its country.
+  if (updated.country !== before.country) await syncDateCalendars({ clientId: before.clientId });
   return updated;
 }
 

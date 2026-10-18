@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  calendarForCountry,
+  calendarSourceLine,
+  processCalendar,
   addDaysToKey,
   isBusinessDay,
   rollToBusinessDay,
@@ -106,5 +109,21 @@ describe("subtractBusinessDays", () => {
   });
   it("zero returns the day itself", () => {
     expect(subtractBusinessDays("2026-11-07", 0, "IL")).toBe("2026-11-07");
+  });
+});
+
+describe("the calendar a process decides (decision 6)", () => {
+  it("is set on the process, or its entity's country, or none", () => {
+    expect(calendarForCountry(" us ")).toBe("US");
+    expect(calendarForCountry("GB")).toBeNull();
+    expect(processCalendar({ businessCalendar: "IL", entity: { name: "NUX Inc", country: "US" } })).toEqual({ key: "IL", by: "PROCESS", entityName: null });
+    expect(processCalendar({ businessCalendar: null, entity: { name: "NUX Inc", country: "US" } })).toEqual({ key: "US", by: "ENTITY", entityName: "NUX Inc" });
+    expect(processCalendar({ businessCalendar: null, entity: { name: "NUX UK", country: "GB" } })).toBeNull();
+    expect(processCalendar({ businessCalendar: null, entity: null })).toBeNull();
+  });
+
+  it("says why, in the date's words", () => {
+    expect(calendarSourceLine("P3", "Washington DOR", { key: "US", by: "ENTITY", entityName: "NUX Inc" })).toBe('ארה"ב (שני עד שישי), לפי הישות NUX Inc של התהליך P3 Washington DOR');
+    expect(calendarSourceLine("P3", "Washington DOR", { key: "IL", by: "PROCESS", entityName: null })).toContain("כפי שנקבע בתהליך P3");
   });
 });

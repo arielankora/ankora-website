@@ -9,6 +9,8 @@ import { ACTION_TAG_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABE
 import { POLICY_KIND_LABELS, ruleInForce } from "@/lib/client-policies";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
+import { BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
+import { calendarOfProcess } from "@/lib/app-domain/date-calendars";
 
 // Org brain (claude/org-brain-spec-2026-10-12.md, 8): a client's processes
 // and rules, for Claude.
@@ -91,6 +93,12 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
   return {
     ...summary(p, user),
     sla: p.slaText,
+    // Decision 6: business days are counted on this calendar, for its
+    // steps and for the dates that start it.
+    businessDays: await (async () => {
+      const c = await calendarOfProcess(p);
+      return c ? BUSINESS_CALENDAR_LABELS[c.key] : "לפי לוח המועד (ברירת מחדל: ישראל)";
+    })(),
     executorToday: p.executorText,
     // Who signs an approval step: at Ankora in the product, at the client
     // by name (a contact Claude may not see is not named).

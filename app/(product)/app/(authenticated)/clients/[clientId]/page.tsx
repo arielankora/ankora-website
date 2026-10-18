@@ -424,6 +424,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 approvalText: p.approvalText,
                 exceptionPlaybook: p.exceptionPlaybook,
                 entityId: p.entityId,
+                businessCalendar: p.businessCalendar,
                 executorText: p.executorText,
                 transitionStatus: p.transitionStatus,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),

@@ -16,6 +16,8 @@ import { ImportantDateForm } from "../ImportantDateForm";
 import { ImportantDateStatusSelect } from "../ImportantDateStatusSelect";
 import { snoozeImportantDateAction, deleteImportantDateAction } from "../actions";
 import type { ImportantDateStatus } from "@prisma/client";
+import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
+import { BUSINESS_CALENDAR_LABELS, calendarSourceLine, isBusinessCalendarKey } from "@/lib/business-calendar";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -52,6 +54,9 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
     listCategories(),
   ]);
   if (!date) notFound();
+  // Decision 6: a date that starts a process is on the process's calendar.
+  const lock = await lockedCalendarFor(date.processId);
+  const calendarLine = lock ? calendarSourceLine(lock.code, lock.title, lock) : null;
 
   const clientIds = new Set(clients.map((c) => c.id));
   const categoriesForAutoTask = allCategories.filter(
@@ -108,6 +113,7 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
                   leadUnit: date.leadUnit,
                   rollConvention: date.rollConvention,
                   businessCalendar: date.businessCalendar,
+                  calendarLockedBy: calendarLine,
                   precision: date.precision,
                   dayAlternatives: date.dayAlternatives,
                   conditionText: date.conditionText,
@@ -158,6 +164,12 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
                 <div>
                   <dt className="text-xs text-appNavy/50">לוח שנה</dt>
                   <dd className="text-appNavy">{date.calendarType === "HEBREW" ? "עברי" : "לועזי"}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-appNavy/50">ימי עבודה לפי</dt>
+                  <dd className="text-appNavy" data-testid="date-business-calendar">
+                    {calendarLine ?? BUSINESS_CALENDAR_LABELS[isBusinessCalendarKey(date.businessCalendar) ? date.businessCalendar : "IL"]}
+                  </dd>
                 </div>
                 <div>
                   <dt className="text-xs text-appNavy/50">רגישות</dt>
