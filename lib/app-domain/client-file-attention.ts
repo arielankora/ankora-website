@@ -6,6 +6,7 @@ import {
   DAY_MS,
   attentionSentence,
   hasAttention,
+  isStaleProposedRule,
   isStaleUncertain,
   type Attention,
 } from "@/lib/client-file-attention";
@@ -22,19 +23,26 @@ import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
 // true?" is a question with a date on it.
 //
 // Who hears: the client's account manager, about everything; whoever
-// chases an open question or owns a temporary item, about theirs. A
-// client with no account manager and no assignee is counted, not
+// chases an open question or owns a temporary item, about theirs; and an
+// item's owner (spec 3.1), about the uncertain items they keep. A client
+// with no account manager and nobody else to tell is counted, not
 // silently skipped.
+//
+// Every kind of item in the file is looked at: facts, people,
+// organizations, systems, entities, request types, rules and processes.
 
 export const ATTENTION_TYPE = "client_file.attention";
 
-const ZERO: Attention = { pastValidity: 0, staleUncertain: 0, openQuestions: 0 };
+const ZERO: Attention = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 };
 
 export async function notifyClientFileAttention(now = new Date()): Promise<{ notified: number; unowned: number }> {
   const staleBefore = new Date(now.getTime() - UNCERTAIN_REMINDER_DAYS * DAY_MS);
   const live = { deletedAt: null, client: { status: "ACTIVE" as const, deletedAt: null } };
 
-  const [facts, contacts, orgs, systems, entities] = await Promise.all([
+  const stale = { knowledgeStatus: "UNCERTAIN" as const, updatedAt: { lt: staleBefore } };
+  const row = { clientId: true, knowledgeStatus: true, updatedAt: true, ownerId: true } as const;
+
+  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies] = await Promise.all([
     prisma.clientFact.findMany({
       where: {
         ...live,
@@ -45,12 +53,18 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
           { knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } },
         ],
       },
-      select: { clientId: true, kind: true, validUntil: true, closedAt: true, answeredAt: true, assigneeId: true, knowledgeStatus: true, updatedAt: true },
+      select: { clientId: true, kind: true, validUntil: true, closedAt: true, answeredAt: true, assigneeId: true, ownerId: true, knowledgeStatus: true, updatedAt: true },
     }),
-    prisma.clientContact.findMany({ where: { ...live, knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } }, select: { clientId: true, knowledgeStatus: true, updatedAt: true } }),
-    prisma.clientOrganization.findMany({ where: { ...live, knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } }, select: { clientId: true, knowledgeStatus: true, updatedAt: true } }),
-    prisma.systemAccess.findMany({ where: { ...live, knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } }, select: { clientId: true, knowledgeStatus: true, updatedAt: true } }),
-    prisma.clientEntity.findMany({ where: { ...live, knowledgeStatus: "UNCERTAIN", updatedAt: { lt: staleBefore } }, select: { clientId: true, knowledgeStatus: true, updatedAt: true } }),
+    prisma.clientContact.findMany({ where: { ...live, ...stale }, select: row }),
+    prisma.clientOrganization.findMany({ where: { ...live, ...stale }, select: row }),
+    prisma.systemAccess.findMany({ where: { ...live, ...stale }, select: row }),
+    prisma.clientEntity.findMany({ where: { ...live, ...stale }, select: row }),
+    prisma.requestType.findMany({ where: { ...live, ...stale }, select: row }),
+    prisma.process.findMany({ where: { ...live, ...stale, status: { not: "RETIRED" } }, select: row }),
+    prisma.clientPolicy.findMany({
+      where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: staleBefore } }] },
+      select: { ...row, status: true, createdAt: true },
+    }),
   ]);
 
   // Per client: the counts for the account manager, each assignee's own
@@ -62,6 +76,12 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     let b = buckets.get(clientId);
     if (!b) buckets.set(clientId, (b = { all: { ...ZERO }, byAssignee: new Map(), latestExpiry: null }));
     return b;
+  };
+
+  const theirs = (b: Bucket, userId: string) => {
+    let a = b.byAssignee.get(userId);
+    if (!a) b.byAssignee.set(userId, (a = { ...ZERO }));
+    return a;
   };
 
   for (const f of facts) {
@@ -81,10 +101,20 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
       if (f.assigneeId) mine().openQuestions++;
     } else if (isStaleUncertain(f, now)) {
       b.all.staleUncertain++;
+      if (f.ownerId) theirs(b, f.ownerId).staleUncertain++;
     }
   }
-  for (const row of [...contacts, ...orgs, ...systems, ...entities]) {
-    if (isStaleUncertain(row, now)) bucket(row.clientId).all.staleUncertain++;
+  for (const item of [...contacts, ...orgs, ...systems, ...entities, ...requestTypes, ...processes, ...policies]) {
+    if (!isStaleUncertain(item, now)) continue;
+    const b = bucket(item.clientId);
+    b.all.staleUncertain++;
+    // Spec 3.1: the person who keeps it hears about it.
+    if (item.ownerId) theirs(b, item.ownerId).staleUncertain++;
+  }
+  // A rule the client set, still waiting for a manager: the account
+  // manager's to chase.
+  for (const rule of policies) {
+    if (isStaleProposedRule(rule, now)) bucket(rule.clientId).all.staleProposedRules++;
   }
 
   const clients = await prisma.client.findMany({
