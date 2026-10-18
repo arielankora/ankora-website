@@ -23,6 +23,7 @@ import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
+import * as schedule from "./checks/schedule.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -105,6 +106,18 @@ async function main() {
     "production",
     { label: "Production probe", level: 1, skipIf: production.skipIfUnreachable },
     production.probe,
+  );
+
+  // Level 1, and never blocking: this one looks at the SUITE, not the
+  // product, so it must not turn a pull request red for something the
+  // pull request did not do. It is here rather than at level 3 because
+  // the thing it watches is a level-3 run - a watchdog that only runs
+  // inside the run it is watching cannot report that run going missing.
+  // One unauthenticated HTTP call, so it is free enough for every PR.
+  await run.check(
+    "schedule",
+    { label: "Scheduled run health", level: 1, blocking: false, skipIf: schedule.skipIfUnreachable },
+    schedule.scheduledRunHealth,
   );
 
   // ── Level 2 ───────────────────────────────────────────────────────────

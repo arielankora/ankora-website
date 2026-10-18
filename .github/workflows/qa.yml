@@ -63,6 +63,12 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
+      # 18.10.2026, for the "Scheduled run health" check: it reads this
+      # workflow's own past scheduled runs to notice one that never
+      # produced a verdict. Without this the API answers "Resource not
+      # accessible by integration". Read-only, and only this workflow's
+      # runs are of any interest to it.
+      actions: read
 
     # Level 2 and 3 run the integration suite, which needs a real Postgres.
     # A service container is cheaper and far more predictable than the
@@ -252,6 +258,13 @@ jobs:
       - name: Run QA
         id: qa
         timeout-minutes: 75
+        env:
+          # Read-only, for the "Scheduled run health" check (see the
+          # `actions: read` note above). Unauthenticated Actions API calls
+          # are capped at 60 an hour per IP and runners share addresses,
+          # so without this the check would go quiet exactly when the
+          # runners are busy, which is when it matters.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node qa/run.mjs ${{ steps.level.outputs.value }}
 
       # Always upload, especially on failure - the report is the artefact
