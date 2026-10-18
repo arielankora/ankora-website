@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { listOpenBatches, proposalQuality } from "@/lib/app-domain/knowledge-proposals";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { DECISION_1_DAYS, firefliesLink, proposalHeadline, qualityLine, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { DECISION_1_DAYS, firefliesLink, proposalHeadline, qualityLine, reviewConfidence, reviewRank, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import {
   batchMatches,
   batchUrgent,
@@ -61,7 +61,13 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
     const proposals: ReviewProposal[] = b.proposals.map((p) => {
       const payload = p.payload as Record<string, unknown>;
       const at = readSourceRefs(payload.sources)[0]?.at ?? null;
+      const flags = (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string; block?: boolean }[];
+      // Spec 5.2: how sure, as the reviewer should read it, and where it
+      // goes on the card.
+      const confidence = reviewConfidence({ confidence: p.confidence, flags, payload, at, sourceKind: b.source?.kind ?? null, sourceRestriction: b.source?.restriction ?? null });
       return {
+        confidence,
+        rank: reviewRank({ action: p.action, flags, payload, level: confidence.level }),
         id: p.id,
         target: p.target as ProposalTargetLike,
         action: p.action,
@@ -71,13 +77,15 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
         sources: readSourceRefs(payload.sources).map(formatSourceRef),
         reason: p.reason,
         quote: p.quote,
-        flags: (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string; block?: boolean }[],
+        flags,
         link: fireflies ? firefliesLink(fireflies, at) : null,
         existing: p.existing ? { body: p.existing.body } : null,
         rejectReason: p.rejectReason,
         hiddenFor: p.hiddenFor,
       };
     });
+    // Pending first, in the order they should be read; decided ones after.
+    proposals.sort((x, y) => Number(x.state !== "PENDING") - Number(y.state !== "PENDING") || x.rank - y.rank);
     return { b, meta: { clientId: b.client.id, sourceKind: b.source?.kind ?? null, createdById: b.createdById, createdAt: b.createdAt }, proposals };
   });
 

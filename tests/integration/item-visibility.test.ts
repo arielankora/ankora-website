@@ -60,8 +60,8 @@ describe("visible to the client, and owner", () => {
       clientId: client.id,
       source: { code: "S1" },
       items: [
-        { target: "SYSTEM", payload: { systemName: "Mercury", clientVisible: true, ownerName: user.name } },
-        { target: "SYSTEM", payload: { systemName: "Brex", ownerName: "מישהו אחר" } },
+        { target: "SYSTEM", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", systemName: "Mercury", clientVisible: true, ownerName: user.name } },
+        { target: "SYSTEM", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", systemName: "Brex", ownerName: "מישהו אחר" } },
       ],
     });
     const [batch] = await listOpenBatches(user, { clientId: client.id });

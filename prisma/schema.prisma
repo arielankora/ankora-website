@@ -3286,6 +3286,10 @@ model KnowledgeProposal {
   reason   String?
   /// A short quote from the source, when the source allows quotes.
   quote    String?
+  /// How sure Claude is, by its own account: HIGH, MEDIUM or LOW. The
+  /// review screen lowers it for what it can see (lib/knowledge-proposals.ts,
+  /// reviewConfidence) and orders the card by it.
+  confidence String?
   /// Rule flags found when the proposal arrived: [{ code, message }].
   flags    Json           @default("[]")
 

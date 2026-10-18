@@ -7,7 +7,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -31,6 +31,9 @@ export type ReviewProposal = {
   rejectReason: string | null;
   /// Sensitive and this person is not an approver (R6): who decides it.
   hiddenFor: string | null;
+  /// Spec 5.2: how sure, with why it is lower, and its place on the card.
+  confidence: { level: ConfidenceLike; why: string[] };
+  rank: number;
 };
 
 const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
@@ -260,6 +263,12 @@ function ProposalRow({ p, selected, onSelect }: { p: ReviewProposal; selected: b
           <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60">
             {status !== "CONFIRMED" && <StatusBadge label={KNOWLEDGE_STATUS_LABELS[status]} tone={status === "MISSING" ? "red" : "amber"} />}
             {str(p.payload.toResolve) && <span>{str(p.payload.toResolve)}</span>}
+            {p.state === "PENDING" && (
+              <span title={p.confidence.why.join(" · ") || undefined} data-testid="proposal-confidence">
+                <StatusBadge label={CONFIDENCE_LABELS[p.confidence.level]} tone={p.confidence.level === "HIGH" ? "green" : p.confidence.level === "LOW" ? "red" : "gray"} />
+              </span>
+            )}
+            {p.state === "PENDING" && p.confidence.why.length > 0 && p.confidence.level !== "HIGH" && <span>{p.confidence.why.join(", ")}</span>}
             {p.sources.length > 0 && <span dir="ltr">[{p.sources.join(", ")}]</span>}
             {p.link && (
               <a href={p.link} target="_blank" rel="noreferrer" className="text-gold-dim hover:underline">
@@ -370,6 +379,15 @@ export function ReviewBatch({
         </div>
         <p className="text-xs text-appNavy/60">{counts.map(([k, n]) => `${n} ${k}`).join(" · ")}</p>
       </div>
+      {/* Spec 5.2: how much of the card goes together, before reading it. */}
+      {(() => {
+        const line = reviewSummary(decidable.map((p) => p.rank));
+        return line ? (
+          <p className="mt-2 text-xs font-medium text-appNavy/70" data-testid="review-summary">
+            {line}
+          </p>
+        ) : null;
+      })()}
       {note && <p className="mt-2 text-xs text-appNavy/60">{note}</p>}
       {droppedCount > 0 && (
         <p className="mt-2 text-xs text-warning">

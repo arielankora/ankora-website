@@ -18,6 +18,9 @@ import {
   type ProposalTargetLike,
   bulkApproveBlocker,
   MAX_BULK,
+  missingRequired,
+  CONFIDENCE_LEVELS,
+  type ConfidenceLike,
 } from "@/lib/knowledge-proposals";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity } from "@/lib/app-domain/client-entities";
@@ -66,6 +69,8 @@ export type ProposalItemInput = {
   alsoSources?: string[];
   reason?: string | null;
   quote?: string | null;
+  /// How sure Claude is: HIGH, MEDIUM or LOW (spec 5.2).
+  confidence?: string | null;
 };
 
 export type BatchSourceInput =
@@ -243,6 +248,12 @@ export async function proposeKnowledge(
       dropped.push({ index, reason: "סוג פריט לא מוכר." });
       continue;
     }
+    // Spec 5.2: a reason and a status, or it is not read at all.
+    const missing = missingRequired(item.target, item.payload ?? {}, item.reason);
+    if (missing) {
+      dropped.push({ index, reason: missing });
+      continue;
+    }
     const parsed = schema.safeParse(item.payload);
     if (!parsed.success) {
       dropped.push({ index, reason: `הפריט לא בנוי נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` });
@@ -310,6 +321,7 @@ export async function proposeKnowledge(
           payload: payload as Prisma.InputJsonValue,
           reason: item.reason?.trim() || null,
           quote: item.quote?.trim() || null,
+          confidence: CONFIDENCE_LEVELS.includes(item.confidence as ConfidenceLike) ? item.confidence : null,
           flags: flags as Prisma.InputJsonValue,
         })),
       },

@@ -37,8 +37,8 @@ describe("knowledge proposals", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "FACT", payload: { kind: "PREFERENCE", topic: "COMMUNICATION", body: "WhatsApp, אחר כך Slack, אחר כך מייל" }, at: "05:02", reason: "אורן אמר במפורש" },
-        { target: "CONTACT", payload: { name: "שני הלוי", role: "VP Finance", emails: ["shani@nextage.co.il"], relationship: "PROVIDER" }, at: "12:40" },
+        { target: "FACT", payload: { knowledgeStatus: "CONFIRMED", kind: "PREFERENCE", topic: "COMMUNICATION", body: "WhatsApp, אחר כך Slack, אחר כך מייל" }, at: "05:02", reason: "אורן אמר במפורש" },
+        { target: "CONTACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", name: "שני הלוי", role: "VP Finance", emails: ["shani@nextage.co.il"], relationship: "PROVIDER" }, at: "12:40" },
       ],
     });
     expect(first).toMatchObject({ sourceCode: "S1", proposed: 2, dropped: [], secretTaskId: null });
@@ -46,7 +46,7 @@ describe("knowledge proposals", () => {
     expect(await countPendingProposals(user, client.id)).toBe(2);
 
     // The same recording again: the same source, not S2.
-    const again = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "עוד משהו" } }] });
+    const again = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "עוד משהו" } }] });
     expect(again.sourceCode).toBe("S1");
     expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(1);
 
@@ -72,8 +72,8 @@ describe("knowledge proposals", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "SYSTEM", payload: { systemName: "Mercury", notes: "הסיסמה היא Nux2026!" } },
-        { target: "FACT", payload: { kind: "FINANCE", body: "מגבלת Justworks: 25,000$ להעברה" } },
+        { target: "SYSTEM", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", systemName: "Mercury", notes: "הסיסמה היא Nux2026!" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "FINANCE", body: "מגבלת Justworks: 25,000$ להעברה" } },
       ],
     });
     expect(r.proposed).toBe(1);
@@ -94,8 +94,8 @@ describe("knowledge proposals", () => {
       clientId: client.id,
       source: { kind: "TRANSCRIPT", title: "ישיבת הנהלה", restriction: "TOPICS_ONLY" },
       items: [
-        { target: "FACT", payload: { kind: "NOTE", body: "נדון גיוס" }, quote: "אנחנו מגייסים 5 מיליון" },
-        { target: "FACT", payload: { kind: "NOTE", body: "נדון תקציב 2027" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "נדון גיוס" }, quote: "אנחנו מגייסים 5 מיליון" },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "נדון תקציב 2027" } },
       ],
     });
     expect(board.proposed).toBe(1);
@@ -104,7 +104,7 @@ describe("knowledge proposals", () => {
     const ki = await proposeKnowledge(user, {
       clientId: client.id,
       source: { kind: "ANKORA_DOCUMENT", title: "KI" },
-      items: [{ target: "FACT", payload: { kind: "FINANCE", body: "שכר ב-9 לחודש" } }],
+      items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "FINANCE", body: "שכר ב-9 לחודש" } }],
     });
     const p = (await listOpenBatches(user)).find((b) => b.id === ki.batchId)!.proposals[0];
     expect(p.flags).toEqual([expect.objectContaining({ code: "R14" })]);
@@ -119,7 +119,7 @@ describe("knowledge proposals", () => {
     const r = await proposeKnowledge(user, {
       clientId: client.id,
       source: MEETING, // S2
-      items: [{ target: "FACT", action: "CONTRADICT", targetId: bank.id, payload: { kind: "FINANCE", body: "הבנק בישראל: הפועלים" }, at: "21:30" }],
+      items: [{ target: "FACT", reason: "נאמר בפגישה", action: "CONTRADICT", targetId: bank.id, payload: { knowledgeStatus: "CONFIRMED", kind: "FINANCE", body: "הבנק בישראל: הפועלים" }, at: "21:30" }],
     });
     const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
     expect(p.existing?.body).toBe("הבנק בישראל: לאומי");
@@ -137,7 +137,7 @@ describe("knowledge proposals", () => {
     const r = await proposeKnowledge(user, {
       clientId: client.id,
       source: { code: "s1" },
-      items: [{ target: "FACT", payload: { kind: "REQUIREMENT", body: "כל תהליך מתועד עם owner ו SLA." } }],
+      items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "REQUIREMENT", body: "כל תהליך מתועד עם owner ו SLA." } }],
     });
     const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
     expect(p.flags).toEqual([expect.objectContaining({ code: "DUPLICATE" })]);
@@ -154,10 +154,10 @@ describe("knowledge proposals", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "FACT", payload: { kind: "NOTE", body: "9 עובדים שכירים בישראל" } },
-        { target: "FACT", payload: { kind: "NOTE", body: "SOC 2 הושג" } },
-        { target: "FACT", payload: { kind: "REQUIREMENT", body: "דוח שבועי לאורן" } },
-        { target: "FACT", payload: { kind: "NOTE", body: "שיחת חולין" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "9 עובדים שכירים בישראל" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "SOC 2 הושג" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "REQUIREMENT", body: "דוח שבועי לאורן" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "שיחת חולין" } },
       ],
     });
     const [a, b, dup, chat] = (await listOpenBatches(user)).find((x) => x.id === r.batchId)!.proposals;
@@ -176,7 +176,7 @@ describe("knowledge proposals", () => {
     expect(await countPendingProposals(user, client.id)).toBe(0);
 
     const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
-    const other = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "עוד" } }] });
+    const other = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "עוד" } }] });
     const [mine] = (await listOpenBatches(user)).find((x) => x.id === other.batchId)!.proposals;
     expect((await decideProposals(stranger, [mine.id], { approve: true })).failed).toHaveLength(1);
   });
@@ -184,8 +184,8 @@ describe("knowledge proposals", () => {
   it("is closed to anyone not assigned to the client, in both directions", async () => {
     const { client, user } = await setup();
     const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
-    await expect(proposeKnowledge(stranger, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] })).rejects.toBeInstanceOf(ForbiddenError);
-    const r = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] });
+    await expect(proposeKnowledge(stranger, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] })).rejects.toBeInstanceOf(ForbiddenError);
+    const r = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] });
     expect(await listOpenBatches(stranger)).toEqual([]);
     const pid = (await prisma.knowledgeProposal.findFirstOrThrow({ where: { batchId: r.batchId! } })).id;
     await expect(approveProposal(stranger, pid)).rejects.toBeInstanceOf(ForbiddenError);
@@ -198,7 +198,7 @@ describe("request types and the extraction brief", () => {
     const r = await proposeKnowledge(user, {
       clientId: client.id,
       source: MEETING,
-      items: [{ target: "REQUEST_TYPE", payload: { title: "חשבונית Inc", arrivesVia: "billing-us", handling: "לשני ולג'נן, לא לאיילה" }, at: "14:20" }],
+      items: [{ target: "REQUEST_TYPE", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", title: "חשבונית Inc", arrivesVia: "billing-us", handling: "לשני ולג'נן, לא לאיילה" }, at: "14:20" }],
     });
     const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
     const approved = await approveProposal(user, p.id);
@@ -213,15 +213,15 @@ describe("request types and the extraction brief", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "ENTITY", payload: { name: "NUX Inc", country: "US", currency: "USD" }, at: "02:00" },
-        { target: "ENTITY", payload: { name: "NUX.AI Ltd", country: "IL", parentName: "NUX Inc" }, at: "02:10" },
+        { target: "ENTITY", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", name: "NUX Inc", country: "US", currency: "USD" }, at: "02:00" },
+        { target: "ENTITY", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", name: "NUX.AI Ltd", country: "IL", parentName: "NUX Inc" }, at: "02:10" },
         {
-          target: "PROCESS",
-          payload: { title: "תשלומי ספקים LTD", triggerKinds: ["SCHEDULED"], triggerText: "ב-10 וב-25", steps: [{ title: "מעלים ל-Doka", actionTags: ["INVOICE"] }, { title: "מורשה חתימה חותם", actionTags: ["BANK_SIGNATURE"], requiresApproval: true }] },
+          target: "PROCESS", reason: "נאמר בפגישה",
+          payload: { knowledgeStatus: "CONFIRMED", title: "תשלומי ספקים LTD", triggerKinds: ["SCHEDULED"], triggerText: "ב-10 וב-25", steps: [{ title: "מעלים ל-Doka", actionTags: ["INVOICE"] }, { title: "מורשה חתימה חותם", actionTags: ["BANK_SIGNATURE"], requiresApproval: true }] },
           at: "24:11",
         },
-        { target: "DOMAIN", payload: { domain: "nux.ai", kind: "CLIENT" } },
-        { target: "NARRATIVE", payload: { kind: "OVERVIEW", body: "חברה, סטארטאפ AI עם שתי ישויות [S1 02:00]" } },
+        { target: "DOMAIN", reason: "נאמר בפגישה", payload: { domain: "nux.ai", kind: "CLIENT" } },
+        { target: "NARRATIVE", reason: "נאמר בפגישה", payload: { kind: "OVERVIEW", body: "חברה, סטארטאפ AI עם שתי ישויות [S1 02:00]" } },
       ],
     });
     expect(r.proposed).toBe(5);
@@ -252,7 +252,7 @@ describe("request types and the extraction brief", () => {
     const { client, user } = await setup();
     await addClientSource(user, { clientId: client.id, kind: "TRANSCRIPT", title: "Nextage & Ankora" });
     await saveNarrative(user, { clientId: client.id, kind: "OUR_ROLE", body: "גרסה ראשונה", baseVersion: 0 });
-    const r = await proposeKnowledge(user, { clientId: client.id, source: { code: "S1" }, items: [{ target: "NARRATIVE", payload: { kind: "OUR_ROLE", body: "אנחנו מנהלים את התפעול השוטף" } }] });
+    const r = await proposeKnowledge(user, { clientId: client.id, source: { code: "S1" }, items: [{ target: "NARRATIVE", reason: "נאמר בפגישה", payload: { kind: "OUR_ROLE", body: "אנחנו מנהלים את התפעול השוטף" } }] });
     const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
     await approveProposal(user, p.id);
     const versions = await prisma.clientNarrative.findMany({ where: { clientId: client.id, kind: "OUR_ROLE" }, orderBy: { version: "asc" } });
@@ -265,8 +265,8 @@ describe("request types and the extraction brief", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "FACT", payload: { kind: "TEMPORARY", body: "Anthropic משולם מהכרטיס הפרטי של אורן" } },
-        { target: "FACT", payload: { kind: "NOTE", body: "לפי הסיכום [S7] הם עוברים לבנק אחר" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "TEMPORARY", body: "Anthropic משולם מהכרטיס הפרטי של אורן" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "לפי הסיכום [S7] הם עוברים לבנק אחר" } },
       ],
     });
     const [temporary, cited] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
@@ -289,7 +289,7 @@ describe("request types and the extraction brief", () => {
     const other = await createTestClient({ name: "Not mine" });
     await addClientDomain(user, { clientId: client.id, domain: "nux.ai", kind: "CLIENT" });
     await addClientDomain(user, { clientId: client.id, domain: "nextage.co.il", kind: "PARTNER", organizationName: "Nextage" });
-    await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", payload: { kind: "NOTE", body: "x" } }] });
+    await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "x" } }] });
 
     const b = await extractionBrief(user);
     expect(b.guide.version).toBeNull();
@@ -306,5 +306,27 @@ describe("request types and the extraction brief", () => {
     ]);
     expect(b.clients.map((c) => c.name)).not.toContain(other.name);
     expect(b.processedRecordings).toEqual([{ firefliesId: "ff-123", client: "NUX", sourceCode: "S1", title: "Nextage & Ankora" }]);
+  });
+
+  it("spec 5.2: an item without a reason or a status is refused on arrival, and confidence is kept", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "SYSTEM", payload: { systemName: "Mercury", knowledgeStatus: "CONFIRMED" } },
+        { target: "SYSTEM", reason: "נאמר ב-08:13", payload: { systemName: "Brex" } },
+        { target: "SYSTEM", reason: "נאמר ב-08:13", confidence: "LOW", payload: { systemName: "Ramp", knowledgeStatus: "CONFIRMED" }, at: "08:13" },
+        { target: "SYSTEM", reason: "נאמר ב-09:00", confidence: "SURE", payload: { systemName: "Doka", knowledgeStatus: "CONFIRMED" } },
+      ],
+    });
+    expect(r.proposed).toBe(2);
+    expect(r.dropped).toEqual([
+      { index: 0, reason: expect.stringContaining("חסרה סיבה") },
+      { index: 1, reason: expect.stringContaining("חסר סטטוס") },
+    ]);
+    const rows = await prisma.knowledgeProposal.findMany({ where: { batchId: r.batchId! }, orderBy: { createdAt: "asc" } });
+    // A level that is not one of the three is no level.
+    expect(rows.map((p) => p.confidence)).toEqual(["LOW", null]);
   });
 });
