@@ -133,3 +133,34 @@ describe("sweepBackupFolder()", () => {
     expect(removeDriveFile).not.toHaveBeenCalled();
   });
 });
+
+describe("sweepBackupFolder() with a count-based policy", () => {
+  beforeEach(() => {
+    vi.mocked(listFilesInFolder).mockReset();
+    vi.mocked(removeDriveFile).mockReset();
+  });
+
+  it("keeps exactly the newest N when retentionDays is 0 (the weekly code snapshot)", async () => {
+    const weekly = Array.from({ length: 10 }, (_, weeksAgo) => {
+      const t = new Date(NOW.getTime() - weeksAgo * 7 * DAY);
+      const key = t.toISOString().slice(0, 10);
+      return { id: `code-${key}`, name: `ankora-website-code-${key}.tar.gz`, createdTime: t.toISOString() };
+    });
+    vi.mocked(listFilesInFolder).mockResolvedValue({ ok: true, files: weekly });
+    vi.mocked(removeDriveFile).mockResolvedValue({ ok: true, how: "trashed" });
+
+    const result = await sweepBackupFolder({
+      folderId: "code",
+      namePattern: /^ankora-website-code-\d{4}-\d{2}-\d{2}\.tar\.gz$/,
+      uploadSucceededTonight: true,
+      now: NOW,
+      retentionDays: 0,
+      minKeep: 8,
+    });
+
+    expect(result).toMatchObject({ ok: true, trashed: 2, deleted: 0, failed: 0 });
+    expect(vi.mocked(removeDriveFile).mock.calls.map((c) => c[0]).sort()).toEqual(
+      [weekly[8].id, weekly[9].id].sort(),
+    );
+  });
+});

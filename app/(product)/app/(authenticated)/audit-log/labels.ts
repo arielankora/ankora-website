@@ -263,6 +263,10 @@ export const ACTION_LABEL: Record<string, string> = {
   // Phase 11: the nightly data export, recorded so a missing backup is
   // visible here and not only in a mailbox.
   "backup.nightly_export.sent": "שליחת גיבוי יומי",
+  // Weekly snapshot of the site's source code to Drive. The failure gets its
+  // own row so a missing week shows up here, not only in Vercel's logs.
+  "backup.code_snapshot.sent": "גיבוי שבועי של קוד האתר",
+  "backup.code_snapshot.upload_failed": "גיבוי שבועי של קוד האתר נכשל",
   // Credentials vault (6.10.2026). Every reveal, every refused reveal and
   // every failed "verify it's you" is a row here, by design.
   "credential.create": "הוספת גישה למערכת",

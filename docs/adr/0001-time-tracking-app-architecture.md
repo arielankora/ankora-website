@@ -3426,6 +3426,68 @@ checking against what this dump is now expected to cover. An offsite
 `prisma/migrations` in git, which is a real dependency on GitHub being
 there.
 
+### 22.10 The weekly code snapshot moves into this app too (2026-10-18)
+
+A second, older backup had the same flaw 22.7 fixed for the nightly
+export and was never fixed: a Claude-side scheduled task that, once a
+week, cloned this repo in an AI sandbox, packed it as a `tar.gz`, encoded
+it to base64 and passed the string to the Google Drive MCP tool. Between
+2026-09-19 and 2026-10-17 it ran five weeks in a row and delivered
+nothing. The Drive folder "קוד - GitHub snapshots" is still empty.
+
+Two independent walls, logged run by run in the project doc
+`claude/backup-run-log.md`:
+
+- The sandbox's "Data Exfiltration" classifier blocked the base64 step
+  on some runs and not on others. Not deterministic, so not something to
+  plan around.
+- Even on runs where encoding passed, the MCP tool accepts file content
+  only inline, as a tool-call parameter. The archive was 9.9 MB in
+  September and 22 MB by mid-October; its base64 is tens of millions of
+  characters, orders of magnitude past what one tool call can carry.
+
+The second wall is structural, and it grows every week. Same lesson as
+22.7: backup bytes do not belong in an agent's tool calls.
+
+**What changed.** `lib/app-domain/code-backup.ts` (new) fetches the
+tarball GitHub already builds for `main` (the same bytes `git archive`
+would produce, without `.git`) and uploads it to that folder with the
+Workload Identity Federation identity from 22.8. No new secret, no new
+dependency, and no git inside the function.
+
+- **Source.** With `GITHUB_TOKEN` set (it already is, for blog
+  publishing) the fetch goes through `api.github.com/.../tarball/main`,
+  which works whether the repo is public or private; without it, the
+  public `codeload.github.com` URL. The response must start with the
+  gzip magic bytes and be at least 64 KB, so an error page that comes
+  back with a 200 is logged as a failure, not filed as a backup.
+- **Upload.** `uploadLargeFileToDriveFolder()` (new, in
+  `lib/google-drive.ts`) uses Drive's resumable upload. The existing
+  multipart upload is documented for files of 5 MB or less; the nightly
+  files are far below that and keep using it.
+- **Cadence.** Folded into the `scheduled-reports` cron (00:00 UTC
+  daily), for the reason 22.3 gives. The job runs only on Sunday UTC and
+  returns a skip on every other day. It is idempotent per day: if a file
+  with today's name is already in the folder it does nothing, so a manual
+  re-run of the cron cannot create the same-name duplicates that made the
+  September relay copies dangerous in a restore.
+- **Retention.** The newest eight snapshots, by count. Reuses
+  `sweepBackupFolder()` from 22.9's retention work with two new optional
+  parameters (`retentionDays: 0`, `minKeep: 8`). Same two safety rules:
+  it runs only after a successful upload, and only touches files named
+  `ankora-website-code-YYYY-MM-DD.tar.gz`.
+- **Visibility.** Two audit actions,
+  `backup.code_snapshot.sent` and `backup.code_snapshot.upload_failed`,
+  so a missing week shows up in the audit log and not only in Vercel's
+  logs.
+- **No Google Cloud change.** The service account is a member of the
+  "Ankora" Shared drive (22.8), not of individual folders, so this folder
+  is already covered. The first production run is the real test of that.
+
+**What the old task becomes.** After the first Sunday on which a file
+lands in the folder, the Claude-side weekly task is retired, the same
+way the nightly relay was on 2026-09-22.
+
 ## 23. Addendum: Profile & Guide screens redesign (screen 18)
 
 **Context.** Continuing the screen-by-screen App redesign (section 20) per

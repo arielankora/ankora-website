@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileScheduledReports } from "@/lib/app-domain/report-schedules";
 import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
+import { backupCodeSnapshotToDrive } from "@/lib/app-domain/code-backup";
 
 // Spec 15's weekly/monthly scheduled email reports, checked hourly (finer
 // grained than Phase 4's once-daily alerts-reconcile cron, since a
@@ -41,6 +42,10 @@ import { sendNightlyDataExport } from "@/lib/app-domain/backup-export";
 // day-of-week/day-of-month (never `hour`, per its own doc comment) and
 // 00:00-03:00 UTC is still the same Israel calendar day as the previous
 // 06:00 UTC fire time, so which day a schedule is due on is unchanged.
+//
+// Also carries the weekly code snapshot (lib/app-domain/code-backup.ts),
+// for the same reason: no cron slot of its own. It decides for itself
+// that today is Sunday UTC and returns a skip on every other day.
 export async function GET(request: Request) {
   // Security review: constant-time comparison, shared with the other
   // cron route - see lib/cron-auth.ts for the CWE-208 reasoning.
@@ -50,8 +55,12 @@ export async function GET(request: Request) {
   }
 
   try {
-    const [result, nightlyExport] = await Promise.all([reconcileScheduledReports(), sendNightlyDataExport()]);
-    return NextResponse.json({ ok: true, ...result, nightlyExport });
+    const [result, nightlyExport, codeBackup] = await Promise.all([
+      reconcileScheduledReports(),
+      sendNightlyDataExport(),
+      backupCodeSnapshotToDrive(),
+    ]);
+    return NextResponse.json({ ok: true, ...result, nightlyExport, codeBackup });
   } catch (err) {
     console.error("scheduled-reports cron failed:", err);
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });

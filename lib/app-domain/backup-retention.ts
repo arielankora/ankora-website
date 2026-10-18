@@ -67,6 +67,10 @@ export async function sweepBackupFolder(params: {
   namePattern: RegExp;
   uploadSucceededTonight: boolean;
   now: Date;
+  /// Defaults are the nightly policy. The weekly code snapshot passes its
+  /// own (lib/app-domain/code-backup.ts): keep the newest eight, by count.
+  retentionDays?: number;
+  minKeep?: number;
 }): Promise<RetentionSweepResult> {
   const empty = { deleted: 0, trashed: 0, failed: 0 };
   if (!params.uploadSucceededTonight) {
@@ -78,7 +82,13 @@ export async function sweepBackupFolder(params: {
     return { ok: false, error: listed.error ?? "Drive list returned no files array", ...empty };
   }
 
-  const expired = selectExpiredBackups(listed.files, params.now, params.namePattern);
+  const expired = selectExpiredBackups(
+    listed.files,
+    params.now,
+    params.namePattern,
+    params.retentionDays ?? BACKUP_RETENTION_DAYS,
+    params.minKeep ?? BACKUP_MIN_KEEP,
+  );
   const result: RetentionSweepResult = { ok: true, ...empty };
   // One at a time: at most one file ages out per folder per night in steady
   // state, so there is nothing to gain from parallelism and a lot to lose

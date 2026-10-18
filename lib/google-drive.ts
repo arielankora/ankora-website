@@ -77,6 +77,10 @@ const CLOUD_PLATFORM_SCOPE = "https://www.googleapis.com/auth/cloud-platform";
 // for the full Drive folder structure).
 export const DRIVE_FOLDER_EXCEL_REPORTS = "1rco2ZnbDDZF_QxI79MdfwUrHfvH_0HBC"; // "דוחות יומיים - Excel"
 export const DRIVE_FOLDER_DB_DUMPS = "1H4kXfsCuzF_vutlLdjhfjUG1xhmvHZ4p"; // "דאטהבייס - dumps"
+/// Weekly snapshot of this repo's source (lib/app-domain/code-backup.ts).
+/// Same Shared drive as the two above, so the service account's membership
+/// of that drive already covers it: no per-folder share was needed.
+export const DRIVE_FOLDER_CODE_SNAPSHOTS = "1faMH-H2K-lbSB1tmZJHEp0YBpx0cvln3"; // "קוד - GitHub snapshots"
 
 /// Portal phase 3: where a client's documents are filed.
 ///
@@ -304,6 +308,68 @@ export async function uploadFileToDriveFolder(params: {
     return { ok: true, fileId: uploaded.id };
   } catch (err: any) {
     return { ok: false, error: err?.message ?? "Unknown error uploading to Drive" };
+  }
+}
+
+
+const RESUMABLE_URL =
+  "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id&supportsAllDrives=true";
+
+/// Uploads one file of any size into one Drive folder. Never throws.
+///
+/// uploadFileToDriveFolder() above uses Drive's `multipart` upload, which
+/// Google documents for files of 5 MB or less. The nightly Excel report and
+/// dump sit far below that; the weekly code snapshot does not (22 MB in
+/// October 2026, and growing every week). This is the documented path for
+/// larger files: open a resumable session with the metadata, then send the
+/// bytes to the session URI Google returns. The whole file goes in one PUT,
+/// since a Vercel function already holds it in memory and has no partial
+/// upload to resume.
+export async function uploadLargeFileToDriveFolder(params: {
+  name: string;
+  mimeType: string;
+  content: Buffer;
+  folderId: string;
+}): Promise<DriveUploadFileResult> {
+  const tokenResult = await getAccessToken();
+  if (!tokenResult.ok) {
+    return { ok: false, error: tokenResult.error };
+  }
+
+  try {
+    const session = await fetch(RESUMABLE_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${tokenResult.token}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": params.mimeType,
+        "X-Upload-Content-Length": String(params.content.length),
+      },
+      body: JSON.stringify({ name: params.name, parents: [params.folderId] }),
+    });
+    if (!session.ok) {
+      return { ok: false, error: `Drive resumable session failed ${session.status}: ${await session.text()}` };
+    }
+    const sessionUri = session.headers.get("location");
+    if (!sessionUri) {
+      return { ok: false, error: "Drive resumable session response had no Location header" };
+    }
+
+    const res = await fetch(sessionUri, {
+      method: "PUT",
+      headers: {
+        "Content-Type": params.mimeType,
+        "Content-Length": String(params.content.length),
+      },
+      body: params.content,
+    });
+    if (!res.ok) {
+      return { ok: false, error: `Drive upload failed ${res.status}: ${await res.text()}` };
+    }
+    const uploaded = (await res.json()) as { id?: string };
+    return { ok: true, fileId: uploaded.id };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error uploading to Drive" };
   }
 }
 
