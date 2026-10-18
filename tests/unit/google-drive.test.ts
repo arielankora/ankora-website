@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getVercelOidcToken } from "@vercel/oidc";
 import {
   uploadFileToDriveFolder,
+  uploadLargeFileToDriveFolder,
   listFilesInFolder,
   removeDriveFile,
   DRIVE_FOLDER_EXCEL_REPORTS,
   DRIVE_FOLDER_DB_DUMPS,
+  DRIVE_FOLDER_CODE_SNAPSHOTS,
 } from "@/lib/google-drive";
 
 // Vercel hands the OIDC token to the running function through the request
@@ -301,5 +303,105 @@ describe("google-drive retention helpers", () => {
     const result = await removeDriveFile("file-1");
     expect(result.ok).toBe(false);
     expect(calls).toHaveLength(1);
+  });
+});
+
+// The weekly code snapshot is 22 MB and growing, past the 5 MB Google
+// documents for multipart uploads, so it goes through a resumable session.
+describe("uploadLargeFileToDriveFolder()", () => {
+  const originalFetch = global.fetch;
+  const originalEnv = { ...process.env };
+  const SESSION_URI = "https://www.googleapis.com/upload/drive/v3/files?upload_id=abc";
+
+  beforeEach(() => {
+    process.env.GCP_PROJECT_NUMBER = "1234567890";
+    process.env.GCP_WORKLOAD_IDENTITY_POOL_ID = "test-pool";
+    process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID = "test-provider";
+    process.env.GCP_SERVICE_ACCOUNT_EMAIL = "test@example.iam.gserviceaccount.com";
+    vi.mocked(getVercelOidcToken).mockResolvedValue(FAKE_OIDC_TOKEN as any);
+  });
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    process.env = { ...originalEnv };
+    vi.mocked(getVercelOidcToken).mockReset();
+  });
+
+  function authOk(url: string) {
+    if (url.includes("sts.googleapis.com")) {
+      return new Response(JSON.stringify({ access_token: "federated-token" }), { status: 200 });
+    }
+    if (url.includes("iamcredentials.googleapis.com")) {
+      return new Response(JSON.stringify({ accessToken: "sa-access-token" }), { status: 200 });
+    }
+    return null;
+  }
+
+  function uploadBig() {
+    return uploadLargeFileToDriveFolder({
+      name: "ankora-website-code-2026-10-18.tar.gz",
+      mimeType: "application/gzip",
+      content: Buffer.from([0x1f, 0x8b, 1, 2, 3]),
+      folderId: DRIVE_FOLDER_CODE_SNAPSHOTS,
+    });
+  }
+
+  it("keeps the code snapshot folder ID unchanged", () => {
+    expect(DRIVE_FOLDER_CODE_SNAPSHOTS).toBe("1faMH-H2K-lbSB1tmZJHEp0YBpx0cvln3");
+  });
+
+  it("opens a resumable session in the Shared drive, then PUTs the bytes to the session URI", async () => {
+    global.fetch = vi.fn(async (url: any, init: any) => {
+      const auth = authOk(String(url));
+      if (auth) return auth;
+      if (String(url).includes("uploadType=resumable")) {
+        return new Response(null, { status: 200, headers: { Location: SESSION_URI } });
+      }
+      if (String(url) === SESSION_URI) {
+        return new Response(JSON.stringify({ id: "snapshot-id" }), { status: 200 });
+      }
+      throw new Error(`unexpected fetch ${url} ${init?.method}`);
+    }) as any;
+
+    const result = await uploadBig();
+
+    expect(result).toEqual({ ok: true, fileId: "snapshot-id" });
+    const calls = (global.fetch as any).mock.calls as any[][];
+    const open = calls.find((c) => String(c[0]).includes("uploadType=resumable"))!;
+    expect(String(open[0])).toContain("supportsAllDrives=true");
+    expect(open[1].headers.Authorization).toBe("Bearer sa-access-token");
+    expect(open[1].headers["X-Upload-Content-Length"]).toBe("5");
+    expect(JSON.parse(open[1].body)).toEqual({
+      name: "ankora-website-code-2026-10-18.tar.gz",
+      parents: [DRIVE_FOLDER_CODE_SNAPSHOTS],
+    });
+    const put = calls.find((c) => String(c[0]) === SESSION_URI)!;
+    expect(put[1].method).toBe("PUT");
+    expect(Buffer.compare(put[1].body, Buffer.from([0x1f, 0x8b, 1, 2, 3]))).toBe(0);
+  });
+
+  it("returns ok:false (never throws) when the session has no Location header", async () => {
+    global.fetch = vi.fn(async (url: any) => authOk(String(url)) ?? new Response(null, { status: 200 })) as any;
+
+    const result = await uploadBig();
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Location/);
+  });
+
+  it("returns ok:false (never throws) when Drive refuses the bytes", async () => {
+    global.fetch = vi.fn(async (url: any) => {
+      const auth = authOk(String(url));
+      if (auth) return auth;
+      if (String(url).includes("uploadType=resumable")) {
+        return new Response(null, { status: 200, headers: { Location: SESSION_URI } });
+      }
+      return new Response("quota", { status: 403 });
+    }) as any;
+
+    const result = await uploadBig();
+
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Drive upload failed 403/);
   });
 });
