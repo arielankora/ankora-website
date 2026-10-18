@@ -67,6 +67,7 @@ export function batchItem(b: Batch, day: (d: Date) => string | null): DocItem & 
   const approved = count("APPROVED");
   const rejected = count("REJECTED");
   const pending = count("PENDING");
+  const tasks = count("TASK");
   return {
     text: `${day(b.createdAt)}: ${b.source ? b.source.title : "אצווה בלי מקור"}`,
     details: [
@@ -74,6 +75,7 @@ export function batchItem(b: Batch, day: (d: Date) => string | null): DocItem & 
       b.states.length === 1 ? "הצעה אחת" : `${b.states.length} הצעות`,
       approved ? `${approved} אושרו` : null,
       rejected ? `${rejected} נדחו` : null,
+      ...(tasks ? [tasks === 1 ? "אחת הפכה למשימה" : `${tasks} הפכו למשימות`] : []),
       pending ? `${pending} ממתינות` : null,
       b.note,
     ],

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf } from "@/lib/knowledge-proposals";
+import { FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf, taskBlocker, taskFromProposal } from "@/lib/knowledge-proposals";
 
 describe("knowledge proposals, pure parts", () => {
   it("opens a recording at the minute", () => {
@@ -76,5 +76,42 @@ describe("decision 1's measure", () => {
     const after = new Date("2026-10-17T00:00:00Z");
     expect(qualityLine({ approved: 100, editedBeforeApproval: 5, rejected: 2, firstDecidedAt: after }, now).tone).toBe("good");
     expect(qualityLine({ approved: 100, editedBeforeApproval: 15, rejected: 2, firstDecidedAt: after }, now).tone).toBe("warn");
+  });
+});
+
+describe("a proposal that is a task", () => {
+  it("starts the task from the proposal: its line, why, the quote, the source and the moment", () => {
+    const t = taskFromProposal({
+      target: "FACT",
+      payload: { kind: "NOTE", body: "לשלוח לדנה את החוזה המעודכן", doNotDisclose: "המחיר החדש" },
+      reason: "אורן ביקש בסוף הפגישה",
+      quote: "תשלחו לה עד יום חמישי",
+      source: { code: "S3", title: "NUX weekly" },
+      link: "https://app.fireflies.ai/view/ff?t=60",
+    });
+    expect(t.title).toBe("לשלוח לדנה את החוזה המעודכן");
+    expect(t.description.split("\n\n")).toEqual([
+      "למה: אורן ביקש בסוף הפגישה",
+      '"תשלחו לה עד יום חמישי"',
+      "לא לספר: המחיר החדש",
+      "מקור: S3 NUX weekly",
+      "ברגע בשיחה: https://app.fireflies.ai/view/ff?t=60",
+      "נפתחה מהצעה של Claude בממתין לאישור.",
+    ]);
+  });
+
+  it("cuts a long line for the title and keeps the whole of it in the description", () => {
+    const body = "א".repeat(260);
+    const t = taskFromProposal({ target: "FACT", payload: { body }, reason: null, quote: null, source: null, link: null });
+    expect(t.title).toHaveLength(200);
+    expect(t.title.endsWith("...")).toBe(true);
+    expect(t.description.startsWith(body)).toBe(true);
+  });
+
+  it("keeps what only some may read as a proposal", () => {
+    expect(taskBlocker({ payload: { body: "x" } })).toBeNull();
+    expect(taskBlocker({ payload: { sensitivity: "SENSITIVE" } })).toContain("רגיש");
+    expect(taskBlocker({ payload: { audience: "RESTRICTED" } })).toContain("חלק מהצוות");
+    expect(taskBlocker({ payload: { audience: "ALL_STAFF" } })).toBeNull();
   });
 });

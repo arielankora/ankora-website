@@ -10,6 +10,7 @@ import {
   countPendingProposals,
   decideProposals,
   listOpenBatches,
+  proposalToTask,
   proposeKnowledge,
   rejectProposal,
 } from "@/lib/app-domain/knowledge-proposals";
@@ -328,5 +329,33 @@ describe("request types and the extraction brief", () => {
     const rows = await prisma.knowledgeProposal.findMany({ where: { batchId: r.batchId! }, orderBy: { createdAt: "asc" } });
     // A level that is not one of the three is no level.
     expect(rows.map((p) => p.confidence)).toEqual(["LOW", null]);
+  });
+});
+
+describe("a proposal that is a task", () => {
+  it("opens a task on the client instead of entering the file, and closes the batch", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [{ target: "FACT", reason: "אורן ביקש בסוף הפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "לשלוח לדנה את החוזה המעודכן" }, at: "01:00" }],
+    });
+    const p = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals[0];
+    await expect(proposalToTask(user, p.id, { description: "הסיסמה היא password=Hunter2Hunter2!" })).rejects.toThrow("סיסמה");
+
+    const { taskId } = await proposalToTask(user, p.id, { dueDate: new Date("2026-10-22T00:00:00Z") });
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task).toMatchObject({ clientId: client.id, title: "לשלוח לדנה את החוזה המעודכן", assignedToId: user.id });
+    expect(task.description).toContain("למה: אורן ביקש בסוף הפגישה");
+    expect(task.description).toContain("https://app.fireflies.ai/view/ff-123?t=60");
+    expect(task.dueDate?.toISOString()).toBe("2026-10-22T00:00:00.000Z");
+
+    const after = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: p.id } });
+    expect(after).toMatchObject({ state: "TASK", resultId: taskId, decidedById: user.id });
+    expect((await listClientFacts(user, client.id)).current).toHaveLength(0);
+    expect((await prisma.knowledgeBatch.findUniqueOrThrow({ where: { id: r.batchId! } })).closedAt).not.toBeNull();
+    expect(await prisma.auditEvent.count({ where: { action: "knowledge_proposal.to_task", entityId: p.id } })).toBe(1);
+    // Decided once: not again, not as a task and not into the file.
+    await expect(proposalToTask(user, p.id)).rejects.toThrow("כבר הוחלט");
   });
 });
