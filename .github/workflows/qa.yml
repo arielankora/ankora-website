@@ -34,7 +34,29 @@ concurrency:
 jobs:
   qa:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 18.10.2026: was 45. The weekly level-3 run cannot finish inside it,
+    # and that is measured twice, not inferred: run #299 (11.10) and run
+    # #406 (18.10) were both stopped by this wall with "the job has
+    # exceeded the maximum execution time of 45m0s". Neither produced a
+    # verdict. The last level-3 report is from 4.10.
+    #
+    # The arithmetic says it could never have finished. Level 3 is level
+    # 2 plus three passes, and level 2 alone measures 32.6 min of checks
+    # (run #399, 17.10): integration 1266.7s, integration-UTC 244.9s over
+    # 12 date-sensitive files, e2e 257.3s, build 54.0s. Level 3 swaps
+    # those 12 files for the whole suite (+~1020s) and adds a third full
+    # unit+integration pass under V8 coverage (>=1300s) plus the
+    # accessibility check: ~73 min of checks against a 45-minute wall.
+    #
+    # 90 is headroom, not a target. The daily level-2 run has gone from
+    # 11 min (late September) to 34 min, so the wall has to sit above
+    # where the suite is heading.
+    #
+    # The real fix is structural and is NOT done here: the three heavy
+    # passes (Israel, UTC, coverage) are independent, and run serially
+    # against one database. Three parallel jobs with a Postgres each
+    # would put level 3 at ~25 min instead of ~73.
+    timeout-minutes: 90
 
     # The default GITHUB_TOKEN is read-only, so the report comment failed on
     # the first real run with "Resource not accessible by integration".
@@ -213,8 +235,23 @@ jobs:
         if: steps.level.outputs.value != '1'
         run: npm run db:seed
 
+      # The step budget sits BELOW the job wall on purpose, so that an
+      # overrun is a failure rather than a cancellation.
+      #
+      # What a job-wall cancellation actually does, checked against run
+      # #406 rather than assumed: the `if: always()` steps below DO still
+      # run (the partial artefact was uploaded), but `qa/run.mjs` is
+      # killed before it prints a verdict or sets an exit code, so the
+      # report has no PASS/FAIL line and the run is labelled "cancelled".
+      # "Cancelled" reads as a person having stopped it, which is how two
+      # Sundays in a row went unnoticed. A step that exceeds its own
+      # budget fails, and a failed run is red, named and searchable.
+      #
+      # 75 leaves fifteen minutes under the wall: enough for the upload
+      # and the teardown to finish on their own terms.
       - name: Run QA
         id: qa
+        timeout-minutes: 75
         run: node qa/run.mjs ${{ steps.level.outputs.value }}
 
       # Always upload, especially on failure - the report is the artefact
