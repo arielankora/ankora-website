@@ -166,6 +166,13 @@ describe("buildLessonsPrompt()", () => {
     expect(text).not.toContain("save_task_plan");
   });
 
+  it("a run of a process also asks about its procedure, and only then", () => {
+    expect(buildLessonsPrompt(closed)).not.toContain("record_run_lesson");
+    const text = buildLessonsPrompt({ ...closed, process: { code: "P1", title: "תשלומי ספקים" } });
+    expect(text).toContain("ריצה של התהליך P1 תשלומי ספקים");
+    expect(text).toContain('record_run_lesson: taskId "cmg1abc"');
+  });
+
   it("carries when it opened and when it closed, and the hours", () => {
     const text = buildLessonsPrompt(closed);
     expect(text).toContain("- נפתחה: 01.10.2026");

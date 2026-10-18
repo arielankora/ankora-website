@@ -77,7 +77,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ai = options.audience === "ai";
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
-  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, batches] = await Promise.all([
+  const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, openLessons, batches] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
@@ -105,6 +105,8 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       take: 200,
       select: { title: true, supplierName: true, supplierExperience: true, supplierRecordedAt: true, createdAt: true },
     }),
+    // Section 7.4: remarks from closed runs, waiting for the next version.
+    prisma.processLesson.groupBy({ by: ["processId"], where: { clientId, status: "OPEN" }, _count: true }),
     // Section 16: what the extraction delivered, and what became of it.
     prisma.knowledgeBatch.findMany({
       where: { clientId },
@@ -304,6 +306,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
           readReviewReason(p.reviewReason) ? `דורש סקירה: ${REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!]}` : null,
           `שלמות ${p.completeness.score} מתוך 9`,
+          (() => {
+            const n = openLessons.find((l) => l.processId === p.id)?._count ?? 0;
+            return n ? (n === 1 ? "הערה אחת מריצות ממתינה לגרסה הבאה" : `${n} הערות מריצות ממתינות לגרסה הבאה`) : null;
+          })(),
           ...p.gaps,
           p.current
             ? `נוהל גרסה ${p.current.version}: ${p.current.steps.map((st, i) => `${i + 1}. ${st.title} (${STEP_MODE_LABELS[st.mode]}${st.requiresApproval ? ", דורש אישור" : ""})`).join(" ")}`

@@ -3690,6 +3690,7 @@ model Process {
 
   client   Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
   versions ProcessVersion[]
+  lessons  ProcessLesson[]
   requestTypes RequestType[]
   dates    ImportantDate[]
   checks   ProcessCheck[]
@@ -3711,6 +3712,44 @@ enum ProcessCheckOutcome {
 
 /// One check of an ongoing process: who looked, what they found. An issue
 /// says what, and opens a task for it.
+/// What the person who closed a run says about the procedure it followed
+/// (spec 5.4): "was anything in the procedure wrong or missing?". One
+/// answer per run. "Nothing" is an answer too, recorded so the question
+/// is not asked again. A lesson waits for the process's owner or a manager
+/// to apply it in the next version, or to dismiss it.
+model ProcessLesson {
+  id        String              @id @default(cuid())
+  processId String
+  clientId  String
+  /// The run. One answer per run.
+  taskId    String              @unique
+  /// The procedure version the run followed.
+  version   Int?
+  status    ProcessLessonStatus
+  /// What was wrong or missing. Empty for NOTHING.
+  body      String?
+  authorId  String?
+  createdAt DateTime            @default(now())
+
+  resolvedById String?
+  resolvedAt   DateTime?
+  /// One line from whoever resolved it ("נכנס לגרסה 4").
+  resolution   String?
+
+  process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
+
+  @@index([processId, status])
+  @@map("process_lessons")
+}
+
+enum ProcessLessonStatus {
+  /// "Nothing was wrong."
+  NOTHING
+  OPEN
+  APPLIED
+  DISMISSED
+}
+
 model ProcessCheck {
   id          String              @id @default(cuid())
   processId   String

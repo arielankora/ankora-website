@@ -72,6 +72,9 @@ export type AdvancePromptPlan = {
 
 export type AdvancePromptInput = {
   taskId: string;
+  /// A run of a process (spec 5.4): its code and title. The lessons
+  /// prompt then also asks about the procedure.
+  process?: { code: string; title: string } | null;
   url: string;
   title: string;
   clientName: string;
@@ -355,6 +358,11 @@ export function buildLessonsPrompt(input: AdvancePromptInput): string {
     `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את הסיכום כהערה פנימית במשימה עם add_task_comment: taskId "${input.taskId}", includeDone: true. עד 4000 תווים. הערות לא מוצגות ללקוח.`,
     ...(input.files.length > 0 ? ["אם קובץ מצורף רלוונטי לסיכום, אפשר לקרוא אותו עם read_document."] : []),
     "4. אם עולה לקח שכדאי להפוך לנוהל או לשלבים קבועים במשימות דומות, תציע אותו בנפרד בסוף. אל תשנה שום דבר אחר במשימה, ואל תפתח אותה מחדש.",
+    ...(input.process
+      ? [
+          `5. המשימה היא ריצה של התהליך ${input.process.code} ${input.process.title}. תשאל אותי: האם משהו בנוהל לא היה נכון או חסר? אחרי שאישרתי את הנוסח במפורש, תשמור את התשובה עם record_run_lesson: taskId "${input.taskId}", ו-lesson עם מה שלא היה נכון, או nothing: true אם הנוהל היה נכון. זה מגיע לבעלים של התהליך, ולא משנה את הנוהל בעצמו.`,
+        ]
+      : []),
     "",
     ...HOW_TO_ASK,
     "## מבנה הסיכום",

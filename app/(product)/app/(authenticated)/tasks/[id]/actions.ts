@@ -16,6 +16,7 @@ import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
+import { recordRunLesson } from "@/lib/app-domain/process-lessons";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Tasks phase 1, the writes behind /app/tasks/[id].
@@ -430,6 +431,19 @@ export async function attachFileToTaskAction(form: FormData) {
     // this just added one to it.
     revalidatePath(`/app/clients/${task.clientId}`);
     if (task.clientVisible) revalidatePath("/app/portal");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// Learning from runs (spec 5.4): the answer to "was anything in the
+/// procedure wrong or missing?" on a closed run. `body` null: it held.
+export async function recordRunLessonAction(input: { taskId: string; body: string | null }) {
+  const user = await requireUser();
+  try {
+    await recordRunLesson(user, input.taskId, input.body);
+    revalidatePath(`/app/tasks/${input.taskId}`);
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

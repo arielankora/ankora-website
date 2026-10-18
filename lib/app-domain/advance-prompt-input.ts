@@ -73,9 +73,13 @@ export async function advancePromptFor(
 
   const loggedMinutes = Math.round(time.totalSeconds / 60);
 
+  // A run of a process: the lessons prompt also asks about its procedure.
+  const process = mode === "lessons" && task.processId && !task.parentId ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } }) : null;
+
   const build = mode === "lessons" ? buildLessonsPrompt : buildAdvancePrompt;
   return build({
     taskId: task.id,
+    process,
     url: taskUrl(appBaseUrl(), task.id),
     title: task.title,
     clientName: task.client.name,
