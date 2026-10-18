@@ -40,6 +40,9 @@ const EDITABLE = new Set([
   "domain",
   "ownerName",
   "clientVisible",
+  "description",
+  "dueDate",
+  "assigneeName",
 ]);
 
 function friendlyError(err: unknown): string {

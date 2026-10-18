@@ -91,8 +91,8 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
           source: b.source ? { code: b.source.code, title: b.source.title } : null,
           link: fireflies ? firefliesLink(fireflies, at) : null,
         }),
-        taskBlocked: taskBlocker({ payload }),
-        taskId: p.state === "TASK" ? p.resultId : null,
+        taskBlocked: taskBlocker({ target: p.target as ProposalTargetLike, payload }),
+        taskId: p.state === "TASK" || (p.state === "APPROVED" && p.target === "TASK") ? p.resultId : null,
       };
     });
     // Pending first, in the order they should be read; decided ones after.

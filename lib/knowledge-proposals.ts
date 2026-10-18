@@ -161,6 +161,20 @@ export const DomainPayload = z.object({
   organizationName: z.string().max(200).nullish(),
 });
 
+/// Something to do, not to know (a promise made in the meeting, a document
+/// to send): approving it opens a task on the client, not an item in the
+/// file. No knowledge fields: a task is read by everyone on the client, so
+/// nothing sensitive is ever proposed as one.
+export const TaskPayload = z.object({
+  title: z.string().min(1).max(200),
+  description: z.string().max(4000).nullish(),
+  dueDate: day,
+  /// Who at Ankora does it, by name. Nobody, or more than one person, is
+  /// the person approving it.
+  assigneeName: z.string().max(200).nullish(),
+  priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).nullish(),
+});
+
 export const PAYLOADS = {
   FACT: FactPayload,
   CONTACT: ContactPayload,
@@ -172,6 +186,7 @@ export const PAYLOADS = {
   NARRATIVE: NarrativePayload,
   PROCESS: ProcessPayload,
   DOMAIN: DomainPayload,
+  TASK: TaskPayload,
 } as const;
 export type ProposalTargetLike = keyof typeof PAYLOADS;
 export type ProposalActionLike = "CREATE" | "SUPERSEDE" | "CONTRADICT";
@@ -187,6 +202,7 @@ export const TARGET_LABELS: Record<ProposalTargetLike, string> = {
   NARRATIVE: "סקירה, רקע או תפקידנו",
   PROCESS: "תהליך",
   DOMAIN: "דומיין",
+  TASK: "משימה",
 };
 
 export const ACTION_LABELS: Record<ProposalActionLike, string> = {
@@ -358,6 +374,8 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
       return [s("title"), s("purpose")].filter(Boolean).join(": ");
     case "DOMAIN":
       return [s("domain"), s("organizationName")].filter(Boolean).join(", ");
+    case "TASK":
+      return s("title");
   }
 }
 
@@ -371,6 +389,15 @@ export function proposalDetails(target: ProposalTargetLike, payload: Record<stri
 
 function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : "");
+  if (target === "TASK") {
+    const PRIORITY: Record<string, string> = { LOW: "נמוכה", NORMAL: "רגילה", HIGH: "גבוהה", URGENT: "דחופה" };
+    return [
+      s("description"),
+      s("dueDate") && `תאריך יעד: ${s("dueDate")}`,
+      s("assigneeName") && `אחראי: ${s("assigneeName")}`,
+      s("priority") && s("priority") !== "NORMAL" && `עדיפות: ${PRIORITY[s("priority")] ?? s("priority")}`,
+    ].filter((x): x is string => !!x);
+  }
   if (target === "PROCESS") {
     const steps = Array.isArray(payload.steps) ? (payload.steps as { title?: unknown; requiresApproval?: unknown }[]) : [];
     return [
@@ -451,7 +478,8 @@ export function normalizeForMatch(s: string): string {
 /// proposal becomes a task instead of being rejected or squeezed into the
 /// file. A task is read by everyone on the client and by Claude, so what
 /// only some may read stays a proposal.
-export function taskBlocker(p: { payload: Record<string, unknown> }): string | null {
+export function taskBlocker(p: { target?: ProposalTargetLike; payload: Record<string, unknown> }): string | null {
+  if (p.target === "TASK") return "ההצעה כבר משימה: אישור פותח אותה.";
   if (p.payload.sensitivity === "SENSITIVE") return "פריט רגיש לא הופך למשימה: משימה גלויה לכל מי שעובד על הלקוח.";
   if (p.payload.audience && p.payload.audience !== "ALL_STAFF") return "פריט שרק חלק מהצוות רואה לא הופך למשימה.";
   return null;
@@ -476,6 +504,7 @@ export function taskFromProposal(p: {
   const s = (k: string) => (typeof p.payload[k] === "string" ? (p.payload[k] as string).trim() : "");
   const lines = [
     headline.length > TASK_TITLE_MAX ? headline : null,
+    p.target === "TASK" && s("description") ? s("description") : null,
     p.reason?.trim() ? `למה: ${p.reason.trim()}` : null,
     p.quote?.trim() ? `"${p.quote.trim()}"` : null,
     s("doNotDisclose") ? `לא לספר: ${s("doNotDisclose")}` : null,
