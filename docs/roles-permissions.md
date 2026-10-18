@@ -32,9 +32,9 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
 | `report.client.view` | Phase 6 | — | — | — | ✅ |
 | `integration.manage` | Phase 8 | ✅ | — | — | — |
 | `important_date.manage_catalog` | Phase 10 | ✅ | — | — | — |
-| `credential.view` | Vault | ✅ | ✅ | ✅ | |
-| `credential.reveal` | Vault | ✅ | ✅ | ✅ | |
-| `credential.manage` | Vault | ✅ | ✅ | ✅ | |
+| `credential.view` | Vault | ✅ | ✅ | ✅ | — |
+| `credential.reveal` | Vault | ✅ | ✅ | ✅ | — |
+| `credential.manage` | Vault | ✅ | ✅ | ✅ | — |
 
 ## Per-role summary
 
@@ -53,10 +53,12 @@ enforced by hiding a UI element alone (spec §4.1: "אין להסתמך על ה�
   `time_entry.create_self`'s client scoping, but subscribing a client to a
   whole holiday catalog — which creates dozens of dated records at once —
   stays with Super Admin.
-- **ANKORA_EMPLOYEE** — only their own timer and time entries
+- **ANKORA_EMPLOYEE** — their own timer and time entries
   (`create_self` + `edit_self`); never `edit_others`, never any report or
   admin permission. Spec §4: "טיימר ודיווחים שלו; עריכה עצמית לפי window
-  מוגדר."
+  מוגדר." Plus the three `credential.*` permissions, which every
+  internal role holds — see the Credentials vault section below for the
+  client scoping, step-up check and audit trail that narrow them.
 - **CLIENT_USER** — only `report.client.view`, which gates every Client
   Portal screen and export. No `time_entry.*` permission at all (spec
   §4.1: "לקוח לעולם לא מקבל הרשאת edit על Time Entries של Ankora ב-MVP")
