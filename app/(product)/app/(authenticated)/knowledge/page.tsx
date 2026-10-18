@@ -17,6 +17,8 @@ import {
 } from "@/lib/knowledge-review-filters";
 import { ReviewBatch, type ReviewProposal } from "./ReviewBatch";
 import { ReviewFilterBar, type FilterOption } from "./ReviewFilters";
+import { AwaitingAssignmentCard } from "./AwaitingAssignment";
+import { listAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
 
 // Org brain, phase 2: "ממתין לאישור" (claude/org-brain-spec-2026-10-12.md,
 // 5.2; decision 1). Every proposal Claude sends lands here, one card per
@@ -46,7 +48,7 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
   // The whole queue this person can see, filtered here: the counts beside
   // each option come from the queue, not from what is left after filtering,
   // so a person sees what exists without clearing anything.
-  const all = await listOpenBatches(user);
+  const [all, awaiting] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user)]);
   const now = new Date();
   // Decision 1's measure, for whoever makes that decision.
   const quality = canManageClients(user.role) ? qualityLine(await proposalQuality(user, new Date(now.getTime() - DECISION_1_DAYS * 86_400_000)), now) : null;
@@ -121,6 +123,25 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
         )}
       </div>
 
+      {/* Spec 5.1, step 3: before anything else, since nothing in these can
+          be reviewed until a person says whose meeting it was. */}
+      {awaiting.map((a) => (
+        <AwaitingAssignmentCard
+          key={a.id}
+          batch={{
+            id: a.id,
+            sourceLabel: a.source.title,
+            sourceDetails: [day(a.source.occurredAt), a.source.participants.join(", ") || null, a.source.topicsOnly ? "נושאים בלבד" : null, a.createdByName ? `נשלח על ידי ${a.createdByName}` : null].filter(Boolean).join(" · "),
+            note: a.note,
+            reason: a.reason,
+            proposedClientId: a.proposedClientId,
+            candidates: a.candidates,
+            items: a.items,
+            droppedCount: a.droppedCount,
+          }}
+        />
+      ))}
+
       {all.length > 0 && (
         <ReviewFilterBar
           filters={filters}
@@ -133,7 +154,7 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
       )}
 
       {all.length === 0 ? (
-        <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">אין הצעות שממתינות לאישור.</div>
+        awaiting.length === 0 && <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">אין הצעות שממתינות לאישור.</div>
       ) : shown.length === 0 ? (
         <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
           אין הצעות שמתאימות לסינון.{" "}

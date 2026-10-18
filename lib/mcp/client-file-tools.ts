@@ -10,6 +10,7 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
 import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
+import { proposeAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
 import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
@@ -91,6 +92,7 @@ export function registerClientFileTools(server: McpServer): void {
         "Every payload may carry knowledgeStatus (CONFIRMED only if the client or their supplier said or showed it explicitly; UNCERTAIN with toResolve otherwise) and sensitivity. Set sensitivity SENSITIVE for medical, political or personal information, or whatever the client's data-handling rules call sensitive: such an item is shown and decided only by the client's approvers for sensitive information, and never leaves the product through MCP once in the file.",
         "To change an existing fact, set action SUPERSEDE (the client changed it) or CONTRADICT (someone said otherwise; nothing is overwritten) with `targetId` from the file.",
         "Never include passwords, keys or card numbers: such items are dropped and a task to change the secret is opened. Leave out small talk, momentary technical issues, guesses, and Ankora's own commercial terms.",
+        "Whose meeting it is: a participant from a client's domain decides; so does a partner linked to one client only. A meeting about several clients (a supplier reviewing two of them): give each item its own `client`, and each goes only to that client's file, with the meeting registered in each one's register (newSource, not sourceCode). A partner linked to several clients and nobody on the call who decides: do not guess. Pass `client` as the one you think, and `uncertain` with all the clients it could be and the reason; nothing enters any file, and the batch waits until a person picks the client on the review screen.",
       ].join(" "),
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
@@ -107,6 +109,13 @@ export function registerClientFileTools(server: McpServer): void {
           })
           .optional(),
         note: z.string().optional().describe("One line: what was read, what was left out."),
+        uncertain: z
+          .object({
+            candidates: z.array(z.string()).min(2).max(6).describe("Every client the meeting could belong to, by name, including `client`."),
+            reason: z.string().describe("Why `client` is the likely one: what in the title or the content points to it."),
+          })
+          .optional()
+          .describe("Only when it is not clear whose meeting this is. Needs newSource of kind TRANSCRIPT."),
         items: z
           .array(
             z.object({
@@ -118,6 +127,7 @@ export function registerClientFileTools(server: McpServer): void {
               alsoSources: z.array(z.string()).optional(),
               reason: z.string().optional(),
               quote: z.string().optional(),
+              client: z.string().optional().describe("For a meeting about several clients: this item's client, by name. Defaults to `client`."),
             })
           )
           .min(1)
@@ -131,7 +141,8 @@ export function registerClientFileTools(server: McpServer): void {
         sourceCode?: string;
         newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT"; title: string; date?: string; participants?: string[]; firefliesId?: string; documentId?: string; topicsOnly?: boolean };
         note?: string;
-        items: ProposalItemInput[];
+        uncertain?: { candidates: string[]; reason: string };
+        items: (ProposalItemInput & { client?: string })[];
       },
       ctx: ServerContext
     ) => {
@@ -142,29 +153,75 @@ export function registerClientFileTools(server: McpServer): void {
         if (!args.sourceCode && !args.newSource) return toolText("Say where this comes from: pass `sourceCode` for a source already in the register, or `newSource`.");
         const ns = args.newSource;
         if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
-        const result = await proposeKnowledge(actor, {
-          clientId: client.value.id,
-          source: args.sourceCode
-            ? { code: args.sourceCode }
-            : {
-                kind: ns!.kind,
-                title: ns!.title,
-                occurredAt: ns!.date ? new Date(`${ns!.date}T00:00:00Z`) : null,
-                participants: ns!.participants,
-                externalIds: [ns!.firefliesId, ns!.documentId].filter((v): v is string => !!v),
-                restriction: ns!.topicsOnly ? "TOPICS_ONLY" : "NONE",
-              },
-          note: args.note,
-          via: "MCP",
-          items: args.items,
-        });
-        return toolJson({
-          ...result,
-          next:
-            result.proposed > 0
-              ? `${result.proposed} proposals are waiting for a person to approve them on Ankora's review screen (/app/knowledge). Nothing is in the file yet.`
-              : "Nothing was proposed.",
-        });
+        const newSource = ns
+          ? {
+              kind: ns.kind,
+              title: ns.title,
+              occurredAt: ns.date ? new Date(`${ns.date}T00:00:00Z`) : null,
+              participants: ns.participants,
+              externalIds: [ns.firefliesId, ns.documentId].filter((v): v is string => !!v),
+              restriction: ns.topicsOnly ? ("TOPICS_ONLY" as const) : ("NONE" as const),
+            }
+          : null;
+        const items = args.items.map(({ client: _client, ...item }) => item);
+
+        // Spec 5.1, step 3: not clear whose meeting it is.
+        if (args.uncertain) {
+          if (args.items.some((i) => i.client)) return toolText("`uncertain` is for a meeting of one client that is not clear. A meeting about several clients sets `client` on each item instead.");
+          if (!newSource || newSource.kind !== "TRANSCRIPT") return toolText("`uncertain` needs `newSource` of kind TRANSCRIPT: a waiting meeting is in no client's register yet.");
+          const candidateIds: string[] = [];
+          for (const name of args.uncertain.candidates) {
+            const c = await lookupClient(actor, name);
+            if (!c.ok) return toolText(c.message);
+            candidateIds.push(c.value.id);
+          }
+          const waiting = await proposeAwaitingAssignment(actor, {
+            proposedClientId: client.value.id,
+            candidateClientIds: candidateIds,
+            reason: args.uncertain.reason,
+            source: newSource,
+            note: args.note,
+            items,
+          });
+          return toolJson({
+            ...waiting,
+            next:
+              waiting.waiting > 0
+                ? `${waiting.waiting} items are waiting for a person to say whose meeting this was, on Ankora's review screen (/app/knowledge). They enter no file, and no register, until then.`
+                : "Nothing was kept.",
+          });
+        }
+
+        // Spec 5.1, step 4: a meeting about several clients, item by item.
+        const groups = new Map<string, { id: string; name: string; items: ProposalItemInput[]; indexes: number[] }>();
+        for (const [index, item] of args.items.entries()) {
+          let target = client.value;
+          if (item.client && item.client.trim() !== args.client.trim()) {
+            const c = await lookupClient(actor, item.client);
+            if (!c.ok) return toolText(`Item ${index}: ${c.message}`);
+            target = c.value;
+          }
+          const g = groups.get(target.id) ?? { id: target.id, name: target.name, items: [], indexes: [] };
+          g.items.push(items[index]);
+          g.indexes.push(index);
+          groups.set(target.id, g);
+        }
+        if (groups.size > 1 && !newSource) return toolText("A meeting about several clients needs `newSource`: a source code belongs to one client's register.");
+        const batches = [];
+        for (const g of groups.values()) {
+          const result = await proposeKnowledge(
+            actor,
+            { clientId: g.id, source: args.sourceCode && groups.size === 1 ? { code: args.sourceCode } : newSource!, note: args.note, via: "MCP", items: g.items },
+            { indexes: g.indexes }
+          );
+          batches.push({ client: g.name, ...result });
+        }
+        const proposed = batches.reduce((n, b) => n + b.proposed, 0);
+        const next =
+          proposed > 0
+            ? `${proposed} proposals are waiting for a person to approve them on Ankora's review screen (/app/knowledge). Nothing is in the file yet.`
+            : "Nothing was proposed.";
+        return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });
       } catch (err) {
         console.error("[mcp] propose_knowledge failed", err);
         return toolFailure(err);

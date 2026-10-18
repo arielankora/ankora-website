@@ -1730,6 +1730,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-18",
       "riskReason": "Unknown and conditional dates become open questions in the client file, once per date or occurrence, for the date's owner; a sensitive date asks a restricted, sensitive question"
+    },
+    "domain:batch-assignment": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-18",
+      "riskReason": "A meeting whose client is not clear waits in no file or register until a person picks; only someone with every candidate client sees it, and a different pick carries nothing that pointed into the proposed client's file"
     }
   },
   "waivers": {},

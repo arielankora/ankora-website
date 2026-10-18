@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const view = vi.hoisted(() => ({ buildClientFile: vi.fn() }));
 const proposals = vi.hoisted(() => ({ proposeKnowledge: vi.fn() }));
+const assignment = vi.hoisted(() => ({ proposeAwaitingAssignment: vi.fn() }));
 const contacts = vi.hoisted(() => ({ lookupContact: vi.fn() }));
 const brief = vi.hoisted(() => ({ extractionBrief: vi.fn() }));
 const lookup = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
 vi.mock("@/lib/app-domain/client-file-view", () => view);
 vi.mock("@/lib/app-domain/knowledge-proposals", () => proposals);
+vi.mock("@/lib/app-domain/batch-assignment", () => assignment);
 vi.mock("@/lib/app-domain/client-contacts", () => contacts);
 vi.mock("@/lib/app-domain/extraction-brief", () => brief);
 vi.mock("@/lib/app-domain/mcp-files", () => ({}));
@@ -116,7 +118,8 @@ describe("propose_knowledge", () => {
         clientId: "c-nux",
         via: "MCP",
         source: expect.objectContaining({ kind: "TRANSCRIPT", externalIds: ["ff-1"], restriction: "NONE", occurredAt: new Date("2026-10-12T00:00:00Z") }),
-      })
+      }),
+      { indexes: [0] }
     );
   });
 
@@ -124,6 +127,31 @@ describe("propose_knowledge", () => {
     expect((await call({ client: "nux", items: [ITEM] })).content[0].text).toContain("sourceCode");
     expect((await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "x", date: "12.10.2026" }, items: [ITEM] })).content[0].text).toContain("YYYY-MM-DD");
     expect(proposals.proposeKnowledge).not.toHaveBeenCalled();
+  });
+
+  it("a meeting about several clients goes to each one's file, item by item", async () => {
+    lookup.lookupClient.mockImplementation(async (_a: unknown, name: string) => ({ ok: true, value: /zest/i.test(name) ? { id: "c-zest", name: "Zest" } : { id: "c-nux", name: "NUX" } }));
+    const r = await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "Nextage", firefliesId: "ff-2" }, items: [ITEM, { ...ITEM, client: "zest" }, ITEM] });
+    const body = JSON.parse(r.content[0].text!);
+    expect(body.batches.map((b: { client: string }) => b.client)).toEqual(["NUX", "Zest"]);
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-nux", items: [ITEM, ITEM] }), { indexes: [0, 2] });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-zest", items: [ITEM] }), { indexes: [1] });
+    // A source code belongs to one register.
+    proposals.proposeKnowledge.mockClear();
+    expect((await call({ client: "nux", sourceCode: "S1", items: [ITEM, { ...ITEM, client: "zest" }] })).content[0].text).toContain("newSource");
+    expect(proposals.proposeKnowledge).not.toHaveBeenCalled();
+  });
+
+  it("not clear whose meeting it is: it waits for a person, in no file", async () => {
+    lookup.lookupClient.mockImplementation(async (_a: unknown, name: string) => ({ ok: true, value: /zest/i.test(name) ? { id: "c-zest", name: "Zest" } : { id: "c-nux", name: "NUX" } }));
+    assignment.proposeAwaitingAssignment.mockResolvedValue({ batchId: "w1", waiting: 1, dropped: [], secretTaskId: null });
+    const args = { client: "nux", newSource: { kind: "TRANSCRIPT", title: "Nextage", firefliesId: "ff-3" }, uncertain: { candidates: ["nux", "zest"], reason: "Justworks" }, items: [ITEM] };
+    const body = JSON.parse((await call(args)).content[0].text!);
+    expect(body.next).toContain("whose meeting");
+    expect(assignment.proposeAwaitingAssignment).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ proposedClientId: "c-nux", candidateClientIds: ["c-nux", "c-zest"], reason: "Justworks" }));
+    expect(proposals.proposeKnowledge).not.toHaveBeenCalled();
+    expect((await call({ ...args, newSource: undefined, sourceCode: "S1" })).content[0].text).toContain("TRANSCRIPT");
+    expect((await call({ ...args, items: [{ ...ITEM, client: "zest" }] })).content[0].text).toContain("several clients");
   });
 
   it("there is no tool that approves", () => {
