@@ -183,5 +183,13 @@ describe("lookup_contact", () => {
     expect(await lookupContact(manager, "doron@example.com")).toEqual([]);
     expect(await lookupContact(named, "doron@example.com")).toEqual([expect.objectContaining({ name: "דורון", client: "NUX" })]);
   });
+
+  it("says who must not be told what, next to the person", async () => {
+    const { lookupContact } = await import("@/lib/app-domain/client-contacts");
+    const nux = await createTestClient({ name: "NUX" });
+    const me = await employeeOn(nux.id);
+    await addClientContact(me, { clientId: nux.id, name: "גיא", role: "CTO", emails: ["guy@nux.ai"], doNotDisclose: "עובדי NUX, עד הודעה של אורן", sources: S1 });
+    expect(await lookupContact(me, "guy@nux.ai")).toEqual([expect.objectContaining({ name: "גיא", doNotDisclose: "עובדי NUX, עד הודעה של אורן" })]);
+  });
 });
 

@@ -1,7 +1,7 @@
 "use client";
-import { createContext, useContext } from "react";
+import { createContext, useContext, useState } from "react";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import { KNOWLEDGE_AUDIENCE_LABELS, KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 
 // The pieces every section of the client file draws the same way: the
 // form field, the status line with what would close it, and the sources.
@@ -110,11 +110,28 @@ export function ItemStaffProvider({ staff, children }: { staff: StaffOption[]; c
 
 /// The two fields in an item's form. `owner` false for a process, whose
 /// form already asks for its owner.
-export function ItemExtras({ existing, owner = true }: { existing?: { clientVisible?: boolean; ownerId?: string | null } | null; owner?: boolean }) {
+export function ItemExtras({
+  existing,
+  owner = true,
+  disclose = false,
+}: {
+  existing?: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null } | null;
+  owner?: boolean;
+  /// Spec 3.1, 6.1: "not to tell", for the forms that have no field of their own.
+  disclose?: boolean;
+}) {
   const staff = useContext(StaffContext);
   return (
     <div className="grid grid-cols-2 gap-3">
       <input type="hidden" name="itemExtras" value="1" />
+      {disclose && (
+        <div className="col-span-2">
+          <input type="hidden" name="itemDisclose" value="1" />
+          <Field label="לא לספר (למי, ועד מתי)">
+            <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} placeholder="עובדי הלקוח, עד הודעה של המנכ״ל" className={INPUT} />
+          </Field>
+        </div>
+      )}
       {owner && (
         <Field label="בעלים באנקורה">
           <select name="itemOwnerId" defaultValue={existing?.ownerId ?? ""} className={INPUT}>
@@ -136,14 +153,54 @@ export function ItemExtras({ existing, owner = true }: { existing?: { clientVisi
 }
 
 /// The two, as a line on the item. Nothing when neither is set.
-export function ItemTags({ item }: { item: { clientVisible?: boolean; ownerId?: string | null } }) {
+export function ItemTags({ item, disclose = false }: { item: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null }; disclose?: boolean }) {
   const staff = useContext(StaffContext);
   const owner = item.ownerId ? staff.find((u) => u.id === item.ownerId)?.name : null;
-  if (!item.clientVisible && !owner) return null;
+  const notToTell = disclose ? item.doNotDisclose?.trim() : null;
+  if (!item.clientVisible && !owner && !notToTell) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60" data-testid="item-tags">
+      {notToTell && <span className="w-full text-red-700" data-testid="do-not-disclose">לא לספר: {notToTell}</span>}
       {item.clientVisible && <StatusBadge label="גלוי ללקוח" tone="green" />}
       {owner && <span>בעלים: {owner}</span>}
     </div>
+  );
+}
+
+type Audience = keyof typeof KNOWLEDGE_AUDIENCE_LABELS;
+
+/// Spec 3.1: who sees the item. "Restricted" and "account team" name the
+/// people on it; whoever saves it is added on the server, so nobody locks
+/// themselves out of what they wrote.
+export function AudienceField({ existing }: { existing?: { audience?: Audience; audienceUserIds?: string[] } | null }) {
+  const staff = useContext(StaffContext);
+  const [audience, setAudience] = useState<Audience>(existing?.audience ?? "ALL_STAFF");
+  const chosen = new Set(existing?.audienceUserIds ?? []);
+  return (
+    <>
+      <Field label="מי רואה">
+        <select name="audience" value={audience} onChange={(e) => setAudience(e.target.value as Audience)} className={INPUT}>
+          {(Object.keys(KNOWLEDGE_AUDIENCE_LABELS) as Audience[]).map((a) => (
+            <option key={a} value={a}>
+              {KNOWLEDGE_AUDIENCE_LABELS[a]}
+            </option>
+          ))}
+        </select>
+      </Field>
+      {audience !== "ALL_STAFF" && staff.length > 0 && (
+        <fieldset className="col-span-2" data-testid="audience-people">
+          <input type="hidden" name="audiencePeople" value="1" />
+          <legend className={LABEL}>{audience === "RESTRICTED" ? "רק האנשים האלה רואים" : "מנהל התיק, ובנוסף"}</legend>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+            {staff.map((u) => (
+              <label key={u.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+                <input type="checkbox" name="audienceUserIds" value={u.id} defaultChecked={chosen.has(u.id)} className="h-4 w-4 accent-gold" />
+                {u.name}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      )}
+    </>
   );
 }

@@ -56,6 +56,7 @@ type Option = { id: string; name: string };
 
 export type PanelProcess = {
   clientVisible?: boolean;
+  doNotDisclose?: string | null;
   id: string;
   code: string;
   title: string;
@@ -393,7 +394,7 @@ function ProcessForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} owner={false} />
+      <ItemExtras existing={existing} owner={false} disclose />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -733,7 +734,7 @@ export function ProcessesPanel({
                     </ul>
                   )}
                   <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
-                  <ItemTags item={{ clientVisible: p.clientVisible }} />
+                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose }} disclose />
                   <SourceCodes sources={p.sources} options={sourceOptions} />
 
                   {p.current ? (

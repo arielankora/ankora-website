@@ -109,6 +109,7 @@ export async function openProcessRun(input: OpenRunInput) {
     title: process.title,
     version: version.version,
     purpose: process.purpose,
+    doNotDisclose: process.doNotDisclose,
     steps,
     highlights: version.highlights,
     outputs: version.outputs,

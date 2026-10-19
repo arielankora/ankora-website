@@ -34,6 +34,8 @@ export type RunDescriptionInput = {
   title: string;
   version: number;
   purpose: string | null;
+  /// Spec 6.1: who must not be told what, read before anything else.
+  doNotDisclose?: string | null;
   steps: ProcessStep[];
   highlights: string | null;
   outputs: string | null;
@@ -50,6 +52,7 @@ export type RunDescriptionInput = {
 export function runDescription(r: RunDescriptionInput): string {
   const out: string[] = [`**ריצה של ${r.code} ${r.title}, לפי נוהל גרסה ${r.version}.**`];
   if (r.purpose) out.push("", `למה: ${r.purpose}`);
+  if (r.doNotDisclose?.trim()) out.push("", `**לא לספר:** ${r.doNotDisclose.trim()}`);
   out.push("", "**השלבים**");
   r.steps.forEach((s, i) => {
     const details = [

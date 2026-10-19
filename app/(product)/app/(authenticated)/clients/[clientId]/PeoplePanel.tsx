@@ -5,7 +5,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { formatMinor } from "@/lib/money";
 import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField } from "./knowledge-ui";
 import {
   addClientContactAction,
   updateClientContactAction,
@@ -55,6 +55,7 @@ export type PanelContact = {
   status: KnowledgeStatusLike;
   toResolve: string | null;
   audience: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   doNotDisclose: string | null;
   sensitive: boolean;
   /// Formatted refs: ["S1 08:13", "S3"].
@@ -63,6 +64,7 @@ export type PanelContact = {
 
 export type PanelOrganization = {
   clientVisible?: boolean;
+  doNotDisclose?: string | null;
   ownerId?: string | null;
   id: string;
   name: string;
@@ -173,15 +175,7 @@ function ContactForm({
             <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
           </select>
         </Field>
-        <Field label="מי רואה">
-          <select name="audience" defaultValue={existing?.audience ?? "ALL_STAFF"} className={INPUT}>
-            {(Object.keys(KNOWLEDGE_AUDIENCE_LABELS) as (keyof typeof KNOWLEDGE_AUDIENCE_LABELS)[]).map((a) => (
-              <option key={a} value={a}>
-                {KNOWLEDGE_AUDIENCE_LABELS[a]}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <AudienceField existing={existing} />
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
       <ItemExtras existing={existing} />
@@ -263,7 +257,7 @@ function OrganizationForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} status={status} />
-      <ItemExtras />
+      <ItemExtras disclose />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required className={INPUT} />
@@ -382,7 +376,7 @@ export function PeoplePanel({
                   )}
                   {o.notes && <p className="mt-1 text-xs text-appNavy/70">{o.notes}</p>}
                   <StatusLine status={o.status} toResolve={o.toResolve} />
-                  <ItemTags item={o} />
+                  <ItemTags item={o} disclose />
                   <SourceCodes sources={o.sources} options={sourceOptions} />
                 </div>
                 <button type="button" onClick={() => removeOrganization(o)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">

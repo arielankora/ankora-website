@@ -18,7 +18,7 @@ import {
   type SystemPermissionLike,
 } from "@/lib/system-map";
 import { addSystemAccessAction, updateSystemAccessAction, removeSystemAccessAction } from "../system-actions";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField } from "./knowledge-ui";
 
 // Org brain, phase 2: the system map, section 7.1 of the client file
 // (claude/org-brain-spec-2026-10-12.md, 3.6).
@@ -52,6 +52,7 @@ export type PanelSystem = {
   status: KnowledgeStatusLike;
   toResolve: string | null;
   audience: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   doNotDisclose: string | null;
   sources: string[];
 };
@@ -184,15 +185,7 @@ function SystemForm({
             <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
           </select>
         </Field>
-        <Field label="מי רואה">
-          <select name="audience" defaultValue={existing?.audience ?? "ALL_STAFF"} className={INPUT}>
-            {(Object.keys(KNOWLEDGE_AUDIENCE_LABELS) as (keyof typeof KNOWLEDGE_AUDIENCE_LABELS)[]).map((a) => (
-              <option key={a} value={a}>
-                {KNOWLEDGE_AUDIENCE_LABELS[a]}
-              </option>
-            ))}
-          </select>
-        </Field>
+        <AudienceField existing={existing} />
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
       <ItemExtras existing={existing} />

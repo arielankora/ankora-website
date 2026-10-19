@@ -66,6 +66,8 @@ describe("a run", () => {
     expect(d).toContain("**ריצה של P1 תשלומי ספקים, LTD, לפי נוהל גרסה 2.**");
     expect(d).toContain("2. מייל לאיילה (Claude מכין, אדם בודק · תשלום)");
     expect(d).toContain("**דגשים:** רישום ותשלום הם שני ערוצים נפרדים");
+    expect(d).not.toContain("לא לספר");
+    expect(runDescription({ code: "P1", title: "x", version: 1, purpose: "למה", doNotDisclose: "עובדי הלקוח", steps, highlights: null, outputs: null, gaps: [], rules: [], exceptions: [], exceptionPlaybook: null, systemName: () => "" })).toContain("**לא לספר:** עובדי הלקוח");
     expect(d).toContain("- Inc ו-LTD: לא שולחים לאיילה שום דבר של Inc");
     expect(d).toContain("- אין מחליף: הידע אצל אדם אחד");
     expect(d).not.toContain("חריגות מאושרות");
