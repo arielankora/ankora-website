@@ -6,6 +6,7 @@ import { reconcileImportantDates } from "@/lib/app-domain/important-dates-job";
 import { purgeExpiredWebsiteLeads } from "@/lib/website-leads";
 import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
 import { notifyClientFileAttention } from "@/lib/app-domain/client-file-attention";
+import { sendWeeklyBrainMetrics } from "@/lib/app-domain/brain-metrics";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -27,7 +28,7 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles, brainMetrics] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
@@ -55,6 +56,12 @@ export async function GET(request: Request) {
         console.error("[cron] notifyClientFileAttention failed", err);
         return { notified: 0, unowned: 0, error: String(err) };
       }),
+      // The org brain's measures (spec section 11), by email to the
+      // admins every Sunday. Isolated the same way.
+      sendWeeklyBrainMetrics().catch((err) => {
+        console.error("[cron] sendWeeklyBrainMetrics failed", err);
+        return { sent: 0, error: String(err) };
+      }),
     ]);
 
     return NextResponse.json({
@@ -66,6 +73,7 @@ export async function GET(request: Request) {
       digest,
       leadRetention,
       clientFiles,
+      brainMetrics,
     });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);

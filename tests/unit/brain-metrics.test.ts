@@ -63,3 +63,23 @@ describe("the measures of spec section 11", () => {
     expect(r.clients.map((c) => byKey(c.measures).noAccess.value)).toEqual([1, 1]);
   });
 });
+
+describe("the weekly email", () => {
+  it("leads with what is off, and lists only what is off per client", async () => {
+    const { metricsSubject, renderMetricsEmail } = await import("@/lib/brain-metrics-email");
+    const r = metricsReport([{ clientId: "a", clientName: "NUX", ...empty, systems: [{ accessStatus: "NO_ACCESS" }] }], now);
+    expect(metricsSubject(r, "25.10.2026")).toBe("מדדי התיק, שבוע 25.10.2026: מדד אחד עוד לא ביעד");
+    const { html, text } = renderMetricsEmail(r, "אריאל", "https://www.ankora.co.il", "25.10.2026");
+    expect(text).toContain("- מערכות בלי גישה: 1 (יעד: יורד). עוד לא.");
+    expect(text).toContain("- NUX: מערכות בלי גישה 1");
+    expect(text).toContain("https://www.ankora.co.il/app/brain-metrics");
+    expect(html).toContain('dir="rtl"');
+  });
+
+  it("goes out on Sunday in Israel", async () => {
+    const { isMetricsDay } = await import("@/lib/app-domain/brain-metrics");
+    expect(isMetricsDay(new Date("2026-10-25T06:00:00Z"))).toBe(true);
+    expect(isMetricsDay(new Date("2026-10-24T22:30:00Z"))).toBe(true);
+    expect(isMetricsDay(new Date("2026-10-26T06:00:00Z"))).toBe(false);
+  });
+});
