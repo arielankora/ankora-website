@@ -7,8 +7,8 @@ const TABS = [
   // a row they stop reading.
   { href: "/app/portal/decisions", key: "decisions", label: "החלטות" },
   { href: "/app/portal/activity", key: "activity", label: "פעילות" },
-  { href: "/app/portal/hours", key: "hours", label: "שעות" },
-  { href: "/app/portal/monthly", key: "month", label: "דוח חודשי" },
+  // 19.10.2026: the monthly report is a view inside "שעות ודוחות".
+  { href: "/app/portal/hours", key: "hours", label: "שעות ודוחות" },
   { href: "/app/portal/history", key: "history", label: "היסטוריה" },
   // Portal phase 3. Last on purpose: it is the one screen nobody opens to
   // find out what is happening. People come here when they are asked for

@@ -49,7 +49,7 @@ export async function createReportScheduleAction(_prev: FormState | undefined, f
     return { error: friendlyError(err) };
   }
 
-  revalidatePath("/app/report-schedules");
+  revalidatePath("/app/reports");
   return { ok: true };
 }
 
@@ -68,7 +68,7 @@ export async function toggleReportScheduleAction(
   } catch (err) {
     return { ok: false, error: friendlyError(err) };
   }
-  revalidatePath("/app/report-schedules");
+  revalidatePath("/app/reports");
   return { ok: true };
 }
 
@@ -79,7 +79,7 @@ export async function deleteReportScheduleAction(scheduleId: string): Promise<{ 
   } catch (err) {
     return { ok: false, error: friendlyError(err) };
   }
-  revalidatePath("/app/report-schedules");
+  revalidatePath("/app/reports");
   return { ok: true };
 }
 

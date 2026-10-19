@@ -15,6 +15,8 @@ import { formatDuration, formatSource } from "@/lib/time-entry-format";
 import { buildClientActivityPrompt, type ActivityPromptEntry } from "@/lib/client-activity-prompt";
 import type { TimeEntrySource } from "@prisma/client";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
+import { ViewTabs } from "@/components/app/ViewTabs";
+import { ReportSchedulesView } from "../report-schedules/ReportSchedulesView";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -96,30 +98,31 @@ export default async function AdminReportsPage(
     );
   }
 
-  const tab = searchParams.tab === "summary" ? "summary" : "numeric";
+  const tab = searchParams.tab === "summary" ? "summary" : searchParams.tab === "schedules" ? "schedules" : "numeric";
   const clients = await listClients();
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
 
+  // 19.10.2026: scheduled reports joined as a third tab (canvas "Ankora App UI Round").
   const tabs = (
-    <div className="flex gap-2 border-b border-app-border">
-      <Link
-        href="/app/reports"
-        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "numeric" ? "border-gold text-app-text-primary" : "border-transparent text-app-text-tertiary hover:text-app-text-primary"
-        }`}
-      >
-        דוחות
-      </Link>
-      <Link
-        href="/app/reports?tab=summary"
-        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "summary" ? "border-gold text-app-text-primary" : "border-transparent text-app-text-tertiary hover:text-app-text-primary"
-        }`}
-      >
-        תקציר פעילות ללקוח
-      </Link>
-    </div>
+    <ViewTabs
+      label="דוחות"
+      active={tab}
+      tabs={[
+        { key: "numeric", label: "דוחות", href: "/app/reports" },
+        { key: "summary", label: "תקציר פעילות ללקוח", href: "/app/reports?tab=summary" },
+        { key: "schedules", label: "מתוזמנים", href: "/app/reports?tab=schedules" },
+      ]}
+    />
   );
+
+  if (tab === "schedules") {
+    return (
+      <div className="space-y-5">
+        {tabs}
+        <ReportSchedulesView searchParams={{ clientId: searchParams.clientId }} />
+      </div>
+    );
+  }
 
   if (tab === "summary") {
     const clientId = searchParams.clientId || undefined;

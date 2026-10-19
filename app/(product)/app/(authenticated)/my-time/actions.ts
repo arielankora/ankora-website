@@ -107,7 +107,7 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
     return { error: friendlyError(err) };
   }
 
-  revalidatePath("/app/my-time");
+  revalidatePath("/app/timer");
   return { ok: true };
 }
 
@@ -141,7 +141,7 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
     return { error: friendlyError(err) };
   }
 
-  revalidatePath("/app/my-time");
+  revalidatePath("/app/timer");
   return {
     ok: true,
     entry: {
@@ -169,6 +169,6 @@ export async function deleteMyEntryAction(timeEntryId: string): Promise<FormStat
   } catch (err) {
     return { error: friendlyError(err) };
   }
-  revalidatePath("/app/my-time");
+  revalidatePath("/app/timer");
   return { ok: true };
 }
