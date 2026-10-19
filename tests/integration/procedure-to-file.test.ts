@@ -24,7 +24,12 @@ async function fileDocument(clientId: string, taskId: string, kind: "PROCEDURE" 
   });
 }
 
-async function proposeFrom(clientId: string, ref: { system: "DOCUMENT" | "TASK"; id: string }, seq = 1) {
+async function proposeFrom(
+  clientId: string,
+  ref: { system: "DOCUMENT" | "TASK"; id: string },
+  seq = 1,
+  states: ("PENDING" | "APPROVED" | "REJECTED")[] = ["PENDING"]
+) {
   const source = await prisma.clientSource.create({
     data: {
       clientId,
@@ -35,7 +40,10 @@ async function proposeFrom(clientId: string, ref: { system: "DOCUMENT" | "TASK";
       externalRefs: [ref],
     },
   });
-  await prisma.knowledgeBatch.create({ data: { clientId, sourceId: source.id } });
+  const batch = await prisma.knowledgeBatch.create({ data: { clientId, sourceId: source.id } });
+  for (const state of states) {
+    await prisma.knowledgeProposal.create({ data: { batchId: batch.id, clientId, target: "PROCESS", payload: { title: "תהליך" }, state } });
+  }
   return source;
 }
 
@@ -63,6 +71,22 @@ describe("procedureReminderFor()", () => {
     const doc = await fileDocument(client.id, task.id, "PROCEDURE");
     await proposeFrom(client.id, { system: "DOCUMENT", id: doc.id });
     expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
+  });
+
+  it("a batch whose every proposal was rejected does not count, one still standing does (20.10.2026)", async () => {
+    const { client, task } = await setup();
+    const doc = await fileDocument(client.id, task.id, "PROCEDURE");
+    await proposeFrom(client.id, { system: "DOCUMENT", id: doc.id }, 1, ["REJECTED", "REJECTED"]);
+    expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("PROCEDURE");
+    await proposeFrom(client.id, { system: "DOCUMENT", id: doc.id }, 2, ["REJECTED", "APPROVED"]);
+    expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
+  });
+
+  it("a batch with nothing in it does not count", async () => {
+    const { client, task } = await setup();
+    const doc = await fileDocument(client.id, task.id, "PROCEDURE");
+    await proposeFrom(client.id, { system: "DOCUMENT", id: doc.id }, 1, []);
+    expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("PROCEDURE");
   });
 
   it("a source registered but never used does not count", async () => {

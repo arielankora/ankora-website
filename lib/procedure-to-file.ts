@@ -64,7 +64,8 @@ export type ProcedureCheckFacts = {
   namedProcedureDocumentIds?: string[];
   isMapping: boolean;
   /// A proposal batch exists whose source points at one of the task's
-  /// documents, or at the task itself.
+  /// documents, or at the task itself, with at least one proposal in it
+  /// not rejected (20.10.2026).
   hasProposalFromTask: boolean;
 };
 

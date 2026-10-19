@@ -9,7 +9,10 @@
 // - uncertain items nobody has confirmed for two weeks,
 // - open questions nobody has answered,
 // - a client's rule proposed and not approved for two weeks, while only
-//   its interim rule applies.
+//   its interim rule applies,
+// - proposals waiting on the review screen for more than a week
+//   (20.10.2026): a procedure proposed and never approved is no more in
+//   the file than one never proposed.
 
 import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
 
@@ -21,6 +24,8 @@ export type Attention = {
   staleProposedRules: number;
   /// Rules whose review date has passed (spec 3.11).
   rulesDueReview?: number;
+  /// Proposals still waiting on the review screen after a week.
+  staleProposals?: number;
 };
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,12 +34,20 @@ export const DAY_MS = 24 * 60 * 60 * 1000;
 /// something new has expired since.
 export const ATTENTION_EVERY_DAYS = 7;
 
+/// How long a proposal may wait on the review screen before the file says
+/// so (Ariel, 20.10.2026: a week).
+export const PROPOSAL_WAIT_DAYS = 7;
+
+export function isStaleProposal(p: { state: string; createdAt: Date }, now: Date): boolean {
+  return p.state === "PENDING" && now.getTime() - p.createdAt.getTime() > PROPOSAL_WAIT_DAYS * DAY_MS;
+}
+
 export function isStaleUncertain(item: { knowledgeStatus: string; updatedAt: Date }, now: Date): boolean {
   return item.knowledgeStatus === "UNCERTAIN" && now.getTime() - item.updatedAt.getTime() > UNCERTAIN_REMINDER_DAYS * DAY_MS;
 }
 
 export function hasAttention(a: Attention): boolean {
-  return a.pastValidity + a.staleUncertain + a.openQuestions + a.staleProposedRules + (a.rulesDueReview ?? 0) > 0;
+  return a.pastValidity + a.staleUncertain + a.openQuestions + a.staleProposedRules + (a.rulesDueReview ?? 0) + (a.staleProposals ?? 0) > 0;
 }
 
 /// One sentence, the counts that are not zero, in order of urgency.
@@ -54,6 +67,13 @@ export function attentionSentence(a: Attention): string {
       a.staleProposedRules === 1
         ? `כלל מוצע אחד מחכה לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חל רק כלל הביניים.`
         : `${a.staleProposedRules} כללים מוצעים מחכים לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חלים רק כללי הביניים.`
+    );
+  }
+  if (a.staleProposals) {
+    parts.push(
+      a.staleProposals === 1
+        ? `הצעה אחת מחכה במסך הבדיקה כבר יותר מ-${PROPOSAL_WAIT_DAYS} ימים, ועד שתאושר היא לא בתיק.`
+        : `${a.staleProposals} הצעות מחכות במסך הבדיקה כבר יותר מ-${PROPOSAL_WAIT_DAYS} ימים, ועד שיאושרו הן לא בתיק.`
     );
   }
   if (a.rulesDueReview) {
