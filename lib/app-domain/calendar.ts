@@ -52,11 +52,21 @@ export type CalendarData = {
   tasks: CalendarTask[];
   dates: CalendarDate[];
   undated: CalendarTask[];
+  /// 20.10.2026, the drawer: open tasks whose due day is before today,
+  /// INCLUDING those before the range on screen. Without this list a task
+  /// that slipped last week was on no screen of the calendar at all.
+  /// Oldest first: the one that has waited longest is the one to place.
+  overdue: CalendarTask[];
+  /// The real counts, for the toolbar's buttons: the two lists above stop
+  /// at their limit.
+  undatedTotal: number;
+  overdueTotal: number;
 };
 
-/// A side panel is a list someone reads, not a dump. Past this the panel
-/// says how many more there are and links to the tasks screen.
+/// A drawer list is something someone reads, not a dump. Past this the
+/// drawer says how many more there are and links to the tasks screen.
 export const UNDATED_LIMIT = 50;
+export const OVERDUE_LIMIT = 50;
 
 /// Statuses a date can be in and still belong on a calendar.
 const HIDDEN_DATE_STATUSES = new Set(["ARCHIVED", "PAUSED"]);
@@ -78,7 +88,7 @@ function toCalendarTask(t: TaskRow): CalendarTask {
 
 export async function loadCalendar(
   actor: User,
-  opts: { view: CalendarView; date: string; show: CalendarShow; clientId?: string; mine: boolean }
+  opts: { view: CalendarView; date: string; show: CalendarShow; clientId?: string; mine: boolean; today: string }
 ): Promise<CalendarData> {
   const days = visibleDays(opts.view, opts.date);
   const startKey = days[0];
@@ -91,18 +101,30 @@ export async function loadCalendar(
   const wantTasks = opts.show !== "dates";
   const wantDates = opts.show !== "tasks";
 
-  // The undated panel is about tasks, so it follows the same switch.
-  const [dated, undated, dates] = await Promise.all([
+  // "Overdue" is due before the start of TODAY, in Israel: a task due
+  // today is not late yet. One millisecond before today's start, because
+  // `dueBefore` is inclusive.
+  const todayStart = dayStartInZone(opts.today);
+  const overdueBefore = todayStart ? new Date(todayStart.getTime() - 1) : undefined;
+
+  // The drawer is about tasks, so it follows the same switch.
+  const [dated, undated, overdue, dates] = await Promise.all([
     wantTasks ? listTasks(actor, { ...base, dueFrom: dayStartInZone(startKey), dueBefore: dayEndInZone(endKey) }) : [],
     wantTasks ? listTasks(actor, { ...base, noDueDate: true }) : [],
+    wantTasks && overdueBefore ? listTasks(actor, { ...base, dueBefore: overdueBefore }) : [],
     wantDates ? loadDates(actor, startKey, endKey, opts.clientId, opts.mine) : [],
   ]);
+
+  const overdueRows = overdue.map(toCalendarTask).sort((a, b) => ((a.dueKey ?? "") < (b.dueKey ?? "") ? -1 : (a.dueKey ?? "") > (b.dueKey ?? "") ? 1 : 0));
 
   return {
     days,
     tasks: dated.map(toCalendarTask),
     dates,
     undated: undated.slice(0, UNDATED_LIMIT).map(toCalendarTask),
+    overdue: overdueRows.slice(0, OVERDUE_LIMIT),
+    undatedTotal: undated.length,
+    overdueTotal: overdueRows.length,
   };
 }
 

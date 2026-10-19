@@ -12,7 +12,7 @@ import { occurrencesInRange, type OccurrenceRow } from "@/lib/app-domain/calenda
 import { computeHolidayOccurrencesForYear } from "@/lib/app-domain/important-dates-holidays";
 import { localDateKey } from "@/lib/timezone";
 import { backLabel, carriedListQuery, tasksListHref } from "@/app/(product)/app/(authenticated)/tasks/list-query";
-import { calendarBackHref, calendarFrom } from "@/lib/calendar-keys";
+import { calendarBackHref, calendarFrom, parseDrawer } from "@/lib/calendar-keys";
 
 // 19.10.2026, the calendar screen. No Prisma here: calendar-keys.ts is
 // plain key arithmetic and calendar-occurrences.ts only walks the
@@ -163,6 +163,13 @@ describe("the way back to the calendar", () => {
 
   it("a step opened from that task still leads back to the calendar", () => {
     expect(tasksListHref(carriedListQuery(from))).toBe("/app/calendar?view=month&date=2026-11-01&show=tasks&mine=0");
+  });
+
+  it("the drawer travels with the way back", () => {
+    expect(tasksListHref(calendarFrom("view=week&drawer=overdue"))).toBe("/app/calendar?view=week&drawer=overdue");
+    expect(calendarHref({ view: "week", date: "2026-10-19", show: "all", mine: true, drawer: "undated" }, "2026-10-19")).toBe("/app/calendar?drawer=undated");
+    expect(parseDrawer("undated")).toBe("undated");
+    expect(parseDrawer("x")).toBeUndefined();
   });
 
   it("only the calendar's own keys survive, and the path is always the calendar", () => {

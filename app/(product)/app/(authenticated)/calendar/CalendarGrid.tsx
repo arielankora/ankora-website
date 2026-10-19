@@ -1,14 +1,21 @@
 "use client";
 import Link from "next/link";
-import { CalendarDays, Inbox } from "lucide-react";
+import { CalendarDays, Clock, Search, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { taskHref } from "../tasks/list-query";
 import { setTaskDueDateAction } from "./actions";
-import { calendarFrom, dayOfMonth, shortDate, WEEKDAY_LABELS, type CalendarView } from "@/lib/calendar-keys";
+import { calendarFrom, dayOfMonth, shortDate, WEEKDAY_LABELS, type CalendarDrawer, type CalendarView } from "@/lib/calendar-keys";
 import type { CalendarDate, CalendarTask } from "@/lib/app-domain/calendar";
 
-// The calendar's grid and its side panel of undated tasks.
+// The calendar's grid and its drawer: tasks with no due date, and tasks
+// whose due date has passed.
+//
+// 20.10.2026 (Ariel): the drawer replaced a fixed side column that took a
+// quarter of the width all the time and folded every title in the week
+// into seven lines. It opens from two buttons above the grid, sits beside
+// it rather than over it, and stays open while a task is dragged out of
+// it, which is the whole point of having it.
 //
 // **Dragging changes one thing: the due date.** It calls the same
 // `updateTask` as the task screen, through setTaskDueDateAction, so the
@@ -28,9 +35,20 @@ import type { CalendarDate, CalendarTask } from "@/lib/app-domain/calendar";
 // Dates (important dates) are drawn but never dragged: a birthday does
 // not move because the calendar was rearranged.
 
+type DropZone = {
+  onDragOver: (e: React.DragEvent) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent) => void;
+};
+
 /// Items a month cell draws before "ועוד N". A month cell is a glance,
 /// not a list; the day view is the list.
 const MONTH_CELL_CAP = 4;
+
+/// Sunday to Thursday full width, Friday and Saturday a little over half:
+/// the weekend is where almost nothing is due, and equal columns spent a
+/// fifth of the grid on two near-empty days.
+const GRID_COLUMNS = "grid-cols-[repeat(5,minmax(0,1fr))_repeat(2,minmax(0,0.55fr))]";
 
 const PRIORITY_DOT: Record<CalendarTask["priority"], string> = {
   LOW: "bg-transparent",
@@ -47,8 +65,12 @@ type Props = {
   /// Dated and undated together. `dueKey: null` is the side panel.
   tasks: CalendarTask[];
   dates: CalendarDate[];
-  showTasks: boolean;
-  undatedCapped: boolean;
+  /// Which list the drawer shows; absent = closed.
+  drawer?: CalendarDrawer;
+  /// Built on the server from the same calendarHref as every control.
+  drawerHrefs: { undated: string; overdue: string; close: string };
+  undatedMore: boolean;
+  overdueMore: boolean;
   /// The calendar's query now, for the way back from a task or a date.
   query: string;
   dayHrefs: Record<string, string>;
@@ -82,6 +104,11 @@ export function CalendarGrid(props: Props) {
   }, [local, props.dates, props.days]);
 
   const undated = local.filter((t) => t.dueKey === null);
+  // Read off the same local list, so a task dragged out of "באיחור" onto
+  // a future day leaves the list the moment it lands.
+  const overdue = local
+    .filter((t) => t.dueKey !== null && t.dueKey < props.today)
+    .sort((a, b) => (a.dueKey! < b.dueKey! ? -1 : a.dueKey! > b.dueKey! ? 1 : 0));
 
   async function save(task: CalendarTask, to: string | null, prev: string | null, withUndo: boolean) {
     setLocal((rows) => rows.map((t) => (t.id === task.id ? { ...t, dueKey: to } : t)));
@@ -125,8 +152,8 @@ export function CalendarGrid(props: Props) {
     void save(task, to, fromKey, true);
   }
 
-  // Shared by every cell and by the panel: where a drag may land.
-  function dropZone(key: string) {
+  // Shared by every cell and by the drawer: where a drag may land.
+  function dropZone(key: string): DropZone {
     return {
       onDragOver: (e: React.DragEvent) => {
         // Without preventDefault the browser refuses the drop and the
@@ -151,7 +178,7 @@ export function CalendarGrid(props: Props) {
 
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1" data-testid="calendar-grid">
         {props.view === "day" ? (
           <section
             data-day={props.days[0]}
@@ -171,7 +198,7 @@ export function CalendarGrid(props: Props) {
             {/* Desk: the grid. Sunday is the first column, and in a
                 right-to-left page that is the right edge, as on paper. */}
             <div className="hidden overflow-hidden rounded-2xl border border-lineDark bg-lineDark md:block">
-              <div className="grid grid-cols-7 gap-px">
+              <div className={`grid gap-px ${GRID_COLUMNS}`}>
                 {WEEKDAY_LABELS.map((label) => (
                   <div key={label} className="bg-cream-dim/40 px-2 py-1.5 text-center text-[12px] font-medium text-appNavy/55">
                     {label}
@@ -182,13 +209,22 @@ export function CalendarGrid(props: Props) {
                   const items = [...cell.dates.map(dateItem), ...cell.tasks.map(item)];
                   const capped = props.view === "month" ? items.slice(0, MONTH_CELL_CAP) : items;
                   const outside = props.view === "month" && day.slice(0, 7) !== anchorMonth;
+                  const weekend = new Date(`${day}T00:00:00Z`).getUTCDay() >= 5;
                   return (
                     <section
                       key={day}
                       data-day={day}
                       {...dropZone(day)}
                       className={`flex flex-col gap-1 p-1.5 transition-colors ${props.view === "month" ? "min-h-[118px]" : "min-h-[260px]"} ${
-                        over === day ? "bg-appNavy/[0.06]" : outside ? "bg-cream-dim/30" : "bg-white"
+                        over === day
+                          ? "bg-gold/10 outline outline-1 -outline-offset-1 outline-gold"
+                          : outside
+                            ? "bg-cream-dim/30"
+                            : day === props.today
+                              ? "bg-[#FDFBF7]"
+                              : weekend
+                                ? "bg-cream-dim/20"
+                                : "bg-white"
                       }`}
                     >
                       <a
@@ -237,31 +273,19 @@ export function CalendarGrid(props: Props) {
         )}
       </div>
 
-      {props.showTasks && (
-        <aside
-          data-testid="calendar-undated"
-          data-day="undated"
-          {...dropZone("undated")}
-          className={`w-full shrink-0 rounded-2xl border p-3 transition-colors lg:sticky lg:top-4 lg:w-72 ${
-            over === "undated" ? "border-appNavy bg-appNavy/[0.04]" : "border-lineDark bg-cream-dim/30"
-          }`}
-        >
-          <h2 className="flex items-center gap-2 px-1 pb-1 text-[13px] font-medium text-appNavy">
-            <Inbox size={14} strokeWidth={1.8} />
-            בלי תאריך יעד
-            <span className="font-jbmono text-[11px] text-appNavy/45">{undated.length}{props.undatedCapped ? "+" : ""}</span>
-          </h2>
-          <p className="px-1 pb-2 text-[11.5px] text-appNavy/45">גוררים משימה ליום כדי לקבוע לה יעד. גרירה לכאן מסירה את היעד.</p>
-          <div className="flex flex-col gap-1.5">
-            {undated.map(item)}
-            {undated.length === 0 && <p className="px-1 py-2 text-[12px] text-appNavy/35">לכל המשימות הפתוחות יש תאריך.</p>}
-            {props.undatedCapped && (
-              <Link href="/app/tasks" className="px-1 text-[11.5px] text-appNavy/50 hover:text-appNavy">
-                יש עוד. לרשימת המשימות
-              </Link>
-            )}
-          </div>
-        </aside>
+      {props.drawer && (
+        <Drawer
+          tab={props.drawer}
+          hrefs={props.drawerHrefs}
+          undated={undated}
+          overdue={overdue}
+          undatedMore={props.undatedMore}
+          overdueMore={props.overdueMore}
+          from={from}
+          disabled={pending}
+          over={over === "undated"}
+          zone={dropZone("undated")}
+        />
       )}
     </div>
   );
@@ -299,23 +323,173 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
         e.dataTransfer.effectAllowed = "move";
       }}
       data-calendar-task={task.id}
-      title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}`}
-      className={`cursor-grab rounded-lg border bg-white px-2 py-1 active:cursor-grabbing ${overdue ? "border-error/40" : "border-lineDark"}`}
+      title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}${overdue ? " · באיחור" : ""}`}
+      className="cursor-grab rounded-lg border border-lineDark bg-white px-2 py-1 active:cursor-grabbing"
     >
       <div className="flex items-start gap-1.5">
-        <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${PRIORITY_DOT[task.priority]}`} />
+        {/* Late is a dot, not a red card. A week with four late tasks
+            used to be a red column that drowned out everything else on
+            screen; the dot says the same thing and lets the week read. */}
+        <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${overdue ? "bg-error" : PRIORITY_DOT[task.priority]}`} />
         {/* A plain anchor, like the board: a soft navigation to a task was
             being cancelled by the router. The link does not carry the
-            drag; the chip does. */}
+            drag; the chip does. Two lines at most: the whole title is in
+            the tooltip and one click away. */}
         <a
           href={taskHref(task.id, from)}
           draggable={false}
-          className={`min-w-0 flex-1 text-[12.5px] leading-snug [overflow-wrap:anywhere] hover:text-appNavy/70 ${overdue ? "text-error" : "text-appNavy"}`}
+          className="line-clamp-2 min-w-0 flex-1 text-[12.5px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70"
         >
           {task.title}
         </a>
       </div>
-      <p className="truncate ps-3 text-[11px] text-appNavy/45">{task.clientName}</p>
+      <p className="truncate ps-3 text-[11px] text-appNavy/55">{task.clientName}</p>
+    </article>
+  );
+}
+
+/// The drawer: one of two lists, searchable, grouped by client.
+///
+/// Beside the grid and not over it, so nothing it is dragged onto is
+/// hidden by it. Rows are one line each: the drawer is for finding a task
+/// and putting it on a day, and nineteen two-line cards were a column you
+/// scrolled instead of read.
+function Drawer({
+  tab,
+  hrefs,
+  undated,
+  overdue,
+  undatedMore,
+  overdueMore,
+  from,
+  disabled,
+  over,
+  zone,
+}: {
+  tab: CalendarDrawer;
+  hrefs: { undated: string; overdue: string; close: string };
+  undated: CalendarTask[];
+  overdue: CalendarTask[];
+  undatedMore: boolean;
+  overdueMore: boolean;
+  from: string;
+  disabled: boolean;
+  over: boolean;
+  zone: DropZone;
+}) {
+  const [q, setQ] = useState("");
+  const rows = tab === "undated" ? undated : overdue;
+  const needle = q.trim().toLowerCase();
+  const shown = needle ? rows.filter((t) => `${t.title} ${t.clientName}`.toLowerCase().includes(needle)) : rows;
+
+  // Grouped by client, the way the people using this think about work:
+  // one client, one set of open loops. Groups in name order, rows in the
+  // order the list already has (oldest first for "באיחור").
+  const groups = new Map<string, CalendarTask[]>();
+  for (const t of shown) groups.set(t.clientName, [...(groups.get(t.clientName) ?? []), t]);
+  const ordered = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b, "he"));
+
+  const tabClass = (active: boolean) =>
+    `flex-1 rounded-full px-3 py-1.5 text-center text-[12.5px] font-medium transition-colors ${
+      active ? "border border-lineDark bg-white text-appNavy" : "text-appNavy/60 hover:text-appNavy"
+    }`;
+
+  return (
+    <aside
+      data-testid="calendar-drawer"
+      data-day="undated"
+      {...zone}
+      className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] ${
+        over ? "border-gold bg-gold/5" : "border-lineDark"
+      }`}
+    >
+      <div className="flex flex-col gap-2.5 border-b border-lineDark p-3">
+        <div className="flex items-center gap-2">
+          <h2 className="flex-1 text-[14px] font-medium text-appNavy">{tab === "undated" ? "בלי תאריך יעד" : "באיחור"}</h2>
+          <Link href={hrefs.close} aria-label="סגירת המגירה" data-testid="calendar-drawer-close" className="rounded-lg p-1.5 text-appNavy/60 hover:bg-cream-dim/40 hover:text-appNavy">
+            <X size={16} strokeWidth={1.8} />
+          </Link>
+        </div>
+        <div className="flex rounded-full bg-cream-dim/40 p-[3px]">
+          <Link href={hrefs.undated} data-testid="calendar-drawer-tab-undated" className={tabClass(tab === "undated")} aria-current={tab === "undated" ? "page" : undefined}>
+            בלי תאריך <span className="font-jbmono text-[11.5px]">{undated.length}{undatedMore ? "+" : ""}</span>
+          </Link>
+          <Link href={hrefs.overdue} data-testid="calendar-drawer-tab-overdue" className={tabClass(tab === "overdue")} aria-current={tab === "overdue" ? "page" : undefined}>
+            באיחור <span className="font-jbmono text-[11.5px]">{overdue.length}{overdueMore ? "+" : ""}</span>
+          </Link>
+        </div>
+        <label className="flex items-center gap-2 rounded-lg border border-lineDark px-2.5 py-1.5 text-[13px] text-appNavy/60 focus-within:border-appNavy/40">
+          <Search size={14} strokeWidth={1.8} />
+          <span className="sr-only">חיפוש</span>
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="חיפוש לפי משימה או לקוח"
+            data-testid="calendar-drawer-search"
+            className="min-w-0 flex-1 bg-transparent text-appNavy outline-none placeholder:text-appNavy/45"
+          />
+        </label>
+        <p className="text-[11.5px] text-appNavy/55">גוררים משימה ליום כדי לקבוע יעד. גרירה לכאן מסירה את היעד.</p>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-2 pb-3">
+        {ordered.map(([client, list]) => (
+          <section key={client}>
+            <h3 className="flex items-baseline gap-1.5 px-1.5 pb-1 pt-3 text-[11.5px] font-semibold tracking-wide text-appNavy/60">
+              {client}
+              <span className="font-jbmono text-[11px] font-normal text-appNavy/45">{list.length}</span>
+            </h3>
+            {list.map((t) => (
+              <DrawerRow key={t.id} task={t} from={from} disabled={disabled} showDue={tab === "overdue"} />
+            ))}
+          </section>
+        ))}
+        {shown.length === 0 && (
+          <p className="px-1.5 py-4 text-[12.5px] text-appNavy/45">
+            {needle ? "אין משימה שמתאימה לחיפוש." : tab === "undated" ? "לכל המשימות הפתוחות יש תאריך." : "אין משימות באיחור."}
+          </p>
+        )}
+        {(tab === "undated" ? undatedMore : overdueMore) && (
+          <Link href="/app/tasks" className="block px-1.5 pt-3 text-[12px] text-appNavy/55 hover:text-appNavy">
+            יש עוד. לרשימת המשימות
+          </Link>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from: string; disabled: boolean; showDue: boolean }) {
+  return (
+    <article
+      draggable={!disabled}
+      onDragStart={(e) => {
+        e.dataTransfer.setData("text/plain", task.id);
+        e.dataTransfer.effectAllowed = "move";
+      }}
+      data-calendar-task={task.id}
+      title={`${task.title} · ${task.clientName}`}
+      className="group flex cursor-grab items-center gap-1.5 rounded-lg px-1.5 py-1.5 hover:bg-cream-dim/30 active:cursor-grabbing"
+    >
+      {/* The grip says "this moves" before anyone tries. */}
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0 text-appNavy/30 group-hover:text-appNavy/55">
+        <circle cx="9" cy="6" r="1.6" />
+        <circle cx="15" cy="6" r="1.6" />
+        <circle cx="9" cy="12" r="1.6" />
+        <circle cx="15" cy="12" r="1.6" />
+        <circle cx="9" cy="18" r="1.6" />
+        <circle cx="15" cy="18" r="1.6" />
+      </svg>
+      <a href={taskHref(task.id, from)} draggable={false} className="min-w-0 flex-1 truncate text-[13px] text-appNavy hover:text-appNavy/70">
+        {task.title}
+      </a>
+      {showDue && task.dueKey && (
+        <span className="flex shrink-0 items-center gap-1 font-jbmono text-[11px] text-error">
+          <Clock size={11} strokeWidth={1.8} />
+          {shortDate(task.dueKey)}
+        </span>
+      )}
     </article>
   );
 }
