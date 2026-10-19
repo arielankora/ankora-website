@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { NavItem } from "./Sidebar";
-import { LiveTimerPill } from "./LiveTimerPill";
+import { ShellTimerPill } from "./ActiveTimerProvider";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
 
@@ -20,13 +20,11 @@ import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, t
 // second child lands at the left/end edge. See inline comments below.
 export function TopBar({
   items,
-  activeTimer,
   notifications,
   unreadCount,
   showPrimaryCta,
 }: {
   items: NavItem[];
-  activeTimer: { startAt: string; extraCount?: number } | null;
   notifications: NotificationSummary[];
   unreadCount: number;
   showPrimaryCta: boolean;
@@ -38,7 +36,8 @@ export function TopBar({
     <header className="sticky top-0 z-30 hidden min-h-[62px] flex-wrap items-center justify-between gap-4 border-b border-lineDark bg-white/92 px-7 py-[11px] backdrop-blur-[8px] md:flex">
       {/* Right (start) side: live timer pill, notification bell, primary CTA. */}
       <div className="flex items-center gap-3">
-        {activeTimer && <LiveTimerPill startAt={activeTimer.startAt} extraCount={activeTimer.extraCount} />}
+        {/* Live: kept in step with the other tabs and the server (ActiveTimerProvider). */}
+        <ShellTimerPill />
         <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
         {showPrimaryCta && (
           <Link

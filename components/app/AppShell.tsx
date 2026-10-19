@@ -6,7 +6,7 @@ import { BottomNav } from "./BottomNav";
 import { Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { CommandPalette } from "./CommandPalette";
-import { LiveTimerPill } from "./LiveTimerPill";
+import { ActiveTimerProvider, MobileTimerStrip } from "./ActiveTimerProvider";
 import { OfflineBanner } from "./states/Offline";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 
@@ -161,13 +161,15 @@ export function AppShell({
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
+    <ActiveTimerProvider
+      initial={activeTimer ? { startAt: activeTimer.startAt, extraCount: activeTimer.extraCount ?? 0 } : null}
+    >
     <div className="min-h-screen bg-cream md:flex">
       <Sidebar
         items={items}
         userName={user.name}
         roleLabel={ROLE_LABELS[user.role]}
         counters={{
-          activeTimerStartAt: activeTimer?.startAt ?? null,
           importantDatesCount,
           alertsCount,
           supervisingCount: supervising.pending,
@@ -185,16 +187,11 @@ export function AppShell({
             <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
           </div>
           {/* Spec, Responsive/Mobile: "פס טיימר חי מתחת לכותרת בכל מסך (לחיצה → טיימר)". */}
-          {activeTimer && (
-            <div className="border-t border-lineDark px-6 py-2">
-              <LiveTimerPill startAt={activeTimer.startAt} extraCount={activeTimer.extraCount} />
-            </div>
-          )}
+          <MobileTimerStrip />
         </header>
 
         <TopBar
           items={items}
-          activeTimer={activeTimer}
           notifications={notifications}
           unreadCount={unreadCount}
           showPrimaryCta={showPrimaryCta}
@@ -211,5 +208,6 @@ export function AppShell({
 
       <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
     </div>
+    </ActiveTimerProvider>
   );
 }
