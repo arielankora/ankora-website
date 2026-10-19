@@ -1283,6 +1283,14 @@
       "firstSeen": "2026-10-10",
       "riskReason": "Written by Claude through MCP; versioning guards against overwrite, and applying a plan removes open steps"
     },
+    "domain:procedure-to-file": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-19",
+      "riskReason": "Read-only check on every task close (MCP and screen); a failure must never turn a successful close into an error, and it reads another client's sources only if the clientId filter breaks"
+    },
     "api:/api/mcp/files/[ticket]": {
       "kind": "api",
       "area": "mcp",

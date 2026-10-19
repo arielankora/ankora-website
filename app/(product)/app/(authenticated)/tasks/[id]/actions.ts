@@ -2,6 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setStepDone, updateTask } from "@/lib/app-domain/tasks";
+import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
   getActiveTimers,
@@ -105,8 +106,15 @@ export async function updateTaskDetailAction(input: {
     // may be looking at right now, and something the home screen counts.
     revalidatePath("/app/portal");
     revalidatePath("/app");
+    // 19.10.2026: closing a task whose procedure (or mapping) never
+    // reached the client file. Shown as a banner; the close stands, and a
+    // failed check is not allowed to make a successful close look failed.
+    const reminder = await procedureReminderFor(updated.id, input.status).catch(() => null);
     return {
       ok: true as const,
+      procedureReminder: reminder
+        ? { text: reminder.forScreen, reviewHref: `/app/knowledge?clientId=${encodeURIComponent(updated.clientId)}` }
+        : null,
       status: updated.status,
       supervisorId: updated.supervisorId,
       requiresApproval: updated.requiresApproval,

@@ -65,7 +65,11 @@ const plans = vi.hoisted(() => {
   };
 });
 
+// 19.10.2026: the closing check behind update_task's `reminder`.
+const procedure = vi.hoisted(() => ({ procedureReminderFor: vi.fn(async (): Promise<unknown> => null) }));
+
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
+vi.mock("@/lib/app-domain/procedure-to-file", () => procedure);
 vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/app-domain/decisions", () => decisions);
 vi.mock("@/lib/mcp/lookup", () => lookup);
@@ -218,6 +222,24 @@ describe("update_task: portal visibility and waiting", () => {
   it("returns the task's link alongside the change", async () => {
     const out = await call("update_task", { task: "x", priority: "HIGH" });
     expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t1");
+  });
+
+  it("carries the procedure reminder when closing left the client file behind, and asks with the new status", async () => {
+    procedure.procedureReminderFor.mockResolvedValueOnce({ kind: "PROCEDURE", forClaude: "Propose it now with propose_knowledge", forScreen: "x" });
+    tasks.updateTask.mockResolvedValueOnce({ id: "t1", title: "x", status: "DONE" });
+    const out = await call("update_task", { task: "x", status: "DONE" });
+    expect(procedure.procedureReminderFor).toHaveBeenCalledWith("t1", "DONE");
+    expect(out.updated).toBe(true);
+    expect(out.reminder).toContain("propose_knowledge");
+  });
+
+  it("has no reminder field when there is nothing to remind, and a failed check never fails the close", async () => {
+    const quiet = await call("update_task", { task: "x", priority: "HIGH" });
+    expect(quiet).not.toHaveProperty("reminder");
+    procedure.procedureReminderFor.mockRejectedValueOnce(new Error("db down"));
+    const out = await call("update_task", { task: "x", status: "DONE" });
+    expect(out.updated).toBe(true);
+    expect(out).not.toHaveProperty("reminder");
   });
 
   it("marks a task as waiting on the client, with the reason", async () => {

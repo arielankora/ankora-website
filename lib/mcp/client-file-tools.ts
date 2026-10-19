@@ -107,6 +107,7 @@ export function registerClientFileTools(server: McpServer): void {
             participants: z.array(z.string()).optional(),
             firefliesId: z.string().optional(),
             documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
+            taskId: z.string().optional().describe("For kind TASK: the task the knowledge came out of, such as a mapping task."),
             topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
           })
           .optional(),
@@ -142,7 +143,7 @@ export function registerClientFileTools(server: McpServer): void {
       args: {
         client: string;
         sourceCode?: string;
-        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT"; title: string; date?: string; participants?: string[]; firefliesId?: string; documentId?: string; topicsOnly?: boolean };
+        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT"; title: string; date?: string; participants?: string[]; firefliesId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean };
         note?: string;
         uncertain?: { candidates: string[]; reason: string };
         items: (ProposalItemInput & { client?: string })[];
@@ -162,7 +163,7 @@ export function registerClientFileTools(server: McpServer): void {
               title: ns.title,
               occurredAt: ns.date ? new Date(`${ns.date}T00:00:00Z`) : null,
               participants: ns.participants,
-              externalIds: [ns.firefliesId, ns.documentId].filter((v): v is string => !!v),
+              externalIds: [ns.firefliesId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
               restriction: ns.topicsOnly ? ("TOPICS_ONLY" as const) : ("NONE" as const),
             }
           : null;

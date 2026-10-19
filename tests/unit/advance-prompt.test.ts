@@ -9,6 +9,7 @@ import {
   timerRules,
   type AdvancePromptInput,
 } from "@/lib/advance-prompt";
+import { PROPOSE_MAPPING_STEP_TITLE, PROPOSE_STEP_TITLE } from "@/lib/procedure-to-file";
 
 // "קדם עם קלוד" (10.10.2026). The prompt the task screen copies. Pure, so
 // it runs in the sandbox like client-activity-prompt.test.ts.
@@ -318,5 +319,41 @@ describe("the timer around the conversation (19.10.2026)", () => {
     expect(text).toContain("## טיימר");
     expect(text).toContain("סוף העבודה: כשהסיכום נשמר");
     expect(text).not.toContain("כשמסומן השלב האחרון");
+  });
+});
+
+describe("a new procedure reaches the client file (19.10.2026)", () => {
+  it("files a procedure as POLICY and proposes it to the client file without asking", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("kind: POLICY");
+    expect(text).toContain("propose_knowledge");
+    expect(text).toContain("PROCESS");
+    expect(text).toContain("newSource מסוג ANKORA_DOCUMENT");
+    expect(text).toContain("מותר לשלוח אותן בלי לשאול");
+    expect(text).toContain("להזכיר לי לאשר");
+  });
+
+  it("puts the fixed proposal step before closing into the plan's shape", () => {
+    const text = buildAdvancePrompt(base);
+    const shape = text.slice(text.indexOf("## מבנה התוכנית"), text.indexOf("## החיבור למערכת"));
+    expect(shape).toContain(`"${PROPOSE_STEP_TITLE}"`);
+    expect(shape).toContain("אישור: מנהל במסך הבדיקה");
+    expect(shape).not.toContain(PROPOSE_MAPPING_STEP_TITLE);
+  });
+
+  it("on a mapping task, also proposes what was learned, sourced to the task itself", () => {
+    const text = buildAdvancePrompt({ ...base, mapping: true });
+    expect(text).toContain("המשימה בשלב מיפוי וצפייה");
+    expect(text).toContain('newSource מסוג TASK עם taskId "cmg1abc"');
+    expect(text).toContain(`"${PROPOSE_MAPPING_STEP_TITLE}"`);
+  });
+
+  it("says nothing about mapping on an ordinary task", () => {
+    expect(buildAdvancePrompt(base)).not.toContain("מיפוי וצפייה");
+  });
+
+  it("still has no em-dash or en-dash with the new rules", () => {
+    const text = buildAdvancePrompt({ ...base, mapping: true });
+    expect(text).not.toMatch(/[\u2013\u2014]/);
   });
 });

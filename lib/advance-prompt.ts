@@ -1,7 +1,7 @@
 // "קדם עם קלוד" (10.10.2026): the prompt behind the button on the task
 // screen.
 //
-// Pure and free of project imports, so tests/unit runs it in the sandbox
+// Pure, importing only other pure modules, so tests/unit runs it in the sandbox
 // (the same convention as lib/client-activity-prompt.ts, which does the
 // same job for the client activity summary). The page reads the task, its
 // steps, thread, decisions, files and plan, formats every date and label
@@ -18,6 +18,8 @@
 //
 // The prompt is written in Hebrew because the conversation it starts is in
 // Hebrew. Tool names, the task id and field values stay as they are.
+
+import { PROPOSE_MAPPING_STEP_TITLE, PROPOSE_STEP_TITLE } from "./procedure-to-file";
 
 export type AdvancePromptStep = {
   title: string;
@@ -104,6 +106,10 @@ export type AdvancePromptInput = {
   files: AdvancePromptFile[];
   loggedLabel: string | null;
   plan: AdvancePromptPlan | null;
+  /// The task is in a handover's "mapping and watching" stage
+  /// (isMappingTask). What it learns goes to the client file before it
+  /// closes, even when no document came out of it.
+  mapping?: boolean;
   requestedBy: string;
   todayLabel: string;
 };
@@ -255,7 +261,15 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "- בלי לשאול: לקרוא נתונים, לחקור, לנסח טיוטות, להוסיף הערה פנימית במשימה (add_task_comment) ולסמן שלב שהסתיים.",
     "- רק אחרי אישור שלי: לסגור את המשימה, לשנות אחראי, תאריך יעד או עדיפות, לדווח זמן, לפתוח החלטה ללקוח, וכל דבר שהלקוח רואה.",
     "- החלטה שהלקוח צריך לקבל: אחרי אישור שלי, אפשר לפתוח אותה בפורטל שלו עם create_decision ולקשר אותה למשימה עם taskId. הלקוח לא מקבל הודעה אוטומטית, אז תזכיר לי לעדכן אותו.",
-    `- מסמך שנוצר או נחתם במהלך העבודה: אחרי אישור שלי, לתייק אותו בתיק הלקוח ולקשר למשימה (taskId "${input.taskId}"). אם אתה יכול להריץ פקודות, עם start_document_upload ו-curl. אחרת עם upload_document, עד 1MB. מסמך שתויק מוסתר מהלקוח, אלא אם ביקשתי במפורש שיראה אותו.`,
+    `- מסמך שנוצר או נחתם במהלך העבודה: אחרי אישור שלי, לתייק אותו בתיק הלקוח ולקשר למשימה (taskId "${input.taskId}"). אם אתה יכול להריץ פקודות, עם start_document_upload ו-curl. אחרת עם upload_document, עד 1MB. מסמך שתויק מוסתר מהלקוח, אלא אם ביקשתי במפורש שיראה אותו. נוהל הוא חריג, בסעיף הבא.`,
+    // 19.10.2026: a procedure filed as a document only was found in the
+    // client file only after someone asked. See lib/procedure-to-file.ts.
+    `- נוהל, תהליך או כלל קבוע שנוצר במשימה: לפני סגירת המשימה, לתייק אותו כ-PDF עם kind: POLICY ולקשר למשימה. את זה מותר בלי לשאול, והמסמך מוסתר מהלקוח. אחר כך להציע אותו לתיק הלקוח עם propose_knowledge: התהליך עצמו כ-PROCESS, ולפי הצורך גם SYSTEM, REQUEST_TYPE או POLICY. המקור הוא המסמך שתויק (newSource מסוג ANKORA_DOCUMENT עם ה-documentId שלו). ההצעות ממתינות לאישור במסך הבדיקה, ולכן מותר לשלוח אותן בלי לשאול. אחר כך להזכיר לי לאשר.`,
+    ...(input.mapping
+      ? [
+          `- המשימה בשלב מיפוי וצפייה: לפני הסגירה, להציע לתיק הלקוח עם propose_knowledge את מה שנלמד בה (מערכות, אנשי קשר, סוגי בקשות, כללים), גם אם לא נוצר מסמך. המקור הוא המשימה עצמה (newSource מסוג TASK עם taskId "${input.taskId}"), או המסמך שתויק אם יש. מותר בלי לשאול, ואחר כך להזכיר לי לאשר.`,
+        ]
+      : []),
     "- אף פעם: לשלוח משהו ללקוח או לספק בעצמך. אתה מנסח, אני שולח.",
     "- אם התוכנית משתנה תוך כדי ביצוע, תציע גרסה חדשה ותשמור אותה רק אחרי אישור. לא משנים תוכנית בשקט.",
     `- אם save_task_plan מחזיר שנשמרה גרסה חדשה יותר, תקרא אותה עם get_task_plan, תראה לי מה שונה ותשאל לפני שאתה שומר.`,
@@ -270,6 +284,10 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "- **מה ידוע**: התמצית מהנתונים, בלי לחזור על כולם.",
     "- **מה חסר**: שאלות פתוחות שצריך לענות עליהן. אם אין, לכתוב \"אין\".",
     "- **שלבים**: רשימה ממוספרת. לכל שלב: מה עושים, מי מבצע (קלוד, שם מנהל התפעול, הלקוח או ספק), במה הוא תלוי, וזמן משוער.",
+    `  אם תוצאת המשימה היא נוהל, השלב שלפני הסגירה הוא תמיד: "${PROPOSE_STEP_TITLE}". מבצע: קלוד. אישור: מנהל במסך הבדיקה.`,
+    ...(input.mapping
+      ? [`  במשימת מיפוי, השלב שלפני הסגירה הוא תמיד: "${PROPOSE_MAPPING_STEP_TITLE}". מבצע: קלוד. אישור: מנהל במסך הבדיקה.`]
+      : []),
     "- **החלטות של הלקוח**: מה הלקוח צריך להחליט. אם אין, לכתוב \"אין\".",
     "- **סיכונים**: מה עלול להשתבש ומה עושים אז.",
     `- **סיום**: מתי המשימה נחשבת סגורה.${input.clientVisible ? " המשימה מוצגת ללקוח, אז לכלול גם הצעה למשפט התוצאה שהלקוח יקרא." : ""}`,
