@@ -434,5 +434,7 @@ export async function lookupContact(actor: User, query: string) {
       organization: person.organization?.name ?? null,
       isPrimary: l.isPrimary,
       isDecisionMaker: l.isDecisionMaker,
+      // Spec 6.1: who must not be told what, next to the person.
+      doNotDisclose: l.doNotDisclose,
     }));
 }

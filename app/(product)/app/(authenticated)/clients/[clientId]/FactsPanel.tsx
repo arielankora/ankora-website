@@ -23,7 +23,7 @@ import {
   closeTemporaryFactAction,
   removeClientFactAction,
 } from "../fact-actions";
-import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
+import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption, ItemExtras, ItemTags, AudienceField } from "./knowledge-ui";
 
 // Org brain, phase 2: the facts of the client file, sections 2, 4, 5, 7.3,
 // 8, 11, 12 and 13 of Hadas's file (claude/org-brain-spec-2026-10-12.md,
@@ -58,6 +58,7 @@ export type PanelFact = {
   toResolve: string | null;
   lowImportance: boolean;
   audience: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   doNotDisclose: string | null;
   sources: string[];
   supersededAt: string | null;
@@ -190,15 +191,7 @@ function FactForm({
               <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
             </select>
           </Field>
-          <Field label="מי רואה">
-            <select name="audience" defaultValue={existing?.audience ?? "ALL_STAFF"} className={INPUT}>
-              {(Object.keys(KNOWLEDGE_AUDIENCE_LABELS) as (keyof typeof KNOWLEDGE_AUDIENCE_LABELS)[]).map((a) => (
-                <option key={a} value={a}>
-                  {KNOWLEDGE_AUDIENCE_LABELS[a]}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <AudienceField existing={existing} />
         </div>
       )}
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={question ? "MISSING" : status} />

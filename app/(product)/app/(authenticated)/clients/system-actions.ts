@@ -65,7 +65,7 @@ function text(formData: FormData, name: string): string | null {
 }
 
 /// Every field, empty ones as null, so an edit can clear what it removes.
-function parseSystem(formData: FormData): {
+function parseSystem(formData: FormData, selfId?: string): {
   error?: string;
   value?: Omit<SystemAccessInput, "clientId">;
 } {
@@ -110,7 +110,7 @@ function parseSystem(formData: FormData): {
     audience: pick(formData.get("audience"), AUDIENCES),
     doNotDisclose: text(formData, "doNotDisclose"),
     sources: refs,
-    ...itemExtrasFrom(formData),
+    ...itemExtrasFrom(formData, selfId),
   };
   // The vault picker is shown only to people who may open the vault. A
   // form without it leaves the link as it is, rather than clearing it.
@@ -124,7 +124,7 @@ export async function addSystemAccessAction(
 ): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseSystem(formData);
+  const parsed = parseSystem(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await addSystemAccess(user, { ...parsed.value, clientId });
@@ -142,7 +142,7 @@ export async function updateSystemAccessAction(
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
   const id = String(formData.get("id") ?? "");
-  const parsed = parseSystem(formData);
+  const parsed = parseSystem(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await updateSystemAccess(user, id, parsed.value);

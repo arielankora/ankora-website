@@ -49,7 +49,7 @@ function parseSources(formData: FormData): { error?: string; refs?: SourceRef[] 
 
 /// Emails and phones arrive as one field each. An entry that is not an
 /// address or a number is refused by name, rather than dropped quietly.
-function parseContactFields(formData: FormData): { error?: string; value?: Parameters<typeof addClientContact>[1] } {
+function parseContactFields(formData: FormData, selfId?: string): { error?: string; value?: Parameters<typeof addClientContact>[1] } {
   const emails = parseList(String(formData.get("emails") ?? ""), normalizeEmail);
   if (emails.invalid.length) return { error: `כתובת מייל לא תקינה: ${emails.invalid.join(", ")}` };
   const phones = parseList(String(formData.get("phones") ?? ""), normalizePhone);
@@ -58,7 +58,7 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
   if (sources.error) return { error: sources.error };
   return {
     value: {
-      ...itemExtrasFrom(formData),
+      ...itemExtrasFrom(formData, selfId),
       clientId: String(formData.get("clientId") ?? ""),
       name: text(formData, "name"),
       role: text(formData, "role"),
@@ -87,7 +87,7 @@ function parseContactFields(formData: FormData): { error?: string; value?: Param
 
 export async function addClientContactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
-  const parsed = parseContactFields(formData);
+  const parsed = parseContactFields(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   if (!parsed.value.clientId) return { error: "לקוח לא נמצא." };
   try {
@@ -102,7 +102,7 @@ export async function addClientContactAction(_prev: FormState | undefined, formD
 export async function updateClientContactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const id = String(formData.get("id") ?? "");
-  const parsed = parseContactFields(formData);
+  const parsed = parseContactFields(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   const { clientId, organizationName: _org, ...rest } = parsed.value;
   void _org;

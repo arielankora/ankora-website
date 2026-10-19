@@ -246,7 +246,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
       status: effectiveStatus(f.knowledgeStatus, parseFieldStatus(f.fieldStatus)),
       toResolve: f.toResolve, clientVisible: f.clientVisible, ownerId: f.ownerId,
       lowImportance: f.importance === "LOW",
-      audience: f.audience,
+      audience: f.audience, audienceUserIds: f.audienceUserIds,
       doNotDisclose: f.doNotDisclose,
       sources: readSourceRefs(f.sources).map(formatSourceRef),
       supersededAt: iso(f.supersededAt),
@@ -404,7 +404,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   missingToResolve: missing[0]?.[1].toResolve ?? null,
                   status: effectiveStatus(e.knowledgeStatus, fields),
                   ownStatus: e.knowledgeStatus,
-                  toResolve: e.toResolve, clientVisible: e.clientVisible, ownerId: e.ownerId,
+                  toResolve: e.toResolve, clientVisible: e.clientVisible, ownerId: e.ownerId, doNotDisclose: e.doNotDisclose,
                   sources: readSourceRefs(e.sources).map(formatSourceRef),
                 };
               })}
@@ -432,7 +432,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 clientSideAddress: c.clientSideAddress,
                 status: effectiveStatus(c.knowledgeStatus, parseFieldStatus(c.fieldStatus)),
                 toResolve: c.toResolve, clientVisible: c.clientVisible, ownerId: c.ownerId,
-                audience: c.audience,
+                audience: c.audience, audienceUserIds: c.audienceUserIds,
                 doNotDisclose: c.doNotDisclose,
                 sensitive: c.sensitivity === "SENSITIVE",
                 sources: readSourceRefs(c.sources).map(formatSourceRef),
@@ -447,7 +447,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 currency: o.currency,
                 notes: o.notes,
                 status: effectiveStatus(o.knowledgeStatus, parseFieldStatus(o.fieldStatus)),
-                toResolve: o.toResolve, clientVisible: o.clientVisible, ownerId: o.ownerId,
+                toResolve: o.toResolve, clientVisible: o.clientVisible, ownerId: o.ownerId, doNotDisclose: o.doNotDisclose,
                 sources: readSourceRefs(o.sources).map(formatSourceRef),
               }))}
             />
@@ -501,7 +501,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 executorText: p.executorText,
                 transitionStatus: p.transitionStatus,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
-                toResolve: p.toResolve, clientVisible: p.clientVisible,
+                toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
                 score: p.completeness.score,
                 gaps: p.gaps,
@@ -601,7 +601,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 approvedByName: p.approvedById ? staffName.get(p.approvedById) ?? null : null,
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
-                toResolve: p.toResolve, clientVisible: p.clientVisible, ownerId: p.ownerId,
+                toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, ownerId: p.ownerId,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
               }))}
             />
@@ -629,7 +629,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   return p ? `${p.code} ${p.title}` : null;
                 })(),
                 status: effectiveStatus(r.knowledgeStatus, parseFieldStatus(r.fieldStatus)),
-                toResolve: r.toResolve, clientVisible: r.clientVisible, ownerId: r.ownerId,
+                toResolve: r.toResolve, clientVisible: r.clientVisible, ownerId: r.ownerId, doNotDisclose: r.doNotDisclose,
                 sources: readSourceRefs(r.sources).map(formatSourceRef),
               }))}
             />
@@ -661,7 +661,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 notes: s.notes,
                 status: effectiveStatus(s.knowledgeStatus, parseFieldStatus(s.fieldStatus)),
                 toResolve: s.toResolve, clientVisible: s.clientVisible, ownerId: s.ownerId,
-                audience: s.audience,
+                audience: s.audience, audienceUserIds: s.audienceUserIds,
                 doNotDisclose: s.doNotDisclose,
                 sources: readSourceRefs(s.sources).map(formatSourceRef),
               }))}

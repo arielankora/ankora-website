@@ -40,6 +40,7 @@ import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
 
 export type PanelPolicy = {
   clientVisible?: boolean;
+  doNotDisclose?: string | null;
   ownerId?: string | null;
   id: string;
   kind: PolicyKindLike;
@@ -234,7 +235,7 @@ function PolicyForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} />
+      <ItemExtras existing={existing} disclose />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -389,7 +390,7 @@ export function PoliciesPanel({
                   </p>
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
-                <ItemTags item={p} />
+                <ItemTags item={p} disclose />
                 <SourceCodes sources={p.sources} options={sourceOptions} />
                 {exceptions
                   .filter((e) => e.policyId === p.id)

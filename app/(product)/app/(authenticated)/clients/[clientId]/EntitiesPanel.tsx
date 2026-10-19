@@ -16,6 +16,7 @@ import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption,
 
 export type PanelEntity = {
   clientVisible?: boolean;
+  doNotDisclose?: string | null;
   ownerId?: string | null;
   id: string;
   name: string;
@@ -131,7 +132,7 @@ function EntityForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} />
+      <ItemExtras existing={existing} disclose />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -196,7 +197,7 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                   </p>
                 )}
                 {e.ownStatus !== "CONFIRMED" && <StatusLine status={e.ownStatus} toResolve={e.toResolve} />}
-                <ItemTags item={e} />
+                <ItemTags item={e} disclose />
                 <SourceCodes sources={e.sources} options={sourceOptions} />
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">

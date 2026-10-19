@@ -53,6 +53,8 @@ function summary(p: Processes[number], user: Map<string, string>) {
     approvedVersion: p.current?.version ?? null,
     nextDate: day(p.nextDate),
     lastRun: day(p.lastRunAt),
+    // Spec 6.1: shown with the item everywhere, Claude included.
+    doNotDisclose: p.doNotDisclose,
   };
 }
 

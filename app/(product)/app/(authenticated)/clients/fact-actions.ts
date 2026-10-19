@@ -54,7 +54,7 @@ function sources(formData: FormData): { error?: string; refs: SourceRef[] } {
   return { refs };
 }
 
-function parseFact(formData: FormData): { error?: string; value?: Omit<ClientFactInput, "clientId"> } {
+function parseFact(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientFactInput, "clientId"> } {
   const kind = pick(formData.get("kind"), KINDS);
   if (!kind) return { error: "צריך לבחור סוג." };
   const src = sources(formData);
@@ -66,7 +66,7 @@ function parseFact(formData: FormData): { error?: string; value?: Omit<ClientFac
   const subject = String(formData.get("subject") ?? "");
   return {
     value: {
-      ...itemExtrasFrom(formData),
+      ...itemExtrasFrom(formData, selfId),
       kind,
       body: String(formData.get("body") ?? ""),
       topic: pick(formData.get("topic"), TOPICS) ?? null,
@@ -101,7 +101,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseFact(formData);
+  const parsed = parseFact(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addClientFact(user, { ...parsed.value!, clientId }));
 }
@@ -109,7 +109,7 @@ export async function addClientFactAction(_prev: FormState | undefined, formData
 export async function supersedeClientFactAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseFact(formData);
+  const parsed = parseFact(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => supersedeClientFact(user, String(formData.get("id") ?? ""), parsed.value!));
 }
