@@ -29,6 +29,9 @@ import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type
 // before they reach for it.
 
 export type PanelSystem = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
   clientVisible?: boolean;
   ownerId?: string | null;
   id: string;

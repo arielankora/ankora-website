@@ -31,13 +31,13 @@ function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
-function parseEntity(formData: FormData): { error?: string; value?: Omit<ClientEntityInput, "clientId"> } {
+function parseEntity(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientEntityInput, "clientId"> } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
   if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
   const status = String(formData.get("knowledgeStatus") ?? "");
   return {
     value: {
-      ...itemExtrasFrom(formData),
+      ...itemExtrasFrom(formData, selfId),
       name: String(formData.get("name") ?? ""),
       legalName: text(formData, "legalName"),
       registrationNumber: text(formData, "registrationNumber"),
@@ -60,7 +60,7 @@ function parseEntity(formData: FormData): { error?: string; value?: Omit<ClientE
 export async function addClientEntityAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseEntity(formData);
+  const parsed = parseEntity(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await addClientEntity(user, { ...parsed.value, clientId });
@@ -74,7 +74,7 @@ export async function addClientEntityAction(_prev: FormState | undefined, formDa
 export async function updateClientEntityAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseEntity(formData);
+  const parsed = parseEntity(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   try {
     await updateClientEntity(user, String(formData.get("id") ?? ""), parsed.value);

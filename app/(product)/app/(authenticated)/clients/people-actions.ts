@@ -9,6 +9,7 @@ import {
   removeClientContact,
   addClientOrganization,
   removeClientOrganization,
+  updateClientOrganization,
 } from "@/lib/app-domain/client-contacts";
 import { normalizeEmail, normalizePhone, parseList } from "@/lib/contact-normalize";
 import { parseSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
@@ -126,9 +127,7 @@ export async function removeClientContactAction(id: string, clientId: string): P
   return { ok: true };
 }
 
-export async function addClientOrganizationAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
-  const user = await requireUser();
-  const clientId = String(formData.get("clientId") ?? "");
+function parseOrganizationFields(formData: FormData, selfId: string): { error?: string; value?: Parameters<typeof addClientOrganization>[1] } {
   const costRaw = String(formData.get("monthlyCost") ?? "").trim();
   let monthlyCostMinor: number | null = null;
   if (costRaw) {
@@ -137,10 +136,10 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
   }
   const sources = parseSources(formData);
   if (sources.error) return { error: sources.error };
-  try {
-    await addClientOrganization(user, {
-      ...itemExtrasFrom(formData),
-      clientId,
+  return {
+    value: {
+      ...itemExtrasFrom(formData, selfId),
+      clientId: String(formData.get("clientId") ?? ""),
       name: String(formData.get("name") ?? ""),
       domains: String(formData.get("domains") ?? "")
         .split(/[,\s]+/)
@@ -153,7 +152,32 @@ export async function addClientOrganizationAction(_prev: FormState | undefined, 
       knowledgeStatus: pick(formData.get("knowledgeStatus"), STATUSES),
       toResolve: text(formData, "toResolve"),
       sources: sources.refs,
-    });
+    },
+  };
+}
+
+export async function addClientOrganizationAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = parseOrganizationFields(formData, user.id);
+  if (parsed.error || !parsed.value) return { error: parsed.error };
+  try {
+    await addClientOrganization(user, parsed.value);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/clients/${parsed.value.clientId}`);
+  return { ok: true };
+}
+
+export async function updateClientOrganizationAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const id = String(formData.get("id") ?? "");
+  const parsed = parseOrganizationFields(formData, user.id);
+  if (parsed.error || !parsed.value) return { error: parsed.error };
+  const { clientId, name: _name, ...rest } = parsed.value;
+  void _name;
+  try {
+    await updateClientOrganization(user, id, rest);
   } catch (err) {
     return { error: friendlyError(err) };
   }

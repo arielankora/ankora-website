@@ -25,13 +25,13 @@ function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
-function parseRequestType(formData: FormData): { error?: string; value?: Omit<RequestTypeInput, "clientId"> } {
+function parseRequestType(formData: FormData, selfId?: string): { error?: string; value?: Omit<RequestTypeInput, "clientId"> } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
   if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
   const status = String(formData.get("knowledgeStatus") ?? "");
   return {
     value: {
-      ...itemExtrasFrom(formData),
+      ...itemExtrasFrom(formData, selfId),
       title: String(formData.get("title") ?? ""),
       fromWho: text(formData, "fromWho"),
       arrivesVia: text(formData, "arrivesVia"),
@@ -59,7 +59,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addRequestTypeAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseRequestType(formData);
+  const parsed = parseRequestType(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addRequestType(user, { ...parsed.value!, clientId }));
 }
@@ -67,7 +67,7 @@ export async function addRequestTypeAction(_prev: FormState | undefined, formDat
 export async function updateRequestTypeAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parseRequestType(formData);
+  const parsed = parseRequestType(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => updateRequestType(user, String(formData.get("id") ?? ""), parsed.value!));
 }

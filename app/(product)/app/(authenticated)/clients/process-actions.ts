@@ -40,7 +40,7 @@ function friendlyError(err: unknown): string {
 const text = (f: FormData, n: string) => String(f.get(n) ?? "").trim() || null;
 const list = (f: FormData, n: string) => f.getAll(n).map(String).filter(Boolean);
 
-function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput, "clientId"> } {
+function parseProcess(f: FormData, selfId?: string): { error?: string; value?: Omit<ProcessInput, "clientId"> } {
   const { refs, invalid } = parseSourceRefs(String(f.get("sources") ?? ""));
   if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
   const status = String(f.get("knowledgeStatus") ?? "");
@@ -53,7 +53,7 @@ function parseProcess(f: FormData): { error?: string; value?: Omit<ProcessInput,
   if (review !== null && !/^\d+$/.test(review)) return { error: "הסקירה היא כל מספר שלם של ימים." };
   return {
     value: {
-      ...itemExtrasFrom(f),
+      ...itemExtrasFrom(f, selfId),
       title: String(f.get("title") ?? ""),
       purpose: text(f, "purpose"),
       triggerKinds: list(f, "triggerKinds").filter((t): t is ProcessTrigger => (TRIGGERS as string[]).includes(t)),
@@ -98,7 +98,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
-  const parsed = parseProcess(f);
+  const parsed = parseProcess(f, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addProcess(user, { ...parsed.value!, clientId }));
 }
@@ -106,7 +106,7 @@ export async function addProcessAction(_prev: FormState | undefined, f: FormData
 export async function updateProcessAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
-  const parsed = parseProcess(f);
+  const parsed = parseProcess(f, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   // The entity and the external parties are what separation rules read:
   // a change to them is a change to what the rules say about the process.

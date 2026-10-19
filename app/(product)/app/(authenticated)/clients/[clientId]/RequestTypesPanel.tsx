@@ -11,6 +11,11 @@ import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type
 // 7.5 of the client file (claude/org-brain-spec-2026-10-12.md, 3.7).
 
 export type PanelRequestType = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
+  audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   clientVisible?: boolean;
   doNotDisclose?: string | null;
   ownerId?: string | null;
@@ -105,7 +110,7 @@ function RequestTypeForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} disclose />
+      <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />

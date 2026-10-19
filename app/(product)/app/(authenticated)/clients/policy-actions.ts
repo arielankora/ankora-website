@@ -34,7 +34,7 @@ function text(formData: FormData, name: string): string | null {
   return String(formData.get(name) ?? "").trim() || null;
 }
 
-function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientPolicyInput, "clientId"> } {
+function parsePolicy(formData: FormData, selfId?: string): { error?: string; value?: Omit<ClientPolicyInput, "clientId"> } {
   const { refs, invalid } = parseSourceRefs(String(formData.get("sources") ?? ""));
   if (invalid.length) return { error: `מקור לא מובן: ${invalid.join(", ")}. כותבים קוד ודקה, למשל S1 08:13.` };
   const kind = String(formData.get("kind") ?? "");
@@ -60,7 +60,7 @@ function parsePolicy(formData: FormData): { error?: string; value?: Omit<ClientP
   if (effectiveFrom === "bad" || reviewBy === "bad") return { error: "תאריך לא תקין." };
   return {
     value: {
-      ...itemExtrasFrom(formData),
+      ...itemExtrasFrom(formData, selfId),
       effectiveFrom,
       reviewBy,
       kind: kind as PolicyKind,
@@ -90,7 +90,7 @@ async function run(clientId: string, fn: () => Promise<unknown>): Promise<FormSt
 export async function addPolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parsePolicy(formData);
+  const parsed = parsePolicy(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => addClientPolicy(user, { ...parsed.value!, clientId }));
 }
@@ -98,7 +98,7 @@ export async function addPolicyAction(_prev: FormState | undefined, formData: Fo
 export async function updatePolicyAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
   const user = await requireUser();
   const clientId = String(formData.get("clientId") ?? "");
-  const parsed = parsePolicy(formData);
+  const parsed = parsePolicy(formData, user.id);
   if (parsed.error || !parsed.value) return { error: parsed.error };
   return run(clientId, () => updateClientPolicy(user, String(formData.get("id") ?? ""), parsed.value!));
 }

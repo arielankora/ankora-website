@@ -28,6 +28,7 @@ import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/proce
 import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
+import { refLabel, teamRefs } from "@/lib/external-refs";
 import type { User, ClientFact, KnowledgeSensitivity } from "@prisma/client";
 
 // Org brain, phase 2: the client file as one document
@@ -63,8 +64,9 @@ function day(d: Date | null | undefined): string | null {
   return d ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d) : null;
 }
 
-function knowledge(row: { knowledgeStatus: DocItem["status"]; fieldStatus: unknown; toResolve: string | null; sources: unknown; doNotDisclose: string | null; clientVisible?: boolean; ownerId?: string | null }): Pick<DocItem, "status" | "toResolve" | "sources" | "doNotDisclose" | "clientVisible" | "owner"> {
+function knowledge(row: { knowledgeStatus: DocItem["status"]; fieldStatus: unknown; toResolve: string | null; sources: unknown; doNotDisclose: string | null; clientVisible?: boolean; ownerId?: string | null; externalRefs?: unknown }): Pick<DocItem, "status" | "toResolve" | "sources" | "doNotDisclose" | "clientVisible" | "owner" | "refs"> {
   return {
+    refs: teamRefs(row.externalRefs).map(refLabel),
     status: effectiveStatus(row.knowledgeStatus!, parseFieldStatus(row.fieldStatus)),
     toResolve: row.toResolve,
     sources: readSourceRefs(row.sources).map(formatSourceRef),

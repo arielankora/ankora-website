@@ -22,6 +22,8 @@ export type DocItem = {
   /// Spec 3.1: shown to the client in the portal, and who keeps it right.
   clientVisible?: boolean;
   owner?: string | null;
+  /// Spec 3.1: where it lives in the team's other registers ("RAID-002").
+  refs?: string[];
   /// The item's id, printed in Claude's version only, so a proposal can
   /// name the item it changes (action SUPERSEDE, targetId).
   ref?: string;
@@ -69,7 +71,7 @@ export function itemLine(item: DocItem, withRef = false): string {
   const status = statusNote(item);
   if (status) parts.push(`**${status}**`);
   if (item.doNotDisclose) parts.push(`**לא לספר: ${item.doNotDisclose}**`);
-  const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner ? `בעלים: ${item.owner}` : null].filter(Boolean);
+  const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner ? `בעלים: ${item.owner}` : null, item.refs?.length ? `הפניות: ${item.refs.join(", ")}` : null].filter(Boolean);
   if (kept.length) parts.push(`{${kept.join(" · ")}}`);
   if (item.sources?.length) parts.push(`[${item.sources.join(", ")}]`);
   if (withRef && item.ref) parts.push(`(id: ${item.ref})`);
