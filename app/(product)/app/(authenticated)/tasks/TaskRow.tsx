@@ -21,7 +21,9 @@ const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 
 const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
   OPEN: "bg-app-neutral-soft text-app-text-secondary",
-  IN_PROGRESS: "bg-app-warning-soft text-app-warning",
+  // 19.10.2026 (canvas "Ankora App UI Round"): in progress is information,
+  // not a warning. Amber is now for what waits on someone.
+  IN_PROGRESS: "bg-app-info-soft text-app-info",
   // Tasks phase 2. Neither in flight nor finished: the work is done and
   // the task is not. A navy tint rather than a fifth colour token - the
   // portal already uses this exact pair for a held state, and inventing

@@ -123,6 +123,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const tab = sp?.tab === "file" ? "file" : "work";
   // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
   const backHref = listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
+  const fromParam = typeof sp?.from === "string" && sp.from ? `from=${encodeURIComponent(sp.from)}` : "";
   const user = await requireUser();
 
   if (!can(user.role, "client.manage")) {
@@ -367,8 +368,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <nav className="flex gap-1 border-b border-app-border" aria-label="לשוניות הלקוח">
           {(
             [
-              ["work", "עבודה שוטפת", `/app/clients/${client.id}`],
-              ["file", "תיק הלקוח", `/app/clients/${client.id}?tab=file`],
+              // The way back to the list survives a change of tab (20.10.2026).
+              ["work", "עבודה שוטפת", `/app/clients/${client.id}${fromParam ? `?${fromParam}` : ""}`],
+              ["file", "תיק הלקוח", `/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`],
             ] as const
           ).map(([key, label, href]) => (
             <Link

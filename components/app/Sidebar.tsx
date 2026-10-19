@@ -97,7 +97,7 @@ export function Sidebar({
         >
           <Search size={15} strokeWidth={1.75} className="shrink-0" />
           <span className="flex-1 truncate">חיפוש או פעולה</span>
-          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-cream/40">
+          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-[#8F98A3]">
             ⌘K
           </kbd>
         </button>
@@ -126,7 +126,7 @@ export function Sidebar({
           return (
             <div key={item.href}>
               {showHeader && (
-                <p className="mb-1 mt-4 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[rgba(248,244,236,0.32)] first:mt-1">
+                <p className="mb-1 mt-4 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#8F98A3] first:mt-1">
                   {item.group}
                 </p>
               )}
@@ -154,7 +154,7 @@ export function Sidebar({
               >
                 <Icon size={16} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" />
                 <span className="flex-1 truncate">{item.label}</span>
-                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-cream/45">{counter}</span>}
+                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-[#B4B8BC]">{counter}</span>}
               </Link>
             </div>
           );
@@ -168,7 +168,8 @@ export function Sidebar({
       <details className="group relative border-t border-white/10">
         <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-4 hover:bg-[rgba(248,244,236,0.06)] [&::-webkit-details-marker]:hidden">
           <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-light text-[13px] font-medium text-app-text-primary">
-            {userName.trim().charAt(0)}
+            {/* The first letter, Hebrew or Latin: "[DEMO] ..." starts with a bracket. */}
+            {userName.replace(/^[^A-Za-z0-9\u0590-\u05FF]+/, "").charAt(0)}
           </span>
           <span className="min-w-0 flex-1">
             <span className="block truncate text-sm font-medium text-cream">{userName}</span>

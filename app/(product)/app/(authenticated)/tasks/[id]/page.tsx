@@ -201,7 +201,7 @@ export default async function TaskDetailPage(props: {
           navigation cannot be quietly cancelled (see TaskRow). */}
       <nav className="flex items-center gap-1.5 text-[13px] text-app-text-tertiary">
         <PageBack href={backHref} label={backTitleText} testId="task-back" />
-        <ChevronLeft size={14} className="text-app-text-tertiary" />
+        <ChevronLeft size={14} className="text-app-text-tertiary md:hidden" />
         <span className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
 

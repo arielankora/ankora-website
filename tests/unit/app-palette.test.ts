@@ -52,7 +52,6 @@ describe("app palette", () => {
   });
 
   it("every app-* colour utility names a token that exists", () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const known = new Set(tokenNames((config as any).theme.extend.colors));
     const used = offenders(/\b(?:bg|text|border|divide|ring|outline|decoration|accent|fill|stroke)-(app-[a-z-]+)(?:\/\d+)?\b/g)
       .map((line) => line.replace(/^.*?-(app-[a-z-]+)(?:\/\d+)?$/, "$1"))
