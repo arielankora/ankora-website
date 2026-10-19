@@ -7,6 +7,7 @@ import {
   addClientDocument,
   listClientDocuments,
   removeClientDocument,
+  setClientDocumentKind,
   setClientDocumentVisibility,
 } from "@/lib/app-domain/client-documents";
 
@@ -95,6 +96,22 @@ describe("addClientDocument()", () => {
         content: Buffer.from("hello"),
       })
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe("changing a document's kind (20.10.2026)", () => {
+  it("corrects the kind, records it, and refuses a client this employee is not on", async () => {
+    const client = await createTestClient({ name: "Client Kind" });
+    const { user: admin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const doc = await seedDocument(client.id, { title: "נוהל טיפול בתקלות" });
+
+    const fixed = await setClientDocumentKind(admin, doc.id, "PROCEDURE");
+    expect(fixed.kind).toBe("PROCEDURE");
+    const audit = await prisma.auditEvent.findFirst({ where: { action: "client_document.kind", entityId: doc.id } });
+    expect(audit).not.toBeNull();
+
+    const { user: outsider } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(setClientDocumentKind(outsider, doc.id, "OTHER")).rejects.toBeInstanceOf(ForbiddenError);
   });
 });
 

@@ -87,7 +87,7 @@ describe("procedureReminderFor()", () => {
     const r = await procedureReminderFor(task.id, "DONE");
     expect(r?.kind).toBe("PROCEDURE");
     expect(r?.forClaude).toContain(`documentId ${doc.id}`);
-    expect(r?.forScreen).toContain('בסוג "נוהל"');
+    expect(r?.forScreen).toContain('לשנות אותו ל"נוהל"');
   });
 
   it("reminds on a task marked as mapping, whatever its description says (20.10.2026)", async () => {

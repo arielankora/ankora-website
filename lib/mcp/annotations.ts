@@ -91,6 +91,9 @@ export const TOOL_ANNOTATIONS = {
   // Issues an address; the filing happens when bytes arrive there. A second
   // call issues a second address and, used, a second document.
   start_document_upload: WRITES,
+  // 20.10.2026: changes what a filed document is. Setting the same kind
+  // twice leaves it as it was.
+  set_document_kind: { ...WRITES, idempotentHint: true },
   // The client file as one document (lib/mcp/client-file-tools.ts,
   // 14.10.2026). Assembled on each call; nothing is written.
   get_client_file: READ_ONLY,
@@ -159,6 +162,7 @@ export const WRITE_TOOLS = [
   "apply_task_plan_steps",
   "upload_document",
   "start_document_upload",
+  "set_document_kind",
   "propose_knowledge",
   "start_process",
   "record_process_check",
