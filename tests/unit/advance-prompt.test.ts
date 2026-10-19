@@ -320,6 +320,20 @@ describe("the timer around the conversation (19.10.2026)", () => {
     expect(text).toContain("סוף העבודה: כשהסיכום נשמר");
     expect(text).not.toContain("כשמסומן השלב האחרון");
   });
+
+  it("puts what has to be seen inside the card's question, not above it (19.10.2026)", () => {
+    const rules = timerRules(base, "advance").join("\n");
+    expect(rules).toContain("כרטיס שאלה מוצג לי בלי הטקסט שלפניו");
+    expect(rules).toContain(`להפעיל טיימר על NUX, המשימה "${base.title}", עם ההערה "<ההערה המוצעת>"?`);
+    expect(rules).toContain("רץ טיימר על <לקוח> מ-<שעה>. מה לעשות?");
+    expect(rules).toContain('הטיימר רץ <משך>. לעצור עם ההערה "<ההערה>"?');
+    expect(rules).not.toContain("מעל הכרטיס מה ייכנס");
+  });
+
+  it("reports the move to in progress where it will be seen", () => {
+    expect(buildAdvancePrompt(base)).toContain("בתוך השאלה של הכרטיס הבא או כשורה ראשונה אם אין כרטיס");
+    expect(buildAdvancePrompt(base)).not.toContain("משפט אחד מעל הכרטיס");
+  });
 });
 
 describe("a new procedure reaches the client file (19.10.2026)", () => {
