@@ -6,6 +6,7 @@ import {
   fileTypeLabel,
   isEmptyBrief,
   MAX_COMMENT_CHARS,
+  timerRules,
   type AdvancePromptInput,
 } from "@/lib/advance-prompt";
 
@@ -267,5 +268,55 @@ describe("files on the task (12.10.2026)", () => {
     expect(fileSizeLabel(320 * 1024)).toBe("320KB");
     expect(fileSizeLabel(1.4 * 1024 * 1024)).toBe("1.4MB");
     expect(fileSizeLabel(null)).toBeNull();
+  });
+});
+
+describe("the timer around the conversation (19.10.2026)", () => {
+  it("checks the running timers live, before anything else", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("## טיימר");
+    expect(text).toContain("get_active_timer");
+    expect(text.indexOf("## טיימר")).toBeLessThan(text.indexOf("## איך שואלים אותי"));
+    expect(text.indexOf("## טיימר")).toBeLessThan(text.indexOf("## נתוני המשימה"));
+  });
+
+  it("starts the timer on this client and this task, named exactly", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain(`start_timer עם client "NUX", task "${base.title}"`);
+    expect(text).toContain("רץ טיימר על הלקוח NUX: לא שואלים");
+  });
+
+  it("never runs in parallel without an explicit choice", () => {
+    expect(buildAdvancePrompt(base)).toContain("confirmParallel: true רק אם בחרתי במקביל");
+  });
+
+  it("reports a timer on another client without recommending what to do with it", () => {
+    const rules = timerRules(base, "advance");
+    const other = rules.find((l) => l.startsWith("- רץ טיימר על לקוח אחר"))!;
+    expect(other).toContain("בלי המלצה");
+    expect(other).not.toMatch(/"[^"]*" \(מומלץ\)/);
+    const two = rules.find((l) => l.startsWith("- רצים כבר שני טיימרים"))!;
+    expect(two).toContain("בלי המלצה");
+  });
+
+  it("offers to stop the timer when the work ends, after looking again", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).toContain("סוף העבודה: כשהמשימה נסגרת או עוברת לאישור");
+    expect(text).toContain("תבדוק שוב עם get_active_timer");
+  });
+
+  it("says an approved plan moves an open task to in progress, without asking", () => {
+    expect(buildAdvancePrompt(base)).toContain('משימה פתוחה עוברת ל"בביצוע" אוטומטית כשהתוכנית מאושרת');
+  });
+
+  it("shows every field before writing it", () => {
+    expect(buildAdvancePrompt(base)).toContain("לא כותבים ערך שלא ראיתי");
+  });
+
+  it("puts the same block in the lessons prompt, ending when the summary is saved", () => {
+    const text = buildLessonsPrompt({ ...base, completedLabel: "14.10.2026" });
+    expect(text).toContain("## טיימר");
+    expect(text).toContain("סוף העבודה: כשהסיכום נשמר");
+    expect(text).not.toContain("כשמסומן השלב האחרון");
   });
 });

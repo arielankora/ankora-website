@@ -151,6 +151,46 @@ export const HOW_TO_ASK: readonly string[] = [
   "",
 ];
 
+/// The timer around a "קדם עם קלוד" conversation (Ariel, 19.10.2026).
+///
+/// Work done with Claude is work on the client, and it went unrecorded
+/// whenever nobody remembered to start a clock. So the conversation opens
+/// by looking at what is running, live through get_active_timer rather
+/// than from a snapshot taken when the prompt was copied (it may be
+/// pasted hours later), and asks only when nothing runs on this client.
+///
+/// A timer on another client is reported, never judged: whether to stop
+/// it, run both or skip is the operations manager's call, so the three
+/// answers carry no recommendation (Ariel, 19.10.2026). The same timer is
+/// offered for stopping when the work ends, after a second look, because
+/// it may have been stopped on the screen in the meantime.
+///
+/// `mode` "lessons" is the closed-task summary: there the work ends when
+/// the summary is saved.
+export function timerRules(
+  input: Pick<AdvancePromptInput, "clientName" | "title">,
+  mode: "advance" | "lessons"
+): string[] {
+  const client = input.clientName;
+  const end =
+    mode === "advance"
+      ? "כשהמשימה נסגרת או עוברת לאישור, כשמסומן השלב האחרון, או כשאני אומר שאני עוצר להיום"
+      : "כשהסיכום נשמר, או כשאני אומר שאני עוצר להיום";
+  return [
+    "## טיימר",
+    "- בתחילת השיחה, לפני כל דבר אחר, תבדוק עם get_active_timer אילו טיימרים רצים לי.",
+    `- רץ טיימר על הלקוח ${client}: לא שואלים. תכתוב שורה אחת: על מה הוא רץ ומאז מתי, ותמשיך.`,
+    `- אין טיימר רץ: השאלה הראשונה שלך היא אם להפעיל טיימר. תכתוב מעל הכרטיס מה ייכנס: הלקוח, המשימה "${input.title}" והערה מוצעת. תשובות: "להפעיל" (מומלץ), "להפעיל עם הערה אחרת", "בלי טיימר".`,
+    "- רץ טיימר על לקוח אחר: תעדכן אותי שהוא רץ, על איזה לקוח ומאז מתי. ההחלטה שלי, אז בלי המלצה ובלי \"(מומלץ)\". תשובות: \"להפעיל כאן במקביל (הזמן נספר במלואו לשני הלקוחות)\", \"לעצור את הטיימר של הלקוח השני ולהתחיל כאן\", \"בלי טיימר\".",
+    "- רצים כבר שני טיימרים, ואף אחד מהם לא על הלקוח הזה: תעדכן אותי על שניהם ותשאל, בלי המלצה, אם לעצור אחד מהם (ואיזה) כדי להתחיל כאן, או להמשיך בלי טיימר.",
+    `- הפעלה: start_timer עם client "${client}", task "${input.title}" וההערה שאישרתי. confirmParallel: true רק אם בחרתי במקביל. אחרי ההפעלה, תגיד באיזו קטגוריה הטיימר רץ.`,
+    "- עצירה של טיימר אחר: stop_timer עם ה-client שלו. אם הכלי מבקש הערה, תציע הערה ותשאל לפני שאתה עוצר.",
+    `- סוף העבודה: ${end}. אז תבדוק שוב עם get_active_timer. אם רץ טיימר על ${client}, תכתוב כמה זמן הוא רץ ותציע לעצור אותו עם הערת סיכום של מה שנעשה בשיחה. תשובות: "לעצור עם ההערה הזו" (מומלץ), "לעצור עם הערה אחרת", "להשאיר רץ".`,
+    "- כל שדה שאתה ממלא (משימה, הערה, קטגוריה) מוצג לי לפני הכתיבה, ואפשר לשנות אותו. לא כותבים ערך שלא ראיתי.",
+    "",
+  ];
+}
+
 /// No description and no comment: nothing a person wrote down.
 export function isEmptyBrief(input: Pick<AdvancePromptInput, "description" | "comments">): boolean {
   return !input.description?.trim() && input.comments.length === 0;
@@ -198,7 +238,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     );
   }
   out.push(
-    `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את התוכנית במערכת עם save_task_plan: taskId "${input.taskId}", הטקסט המלא ב-plan, כותרות השלבים ב-steps, approved: true, ו-baseVersion: ${baseVersion}. אם אני מבקש לשמור בלי לאשר, approved: false.`,
+    `3. רק אחרי שכתבתי במפורש שאני מאשר, תשמור את התוכנית במערכת עם save_task_plan: taskId "${input.taskId}", הטקסט המלא ב-plan, כותרות השלבים ב-steps, approved: true, ו-baseVersion: ${baseVersion}. אם אני מבקש לשמור בלי לאשר, approved: false. משימה פתוחה עוברת ל"בביצוע" אוטומטית כשהתוכנית מאושרת (taskStarted בתשובה). אל תשאל על זה, רק תגיד לי.`,
     input.steps.length === 0
       ? "4. למשימה אין עדיין שלבים, ולכן כשתשמור תוכנית מאושרת, השלבים שלה נוספים למשימה אוטומטית. אל תשאל על זה. רק תגיד לי שהשלבים נוספו."
       : "4. למשימה כבר יש שלבים. אחרי השמירה, תשאל אם להחליף את השלבים הפתוחים בשלבי התוכנית (apply_task_plan_steps). תגיד לי ששלבים שבוצעו או שדווח עליהם זמן נשארים.",
@@ -206,6 +246,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     ""
   );
 
+  out.push(...timerRules(input, "advance"));
   out.push(...HOW_TO_ASK);
 
   // ---- What may be done without asking -----------------------------------
@@ -364,6 +405,7 @@ export function buildLessonsPrompt(input: AdvancePromptInput): string {
         ]
       : []),
     "",
+    ...timerRules(input, "lessons"),
     ...HOW_TO_ASK,
     "## מבנה הסיכום",
     "בלי כותרות עם #. כותרת כל חלק מודגשת (**כך**), והתוכן ברשימות. העברית פשוטה, המשפטים קצרים, ובלי קו מפריד ארוך.",

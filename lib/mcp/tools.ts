@@ -239,7 +239,7 @@ export function registerAnkoraTools(server: McpServer): void {
     "get_active_timer",
     {
       title: "Get the running timers",
-      description: `Returns the employee's running Ankora timers, oldest first, or reports that none is running. A person can run up to ${MAX_PARALLEL_TIMERS} timers at once, never two on the same client. Use it when the user asks what they are working on, or after a timer tool says it needs to know which timer is meant - not as a routine check before starting one, since start_timer refuses on its own and says what to do.`,
+      description: `Returns the employee's running Ankora timers, oldest first, or reports that none is running. A person can run up to ${MAX_PARALLEL_TIMERS} timers at once, never two on the same client. Use it when the user asks what they are working on, after a timer tool says it needs to know which timer is meant, and at the start and end of a "קדם עם קלוד" conversation, whose prompt asks to see what runs before offering a timer and again before offering to stop it. Not as a routine check before an ordinary start_timer, which refuses on its own and says what to do.`,
       inputSchema: z.object({}),
       annotations: READ_ONLY,
     },

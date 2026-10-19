@@ -308,3 +308,44 @@ describe("a task with no steps (11.10.2026)", () => {
     expect((await getTaskDetail(actor, task.id))!.subtasks.map((s) => s.title)).toEqual(["א"]);
   });
 });
+
+describe("an open task when its plan is approved (19.10.2026)", () => {
+  it("moves to in progress on an approved save, with a start date", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    const saved = await saveTaskPlan(actor, task.id, { body: "x", approved: true, baseVersion: 0, origin: "MCP" });
+
+    expect(saved.taskStarted).toBe(true);
+    const row = await prisma.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(row.status).toBe("IN_PROGRESS");
+    expect(row.startedAt).not.toBeNull();
+  });
+
+  it("stays open while the plan is a draft, and moves when the draft is approved", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+
+    const draft = await saveTaskPlan(actor, task.id, { body: "x", approved: false, baseVersion: 0, origin: "MCP" });
+    expect(draft.taskStarted).toBe(false);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("OPEN");
+
+    const approved = await approveTaskPlan(actor, task.id, 1);
+    expect(approved.taskStarted).toBe(true);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("IN_PROGRESS");
+  });
+
+  it("never moves a task that is not open", async () => {
+    const client = await createTestClient();
+    const actor = await employeeOn(client.id);
+    const task = await createTask(actor, { clientId: client.id, title: "התאמה" });
+    await updateTask(actor, task.id, { status: "PENDING_APPROVAL" });
+
+    const saved = await saveTaskPlan(actor, task.id, { body: "x", approved: true, baseVersion: 0, origin: "MCP" });
+
+    expect(saved.taskStarted).toBe(false);
+    expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("PENDING_APPROVAL");
+  });
+});
