@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
+import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { assignableUsers, createTask, updateTask } from "@/lib/app-domain/tasks";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -192,7 +193,10 @@ export async function toggleTaskDoneAction(input: {
     });
     revalidatePath("/app/tasks");
     revalidatePath("/app/portal");
-    return { ok: true as const, status: updated.status, clientOutcome: updated.clientOutcome };
+    // 20.10.2026: the list row and the board close tasks too, so they ask
+    // the same question the task screen asks (lib/procedure-to-file.ts).
+    const procedureReminder = await procedureReminderForScreen(updated.id, updated.clientId, input.nextStatus);
+    return { ok: true as const, status: updated.status, clientOutcome: updated.clientOutcome, procedureReminder };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

@@ -581,6 +581,15 @@ function RunningTimerCard({
               title: "הלקוח מעודכן",
               description: written || promise.label,
             });
+            // 20.10.2026: "הושלם" closed the task; see TaskRow.
+            if (recorded.procedureReminder) {
+              showToast({
+                tone: "warning",
+                title: "עוד לא בתיק הלקוח",
+                description: recorded.procedureReminder.text,
+                link: { label: "למסך הבדיקה", href: recorded.procedureReminder.reviewHref },
+              });
+            }
           },
         },
       });

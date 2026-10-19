@@ -213,6 +213,8 @@ export default async function TaskDetailPage(props: {
           clientTitle: task.clientTitle,
           clientRequest: task.clientRequest,
           clientOutcome: task.clientOutcome,
+          // 20.10.2026: only a task carries the toggle; a step is a line.
+          mappingTask: task.parentId === null ? task.mappingTask : null,
           blockedOn: task.blockedOn,
           blockedReason: task.blockedReason,
           blockedSince: task.blockedSince?.toISOString() ?? null,

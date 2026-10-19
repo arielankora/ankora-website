@@ -117,6 +117,15 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
       tone: "success",
       title: `${card.title}: ${COLUMNS.find((c) => c.status === to)?.label ?? ""}`,
     });
+    // 20.10.2026: see TaskRow, the same reminder after a drag to "הושלמו".
+    if (result.procedureReminder) {
+      showToast({
+        tone: "warning",
+        title: "עוד לא בתיק הלקוח",
+        description: result.procedureReminder.text,
+        link: { label: "למסך הבדיקה", href: result.procedureReminder.reviewHref },
+      });
+    }
   }
 
   function drop(to: TaskStatus, id: string) {

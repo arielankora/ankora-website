@@ -16,6 +16,7 @@ import type {
 import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
+import { isMappingTask } from "@/lib/procedure-to-file";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -885,6 +886,10 @@ export async function createTask(
     /// onboarding and offboarding tasks the server opens. Not offered to
     /// any form or tool; see Task.subjectUserId.
     subject?: { userId: string; kind: EmployeeLifecycleKind } | null;
+    /// 20.10.2026: a mapping task (see Task.mappingTask). When not given,
+    /// a description carrying the handover's "שלב: מיפוי וצפייה" line
+    /// marks it, so a handover plan written as text still gets the check.
+    mappingTask?: boolean;
   }
 ) {
   // permissions.ts requires every server-side entry point to assert, and
@@ -924,6 +929,8 @@ export async function createTask(
       clientTitle: input.clientTitle?.trim() || null,
       subjectUserId: input.subject?.userId ?? null,
       lifecycleKind: input.subject?.kind ?? null,
+      // Steps are checklist lines; only the task above them is filed.
+      mappingTask: input.parentId ? false : (input.mappingTask ?? isMappingTask(input.description)),
     },
   });
 
@@ -1025,6 +1032,8 @@ export type TaskPatch = {
   // `completedAt`. A signature a caller can supply is not a signature.
   supervisorId?: string | null;
   requiresApproval?: boolean;
+  /// 20.10.2026: see Task.mappingTask.
+  mappingTask?: boolean;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -1219,6 +1228,12 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     data.title = title;
   }
   if (patch.description !== undefined) data.description = patch.description?.trim() || null;
+  if (patch.mappingTask !== undefined) data.mappingTask = patch.mappingTask;
+  // A description rewritten into a handover's mapping stage marks the
+  // task, like createTask does. Only ever on: rewording the line away is
+  // not a decision that the task stopped mapping, and the toggle is there
+  // for that.
+  else if (patch.description !== undefined && !task.parentId && isMappingTask(patch.description)) data.mappingTask = true;
   if (patch.priority !== undefined) data.priority = patch.priority;
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.categoryId !== undefined) {

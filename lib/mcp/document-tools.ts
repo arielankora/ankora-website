@@ -46,10 +46,11 @@ import {
 // for the file itself; uploading prefers an address over base64. See
 // lib/mcp/file-ticket.ts.
 
-const KINDS = ["POLICY", "CERTIFICATE", "CONTRACT", "INVOICE", "OTHER"] as const;
+const KINDS = ["POLICY", "PROCEDURE", "CERTIFICATE", "CONTRACT", "INVOICE", "OTHER"] as const;
 
 const KIND_LABELS: Record<ClientDocumentKind, string> = {
   POLICY: "פוליסה",
+  PROCEDURE: "נוהל",
   CERTIFICATE: "אישור",
   CONTRACT: "חוזה",
   INVOICE: "חשבונית",
@@ -117,7 +118,7 @@ function clientScreenUrl(clientId: string): string {
 const UPLOAD_FIELDS = {
   ...TARGET_ARGS,
   title: z.string().min(1).max(200).describe("The document's name as people will read it in Ankora, in Hebrew when the user writes Hebrew. Example: 'חוזה העסקה חתום - דנה כהן'."),
-  kind: z.enum(KINDS).optional().describe("POLICY, CERTIFICATE, CONTRACT, INVOICE or OTHER. Default OTHER."),
+  kind: z.enum(KINDS).optional().describe("POLICY (an insurance policy), PROCEDURE (a procedure or process Ankora wrote), CERTIFICATE, CONTRACT, INVOICE or OTHER. Default OTHER."),
   fileName: z.string().min(1).max(200).describe("The file's name with its extension, e.g. 'contract-signed.pdf'. The extension decides how the file opens."),
   mimeType: z.string().optional().describe("Only if you know it for certain. Otherwise omit; Ankora decides from the extension."),
   clientVisible: z

@@ -242,6 +242,11 @@ describe("update_task: portal visibility and waiting", () => {
     expect(out).not.toHaveProperty("reminder");
   });
 
+  it("marks or unmarks a mapping task (20.10.2026)", async () => {
+    await call("update_task", { task: "x", mappingTask: true });
+    expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { mappingTask: true });
+  });
+
   it("marks a task as waiting on the client, with the reason", async () => {
     await call("update_task", { task: "x", waitingOn: "CLIENT", waitingReason: "אישור ספי הוצאה" });
     expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", {

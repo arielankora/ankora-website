@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isMappingTask,
+  looksLikeProcedure,
   procedureReminderKind,
   reminderForClaude,
   reminderForScreen,
@@ -12,7 +13,7 @@ import {
 
 const facts = (over: Partial<ProcedureCheckFacts> = {}): ProcedureCheckFacts => ({
   closing: true,
-  policyDocumentIds: [],
+  procedureDocumentIds: [],
   isMapping: false,
   hasProposalFromTask: false,
   ...over,
@@ -31,8 +32,8 @@ describe("isMappingTask()", () => {
 });
 
 describe("procedureReminderKind()", () => {
-  it("reminds about a policy document that was never proposed", () => {
-    expect(procedureReminderKind(facts({ policyDocumentIds: ["d1"] }))).toBe("PROCEDURE");
+  it("reminds about a procedure document that was never proposed", () => {
+    expect(procedureReminderKind(facts({ procedureDocumentIds: ["d1"] }))).toBe("PROCEDURE");
   });
 
   it("reminds about a mapping task even without a document", () => {
@@ -40,15 +41,15 @@ describe("procedureReminderKind()", () => {
   });
 
   it("a procedure wins over mapping when both apply", () => {
-    expect(procedureReminderKind(facts({ policyDocumentIds: ["d1"], isMapping: true }))).toBe("PROCEDURE");
+    expect(procedureReminderKind(facts({ procedureDocumentIds: ["d1"], isMapping: true }))).toBe("PROCEDURE");
   });
 
   it("stays quiet once something was proposed from the task", () => {
-    expect(procedureReminderKind(facts({ policyDocumentIds: ["d1"], isMapping: true, hasProposalFromTask: true }))).toBeNull();
+    expect(procedureReminderKind(facts({ procedureDocumentIds: ["d1"], isMapping: true, hasProposalFromTask: true }))).toBeNull();
   });
 
   it("stays quiet when the task is not closing, or has nothing to propose", () => {
-    expect(procedureReminderKind(facts({ closing: false, policyDocumentIds: ["d1"] }))).toBeNull();
+    expect(procedureReminderKind(facts({ closing: false, procedureDocumentIds: ["d1"] }))).toBeNull();
     expect(procedureReminderKind(facts())).toBeNull();
   });
 });
@@ -70,5 +71,35 @@ describe("the reminder's words", () => {
       expect(text).not.toMatch(/[\u2013\u2014]/);
     }
     expect(reminderForScreen("PROCEDURE")).toContain("תיק הלקוח");
+  });
+});
+
+describe("a procedure filed as another kind (20.10.2026)", () => {
+  it("recognises a procedure by its name, in Hebrew or English", () => {
+    expect(looksLikeProcedure("נוהל טיפול בתקלות ציוד")).toBe(true);
+    expect(looksLikeProcedure("נהלים לניהול Google Workspace")).toBe(true);
+    expect(looksLikeProcedure("תהליך קליטת עובד")).toBe(true);
+    expect(looksLikeProcedure("Onboarding SOP v2")).toBe(true);
+    expect(looksLikeProcedure("IT incident procedure")).toBe(true);
+  });
+
+  it("does not take an insurance policy, a contract or an invoice for one", () => {
+    expect(looksLikeProcedure("פוליסת ביטוח צד ג 2026")).toBe(false);
+    expect(looksLikeProcedure("חוזה שכירות")).toBe(false);
+    expect(looksLikeProcedure("חשבונית ספטמבר")).toBe(false);
+    expect(looksLikeProcedure("SOPHIA invoice")).toBe(false);
+    expect(looksLikeProcedure(null)).toBe(false);
+  });
+
+  it("reminds about a named procedure even when no document has the PROCEDURE kind", () => {
+    expect(procedureReminderKind(facts({ namedProcedureDocumentIds: ["d2"] }))).toBe("PROCEDURE");
+  });
+
+  it("says it was misfiled, to Claude and on the screen", () => {
+    expect(reminderForClaude("PROCEDURE", "t1", ["d2"], { misfiled: true })).toContain("PROCEDURE");
+    expect(reminderForClaude("PROCEDURE", "t1", ["d2"], { misfiled: true })).toContain("documentId d2");
+    expect(reminderForScreen("PROCEDURE", { misfiled: true })).toContain('בסוג "נוהל"');
+    expect(reminderForScreen("PROCEDURE")).not.toContain('בסוג "נוהל"');
+    expect(reminderForScreen("PROCEDURE", { misfiled: true })).not.toMatch(/[\u2013\u2014]/);
   });
 });

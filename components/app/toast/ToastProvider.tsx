@@ -62,6 +62,12 @@ export type ShowToastInput = {
   undo?: () => void | Promise<void>;
   /** A question asked inside the toast. Suppresses auto-dismiss. */
   ask?: ToastAsk;
+  /**
+   * A place to go next (20.10.2026: the closing reminder's "to the review
+   * screen"). Presence extends the auto-dismiss delay like `undo` does: a
+   * link that vanishes before it can be read is not an offer.
+   */
+  link?: { label: string; href: string };
 };
 
 type ToastItem = ShowToastInput & { id: string };
@@ -113,7 +119,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       setToasts((prev) => [...prev, { ...input, id }]);
       if (input.ask) return;
-      const duration = input.undo ? UNDO_DURATION_MS : NORMAL_DURATION_MS;
+      const duration = input.undo || input.link ? UNDO_DURATION_MS : NORMAL_DURATION_MS;
       const timer = setTimeout(() => dismiss(id), duration);
       timers.current.set(id, timer);
     },
@@ -174,6 +180,11 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
           <p className="text-[13.5px] font-medium text-appNavy">{toast.title}</p>
           {toast.description && <p className="mt-0.5 text-xs text-appNavy/60">{toast.description}</p>}
           {toast.ask && <ToastQuestion ask={toast.ask} onDone={onDismiss} />}
+          {toast.link && !toast.ask && (
+            <a href={toast.link.href} className="mt-1.5 inline-block text-xs font-medium text-gold-dim hover:text-appNavy">
+              {toast.link.label}
+            </a>
+          )}
           {toast.undo && !toast.ask && (
             <button
               type="button"

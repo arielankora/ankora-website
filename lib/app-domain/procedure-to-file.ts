@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { TaskStatus } from "@prisma/client";
 import {
   isMappingTask,
+  looksLikeProcedure,
   procedureReminderKind,
   reminderForClaude,
   reminderForScreen,
@@ -35,21 +36,28 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, clientId: true, parentId: true, description: true },
+    select: { id: true, clientId: true, parentId: true, description: true, mappingTask: true },
   });
   // Steps are checklist lines; the task above them is what gets filed.
   if (!task || task.parentId) return null;
 
   const documents = await prisma.clientDocument.findMany({
     where: { taskId: task.id, deletedAt: null },
-    select: { id: true, kind: true },
+    select: { id: true, kind: true, title: true },
     orderBy: { createdAt: "asc" },
   });
-  const policyDocumentIds = documents.filter((d) => d.kind === "POLICY").map((d) => d.id);
-  const isMapping = isMappingTask(task.description);
+  const procedureDocumentIds = documents.filter((d) => d.kind === "PROCEDURE").map((d) => d.id);
+  // A procedure filed as something else, by its name (20.10.2026). An
+  // insurance policy filed as POLICY ("פוליסה") is not one.
+  const namedProcedureDocumentIds = documents
+    .filter((d) => d.kind !== "PROCEDURE" && looksLikeProcedure(d.title))
+    .map((d) => d.id);
+  // The flag, and the description line for a task the flag has not
+  // reached yet (one written straight to the database, say).
+  const isMapping = task.mappingTask || isMappingTask(task.description);
   // Nothing to look for: skip the register entirely, which is the common
   // case for an ordinary task closing.
-  if (policyDocumentIds.length === 0 && !isMapping) return null;
+  if (procedureDocumentIds.length === 0 && namedProcedureDocumentIds.length === 0 && !isMapping) return null;
 
   // Any source of this client that names the task or one of its
   // documents, with at least one proposal batch sent from it. A source
@@ -63,11 +71,33 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
   const hasProposalFromTask =
     sourceIds.length > 0 && (await prisma.knowledgeBatch.count({ where: { clientId: task.clientId, sourceId: { in: sourceIds } } })) > 0;
 
-  const kind = procedureReminderKind({ closing: true, policyDocumentIds, isMapping, hasProposalFromTask });
+  const kind = procedureReminderKind({ closing: true, procedureDocumentIds, namedProcedureDocumentIds, isMapping, hasProposalFromTask });
   if (!kind) return null;
+  // Misfiled: the only procedure on the task was filed as another kind.
+  const misfiled = kind === "PROCEDURE" && procedureDocumentIds.length === 0;
+  const documentIds = procedureDocumentIds.length > 0 ? procedureDocumentIds : namedProcedureDocumentIds;
   return {
     kind,
-    forClaude: reminderForClaude(kind, task.id, policyDocumentIds),
-    forScreen: reminderForScreen(kind),
+    forClaude: reminderForClaude(kind, task.id, documentIds, { misfiled }),
+    forScreen: reminderForScreen(kind, { misfiled }),
   };
+}
+
+/// What a screen shows after a close: the Hebrew sentence and where to go
+/// to propose. Every screen that closes a task uses this one helper (the
+/// task screen, the list row, the board, the timer), so a new way to close
+/// a task has one line to add. A failed check is not allowed to make a
+/// successful close look failed, so it answers null instead of throwing.
+export type ScreenProcedureReminder = { text: string; reviewHref: string };
+
+export async function procedureReminderForScreen(
+  taskId: string,
+  clientId: string,
+  newStatus: TaskStatus | undefined
+): Promise<ScreenProcedureReminder | null> {
+  const reminder = await procedureReminderFor(taskId, newStatus).catch((err) => {
+    console.error("[procedure-to-file] closing check failed", err);
+    return null;
+  });
+  return reminder ? { text: reminder.forScreen, reviewHref: `/app/knowledge?clientId=${encodeURIComponent(clientId)}` } : null;
 }

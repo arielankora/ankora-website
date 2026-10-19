@@ -62,6 +62,9 @@ export type TaskDetailData = {
   clientVisible: boolean;
   clientTitle: string | null;
   clientRequest: string | null;
+  /// 20.10.2026: a mapping task (Task.mappingTask). Null on a step, which
+  /// has no toggle.
+  mappingTask: boolean | null;
   clientOutcome: string | null;
   /// Tasks phase 5. Null means nothing is holding this up.
   blockedOn: TaskBlocker | null;
@@ -111,6 +114,7 @@ export function TaskDetail({
   const [clientOutcome, setClientOutcome] = useState(task.clientOutcome ?? "");
   const [supervisorId, setSupervisorId] = useState(task.supervisorId ?? "");
   const [requiresApproval, setRequiresApproval] = useState(task.requiresApproval);
+  const [mappingTask, setMappingTask] = useState(task.mappingTask);
   /// The status the person is trying to reach, held while they are being
   /// asked for the outcome sentence first. Null when nothing is pending.
   ///
@@ -328,6 +332,30 @@ export function TaskDetail({
             />
           </label>
         </div>
+
+        {mappingTask !== null && (
+          <label className="mt-4 flex w-fit items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/60">
+            <input
+              type="checkbox"
+              checked={mappingTask}
+              disabled={pending}
+              onChange={async (e) => {
+                const next = e.target.checked;
+                setMappingTask(next);
+                const ok = await write(
+                  { mappingTask: next },
+                  {
+                    title: next ? "סומנה כמשימת מיפוי" : "הסימון כמשימת מיפוי הוסר",
+                    description: "מה שנלמד במשימת מיפוי מוצע לתיק הלקוח לפני הסגירה.",
+                  }
+                );
+                if (!ok) setMappingTask(!next);
+              }}
+              className="h-3.5 w-3.5 accent-appNavy"
+            />
+            משימת מיפוי: הממצאים מוצעים לתיק הלקוח לפני הסגירה
+          </label>
+        )}
 
         <Timestamps task={task} />
       </section>

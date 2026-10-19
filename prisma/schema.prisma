@@ -789,6 +789,14 @@ model Task {
   processVersionId String?
   stepMode         ProcessStepMode?
 
+  /// 20.10.2026: a mapping task (a handover's "מיפוי וצפייה" stage). What
+  /// it learns goes to the client file before it closes, even without a
+  /// document, and closing reminds when it did not (lib/procedure-to-file.ts).
+  /// A field rather than a line in the description, which was how it was
+  /// first detected: a reworded description silently turned the check off.
+  /// Existing tasks were marked from that line by the migration.
+  mappingTask      Boolean          @default(false)
+
   // Portal phase 1 ("הבטחות"). Three fields, and deliberately not a
   // second status column.
   //
@@ -2244,7 +2252,12 @@ enum PortalDigest {
 }
 
 enum ClientDocumentKind {
+  /// An insurance policy: the screens call it "פוליסה".
   POLICY
+  /// 20.10.2026: a procedure Ankora wrote ("נוהל"). Kept apart from POLICY,
+  /// which procedures were filed as until then, so the closing check in
+  /// lib/procedure-to-file.ts can tell a procedure from an insurance policy.
+  PROCEDURE
   CERTIFICATE
   CONTRACT
   INVOICE
