@@ -218,6 +218,7 @@ export default async function TaskDetailPage(props: {
           startedAt: task.startedAt?.toISOString() ?? null,
           completedAt: task.completedAt?.toISOString() ?? null,
           createdAt: task.createdAt.toISOString(),
+          reportedSeconds: time.totalSeconds,
         }}
         people={people}
         categories={categories}

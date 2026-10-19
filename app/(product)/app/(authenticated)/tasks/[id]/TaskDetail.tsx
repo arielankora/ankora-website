@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
+import { formatDuration } from "@/lib/time-entry-format";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { TASK_BLOCKER_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
@@ -68,6 +69,10 @@ export type TaskDetailData = {
   startedAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  /// Closed time reported on the task and its steps, the same number as
+  /// "שעות על המשימה" further down. Shown under the timer button, where
+  /// the question "how much has this taken so far" is asked.
+  reportedSeconds: number;
 };
 
 export function TaskDetail({
@@ -225,7 +230,25 @@ export function TaskDetail({
             <p className="mt-1 text-[13px] text-appNavy/55">{task.clientName}</p>
           </div>
 
-          <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
+          {/* Ariel, 19.10.2026: the timer was here, the hours it had
+              already added up to were at the bottom of the screen. The
+              total sits under the button and links to the breakdown. */}
+          <div className="flex shrink-0 flex-col items-end gap-1.5">
+            <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
+            <a
+              href="#task-time"
+              data-testid="task-reported-total"
+              className="text-[12.5px] text-appNavy/55 hover:text-appNavy"
+            >
+              {task.reportedSeconds > 0 ? (
+                <>
+                  דווחו עד כה <span className="font-jbmono text-appNavy">{formatDuration(task.reportedSeconds)}</span> שעות
+                </>
+              ) : (
+                "עוד לא דווח זמן"
+              )}
+            </a>
+          </div>
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">

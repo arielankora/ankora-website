@@ -24,7 +24,7 @@ export function TaskTimeSummary({
   };
 }) {
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-5">
+    <section id="task-time" className="scroll-mt-24 rounded-2xl border border-lineDark bg-white p-5">
       <div className="flex items-center justify-between">
         <h2 className="flex items-center gap-2 text-sm font-medium text-appNavy/70">
           <Clock size={15} strokeWidth={1.75} className="text-appNavy/40" />
