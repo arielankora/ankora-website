@@ -1803,6 +1803,14 @@
       "risk": "high",
       "riskAssigned": false,
       "firstSeen": "2026-10-19"
+    },
+    "domain:proposal-links": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-19",
+      "riskReason": "Resolves names Claude sends to ids inside one client only; a wrong match links a request or a process to the wrong contact or system"
     }
   },
   "waivers": {},
