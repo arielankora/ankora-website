@@ -119,6 +119,10 @@ export function TaskDetail({
   /// also a person saying they are finished with it, and the supervisor
   /// about to be asked to sign needs to see what they are signing for.
   const [closingTo, setClosingTo] = useState<TaskStatus | null>(null);
+  /// 19.10.2026: the task closed, but the procedure filed on it (or what
+  /// a mapping task learned) was never proposed to the client file. Set
+  /// from the server's answer to the close, cleared by the person.
+  const [procedureReminder, setProcedureReminder] = useState<{ text: string; reviewHref: string } | null>(null);
 
   /// The one write path on this screen.
   ///
@@ -151,6 +155,7 @@ export function TaskDetail({
     setClientOutcome(result.clientOutcome ?? "");
     setSupervisorId(result.supervisorId ?? "");
     setRequiresApproval(result.requiresApproval);
+    if (result.procedureReminder) setProcedureReminder(result.procedureReminder);
     showToast({ tone: "success", ...toast });
     return true;
   }
@@ -424,6 +429,31 @@ export function TaskDetail({
           <p className="mt-3 text-sm text-appNavy/45">אין תיאור. כל מה שנמצא היום בוואטסאפ שייך לכאן.</p>
         )}
       </section>
+
+      {procedureReminder && (
+        <section role="status" className="rounded-2xl border border-warning/30 bg-warning-soft p-5">
+          <p className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
+            <Hourglass size={15} className="text-warning" />
+            עוד לא בתיק הלקוח
+          </p>
+          <p className="mt-1 text-[12.5px] text-appNavy/70">{procedureReminder.text}</p>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <a
+              href={procedureReminder.reviewHref}
+              className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream"
+            >
+              למסך הבדיקה
+            </a>
+            <button
+              type="button"
+              onClick={() => setProcedureReminder(null)}
+              className="text-[12.5px] text-appNavy/60 hover:text-appNavy"
+            >
+              הבנתי
+            </button>
+          </div>
+        </section>
+      )}
 
       <BlockSection task={task} pending={pending} write={write} isClosed={status === "DONE" || status === "ARCHIVED"} />
 

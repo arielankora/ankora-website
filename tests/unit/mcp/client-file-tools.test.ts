@@ -123,6 +123,15 @@ describe("propose_knowledge", () => {
     );
   });
 
+  it("takes a task as the source, so a mapping task can be cited (19.10.2026)", async () => {
+    await call({ client: "nux", newSource: { kind: "TASK", title: "מיפוי SaaS", taskId: "t-map" }, items: [ITEM] });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(
+      ACTOR,
+      expect.objectContaining({ source: expect.objectContaining({ kind: "TASK", externalIds: ["t-map"] }) }),
+      { indexes: [0] }
+    );
+  });
+
   it("needs a source, and a date it can read, before anything is sent", async () => {
     expect((await call({ client: "nux", items: [ITEM] })).content[0].text).toContain("sourceCode");
     expect((await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "x", date: "12.10.2026" }, items: [ITEM] })).content[0].text).toContain("YYYY-MM-DD");
