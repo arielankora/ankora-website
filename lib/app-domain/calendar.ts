@@ -4,6 +4,7 @@ import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listTasks, OPEN_STATUSES } from "@/lib/app-domain/tasks";
+import { mineFilters, type MineScope } from "@/app/(product)/app/(authenticated)/tasks/mine-scope";
 import { occurrencesInRange } from "@/lib/app-domain/calendar-occurrences";
 import { dayEndInZone, dayStartInZone, localDateKey, TIMEZONE } from "@/lib/timezone";
 import { visibleDays, type CalendarShow, type CalendarView } from "@/lib/calendar-keys";
@@ -88,14 +89,14 @@ function toCalendarTask(t: TaskRow): CalendarTask {
 
 export async function loadCalendar(
   actor: User,
-  opts: { view: CalendarView; date: string; show: CalendarShow; clientId?: string; mine: boolean; today: string }
+  opts: { view: CalendarView; date: string; show: CalendarShow; clientId?: string; mine: MineScope; today: string }
 ): Promise<CalendarData> {
   const days = visibleDays(opts.view, opts.date);
   const startKey = days[0];
   const endKey = days[days.length - 1];
-  // "שלי" on the calendar is the tasks screen's default: work I carry or
-  // supervise. The narrower halves are on the tasks screen.
-  const person = opts.mine ? { involvedUserId: actor.id } : {};
+  // The tasks screen's four scopes, through its own filter builder, so
+  // "לביצוע" here and there can never mean two different things.
+  const person = mineFilters(opts.mine, actor.id);
   const base = { clientId: opts.clientId, statusIn: OPEN_STATUSES, ...person };
 
   const wantTasks = opts.show !== "dates";
@@ -128,7 +129,11 @@ export async function loadCalendar(
   };
 }
 
-async function loadDates(actor: User, startKey: string, endKey: string, clientId: string | undefined, mine: boolean): Promise<CalendarDate[]> {
+async function loadDates(actor: User, startKey: string, endKey: string, clientId: string | undefined, mine: MineScope): Promise<CalendarDate[]> {
+  // A date has a responsible person and participants, and no supervisor.
+  // So "בפיקוח" shows no dates (Ariel, 20.10.2026), and "שלי" and "לביצוע"
+  // both mean "mine to handle".
+  if (mine === "supervising") return [];
   const accessibleIds = (await listAccessibleClients(actor)).map((c) => c.id);
   if (accessibleIds.length === 0) return [];
   const scoped = clientId && accessibleIds.includes(clientId) ? clientId : undefined;
@@ -138,7 +143,7 @@ async function loadDates(actor: User, startKey: string, endKey: string, clientId
       deletedAt: null,
       clientId: scoped ?? { in: accessibleIds },
       status: { notIn: ["ARCHIVED", "PAUSED"] },
-      ...(mine ? { OR: [{ responsibleUserId: actor.id }, { additionalUserIds: { has: actor.id } }] } : {}),
+      ...(mine !== "all" ? { OR: [{ responsibleUserId: actor.id }, { additionalUserIds: { has: actor.id } }] } : {}),
     },
     include: { client: { select: { name: true } } },
   });

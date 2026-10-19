@@ -7,6 +7,8 @@
 // timezone, no `server-only`: the client component imports this too, to
 // know which keys the grid draws and where "next week" goes.
 
+import { mineParam, type MineScope } from "@/app/(product)/app/(authenticated)/tasks/mine-scope";
+
 export type CalendarView = "day" | "week" | "month";
 export type CalendarShow = "all" | "tasks" | "dates";
 
@@ -127,8 +129,10 @@ export type CalendarState = {
   date: string;
   show: CalendarShow;
   clientId?: string;
-  /// false = everyone's work. Written as `mine=0`, like the tasks screen.
-  mine: boolean;
+  /// Whose work, in the tasks screen's own four words and URL values
+  /// (mine-scope.ts): absent or `1` = "שלי", `assigned`, `supervising`,
+  /// `0` = everyone. 20.10.2026: the calendar had only "שלי" and "כולם".
+  mine: MineScope;
   /// 20.10.2026: the drawer, and which of its two lists. Absent = closed,
   /// which is the default: the grid gets the whole width until somebody
   /// is planning.
@@ -147,7 +151,8 @@ export function calendarHref(state: CalendarState, today: string): string {
   if (state.date !== today) p.set("date", state.date);
   if (state.show !== "all") p.set("show", state.show);
   if (state.clientId) p.set("clientId", state.clientId);
-  if (!state.mine) p.set("mine", "0");
+  const mine = mineParam(state.mine);
+  if (mine) p.set("mine", mine);
   if (state.drawer) p.set("drawer", state.drawer);
   const qs = p.toString();
   return qs ? `/app/calendar?${qs}` : "/app/calendar";

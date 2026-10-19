@@ -69,6 +69,9 @@ test("the calendar draws a week, and the drawer opens from its button and closes
   for (const testId of ["calendar-view", "calendar-show", "calendar-mine", "calendar-client", "calendar-undated-button", "calendar-overdue-button"]) {
     await expect(page.getByTestId(testId)).toBeVisible();
   }
+  // The tasks screen's four scopes, in its order.
+  await expect(page.getByTestId("calendar-mine").getByRole("link")).toHaveText(["שלי", "לביצוע", "בפיקוח", "כולם"]);
+
   // Closed by default: the grid has the width.
   await expect(page.getByTestId("calendar-drawer")).toHaveCount(0);
 

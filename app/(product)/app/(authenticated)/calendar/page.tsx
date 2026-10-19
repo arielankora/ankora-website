@@ -19,6 +19,7 @@ import {
   type CalendarState,
 } from "@/lib/calendar-keys";
 import { Forbidden } from "@/components/app/Forbidden";
+import { MINE_OPTIONS, parseMineScope } from "../tasks/mine-scope";
 import { CalendarClientSelect } from "./CalendarClientSelect";
 import { CalendarGrid } from "./CalendarGrid";
 
@@ -54,8 +55,9 @@ export default async function CalendarPage(props: {
     date: isDayKey(searchParams.date) ? searchParams.date : today,
     show: parseShow(searchParams.show),
     clientId,
-    // "שלי" is the default, like the tasks screen. `mine=0` is everyone.
-    mine: searchParams.mine !== "0",
+    // The tasks screen's four scopes and its URL values. "שלי" is the
+    // default, `mine=0` is everyone. See mine-scope.ts.
+    mine: parseMineScope(searchParams.mine),
     // The drawer belongs to tasks, so it has nothing to show under
     // "מועדים" and stays shut there.
     drawer: parseShow(searchParams.show) === "dates" ? undefined : parseDrawer(searchParams.drawer),
@@ -102,12 +104,11 @@ export default async function CalendarPage(props: {
         </div>
 
         <div data-testid="calendar-mine" className="flex rounded-full border border-lineDark bg-white p-[3px]">
-          <Link href={href({ mine: true })} className={segment(state.mine)}>
-            שלי
-          </Link>
-          <Link href={href({ mine: false })} className={segment(!state.mine)}>
-            כולם
-          </Link>
+          {MINE_OPTIONS.map((option) => (
+            <Link key={option.scope} href={href({ mine: option.scope })} className={segment(state.mine === option.scope)} aria-current={state.mine === option.scope ? "page" : undefined}>
+              {option.label}
+            </Link>
+          ))}
         </div>
 
         <CalendarClientSelect clients={clients.map((c) => ({ id: c.id, name: c.name }))} value={clientId ?? ""} hrefs={Object.fromEntries([["", href({ clientId: undefined })], ...clients.map((c) => [c.id, href({ clientId: c.id })])])} />
