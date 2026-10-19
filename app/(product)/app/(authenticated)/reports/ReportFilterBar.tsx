@@ -1,8 +1,16 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import type { ReportType } from "@/lib/app-domain/reports";
 import { ExportMenu } from "@/components/app/ExportMenu";
+
+// 20.10.2026: a document navigation, not the router. A router navigation
+// can be dropped and leave the screen unchanged while the address says the
+// filter was applied; a document navigation cannot. Same rule as
+// TaskFilters and the knowledge review filters
+// (claude/search-navigation-lost-2026-09-25.md).
+function go(href: string) {
+  window.location.assign(href);
+}
 
 type Option = { id: string; name: string };
 
@@ -35,7 +43,6 @@ export function ReportFilterBar({
   categories: Option[];
   current: Current;
 }) {
-  const router = useRouter();
   const [type, setType] = useState<ReportType>(current.type);
   const [clientId, setClientId] = useState(current.clientId ?? "");
   const [userId, setUserId] = useState(current.userId ?? "");
@@ -61,7 +68,7 @@ export function ReportFilterBar({
   }
 
   function apply() {
-    router.push(`/app/reports?${buildParams().toString()}`);
+    go(`/app/reports?${buildParams().toString()}`);
   }
 
   function clear() {
@@ -73,7 +80,7 @@ export function ReportFilterBar({
     setManualOnly(false);
     setFrom("");
     setTo("");
-    router.push(`/app/reports?type=${type}`);
+    go(`/app/reports?type=${type}`);
   }
 
   const exportHref = `/api/reports/export?${buildParams().toString()}`;

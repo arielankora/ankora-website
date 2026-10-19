@@ -797,7 +797,9 @@
       "area": "app",
       "risk": "high",
       "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "firstSeen": "2026-09-20",
+      "redirectsTo": "/app/timer?tab=mine",
+      "note": "Since 19.10.2026 a redirect only (task cmvddvqqv000plc08l6qzt2ho). The screen itself is the target's tab; the redirect and the keys it carries are covered by qa/e2e/flows-redirects.app.spec.ts."
     },
     "screen:/app/notifications": {
       "kind": "screen",
@@ -832,7 +834,9 @@
       "area": "app",
       "risk": "high",
       "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "firstSeen": "2026-09-20",
+      "redirectsTo": "/app/portal/hours?view=monthly",
+      "note": "Since 19.10.2026 a redirect only (task cmvddvqqv000plc08l6qzt2ho). The screen itself is the target's tab; the redirect and the keys it carries are covered by qa/e2e/flows-redirects.app.spec.ts."
     },
     "screen:/app/portal/weekly": {
       "kind": "screen",
@@ -853,7 +857,9 @@
       "area": "app",
       "risk": "high",
       "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "firstSeen": "2026-09-20",
+      "redirectsTo": "/app/reports?tab=schedules",
+      "note": "Since 19.10.2026 a redirect only (task cmvddvqqv000plc08l6qzt2ho). The screen itself is the target's tab; the redirect and the keys it carries are covered by qa/e2e/flows-redirects.app.spec.ts."
     },
     "screen:/app/reports": {
       "kind": "screen",

@@ -1,6 +1,14 @@
 "use client";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+
+// 20.10.2026: a document navigation, not the router. A router navigation
+// can be dropped and leave the screen unchanged while the address says the
+// filter was applied; a document navigation cannot. Same rule as
+// TaskFilters and the knowledge review filters
+// (claude/search-navigation-lost-2026-09-25.md).
+function go(href: string) {
+  window.location.assign(href);
+}
 
 type Option = { id: string; name: string };
 
@@ -17,7 +25,6 @@ export function ClientSummaryFilterBar({
   clients: Option[];
   current: { clientId?: string; from?: string; to?: string };
 }) {
-  const router = useRouter();
   const [clientId, setClientId] = useState(current.clientId ?? "");
   const [from, setFrom] = useState(current.from ?? "");
   const [to, setTo] = useState(current.to ?? "");
@@ -27,14 +34,14 @@ export function ClientSummaryFilterBar({
     if (clientId) params.set("clientId", clientId);
     if (from) params.set("from", from);
     if (to) params.set("to", to);
-    router.push(`/app/reports?${params.toString()}`);
+    go(`/app/reports?${params.toString()}`);
   }
 
   function clear() {
     setClientId("");
     setFrom("");
     setTo("");
-    router.push("/app/reports?tab=summary");
+    go("/app/reports?tab=summary");
   }
 
   return (
