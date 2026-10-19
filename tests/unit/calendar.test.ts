@@ -73,6 +73,14 @@ describe("URL state", () => {
     expect(parseShow("dates")).toBe("dates");
   });
 
+  it("writes the tasks screen's own values for each of the four scopes", () => {
+    const today = "2026-10-19";
+    const base = { view: "week" as const, date: today, show: "all" as const };
+    expect(calendarHref({ ...base, mine: "assigned" }, today)).toBe("/app/calendar?mine=assigned");
+    expect(calendarHref({ ...base, mine: "supervising" }, today)).toBe("/app/calendar?mine=supervising");
+    expect(calendarHref({ ...base, mine: "all" }, today)).toBe("/app/calendar?mine=0");
+  });
+
   it("validates day keys, including impossible dates", () => {
     expect(isDayKey("2026-10-19")).toBe(true);
     expect(isDayKey("2026-02-30")).toBe(false);
@@ -81,8 +89,8 @@ describe("URL state", () => {
 
   it("leaves defaults out of the address", () => {
     const today = "2026-10-19";
-    expect(calendarHref({ view: "week", date: today, show: "all", mine: true }, today)).toBe("/app/calendar");
-    expect(calendarHref({ view: "month", date: "2026-11-01", show: "tasks", clientId: "c1", mine: false }, today)).toBe(
+    expect(calendarHref({ view: "week", date: today, show: "all", mine: "involved" }, today)).toBe("/app/calendar");
+    expect(calendarHref({ view: "month", date: "2026-11-01", show: "tasks", clientId: "c1", mine: "all" }, today)).toBe(
       "/app/calendar?view=month&date=2026-11-01&show=tasks&clientId=c1&mine=0"
     );
   });
@@ -167,7 +175,7 @@ describe("the way back to the calendar", () => {
 
   it("the drawer travels with the way back", () => {
     expect(tasksListHref(calendarFrom("view=week&drawer=overdue"))).toBe("/app/calendar?view=week&drawer=overdue");
-    expect(calendarHref({ view: "week", date: "2026-10-19", show: "all", mine: true, drawer: "undated" }, "2026-10-19")).toBe("/app/calendar?drawer=undated");
+    expect(calendarHref({ view: "week", date: "2026-10-19", show: "all", mine: "involved", drawer: "undated" }, "2026-10-19")).toBe("/app/calendar?drawer=undated");
     expect(parseDrawer("undated")).toBe("undated");
     expect(parseDrawer("x")).toBeUndefined();
   });
