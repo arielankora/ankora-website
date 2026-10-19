@@ -271,7 +271,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     `- מסמך שנוצר או נחתם במהלך העבודה: אחרי אישור שלי, לתייק אותו בתיק הלקוח ולקשר למשימה (taskId "${input.taskId}"). אם אתה יכול להריץ פקודות, עם start_document_upload ו-curl. אחרת עם upload_document, עד 1MB. מסמך שתויק מוסתר מהלקוח, אלא אם ביקשתי במפורש שיראה אותו. נוהל הוא חריג, בסעיף הבא.`,
     // 19.10.2026: a procedure filed as a document only was found in the
     // client file only after someone asked. See lib/procedure-to-file.ts.
-    `- נוהל, תהליך או כלל קבוע שנוצר במשימה: לפני סגירת המשימה, לתייק אותו כ-PDF עם kind: POLICY ולקשר למשימה. את זה מותר בלי לשאול, והמסמך מוסתר מהלקוח. אחר כך להציע אותו לתיק הלקוח עם propose_knowledge: התהליך עצמו כ-PROCESS, ולפי הצורך גם SYSTEM, REQUEST_TYPE או POLICY. המקור הוא המסמך שתויק (newSource מסוג ANKORA_DOCUMENT עם ה-documentId שלו). ההצעות ממתינות לאישור במסך הבדיקה, ולכן מותר לשלוח אותן בלי לשאול. אחר כך להזכיר לי לאשר.`,
+    `- נוהל, תהליך או כלל קבוע שנוצר במשימה: לפני סגירת המשימה, לתייק אותו כ-PDF עם kind: PROCEDURE ולקשר למשימה. את זה מותר בלי לשאול, והמסמך מוסתר מהלקוח. אחר כך להציע אותו לתיק הלקוח עם propose_knowledge: התהליך עצמו כ-PROCESS, ולפי הצורך גם SYSTEM, REQUEST_TYPE או POLICY. המקור הוא המסמך שתויק (newSource מסוג ANKORA_DOCUMENT עם ה-documentId שלו). ההצעות ממתינות לאישור במסך הבדיקה, ולכן מותר לשלוח אותן בלי לשאול. אחר כך להזכיר לי לאשר.`,
     ...(input.mapping
       ? [
           `- המשימה בשלב מיפוי וצפייה: לפני הסגירה, להציע לתיק הלקוח עם propose_knowledge את מה שנלמד בה (מערכות, אנשי קשר, סוגי בקשות, כללים), גם אם לא נוצר מסמך. המקור הוא המשימה עצמה (newSource מסוג TASK עם taskId "${input.taskId}"), או המסמך שתויק אם יש. מותר בלי לשאול, ואחר כך להזכיר לי לאשר.`,

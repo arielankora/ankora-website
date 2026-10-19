@@ -895,6 +895,7 @@ export function registerAnkoraTools(server: McpServer): void {
           .string()
           .optional()
           .describe("The title the client sees, in their language, when it should differ from the internal title. Only meaningful with clientVisible."),
+        mappingTask: z.boolean().optional().describe("A mapping task: one that maps how the client works (systems, people, requests, rules), such as a handover's \"מיפוי וצפייה\" stage. What it learns is proposed to the client file before it closes, and closing reminds when it was not. A description with the handover's \"שלב: מיפוי וצפייה\" line marks it on its own."),
         steps: z
           .array(z.string().min(1))
           .max(MAX_STEPS)
@@ -916,6 +917,7 @@ export function registerAnkoraTools(server: McpServer): void {
         priority?: "LOW" | "NORMAL" | "HIGH" | "URGENT";
         supervisor?: string;
         requireApproval?: boolean;
+        mappingTask?: boolean;
         clientVisible?: boolean;
         clientTitle?: string;
         steps?: string[];
@@ -984,6 +986,7 @@ export function registerAnkoraTools(server: McpServer): void {
           requiresApproval: args.requireApproval ?? false,
           clientVisible: args.clientVisible ?? false,
           clientTitle: args.clientVisible ? (args.clientTitle ?? null) : null,
+          ...(args.mappingTask !== undefined ? { mappingTask: args.mappingTask } : {}),
           // End of the due day, not its start: a task due today should not
           // read as overdue at nine in the morning.
           dueDate: args.due ? localDateTimeToUtc(args.due, "23:59", actor.timezone) : null,
@@ -1125,6 +1128,7 @@ export function registerAnkoraTools(server: McpServer): void {
             "What we ask the client to do, as one sentence addressed to them: what, where and how long it takes. Shown on their portal under 'waiting for you' while the task waits on the client. Pass an empty string to clear it."
           ),
         clearWaiting: z.boolean().optional().describe("The task is no longer waiting on anyone."),
+        mappingTask: z.boolean().optional().describe("A mapping task: one that maps how the client works (systems, people, requests, rules), such as a handover's \"מיפוי וצפייה\" stage. What it learns is proposed to the client file before it closes, and closing reminds when it was not. A description with the handover's \"שלב: מיפוי וצפייה\" line marks it on its own."),
       }),
       annotations: { ...WRITES, idempotentHint: true },
     },
@@ -1147,6 +1151,7 @@ export function registerAnkoraTools(server: McpServer): void {
         clearSupervisor?: boolean;
         requireApproval?: boolean;
         outcome?: string;
+        mappingTask?: boolean;
         clientVisible?: boolean;
         clientTitle?: string;
         waitingOn?: "CLIENT" | "SUPPLIER" | "INTERNAL" | "OTHER";
@@ -1223,6 +1228,7 @@ export function registerAnkoraTools(server: McpServer): void {
         }
         if (args.requireApproval !== undefined) patch.requiresApproval = args.requireApproval;
         if (args.clientVisible !== undefined) patch.clientVisible = args.clientVisible;
+        if (args.mappingTask !== undefined) patch.mappingTask = args.mappingTask;
         if (args.clientTitle !== undefined) patch.clientTitle = args.clientTitle;
         if (args.clientRequest !== undefined) patch.clientRequest = args.clientRequest;
         if (args.clearWaiting) patch.block = null;
@@ -1253,7 +1259,7 @@ export function registerAnkoraTools(server: McpServer): void {
 
         if (Object.keys(patch).length === 0) {
           return toolText(
-            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due, outcome, clientVisible, clientTitle, clientRequest, waitingOn or clearWaiting."
+            "Nothing to change - pass at least one of status, title, category, assignTo, supervisor, due, outcome, clientVisible, clientTitle, clientRequest, mappingTask, waitingOn or clearWaiting."
           );
         }
 

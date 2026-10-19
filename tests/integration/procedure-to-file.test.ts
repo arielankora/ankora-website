@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
-import { createTask } from "@/lib/app-domain/tasks";
+import { createTask, updateTask } from "@/lib/app-domain/tasks";
 import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
 
 // 19.10.2026: closing a task that produced a procedure, or that mapped
@@ -18,9 +18,9 @@ async function setup(description?: string) {
   return { client, user, task };
 }
 
-async function fileDocument(clientId: string, taskId: string, kind: "POLICY" | "OTHER") {
+async function fileDocument(clientId: string, taskId: string, kind: "PROCEDURE" | "POLICY" | "OTHER", title = "מסמך") {
   return prisma.clientDocument.create({
-    data: { clientId, taskId, title: "נוהל", kind, driveFileId: `drive-${Math.random()}`, mimeType: "application/pdf", clientVisible: false },
+    data: { clientId, taskId, title, kind, driveFileId: `drive-${Math.random()}`, mimeType: "application/pdf", clientVisible: false },
   });
 }
 
@@ -42,7 +42,7 @@ async function proposeFrom(clientId: string, ref: { system: "DOCUMENT" | "TASK";
 describe("procedureReminderFor()", () => {
   it("reminds when a task with a policy document closes and nothing was proposed from it", async () => {
     const { client, task } = await setup();
-    const doc = await fileDocument(client.id, task.id, "POLICY");
+    const doc = await fileDocument(client.id, task.id, "PROCEDURE");
     const r = await procedureReminderFor(task.id, "DONE");
     expect(r?.kind).toBe("PROCEDURE");
     expect(r?.forClaude).toContain(`documentId ${doc.id}`);
@@ -51,7 +51,7 @@ describe("procedureReminderFor()", () => {
 
   it("reminds on PENDING_APPROVAL too, and never on other moves", async () => {
     const { client, task } = await setup();
-    await fileDocument(client.id, task.id, "POLICY");
+    await fileDocument(client.id, task.id, "PROCEDURE");
     expect((await procedureReminderFor(task.id, "PENDING_APPROVAL"))?.kind).toBe("PROCEDURE");
     expect(await procedureReminderFor(task.id, "IN_PROGRESS")).toBeNull();
     expect(await procedureReminderFor(task.id, "ARCHIVED")).toBeNull();
@@ -60,24 +60,48 @@ describe("procedureReminderFor()", () => {
 
   it("is quiet once a batch was proposed from the document", async () => {
     const { client, task } = await setup();
-    const doc = await fileDocument(client.id, task.id, "POLICY");
+    const doc = await fileDocument(client.id, task.id, "PROCEDURE");
     await proposeFrom(client.id, { system: "DOCUMENT", id: doc.id });
     expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
   });
 
   it("a source registered but never used does not count", async () => {
     const { client, task } = await setup();
-    const doc = await fileDocument(client.id, task.id, "POLICY");
+    const doc = await fileDocument(client.id, task.id, "PROCEDURE");
     await prisma.clientSource.create({
       data: { clientId: client.id, seq: 1, code: "S1", kind: "ANKORA_DOCUMENT", title: "מקור", externalRefs: [{ system: "DOCUMENT", id: doc.id }] },
     });
     expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("PROCEDURE");
   });
 
-  it("ignores documents that are not policies", async () => {
+  it("ignores documents that are not procedures, an insurance policy included", async () => {
     const { client, task } = await setup();
-    await fileDocument(client.id, task.id, "OTHER");
+    await fileDocument(client.id, task.id, "OTHER", "חשבונית ספטמבר");
+    await fileDocument(client.id, task.id, "POLICY", "פוליסת ביטוח צד ג");
     expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
+  });
+
+  it("catches a procedure filed as another kind by its name, and says it was misfiled (20.10.2026)", async () => {
+    const { client, task } = await setup();
+    const doc = await fileDocument(client.id, task.id, "OTHER", "נוהל טיפול בתקלות ציוד");
+    const r = await procedureReminderFor(task.id, "DONE");
+    expect(r?.kind).toBe("PROCEDURE");
+    expect(r?.forClaude).toContain(`documentId ${doc.id}`);
+    expect(r?.forScreen).toContain('בסוג "נוהל"');
+  });
+
+  it("reminds on a task marked as mapping, whatever its description says (20.10.2026)", async () => {
+    const { task } = await setup("מיפוי של מערכות, בלי שורת ההעברה");
+    expect(task.mappingTask).toBe(false);
+    await prisma.task.update({ where: { id: task.id }, data: { mappingTask: true } });
+    expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("MAPPING");
+  });
+
+  it("marks a task created with the handover's mapping line, and not one without it", async () => {
+    const { task: mapping } = await setup("**HND-029** | שלב: מיפוי וצפייה");
+    const { task: plain } = await setup("משימה רגילה");
+    expect(mapping.mappingTask).toBe(true);
+    expect(plain.mappingTask).toBe(false);
   });
 
   it("reminds on a mapping task without any document, and a proposal from the task quiets it", async () => {
@@ -91,9 +115,19 @@ describe("procedureReminderFor()", () => {
 
   it("a proposal from another client's task with the same id shape does not count", async () => {
     const { client, task } = await setup();
-    await fileDocument(client.id, task.id, "POLICY");
+    await fileDocument(client.id, task.id, "PROCEDURE");
     const other = await createTestClient();
     await proposeFrom(other.id, { system: "TASK", id: task.id });
     expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("PROCEDURE");
+  });
+
+  it("updateTask: a rewritten description turns the flag on, and only the flag itself turns it off", async () => {
+    const { user, task } = await setup("משימה רגילה");
+    const on = await updateTask(user, task.id, { description: "**HND-031** | שלב: מיפוי וצפייה" });
+    expect(on.mappingTask).toBe(true);
+    const reworded = await updateTask(user, task.id, { description: "בלי השורה" });
+    expect(reworded.mappingTask).toBe(true);
+    const off = await updateTask(user, task.id, { mappingTask: false });
+    expect(off.mappingTask).toBe(false);
   });
 });

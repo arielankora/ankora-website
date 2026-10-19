@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setStepDone, updateTask } from "@/lib/app-domain/tasks";
-import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
+import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
   getActiveTimers,
@@ -76,10 +76,13 @@ export async function updateTaskDetailAction(input: {
   /// say we are not waiting any more. The one-click gestures elsewhere
   /// (the list row, the timer) still speak in booleans and translate.
   block?: { on: TaskBlocker; reason?: string | null } | null;
+  /// 20.10.2026: see Task.mappingTask.
+  mappingTask?: boolean;
 }) {
   const user = await requireUser();
   try {
     const updated = await updateTask(user, input.taskId, {
+      mappingTask: input.mappingTask,
       title: input.title,
       description: input.description,
       priority: input.priority,
@@ -109,12 +112,10 @@ export async function updateTaskDetailAction(input: {
     // 19.10.2026: closing a task whose procedure (or mapping) never
     // reached the client file. Shown as a banner; the close stands, and a
     // failed check is not allowed to make a successful close look failed.
-    const reminder = await procedureReminderFor(updated.id, input.status).catch(() => null);
+    const procedureReminder = await procedureReminderForScreen(updated.id, updated.clientId, input.status);
     return {
       ok: true as const,
-      procedureReminder: reminder
-        ? { text: reminder.forScreen, reviewHref: `/app/knowledge?clientId=${encodeURIComponent(updated.clientId)}` }
-        : null,
+      procedureReminder,
       status: updated.status,
       supervisorId: updated.supervisorId,
       requiresApproval: updated.requiresApproval,

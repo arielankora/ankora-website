@@ -310,6 +310,17 @@ export function TaskRow({
         undo: () => changeStatus(previousStatus, true),
       });
     }
+    // 20.10.2026: closed, but its procedure (or what it mapped) is not in
+    // the client file yet. A toast of its own, after the confirmation, so
+    // the undo on that one keeps working.
+    if (result.procedureReminder) {
+      showToast({
+        tone: "warning",
+        title: "עוד לא בתיק הלקוח",
+        description: result.procedureReminder.text,
+        link: { label: "למסך הבדיקה", href: result.procedureReminder.reviewHref },
+      });
+    }
   }
 
   const dueLabel = task.dueDate

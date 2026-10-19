@@ -337,9 +337,10 @@ describe("the timer around the conversation (19.10.2026)", () => {
 });
 
 describe("a new procedure reaches the client file (19.10.2026)", () => {
-  it("files a procedure as POLICY and proposes it to the client file without asking", () => {
+  it("files a procedure as PROCEDURE and proposes it to the client file without asking", () => {
     const text = buildAdvancePrompt(base);
-    expect(text).toContain("kind: POLICY");
+    expect(text).toContain("kind: PROCEDURE");
+    expect(text).not.toContain("kind: POLICY");
     expect(text).toContain("propose_knowledge");
     expect(text).toContain("PROCESS");
     expect(text).toContain("newSource מסוג ANKORA_DOCUMENT");

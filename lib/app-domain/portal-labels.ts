@@ -17,6 +17,7 @@ export const DIGEST_LABELS: Record<PortalDigest, string> = {
 
 export const DOCUMENT_KIND_LABELS: Record<ClientDocumentKind, string> = {
   POLICY: "פוליסה",
+  PROCEDURE: "נוהל",
   CERTIFICATE: "אישור",
   CONTRACT: "חוזה",
   INVOICE: "חשבונית",

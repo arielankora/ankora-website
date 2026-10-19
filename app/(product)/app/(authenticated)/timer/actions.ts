@@ -1,6 +1,7 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
+import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import {
   startTimer,
   stopTimer,
@@ -166,7 +167,10 @@ export async function recordPromiseStageAction(input: {
     revalidatePath("/app/tasks");
     revalidatePath("/app/portal");
     revalidatePath("/app");
-    return { ok: true as const, status: updated.status };
+    // 20.10.2026: "הושלם" after the clock stops closes the task, so it
+    // asks the closing question too (lib/procedure-to-file.ts).
+    const procedureReminder = await procedureReminderForScreen(updated.id, updated.clientId, updated.status);
+    return { ok: true as const, status: updated.status, procedureReminder };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }
