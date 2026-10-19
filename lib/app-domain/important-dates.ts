@@ -152,6 +152,9 @@ export interface ImportantDateInput {
   precision?: DatePrecisionLike;
   dayAlternatives?: number[];
   conditionText?: string | null;
+  /// Spec 3.10: something due to reach us on the date, and from whom.
+  expectsReceipt?: boolean;
+  expectedFrom?: string | null;
   rangeStart?: Date | null;
   rangeEnd?: Date | null;
   /// When provided (and truthy), no explicit ReminderRule list needs to
@@ -362,6 +365,8 @@ async function createImportantDateInner(actor: User, input: ImportantDateInput) 
       precision,
       dayAlternatives,
       conditionText,
+      expectsReceipt: input.expectsReceipt ?? false,
+      expectedFrom: input.expectsReceipt ? input.expectedFrom?.trim() || null : null,
       rangeStart,
       rangeEnd,
       nextOccurrenceAt,
@@ -500,6 +505,7 @@ export async function updateImportantDate(
       precision: resolved.precision,
       dayAlternatives: resolved.dayAlternatives,
       conditionText,
+      ...(input.expectsReceipt !== undefined ? { expectsReceipt: input.expectsReceipt, expectedFrom: input.expectsReceipt ? input.expectedFrom?.trim() || null : null } : {}),
       rangeStart,
       rangeEnd,
       nextOccurrenceAt,
