@@ -37,6 +37,7 @@ import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
+import { applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 
 // Org brain, phase 2: proposals to the client file
@@ -220,6 +221,8 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
     }
     flags.push({ code: "POLICY", message: "באישור, הכלל נכנס לתיק כמוצע. מנהל מאשר אותו בנפרד כדי שייכנס לתוקף." });
   }
+  // A change to an item is about that item: "already in the file" is the point.
+  if (item.action === "SUPERSEDE") return flags.filter((f) => f.code !== "DUPLICATE");
   return flags;
 }
 
@@ -266,14 +269,21 @@ export async function proposeKnowledge(
       dropped.push({ index, reason: missing });
       continue;
     }
-    const parsed = schema.safeParse(item.payload);
+    // A change to an item already in the file says only what changes.
+    const updating = item.action === "SUPERSEDE" && isUpdatable(item.target);
+    const parsed = updating ? (schema as unknown as { partial: () => typeof schema }).partial().safeParse(item.payload) : schema.safeParse(item.payload);
     if (!parsed.success) {
       dropped.push({ index, reason: `הפריט לא בנוי נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` });
       continue;
     }
-    if (item.action !== "CREATE") {
+    if (updating) {
+      if (!item.targetId || !(await currentItem(input.clientId, item.target, item.targetId))) {
+        dropped.push({ index, reason: "הפריט שההצעה מעדכנת לא נמצא בתיק. targetId הוא המזהה שמופיע בתיק (id: ...)." });
+        continue;
+      }
+    } else if (item.action !== "CREATE") {
       if (item.target !== "FACT" || !item.targetId) {
-        dropped.push({ index, reason: "החלפה וסתירה הן רק של עובדה קיימת, עם המזהה שלה." });
+        dropped.push({ index, reason: "סתירה היא רק של עובדה קיימת. עדכון (SUPERSEDE) הוא של עובדה, איש קשר, מערכת, סוג פנייה, כלל, ישות או תהליך, עם המזהה שלהם." });
         continue;
       }
       const fact = await prisma.clientFact.findFirst({ where: { id: item.targetId, clientId: input.clientId, deletedAt: null, knowledgeStatus: { not: "SUPERSEDED" } } });
@@ -391,7 +401,16 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     where: { id: { in: targetIds }, clientId: { in: clientIds } },
     select: { id: true, body: true, knowledgeStatus: true, sources: true },
   });
-  const targetById = new Map(targets.map((t) => [t.id, t]));
+  const targetById = new Map<string, { id: string; body: string }>(targets.map((t) => [t.id, t]));
+  // A change to another kind of item: the item as it is now.
+  for (const b of batches) {
+    for (const pr of b.proposals) {
+      if (pr.targetId && pr.target !== "FACT" && !targetById.has(pr.targetId)) {
+        const now = await currentItem(b.clientId, pr.target, pr.targetId);
+        if (now) targetById.set(pr.targetId, now);
+      }
+    }
+  }
   // R6: a sensitive proposal is shown to the client's approvers only.
   // Everyone else sees that one is waiting, and for whom, not what it says.
   const approverOf = new Map<string, boolean>();
@@ -504,6 +523,22 @@ async function apply(
   // now: something approved earlier in the same batch is found too.
   const links = await resolveLinks(p.clientId, p.target, payload);
   const linked = links.fields;
+  if (p.action === "SUPERSEDE" && p.targetId && isUpdatable(p.target)) {
+    const schema = PAYLOADS[p.target] as unknown as { partial: () => { parse: (v: unknown) => Record<string, unknown> } };
+    const { steps, highlights, outputs, ownerName: _o, params, interimParams, effectiveFrom, reviewBy, ...rest } = withoutLinkNames(schema.partial().parse(payload)) as Record<string, unknown>;
+    const fields: Record<string, unknown> = { ...rest, ...linked, ...owner };
+    if (p.target === "POLICY") {
+      if (params !== undefined) fields.params = await paramsWithEntities(p.clientId, params as Record<string, unknown> | null);
+      if (interimParams !== undefined) fields.interimParams = await paramsWithEntities(p.clientId, interimParams as Record<string, unknown> | null);
+      if (effectiveFrom !== undefined) fields.effectiveFrom = date(effectiveFrom);
+      if (reviewBy !== undefined) fields.reviewBy = date(reviewBy);
+    }
+    const procedure =
+      p.target === "PROCESS" && Array.isArray(steps) && steps.length
+        ? { steps: (steps as Record<string, unknown>[]).map(({ systemNames: _s, ...st }, i) => ({ ...st, systemIds: links.stepSystemIds[i] ?? [] })), highlights: highlights as string | null, outputs: outputs as string | null }
+        : null;
+    return applyUpdate(actor, { clientId: p.clientId, target: p.target, targetId: p.targetId }, fields, sources, procedure);
+  }
   if (p.target === "FACT") {
     const f = withoutLinkNames(PAYLOADS.FACT.parse(payload));
     const { ownerName: _o, ...fact } = f;

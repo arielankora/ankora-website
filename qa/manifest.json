@@ -1811,6 +1811,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-19",
       "riskReason": "Resolves names Claude sends to ids inside one client only; a wrong match links a request or a process to the wrong contact or system"
+    },
+    "domain:proposal-updates": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-19",
+      "riskReason": "Changes items already in a client file from an approved proposal; only the fields it names change, sources add up, and a changed rule goes back to proposed"
     }
   },
   "waivers": {},
