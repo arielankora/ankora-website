@@ -59,6 +59,23 @@ const config: Config = {
         error: { DEFAULT: "#B3261E", soft: "rgba(179,38,30,0.08)", "on-dark": "#E5847E" },
         warning: { DEFAULT: "#8A6F45", soft: "rgba(176,141,87,0.16)" },
         neutral: { DEFAULT: "rgba(27,42,61,0.55)", soft: "rgba(27,42,61,0.07)" },
+        // App palette by role (19.10.2026, canvas "Ankora App UI Round", task
+        // cmvddvqqv000plc08l6qzt2ho; claude/app-ui-conflicts-2026-10-19.md).
+        // Solid values, not opacities of appNavy: three text levels instead of
+        // twelve, every one 4.5:1 or better on page, card and sunken. Warning
+        // is no longer the accent's own gold. Namespaced `app` so the brand
+        // palette above keeps its names and the marketing site is untouched.
+        app: {
+          surface: { page: "#F8F4EC", card: "#FFFFFF", sunken: "#F4EFE6", nav: "#1B2A3D" },
+          text: { primary: "#1B2A3D", secondary: "#4D5867", tertiary: "#5F6976", accent: "#7A5F38" },
+          border: { DEFAULT: "#E3DDD2", strong: "#8E8678" },
+          accent: { DEFAULT: "#B08D57", soft: "#F3EADB" },
+          success: { DEFAULT: "#1F7A4D", soft: "#E6F1EB" },
+          warning: { DEFAULT: "#8A4508", soft: "#FBEFE3" },
+          error: { DEFAULT: "#B3261E", soft: "#F8E7E5" },
+          info: { DEFAULT: "#2F5D8A", soft: "#E7EEF5" },
+          neutral: { soft: "#F1EDE6" },
+        },
       },
       fontFamily: {
         sans: ["Heebo", "system-ui", "sans-serif"],

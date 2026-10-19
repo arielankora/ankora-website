@@ -46,9 +46,9 @@ export default async function PortalHomePage() {
     <div className="space-y-4">
       <PortalTabs active="home" />
 
-      <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
-        <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
-        <p className="mt-1.5 text-[13.5px] text-appNavy/60">
+      <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
+        <p className="text-xl font-medium text-app-text-primary">שלום, {client.name}</p>
+        <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
           {portalHeadline(openDecisions, waitingOnClient.length, inProgress.length)}
         </p>
       </div>
@@ -57,14 +57,14 @@ export default async function PortalHomePage() {
         // The empty state of a brand-new client, and the one place the
         // portal explains itself. Written as a promise with a date on it
         // rather than as a tour: "here is what will appear, and when".
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <p className="text-[13.5px] font-medium text-appNavy">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
-          <ul className="mt-3 space-y-2 text-sm text-appNavy/65">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <p className="text-[13.5px] font-medium text-app-text-primary">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
+          <ul className="mt-3 space-y-2 text-sm text-app-text-secondary">
             <li>כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.</li>
             <li>כשמשהו מחכה לך, הוא יעלה לראש המסך.</li>
             <li>מה שהושלם נשאר כאן, עם התאריך.</li>
           </ul>
-          <p className="mt-4 text-[12.5px] text-appNavy/50">
+          <p className="mt-4 text-[12.5px] text-app-text-tertiary">
             הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק.
           </p>
         </div>
@@ -77,12 +77,12 @@ export default async function PortalHomePage() {
           {openDecisions > 0 && (
             <Link
               href="/app/portal/decisions"
-              className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-gold/45 bg-[#FBF7F0] px-[18px] py-4 transition-colors hover:border-gold"
+              className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-gold/45 bg-app-surface-sunken px-[18px] py-4 transition-colors hover:border-gold"
             >
-              <span className="text-[13.5px] font-medium text-appNavy">
+              <span className="text-[13.5px] font-medium text-app-text-primary">
                 {openDecisions === 1 ? "החלטה אחת מחכה לך" : `${openDecisions} החלטות מחכות לך`}
               </span>
-              <span className="text-xs text-gold-dim">לצפייה והחלטה</span>
+              <span className="text-xs text-app-text-accent">לצפייה והחלטה</span>
             </Link>
           )}
 
@@ -109,7 +109,7 @@ export default async function PortalHomePage() {
             title="נסגר לאחרונה"
             promises={recentlyDone}
             action={
-              <Link href="/app/portal/activity" className="text-xs text-gold-dim hover:underline">
+              <Link href="/app/portal/activity" className="text-xs text-app-text-accent hover:underline">
                 כל הפעילות
               </Link>
             }
@@ -123,8 +123,8 @@ export default async function PortalHomePage() {
           client needs - but always present, because a portal without a
           name on it is a system, and Ankora is not selling a system. */}
       {(contact.managerName || waHref) && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-lineDark bg-white px-[18px] py-3.5">
-          <span className="text-[12.5px] text-appNavy/60">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
+          <span className="text-[12.5px] text-app-text-secondary">
             {contact.managerName ? `מנהל התיק שלך: ${contact.managerName}` : "מנהל התיק שלך ב-Ankora"}
           </span>
           {waHref ? (
@@ -132,19 +132,19 @@ export default async function PortalHomePage() {
               href={waHref}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-full border border-lineDark px-3.5 py-1.5 text-xs text-appNavy hover:border-gold"
+              className="rounded-full border border-app-border px-3.5 py-1.5 text-xs text-app-text-primary hover:border-gold"
             >
               וואטסאפ
             </a>
           ) : (
-            <span className="text-xs text-appNavy/35">וואטסאפ: זמין בקרוב</span>
+            <span className="text-xs text-app-text-tertiary">וואטסאפ: זמין בקרוב</span>
           )}
         </div>
       )}
 
       {cycle && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-lineDark bg-white px-[18px] py-3.5">
-          <span className="text-[12.5px] text-appNavy/60">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
+          <span className="text-[12.5px] text-app-text-secondary">
             {/* A bank reads in decimal hours everywhere (3.10.2026), the same
                 figures the client sees on the hours screen one click away. */}
             {cycle.kind === "PREPAID" ? (
@@ -163,7 +163,7 @@ export default async function PortalHomePage() {
             )}
             {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
           </span>
-          <Link href="/app/portal/hours" className="text-xs text-gold-dim hover:underline">
+          <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
             פירוט השעות
           </Link>
         </div>

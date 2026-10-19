@@ -24,18 +24,18 @@ export default async function ExtractionGuidePage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-appNavy">הנחיות החילוץ</h1>
-        <p className="mt-1 text-sm text-appNavy/60">
+        <h1 className="text-xl font-medium text-app-text-primary">הנחיות החילוץ</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">
           מה Claude מכניס לתיק הלקוח ומה לא. כל פרומט של &quot;חלץ ידע עם קלוד&quot; נושא את הגרסה המאושרת האחרונה. מה שהשרת אוכף נשאר בקוד ולא משתנה כאן.
         </p>
       </div>
 
-      <section className="rounded-2xl border border-lineDark bg-white p-6">
+      <section className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-medium text-appNavy">{current ? `בשימוש: גרסה ${current.version}` : "בשימוש: ההנחיות המקוריות"}</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">{current ? `בשימוש: גרסה ${current.version}` : "בשימוש: ההנחיות המקוריות"}</h2>
           <ProposeGuide current={body} />
         </div>
-        <ul className="mt-3 list-disc space-y-1.5 ps-5 text-sm leading-relaxed text-appNavy">
+        <ul className="mt-3 list-disc space-y-1.5 ps-5 text-sm leading-relaxed text-app-text-primary">
           {guideLines(body).map((l, i) => (
             <li key={i}>{l}</li>
           ))}
@@ -43,25 +43,25 @@ export default async function ExtractionGuidePage() {
       </section>
 
       {versions.length > 0 && (
-        <section className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="text-sm font-medium text-appNavy">גרסאות</h2>
-          <ul className="mt-3 divide-y divide-lineDark">
+        <section className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="text-sm font-medium text-app-text-primary">גרסאות</h2>
+          <ul className="mt-3 divide-y divide-app-border">
             {versions.map((v) => (
               <li key={v.id} className="py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm text-appNavy">
+                    <p className="text-sm text-app-text-primary">
                       גרסה {v.version} · {STATE_LABEL[v.state]}
                     </p>
-                    <p className="text-xs text-appNavy/60">
+                    <p className="text-xs text-app-text-secondary">
                       {[v.createdByName ? `הוצעה על ידי ${v.createdByName}, ${when(v.createdAt)}` : when(v.createdAt), v.decidedByName ? `הוחלט על ידי ${v.decidedByName}` : null].filter(Boolean).join(" · ")}
                     </p>
-                    {v.note && <p className="mt-1 text-xs text-appNavy/70">{v.note}</p>}
-                    {v.rejectReason && <p className="mt-1 text-xs text-appNavy/60">למה נדחתה: {v.rejectReason}</p>}
+                    {v.note && <p className="mt-1 text-xs text-app-text-secondary">{v.note}</p>}
+                    {v.rejectReason && <p className="mt-1 text-xs text-app-text-secondary">למה נדחתה: {v.rejectReason}</p>}
                     {v.state === "DRAFT" && (
                       <details className="mt-1.5">
-                        <summary className="cursor-pointer text-xs text-gold-dim">הטקסט המוצע</summary>
-                        <ul className="mt-1.5 list-disc space-y-1 ps-5 text-xs text-appNavy/80">
+                        <summary className="cursor-pointer text-xs text-app-text-accent">הטקסט המוצע</summary>
+                        <ul className="mt-1.5 list-disc space-y-1 ps-5 text-xs text-app-text-primary">
                           {guideLines(v.body).map((l, i) => (
                             <li key={i}>{l}</li>
                           ))}

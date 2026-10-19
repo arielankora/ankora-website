@@ -107,7 +107,7 @@ function FactForm({
       {existing ? (
         <>
           <input type="hidden" name="kind" value={kind} />
-          <p className="text-xs text-appNavy/60">
+          <p className="text-xs text-app-text-secondary">
             הגרסה הנוכחית תישמר בהיסטוריה, מסומנת &quot;הוחלף&quot;, והחדשה תופיע במקומה.
           </p>
         </>
@@ -207,7 +207,7 @@ function FactForm({
         </Field>
       )}
       {(question || status !== "CONFIRMED") && (
-        <label className="flex items-center gap-2 text-sm text-appNavy">
+        <label className="flex items-center gap-2 text-sm text-app-text-primary">
           <input type="checkbox" name="lowImportance" defaultChecked={existing?.lowImportance} className="h-4 w-4 accent-gold" />
           לא קריטי
         </label>
@@ -215,8 +215,8 @@ function FactForm({
       <Field label="למי אסור לספר">
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירת הגרסה החדשה" : "הוספה לתיק"}
       </button>
     </form>
@@ -230,11 +230,11 @@ function ConfirmForm({ clientId, fact, sourceOptions }: { clientId: string; fact
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={fact.id} />
-      <p className="text-sm text-appNavy">{fact.body}</p>
+      <p className="text-sm text-app-text-primary">{fact.body}</p>
       <SourcesField options={sourceOptions} defaultValue={fact.sources.join(", ")} status="CONFIRMED" />
-      <p className="-mt-2 text-[11px] text-appNavy/40">צריך מקור מהלקוח או מספק שלו. מסמך של אנקורה לבד לא מאשר.</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">צריך מקור מהלקוח או מספק שלו. מסמך של אנקורה לבד לא מאשר.</p>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "אישור"}
       </button>
     </form>
@@ -248,13 +248,13 @@ function AnswerForm({ clientId, fact, sourceOptions }: { clientId: string; fact:
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={fact.id} />
-      <p className="text-sm text-appNavy">{fact.body}</p>
+      <p className="text-sm text-app-text-primary">{fact.body}</p>
       <Field label="התשובה *">
         <textarea name="answer" required rows={3} className={INPUT} />
       </Field>
       <SourcesField options={sourceOptions} status="CONFIRMED" />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירת התשובה"}
       </button>
     </form>
@@ -304,16 +304,16 @@ function FactRow({
     <li className={`py-3 ${closed ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-appNavy">{fact.body}</p>
-          {meta.length > 0 && <p className="mt-0.5 text-xs text-appNavy/60">{meta.join(" · ")}</p>}
+          <p className="text-sm text-app-text-primary">{fact.body}</p>
+          {meta.length > 0 && <p className="mt-0.5 text-xs text-app-text-secondary">{meta.join(" · ")}</p>}
           {answered && (
-            <p className="mt-1 text-xs text-appNavy/80">
+            <p className="mt-1 text-xs text-app-text-primary">
               תשובה ({dateLabel(fact.answeredAt)}): {fact.answer}
             </p>
           )}
-          {closed && <p className="mt-1 text-xs text-appNavy/50">נסגר ב-{dateLabel(fact.closedAt)}</p>}
+          {closed && <p className="mt-1 text-xs text-app-text-tertiary">נסגר ב-{dateLabel(fact.closedAt)}</p>}
           {fact.alternatives.map((a, i) => (
-            <p key={i} className="mt-1 text-xs text-warning">
+            <p key={i} className="mt-1 text-xs text-app-warning">
               גרסה אחרת: {a.value}
               {a.sources.length > 0 && <span dir="ltr"> [{a.sources.join(", ")}]</span>}
             </p>
@@ -325,16 +325,16 @@ function FactRow({
           )}
           {fact.taskId && (
             <p className="mt-1 text-xs">
-              <Link href={`/app/tasks/${fact.taskId}`} className="text-gold-dim hover:underline">
+              <Link href={`/app/tasks/${fact.taskId}`} className="text-app-text-accent hover:underline">
                 למשימה
               </Link>
             </p>
           )}
-          {fact.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {fact.doNotDisclose}</p>}
+          {fact.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {fact.doNotDisclose}</p>}
           {fact.kind !== "QUESTION" && <StatusLine status={fact.status} toResolve={fact.toResolve} />}
           <ItemTags item={fact} />
           {fact.kind === "QUESTION" && !answered && fact.toResolve && fact.toResolve !== "תשובה לשאלה." && (
-            <p className="mt-1 text-xs text-appNavy/60">{fact.toResolve}</p>
+            <p className="mt-1 text-xs text-app-text-secondary">{fact.toResolve}</p>
           )}
           <SourceCodes sources={fact.sources} options={sourceOptions} />
         </div>
@@ -345,7 +345,7 @@ function FactRow({
             </Drawer>
           )}
           {fact.kind === "QUESTION" && !answered && !fact.taskId && (
-            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-gold-dim hover:underline">
+            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-app-text-accent hover:underline">
               למשימה
             </button>
           )}
@@ -355,12 +355,12 @@ function FactRow({
             </Drawer>
           )}
           {fact.kind === "TEMPORARY" && !closed && !fact.taskId && (
-            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-gold-dim hover:underline">
+            <button type="button" onClick={() => act(() => questionToTaskAction(fact.id, clientId), "נפתחה משימה")} className="text-app-text-accent hover:underline">
               למשימה
             </button>
           )}
           {fact.kind === "TEMPORARY" && !closed && (
-            <button type="button" onClick={() => act(() => closeTemporaryFactAction(fact.id, clientId), "נסגר")} className="text-appNavy/60 hover:text-appNavy">
+            <button type="button" onClick={() => act(() => closeTemporaryFactAction(fact.id, clientId), "נסגר")} className="text-app-text-secondary hover:text-app-text-primary">
               כבר לא נכון
             </button>
           )}
@@ -369,7 +369,7 @@ function FactRow({
               <FactForm clientId={clientId} sourceOptions={sourceOptions} subjects={subjects} staff={staff} existing={fact} />
             </Drawer>
           )}
-          <button type="button" onClick={() => act(() => removeClientFactAction(fact.id, clientId), "הוסר מהתיק")} className="text-appNavy/50 hover:text-red-600">
+          <button type="button" onClick={() => act(() => removeClientFactAction(fact.id, clientId), "הוסר מהתיק")} className="text-app-text-tertiary hover:text-app-error">
             הסרה
           </button>
         </div>
@@ -401,28 +401,28 @@ export function FactsPanel({
   const openQuestions = facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).length;
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">
+        <h2 className="text-sm font-medium text-app-text-primary">
           תיק הלקוח: עובדות ({facts.length})
-          {openQuestions > 0 && <span className="ms-2 text-xs font-normal text-warning">{openQuestions} שאלות פתוחות</span>}
+          {openQuestions > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{openQuestions} שאלות פתוחות</span>}
         </h2>
         <Drawer triggerLabel="+ פריט" title="פריט חדש בתיק" variant="link">
           <FactForm clientId={clientId} sourceOptions={sourceOptions} subjects={subjects} staff={staff} />
         </Drawer>
       </div>
       {sections.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">
+        <p className="mt-2 text-sm text-app-text-tertiary">
           אין עדיין עובדות בתיק: תחומי אחריות, העדפות, דרישות, מידע זמני, החלטות ושאלות פתוחות נכנסים לכאן.
         </p>
       ) : (
         sections.map((s) => (
           <section key={s.kind} className="mt-5">
-            <h3 className="text-xs font-medium text-appNavy/60">
-              {s.section && <span className="me-1.5 font-mono text-gold-dim">{s.section}</span>}
+            <h3 className="text-xs font-medium text-app-text-secondary">
+              {s.section && <span className="me-1.5 font-mono text-app-text-accent">{s.section}</span>}
               {s.title} ({s.items.length})
             </h3>
-            <ul className="mt-1 divide-y divide-lineDark">
+            <ul className="mt-1 divide-y divide-app-border">
               {s.items.map((f) => (
                 <FactRow key={f.id} fact={f} clientId={clientId} sourceOptions={sourceOptions} subjects={subjects} staff={staff} now={now} />
               ))}
@@ -432,10 +432,10 @@ export function FactsPanel({
       )}
       {history.length > 0 && (
         <details className="mt-5">
-          <summary className="cursor-pointer text-xs text-appNavy/50">היסטוריה: גרסאות שהוחלפו ({history.length})</summary>
+          <summary className="cursor-pointer text-xs text-app-text-tertiary">היסטוריה: גרסאות שהוחלפו ({history.length})</summary>
           <ul className="mt-2 space-y-1.5">
             {history.map((f) => (
-              <li key={f.id} className="text-xs text-appNavy/50">
+              <li key={f.id} className="text-xs text-app-text-tertiary">
                 <span className="me-1.5">{FACT_KIND_LABELS[f.kind]}:</span>
                 <span className="line-through">{f.body}</span>
                 {f.supersededAt && <span className="ms-1.5">(הוחלף ב-{dateLabel(f.supersededAt)})</span>}

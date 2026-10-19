@@ -1,5 +1,7 @@
-import { ArrowRight, ChevronLeft } from "lucide-react";
-import { backLabel, carriedListQuery, tasksListHref } from "../list-query";
+import { ChevronLeft } from "lucide-react";
+import { PageBack } from "@/components/app/BackSlot";
+import { backLabel, backTitle, carriedListQuery, tasksListHref } from "../list-query";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
@@ -96,6 +98,24 @@ export default async function TaskDetailPage(props: {
 
   const { task, time, thread, commentCount, subtasks } = detail;
 
+  // The way back names the list it returns to (19.10.2026). A client or a
+  // category is named only if this person can see it: an id they cannot
+  // reach, typed into the address, adds nothing to the label.
+  const fromQuery = new URLSearchParams(listQuery);
+  const backNames: { client?: string; category?: string } = {};
+  const fromClientId = fromQuery.get("clientId");
+  const fromCategoryId = fromQuery.get("categoryId");
+  if (fromClientId || fromCategoryId) {
+    const [reachable, allCategories] = await Promise.all([listAccessibleClients(user), fromCategoryId ? listCategories() : Promise.resolve([])]);
+    const reachableIds = new Set(reachable.map((c) => c.id));
+    backNames.client = reachable.find((c) => c.id === fromClientId)?.name;
+    const category = allCategories.find((c) => c.id === fromCategoryId);
+    if (category && (category.visibility === "GLOBAL" || (category.clientId && reachableIds.has(category.clientId)))) {
+      backNames.category = category.name;
+    }
+  }
+  const backTitleText = backTitle(from, backNames);
+
   // Opening the task is reading what the bell said about it.
   await markTaskNotificationsRead(user.id, task.id);
 
@@ -179,17 +199,10 @@ export default async function TaskDetailPage(props: {
           every filter. The arrow points right because right is back in
           Hebrew. A plain anchor, like the links that lead here, so the
           navigation cannot be quietly cancelled (see TaskRow). */}
-      <nav className="flex items-center gap-1.5 text-[13px] text-appNavy/50">
-        <a
-          href={backHref}
-          data-testid="task-back"
-          className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 font-medium text-appNavy/70 transition-colors hover:border-appNavy/30 hover:text-appNavy"
-        >
-          <ArrowRight size={14} />
-          {backText}
-        </a>
-        <ChevronLeft size={14} className="text-appNavy/30" />
-        <span className="truncate text-appNavy/70">{task.client.name}</span>
+      <nav className="flex items-center gap-1.5 text-[13px] text-app-text-tertiary">
+        <PageBack href={backHref} label={backTitleText} testId="task-back" />
+        <ChevronLeft size={14} className="text-app-text-tertiary md:hidden" />
+        <span className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
 
       <TaskDetail
@@ -310,14 +323,14 @@ export default async function TaskDetailPage(props: {
       />
 
       {credentials.length > 0 && (
-        <details className="rounded-2xl border border-lineDark bg-white p-5">
-          <summary className="cursor-pointer text-sm font-medium text-appNavy">
+        <details className="rounded-2xl border border-app-border bg-white p-5">
+          <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
             גישות למערכות של {task.client.name} ({credentials.length})
           </summary>
           <ul className="mt-4 space-y-4">
             {credentials.map((c) => (
               <li key={c.id} className="flex flex-col gap-2">
-                <span className="text-sm text-appNavy">
+                <span className="text-sm text-app-text-primary">
                   {c.systemName}
                   {c.url && (
                     <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-gold hover:underline">

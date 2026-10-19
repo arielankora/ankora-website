@@ -129,7 +129,7 @@ function ContactForm({
           <input name="role" defaultValue={existing?.role ?? ""} placeholder="VP Finance" className={INPUT} />
         </Field>
       </div>
-      <p className="-mt-2 text-[11px] text-appNavy/40">שם או תפקיד, לפחות אחד מהם.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">שם או תפקיד, לפחות אחד מהם.</p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="קשר ללקוח">
           <select name="relationship" value={relationship} onChange={(e) => setRelationship(e.target.value as Relationship)} className={INPUT}>
@@ -159,7 +159,7 @@ function ContactForm({
         <input name="phones" dir="ltr" defaultValue={existing?.phones.join(", ") ?? ""} placeholder="054-1234567" className={INPUT} />
       </Field>
       {existing && (existing.emails.length > 0 || existing.phones.length > 0) && (
-        <p className="-mt-2 text-[11px] text-appNavy/40">מייל וטלפון שייכים לאדם, ומתעדכנים בכל תיק שהוא מופיע בו.</p>
+        <p className="-mt-2 text-[11px] text-app-text-tertiary">מייל וטלפון שייכים לאדם, ומתעדכנים בכל תיק שהוא מופיע בו.</p>
       )}
       <Field label="ערוצים לפי סדר עדיפות">
         <input name="channelOrder" defaultValue={existing?.channelOrder.join(", ") ?? ""} placeholder="WhatsApp, Slack, מייל" className={INPUT} />
@@ -184,7 +184,7 @@ function ContactForm({
           </Field>
         </>
       )}
-      <div className="flex flex-wrap gap-4 text-sm text-appNavy">
+      <div className="flex flex-wrap gap-4 text-sm text-app-text-primary">
         <label className="flex items-center gap-2">
           <input type="checkbox" name="isPrimary" defaultChecked={existing?.isPrimary} className="h-4 w-4 accent-gold" />
           איש קשר ראשי
@@ -221,8 +221,8 @@ function ContactForm({
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} placeholder="עובדי הלקוח, עד הודעה של המנכ״ל" className={INPUT} />
       </Field>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -299,8 +299,8 @@ function OrganizationForm({
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -337,37 +337,37 @@ export function PeoplePanel({
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-lineDark bg-white p-6">
+      <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-appNavy">אנשים ויחסים ({contacts.length})</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">אנשים ויחסים ({contacts.length})</h2>
           <Drawer triggerLabel="+ איש קשר" title="איש קשר בתיק" variant="link">
             <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} />
           </Drawer>
         </div>
         {contacts.length === 0 ? (
-          <p className="mt-2 text-sm text-appNavy/50">אין עדיין אנשי קשר בתיק.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין אנשי קשר בתיק.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-lineDark">
+          <ul className="mt-4 divide-y divide-app-border">
             {contacts.map((c) => (
               <li key={c.id} className="py-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-appNavy">
+                    <p className="text-sm font-medium text-app-text-primary">
                       {c.name ?? c.role}
-                      {c.isPrimary && <span className="ms-2 text-xs font-normal text-gold-dim">ראשי</span>}
-                      {c.isDecisionMaker && <span className="ms-2 text-xs font-normal text-gold-dim">מקבל החלטות</span>}
+                      {c.isPrimary && <span className="ms-2 text-xs font-normal text-app-text-accent">ראשי</span>}
+                      {c.isDecisionMaker && <span className="ms-2 text-xs font-normal text-app-text-accent">מקבל החלטות</span>}
                     </p>
-                    <p className="text-xs text-appNavy/60">
+                    <p className="text-xs text-app-text-secondary">
                       {[c.name ? c.role : null, RELATIONSHIP_LABELS[c.relationship], c.organizationName, c.entityName].filter(Boolean).join(" · ")}
                     </p>
                     {(c.emails.length > 0 || c.phones.length > 0 || c.clientSideAddress) && (
-                      <p className="mt-1 text-xs text-appNavy/70" dir="ltr">
+                      <p className="mt-1 text-xs text-app-text-secondary" dir="ltr">
                         {[...c.emails, ...c.phones, c.clientSideAddress].filter(Boolean).join("  ·  ")}
                       </p>
                     )}
-                    {c.context && <p className="mt-1 text-xs text-appNavy/70">{c.context}</p>}
-                    {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-appNavy/50">ערוצים: {c.channelOrder.join(", ")}</p>}
-                    {c.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {c.doNotDisclose}</p>}
+                    {c.context && <p className="mt-1 text-xs text-app-text-secondary">{c.context}</p>}
+                    {c.channelOrder.length > 0 && <p className="mt-1 text-xs text-app-text-tertiary">ערוצים: {c.channelOrder.join(", ")}</p>}
+                    {c.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {c.doNotDisclose}</p>}
                     <StatusLine status={c.status} toResolve={c.toResolve} />
                     <ItemTags item={c} />
                     <SourceCodes sources={c.sources} options={sourceOptions} />
@@ -376,7 +376,7 @@ export function PeoplePanel({
                     <Drawer triggerLabel="עריכה" title="עריכת איש קשר" variant="link">
                       <ContactForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} entities={entities} existing={c} />
                     </Drawer>
-                    <button type="button" onClick={() => removeContact(c)} className="text-appNavy/50 hover:text-red-600">
+                    <button type="button" onClick={() => removeContact(c)} className="text-app-text-tertiary hover:text-app-error">
                       הסרה
                     </button>
                   </div>
@@ -387,30 +387,30 @@ export function PeoplePanel({
         )}
       </div>
 
-      <div className="rounded-2xl border border-lineDark bg-white p-6">
+      <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-appNavy">ספקים ונותני שירות ({organizations.length})</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">ספקים ונותני שירות ({organizations.length})</h2>
           <Drawer triggerLabel="+ ארגון" title="ארגון בתיק" variant="link">
             <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} />
           </Drawer>
         </div>
         {organizations.length === 0 ? (
-          <p className="mt-2 text-sm text-appNavy/50">אין עדיין ספקים או נותני שירות קבועים בתיק.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין ספקים או נותני שירות קבועים בתיק.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-lineDark">
+          <ul className="mt-4 divide-y divide-app-border">
             {organizations.map((o) => (
               <li key={o.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium text-appNavy">{o.name}</p>
-                  <p className="text-xs text-appNavy/60">
+                  <p className="text-sm font-medium text-app-text-primary">{o.name}</p>
+                  <p className="text-xs text-app-text-secondary">
                     {[o.role, RELATIONSHIP_LABELS[o.relationship], o.domains.join(", ") || null].filter(Boolean).join(" · ")}
                   </p>
                   {o.monthlyCostMinor !== null && (
-                    <p className="mt-1 text-xs text-appNavy/70">
+                    <p className="mt-1 text-xs text-app-text-secondary">
                       {o.currency === "USD" ? `$${(o.monthlyCostMinor / 100).toLocaleString("en-US")}` : formatMinor(o.monthlyCostMinor)} בחודש
                     </p>
                   )}
-                  {o.notes && <p className="mt-1 text-xs text-appNavy/70">{o.notes}</p>}
+                  {o.notes && <p className="mt-1 text-xs text-app-text-secondary">{o.notes}</p>}
                   <StatusLine status={o.status} toResolve={o.toResolve} />
                   <ItemTags item={o} disclose />
                   <SourceCodes sources={o.sources} options={sourceOptions} />
@@ -419,7 +419,7 @@ export function PeoplePanel({
                   <Drawer triggerLabel="עריכה" title={`עריכת ${o.name}`} variant="link">
                     <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} existing={o} />
                   </Drawer>
-                  <button type="button" onClick={() => removeOrganization(o)} className="text-xs text-appNavy/50 hover:text-red-600">
+                  <button type="button" onClick={() => removeOrganization(o)} className="text-xs text-app-text-tertiary hover:text-app-error">
                     הסרה
                   </button>
                 </div>

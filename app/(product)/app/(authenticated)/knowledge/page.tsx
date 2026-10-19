@@ -88,23 +88,23 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-appNavy">ממתין לאישור</h1>
-        <p className="mt-1 text-sm text-appNavy/60">
+        <h1 className="text-xl font-medium text-app-text-primary">ממתין לאישור</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">
           מה ש-Claude הציע לתיקי הלקוחות. שום דבר לא נכנס לתיק לפני שמישהו מאשר אותו כאן.{" "}
-          <Link href="/app/extraction-guide" className="text-gold-dim hover:underline">
+          <Link href="/app/extraction-guide" className="text-app-text-accent hover:underline">
             הנחיות החילוץ
           </Link>
           {canManageClients(user.role) && (
             <>
               {" · "}
-              <Link href="/app/brain-metrics" className="text-gold-dim hover:underline">
+              <Link href="/app/brain-metrics" className="text-app-text-accent hover:underline">
                 מדדי התיק
               </Link>
             </>
           )}
         </p>
         {quality && (
-          <p className={`mt-1.5 text-xs ${quality.tone === "warn" ? "text-warning" : quality.tone === "good" ? "text-success" : "text-appNavy/55"}`} data-testid="proposal-quality">
+          <p className={`mt-1.5 text-xs ${quality.tone === "warn" ? "text-app-warning" : quality.tone === "good" ? "text-app-success" : "text-app-text-secondary"}`} data-testid="proposal-quality">
             {quality.text}
           </p>
         )}
@@ -141,12 +141,12 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
       )}
 
       {all.length === 0 ? (
-        awaiting.length === 0 && <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">אין הצעות שממתינות לאישור.</div>
+        awaiting.length === 0 && <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">אין הצעות שממתינות לאישור.</div>
       ) : shown.length === 0 ? (
-        <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+        <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
           אין הצעות שמתאימות לסינון.{" "}
           {/* A plain anchor: a document navigation the router cannot drop (see TaskFilters). */}
-          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-gold-dim hover:underline">
+          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-app-text-accent hover:underline">
             ניקוי הסינון
           </a>
         </div>

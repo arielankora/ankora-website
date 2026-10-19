@@ -18,8 +18,12 @@ export const metadata = { robots: { index: false, follow: false } };
 // number of employees assigned to the client (the same _count the old
 // table already showed as "משתמשים מוקצים") - a real, honest number
 // instead of fabricating a manager designation the schema doesn't have.
-export default async function ClientsPage() {
+export default async function ClientsPage(props: { searchParams: Promise<{ q?: string | string[] }> }) {
   const user = await requireUser();
+  // The search lives in the address bar (19.10.2026), so a client opened
+  // from a narrowed list comes back to the same list. See ClientsGrid.
+  const rawQ = (await props.searchParams).q;
+  const initialQuery = typeof rawQ === "string" ? rawQ.slice(0, 200) : "";
 
   if (!can(user.role, "client.manage")) {
     return (
@@ -61,8 +65,8 @@ export default async function ClientsPage() {
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-appNavy">לקוחות</h1>
-            <p className="mt-1 text-sm text-appNavy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
+            <h1 className="text-xl font-medium text-app-text-primary">לקוחות</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
           </div>
           <Drawer triggerLabel="לקוח חדש" title="לקוח חדש">
             <CreateClientForm />
@@ -75,19 +79,20 @@ export default async function ClientsPage() {
         <ClientsGrid
           key={cards.map((c) => c.id).join(",")}
           cards={cards}
+          initialQuery={initialQuery}
           canManageBanks={canManageBanks}
           canViewReports={canViewReports}
         />
 
         {archived.length > 0 && (
-          <details className="rounded-2xl border border-lineDark bg-white p-5">
-            <summary className="cursor-pointer text-sm font-medium text-appNavy">
+          <details className="rounded-2xl border border-app-border bg-white p-5">
+            <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
               בארכיון ({archived.length})
             </summary>
-            <ul className="mt-3 divide-y divide-lineDark">
+            <ul className="mt-3 divide-y divide-app-border">
               {archived.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <span className="text-sm text-appNavy">{c.name}</span>
+                  <span className="text-sm text-app-text-primary">{c.name}</span>
                   <RestoreClientButton clientId={c.id} />
                 </li>
               ))}

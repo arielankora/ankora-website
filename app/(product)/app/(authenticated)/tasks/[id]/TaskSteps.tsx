@@ -61,22 +61,22 @@ export function TaskSteps({
   const done = steps.filter((s) => !OPEN.includes(s.status)).length;
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-5">
+    <div className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-medium text-appNavy/70">שלבים</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">שלבים</h2>
         {steps.length > 0 && (
-          <span className="font-jbmono text-[13px] text-appNavy/55">
+          <span className="font-jbmono text-[13px] text-app-text-secondary">
             {done}/{steps.length}
           </span>
         )}
       </div>
 
       {steps.length === 0 ? (
-        <p className="mt-1.5 text-[12.5px] text-appNavy/55">
+        <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
           אפשר לפרק את המשימה לשלבים. לכל שלב אפשר לתת אחראי, תאריך יעד וטיימר משלו.
         </p>
       ) : (
-        <ul className="mt-3 divide-y divide-lineDark/70">
+        <ul className="mt-3 divide-y divide-app-border">
           {steps.map((step) => (
             <StepRow key={step.id} step={step} parentId={taskId} listQuery={listQuery} />
           ))}
@@ -129,23 +129,23 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
       <div className="min-w-0 flex-1">
         <Link
           href={taskHref(step.id, listQuery)}
-          className={`block text-[13.5px] transition-colors hover:text-appNavy ${
-            isDone ? "text-appNavy/45 line-through" : "text-appNavy"
+          className={`block text-[13.5px] transition-colors hover:text-app-text-primary ${
+            isDone ? "text-app-text-tertiary line-through" : "text-app-text-primary"
           }`}
         >
           {step.title}
         </Link>
         {step.approverName && (
-          <p className={`mt-0.5 text-[11.5px] ${step.status === "PENDING_APPROVAL" ? "font-medium text-warning" : "text-appNavy/50"}`}>
+          <p className={`mt-0.5 text-[11.5px] ${step.status === "PENDING_APPROVAL" ? "font-medium text-app-warning" : "text-app-text-tertiary"}`}>
             {step.status === "PENDING_APPROVAL" ? `מחכה לאישור של ${step.approverName}` : isDone ? `אושר` : `דורש אישור של ${step.approverName}`}
           </p>
         )}
         {(step.assignedToName || step.dueDate) && (
-          <p className="mt-0.5 text-[11.5px] text-appNavy/50">
+          <p className="mt-0.5 text-[11.5px] text-app-text-tertiary">
             {[step.assignedToName, step.dueDate ? formatDay(step.dueDate) : null].filter(Boolean).join(" · ")}
           </p>
         )}
-        {error && <p className="mt-1 text-[11.5px] text-error">{error}</p>}
+        {error && <p className="mt-1 text-[11.5px] text-app-error">{error}</p>}
       </div>
     </li>
   );
@@ -161,23 +161,23 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
 
   return (
     <form onSubmit={onSubmit} className="mt-3 flex items-center gap-2">
-      <Plus size={15} className="shrink-0 text-appNavy/40" />
+      <Plus size={15} className="shrink-0 text-app-text-tertiary" />
       <input
         name="title"
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         aria-label="שלב חדש"
         placeholder="מה צריך לקרות"
-        className="min-w-0 flex-1 border-b border-lineDark bg-transparent py-1.5 text-[13.5px] text-appNavy outline-none placeholder:text-appNavy/35 focus:border-appNavy"
+        className="min-w-0 flex-1 border-b border-app-border-strong bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
       />
       <button
         type="submit"
         disabled={pending || !title.trim()}
-        className="shrink-0 rounded-full border border-lineDark px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold disabled:opacity-40"
+        className="shrink-0 rounded-full border border-app-border px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
       >
         {pending ? "מוסיף..." : "הוספה"}
       </button>
-      {error && <p className="w-full text-[11.5px] text-error">{error}</p>}
+      {error && <p className="w-full text-[11.5px] text-app-error">{error}</p>}
     </form>
   );
 }
@@ -217,7 +217,7 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mt-3 text-[12.5px] text-gold-dim transition-colors hover:text-appNavy"
+        className="mt-3 text-[12.5px] text-app-text-accent transition-colors hover:text-app-text-primary"
       >
         מתוך ספר הנהלים
       </button>
@@ -225,18 +225,18 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
   }
 
   return (
-    <div className="mt-3 rounded-xl border border-lineDark bg-cream/40 p-3">
+    <div className="mt-3 rounded-xl border border-app-border bg-cream/40 p-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className="text-[12.5px] font-medium text-appNavy">מתוך ספר הנהלים</p>
+        <p className="text-[12.5px] font-medium text-app-text-primary">מתוך ספר הנהלים</p>
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="text-[11.5px] text-appNavy/50 hover:text-appNavy"
+          className="text-[11.5px] text-app-text-tertiary hover:text-app-text-primary"
         >
           סגירה
         </button>
       </div>
-      <p className="mt-0.5 text-[11.5px] text-appNavy/55">
+      <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
         השלבים נוספים למה שכבר יש כאן, ולא במקומו.
       </p>
       <ul className="mt-2 space-y-1">
@@ -248,14 +248,14 @@ function FromTheBook({ taskId, templates }: { taskId: string; templates: Templat
               onClick={() => apply(t.id)}
               className="w-full rounded-lg px-2 py-1.5 text-start transition-colors hover:bg-white disabled:opacity-40"
             >
-              <span className="text-[13px] text-appNavy">{t.name}</span>
-              <span className="font-jbmono text-[11px] text-appNavy/45"> · {t.stepCount}</span>
-              <span className="block text-[11.5px] text-appNavy/55">{t.when}</span>
+              <span className="text-[13px] text-app-text-primary">{t.name}</span>
+              <span className="font-jbmono text-[11px] text-app-text-tertiary"> · {t.stepCount}</span>
+              <span className="block text-[11.5px] text-app-text-secondary">{t.when}</span>
             </button>
           </li>
         ))}
       </ul>
-      {error && <p className="mt-1.5 text-[11.5px] text-error">{error}</p>}
+      {error && <p className="mt-1.5 text-[11.5px] text-app-error">{error}</p>}
     </div>
   );
 }

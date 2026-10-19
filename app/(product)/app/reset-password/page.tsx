@@ -15,13 +15,13 @@ export default async function ResetPasswordPage(
 
   return (
     <AuthShell>
-      <p className="text-[22px] font-medium text-appNavy">בחירת סיסמה חדשה</p>
-      <p className="mb-6 mt-2 text-[13.5px] text-appNavy/60">לפחות 10 תווים.</p>
+      <p className="text-[22px] font-medium text-app-text-primary">בחירת סיסמה חדשה</p>
+      <p className="mb-6 mt-2 text-[13.5px] text-app-text-secondary">לפחות 10 תווים.</p>
 
       {token ? (
         <ResetPasswordForm token={token} />
       ) : (
-        <p className="text-sm text-error">
+        <p className="text-sm text-app-error">
           הקישור אינו תקין או שפג תוקפו.{" "}
           <Link href="/app/forgot-password" className="underline">
             בקשה חדשה לאיפוס סיסמה
@@ -29,8 +29,8 @@ export default async function ResetPasswordPage(
         </p>
       )}
 
-      <p className="mt-6 text-center text-xs text-appNavy/50">
-        <Link href="/app/login" className="hover:text-gold-dim">
+      <p className="mt-6 text-center text-xs text-app-text-tertiary">
+        <Link href="/app/login" className="hover:text-app-text-accent">
           חזרה להתחברות
         </Link>
       </p>

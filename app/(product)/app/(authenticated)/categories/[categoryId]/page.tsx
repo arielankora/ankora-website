@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -30,16 +30,14 @@ export default async function CategoryDetailPage(props: { params: Promise<{ cate
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/categories" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה לרשימת הקטגוריות
-          </Link>
-          <h1 className="mt-2 text-xl font-medium text-appNavy">{category.name}</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <PageBack href="/app/categories" label="קטגוריות" />
+          <h1 className="mt-3 text-xl font-medium text-app-text-primary">{category.name}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             {category.visibility === "GLOBAL" ? "קטגוריה כללית" : `ספציפית ללקוח: ${category.client?.name ?? ""}`}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
           <EditCategoryForm category={category} />
         </div>
       </div>

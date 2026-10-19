@@ -8,7 +8,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "יוצר..." : "יצירת דוח מתוזמן"}
     </button>
@@ -33,16 +33,16 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-1 gap-4 rounded-2xl border border-app-border bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <input type="hidden" name="clientId" value={clientId} />
 
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">סוג דוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">סוג דוח *</label>
         <select
           name="reportType"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           {REPORT_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -53,13 +53,13 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">תדירות *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">תדירות *</label>
         <select
           name="frequency"
           required
           value={frequency}
           onChange={(e) => setFrequency(e.target.value as "WEEKLY" | "MONTHLY")}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="WEEKLY">שבועי</option>
           <option value="MONTHLY">חודשי</option>
@@ -68,10 +68,10 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
 
       {frequency === "WEEKLY" ? (
         <div>
-          <label className="block text-xs font-medium text-appNavy/60">יום בשבוע</label>
+          <label className="block text-xs font-medium text-app-text-secondary">יום בשבוע</label>
           <select
             name="dayOfWeek"
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             {WEEKDAYS.map((label, i) => (
               <option key={i} value={i}>
@@ -82,44 +82,44 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
         </div>
       ) : (
         <div>
-          <label className="block text-xs font-medium text-appNavy/60">יום בחודש (1-28)</label>
+          <label className="block text-xs font-medium text-app-text-secondary">יום בחודש (1-28)</label>
           <input
             type="number"
             name="dayOfMonth"
             min={1}
             max={28}
             defaultValue={1}
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}
 
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שעה מועדפת (0-23)</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שעה מועדפת (0-23)</label>
         <input
           type="number"
           name="hour"
           min={0}
           max={23}
           defaultValue={7}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
-        <p className="mt-1 text-[11px] text-appNavy/40">בפועל נשלח פעם ביום; זהו תיעוד ההעדפה בלבד.</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">בפועל נשלח פעם ביום; זהו תיעוד ההעדפה בלבד.</p>
       </div>
 
       <div className="sm:col-span-2 lg:col-span-4">
-        <label className="block text-xs font-medium text-appNavy/60">נמענים (מופרד בפסיקים) *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">נמענים (מופרד בפסיקים) *</label>
         <input
           name="recipients"
           required
           placeholder="finance@client.com, ops@ankora.co.il"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {error && <p className="text-sm text-red-600">{error}</p>}
-        {ok && <p className="text-sm text-emerald-700">הדוח המתוזמן נוצר.</p>}
+        {error && <p className="text-sm text-app-error">{error}</p>}
+        {ok && <p className="text-sm text-app-success">הדוח המתוזמן נוצר.</p>}
         <div className="ms-auto">
           <SubmitButton pending={pending} />
         </div>

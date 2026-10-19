@@ -51,11 +51,11 @@ export function TasksPanel({
 }) {
   const now = Date.now();
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-appNavy">משימות ({openCount} פתוחות)</h2>
+        <h2 className="text-sm font-medium text-app-text-primary">משימות ({openCount} פתוחות)</h2>
         <div className="flex items-center gap-4">
-          <Link href={`/app/tasks?clientId=${clientId}`} className="text-xs text-gold-dim underline underline-offset-4">
+          <Link href={`/app/tasks?clientId=${clientId}`} className="text-xs text-app-text-accent underline underline-offset-4">
             לכל המשימות של הלקוח
           </Link>
           <Drawer triggerLabel="משימה" title={`משימה חדשה: ${clientName}`}>
@@ -68,27 +68,27 @@ export function TasksPanel({
         </div>
       </div>
 
-      <p className="mt-1 text-xs text-appNavy/50">
+      <p className="mt-1 text-xs text-app-text-tertiary">
         {closedRecently} נסגרו ב-30 הימים האחרונים
         {untaskedSecondsThisMonth > 0 && <> · {formatDuration(untaskedSecondsThisMonth)} שעות החודש דווחו בלי משימה</>}
       </p>
 
       {tasks.length === 0 ? (
-        <p className="mt-3 text-sm text-appNavy/50">אין משימות פתוחות ללקוח זה.</p>
+        <p className="mt-3 text-sm text-app-text-tertiary">אין משימות פתוחות ללקוח זה.</p>
       ) : (
-        <ul className="mt-3 divide-y divide-lineDark">
+        <ul className="mt-3 divide-y divide-app-border">
           {tasks.map((t) => {
             const overdue = t.dueDate !== null && new Date(t.dueDate).getTime() < now;
             return (
               <li key={t.id} className="flex flex-wrap items-center justify-between gap-3 py-2.5 text-sm">
                 <div className="min-w-0 flex-1">
-                  <Link href={`/app/tasks/${t.id}`} className="text-appNavy hover:text-gold-dim">
+                  <Link href={`/app/tasks/${t.id}`} className="text-app-text-primary hover:text-app-text-accent">
                     {t.title}
                   </Link>
-                  <p className="mt-0.5 text-xs text-appNavy/50">
+                  <p className="mt-0.5 text-xs text-app-text-tertiary">
                     {t.assigneeName ?? "ללא אחראי"}
                     {t.dueDate && (
-                      <span className={overdue ? "text-red-600" : undefined}> · יעד {formatDue(t.dueDate)}</span>
+                      <span className={overdue ? "text-app-error" : undefined}> · יעד {formatDue(t.dueDate)}</span>
                     )}
                     {t.seconds > 0 && <> · {formatDuration(t.seconds)} שעות</>}
                   </p>
@@ -100,7 +100,7 @@ export function TasksPanel({
         </ul>
       )}
       {openCount > tasks.length && (
-        <p className="mt-2 text-xs text-appNavy/50">
+        <p className="mt-2 text-xs text-app-text-tertiary">
           מוצגות {tasks.length} מתוך {openCount}.{" "}
           <Link href={`/app/tasks?clientId=${clientId}`} className="underline">
             לכל הרשימה

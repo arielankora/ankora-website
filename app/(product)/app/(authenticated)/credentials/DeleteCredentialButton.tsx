@@ -14,14 +14,14 @@ export function DeleteCredentialButton({ id, systemName }: { id: string; systemN
 
   if (!asking) {
     return (
-      <button type="button" onClick={() => setAsking(true)} className="text-xs text-appNavy/50 hover:text-error">
+      <button type="button" onClick={() => setAsking(true)} className="text-xs text-app-text-tertiary hover:text-app-error">
         מחיקה
       </button>
     );
   }
   return (
     <span className="flex flex-wrap items-center gap-2 text-xs">
-      <span className="text-appNavy/70">למחוק את הגישה ל{systemName}? הסיסמה תימחק לצמיתות.</span>
+      <span className="text-app-text-secondary">למחוק את הגישה ל{systemName}? הסיסמה תימחק לצמיתות.</span>
       <button
         type="button"
         disabled={pending}
@@ -32,14 +32,14 @@ export function DeleteCredentialButton({ id, systemName }: { id: string; systemN
             else hideRow();
           })
         }
-        className="font-medium text-error"
+        className="font-medium text-app-error"
       >
         {pending ? "נמחק..." : "למחוק"}
       </button>
-      <button type="button" onClick={() => setAsking(false)} className="text-appNavy/60">
+      <button type="button" onClick={() => setAsking(false)} className="text-app-text-secondary">
         ביטול
       </button>
-      {error && <span className="text-error">{error}</span>}
+      {error && <span className="text-app-error">{error}</span>}
     </span>
   );
 }

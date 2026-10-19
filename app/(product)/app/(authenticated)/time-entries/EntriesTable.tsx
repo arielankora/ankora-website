@@ -57,14 +57,14 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
   return (
     <div className="space-y-3">
       {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-appNavy px-4 py-3 text-cream-warm">
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-app-surface-nav px-4 py-3 text-cream-warm">
           <span className="text-sm">{selected.size} דיווחים נבחרו</span>
           <span className="flex-1" />
           <button
             type="button"
             disabled={pending}
             onClick={bulkDelete}
-            className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
+            className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50"
           >
             מחיקת מסומנים
           </button>
@@ -78,10 +78,10 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
         </div>
       )}
 
-      <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
         <table className="w-full min-w-[900px] text-start text-sm">
           <thead>
-            <tr className="border-b border-lineDark text-xs text-appNavy/50">
+            <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="w-10 px-5 py-3"></th>
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">איש צוות</th>
@@ -96,7 +96,7 @@ export function EntriesTable({ entries }: { entries: Entry[] }) {
           <tbody>
             {entries.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-5 py-8 text-center text-appNavy/50">
+                <td colSpan={9} className="px-5 py-8 text-center text-app-text-tertiary">
                   אין דיווחים התואמים את הסינון.
                 </td>
               </tr>

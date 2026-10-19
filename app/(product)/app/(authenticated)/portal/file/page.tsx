@@ -37,10 +37,10 @@ function Block({
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-      <div className="border-b border-lineDark px-[18px] py-3.5">
-        <h2 className="text-[13.5px] font-medium text-appNavy">{title}</h2>
-        {subtitle && <p className="mt-0.5 text-[12px] text-appNavy/55">{subtitle}</p>}
+    <section className="overflow-hidden rounded-2xl border border-app-border bg-white">
+      <div className="border-b border-app-border px-[18px] py-3.5">
+        <h2 className="text-[13.5px] font-medium text-app-text-primary">{title}</h2>
+        {subtitle && <p className="mt-0.5 text-[12px] text-app-text-secondary">{subtitle}</p>}
       </div>
       <div className="px-[18px] py-4">{children}</div>
     </section>
@@ -48,7 +48,7 @@ function Block({
 }
 
 function Empty({ children }: { children: React.ReactNode }) {
-  return <p className="text-[13px] text-appNavy/50">{children}</p>;
+  return <p className="text-[13px] text-app-text-tertiary">{children}</p>;
 }
 
 // Portal phase 3, screen 5: "התיק שלי".
@@ -78,9 +78,9 @@ export default async function PortalFilePage() {
     <div className="space-y-4">
       <PortalTabs active="file" />
 
-      <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
-        <p className="text-xl font-medium text-appNavy">התיק של {client.name}</p>
-        <p className="mt-1.5 text-[13.5px] text-appNavy/60">
+      <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
+        <p className="text-xl font-medium text-app-text-primary">התיק של {client.name}</p>
+        <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
           מה שאנחנו יודעים עליך ומה שנאסף תוך כדי עבודה. הכול כאן כדי שלא תצטרך לזכור את זה.
         </p>
       </div>
@@ -95,7 +95,7 @@ export default async function PortalFilePage() {
       >
         <PreferencesForm preferences={preferences} canEdit={canEdit} />
         {preferences.updatedAt && (
-          <p className="mt-3 text-[11.5px] text-appNavy/45">עודכן לאחרונה ב-{formatDay(preferences.updatedAt)}</p>
+          <p className="mt-3 text-[11.5px] text-app-text-tertiary">עודכן לאחרונה ב-{formatDay(preferences.updatedAt)}</p>
         )}
       </Block>
 
@@ -106,24 +106,24 @@ export default async function PortalFilePage() {
       {/* The client file, as far as it is the client's to see (lib/portal-knowledge.ts). */}
       {knowledge.map((g) => (
         <Block key={g.key} title={g.title} subtitle={g.subtitle}>
-          <ul className="divide-y divide-lineDark/60" data-testid={`portal-knowledge-${g.key}`}>
+          <ul className="divide-y divide-app-border" data-testid={`portal-knowledge-${g.key}`}>
             {g.items.map((i, n) => (
               <li key={n} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-appNavy">
+                <span className="text-sm text-app-text-primary">
                   {i.text}
-                  {i.detail && <span className="text-appNavy/55"> · {i.detail}</span>}
+                  {i.detail && <span className="text-app-text-secondary"> · {i.detail}</span>}
                 </span>
                 <span className="flex items-center gap-2">
                   {i.askToConfirm && (
-                    <span className="rounded-full border border-warning/30 bg-warning-soft px-2.5 py-1 text-[11px] text-warning">נשמח לאישור שלך</span>
+                    <span className="rounded-full border border-app-warning/30 bg-app-warning-soft px-2.5 py-1 text-[11px] text-app-warning">נשמח לאישור שלך</span>
                   )}
-                  {i.tag && <span className="rounded-full border border-lineDark bg-appNavy/5 px-2.5 py-1 text-[11px] text-appNavy/70">{i.tag}</span>}
+                  {i.tag && <span className="rounded-full border border-app-border bg-app-surface-sunken px-2.5 py-1 text-[11px] text-app-text-secondary">{i.tag}</span>}
                 </span>
               </li>
             ))}
           </ul>
           {g.items.some((i) => i.askToConfirm) && (
-            <p className="mt-3 text-[11.5px] text-appNavy/50">משהו לא מדויק, או מסומן לאישור? כתוב למנהל התיק שלך, ונעדכן.</p>
+            <p className="mt-3 text-[11.5px] text-app-text-tertiary">משהו לא מדויק, או מסומן לאישור? כתוב למנהל התיק שלך, ונעדכן.</p>
           )}
         </Block>
       ))}
@@ -132,24 +132,24 @@ export default async function PortalFilePage() {
         {suppliers.length === 0 ? (
           <Empty>עוד לא תיאמנו עבורך גורם חיצוני. כשנעשה זאת, הוא יירשם כאן.</Empty>
         ) : (
-          <ul className="divide-y divide-lineDark/60">
+          <ul className="divide-y divide-app-border">
             {suppliers.map((s) => (
               <li key={s.taskId} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-appNavy">
+                <span className="text-sm text-app-text-primary">
                   {s.name}
-                  <span className="text-appNavy/55"> · {s.what}</span>
+                  <span className="text-app-text-secondary"> · {s.what}</span>
                 </span>
                 <span className="flex items-center gap-2.5">
-                  <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+                  <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                     {formatDay(s.when)}
                   </span>
                   <span
                     className={`rounded-full border px-2.5 py-1 text-[11px] ${
                       s.experience === "GOOD"
-                        ? "border-success/25 bg-success-soft text-success"
+                        ? "border-app-success/25 bg-app-success-soft text-app-success"
                         : s.experience === "AVOID"
-                          ? "border-error/25 bg-error-soft text-error"
-                          : "border-lineDark bg-appNavy/5 text-appNavy/70"
+                          ? "border-app-error/25 bg-app-error-soft text-app-error"
+                          : "border-app-border bg-app-surface-sunken text-app-text-secondary"
                     }`}
                   >
                     {SUPPLIER_EXPERIENCE_LABELS[s.experience]}
@@ -165,28 +165,28 @@ export default async function PortalFilePage() {
         {documents.length === 0 ? (
           <Empty>עוד אין מסמכים בתיק. כל מסמך שייווצר בעבודה עבורך יופיע כאן להורדה.</Empty>
         ) : (
-          <ul className="divide-y divide-lineDark/60">
+          <ul className="divide-y divide-app-border">
             {documents.map((d) => {
               const size = formatSize(d.sizeBytes);
               return (
                 <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                  <span className="text-sm text-appNavy">
+                  <span className="text-sm text-app-text-primary">
                     {d.title}
-                    <span className="text-appNavy/55"> · {DOCUMENT_KIND_LABELS[d.kind]}</span>
+                    <span className="text-app-text-secondary"> · {DOCUMENT_KIND_LABELS[d.kind]}</span>
                   </span>
                   <span className="flex items-center gap-2.5">
                     {size && (
-                      <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+                      <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                         {size}
                       </span>
                     )}
-                    <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+                    <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                       {formatDay(d.addedAt)}
                     </span>
                     {/* A plain link, and the href is a document id rather
                         than a file: the server decides on every request
                         whether this person may have it. */}
-                    <a href={`/api/portal/documents/${d.id}`} className="text-xs text-gold-dim hover:underline">
+                    <a href={`/api/portal/documents/${d.id}`} className="text-xs text-app-text-accent hover:underline">
                       הורדה
                     </a>
                   </span>
@@ -201,12 +201,12 @@ export default async function PortalFilePage() {
         {dates.length === 0 ? (
           <Empty>עוד לא רשמנו מועד חוזר עבורך.</Empty>
         ) : (
-          <ul className="divide-y divide-lineDark/60">
+          <ul className="divide-y divide-app-border">
             {dates.map((d) => (
               <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0">
-                <span className="text-sm text-appNavy">{d.title}</span>
+                <span className="text-sm text-app-text-primary">{d.title}</span>
                 {d.nextAt && (
-                  <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+                  <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
                     {formatDay(d.nextAt)}
                   </span>
                 )}
@@ -218,18 +218,18 @@ export default async function PortalFilePage() {
 
       <div id="claude">
         <Block title="חיבור ל-Claude" subtitle="אפשר לשאול את Claude מה המצב, מה מחכה לך ומה היה החודש, ולקבל תשובה מתוך הפורטל.">
-          <ol className="list-decimal space-y-1.5 pe-5 text-[13px] leading-relaxed text-appNavy/75">
+          <ol className="list-decimal space-y-1.5 pe-5 text-[13px] leading-relaxed text-app-text-secondary">
             <li>ב-Claude: הגדרות, Connectors, הוספת Connector מותאם אישית.</li>
             <li>להדביק את הכתובת שלמטה ולאשר את החיבור עם המשתמש שלך באנקורה.</li>
             <li>לשאול, למשל: &quot;איפה עומדת החפיפה?&quot; או &quot;מה מחכה לי?&quot;.</li>
           </ol>
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <code dir="ltr" className="rounded bg-cream px-2 py-1 font-jbmono text-[12px] text-appNavy">
+            <code dir="ltr" className="rounded bg-app-surface-page px-2 py-1 font-jbmono text-[12px] text-app-text-primary">
               {PORTAL_CONNECTOR_URL}
             </code>
             <CopyValue value={PORTAL_CONNECTOR_URL} label="העתקת כתובת החיבור" />
           </div>
-          <p className="mt-3 text-[12px] text-appNavy/55">
+          <p className="mt-3 text-[12px] text-app-text-secondary">
             Claude רואה רק את מה שמופיע לך בפורטל. רק מנהל החשבון יכול לענות דרכו על החלטות.
           </p>
         </Block>

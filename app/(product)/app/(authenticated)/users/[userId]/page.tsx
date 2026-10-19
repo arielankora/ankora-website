@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -84,15 +84,13 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/users" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה לרשימת המשתמשים
-          </Link>
-          <h1 className="mt-2 text-xl font-medium text-appNavy">{targetUser.name}</h1>
-          <p className="mt-1 text-sm text-appNavy/60">{targetUser.email}</p>
+          <PageBack href="/app/users" label="משתמשים" />
+          <h1 className="mt-3 text-xl font-medium text-app-text-primary">{targetUser.name}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">{targetUser.email}</p>
         </div>
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-appNavy">תפקיד וסטטוס</h2>
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="mb-4 text-sm font-medium text-app-text-primary">תפקיד וסטטוס</h2>
           {/* An explicit literal, not the row. The narrowed prop type on the
               component is the declaration; this is the enforcement - a prop
               typed narrower still serialises every field the object actually
@@ -104,8 +102,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
         </div>
 
         {targetUser.role !== "CLIENT_USER" && (
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-4 text-sm font-medium text-appNavy">הרשאות מיוחדות</h2>
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="mb-4 text-sm font-medium text-app-text-primary">הרשאות מיוחדות</h2>
             <ExceptionApproverForm userId={targetUser.id} value={targetUser.canApproveExceptions} />
           </div>
         )}
@@ -114,35 +112,35 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             has signed, and the deletion declaration for when they leave.
             Staff only; clients sign nothing here. */}
         {targetUser.role !== "CLIENT_USER" && (
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
+          <div className="rounded-2xl border border-app-border bg-white p-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-appNavy">מסמכים חתומים</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">מסמכים חתומים</h2>
               {/* The blank forms for the PDF channel. A plain link: the
                   route answers with the file as an attachment. */}
-              <span className="text-xs text-appNavy/60">
+              <span className="text-xs text-app-text-secondary">
                 הורדת טופס לחתימה:{" "}
-                <a href="/app/agreements/blank/confidentiality" download className="text-gold-dim underline underline-offset-2 hover:text-appNavy">
+                <a href="/app/agreements/blank/confidentiality" download className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">
                   התחייבות לסודיות
                 </a>
                 {" · "}
-                <a href="/app/agreements/blank/deletion-declaration" download className="text-gold-dim underline underline-offset-2 hover:text-appNavy">
+                <a href="/app/agreements/blank/deletion-declaration" download className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">
                   הצהרת מחיקה
                 </a>
               </span>
             </div>
             <PersonalEmailForm userId={targetUser.id} value={targetUser.personalEmail} />
 
-            <div className="mt-5 border-t border-lineDark pt-5">
+            <div className="mt-5 border-t border-app-border pt-5">
               {agreements.length === 0 ? (
-                <p className="text-sm text-appNavy/60">עדיין לא נחתם אף מסמך.</p>
+                <p className="text-sm text-app-text-secondary">עדיין לא נחתם אף מסמך.</p>
               ) : (
-                <ul className="divide-y divide-lineDark text-sm">
+                <ul className="divide-y divide-app-border text-sm">
                   {agreements.map((a) => (
                     <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <span className="text-appNavy">
-                        {AGREEMENT_KIND_LABEL[a.kind]} <span className="text-appNavy/50">· {a.version}</span>
+                      <span className="text-app-text-primary">
+                        {AGREEMENT_KIND_LABEL[a.kind]} <span className="text-app-text-tertiary">· {a.version}</span>
                       </span>
-                      <span className="text-xs text-appNavy/60">
+                      <span className="text-xs text-app-text-secondary">
                         {AGREEMENT_CHANNEL_LABEL[a.channel]} · {SIGNED_AT.format(a.signedAt)}
                         {a.driveFileId ? (
                           <>
@@ -151,7 +149,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                               href={`https://drive.google.com/file/d/${encodeURIComponent(a.driveFileId)}/view`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-gold-dim underline underline-offset-2 hover:text-appNavy"
+                              className="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary"
                             >
                               PDF
                             </a>
@@ -166,9 +164,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               )}
             </div>
 
-            <div className="mt-5 border-t border-lineDark pt-5">
-              <p className="text-sm font-medium text-appNavy">הצהרת מחיקה</p>
-              <p className="mt-1 text-sm text-appNavy/60">
+            <div className="mt-5 border-t border-app-border pt-5">
+              <p className="text-sm font-medium text-app-text-primary">הצהרת מחיקה</p>
+              <p className="mt-1 text-sm text-app-text-secondary">
                 בסיום העבודה נשלח למייל הפרטי קישור חד-פעמי לשבעה ימים, לקריאה ולאישור של הצהרת המחיקה והחזרת הציוד.
               </p>
               <DeletionDeclarationForm
@@ -180,8 +178,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           </div>
         )}
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="mb-4 text-sm font-medium text-appNavy">גישה ללקוחות</h2>
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="mb-4 text-sm font-medium text-app-text-primary">גישה ללקוחות</h2>
           <ClientAccessForm
             userId={targetUser.id}
             clients={clients.filter((c) => c.status === "ACTIVE").map((c) => ({ id: c.id, name: c.name }))}
@@ -194,9 +192,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             delete the person and create them again, discarding their
             client access with them. */}
         {targetUser.status === "INVITED" && (
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="text-sm font-medium text-appNavy">הזמנה ממתינה</h2>
-            <p className="mt-1 text-sm text-appNavy/60">
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="text-sm font-medium text-app-text-primary">הזמנה ממתינה</h2>
+            <p className="mt-1 text-sm text-app-text-secondary">
               המשתמש טרם בחר סיסמה. שליחה מחדש מנפיקה קישור חדש לארבעים ושמונה שעות ומבטלת את
               הקישור הקודם.
             </p>
@@ -204,16 +202,16 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           </div>
         )}
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="text-sm font-medium text-appNavy">אבטחה</h2>
-          <p className="mt-1 text-sm text-appNavy/60">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="text-sm font-medium text-app-text-primary">אבטחה</h2>
+          <p className="mt-1 text-sm text-app-text-secondary">
             ניתוק כל ההתחברויות הפעילות של המשתמש. שימושי אם יש חשד שהחשבון נפגע.
           </p>
           <form action={logoutAllSessionsAction} className="mt-3">
             <input type="hidden" name="userId" value={targetUser.id} />
             <button
               type="submit"
-              className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-gold hover:text-appNavy"
+              className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-gold hover:text-app-text-primary"
             >
               ניתוק כל ההתחברויות
             </button>
@@ -230,9 +228,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
               The count is shown because an admin pressing a button that
               looks the same whether there are three grants or none is
               guessing. With none, there is nothing to press. */}
-          <div className="mt-5 border-t border-lineDark pt-5">
-            <p className="text-sm font-medium text-appNavy">חיבור Claude (MCP)</p>
-            <p className="mt-1 text-sm text-appNavy/60">
+          <div className="mt-5 border-t border-app-border pt-5">
+            <p className="text-sm font-medium text-app-text-primary">חיבור Claude (MCP)</p>
+            <p className="mt-1 text-sm text-app-text-secondary">
               {claudeGrantCount > 0
                 ? `למשתמש יש ${claudeGrantCount} חיבורים פעילים ל-Claude. ניתוק מבטל את כולם מיידית, בלי לנתק אותו משאר המערכת.`
                 : "למשתמש אין חיבורים פעילים ל-Claude."}
@@ -242,7 +240,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                 <input type="hidden" name="userId" value={targetUser.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-error hover:text-error"
+                  className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
                   ניתוק Claude
                 </button>
@@ -253,9 +251,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
           {/* Two-step sign-in (16.10.2026). The recovery path for a lost
               device: clear the passkeys, end every session, and the person
               enrols a new one at their next sign-in, after their password. */}
-          <div className="mt-5 border-t border-lineDark pt-5">
-            <p className="text-sm font-medium text-appNavy">Passkeys ואימות דו-שלבי</p>
-            <p className="mt-1 text-sm text-appNavy/60">
+          <div className="mt-5 border-t border-app-border pt-5">
+            <p className="text-sm font-medium text-app-text-primary">Passkeys ואימות דו-שלבי</p>
+            <p className="mt-1 text-sm text-app-text-secondary">
               {passkeyCount > 0
                 ? `למשתמש רשומים ${passkeyCount} מכשירים. אם מכשיר אבד, איפוס מוחק את כולם ומנתק את כל ההתחברויות. בכניסה הבאה המשתמש ירשום מכשיר חדש אחרי הסיסמה.`
                 : "למשתמש אין passkey רשום. בכניסה הבאה הוא יתבקש לרשום מכשיר, אם האימות הדו-שלבי חל עליו."}
@@ -265,7 +263,7 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
                 <input type="hidden" name="userId" value={targetUser.id} />
                 <button
                   type="submit"
-                  className="rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 hover:border-error hover:text-error"
+                  className="rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary hover:border-app-error hover:text-app-error"
                 >
                   איפוס passkeys
                 </button>
@@ -279,9 +277,9 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
             exactly those. Internal staff only; a client user never
             reveals anything. */}
         {targetUser.role !== "CLIENT_USER" && (
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="text-sm font-medium text-appNavy">גישות של לקוחות שנצפו</h2>
-            <p className="mt-1 text-sm text-appNavy/60">
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="text-sm font-medium text-app-text-primary">גישות של לקוחות שנצפו</h2>
+            <p className="mt-1 text-sm text-app-text-secondary">
               פרטי הגישה של לקוחות שהמשתמש צפה בהם ב-90 הימים האחרונים, לפי לקוח, עם הודעה מוכנה לכל לקוח. בעזיבת ספק פנימי,
               שולחים לכל לקוח את ההודעה שלו כדי שיחליף את הסיסמאות האלה.
             </p>

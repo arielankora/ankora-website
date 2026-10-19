@@ -76,3 +76,34 @@ export function carriedListQuery(from?: string | null): string {
 export function backLabel(from?: string | null): string {
   return calendarBackHref(from) ? "חזרה ליומן" : "חזרה למשימות";
 }
+
+/// 19.10.2026: the words on the way back name the list as it was, so a
+/// person sees which list they return to before they click: "משימות ·
+/// שלי · <client> · "<search>"". Names come from the caller, already
+/// resolved against what this person may see (an id they cannot reach
+/// arrives as undefined and is left out, so the label never names a
+/// client the list itself would not show). Anything not set says nothing.
+export const STATUS_WORDS: Record<string, string> = {
+  ACTIVE: "פעילות",
+  OPEN: "פתוחות",
+  IN_PROGRESS: "בטיפול",
+  PENDING_APPROVAL: "ממתינות לאישור",
+  DONE: "הושלמו",
+};
+const MINE_WORDS: Record<string, string> = { "0": "כולם", assigned: "לביצוע", supervising: "בפיקוח" };
+
+export function backTitle(from: string | null | undefined, names: { client?: string; category?: string } = {}): string {
+  if (calendarBackHref(from)) return "יומן";
+  const q = new URLSearchParams(from ? clean(new URLSearchParams(from)) : "");
+  const parts = ["משימות"];
+  const mine = q.get("mine");
+  parts.push(mine && MINE_WORDS[mine] ? MINE_WORDS[mine] : "שלי");
+  const status = q.get("status");
+  if (status && STATUS_WORDS[status]) parts.push(STATUS_WORDS[status]);
+  if (q.get("clientId") && names.client) parts.push(names.client);
+  if (q.get("categoryId") && names.category) parts.push(names.category);
+  const text = q.get("q")?.trim();
+  if (text) parts.push(`"${text.length > 40 ? `${text.slice(0, 40)}…` : text}"`);
+  if (q.get("view") === "board") parts.push("לוח");
+  return parts.join(" · ");
+}

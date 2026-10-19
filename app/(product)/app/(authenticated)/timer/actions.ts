@@ -50,7 +50,7 @@ export async function startTimerAction(input: {
       confirmParallel: !!input.confirmParallel,
     });
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     return { ok: true as const, entry };
   } catch (err) {
     if (err instanceof ParallelTimerConfirmationRequiredError) {
@@ -76,7 +76,7 @@ export async function stopTimerAction(input: { timeEntryId: string; note?: strin
       ...(input.taskId === undefined ? {} : { taskId: input.taskId }),
     });
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     return { ok: true as const, entry };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
@@ -91,7 +91,7 @@ export async function reopenTimerAction(input: { timeEntryId: string }) {
   try {
     const entry = await reopenTimer(user, input.timeEntryId);
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     return { ok: true as const, entry };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
@@ -107,7 +107,7 @@ export async function discardActiveTimerAction(input: { timeEntryId: string }) {
   try {
     await deleteTimeEntry(user, input.timeEntryId);
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };

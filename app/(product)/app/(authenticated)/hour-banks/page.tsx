@@ -72,8 +72,8 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">בנק שעות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="text-xl font-medium text-app-text-primary">בנק שעות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             מדיניות חיוב, מחזורים או חבילות שעות, והתאמות ידניות לכל לקוח. מחזור מתחדש בתאריך קבוע. חבילה נרכשת מראש ונספרת עד שהיא נגמרת.
           </p>
         </div>
@@ -81,13 +81,13 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
         <HbClientPicker clients={activeClients.map((c) => ({ id: c.id, name: c.name }))} current={clientId} />
 
         {!clientId && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+          <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
             בחרו לקוח כדי לצפות במדיניות החיוב ובבנק השעות שלו.
           </div>
         )}
 
         {clientId && !selectedClient && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+          <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
             הלקוח לא נמצא או שהוא בארכיון.
           </div>
         )}
@@ -95,7 +95,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
         {selectedClient && (
           <>
             <div className="flex flex-wrap items-center gap-3">
-              <h2 className="text-sm font-medium text-appNavy">{selectedClient.name}</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">{selectedClient.name}</h2>
               <span className="flex-1" />
               <Drawer triggerLabel="טעינת חבילה" title={`טעינת חבילת שעות - ${selectedClient.name}`}>
                 <LoadPackageForm clientId={selectedClient.id} />
@@ -121,7 +121,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                     <span className="text-xs text-cream-warm/60">{isPrepaid ? "חבילה נוכחית" : "מחזור נוכחי"}</span>
                     <span
                       className={`font-jbmono text-[40px] font-medium leading-none ${
-                        current.utilization.utilizationPct > 100 ? "text-error" : "text-cream-warm"
+                        current.utilization.utilizationPct > 100 ? "text-app-error" : "text-cream-warm"
                       }`}
                       dir="ltr"
                     >
@@ -131,7 +131,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   <div className="mt-3 h-2 overflow-hidden rounded-full bg-cream-warm/15">
                     <span
                       className={`block h-full rounded-full ${
-                        current.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"
+                        current.utilization.utilizationPct > 100 ? "bg-app-error" : "bg-gold-gradient"
                       }`}
                       style={{ width: `${Math.min(100, current.utilization.utilizationPct)}%` }}
                     />
@@ -153,7 +153,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                       <span className="block text-[11px] text-cream-warm/50">נותר</span>
                       <span
                         className={`mt-1 block font-jbmono text-[16px] ${
-                          currentFigures.overdrawn ? "text-error" : "text-cream-warm"
+                          currentFigures.overdrawn ? "text-app-error" : "text-cream-warm"
                         }`}
                       >
                         <Hours>{currentFigures.remaining}</Hours>
@@ -181,14 +181,14 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                   </p>
                 </div>
               ) : (
-                <div className="rounded-2xl border border-lineDark bg-white p-6 text-center text-sm text-appNavy/50">
+                <div className="rounded-2xl border border-app-border bg-white p-6 text-center text-sm text-app-text-tertiary">
                   אין עדיין מחזור או חבילה ללקוח זה. טענו חבילה או פתחו מחזור למעלה.
                 </div>
               )}
 
-              <div className="rounded-2xl border border-lineDark bg-white p-5">
-                <p className="mb-1 text-sm font-medium text-appNavy">מדיניות חיוב</p>
-                <p className="mb-3 text-[11px] text-appNavy/40">
+              <div className="rounded-2xl border border-app-border bg-white p-5">
+                <p className="mb-1 text-sm font-medium text-app-text-primary">מדיניות חיוב</p>
+                <p className="mb-3 text-[11px] text-app-text-tertiary">
                   ללא מדיניות מוגדרת, הזמן החייב זהה תמיד לזמן בפועל.
                 </p>
                 <BillingPolicyForm
@@ -204,16 +204,16 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                 />
               </div>
 
-              <div className="rounded-2xl border border-lineDark bg-white p-5">
-                <p className="mb-3 text-sm font-medium text-appNavy">התאמה ידנית</p>
+              <div className="rounded-2xl border border-app-border bg-white p-5">
+                <p className="mb-3 text-sm font-medium text-app-text-primary">התאמה ידנית</p>
                 <AdjustmentForm clientId={selectedClient.id} currentHourBankId={current?.bank.id} />
               </div>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
+            <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
               <table className="w-full min-w-[900px] text-start text-sm">
                 <thead>
-                  <tr className="border-b border-lineDark text-xs text-appNavy/50">
+                  <tr className="border-b border-app-border text-xs text-app-text-tertiary">
                     <th className="px-5 py-3 font-medium">תקופה</th>
                     <th className="px-5 py-3 font-medium">סטטוס</th>
                     <th className="px-5 py-3 font-medium">נרכש</th>
@@ -227,7 +227,7 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                 <tbody>
                   {banks.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-5 py-8 text-center text-appNavy/50">
+                      <td colSpan={8} className="px-5 py-8 text-center text-app-text-tertiary">
                         עדיין אין מחזורים או חבילות ללקוח זה.
                       </td>
                     </tr>
@@ -236,26 +236,26 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                     const status = STATUS_LABEL[bank.status] ?? STATUS_LABEL.OPEN;
                     const figures = bankFigures(utilization.totalMinutes, utilization.consumedMinutes);
                     return (
-                      <tr key={bank.id} className="border-b border-lineDark align-top last:border-0">
-                        <td className="px-5 py-3 text-appNavy/80">
-                          <span className="block text-[11px] text-appNavy/45">{bank.kind === "PREPAID" ? "חבילה" : "מחזור"}</span>
+                      <tr key={bank.id} className="border-b border-app-border align-top last:border-0">
+                        <td className="px-5 py-3 text-app-text-primary">
+                          <span className="block text-[11px] text-app-text-tertiary">{bank.kind === "PREPAID" ? "חבילה" : "מחזור"}</span>
                           {formatDate(bank.cycleStart)} עד {formatDate(bank.cycleEnd)}
                         </td>
                         <td className="px-5 py-3">
                           <StatusBadge label={status.label} tone={status.tone} />
                           {bank.recalculatedAt && (
-                            <p className="mt-1 text-[11px] text-appNavy/40">חושב מחדש: {formatDate(bank.recalculatedAt)}</p>
+                            <p className="mt-1 text-[11px] text-app-text-tertiary">חושב מחדש: {formatDate(bank.recalculatedAt)}</p>
                           )}
                         </td>
-                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                        <td className="px-5 py-3 font-jbmono text-app-text-secondary">
                           <Hours>{formatDecimalHours(bank.purchasedMinutes)}</Hours>
                         </td>
                         <td
-                          className={`px-5 py-3 font-jbmono ${bank.rolloverInMinutes < 0 ? "text-error" : "text-appNavy/70"}`}
+                          className={`px-5 py-3 font-jbmono ${bank.rolloverInMinutes < 0 ? "text-app-error" : "text-app-text-secondary"}`}
                         >
                           <Hours>{formatDecimalHours(bank.rolloverInMinutes)}</Hours>
                         </td>
-                        <td className="px-5 py-3 font-jbmono text-appNavy/70">
+                        <td className="px-5 py-3 font-jbmono text-app-text-secondary">
                           <Hours>{figures.consumed}</Hours>
                         </td>
                         {/* **קריטי ל-RTL** (handoff README): a signed number
@@ -263,25 +263,25 @@ export default async function HourBanksPage(props: { searchParams: Promise<{ cli
                             wrong side. <Hours> gives it one without moving
                             the figure away from its column header. */}
                         <td
-                          className={`px-5 py-3 font-jbmono ${figures.overdrawn ? "text-error" : "text-appNavy/70"}`}
+                          className={`px-5 py-3 font-jbmono ${figures.overdrawn ? "text-app-error" : "text-app-text-secondary"}`}
                         >
                           <Hours>{figures.remaining}</Hours>
                         </td>
-                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-error" : "text-appNavy/70"}`}>
+                        <td className={`px-5 py-3 ${utilization.utilizationPct > 100 ? "text-app-error" : "text-app-text-secondary"}`}>
                           {utilization.utilizationPct}%
                         </td>
-                        <td className="px-5 py-3 text-appNavy/70">
+                        <td className="px-5 py-3 text-app-text-secondary">
                           {bank.adjustments.length === 0 ? (
-                            <span className="text-appNavy/30">-</span>
+                            <span className="text-app-text-tertiary">-</span>
                           ) : (
                             <ul className="space-y-1">
                               {bank.adjustments.map((a) => (
                                 <li key={a.id} className="text-xs">
-                                  <bdi dir="ltr" className={`font-jbmono ${a.minutes < 0 ? "text-error" : "text-success"}`}>
+                                  <bdi dir="ltr" className={`font-jbmono ${a.minutes < 0 ? "text-app-error" : "text-app-success"}`}>
                                     {a.minutes > 0 ? "+" : ""}
                                     {formatDecimalHours(a.minutes)}
                                   </bdi>{" "}
-                                  <span className="text-appNavy/40">- {a.reason}</span>
+                                  <span className="text-app-text-tertiary">- {a.reason}</span>
                                 </li>
                               ))}
                             </ul>

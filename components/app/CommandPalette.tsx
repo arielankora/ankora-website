@@ -70,25 +70,25 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="חיפוש ופעולות">
       <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="absolute inset-0 bg-appNavy/30" />
       <div
-        className="relative mx-auto flex max-h-[70vh] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-lineDark bg-white shadow-[0_30px_70px_rgba(11,27,51,0.3)]"
+        className="relative mx-auto flex max-h-[70vh] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-app-border bg-white shadow-[0_30px_70px_rgba(11,27,51,0.3)]"
         style={{ marginTop: "14vh" }}
       >
-        <div className="flex items-center gap-2.5 border-b border-lineDark px-4 py-3.5">
-          <Search size={16} strokeWidth={1.75} className="shrink-0 text-appNavy/40" />
+        <div className="flex items-center gap-2.5 border-b border-app-border px-4 py-3.5">
+          <Search size={16} strokeWidth={1.75} className="shrink-0 text-app-text-tertiary" />
           <input
             ref={inputRef}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="חיפוש או פעולה"
-            className="w-full bg-transparent text-sm text-appNavy outline-none placeholder:text-appNavy/40"
+            className="w-full bg-transparent text-sm text-app-text-primary outline-none placeholder:text-app-text-tertiary"
           />
-          <kbd className="shrink-0 rounded border border-lineDark px-1.5 py-0.5 font-jbmono text-[10px] text-appNavy/40">Esc</kbd>
+          <kbd className="shrink-0 rounded border border-app-border px-1.5 py-0.5 font-jbmono text-[10px] text-app-text-tertiary">Esc</kbd>
         </div>
 
         <div className="overflow-y-auto py-2">
           {filteredActions.length > 0 && (
             <div className="px-2 pb-2">
-              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-appNavy/35">פעולות</p>
+              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">פעולות</p>
               {filteredActions.map((a) => {
                 const Icon = NAV_ICONS[a.href] ?? Home;
                 return (
@@ -96,9 +96,9 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
                     key={a.href}
                     type="button"
                     onClick={() => go(a.href)}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] text-appNavy hover:bg-cream"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] text-app-text-primary hover:bg-app-surface-page"
                   >
-                    <Icon size={16} strokeWidth={1.75} className="text-appNavy/50" />
+                    <Icon size={16} strokeWidth={1.75} className="text-app-text-tertiary" />
                     {a.label}
                   </button>
                 );
@@ -108,13 +108,13 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
 
           {filteredClients.length > 0 && (
             <div className="px-2 pb-2">
-              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-appNavy/35">לקוחות</p>
+              <p className="px-2.5 py-1.5 text-[10.5px] font-medium uppercase tracking-wide text-app-text-tertiary">לקוחות</p>
               {filteredClients.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => go(`/app/clients/${c.id}`)}
-                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] text-appNavy hover:bg-cream"
+                  className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-start text-[13px] text-app-text-primary hover:bg-app-surface-page"
                 >
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold/50" aria-hidden="true" />
                   {c.name}
@@ -124,7 +124,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
           )}
 
           {filteredActions.length === 0 && filteredClients.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-appNavy/50">אין תוצאות</p>
+            <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">אין תוצאות</p>
           )}
         </div>
       </div>

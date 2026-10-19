@@ -125,7 +125,7 @@ test("opening a task and going back keeps the view and the filters", async ({ pa
 
   // The task screen's own link says where it goes and goes there.
   const back = page.getByTestId("task-back");
-  await expect(back).toHaveText(/חזרה ליומן/, { timeout: 30_000 });
+  await expect(back).toHaveText(/יומן/, { timeout: 30_000 });
   await back.click();
   await page.waitForURL(/\/app\/calendar\?/, { timeout: 30_000 });
   expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0&drawer=undated");

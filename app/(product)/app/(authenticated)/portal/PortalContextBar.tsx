@@ -21,13 +21,13 @@ export function PortalContextBar({
   if (isStaffPreview) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-gold/40 bg-gold/10 px-4 py-3">
-        <p className="text-[12.5px] text-appNavy">
+        <p className="text-[12.5px] text-app-text-primary">
           תצוגת לקוח: <span className="font-medium">{clientName}</span>. זה בדיוק מה שהלקוח רואה, וכל פעולה חסומה.
         </p>
         <form action={exitPortalPreviewAction}>
           <button
             type="submit"
-            className="rounded-full border border-gold/50 bg-white px-3.5 py-1.5 text-[12px] text-appNavy hover:border-gold"
+            className="rounded-full border border-gold/50 bg-white px-3.5 py-1.5 text-[12px] text-app-text-primary hover:border-gold"
           >
             יציאה מהתצוגה
           </button>
@@ -39,8 +39,8 @@ export function PortalContextBar({
   if (memberships.length < 2) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-lineDark bg-white px-4 py-3">
-      <span className="text-[12.5px] text-appNavy/60">התיק המוצג</span>
+    <div className="flex flex-wrap items-center gap-2.5 rounded-[14px] border border-app-border bg-white px-4 py-3">
+      <span className="text-[12.5px] text-app-text-secondary">התיק המוצג</span>
       {memberships.map((m) => (
         <form key={m.clientId} action={switchPortalClientAction}>
           <input type="hidden" name="clientId" value={m.clientId} />
@@ -49,8 +49,8 @@ export function PortalContextBar({
             aria-current={m.clientId === currentClientId ? "true" : undefined}
             className={`rounded-full px-3.5 py-1.5 text-[12.5px] transition-colors ${
               m.clientId === currentClientId
-                ? "bg-appNavy text-cream"
-                : "border border-lineDark text-appNavy hover:border-gold"
+                ? "bg-app-surface-nav text-cream"
+                : "border border-app-border text-app-text-primary hover:border-gold"
             }`}
           >
             {m.clientName}

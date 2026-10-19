@@ -10,10 +10,10 @@ import type { AdvanceUsage } from "@/lib/app-domain/task-plans";
 
 function Stat({ label, value, hint }: { label: string; value: number; hint?: string }) {
   return (
-    <div className="rounded-xl border border-lineDark/70 px-4 py-3">
-      <p className="text-[12px] text-appNavy/55">{label}</p>
-      <p className="mt-1 font-jbmono text-xl text-appNavy">{value}</p>
-      {hint && <p className="mt-0.5 text-[11.5px] text-appNavy/45">{hint}</p>}
+    <div className="rounded-xl border border-app-border px-4 py-3">
+      <p className="text-[12px] text-app-text-secondary">{label}</p>
+      <p className="mt-1 font-jbmono text-xl text-app-text-primary">{value}</p>
+      {hint && <p className="mt-0.5 text-[11.5px] text-app-text-tertiary">{hint}</p>}
     </div>
   );
 }
@@ -23,12 +23,12 @@ export function AdvanceUsageCard({ usage }: { usage: AdvanceUsage }) {
   const plans = usage.plansViaClaude + usage.plansInApp;
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6" data-testid="advance-usage">
-      <h2 className="text-base font-medium text-appNavy">קדם עם קלוד</h2>
-      <p className="mt-1 text-sm text-appNavy/60">שימוש ב-{usage.days} הימים האחרונים, בכל הלקוחות.</p>
+    <div className="rounded-2xl border border-app-border bg-white p-6" data-testid="advance-usage">
+      <h2 className="text-base font-medium text-app-text-primary">קדם עם קלוד</h2>
+      <p className="mt-1 text-sm text-app-text-secondary">שימוש ב-{usage.days} הימים האחרונים, בכל הלקוחות.</p>
 
       {copies === 0 && plans === 0 ? (
-        <p className="mt-4 text-sm text-appNavy/55">עדיין אין שימוש בתקופה הזו.</p>
+        <p className="mt-4 text-sm text-app-text-secondary">עדיין אין שימוש בתקופה הזו.</p>
       ) : (
         <>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -48,18 +48,18 @@ export function AdvanceUsageCard({ usage }: { usage: AdvanceUsage }) {
           {usage.people.length > 0 && (
             <table className="mt-5 w-full text-start text-[13px]">
               <thead>
-                <tr className="text-[12px] text-appNavy/50">
+                <tr className="text-[12px] text-app-text-tertiary">
                   <th className="pb-2 text-start font-normal">מי</th>
                   <th className="pb-2 text-start font-normal">פרומטים</th>
                   <th className="pb-2 text-start font-normal">גרסאות תוכנית</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-lineDark/60">
+              <tbody className="divide-y divide-app-border">
                 {usage.people.map((p) => (
                   <tr key={p.name}>
-                    <td className="py-2 text-appNavy">{p.name}</td>
-                    <td className="py-2 font-jbmono text-appNavy/75">{p.copies}</td>
-                    <td className="py-2 font-jbmono text-appNavy/75">{p.plans}</td>
+                    <td className="py-2 text-app-text-primary">{p.name}</td>
+                    <td className="py-2 font-jbmono text-app-text-secondary">{p.copies}</td>
+                    <td className="py-2 font-jbmono text-app-text-secondary">{p.plans}</td>
                   </tr>
                 ))}
               </tbody>

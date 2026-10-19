@@ -3,8 +3,9 @@ import Link from "next/link";
 import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
 import { BottomNav } from "./BottomNav";
-import { Sidebar, type NavItem } from "./Sidebar";
+import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { BackSlotProvider } from "./BackSlot";
 import { CommandPalette } from "./CommandPalette";
 import { ActiveTimerProvider, MobileTimerStrip } from "./ActiveTimerProvider";
 import { OfflineBanner } from "./states/Offline";
@@ -18,104 +19,68 @@ const ROLE_LABELS: Record<User["role"], string> = {
 };
 
 function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
-  // Phase 6 (spec 13 "Client Portal"): a CLIENT_USER gets an entirely
-  // separate, deliberately short nav - the portal is meant to "feel part
-  // of Ankora, not an internal tool exposed outward" (spec 13's own
-  // words), so it never shows any of the Ankora-internal admin screens
-  // below, even ones a permission check would technically pass (there are
-  // none for CLIENT_USER today, but this keeps the two navs structurally
-  // separate rather than relying on every future admin item remembering
-  // to gate itself out for this role).
+  // 19.10.2026 (canvas "Ankora App UI Round", task cmvddvqqv000plc08l6qzt2ho):
+  // four groups instead of six, by what the person came to do, and the
+  // account items moved out of the list into the menu under the person's
+  // name (Sidebar.tsx renders group ACCOUNT_GROUP there, not in the list).
+  // A super admin went from 20 rows to 15, an operations manager from 10
+  // to 6, a client from 9 to 5. "הזמן שלי" is a tab of the timer,
+  // "דוחות מתוזמנים" a tab of the reports, "דוח חודשי" a view of the
+  // portal's hours; their old addresses redirect.
   //
-  // `group` (redesign direction A): section header rendered by Sidebar.tsx
-  // the first time it changes as items are walked in order - purely a
-  // presentation grouping, no effect on BottomNav or the permission gates
-  // below.
+  // The portal keeps a separate, deliberately short list (spec 13: "feel
+  // part of Ankora, not an internal tool exposed outward"), never derived
+  // from the staff list below.
+  //
+  // Every item is still filtered server-side from the real permission
+  // map; the pages re-check on their own.
   if (role === "CLIENT_USER") {
     return [
-      // Portal phase 1: the nav mirrors the tab bar, in the order of the
-      // client's questions. "פעילות שבועית" is reachable from the שעות
-      // screen rather than listed here - see PortalTabs's comment.
-      { href: "/app/portal", label: "בית", group: "פורטל" },
-      { href: "/app/portal/decisions", label: "החלטות", group: "פורטל" },
-      { href: "/app/portal/activity", label: "פעילות", group: "פורטל" },
-      { href: "/app/portal/hours", label: "שעות", group: "פורטל" },
-      { href: "/app/portal/monthly", label: "דוח חודשי", group: "פורטל" },
-      { href: "/app/portal/history", label: "היסטוריה", group: "פורטל" },
-      { href: "/app/notifications", label: "התראות שלי", group: "חשבון" },
-      { href: "/app/profile", label: "הפרופיל שלי", group: "חשבון" },
-      { href: "/app/guide", label: "מדריך שימוש", group: "חשבון" },
+      { href: "/app/portal", label: "בית" },
+      { href: "/app/portal/decisions", label: "החלטות" },
+      { href: "/app/portal/activity", label: "פעילות" },
+      { href: "/app/portal/hours", label: "שעות ודוחות" },
+      { href: "/app/portal/history", label: "היסטוריה" },
+      ...accountItems(),
     ];
   }
 
-  const items: NavItem[] = [{ href: "/app", label: "בית", group: "בית" }];
-  // Phase 2 (spec 11 "מסכים - חוויית עובד Ankora"): Today/Timer and My
-  // Time come first in the nav for anyone who can track their own time -
-  // spec 6.2 calls Quick Timer "המסך החשוב ביותר" on mobile.
-  if (can(role, "time_entry.create_self")) items.push({ href: "/app/timer", label: "טיימר", group: "העבודה שלי" });
-  if (can(role, "time_entry.create_self")) items.push({ href: "/app/my-time", label: "הזמן שלי", group: "העבודה שלי" });
-  // Phase 9 gap-fix (spec 11, docs/adr/0001 section 17.2): standalone
-  // Tasks screen - same gate as Timer/My Time (see lib/app-domain/tasks.ts
-  // for why no dedicated permission exists).
-  if (can(role, "time_entry.create_self")) items.push({ href: "/app/tasks", label: "משימות", group: "העבודה שלי" });
-  // 19.10.2026: the calendar. Tasks by due date and important dates by
-  // occurrence, on one screen. Same gate as the two it shows.
-  if (can(role, "time_entry.create_self")) items.push({ href: "/app/calendar", label: "יומן", group: "העבודה שלי" });
-  // "בפיקוח שלי" had its own row here from tasks phase 2 until
-  // 15.10.2026 (Ariel): the tasks screen's "בפיקוח" shows the same work,
-  // and two places for one list is one too many. What the row carried
-  // that mattered, the count of tasks waiting on this person's sign-off,
-  // now sits beside "משימות". /app/supervising redirects there.
-  // Org brain (spec 5.2): proposals to client files, from Claude. Same rule
-  // as supervision: the row is there only while something waits.
-  if (proposals > 0) items.push({ href: "/app/knowledge", label: "ממתין לאישור", group: "העבודה שלי" });
-  if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "ניהול" });
-  if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "ניהול" });
-  if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "ניהול" });
-  // Phase 10 (spec: "מועדים חשובים" - Important Dates). Gated the exact
-  // same way as Tasks (time_entry.create_self - see permissions.ts's
-  // Phase 10 comment and lib/app-domain/important-dates.ts's own header
-  // comment for why no dedicated permission exists): every role that
-  // tracks time for a client should see and manage that client's
-  // important dates, including ANKORA_EMPLOYEE. Placed in the "ניהול"
-  // group per the brief's explicit nav-placement instruction, even though
-  // its permission gate matches the "העבודה שלי" items above it.
-  if (can(role, "time_entry.create_self")) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "ניהול" });
-  // Credentials vault (6.10.2026). Its own permission, then narrowed to
-  // the person's assigned clients on the screen itself.
-  if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "ניהול" });
-  // Spec 12: Admin "Time Entries" screen - cross-client table, gated on
-  // the same permission that lets an admin edit someone else's entries.
-  if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "דיווח ובקרה" });
-  // Phase 3 (spec 12): Hour Banks admin screen - billing policy + cycles
-  // + adjustments + live utilization, gated on the same Super-Admin-only
-  // permission as the domain logic itself.
-  if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "דיווח ובקרה" });
-  if (can(role, "alert.manage")) items.push({ href: "/app/alerts", label: "התראות", group: "דיווח ובקרה" });
-  // Phase 5 (spec 12): Reports admin screen - internal dashboards +
-  // reports + exports, gated on report.internal.view (SUPER_ADMIN +
-  // ANKORA_ADMIN, unlike hour_bank.manage/alert.manage - see permissions.ts).
-  if (can(role, "report.internal.view")) items.push({ href: "/app/reports", label: "דוחות", group: "דיווח ובקרה" });
-  // Phase 6 (spec 12/15): Report Schedules admin screen - bundled with the
-  // same permission as Reports itself (see permissions.ts's Phase 6
-  // comment on report.internal.view vs report.client.view).
-  if (can(role, "report.internal.view")) items.push({ href: "/app/report-schedules", label: "דוחות מתוזמנים", group: "דיווח ובקרה" });
-  if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות", group: "דיווח ובקרה" });
-  // Phase 8 (spec 12/17.3): Integrations admin screen - placeholder card
-  // only (no real provider connected yet), SUPER_ADMIN-only per
-  // permissions.ts's integration.manage comment. Listed last, matching
-  // spec 12's own admin-screens table order (Integrations is its final row).
-  if (can(role, "integration.manage")) items.push({ href: "/app/integrations", label: "אינטגרציות", group: "מערכת" });
-  // Phase 9 gap-fix: Notifications + Profile are self-service for every
-  // logged-in role (see permissions.ts's Phase 9 comment) - listed last,
-  // right before the guide, for both the CLIENT_USER nav above and this
-  // internal-staff nav.
-  items.push({ href: "/app/notifications", label: "התראות שלי", group: "חשבון" });
-  items.push({ href: "/app/profile", label: "הפרופיל שלי", group: "חשבון" });
-  // Documentation, not a permission - every logged-in role should be able
-  // to understand the system in their own language.
-  items.push({ href: "/app/guide", label: "מדריך שימוש", group: "חשבון" });
+  const tracks = can(role, "time_entry.create_self");
+  const items: NavItem[] = [{ href: "/app", label: "בית", group: "עבודה" }];
+  if (tracks) items.push({ href: "/app/timer", label: "טיימר", group: "עבודה" });
+  if (tracks) items.push({ href: "/app/tasks", label: "משימות", group: "עבודה" });
+  if (tracks) items.push({ href: "/app/calendar", label: "יומן", group: "עבודה" });
+  // Org brain (spec 5.2): there only while something waits.
+  if (proposals > 0) items.push({ href: "/app/knowledge", label: "ממתין לאישור", group: "עבודה" });
+
+  if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "לקוחות" });
+  if (tracks) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "לקוחות" });
+  if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "לקוחות" });
+
+  if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "בקרה" });
+  if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "בקרה" });
+  if (can(role, "report.internal.view")) items.push({ href: "/app/reports", label: "דוחות", group: "בקרה" });
+  // "כללי התראה", not "התראות": the rules managers set, never confused with
+  // "התראות שלי" in the account menu.
+  if (can(role, "alert.manage")) items.push({ href: "/app/alerts", label: "כללי התראה", group: "בקרה" });
+
+  if (can(role, "category.manage")) items.push({ href: "/app/categories", label: "קטגוריות", group: "הגדרות" });
+  if (can(role, "user.manage")) items.push({ href: "/app/users", label: "משתמשים", group: "הגדרות" });
+  if (can(role, "integration.manage")) items.push({ href: "/app/integrations", label: "אינטגרציות", group: "הגדרות" });
+  if (can(role, "audit.view")) items.push({ href: "/app/audit-log", label: "יומן פעולות", group: "הגדרות" });
+
+  items.push(...accountItems());
   return items;
+}
+
+/// Self-service for every signed-in role. Last in the list, so the phone's
+/// bottom bar keeps them under "עוד" and the palette still finds them.
+function accountItems(): NavItem[] {
+  return [
+    { href: "/app/notifications", label: "התראות שלי", group: ACCOUNT_GROUP },
+    { href: "/app/profile", label: "הפרופיל שלי", group: ACCOUNT_GROUP },
+    { href: "/app/guide", label: "מדריך שימוש", group: ACCOUNT_GROUP },
+  ];
 }
 
 /// Shared authenticated shell for every screen under app/(product)/app/**
@@ -167,7 +132,8 @@ export function AppShell({
     <ActiveTimerProvider
       initial={activeTimer ? { startAt: activeTimer.startAt, extraCount: activeTimer.extraCount ?? 0 } : null}
     >
-    <div className="min-h-screen bg-cream md:flex">
+    <BackSlotProvider>
+    <div className="min-h-screen bg-app-surface-page md:flex">
       <Sidebar
         items={items}
         userName={user.name}
@@ -182,9 +148,9 @@ export function AppShell({
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
 
       <div className="min-w-0 flex-1">
-        <header className="border-b border-lineDark bg-white md:hidden">
+        <header className="border-b border-app-border bg-white md:hidden">
           <div className="flex items-center justify-between gap-4 px-6 py-4">
-            <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-dim">
+            <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
               Ankora
             </Link>
             <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
@@ -211,6 +177,7 @@ export function AppShell({
 
       <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
     </div>
+    </BackSlotProvider>
     </ActiveTimerProvider>
   );
 }

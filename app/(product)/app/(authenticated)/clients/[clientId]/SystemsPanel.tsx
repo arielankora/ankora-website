@@ -108,7 +108,7 @@ function SystemForm({
       <Field label="החשבון שאנחנו עובדים איתו">
         <input name="accountUsed" defaultValue={existing?.accountUsed ?? ""} placeholder="office@client.com" className={INPUT} />
       </Field>
-      <p className="-mt-2 text-[11px] text-appNavy/40">בלי סיסמאות. סיסמה נשמרת בכספת.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">בלי סיסמאות. סיסמה נשמרת בכספת.</p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="מצב הגישה">
           <select name="accessStatus" value={access} onChange={(e) => setAccess(e.target.value as SystemAccessStatusLike)} className={INPUT}>
@@ -207,8 +207,8 @@ function SystemForm({
       <Field label="למי אסור לספר">
         <input name="doNotDisclose" defaultValue={existing?.doNotDisclose ?? ""} className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה למפה"}
       </button>
     </form>
@@ -241,42 +241,42 @@ export function SystemsPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">
+        <h2 className="text-sm font-medium text-app-text-primary">
           מפת מערכות ({systems.length})
-          {gaps > 0 && <span className="ms-2 text-xs font-normal text-warning">{gaps} בלי גישה עדיין</span>}
+          {gaps > 0 && <span className="ms-2 text-xs font-normal text-app-warning">{gaps} בלי גישה עדיין</span>}
         </h2>
         <Drawer triggerLabel="+ מערכת" title="מערכת במפה" variant="link">
           <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} />
         </Drawer>
       </div>
       {systems.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">אין עדיין מערכות במפה. גם מערכת שאין לנו אליה גישה נכנסת לכאן.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מערכות במפה. גם מערכת שאין לנו אליה גישה נכנסת לכאן.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark">
+        <ul className="mt-4 divide-y divide-app-border">
           {systems.map((s) => (
             <li key={s.id} className="py-3">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-medium text-appNavy">{s.systemName}</p>
+                    <p className="text-sm font-medium text-app-text-primary">{s.systemName}</p>
                     <StatusBadge label={SYSTEM_ACCESS_STATUS_LABELS[s.accessStatus]} tone={SYSTEM_ACCESS_STATUS_TONE[s.accessStatus]} />
                   </div>
-                  <p className="text-xs text-appNavy/60">
+                  <p className="text-xs text-app-text-secondary">
                     {[s.purpose, s.entityName, s.ourPermission !== "NONE" ? `הרשאה: ${SYSTEM_PERMISSION_LABELS[s.ourPermission]}` : null]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
                   {s.accountUsed && (
-                    <p className="mt-1 text-xs text-appNavy/70">
+                    <p className="mt-1 text-xs text-app-text-secondary">
                       חשבון: <span dir="ltr">{s.accountUsed}</span>
                     </p>
                   )}
-                  {s.blocker && <p className="mt-1 text-xs text-warning">חוסם: {s.blocker}</p>}
-                  {s.clientAdmin && <p className="mt-1 text-xs text-appNavy/60">מנהל אצל הלקוח: {s.clientAdmin}</p>}
+                  {s.blocker && <p className="mt-1 text-xs text-app-warning">חוסם: {s.blocker}</p>}
+                  {s.clientAdmin && <p className="mt-1 text-xs text-app-text-secondary">מנהל אצל הלקוח: {s.clientAdmin}</p>}
                   {s.billingCostMinor !== null && (
-                    <p className="mt-1 text-xs text-appNavy/70">
+                    <p className="mt-1 text-xs text-app-text-secondary">
                       {money(s.billingCostMinor, s.billingCurrency)} {s.billingCycle ? BILLING_CYCLE_LABELS[s.billingCycle] : ""}
                       {s.cardLast4 && <span dir="ltr"> · ****{s.cardLast4}</span>}
                       {s.invoiceTo && (
@@ -287,17 +287,17 @@ export function SystemsPanel({
                       )}
                     </p>
                   )}
-                  {s.notes && <p className="mt-1 text-xs text-appNavy/70">{s.notes}</p>}
+                  {s.notes && <p className="mt-1 text-xs text-app-text-secondary">{s.notes}</p>}
                   {s.credential && (
                     <p className="mt-1 text-xs">
-                      <Link href={`/app/credentials?clientId=${clientId}`} className="text-gold-dim hover:underline">
+                      <Link href={`/app/credentials?clientId=${clientId}`} className="text-app-text-accent hover:underline">
                         בכספת: {s.credential.systemName}
                       </Link>
                     </p>
                   )}
-                  {s.doNotDisclose && <p className="mt-1 text-xs text-red-700">לא לספר: {s.doNotDisclose}</p>}
+                  {s.doNotDisclose && <p className="mt-1 text-xs text-app-error">לא לספר: {s.doNotDisclose}</p>}
                   {(ruleWarnings[s.id] ?? []).map((w, i) => (
-                    <p key={i} className="mt-1 text-xs text-warning">
+                    <p key={i} className="mt-1 text-xs text-app-warning">
                       {w}
                     </p>
                   ))}
@@ -309,7 +309,7 @@ export function SystemsPanel({
                   <Drawer triggerLabel="עריכה" title="עריכת מערכת" variant="link">
                     <SystemForm clientId={clientId} sourceOptions={sourceOptions} vault={vault} entities={entities} existing={s} />
                   </Drawer>
-                  <button type="button" onClick={() => remove(s)} className="text-appNavy/50 hover:text-red-600">
+                  <button type="button" onClick={() => remove(s)} className="text-app-text-tertiary hover:text-app-error">
                     הסרה
                   </button>
                 </div>

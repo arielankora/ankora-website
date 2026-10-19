@@ -233,8 +233,8 @@ export default async function TasksPage(props: {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">משימות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="text-xl font-medium text-app-text-primary">משימות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             משימות פתוחות ואחרונות, לפי לקוח, קטגוריה וסטטוס.
           </p>
         </div>
@@ -274,7 +274,7 @@ export default async function TasksPage(props: {
               the grouping toggle are not hidden to simplify the screen,
               they are hidden because the board already answers both
               questions: its columns ARE the statuses. */}
-            <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+            <div className="flex rounded-full border border-app-border bg-white p-[3px]">
               {[
                 { href: listHref, label: "רשימה", active: !board },
                 { href: boardHref, label: "לוח", active: board },
@@ -284,8 +284,8 @@ export default async function TasksPage(props: {
                   href={view.href}
                   className={`rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
                     view.active
-                      ? "bg-appNavy text-cream"
-                      : "text-appNavy/60 hover:text-appNavy"
+                      ? "bg-app-surface-nav text-cream"
+                      : "text-app-text-secondary hover:text-app-text-primary"
                   }`}
                 >
                   {view.label}
@@ -300,7 +300,7 @@ export default async function TasksPage(props: {
             {!board && (
               <div
                 data-testid="status-pills"
-                className="flex max-w-full overflow-x-auto rounded-full border border-lineDark bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="flex max-w-full overflow-x-auto rounded-full border border-app-border bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
               >
                 {FILTER_PILLS.map((pill) => (
                   <Link
@@ -308,8 +308,8 @@ export default async function TasksPage(props: {
                     href={pillHref(pill.value)}
                     className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
                       activePill === pill.value
-                        ? "bg-appNavy text-cream"
-                        : "text-appNavy/60 hover:text-appNavy"
+                        ? "bg-app-surface-nav text-cream"
+                        : "text-app-text-secondary hover:text-app-text-primary"
                     }`}
                   >
                     {pill.label}
@@ -324,7 +324,7 @@ export default async function TasksPage(props: {
               half, and everyone's work. */}
             <div
               data-testid="mine-scope"
-              className="flex max-w-full overflow-x-auto rounded-full border border-lineDark bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              className="flex max-w-full overflow-x-auto rounded-full border border-app-border bg-white p-[3px] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             >
               {MINE_OPTIONS.map((option) => (
                 <Link
@@ -338,8 +338,8 @@ export default async function TasksPage(props: {
                   }
                   className={`shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
                     mineScope === option.scope
-                      ? "bg-appNavy text-cream"
-                      : "text-appNavy/60 hover:text-appNavy"
+                      ? "bg-app-surface-nav text-cream"
+                      : "text-app-text-secondary hover:text-app-text-primary"
                   }`}
                 >
                   {option.label}
@@ -347,7 +347,7 @@ export default async function TasksPage(props: {
                     <span
                       data-testid="supervising-pending"
                       className={`ms-1.5 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 font-jbmono text-[11px] ${
-                        mineScope === "supervising" ? "bg-cream/20 text-cream" : "bg-appNavy/10 text-appNavy"
+                        mineScope === "supervising" ? "bg-cream/20 text-cream" : "bg-app-surface-sunken text-app-text-primary"
                       }`}
                     >
                       {supervision.pending}
@@ -366,8 +366,8 @@ export default async function TasksPage(props: {
                 href={groupHref}
                 className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
                   grouped
-                    ? "border-appNavy bg-appNavy text-cream"
-                    : "border-lineDark bg-white text-appNavy/60 hover:text-appNavy"
+                    ? "border-appNavy bg-app-surface-nav text-cream"
+                    : "border-app-border bg-white text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >
                 לפי לקוח
@@ -380,9 +380,9 @@ export default async function TasksPage(props: {
           {/* Says what the pill is hiding and how to see it, rather than
               leaving somebody to wonder where March went. */}
           {!board && listStatus === "DONE" && !allClosed && (
-            <p className="text-[12.5px] text-appNavy/55">
+            <p className="text-[12.5px] text-app-text-secondary">
               מוצגות משימות שהושלמו ב-{DONE_WINDOW_DAYS} הימים האחרונים.{" "}
-              <Link href={allClosedHref} className="text-gold-dim underline underline-offset-4">
+              <Link href={allClosedHref} className="text-app-text-accent underline underline-offset-4">
                 להצגת כל ההיסטוריה
               </Link>
             </p>

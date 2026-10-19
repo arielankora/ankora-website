@@ -145,7 +145,7 @@ export function MobileTimerStrip() {
   const { summary } = useActiveTimer();
   if (!summary) return null;
   return (
-    <div className="border-t border-lineDark px-6 py-2">
+    <div className="border-t border-app-border px-6 py-2">
       <LiveTimerPill startAt={summary.startAt} extraCount={summary.extraCount} />
     </div>
   );

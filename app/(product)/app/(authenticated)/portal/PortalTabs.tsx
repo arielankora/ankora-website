@@ -7,8 +7,8 @@ const TABS = [
   // a row they stop reading.
   { href: "/app/portal/decisions", key: "decisions", label: "החלטות" },
   { href: "/app/portal/activity", key: "activity", label: "פעילות" },
-  { href: "/app/portal/hours", key: "hours", label: "שעות" },
-  { href: "/app/portal/monthly", key: "month", label: "דוח חודשי" },
+  // 19.10.2026: the monthly report is a view inside "שעות ודוחות".
+  { href: "/app/portal/hours", key: "hours", label: "שעות ודוחות" },
   { href: "/app/portal/history", key: "history", label: "היסטוריה" },
   // Portal phase 3. Last on purpose: it is the one screen nobody opens to
   // find out what is happening. People come here when they are asked for
@@ -36,13 +36,13 @@ export type PortalTabKey = (typeof TABS)[number]["key"];
 // second menu.
 export function PortalTabs({ active }: { active: PortalTabKey }) {
   return (
-    <div className="flex flex-wrap gap-1 border-b border-lineDark">
+    <div className="flex flex-wrap gap-1 border-b border-app-border">
       {TABS.map((tab) => (
         <Link
           key={tab.key}
           href={tab.href}
           className={`-mb-px border-b-2 px-4 py-2.5 text-[13.5px] ${
-            active === tab.key ? "border-gold font-medium text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
+            active === tab.key ? "border-gold font-medium text-app-text-primary" : "border-transparent text-app-text-tertiary hover:text-app-text-primary"
           }`}
         >
           {tab.label}

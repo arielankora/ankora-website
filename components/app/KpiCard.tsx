@@ -29,17 +29,17 @@ export function KpiCard({ icon: Icon, label, value, href, footer }: KpiCardProps
   const content = (
     <>
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[12.5px] text-appNavy/60">{label}</p>
+        <p className="text-[12.5px] text-app-text-secondary">{label}</p>
         <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-gold/10">
-          <Icon size={16} strokeWidth={1.75} className="text-gold-dim" />
+          <Icon size={16} strokeWidth={1.75} className="text-app-text-accent" />
         </span>
       </div>
-      <p className="mt-3.5 font-jbmono text-[26px] font-medium text-appNavy">{value}</p>
+      <p className="mt-3.5 font-jbmono text-[26px] font-medium text-app-text-primary">{value}</p>
       {footer}
     </>
   );
 
-  const className = `block rounded-2xl border border-lineDark bg-white px-5 py-[18px] transition-colors${
+  const className = `block rounded-2xl border border-app-border bg-white px-5 py-[18px] transition-colors${
     href ? " hover:border-gold" : ""
   }`;
 

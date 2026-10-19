@@ -15,13 +15,13 @@ export function NotFound({
   backLabel?: string;
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-lineDark bg-white px-6 py-14 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-appNavy/5">
-        <FileQuestion size={20} strokeWidth={1.75} className="text-appNavy/50" />
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-app-border bg-white px-6 py-14 text-center">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-app-surface-sunken">
+        <FileQuestion size={20} strokeWidth={1.75} className="text-app-text-tertiary" />
       </span>
-      <p className="text-[15px] font-medium text-appNavy">{title}</p>
-      <p className="max-w-sm text-sm text-appNavy/60">{description}</p>
-      <Link href={backHref} className="mt-2 text-sm font-medium text-gold-dim hover:text-appNavy">
+      <p className="text-[15px] font-medium text-app-text-primary">{title}</p>
+      <p className="max-w-sm text-sm text-app-text-secondary">{description}</p>
+      <Link href={backHref} className="mt-2 text-sm font-medium text-app-text-accent hover:text-app-text-primary">
         {backLabel}
       </Link>
     </div>

@@ -43,7 +43,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
     return (
       <div className="space-y-6">
         <Header />
-        <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+        <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
           אין לקוחות שמשויכים אליך, ולכן אין גישות להצגה.
         </p>
       </div>
@@ -75,7 +75,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
       </div>
 
       {!configured && (
-        <p className="rounded-2xl border border-lineDark bg-cream-dim p-4 text-sm text-appNavy/70">
+        <p className="rounded-2xl border border-app-border bg-cream-dim p-4 text-sm text-app-text-secondary">
           הכספת עוד לא הוגדרה בסביבה הזו, ולכן אי אפשר להוסיף או להציג גישות.
         </p>
       )}
@@ -84,7 +84,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
 
       <div className="space-y-3">
         {rows.length === 0 ? (
-          <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+          <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
             עוד לא נשמרו גישות ללקוח הזה.
           </p>
         ) : (
@@ -92,7 +92,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
             <CredentialRowShell key={row.id} id={row.id}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="text-[15px] font-medium text-appNavy">{row.systemName}</p>
+                  <p className="text-[15px] font-medium text-app-text-primary">{row.systemName}</p>
                   {row.url && (
                     <a
                       href={row.url}
@@ -104,7 +104,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
                       {row.url}
                     </a>
                   )}
-                  <p className="mt-1 text-xs text-appNavy/50">
+                  <p className="mt-1 text-xs text-app-text-tertiary">
                     {[
                       [row.hasUsername && "שם משתמש", row.hasPassword && "סיסמה", row.hasNotes && "הערות"]
                         .filter(Boolean)
@@ -135,7 +135,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
         )}
       </div>
 
-      <p className="text-xs text-appNavy/50">
+      <p className="text-xs text-app-text-tertiary">
         שם המשתמש, הסיסמה וההערות מוצפנים. כל צפייה דורשת אימות זהות ונרשמת ביומן הפעולות.
       </p>
     </div>
@@ -145,8 +145,8 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
 function Header() {
   return (
     <div>
-      <h1 className="text-xl font-medium text-appNavy">מערכות וגישות</h1>
-      <p className="mt-1 text-sm text-appNavy/60">פרטי הגישה של הלקוחות למערכות שלהם, במקום אחד ומוצפן.</p>
+      <h1 className="text-xl font-medium text-app-text-primary">מערכות וגישות</h1>
+      <p className="mt-1 text-sm text-app-text-secondary">פרטי הגישה של הלקוחות למערכות שלהם, במקום אחד ומוצפן.</p>
     </div>
   );
 }

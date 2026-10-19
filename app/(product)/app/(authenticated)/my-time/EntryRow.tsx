@@ -154,54 +154,54 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">תאריך</label>
+            <label className="block text-xs font-medium text-app-text-secondary">תאריך</label>
             <input
               type="date"
               name="date"
               defaultValue={dateKeyOf(entry.startAt)}
               max={todayKey()}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">התחלה</label>
+            <label className="block text-xs font-medium text-app-text-secondary">התחלה</label>
             <input
               type="time"
               name="startTime"
               defaultValue={timeKey(entry.startAt)}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">סיום</label>
+            <label className="block text-xs font-medium text-app-text-secondary">סיום</label>
             <input
               type="time"
               name="endTime"
               defaultValue={entry.endAt ? timeKey(entry.endAt) : ""}
               required
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">הערה</label>
+            <label className="block text-xs font-medium text-app-text-secondary">הערה</label>
             <input
               name="note"
               defaultValue={entry.note ?? ""}
-              className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
         </div>
         <div>
-          <label className="block text-xs font-medium text-appNavy/60">סיבת עריכה (מומלץ)</label>
+          <label className="block text-xs font-medium text-app-text-secondary">סיבת עריכה (מומלץ)</label>
           <input
             name="reason"
-            className="mt-1 w-full rounded-lg border border-lineDark bg-white px-2.5 py-1.5 text-sm text-appNavy outline-none focus:border-gold sm:w-1/2"
+            className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-1/2"
           />
         </div>
         {result?.overlapWarning && !warningDismissed && (
-          <div className="rounded-[10px] border border-warning/35 bg-warning-soft px-3 py-2.5 text-xs text-warning">
+          <div className="rounded-[10px] border border-app-warning/35 bg-app-warning-soft px-3 py-2.5 text-xs text-app-warning">
             <p>
               קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
               {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
@@ -211,14 +211,14 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
               <button
                 type="button"
                 onClick={saveAnyway}
-                className="rounded-full border border-warning/45 px-3 py-1 text-xs font-medium text-warning hover:bg-warning/10"
+                className="rounded-full border border-app-warning/45 px-3 py-1 text-xs font-medium text-app-warning hover:bg-app-warning-soft"
               >
                 שמירה בכל זאת
               </button>
               <button
                 type="button"
                 onClick={() => setWarningDismissed(true)}
-                className="text-xs text-appNavy/55 hover:text-appNavy"
+                className="text-xs text-app-text-secondary hover:text-app-text-primary"
               >
                 ביטול
               </button>
@@ -229,14 +229,14 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           <button
             type="submit"
             disabled={pending}
-            className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy disabled:opacity-50"
+            className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary disabled:opacity-50"
           >
             {pending ? "שומר..." : "שמירה"}
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs text-appNavy/60 hover:text-appNavy">
+          <button type="button" onClick={() => setEditing(false)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
             ביטול
           </button>
-          {error && <p className="text-xs text-red-600">{error}</p>}
+          {error && <p className="text-xs text-app-error">{error}</p>}
         </div>
       </form>
     );
@@ -249,10 +249,10 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
     <div className="flex flex-wrap items-center gap-3.5 px-4 py-3.5">
       <span className="h-[34px] w-[3px] shrink-0 rounded-full bg-gold/60" aria-hidden="true" />
       <div className="min-w-0 flex-1">
-        <p className="truncate text-[13.5px] text-appNavy">
+        <p className="truncate text-[13.5px] text-app-text-primary">
           {entry.note || `${entry.clientName} · ${entry.categoryName}`}
         </p>
-        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
+        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">
           {entry.clientName} · {entry.categoryName} · {timeKey(entry.startAt)}
           {entry.endAt ? `–${timeKey(entry.endAt)}` : ""}
         </p>
@@ -262,9 +262,9 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         {entry.isOverlapConfirmed && <StatusBadge label="חפיפה מאושרת" tone="amber" />}
         {!entry.isManual && <StatusBadge label="טיימר" tone="gray" />}
         <span className="flex flex-col items-end leading-tight">
-          <span className="font-jbmono text-[13.5px] text-appNavy">{formatDuration(entry.actualSeconds)}</span>
+          <span className="font-jbmono text-[13.5px] text-app-text-primary">{formatDuration(entry.actualSeconds)}</span>
           {entry.endAt && entry.billableSeconds != null && entry.billableSeconds !== entry.actualSeconds && (
-            <span className="mt-0.5 text-[11px] text-gold-dim" data-testid="entry-billable">
+            <span className="mt-0.5 text-[11px] text-app-text-accent" data-testid="entry-billable">
               לחיוב <span className="font-jbmono">{formatDuration(entry.billableSeconds)}</span>
             </span>
           )}
@@ -272,7 +272,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-lg border border-lineDark px-3 py-1.5 text-xs text-appNavy/70 hover:border-gold hover:text-appNavy"
+          className="rounded-lg border border-app-border px-3 py-1.5 text-xs text-app-text-secondary hover:border-gold hover:text-app-text-primary"
         >
           עריכה
         </button>
@@ -280,12 +280,12 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           type="button"
           onClick={() => void remove()}
           disabled={deleting}
-          className="text-xs text-appNavy/50 hover:text-error disabled:opacity-50"
+          className="text-xs text-app-text-tertiary hover:text-app-error disabled:opacity-50"
         >
           {deleting ? "מוחק..." : "מחיקה"}
         </button>
       </div>
-      {deleteError && <p className="w-full text-xs text-red-600">{deleteError}</p>}
+      {deleteError && <p className="w-full text-xs text-app-error">{deleteError}</p>}
     </div>
   );
 }

@@ -15,6 +15,8 @@ import { formatDuration, formatSource } from "@/lib/time-entry-format";
 import { buildClientActivityPrompt, type ActivityPromptEntry } from "@/lib/client-activity-prompt";
 import type { TimeEntrySource } from "@prisma/client";
 import { dayEndInZone, dayStartInZone } from "@/lib/timezone";
+import { ViewTabs } from "@/components/app/ViewTabs";
+import { ReportSchedulesView } from "../report-schedules/ReportSchedulesView";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -44,7 +46,7 @@ function ReportCellView({ row, col }: { row: Record<string, string | number>; co
   const cell = formatReportCell(row, col);
   if (!cell.figure) return <>{cell.text}</>;
   return (
-    <span className={`tabular-nums ${cell.tone === "overdrawn" ? "font-medium text-error" : ""}`}>
+    <span className={`tabular-nums ${cell.tone === "overdrawn" ? "font-medium text-app-error" : ""}`}>
       {cell.prefix && `${cell.prefix} `}
       <bdi dir="ltr">{cell.figure}</bdi>
     </span>
@@ -96,30 +98,31 @@ export default async function AdminReportsPage(
     );
   }
 
-  const tab = searchParams.tab === "summary" ? "summary" : "numeric";
+  const tab = searchParams.tab === "summary" ? "summary" : searchParams.tab === "schedules" ? "schedules" : "numeric";
   const clients = await listClients();
   const activeClients = clients.filter((c) => c.status === "ACTIVE");
 
+  // 19.10.2026: scheduled reports joined as a third tab (canvas "Ankora App UI Round").
   const tabs = (
-    <div className="flex gap-2 border-b border-lineDark">
-      <Link
-        href="/app/reports"
-        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "numeric" ? "border-gold text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
-        }`}
-      >
-        דוחות
-      </Link>
-      <Link
-        href="/app/reports?tab=summary"
-        className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium ${
-          tab === "summary" ? "border-gold text-appNavy" : "border-transparent text-appNavy/50 hover:text-appNavy"
-        }`}
-      >
-        תקציר פעילות ללקוח
-      </Link>
-    </div>
+    <ViewTabs
+      label="דוחות"
+      active={tab}
+      tabs={[
+        { key: "numeric", label: "דוחות", href: "/app/reports" },
+        { key: "summary", label: "תקציר פעילות ללקוח", href: "/app/reports?tab=summary" },
+        { key: "schedules", label: "מתוזמנים", href: "/app/reports?tab=schedules" },
+      ]}
+    />
   );
+
+  if (tab === "schedules") {
+    return (
+      <div className="space-y-5">
+        {tabs}
+        <ReportSchedulesView searchParams={{ clientId: searchParams.clientId }} />
+      </div>
+    );
+  }
 
   if (tab === "summary") {
     const clientId = searchParams.clientId || undefined;
@@ -165,8 +168,8 @@ export default async function AdminReportsPage(
       <>
         <div className="space-y-6">
           <div>
-            <h1 className="text-xl font-medium text-appNavy">דוחות</h1>
-            <p className="mt-1 text-sm text-appNavy/60">
+            <h1 className="text-xl font-medium text-app-text-primary">דוחות</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">
               תקציר פעילות גולמי ללקוח נבחר, מוכן להדבקה ב-ChatGPT/Claude לצורך ניסוח סיכום לשיתוף עם הלקוח.
             </p>
           </div>
@@ -179,7 +182,7 @@ export default async function AdminReportsPage(
           />
 
           {!client && (
-            <div className="rounded-2xl border border-lineDark bg-white px-5 py-8 text-center text-sm text-appNavy/50">
+            <div className="rounded-2xl border border-app-border bg-white px-5 py-8 text-center text-sm text-app-text-tertiary">
               בחרו לקוח כדי ליצור תקציר פעילות.
             </div>
           )}
@@ -211,8 +214,8 @@ export default async function AdminReportsPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">דוחות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">דוחות פנימיים לניהול, עם סינון וייצוא ל-CSV.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">דוחות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">דוחות פנימיים לניהול, עם סינון וייצוא ל-CSV.</p>
         </div>
 
         {tabs}
@@ -235,13 +238,13 @@ export default async function AdminReportsPage(
           }}
         />
 
-        <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
-          <div className="border-b border-lineDark px-5 py-3">
-            <h2 className="text-sm font-medium text-appNavy">{result.title}</h2>
+        <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
+          <div className="border-b border-app-border px-5 py-3">
+            <h2 className="text-sm font-medium text-app-text-primary">{result.title}</h2>
           </div>
           <table className="w-full min-w-[700px] text-start text-sm">
             <thead>
-              <tr className="border-b border-lineDark text-xs text-appNavy/50">
+              <tr className="border-b border-app-border text-xs text-app-text-tertiary">
                 {result.columns.map((col) => (
                   <th key={col.key} className="px-5 py-3 font-medium">
                     {col.label}
@@ -252,15 +255,15 @@ export default async function AdminReportsPage(
             <tbody>
               {result.rows.length === 0 && (
                 <tr>
-                  <td colSpan={result.columns.length} className="px-5 py-8 text-center text-appNavy/50">
+                  <td colSpan={result.columns.length} className="px-5 py-8 text-center text-app-text-tertiary">
                     אין נתונים התואמים את הסינון.
                   </td>
                 </tr>
               )}
               {result.rows.map((row, i) => (
-                <tr key={i} className="border-b border-lineDark last:border-0">
+                <tr key={i} className="border-b border-app-border last:border-0">
                   {result.columns.map((col) => (
-                    <td key={col.key} className="px-5 py-3 text-appNavy">
+                    <td key={col.key} className="px-5 py-3 text-app-text-primary">
                       <ReportCellView row={row} col={col} />
                     </td>
                   ))}

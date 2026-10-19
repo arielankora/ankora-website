@@ -18,17 +18,17 @@ export function EmptyState({
   action?: { label: string; href: string } | { label: string; onClick: () => void };
 }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-lineDark bg-white px-6 py-14 text-center">
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-app-border bg-white px-6 py-14 text-center">
       <span className="flex h-11 w-11 items-center justify-center rounded-full bg-gold/10">
-        <Icon size={20} strokeWidth={1.75} className="text-gold-dim" />
+        <Icon size={20} strokeWidth={1.75} className="text-app-text-accent" />
       </span>
-      <p className="text-[15px] font-medium text-appNavy">{title}</p>
-      <p className="max-w-sm text-sm text-appNavy/60">{description}</p>
+      <p className="text-[15px] font-medium text-app-text-primary">{title}</p>
+      <p className="max-w-sm text-sm text-app-text-secondary">{description}</p>
       {action &&
         ("href" in action ? (
           <Link
             href={action.href}
-            className="mt-2 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy"
+            className="mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
           >
             {action.label}
           </Link>
@@ -36,7 +36,7 @@ export function EmptyState({
           <button
             type="button"
             onClick={action.onClick}
-            className="mt-2 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy"
+            className="mt-2 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary"
           >
             {action.label}
           </button>

@@ -8,7 +8,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "נוצר..." : "הוספת לקוח"}
     </button>
@@ -27,37 +27,37 @@ export function CreateClientForm() {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שם הלקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שם הלקוח *</label>
         <input
           name="name"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שם משפטי</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שם משפטי</label>
         <input
           name="legalName"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">איש קשר</label>
+        <label className="block text-xs font-medium text-app-text-secondary">איש קשר</label>
         <input
           name="primaryContact"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">אזור זמן</label>
+        <label className="block text-xs font-medium text-app-text-secondary">אזור זמן</label>
         <input
           name="timezone"
           defaultValue="Asia/Jerusalem"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-app-error">{error}</p>}
       <SubmitButton pending={pending} />
     </form>
   );

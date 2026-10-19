@@ -10,7 +10,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "מתחבר…" : "כניסה"}
     </button>
@@ -59,7 +59,7 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           /app. */}
       <input type="hidden" name="callbackUrl" value={callbackUrl ?? ""} />
       <label className="block">
-        <span className="mb-1.5 block text-xs text-appNavy/60">אימייל או שם משתמש</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">אימייל או שם משתמש</span>
         <input
           name="identifier"
           type="text"
@@ -67,11 +67,11 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           dir="ltr"
           required
           placeholder="name@ankora.co.il"
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-appNavy/60">סיסמה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">סיסמה</span>
         <input
           name="password"
           type="password"
@@ -79,12 +79,12 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
           dir="ltr"
           required
           placeholder="••••••••"
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
       {state?.error && (
-        <p className="mt-3.5 flex items-center gap-2 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-xs text-error">
+        <p className="mt-3.5 flex items-center gap-2 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-xs text-app-error">
           {state.error}
         </p>
       )}
@@ -92,14 +92,14 @@ export function LoginForm({ callbackUrl }: { callbackUrl?: string }) {
       <SubmitButton />
 
       <div className="mt-4 flex items-center justify-between gap-2.5">
-        <Link href="/app/forgot-password" className="text-xs text-gold-dim hover:underline">
+        <Link href="/app/forgot-password" className="text-xs text-app-text-accent hover:underline">
           שכחתי סיסמה
         </Link>
         {/* Portal phase 0: clients open the portal a few times a month and
             will not remember a password. The link flow is offered here
             rather than replacing the form, because Ankora staff sign in on
             this same screen and keep password-only sign-in. */}
-        <Link href="/app/login-link/request" className="text-xs text-gold-dim hover:underline">
+        <Link href="/app/login-link/request" className="text-xs text-app-text-accent hover:underline">
           כניסה בקישור למייל
         </Link>
       </div>

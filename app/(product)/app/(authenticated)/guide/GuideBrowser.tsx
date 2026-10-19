@@ -13,7 +13,7 @@ import { filterGuide, highlightParts, queryWords } from "./search";
 function RoleBadges({ roles }: { roles: GuideRole[] | "all" }) {
   if (roles === "all") {
     return (
-      <span className="inline-flex items-center rounded-full bg-gold-gradient px-3 py-1 text-xs font-medium text-navy">
+      <span className="inline-flex items-center rounded-full bg-app-accent px-3 py-1 text-xs font-medium text-app-text-primary">
         כל המשתמשים
       </span>
     );
@@ -21,7 +21,7 @@ function RoleBadges({ roles }: { roles: GuideRole[] | "all" }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {roles.map((role) => (
-        <span key={role} className="inline-flex items-center rounded-full bg-appNavy/5 px-2.5 py-1 text-xs font-medium text-appNavy/70">
+        <span key={role} className="inline-flex items-center rounded-full bg-app-surface-sunken px-2.5 py-1 text-xs font-medium text-app-text-secondary">
           {ROLE_LABELS[role]}
         </span>
       ))}
@@ -59,7 +59,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
           חיפוש במדריך
         </label>
         <div className="relative">
-          <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-appNavy/40" />
+          <Search size={16} strokeWidth={1.75} className="pointer-events-none absolute start-4 top-1/2 -translate-y-1/2 text-app-text-tertiary" />
           <input
             id="guide-search"
             type="search"
@@ -69,37 +69,37 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
               if (e.key === "Escape") setQuery("");
             }}
             placeholder="חיפוש במדריך, למשל: מפקח, בנק שעות, ייצוא"
-            className="w-full rounded-full border border-lineDark bg-white py-3 pe-11 ps-11 text-sm text-appNavy outline-none focus:border-gold [&::-webkit-search-cancel-button]:hidden"
+            className="w-full rounded-full border border-app-border-strong bg-white py-3 pe-11 ps-11 text-sm text-app-text-primary outline-none focus:border-gold [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery("")}
               aria-label="ניקוי החיפוש"
-              className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-appNavy/40 hover:text-appNavy"
+              className="absolute end-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-app-text-tertiary hover:text-app-text-primary"
             >
               <X size={16} strokeWidth={1.75} />
             </button>
           )}
         </div>
         {words.length > 0 && (
-          <p aria-live="polite" className="text-[12.5px] text-appNavy/55">
+          <p aria-live="polite" className="text-[12.5px] text-app-text-secondary">
             {count === 0 ? "לא נמצאו סעיפים. נסו מילה אחרת, או פחות מילים." : count === 1 ? "נמצא סעיף אחד" : `נמצאו ${count} סעיפים`}
           </p>
         )}
       </div>
 
 {GUIDE_GROUPS.length > 0 && (
-        <nav aria-label="תוכן עניינים" className="rounded-2xl border border-lineDark bg-white p-6">
-          <h2 className="text-sm font-medium text-appNavy">תוכן העניינים</h2>
+        <nav aria-label="תוכן עניינים" className="rounded-2xl border border-app-border bg-white p-6">
+          <h2 className="text-sm font-medium text-app-text-primary">תוכן העניינים</h2>
           <div className="mt-4 grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2">
             {GUIDE_GROUPS.map((group) => (
               <div key={group.id}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gold-dim">{group.title}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-app-text-accent">{group.title}</p>
                 <ul className="mt-1.5 space-y-1">
                   {group.sections.map((section) => (
                     <li key={section.id}>
-                      <a href={`#${section.id}`} className="text-sm text-appNavy/70 hover:text-appNavy hover:underline">
+                      <a href={`#${section.id}`} className="text-sm text-app-text-secondary hover:text-app-text-primary hover:underline">
                         <Hl text={section.title} words={words} />
                       </a>
                     </li>
@@ -113,27 +113,27 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
 
         {GUIDE_GROUPS.map((group) => (
           <section key={group.id} className="space-y-6">
-            <h2 className="text-lg font-medium text-appNavy">{group.title}</h2>
+            <h2 className="text-lg font-medium text-app-text-primary">{group.title}</h2>
             {group.sections.map((section) => (
               <article
                 key={section.id}
                 id={section.id}
-                className="scroll-mt-20 space-y-4 rounded-2xl border border-lineDark bg-white p-6"
+                className="scroll-mt-20 space-y-4 rounded-2xl border border-app-border bg-white p-6"
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h3 className="text-base font-medium text-appNavy">
+                  <h3 className="text-base font-medium text-app-text-primary">
                     <Hl text={section.title} words={words} />
                   </h3>
                   <RoleBadges roles={section.roles} />
                 </div>
 
-                <p className="text-sm font-medium text-appNavy/80">
+                <p className="text-sm font-medium text-app-text-primary">
                   <Hl text={section.summary} words={words} />
                 </p>
 
                 <div className="space-y-3">
                   {section.description.map((paragraph, i) => (
-                    <p key={i} className="text-sm leading-relaxed text-appNavy/70">
+                    <p key={i} className="text-sm leading-relaxed text-app-text-secondary">
                       <Hl text={paragraph} words={words} />
                     </p>
                   ))}
@@ -141,8 +141,8 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
 
                 {section.steps && section.steps.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-appNavy/50">איך עושים את זה</p>
-                    <ol className="mt-2 list-decimal space-y-1.5 pr-5 text-sm leading-relaxed text-appNavy/70">
+                    <p className="text-xs font-semibold text-app-text-tertiary">איך עושים את זה</p>
+                    <ol className="mt-2 list-decimal space-y-1.5 pr-5 text-sm leading-relaxed text-app-text-secondary">
                       {section.steps.map((step, i) => (
                         <li key={i}>
                           <Hl text={step} words={words} />
@@ -155,7 +155,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
                 {section.notes && section.notes.length > 0 && (
                   <div className="space-y-2 rounded-lg border border-gold/30 bg-gold/5 p-4">
                     {section.notes.map((note, i) => (
-                      <p key={i} className="text-sm leading-relaxed text-appNavy/70">
+                      <p key={i} className="text-sm leading-relaxed text-app-text-secondary">
                         <Hl text={note} words={words} />
                       </p>
                     ))}
@@ -165,11 +165,11 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
                 {section.images && section.images.length > 0 && (
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     {section.images.map((image, i) => (
-                      <figure key={i} className="overflow-hidden rounded-xl border border-lineDark">
+                      <figure key={i} className="overflow-hidden rounded-xl border border-app-border">
                         {/* Static guide screenshots in public/guide - plain img is
                             intentional here (fixed, pre-sized assets, not user content). */}
                         <img src={image.src} alt={image.alt} className="w-full" />
-                        <figcaption className="border-t border-lineDark bg-cream-dim px-3 py-2 text-xs text-appNavy/50">
+                        <figcaption className="border-t border-app-border bg-cream-dim px-3 py-2 text-xs text-app-text-tertiary">
                           {image.caption}
                         </figcaption>
                       </figure>

@@ -30,9 +30,9 @@ const VIEW_WINDOW_MS = 15 * 60 * 1000;
 function Unavailable() {
   return (
     <main className="mx-auto max-w-xl px-4 py-16 sm:px-6">
-      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
-      <h1 className="mt-8 text-xl font-medium text-appNavy">הקישור אינו זמין</h1>
-      <p className="mt-3 text-sm leading-7 text-appNavy/70">
+      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
+      <h1 className="mt-8 text-xl font-medium text-app-text-primary">הקישור אינו זמין</h1>
+      <p className="mt-3 text-sm leading-7 text-app-text-secondary">
         אי אפשר לפתוח את המסמך מהקישור הזה. אם עדיין צריך לאשר אותו, אפשר לפנות ל-ops@ankora.co.il ולבקש קישור חדש.
       </p>
     </main>
@@ -55,14 +55,14 @@ export default async function AgreementLinkPage(props: { params: Promise<{ token
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
-      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
+      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
 
-      <h1 className="mt-8 text-2xl font-medium text-appNavy">{view.agreement.title}</h1>
-      <p className="mt-2 text-sm text-appNavy/60">
+      <h1 className="mt-8 text-2xl font-medium text-app-text-primary">{view.agreement.title}</h1>
+      <p className="mt-2 text-sm text-app-text-secondary">
         {view.userName}, יש לקרוא את ההצהרה ולאשר אותה. גרסה {view.agreement.version}.
       </p>
 
-      <div className="mt-8 rounded-2xl border border-lineDark bg-white p-6">
+      <div className="mt-8 rounded-2xl border border-app-border bg-white p-6">
         <AgreementText body={body} />
       </div>
 
@@ -76,7 +76,7 @@ export default async function AgreementLinkPage(props: { params: Promise<{ token
         />
       </div>
 
-      <p className="mt-4 text-xs text-appNavy/50">
+      <p className="mt-4 text-xs text-app-text-tertiary">
         עם האישור נשמרים השם שהוקלד, התאריך והשעה, כתובת ה-IP, הדפדפן והגרסה, ועותק חתום נשמר אצל אנקורה.
       </p>
     </main>

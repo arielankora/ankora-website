@@ -19,7 +19,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {/* Not "שליחה ללקוח". Since 25.9.2026 creating a decision sends
           nothing: it puts the question in the client's portal and hands
@@ -33,21 +33,21 @@ function SubmitButton() {
 
 function OptionFields({ index, required }: { index: number; required: boolean }) {
   return (
-    <div className="grid grid-cols-1 gap-2.5 rounded-lg border border-lineDark bg-white p-3 sm:grid-cols-[1fr_120px_auto]">
+    <div className="grid grid-cols-1 gap-2.5 rounded-lg border border-app-border bg-white p-3 sm:grid-cols-[1fr_120px_auto]">
       <input
         name={`optionLabel${index}`}
         required={required}
         placeholder={required ? `אפשרות ${index + 1} (חובה)` : `אפשרות ${index + 1}`}
-        className="rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        className="rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       />
       <input
         name={`optionAmount${index}`}
         dir="ltr"
         inputMode="decimal"
         placeholder="₪"
-        className="rounded-lg border border-lineDark bg-white px-3 py-2 text-end text-sm text-appNavy outline-none focus:border-gold"
+        className="rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
       />
-      <label className="flex items-center gap-2 px-1 text-xs text-appNavy/70">
+      <label className="flex items-center gap-2 px-1 text-xs text-app-text-secondary">
         <input type="radio" name="recommended" value={String(index)} className="h-4 w-4 accent-gold" />
         מומלץ
       </label>
@@ -89,39 +89,39 @@ export function DecisionsPanel({
   }
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">החלטות ({decisions.filter((d) => d.status === "OPEN").length} פתוחות)</h2>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs text-gold-dim hover:underline">
+        <h2 className="text-sm font-medium text-app-text-primary">החלטות ({decisions.filter((d) => d.status === "OPEN").length} פתוחות)</h2>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="text-xs text-app-text-accent hover:underline">
           {open ? "סגירה" : "+ החלטה חדשה"}
         </button>
       </div>
 
-      <p className="mt-1.5 text-[12px] text-appNavy/50">
+      <p className="mt-1.5 text-[12px] text-app-text-tertiary">
         {ceilingMinor !== null
           ? `תקרת האישור של הלקוח: ${formatMinor(ceilingMinor)}. מעליה ההחלטה מוצגת ככזו שדורשת את אישורו.`
           : "לא הוגדרה תקרת אישור ללקוח הזה, ולכן כל החלטה עם סכום תוצג כדורשת אישור."}
       </p>
 
       {open && (
-        <form action={formAction} className="mt-4 space-y-3 rounded-lg border border-lineDark bg-cream-dim/40 p-4">
+        <form action={formAction} className="mt-4 space-y-3 rounded-lg border border-app-border bg-cream-dim/40 p-4">
           <input type="hidden" name="clientId" value={clientId} />
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">מה צריך להחליט *</span>
+            <span className="block text-xs font-medium text-app-text-secondary">מה צריך להחליט *</span>
             <input
               name="question"
               required
               placeholder="באיזה מועד לקבוע את ביקור הטכנאי?"
-              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">רקע קצר</span>
+            <span className="block text-xs font-medium text-app-text-secondary">רקע קצר</span>
             <textarea
               name="background"
               rows={2}
               placeholder="עד שלושה משפטים. מה הביא לצומת הזו."
-              className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
 
@@ -133,28 +133,28 @@ export function DecisionsPanel({
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="block">
-              <span className="block text-xs font-medium text-appNavy/60">סכום כולל (₪)</span>
+              <span className="block text-xs font-medium text-app-text-secondary">סכום כולל (₪)</span>
               <input
                 name="amount"
                 dir="ltr"
                 inputMode="decimal"
                 placeholder="ריק אם ההחלטה אינה כספית"
-                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-end text-sm text-appNavy outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </label>
             <label className="block">
-              <span className="block text-xs font-medium text-appNavy/60">נשמח לתשובה עד</span>
+              <span className="block text-xs font-medium text-app-text-secondary">נשמח לתשובה עד</span>
               <input
                 name="dueAt"
                 type="date"
-                className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </label>
           </div>
 
-          {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
+          {state?.error && <p className="text-sm text-app-error">{state.error}</p>}
           {state?.ok && (
-            <p className="text-sm text-emerald-700">
+            <p className="text-sm text-app-success">
               ההחלטה מחכה ללקוח בפורטל. הוא לא יודע על זה עדיין.
             </p>
           )}
@@ -177,22 +177,22 @@ export function DecisionsPanel({
       )}
 
       {decisions.length === 0 ? (
-        <p className="mt-3 text-sm text-appNavy/50">עוד לא נפתחו החלטות ללקוח הזה.</p>
+        <p className="mt-3 text-sm text-app-text-tertiary">עוד לא נפתחו החלטות ללקוח הזה.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark/60">
+        <ul className="mt-4 divide-y divide-app-border">
           {decisions.map((d) => (
             <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3">
-              <span className="text-sm text-appNavy">{d.question}</span>
-              <span className="flex items-center gap-2.5 text-[11.5px] text-appNavy/50">
+              <span className="text-sm text-app-text-primary">{d.question}</span>
+              <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
                 {formatMinor(d.amountMinor) && <span dir="ltr" className="font-jbmono">{formatMinor(d.amountMinor)}</span>}
                 {d.status === "ANSWERED" && d.answer && (
-                  <span className="text-success">נבחר: {d.answer.optionLabel}</span>
+                  <span className="text-app-success">נבחר: {d.answer.optionLabel}</span>
                 )}
                 {d.status === "CANCELLED" && <span>בוטלה</span>}
                 {d.status === "OPEN" && (
                   <>
-                    <span className="text-warning">ממתינה ללקוח</span>
-                    <button type="button" onClick={() => cancel(d.id, d.question)} className="hover:text-error">
+                    <span className="text-app-warning">ממתינה ללקוח</span>
+                    <button type="button" onClick={() => cancel(d.id, d.question)} className="hover:text-app-error">
                       ביטול
                     </button>
                   </>

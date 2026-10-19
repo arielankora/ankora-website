@@ -45,8 +45,8 @@ export type PanelDomain = {
   organizationName: string | null;
 };
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
-const LABEL = "block text-xs font-medium text-appNavy/60";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+const LABEL = "block text-xs font-medium text-app-text-secondary";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -113,17 +113,17 @@ function SourceForm({ clientId }: { clientId: string }) {
         </select>
       </Field>
       {weight === "SECONDARY" && (
-        <p className="-mt-2 text-[11px] text-appNavy/40">פריט שכל המקורות שלו משניים נשמר כ&quot;לא ודאי&quot;, עד שהלקוח מאשר.</p>
+        <p className="-mt-2 text-[11px] text-app-text-tertiary">פריט שכל המקורות שלו משניים נשמר כ&quot;לא ודאי&quot;, עד שהלקוח מאשר.</p>
       )}
-      <label className="flex items-center gap-2 text-sm text-appNavy">
+      <label className="flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="topicsOnly" className="h-4 w-4 accent-gold" />
         נושאים בלבד: בלי ציטוטים ובלי פרטים
       </label>
       <Field label="הערות">
         <textarea name="notes" rows={2} className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "הוספה למרשם"}
       </button>
     </form>
@@ -151,11 +151,11 @@ function DomainForm({ clientId }: { clientId: string }) {
           <Field label="ארגון">
             <input name="organizationName" placeholder="Nextage" className={INPUT} />
           </Field>
-          <p className="-mt-2 text-[11px] text-appNavy/40">שותף יכול לעבוד עם כמה לקוחות, ולכן הדומיין שלו לבד לא משייך מייל ללקוח.</p>
+          <p className="-mt-2 text-[11px] text-app-text-tertiary">שותף יכול לעבוד עם כמה לקוחות, ולכן הדומיין שלו לבד לא משייך מייל ללקוח.</p>
         </>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "הוספה"}
       </button>
     </form>
@@ -184,30 +184,30 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-lineDark bg-white p-6">
+      <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-appNavy">מרשם מקורות ({sources.length})</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">מרשם מקורות ({sources.length})</h2>
           <Drawer triggerLabel="+ מקור" title="מקור חדש במרשם" variant="link">
             <SourceForm clientId={clientId} />
           </Drawer>
         </div>
-        <p className="mt-1 text-xs text-appNavy/50">כל פריט בתיק מציין מאיפה הוא ידוע, לפי הקודים כאן.</p>
+        <p className="mt-1 text-xs text-app-text-tertiary">כל פריט בתיק מציין מאיפה הוא ידוע, לפי הקודים כאן.</p>
         {sources.length === 0 ? (
-          <p className="mt-2 text-sm text-appNavy/50">אין עדיין מקורות. מוסיפים את הפגישה או המסמך הראשון, ואז אפשר לציין אותם ליד כל פריט.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מקורות. מוסיפים את הפגישה או המסמך הראשון, ואז אפשר לציין אותם ליד כל פריט.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-lineDark">
+          <ul className="mt-4 divide-y divide-app-border">
             {sources.map((s) => (
               <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
                 <div className="flex min-w-0 gap-3">
-                  <span className="w-9 shrink-0 font-mono text-sm text-gold-dim" dir="ltr">
+                  <span className="w-9 shrink-0 font-mono text-sm text-app-text-accent" dir="ltr">
                     {s.code}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-appNavy">{s.title}</p>
-                    <p className="text-xs text-appNavy/60">
+                    <p className="text-sm font-medium text-app-text-primary">{s.title}</p>
+                    <p className="text-xs text-app-text-secondary">
                       {[SOURCE_KIND_LABELS[s.kind], formatDate(s.occurredAt), s.participants.join(", ") || null].filter(Boolean).join(" · ")}
                     </p>
-                    {s.notes && <p className="mt-1 text-xs text-appNavy/70">{s.notes}</p>}
+                    {s.notes && <p className="mt-1 text-xs text-app-text-secondary">{s.notes}</p>}
                     {(s.weight === "SECONDARY" || s.topicsOnly) && (
                       <div className="mt-1.5 flex flex-wrap gap-2">
                         {s.weight === "SECONDARY" && <StatusBadge label="משני" tone="gray" />}
@@ -216,7 +216,7 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
                     )}
                   </div>
                 </div>
-                <button type="button" onClick={() => removeSource(s)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">
+                <button type="button" onClick={() => removeSource(s)} className="shrink-0 text-xs text-app-text-tertiary hover:text-app-error">
                   הסרה
                 </button>
               </li>
@@ -225,27 +225,27 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
         )}
       </div>
 
-      <div className="rounded-2xl border border-lineDark bg-white p-6">
+      <div className="rounded-2xl border border-app-border bg-white p-6">
         <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <h2 className="text-sm font-medium text-appNavy">דומיינים ({domains.length})</h2>
+          <h2 className="text-sm font-medium text-app-text-primary">דומיינים ({domains.length})</h2>
           <Drawer triggerLabel="+ דומיין" title="דומיין בתיק" variant="link">
             <DomainForm clientId={clientId} />
           </Drawer>
         </div>
-        <p className="mt-1 text-xs text-appNavy/50">כך מייל או הקלטה משויכים ללקוח הנכון.</p>
+        <p className="mt-1 text-xs text-app-text-tertiary">כך מייל או הקלטה משויכים ללקוח הנכון.</p>
         {domains.length === 0 ? (
-          <p className="mt-2 text-sm text-appNavy/50">אין עדיין דומיינים.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין דומיינים.</p>
         ) : (
-          <ul className="mt-4 divide-y divide-lineDark">
+          <ul className="mt-4 divide-y divide-app-border">
             {domains.map((d) => (
               <li key={d.id} className="flex items-center justify-between gap-3 py-2.5">
-                <p className="text-sm text-appNavy">
+                <p className="text-sm text-app-text-primary">
                   <span dir="ltr">{d.domain}</span>
-                  <span className="ms-2 text-xs text-appNavy/60">
+                  <span className="ms-2 text-xs text-app-text-secondary">
                     {d.kind === "CLIENT" ? "של הלקוח" : `שותף${d.organizationName ? `: ${d.organizationName}` : ""}`}
                   </span>
                 </p>
-                <button type="button" onClick={() => removeDomain(d)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">
+                <button type="button" onClick={() => removeDomain(d)} className="shrink-0 text-xs text-app-text-tertiary hover:text-app-error">
                   הסרה
                 </button>
               </li>

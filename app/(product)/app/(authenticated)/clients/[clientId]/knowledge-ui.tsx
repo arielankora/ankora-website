@@ -17,8 +17,8 @@ export const STATUS_TONE: Record<KnowledgeStatusLike, "green" | "amber" | "gray"
   SUPERSEDED: "gray",
 };
 
-export const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
-export const LABEL = "block text-xs font-medium text-appNavy/60";
+export const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+export const LABEL = "block text-xs font-medium text-app-text-secondary";
 
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -38,10 +38,10 @@ export function SourcesField({ options, defaultValue, status }: { options: Sourc
         <input name="sources" dir="ltr" defaultValue={defaultValue ?? ""} placeholder="S1 08:13, S3" className={INPUT} />
       </Field>
       {options.length === 0 ? (
-        <p className="mt-1 text-[11px] text-appNavy/40">אין עדיין מקורות במרשם. מוסיפים אותם ב&quot;מרשם מקורות&quot; במסך הלקוח.</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">אין עדיין מקורות במרשם. מוסיפים אותם ב&quot;מרשם מקורות&quot; במסך הלקוח.</p>
       ) : (
         // The most recent ones: a long register is read in its own panel.
-        <p className="mt-1 text-[11px] text-appNavy/40">
+        <p className="mt-1 text-[11px] text-app-text-tertiary">
           {options
             .slice(-8)
             .map((o) => `${o.code} ${o.title}`)
@@ -57,7 +57,7 @@ export function SourceCodes({ sources, options }: { sources: string[]; options: 
   if (sources.length === 0) return null;
   const titles = new Map(options.map((o) => [o.code, o.title]));
   return (
-    <p className="mt-1 text-[11px] text-appNavy/45" dir="ltr">
+    <p className="mt-1 text-[11px] text-app-text-tertiary" dir="ltr">
       {sources.map((s, i) => (
         <span key={s} title={titles.get(s.split(" ")[0])}>
           {i > 0 && ", "}
@@ -71,7 +71,7 @@ export function SourceCodes({ sources, options }: { sources: string[]; options: 
 export function StatusLine({ status, toResolve }: { status: KnowledgeStatusLike; toResolve: string | null }) {
   if (status === "CONFIRMED") return null;
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60">
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-app-text-secondary">
       <StatusBadge label={KNOWLEDGE_STATUS_LABELS[status]} tone={STATUS_TONE[status]} />
       {toResolve && <span>{toResolve}</span>}
     </div>
@@ -169,7 +169,7 @@ export function ItemExtras({
           </select>
         </Field>
       )}
-      <label className="flex items-center gap-2 self-end pb-2 text-sm text-appNavy">
+      <label className="flex items-center gap-2 self-end pb-2 text-sm text-app-text-primary">
         <input type="checkbox" name="clientVisible" defaultChecked={!!existing?.clientVisible} className="h-4 w-4 accent-gold" />
         גלוי ללקוח
       </label>
@@ -193,10 +193,10 @@ export function MissingFields({
   return (
     <div data-testid="missing-fields">
       <input type="hidden" name="itemMissing" value={target} />
-      <p className="mb-1 text-xs text-appNavy/60">שדות שחסרים</p>
+      <p className="mb-1 text-xs text-app-text-secondary">שדות שחסרים</p>
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {Object.entries(labels).map(([key, label]) => (
-          <label key={key} className="flex items-center gap-1.5 text-xs text-appNavy/70">
+          <label key={key} className="flex items-center gap-1.5 text-xs text-app-text-secondary">
             <input
               type="checkbox"
               name="itemMissingFields"
@@ -231,15 +231,15 @@ export function ItemTags({
   const refs = item.refs ?? [];
   if (!item.clientVisible && !owner && !notToTell && refs.length === 0 && !item.verifiedAt && !item.missing) return null;
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60" data-testid="item-tags">
+    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-app-text-secondary" data-testid="item-tags">
       {refs.map((r) => (
-        <span key={r} dir="ltr" className="rounded border border-lineDark px-1.5 py-0.5 font-jbmono text-[11px]" data-testid="external-ref">
+        <span key={r} dir="ltr" className="rounded border border-app-border px-1.5 py-0.5 font-jbmono text-[11px]" data-testid="external-ref">
           {r}
         </span>
       ))}
       {item.verifiedAt && <span>אומת: {new Date(item.verifiedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</span>}
-      {item.missing && <span className="w-full text-error" data-testid="missing-line">{item.missing}</span>}
-      {notToTell && <span className="w-full text-red-700" data-testid="do-not-disclose">לא לספר: {notToTell}</span>}
+      {item.missing && <span className="w-full text-app-error" data-testid="missing-line">{item.missing}</span>}
+      {notToTell && <span className="w-full text-app-error" data-testid="do-not-disclose">לא לספר: {notToTell}</span>}
       {item.clientVisible && <StatusBadge label="גלוי ללקוח" tone="green" />}
       {owner && <span>בעלים: {owner}</span>}
     </div>
@@ -272,7 +272,7 @@ export function AudienceField({ existing }: { existing?: { audience?: Audience; 
           <legend className={LABEL}>{audience === "RESTRICTED" ? "רק האנשים האלה רואים" : "מנהל התיק, ובנוסף"}</legend>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
             {staff.map((u) => (
-              <label key={u.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+              <label key={u.id} className="flex items-center gap-1.5 text-sm text-app-text-primary">
                 <input type="checkbox" name="audienceUserIds" value={u.id} defaultChecked={chosen.has(u.id)} className="h-4 w-4 accent-gold" />
                 {u.name}
               </label>

@@ -25,15 +25,15 @@ export function CopyValue({ value, label }: { value: string; label: string }) {
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-lineDark bg-cream-dim px-3 py-2">
-      <code dir="ltr" className="min-w-0 flex-1 truncate text-start text-xs text-appNavy/80">
+    <div className="flex items-center gap-2 rounded-lg border border-app-border bg-cream-dim px-3 py-2">
+      <code dir="ltr" className="min-w-0 flex-1 truncate text-start text-xs text-app-text-primary">
         {value}
       </code>
       <button
         type="button"
         onClick={copy}
         aria-label={label}
-        className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-appNavy/60 transition-colors hover:bg-appNavy/5 hover:text-appNavy"
+        className="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
         {copied ? "הועתק" : "העתק"}
       </button>

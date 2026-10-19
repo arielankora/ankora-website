@@ -43,7 +43,7 @@ export type ReviewProposal = {
 
 export type ReviewStaff = { id: string; name: string }[];
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 
 /// The fields a reviewer may change, per kind of item.
 /// The kind of item, as the reviewer reads it: a fact by its kind, a rule
@@ -123,7 +123,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
         .filter((f) => (f.key !== "decidedBy" && f.key !== "decidedAt") || p.payload.kind === "ONE_OFF_DECISION")
         .map((f) => (
           <label key={f.key} className="block">
-            <span className="block text-xs font-medium text-appNavy/60">{f.label}</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{f.label}</span>
             {f.long ? (
               <textarea name={f.key} rows={3} defaultValue={str(p.payload[f.key])} className={INPUT} />
             ) : (
@@ -134,7 +134,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
       {p.target !== "TASK" && (p.target !== "FACT" || p.payload.kind !== "QUESTION") ? (
         <>
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">סטטוס</span>
+            <span className="block text-xs font-medium text-app-text-secondary">סטטוס</span>
             <select name="knowledgeStatus" defaultValue={status} className={INPUT}>
               <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
               <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
@@ -142,7 +142,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
             </select>
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">מה יסגור את זה (אם לא מאושר)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">מה יסגור את זה (אם לא מאושר)</span>
             <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
           </label>
         </>
@@ -150,11 +150,11 @@ function EditForm({ p }: { p: ReviewProposal }) {
       {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && (
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">בעלים באנקורה (שם)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">בעלים באנקורה (שם)</span>
             <input name="ownerName" defaultValue={str(p.payload.ownerName)} className={INPUT} />
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-appNavy/60">גלוי ללקוח</span>
+            <span className="block text-xs font-medium text-app-text-secondary">גלוי ללקוח</span>
             <select name="clientVisible" defaultValue={p.payload.clientVisible === true ? "yes" : "no"} className={INPUT}>
               <option value="no">לא</option>
               <option value="yes">כן</option>
@@ -162,8 +162,8 @@ function EditForm({ p }: { p: ReviewProposal }) {
           </label>
         </div>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : p.target === "TASK" ? "פתיחת המשימה" : "אישור עם השינויים"}
       </button>
     </form>
@@ -176,13 +176,13 @@ function RejectForm({ p }: { p: ReviewProposal }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={p.id} />
-      <p className="text-sm text-appNavy">{p.headline}</p>
+      <p className="text-sm text-app-text-primary">{p.headline}</p>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">למה, בשורה אחת *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">למה, בשורה אחת *</span>
         <input name="reason" required placeholder="שיחת חולין, לא רלוונטי לעבודה" className={INPUT} />
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "דחייה"}
       </button>
     </form>
@@ -199,18 +199,18 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="proposal-task-form">
       <input type="hidden" name="id" value={p.id} />
-      <p className="text-xs text-appNavy/60">ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן &quot;הפכה למשימה&quot;.</p>
+      <p className="text-xs text-app-text-secondary">ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן &quot;הפכה למשימה&quot;.</p>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">כותרת המשימה *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">כותרת המשימה *</span>
         <input name="title" required maxLength={200} defaultValue={p.task.title} className={INPUT} />
       </label>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">תיאור</span>
+        <span className="block text-xs font-medium text-app-text-secondary">תיאור</span>
         <textarea name="description" rows={6} defaultValue={p.task.description} className={INPUT} />
       </label>
       <div className="grid grid-cols-2 gap-3">
         <label className="block">
-          <span className="block text-xs font-medium text-appNavy/60">אחראי</span>
+          <span className="block text-xs font-medium text-app-text-secondary">אחראי</span>
           <select name="assignedToId" defaultValue={meId} className={INPUT}>
             {staff.map((s) => (
               <option key={s.id} value={s.id}>
@@ -220,12 +220,12 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
           </select>
         </label>
         <label className="block">
-          <span className="block text-xs font-medium text-appNavy/60">תאריך יעד</span>
+          <span className="block text-xs font-medium text-app-text-secondary">תאריך יעד</span>
           <input type="date" name="dueDate" className={INPUT} />
         </label>
       </div>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">עדיפות</span>
+        <span className="block text-xs font-medium text-app-text-secondary">עדיפות</span>
         <select name="priority" defaultValue="NORMAL" className={INPUT}>
           <option value="LOW">נמוכה</option>
           <option value="NORMAL">רגילה</option>
@@ -233,8 +233,8 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
           <option value="URGENT">דחופה</option>
         </select>
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "פותח..." : "פתיחת משימה"}
       </button>
     </form>
@@ -252,13 +252,13 @@ function RejectManyForm({ ids, onDone }: { ids: string[]; onDone: () => void }) 
       {ids.map((id) => (
         <input key={id} type="hidden" name="id" value={id} />
       ))}
-      <p className="text-sm text-appNavy">{ids.length === 1 ? "הצעה אחת נדחית." : `${ids.length} הצעות נדחות, עם אותה סיבה.`}</p>
+      <p className="text-sm text-app-text-primary">{ids.length === 1 ? "הצעה אחת נדחית." : `${ids.length} הצעות נדחות, עם אותה סיבה.`}</p>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">למה, בשורה אחת *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">למה, בשורה אחת *</span>
         <input name="reason" required placeholder="כבר בתיק מהחילוץ היומי" className={INPUT} />
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "דחייה"}
       </button>
     </form>
@@ -278,12 +278,12 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 
   if (p.state !== "PENDING") {
     return (
-      <li className="py-2.5 text-xs text-appNavy/45">
+      <li className="py-2.5 text-xs text-app-text-tertiary">
         {p.state === "APPROVED" ? (p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
         {p.taskId && (
-          <a href={`/app/tasks/${p.taskId}`} className="ms-1.5 text-gold-dim hover:underline">
+          <a href={`/app/tasks/${p.taskId}`} className="ms-1.5 text-app-text-accent hover:underline">
             למשימה
           </a>
         )}
@@ -294,8 +294,8 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   if (p.hiddenFor) {
     return (
       <li className="py-3.5">
-        <p className="text-xs text-appNavy/50">{kindLabel}</p>
-        <p className="mt-0.5 text-sm text-appNavy/60">פריט רגיש. רק {p.hiddenFor} רואה אותו ומחליט עליו.</p>
+        <p className="text-xs text-app-text-tertiary">{kindLabel}</p>
+        <p className="mt-0.5 text-sm text-app-text-secondary">פריט רגיש. רק {p.hiddenFor} רואה אותו ומחליט עליו.</p>
       </li>
     );
   }
@@ -315,22 +315,22 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           className="mt-1 h-4 w-4 shrink-0 accent-gold"
         />
         <div className="min-w-0 flex-1">
-          <p className="text-xs text-appNavy/50">
+          <p className="text-xs text-app-text-tertiary">
             {kindLabel}
-            {p.action !== "CREATE" && <span className="ms-1.5 text-warning">· {ACTION_LABELS[p.action]}</span>}
+            {p.action !== "CREATE" && <span className="ms-1.5 text-app-warning">· {ACTION_LABELS[p.action]}</span>}
           </p>
-          <p className="mt-0.5 text-sm text-appNavy">{p.headline}</p>
+          <p className="mt-0.5 text-sm text-app-text-primary">{p.headline}</p>
           {proposalDetails(p.target, p.payload).map((line, i) => (
-            <p key={i} className="mt-0.5 whitespace-pre-line text-xs text-appNavy/65">
+            <p key={i} className="mt-0.5 whitespace-pre-line text-xs text-app-text-secondary">
               {line}
             </p>
           ))}
           {p.existing && (
-            <p className="mt-1 text-xs text-appNavy/55">
+            <p className="mt-1 text-xs text-app-text-secondary">
               היום בתיק: <span className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</span>
             </p>
           )}
-          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60">
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-app-text-secondary">
             {status !== "CONFIRMED" && <StatusBadge label={KNOWLEDGE_STATUS_LABELS[status]} tone={status === "MISSING" ? "red" : "amber"} />}
             {str(p.payload.toResolve) && <span>{str(p.payload.toResolve)}</span>}
             {p.state === "PENDING" && (
@@ -341,15 +341,15 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             {p.state === "PENDING" && p.confidence.why.length > 0 && p.confidence.level !== "HIGH" && <span>{p.confidence.why.join(", ")}</span>}
             {p.sources.length > 0 && <span dir="ltr">[{p.sources.join(", ")}]</span>}
             {p.link && (
-              <a href={p.link} target="_blank" rel="noreferrer" className="text-gold-dim hover:underline">
+              <a href={p.link} target="_blank" rel="noreferrer" className="text-app-text-accent hover:underline">
                 לרגע בשיחה
               </a>
             )}
           </div>
-          {p.reason && <p className="mt-1 text-xs text-appNavy/60">למה: {p.reason}</p>}
-          {p.quote && <p className="mt-1 border-s-2 border-lineDark ps-2 text-xs italic text-appNavy/60">{p.quote}</p>}
+          {p.reason && <p className="mt-1 text-xs text-app-text-secondary">למה: {p.reason}</p>}
+          {p.quote && <p className="mt-1 border-s-2 border-app-border ps-2 text-xs italic text-app-text-secondary">{p.quote}</p>}
           {p.flags.map((f, i) => (
-            <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-red-700" : "text-warning"}`}>
+            <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`}>
               {f.message}
             </p>
           ))}
@@ -361,7 +361,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             <button
               type="button"
               onClick={approve}
-              className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful ? "border border-lineDark text-appNavy/60" : "bg-gold-gradient text-navy"}`}
+              className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
             >
               אישור
             </button>
@@ -448,37 +448,37 @@ export function ReviewBatch({
     }, {})
   );
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-6">
+    <section className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="text-xs text-appNavy/50">
-            <a href={`/app/clients/${clientId}/client-file`} className="hover:text-gold-dim">
+          <p className="text-xs text-app-text-tertiary">
+            <a href={`/app/clients/${clientId}/client-file`} className="hover:text-app-text-accent">
               {clientName}
             </a>
           </p>
-          <h2 className="text-sm font-medium text-appNavy">{sourceLabel}</h2>
-          {sourceDetails && <p className="text-xs text-appNavy/60">{sourceDetails}</p>}
+          <h2 className="text-sm font-medium text-app-text-primary">{sourceLabel}</h2>
+          {sourceDetails && <p className="text-xs text-app-text-secondary">{sourceDetails}</p>}
         </div>
-        <p className="text-xs text-appNavy/60">{counts.map(([k, n]) => `${n} ${k}`).join(" · ")}</p>
+        <p className="text-xs text-app-text-secondary">{counts.map(([k, n]) => `${n} ${k}`).join(" · ")}</p>
       </div>
       {/* Spec 5.2: how much of the card goes together, before reading it. */}
       {(() => {
         const line = reviewSummary(decidable.map((p) => p.rank));
         return line ? (
-          <p className="mt-2 text-xs font-medium text-appNavy/70" data-testid="review-summary">
+          <p className="mt-2 text-xs font-medium text-app-text-secondary" data-testid="review-summary">
             {line}
           </p>
         ) : null;
       })()}
-      {note && <p className="mt-2 text-xs text-appNavy/60">{note}</p>}
+      {note && <p className="mt-2 text-xs text-app-text-secondary">{note}</p>}
       {droppedCount > 0 && (
-        <p className="mt-2 text-xs text-warning">
+        <p className="mt-2 text-xs text-app-warning">
           {droppedCount === 1 ? "פריט אחד לא נכנס להצעות" : `${droppedCount} פריטים לא נכנסו להצעות`} (סוד, ציטוט ממקור מוגבל או מבנה שגוי). מה שנדחה לא נשמר.
         </p>
       )}
       {decidable.length > 1 && (
-        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-lineDark bg-white/95 px-3 py-2 text-xs backdrop-blur">
-          <label className="flex items-center gap-1.5 text-appNavy">
+        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-app-border bg-white/95 px-3 py-2 text-xs backdrop-blur">
+          <label className="flex items-center gap-1.5 text-app-text-primary">
             <input
               type="checkbox"
               checked={chosen.length > 0 && chosen.length === decidable.length}
@@ -488,18 +488,18 @@ export function ReviewBatch({
             {filtered ? "כל מה שבסינון" : "הכול"} ({decidable.length})
           </label>
           {allTogether.length > 0 && allTogether.length < decidable.length && (
-            <button type="button" onClick={() => setSelected(new Set(allTogether.map((p) => p.id)))} className="text-gold-dim hover:underline">
+            <button type="button" onClick={() => setSelected(new Set(allTogether.map((p) => p.id)))} className="text-app-text-accent hover:underline">
               רק מה שאפשר לאשר יחד ({allTogether.length})
             </button>
           )}
           {chosen.length > 0 && (
             <>
-              <span className="text-appNavy/50">נבחרו {chosen.length}</span>
+              <span className="text-app-text-tertiary">נבחרו {chosen.length}</span>
               <button
                 type="button"
                 onClick={approveChosen}
                 disabled={busy || approvable.length === 0}
-                className="rounded-full bg-gold-gradient px-3.5 py-1.5 font-medium text-navy disabled:opacity-40"
+                className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary disabled:opacity-40"
               >
                 {busy ? "מאשר..." : `אישור ${approvable.length}`}
               </button>
@@ -507,13 +507,13 @@ export function ReviewBatch({
                 <RejectManyForm ids={chosen.map((p) => p.id)} onDone={() => setSelected(new Set())} />
               </Drawer>
               {approvable.length < chosen.length && (
-                <span className="text-appNavy/50">{chosen.length - approvable.length} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות.</span>
+                <span className="text-app-text-tertiary">{chosen.length - approvable.length} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות.</span>
               )}
             </>
           )}
         </div>
       )}
-      <ul className="mt-3 divide-y divide-lineDark">
+      <ul className="mt-3 divide-y divide-app-border">
         {proposals.map((p) => (
           <ProposalRow key={p.id} p={p} selected={selected.has(p.id)} onSelect={(on) => select(p.id, on)} staff={staff} meId={meId} />
         ))}

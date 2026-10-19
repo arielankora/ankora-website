@@ -19,7 +19,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="min-h-[46px] w-full rounded-full bg-gold-gradient px-6 text-[15px] font-medium text-navy disabled:opacity-50 sm:w-auto"
+      className="min-h-[46px] w-full rounded-full bg-app-accent px-6 text-[15px] font-medium text-app-text-primary disabled:opacity-50 sm:w-auto"
     >
       {pending ? "שומר..." : "אישור וחתימה"}
     </button>
@@ -47,15 +47,15 @@ export function AgreementSignForm({
   const [signedName, setSignedName] = useState("");
 
   if (state?.done) {
-    return <p className="rounded-xl border border-lineDark bg-white p-4 text-sm text-appNavy">{doneMessage}</p>;
+    return <p className="rounded-xl border border-app-border bg-white p-4 text-sm text-app-text-primary">{doneMessage}</p>;
   }
 
   return (
-    <form action={formAction} className="space-y-4 rounded-2xl border border-lineDark bg-white p-5">
+    <form action={formAction} className="space-y-4 rounded-2xl border border-app-border bg-white p-5">
       <input type="hidden" name="version" value={version} />
       {token && <input type="hidden" name="token" value={token} />}
 
-      <label className="flex items-start gap-3 text-sm text-appNavy">
+      <label className="flex items-start gap-3 text-sm text-app-text-primary">
         <input
           type="checkbox"
           name="consent"
@@ -68,7 +68,7 @@ export function AgreementSignForm({
       </label>
 
       <label className="block">
-        <span className="mb-1.5 block text-xs text-appNavy/60">שם מלא</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">שם מלא</span>
         <input
           name="signedName"
           type="text"
@@ -76,13 +76,13 @@ export function AgreementSignForm({
           value={signedName}
           onChange={(e) => setSignedName(e.target.value)}
           autoComplete="name"
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
         />
-        <span className="mt-1.5 block text-xs text-appNavy/50">כפי שהוא רשום בחשבון. ההקלדה היא החתימה.</span>
+        <span className="mt-1.5 block text-xs text-app-text-tertiary">כפי שהוא רשום בחשבון. ההקלדה היא החתימה.</span>
       </label>
 
       {state?.error && (
-        <p role="alert" className="text-sm text-error">
+        <p role="alert" className="text-sm text-app-error">
           {state.error}
         </p>
       )}

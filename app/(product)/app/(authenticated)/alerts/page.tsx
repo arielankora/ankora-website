@@ -85,8 +85,8 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">התראות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="text-xl font-medium text-app-text-primary">התראות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             כללי התראה על ניצול בנק שעות, היסטוריית אירועים וסטטוס שליחת מיילים (ספירה 9).
           </p>
         </div>
@@ -100,8 +100,8 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
             client without rules is marked, because that is the one place
             a breach would go unseen. */}
         {!clientId && activeClients.length > 0 && (
-          <div className="rounded-2xl border border-lineDark bg-white p-5">
-            <h2 className="text-sm font-medium text-appNavy/70">כללים פעילים לפי לקוח</h2>
+          <div className="rounded-2xl border border-app-border bg-white p-5">
+            <h2 className="text-sm font-medium text-app-text-secondary">כללים פעילים לפי לקוח</h2>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {activeClients.map((c) => {
                 const n = rulesByClient.get(c.id) ?? 0;
@@ -109,10 +109,10 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                   <Link
                     key={c.id}
                     href={`/app/alerts?clientId=${c.id}`}
-                    className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11.5px] text-appNavy/70 transition-colors hover:border-gold"
+                    className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
                   >
                     {c.name} ·{" "}
-                    {n > 0 ? <span className="font-jbmono">{n}</span> : <span className="text-warning">ללא כללים</span>}
+                    {n > 0 ? <span className="font-jbmono">{n}</span> : <span className="text-app-warning">ללא כללים</span>}
                   </Link>
                 );
               })}
@@ -121,7 +121,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
         )}
 
         {clientId && !selectedClient && (
-          <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+          <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
             הלקוח לא נמצא או שהוא בארכיון.
           </div>
         )}
@@ -129,7 +129,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
         {selectedClient && (
           <>
             <div>
-              <h2 className="text-sm font-medium text-appNavy">כלל התראה חדש - {selectedClient.name}</h2>
+              <h2 className="text-sm font-medium text-app-text-primary">כלל התראה חדש - {selectedClient.name}</h2>
               <div className="mt-3">
                 <AlertRuleForm clientId={selectedClient.id} />
               </div>
@@ -137,49 +137,49 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
 
             <div className="space-y-4">
               {rules.length === 0 && (
-                <div className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+                <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
                   עדיין אין כללי התראה ללקוח זה.
                 </div>
               )}
 
               {rules.map((rule) => (
-                <div key={rule.id} className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-lineDark px-5 py-4">
+                <div key={rule.id} className="overflow-hidden rounded-2xl border border-app-border bg-white">
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border px-5 py-4">
                     <div className="flex items-center gap-3">
                       <StatusBadge label={rule.enabled ? "פעיל" : "מושבת"} tone={rule.enabled ? "green" : "gray"} />
-                      <span className="text-sm font-medium text-appNavy">
+                      <span className="text-sm font-medium text-app-text-primary">
                         {describeThreshold(rule.type, rule.thresholdValue)}
                       </span>
                       {rule.allowRetrigger && (
-                        <span className="text-[11px] text-appNavy/40">(התראה חוזרת מופעלת)</span>
+                        <span className="text-[11px] text-app-text-tertiary">(התראה חוזרת מופעלת)</span>
                       )}
                     </div>
                     <RuleActions ruleId={rule.id} enabled={rule.enabled} />
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-appNavy/60 sm:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-3 px-5 py-4 text-xs text-app-text-secondary sm:grid-cols-2">
                     <div>
-                      <span className="font-medium text-appNavy/70">נמענים Ankora: </span>
+                      <span className="font-medium text-app-text-secondary">נמענים Ankora: </span>
                       {rule.recipientsAnkora.length || rule.notifyAccountManager ? (
                         [...rule.recipientsAnkora, ...(rule.notifyAccountManager ? ["מנהל הלקוח"] : [])].join(", ")
                       ) : (
-                        <span className="text-appNavy/30">-</span>
+                        <span className="text-app-text-tertiary">-</span>
                       )}
                     </div>
                     <div>
-                      <span className="font-medium text-appNavy/70">נמענים לקוח: </span>
-                      {rule.recipientsClient.length ? rule.recipientsClient.join(", ") : <span className="text-appNavy/30">-</span>}
+                      <span className="font-medium text-app-text-secondary">נמענים לקוח: </span>
+                      {rule.recipientsClient.length ? rule.recipientsClient.join(", ") : <span className="text-app-text-tertiary">-</span>}
                     </div>
                   </div>
 
                   {rule.events.length > 0 && (
-                    <div className="border-t border-lineDark px-5 py-4">
-                      <p className="mb-2 text-xs font-medium text-appNavy/50">אירועים אחרונים</p>
+                    <div className="border-t border-app-border px-5 py-4">
+                      <p className="mb-2 text-xs font-medium text-app-text-tertiary">אירועים אחרונים</p>
                       <ul className="space-y-2">
                         {rule.events.map((event) => (
-                          <li key={event.id} className="rounded-lg bg-appNavy/[0.03] px-3 py-2 text-xs">
+                          <li key={event.id} className="rounded-lg bg-app-surface-sunken px-3 py-2 text-xs">
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="text-appNavy/70">
+                              <span className="text-app-text-secondary">
                                 {formatDateTime(event.triggeredAt)} - ערך {event.value}
                               </span>
                               <StatusBadge
@@ -190,7 +190,7 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                             {event.emailDeliveries.length > 0 && (
                               <ul className="mt-2 space-y-1">
                                 {event.emailDeliveries.map((d) => (
-                                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-appNavy/50">
+                                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-app-text-tertiary">
                                     <span>
                                       {d.template === "ankora_internal" ? "Ankora" : "לקוח"} - {d.recipients.join(", ")}
                                     </span>

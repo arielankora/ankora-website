@@ -34,10 +34,10 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 };
 
 const PRIORITY_CLASSES: Record<TaskPriority, string> = {
-  LOW: "bg-neutral-soft text-neutral",
-  NORMAL: "bg-neutral-soft text-neutral",
-  HIGH: "bg-warning-soft text-warning",
-  URGENT: "bg-error-soft text-error",
+  LOW: "bg-app-neutral-soft text-app-text-secondary",
+  NORMAL: "bg-app-neutral-soft text-app-text-secondary",
+  HIGH: "bg-app-warning-soft text-app-warning",
+  URGENT: "bg-app-error-soft text-app-error",
 };
 
 const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE", "ARCHIVED"];
@@ -202,7 +202,7 @@ export function TaskDetail({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-2xl border border-lineDark bg-white p-5">
+      <section className="rounded-2xl border border-app-border bg-white p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             {editingTitle ? (
@@ -226,18 +226,18 @@ export function TaskDetail({
                     setEditingTitle(false);
                   }
                 }}
-                className="w-full rounded-lg border border-lineDark px-3 py-2 text-lg font-medium text-appNavy outline-none focus:border-appNavy/40"
+                className="w-full rounded-lg border border-app-border px-3 py-2 text-lg font-medium text-app-text-primary outline-none focus:border-appNavy/40"
               />
             ) : (
               <button
                 type="button"
                 onClick={() => setEditingTitle(true)}
-                className="w-full text-right text-lg font-medium text-appNavy hover:text-appNavy/70"
+                className="w-full text-right text-lg font-medium text-app-text-primary hover:text-app-text-secondary"
               >
                 {title}
               </button>
             )}
-            <p className="mt-1 text-[13px] text-appNavy/55">{task.clientName}</p>
+            <p className="mt-1 text-[13px] text-app-text-secondary">{task.clientName}</p>
           </div>
 
           {/* Ariel, 19.10.2026: the timer was here, the hours it had
@@ -248,11 +248,11 @@ export function TaskDetail({
             <a
               href="#task-time"
               data-testid="task-reported-total"
-              className="text-[12.5px] text-appNavy/55 hover:text-appNavy"
+              className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
               {task.reportedSeconds > 0 ? (
                 <>
-                  דווחו עד כה <span className="font-jbmono text-appNavy">{formatDuration(task.reportedSeconds)}</span> שעות
+                  דווחו עד כה <span className="font-jbmono text-app-text-primary">{formatDuration(task.reportedSeconds)}</span> שעות
                 </>
               ) : (
                 "עוד לא דווח זמן"
@@ -315,7 +315,7 @@ export function TaskDetail({
               write({ categoryId: v || null }, { title: "הקטגוריה עודכנה", description: title })
             }
           />
-          <label className="flex items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/60">
+          <label className="flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
             תאריך יעד
             <input
               type="date"
@@ -328,13 +328,13 @@ export function TaskDetail({
                   { title: e.target.value ? "תאריך היעד עודכן" : "תאריך היעד הוסר", description: title }
                 )
               }
-              className="bg-transparent text-appNavy outline-none"
+              className="bg-transparent text-app-text-primary outline-none"
             />
           </label>
         </div>
 
         {mappingTask !== null && (
-          <label className="mt-4 flex w-fit items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/60">
+          <label className="mt-4 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
             <input
               type="checkbox"
               checked={mappingTask}
@@ -372,14 +372,14 @@ export function TaskDetail({
         onChangeStatus={changeStatus}
       />
 
-      <section className="rounded-2xl border border-lineDark bg-white p-5">
+      <section className="rounded-2xl border border-app-border bg-white p-5">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-appNavy/70">תיאור</h2>
+          <h2 className="text-sm font-medium text-app-text-secondary">תיאור</h2>
           {!editingDescription && (
             <button
               type="button"
               onClick={() => setEditingDescription(true)}
-              className="text-[12.5px] text-gold-dim hover:text-appNavy"
+              className="text-[12.5px] text-app-text-accent hover:text-app-text-primary"
             >
               {description ? "עריכה" : "הוספת תיאור"}
             </button>
@@ -394,12 +394,12 @@ export function TaskDetail({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="מה צריך לעשות, כתובת, מספר אסמכתא, מה כבר נוסה."
-              className="w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] leading-relaxed text-appNavy outline-none focus:border-appNavy/40"
+              className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
             />
             {/* The subset, said once where somebody is typing it. Naming
                 what is supported is cheaper than letting a person
                 discover that a heading does nothing. */}
-            <p className="text-[12px] text-appNavy/45">
+            <p className="text-[12px] text-app-text-tertiary">
               אפשר **מודגש**, *נטוי*, `קוד`, רשימות עם - או 1. וקישורים [טקסט](כתובת).
             </p>
             <div className="flex gap-2">
@@ -415,7 +415,7 @@ export function TaskDetail({
                     { title: next ? "התיאור עודכן" : "התיאור הוסר", description: title }
                   );
                 }}
-                className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-50"
+                className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-50"
               >
                 שמירה
               </button>
@@ -425,7 +425,7 @@ export function TaskDetail({
                   setDescription(task.description ?? "");
                   setEditingDescription(false);
                 }}
-                className="rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/60"
+                className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
               >
                 ביטול
               </button>
@@ -433,7 +433,7 @@ export function TaskDetail({
           </div>
         ) : description ? (
           <div
-            className="mt-3 space-y-2 text-[14px] leading-relaxed text-appNavy/85 [&_p]:m-0"
+            className="mt-3 space-y-2 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0"
             // The only dangerouslySetInnerHTML in this screen, and the
             // reason lib/markdown-lite.ts escapes the whole input before
             // it applies a single pattern. Read that file's security note
@@ -444,38 +444,38 @@ export function TaskDetail({
           // No description, but somebody wrote on the task. Show that
           // rather than "אין תיאור": it is usually the whole brief.
           <div className="mt-3">
-            <p className="text-xs text-appNavy/50">
+            <p className="text-xs text-app-text-tertiary">
               {leadComment.author ? `מהתגובה של ${leadComment.author}` : "מהתגובה הראשונה"}
             </p>
             <div
-              className="mt-1.5 space-y-2 border-s-2 border-gold/50 ps-3 text-[14px] leading-relaxed text-appNavy/85 [&_p]:m-0"
+              className="mt-1.5 space-y-2 border-s-2 border-gold/50 ps-3 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0"
               // Same renderer, same escaping, as the description above.
               dangerouslySetInnerHTML={{ __html: renderMarkdownLite(leadComment.body) }}
             />
           </div>
         ) : (
-          <p className="mt-3 text-sm text-appNavy/45">אין תיאור. כל מה שנמצא היום בוואטסאפ שייך לכאן.</p>
+          <p className="mt-3 text-sm text-app-text-tertiary">אין תיאור. כל מה שנמצא היום בוואטסאפ שייך לכאן.</p>
         )}
       </section>
 
       {procedureReminder && (
-        <section role="status" className="rounded-2xl border border-warning/30 bg-warning-soft p-5">
-          <p className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
-            <Hourglass size={15} className="text-warning" />
+        <section role="status" className="rounded-2xl border border-app-warning/30 bg-app-warning-soft p-5">
+          <p className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
+            <Hourglass size={15} className="text-app-warning" />
             עוד לא בתיק הלקוח
           </p>
-          <p className="mt-1 text-[12.5px] text-appNavy/70">{procedureReminder.text}</p>
+          <p className="mt-1 text-[12.5px] text-app-text-secondary">{procedureReminder.text}</p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <a
               href={procedureReminder.reviewHref}
-              className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream"
+              className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream"
             >
               למסך הבדיקה
             </a>
             <button
               type="button"
               onClick={() => setProcedureReminder(null)}
-              className="text-[12.5px] text-appNavy/60 hover:text-appNavy"
+              className="text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
               הבנתי
             </button>
@@ -547,9 +547,9 @@ function Supervision({
   const supervisorName = people.find((p) => p.id === supervisorId)?.name ?? task.supervisorName;
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-5">
-      <h2 className="flex items-center gap-2 text-sm font-medium text-appNavy/70">
-        <ShieldCheck size={15} strokeWidth={1.75} className="text-appNavy/40" />
+    <section className="rounded-2xl border border-app-border bg-white p-5">
+      <h2 className="flex items-center gap-2 text-sm font-medium text-app-text-secondary">
+        <ShieldCheck size={15} strokeWidth={1.75} className="text-app-text-tertiary" />
         פיקוח ואישור
       </h2>
 
@@ -574,7 +574,7 @@ function Supervision({
           }}
         />
 
-        <label className="flex items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/60">
+        <label className="flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
           <input
             type="checkbox"
             checked={requiresApproval}
@@ -598,23 +598,23 @@ function Supervision({
           click it. A control that does nothing and explains nothing is
           the thing people file a bug about. */}
       {!supervisorId && !requiresApproval && (
-        <p className="mt-2 text-[12px] text-appNavy/45">בחרו מפקח כדי לדרוש אישור.</p>
+        <p className="mt-2 text-[12px] text-app-text-tertiary">בחרו מפקח כדי לדרוש אישור.</p>
       )}
 
       {waiting && (
-        <div className="mt-4 rounded-xl border border-lineDark bg-appNavy/[0.04] p-4">
+        <div className="mt-4 rounded-xl border border-app-border bg-app-surface-sunken p-4">
           {canApprove ? (
             <>
-              <p className="text-[13.5px] font-medium text-appNavy">המשימה מחכה לאישור שלך.</p>
+              <p className="text-[13.5px] font-medium text-app-text-primary">המשימה מחכה לאישור שלך.</p>
               {task.clientOutcome && (
-                <p className="mt-1 text-[12.5px] text-appNavy/60">{task.clientOutcome}</p>
+                <p className="mt-1 text-[12.5px] text-app-text-secondary">{task.clientOutcome}</p>
               )}
               <div className="mt-3 flex flex-wrap gap-2">
                 <button
                   type="button"
                   disabled={pending}
                   onClick={() => onChangeStatus("DONE")}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
                 >
                   <CheckCircle2 size={14} />
                   אישור וסגירה
@@ -623,7 +623,7 @@ function Supervision({
                   type="button"
                   disabled={pending}
                   onClick={() => onChangeStatus("IN_PROGRESS")}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-40"
                 >
                   <Undo2 size={14} />
                   החזרה לביצוע
@@ -632,14 +632,14 @@ function Supervision({
             </>
           ) : (
             <>
-              <p className="text-[13.5px] text-appNavy">
+              <p className="text-[13.5px] text-app-text-primary">
                 {supervisorName ? `ממתינה לאישור של ${supervisorName}.` : "ממתינה לאישור."}
               </p>
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => onChangeStatus("IN_PROGRESS")}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-40"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-40"
               >
                 <Undo2 size={14} />
                 ביטול השליחה
@@ -658,7 +658,7 @@ function Supervision({
           type="button"
           disabled={pending}
           onClick={() => onChangeStatus("PENDING_APPROVAL")}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+          className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
         >
           <ShieldCheck size={14} />
           שליחה לאישור
@@ -666,7 +666,7 @@ function Supervision({
       )}
 
       {task.approvedAt && status === "DONE" && (
-        <p className="mt-4 flex items-center gap-1.5 text-[12.5px] text-success">
+        <p className="mt-4 flex items-center gap-1.5 text-[12.5px] text-app-success">
           <CheckCircle2 size={14} />
           אושרה על ידי {task.approvedByName ?? "המערכת"} ב{formatDate(task.approvedAt)}
         </p>
@@ -682,13 +682,13 @@ function Timestamps({ task }: { task: TaskDetailData }) {
     { label: "הושלמה", value: task.completedAt },
   ];
   return (
-    <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-2 border-t border-lineDark pt-4 text-[12.5px]">
+    <dl className="mt-5 flex flex-wrap gap-x-8 gap-y-2 border-t border-app-border pt-4 text-[12.5px]">
       {rows
         .filter((r) => r.value)
         .map((r) => (
           <div key={r.label} className="flex gap-1.5">
-            <dt className="text-appNavy/45">{r.label}</dt>
-            <dd className="text-appNavy/70">{formatDate(r.value!)}</dd>
+            <dt className="text-app-text-tertiary">{r.label}</dt>
+            <dd className="text-app-text-secondary">{formatDate(r.value!)}</dd>
           </div>
         ))}
     </dl>
@@ -721,11 +721,11 @@ function Select({
 }) {
   return (
     <label
-      className={`flex items-center gap-2 rounded-full border border-lineDark px-3 py-1.5 text-[13px] ${
+      className={`flex items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] ${
         badgeClass ?? ""
       }`}
     >
-      <span className="text-appNavy/50">{label}</span>
+      <span className="text-app-text-tertiary">{label}</span>
       <select
         // The visible <span> and the chosen option share this <label>, so
         // without an explicit name the accessible label would be the
@@ -735,7 +735,7 @@ function Select({
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
-        className="cursor-pointer bg-transparent font-medium text-appNavy outline-none disabled:opacity-50"
+        className="cursor-pointer bg-transparent font-medium text-app-text-primary outline-none disabled:opacity-50"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -789,15 +789,15 @@ function BlockSection({
   }
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-5">
+    <section className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-appNavy/70">ממתינים למשהו?</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">ממתינים למשהו?</h2>
         {blocked ? (
           <button
             type="button"
             disabled={pending}
             onClick={() => write({ block: null }, { title: "המשימה חזרה לטיפול", description: task.title })}
-            className="rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-50"
+            className="rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
           >
             כבר לא ממתינים
           </button>
@@ -807,7 +807,7 @@ function BlockSection({
               type="button"
               disabled={pending}
               onClick={() => setOpen((v) => !v)}
-              className="flex items-center gap-1.5 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
             >
               <Hourglass size={14} />
               {open ? "ביטול" : "סימון כממתין"}
@@ -818,23 +818,23 @@ function BlockSection({
 
       {blocked ? (
         <div className="mt-3">
-          <p className="flex items-center gap-2 text-[13.5px] text-appNavy">
-            <Hourglass size={15} className="text-warning" />
+          <p className="flex items-center gap-2 text-[13.5px] text-app-text-primary">
+            <Hourglass size={15} className="text-app-warning" />
             {waitingTitle(task.blockedOn!, task.blockedSince)}
           </p>
           {task.blockedReason ? (
-            <p className="mt-1 text-[12.5px] text-appNavy/60">{task.blockedReason}</p>
+            <p className="mt-1 text-[12.5px] text-app-text-secondary">{task.blockedReason}</p>
           ) : (
-            <p className="mt-1 text-[12.5px] text-appNavy/45">
+            <p className="mt-1 text-[12.5px] text-app-text-tertiary">
               לא נכתבה סיבה. מי שיפתח את המשימה בעוד שבוע לא ידע למה היא עצרה.
             </p>
           )}
         </div>
       ) : isClosed ? (
-        <p className="mt-2 text-[12.5px] text-appNavy/45">משימה שהושלמה לא ממתינה לאף אחד.</p>
+        <p className="mt-2 text-[12.5px] text-app-text-tertiary">משימה שהושלמה לא ממתינה לאף אחד.</p>
       ) : (
         !open && (
-          <p className="mt-2 text-[12.5px] text-appNavy/55">
+          <p className="mt-2 text-[12.5px] text-app-text-secondary">
             לא ממתינה לאף אחד. אם העבודה עצרה כי מחכים לתשובה, כדאי לסמן: המדד של ההבטחות התקועות
             מפריד בין מה שתקוע אצלנו למה שתקוע אצלם.
           </p>
@@ -852,8 +852,8 @@ function BlockSection({
                 onClick={() => setOn(key)}
                 className={`rounded-full border px-3 py-1.5 text-[12.5px] transition-colors ${
                   on === key
-                    ? "border-warning/50 bg-warning-soft text-appNavy"
-                    : "border-lineDark bg-white text-appNavy/60 hover:border-gold"
+                    ? "border-app-warning/50 bg-app-warning-soft text-app-text-primary"
+                    : "border-app-border bg-white text-app-text-secondary hover:border-gold"
                 }`}
               >
                 {TASK_BLOCKER_LABELS[key]}
@@ -866,10 +866,10 @@ function BlockSection({
             onChange={(e) => setReason(e.target.value)}
             aria-label="סיבת ההמתנה"
             placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
-            className="w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+            className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
           />
           {on === "CLIENT" && task.clientVisible && (
-            <p className="text-[12px] text-appNavy/55">
+            <p className="text-[12px] text-app-text-secondary">
               הסיבה נשארת פנימית. מה שהלקוח רואה תחת &quot;מחכה לך&quot; כותבים ב&quot;מה הלקוח רואה&quot;, בשדה &quot;מה מבקשים מהלקוח&quot;.
             </p>
           )}
@@ -877,7 +877,7 @@ function BlockSection({
             type="button"
             disabled={pending}
             onClick={save}
-            className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+            className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
           >
             שמירה
           </button>
@@ -922,9 +922,9 @@ function ClientSection({
   const [clientRequest, setClientRequest] = useState(task.clientRequest ?? "");
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-5">
+    <section className="rounded-2xl border border-app-border bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-medium text-appNavy/70">מה הלקוח רואה</h2>
+        <h2 className="text-sm font-medium text-app-text-secondary">מה הלקוח רואה</h2>
         <button
           type="button"
           disabled={pending}
@@ -944,7 +944,7 @@ function ClientSection({
               }
             )
           }
-          className="flex items-center gap-1.5 rounded-full border border-lineDark px-3 py-1.5 text-[13px] text-appNavy/70 hover:text-appNavy disabled:opacity-50"
+          className="flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary hover:text-app-text-primary disabled:opacity-50"
         >
           {clientVisible ? <Eye size={14} /> : <EyeOff size={14} />}
           {clientVisible ? "מוצגת בפורטל" : "פנימית"}
@@ -954,7 +954,7 @@ function ClientSection({
       {clientVisible && (
         <div className="mt-4 space-y-4">
           <div>
-            <label className="text-[12.5px] text-appNavy/50">הכותרת שהלקוח קורא</label>
+            <label className="text-[12.5px] text-app-text-tertiary">הכותרת שהלקוח קורא</label>
             <input
               value={clientTitle}
               disabled={pending}
@@ -967,7 +967,7 @@ function ClientSection({
                 );
               }}
               placeholder={task.title}
-              className="mt-1 w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
             />
           </div>
 
@@ -975,7 +975,7 @@ function ClientSection({
               them, so it lives here with the other things they read, and
               not in the block reason, which stays ours. */}
           <div>
-            <label className="text-[12.5px] text-appNavy/50">מה מבקשים מהלקוח (מוצג תחת &quot;מחכה לך&quot;)</label>
+            <label className="text-[12.5px] text-app-text-tertiary">מה מבקשים מהלקוח (מוצג תחת &quot;מחכה לך&quot;)</label>
             <input
               value={clientRequest}
               disabled={pending}
@@ -988,12 +988,12 @@ function ClientSection({
                 );
               }}
               placeholder="במשפט אחד, ישירות ללקוח: מה לעשות, איפה, וכמה זמן זה לוקח."
-              className="mt-1 w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
             />
           </div>
 
           <div>
-            <label className="text-[12.5px] text-appNavy/50">
+            <label className="text-[12.5px] text-app-text-tertiary">
               משפט התוצאה{isDone ? "" : " (נדרש כדי לסגור)"}
             </label>
             <textarea
@@ -1018,19 +1018,19 @@ function ClientSection({
                 );
               }}
               placeholder="במשפט אחד, בשפה של הלקוח: מה קרה בפועל."
-              className="mt-1 w-full rounded-lg border border-lineDark px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
             />
           </div>
         </div>
       )}
 
       {closingTo && (
-        <div className="mt-4 rounded-xl border border-warning/30 bg-warning-soft p-4">
-          <p className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
-            <Hourglass size={15} className="text-warning" />
+        <div className="mt-4 rounded-xl border border-app-warning/30 bg-app-warning-soft p-4">
+          <p className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
+            <Hourglass size={15} className="text-app-warning" />
             {closingTo === "DONE" ? "לפני הסגירה: מה קרה בפועל?" : "לפני השליחה לאישור: מה קרה בפועל?"}
           </p>
-          <p className="mt-1 text-[12.5px] text-appNavy/60">
+          <p className="mt-1 text-[12.5px] text-app-text-secondary">
             המשפט הזה הוא מה שהלקוח קורא בפורטל ומה שנכנס לסיכום החודשי.
           </p>
           <textarea
@@ -1042,14 +1042,14 @@ function ClientSection({
             aria-label="משפט התוצאה לפני סגירה"
             value={clientOutcome}
             onChange={(e) => setClientOutcome(e.target.value)}
-            className="mt-3 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-[14px] text-appNavy outline-none focus:border-appNavy/40"
+            className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
           />
           <div className="mt-3 flex gap-2">
             <button
               type="button"
               disabled={pending || !clientOutcome.trim()}
               onClick={onConfirmClose}
-              className="rounded-full bg-appNavy px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
+              className="rounded-full bg-app-surface-nav px-4 py-1.5 text-[13px] font-medium text-cream disabled:opacity-40"
             >
               {/* "סגירת המשימה", not "סגירה". Every toast in this product
                   carries a dismiss button labelled "סגירה", so the bare
@@ -1062,7 +1062,7 @@ function ClientSection({
             <button
               type="button"
               onClick={onCancelClose}
-              className="rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/60"
+              className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
             >
               ביטול
             </button>
@@ -1221,7 +1221,7 @@ function TimerButton({
         type="button"
         disabled={disabled || pending}
         onClick={stop}
-        className="flex items-center gap-2 rounded-full bg-appNavy px-4 py-2 text-[13.5px] font-medium text-cream disabled:opacity-50"
+        className="flex items-center gap-2 rounded-full bg-app-surface-nav px-4 py-2 text-[13.5px] font-medium text-cream disabled:opacity-50"
       >
         <Pause size={15} />
         <span className="font-jbmono">{formatElapsed(elapsed)}</span>
@@ -1235,7 +1235,7 @@ function TimerButton({
       type="button"
       disabled={disabled || pending}
       onClick={ask}
-      className="flex items-center gap-2 rounded-full border border-appNavy bg-white px-4 py-2 text-[13.5px] font-medium text-appNavy disabled:opacity-50"
+      className="flex items-center gap-2 rounded-full border border-appNavy bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
     >
       <Play size={15} />
       הפעלת טיימר

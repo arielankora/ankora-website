@@ -67,26 +67,26 @@ export default async function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-medium text-appNavy">הפרופיל שלי</h1>
-        <p className="mt-1 text-sm text-appNavy/60">פרטים אישיים, אזור זמן, התראות וחיבורים.</p>
+        <h1 className="text-xl font-medium text-app-text-primary">הפרופיל שלי</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">פרטים אישיים, אזור זמן, התראות וחיבורים.</p>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
+          <div className="rounded-2xl border border-app-border bg-white p-6">
             <div className="flex items-center gap-3">
-              <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-base font-medium text-gold-dim">
+              <span className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-base font-medium text-app-text-accent">
                 {initials(user.name)}
               </span>
               <div className="min-w-0">
-                <p className="truncate text-base font-medium text-appNavy">{user.name}</p>
-                <p dir="ltr" className="truncate text-end text-xs text-appNavy/50">
+                <p className="truncate text-base font-medium text-app-text-primary">{user.name}</p>
+                <p dir="ltr" className="truncate text-end text-xs text-app-text-tertiary">
                   {user.email}
                 </p>
               </div>
             </div>
 
-            <div className="mt-5 space-y-5 border-t border-lineDark pt-5">
+            <div className="mt-5 space-y-5 border-t border-app-border pt-5">
               <NameForm name={user.name} />
               <TimezoneForm timezone={user.timezone} />
             </div>
@@ -94,9 +94,9 @@ export default async function ProfilePage() {
         </div>
 
         <div className="space-y-6">
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-appNavy">התראות אישיות</h2>
-            <div className="divide-y divide-lineDark/70">
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="mb-3 text-sm font-medium text-app-text-primary">התראות אישיות</h2>
+            <div className="divide-y divide-app-border">
               <DailyDigestPreferenceForm enabled={user.dailyDigestByEmail} />
               <div className="pt-3">
                 <NotificationPreferenceForm enabled={user.notifyLongRunningTimerByEmail} />
@@ -104,8 +104,8 @@ export default async function ProfilePage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="mb-3 text-sm font-medium text-appNavy">סיסמה</h2>
+          <div className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="mb-3 text-sm font-medium text-app-text-primary">סיסמה</h2>
             <ChangePasswordForm lastChangedLabel={formatPasswordChangedLabel(lastPasswordChangeAt)} />
           </div>
 

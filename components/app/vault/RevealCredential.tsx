@@ -115,25 +115,25 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
         <button
           type="button"
           onClick={reveal}
-          className="inline-flex items-center gap-1.5 rounded-full border border-lineDark px-3 py-1.5 text-xs font-medium text-appNavy hover:bg-appNavy/5"
+          className="inline-flex items-center gap-1.5 rounded-full border border-app-border px-3 py-1.5 text-xs font-medium text-app-text-primary hover:bg-app-surface-sunken"
         >
           <KeyRound size={14} strokeWidth={1.75} />
           הצגת פרטי גישה
         </button>
-        {phase.kind === "error" && <p className="text-xs text-error">{phase.message}</p>}
+        {phase.kind === "error" && <p className="text-xs text-app-error">{phase.message}</p>}
       </div>
     );
   }
 
   if (phase.kind === "loading") {
-    return <p className="text-xs text-appNavy/60">רגע...</p>;
+    return <p className="text-xs text-app-text-secondary">רגע...</p>;
   }
 
   if (phase.kind === "step-up") {
     const { methods } = phase;
     return (
-      <div className="w-full max-w-sm rounded-xl border border-lineDark bg-cream-dim p-3">
-        <p className="flex items-center gap-1.5 text-xs font-medium text-appNavy">
+      <div className="w-full max-w-sm rounded-xl border border-app-border bg-cream-dim p-3">
+        <p className="flex items-center gap-1.5 text-xs font-medium text-app-text-primary">
           <Lock size={13} strokeWidth={1.75} />
           אימות זהות
         </p>
@@ -141,7 +141,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
           <button
             type="button"
             onClick={() => stepUpWithPasskey(methods)}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-appNavy px-4 py-1.5 text-xs font-medium text-cream"
+            className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-app-surface-nav px-4 py-1.5 text-xs font-medium text-cream"
           >
             <Fingerprint size={14} strokeWidth={1.75} />
             אימות עם Touch ID
@@ -149,7 +149,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
         )}
         {methods.password && (
           <form onSubmit={stepUp} className="mt-2">
-            <p className="text-xs text-appNavy/60">
+            <p className="text-xs text-app-text-secondary">
               {methods.passkey ? "או הסיסמה שלך לאנקורה." : "הקלידו את הסיסמה שלכם לאנקורה. האימות תקף ל-5 דקות."}
             </p>
             <div className="mt-2 flex gap-2">
@@ -160,26 +160,26 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
                 required
                 autoFocus={!methods.passkey}
                 aria-label="הסיסמה שלך לאנקורה"
-                className="min-w-0 flex-1 rounded-lg border border-lineDark bg-white px-3 py-1.5 text-sm text-appNavy outline-none focus:border-gold"
+                className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
               />
-              <button type="submit" className="rounded-full bg-appNavy px-4 py-1.5 text-xs font-medium text-cream">
+              <button type="submit" className="rounded-full bg-app-surface-nav px-4 py-1.5 text-xs font-medium text-cream">
                 אימות
               </button>
             </div>
           </form>
         )}
         {!methods.passkey && !methods.password && (
-          <p className="mt-2 text-xs text-appNavy/70">
+          <p className="mt-2 text-xs text-app-text-secondary">
             צפייה בגישות דורשת passkey (Touch ID).{" "}
             <Link href="/app/profile#passkeys" className="underline">
               להגדרה בפרופיל
             </Link>
           </p>
         )}
-        <button type="button" onClick={() => setPhase({ kind: "idle" })} className="mt-2 text-xs text-appNavy/60">
+        <button type="button" onClick={() => setPhase({ kind: "idle" })} className="mt-2 text-xs text-app-text-secondary">
           ביטול
         </button>
-        {phase.error && <p className="mt-2 text-xs text-error">{phase.error}</p>}
+        {phase.error && <p className="mt-2 text-xs text-app-error">{phase.error}</p>}
       </div>
     );
   }
@@ -187,18 +187,18 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
   const seconds = Math.max(0, Math.ceil((phase.until - now) / 1000));
   const { secret } = phase;
   return (
-    <div className="w-full max-w-md rounded-xl border border-lineDark bg-cream-dim p-3">
+    <div className="w-full max-w-md rounded-xl border border-app-border bg-cream-dim p-3">
       <dl className="flex flex-col gap-2">
         <SecretLine label="שם משתמש" value={secret.username} onCopy={() => (copied.current = true)} />
         <SecretLine label="סיסמה" value={secret.password} onCopy={() => (copied.current = true)} />
         {secret.notes && (
           <div>
-            <dt className="text-[11px] text-appNavy/60">הערות</dt>
-            <dd className="whitespace-pre-wrap text-sm text-appNavy">{secret.notes}</dd>
+            <dt className="text-[11px] text-app-text-secondary">הערות</dt>
+            <dd className="whitespace-pre-wrap text-sm text-app-text-primary">{secret.notes}</dd>
           </div>
         )}
       </dl>
-      <div className="mt-3 flex items-center justify-between text-[11px] text-appNavy/50">
+      <div className="mt-3 flex items-center justify-between text-[11px] text-app-text-tertiary">
         <span>הצפייה נרשמה.</span>
         <span>
           נעלם בעוד {seconds} שניות ·{" "}
@@ -216,8 +216,8 @@ function SecretLine({ label, value, onCopy }: { label: string; value: string | n
   if (value === null) {
     return (
       <div>
-        <dt className="text-[11px] text-appNavy/60">{label}</dt>
-        <dd className="text-sm text-appNavy/40">לא נשמר</dd>
+        <dt className="text-[11px] text-app-text-secondary">{label}</dt>
+        <dd className="text-sm text-app-text-tertiary">לא נשמר</dd>
       </div>
     );
   }
@@ -233,16 +233,16 @@ function SecretLine({ label, value, onCopy }: { label: string; value: string | n
   }
   return (
     <div>
-      <dt className="text-[11px] text-appNavy/60">{label}</dt>
+      <dt className="text-[11px] text-app-text-secondary">{label}</dt>
       <dd className="flex items-center gap-2">
-        <code dir="ltr" className="min-w-0 flex-1 select-all break-all text-start text-sm text-appNavy">
+        <code dir="ltr" className="min-w-0 flex-1 select-all break-all text-start text-sm text-app-text-primary">
           {value}
         </code>
         <button
           type="button"
           onClick={copy}
           aria-label={`העתקת ${label}`}
-          className="shrink-0 rounded-md p-1.5 text-appNavy/60 hover:bg-appNavy/5 hover:text-appNavy"
+          className="shrink-0 rounded-md p-1.5 text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
         >
           {done ? <Check size={14} /> : <Copy size={14} />}
         </button>

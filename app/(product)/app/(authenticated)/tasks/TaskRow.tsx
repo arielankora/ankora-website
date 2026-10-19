@@ -20,15 +20,17 @@ const TASK_STATUS_LABELS: Record<TaskStatus, string> = {
 };
 
 const STATUS_TAG_CLASSES: Record<TaskStatus, string> = {
-  OPEN: "bg-neutral-soft text-neutral",
-  IN_PROGRESS: "bg-warning-soft text-warning",
+  OPEN: "bg-app-neutral-soft text-app-text-secondary",
+  // 19.10.2026 (canvas "Ankora App UI Round"): in progress is information,
+  // not a warning. Amber is now for what waits on someone.
+  IN_PROGRESS: "bg-app-info-soft text-app-info",
   // Tasks phase 2. Neither in flight nor finished: the work is done and
   // the task is not. A navy tint rather than a fifth colour token - the
   // portal already uses this exact pair for a held state, and inventing
   // a colour for one status is how a palette stops meaning anything.
-  PENDING_APPROVAL: "bg-appNavy/5 text-appNavy/70",
-  DONE: "bg-success-soft text-success",
-  ARCHIVED: "bg-neutral-soft text-neutral",
+  PENDING_APPROVAL: "bg-app-surface-sunken text-app-text-secondary",
+  DONE: "bg-app-success-soft text-app-success",
+  ARCHIVED: "bg-app-neutral-soft text-app-text-secondary",
 };
 
 const STATUS_OPTIONS: TaskStatus[] = ["OPEN", "IN_PROGRESS", "PENDING_APPROVAL", "DONE", "ARCHIVED"];
@@ -47,8 +49,8 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 const PRIORITY_DOTS: Record<TaskPriority, string> = {
   LOW: "bg-appNavy/20",
   NORMAL: "bg-transparent",
-  HIGH: "bg-warning",
-  URGENT: "bg-error",
+  HIGH: "bg-app-warning",
+  URGENT: "bg-app-error",
 };
 
 // App redesign (handoff README, screen 4 "משימות"): "שורה: תיבת סימון
@@ -380,7 +382,7 @@ export function TaskRow({
         disabled={pending}
         onClick={() => changeStatus(isDone ? "OPEN" : "DONE")}
         className={`flex h-5 w-5 shrink-0 items-center justify-center self-start rounded-[6px] border transition-colors [grid-area:check] disabled:opacity-50 xl:self-center ${
-          isDone ? "border-success bg-success" : "border-lineDark bg-white hover:border-gold"
+          isDone ? "border-app-success bg-app-success" : "border-app-border bg-white hover:border-gold"
         }`}
       >
         {isDone && <Check size={13} strokeWidth={3} className="text-white" />}
@@ -390,7 +392,7 @@ export function TaskRow({
           ("Rimed Medical Tech...") rather than losing its first word to
           the right-to-left page; text-right keeps it aligned with the
           Hebrew around it. */}
-      <p dir="auto" data-cell="client" className="min-w-0 truncate text-right text-[11.5px] font-medium text-appNavy/55 [grid-area:client] xl:text-[12.5px] xl:font-normal xl:text-appNavy/70">
+      <p dir="auto" data-cell="client" className="min-w-0 truncate text-right text-[11.5px] font-medium text-app-text-secondary [grid-area:client] xl:text-[12.5px] xl:font-normal xl:text-app-text-secondary">
         {task.clientName}
       </p>
 
@@ -434,7 +436,7 @@ export function TaskRow({
             // back - which is most of what anyone opens "הושלמו" to do.
             // `overflow-wrap: anywhere` so a pasted link breaks inside the
             // row instead of running past it.
-            className={`min-w-0 text-[13.5px] leading-snug [overflow-wrap:anywhere] hover:underline xl:truncate ${isDone ? "text-appNavy/45" : "text-appNavy"}`}
+            className={`min-w-0 text-[13.5px] leading-snug [overflow-wrap:anywhere] hover:underline xl:truncate ${isDone ? "text-app-text-tertiary" : "text-app-text-primary"}`}
           >
             {task.title}
           </a>
@@ -443,7 +445,7 @@ export function TaskRow({
             is the category and, from phase 5, how far into its steps the
             task is. Hidden entirely when there is neither. */}
         {(task.categoryName || task.stepsTotal > 0) && (
-          <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">
+          <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">
             {task.categoryName}
             {task.categoryName && task.stepsTotal > 0 ? " · " : ""}
             {task.stepsTotal > 0 && (
@@ -470,14 +472,14 @@ export function TaskRow({
                   }
                 }}
                 placeholder="איך זה ייקרא אצל הלקוח"
-                className="mt-1.5 w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
               />
             ) : (
               <button
                 type="button"
                 onClick={() => setEditingTitle(true)}
                 dir="auto"
-              className="mt-1 block max-w-full truncate text-right text-[11.5px] text-gold-dim hover:underline"
+              className="mt-1 block max-w-full truncate text-right text-[11.5px] text-app-text-accent hover:underline"
               >
                 {clientTitle || "הוספת כותרת ללקוח"}
               </button>
@@ -492,8 +494,8 @@ export function TaskRow({
           {clientVisible && (closing || isDone || clientOutcome) && (
             <div className="mt-1.5">
               {closing ? (
-                <div className="rounded-[10px] border border-gold/40 bg-[#FBF7F0] p-2.5">
-                  <p className="text-[11.5px] text-appNavy/70">מה נגיד ללקוח שקרה?</p>
+                <div className="rounded-[10px] border border-gold/40 bg-app-surface-sunken p-2.5">
+                  <p className="text-[11.5px] text-app-text-secondary">מה נגיד ללקוח שקרה?</p>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                     <input
                       autoFocus
@@ -505,17 +507,17 @@ export function TaskRow({
                         if (e.key === "Escape") cancelClose();
                       }}
                       placeholder="משפט אחד, בשפה שלו"
-                      className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                      className="min-w-0 flex-1 rounded-[8px] border border-app-border-strong bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                     />
                     <button
                       type="button"
                       disabled={pending || !clientOutcome.trim()}
                       onClick={() => void confirmClose()}
-                      className="rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
+                      className="rounded-full bg-app-accent px-3 py-1.5 text-[11px] font-medium text-app-text-primary disabled:opacity-40"
                     >
                       סיום
                     </button>
-                    <button type="button" onClick={cancelClose} className="text-[11px] text-appNavy/40 hover:text-appNavy">
+                    <button type="button" onClick={cancelClose} className="text-[11px] text-app-text-tertiary hover:text-app-text-primary">
                       ביטול
                     </button>
                   </div>
@@ -535,13 +537,13 @@ export function TaskRow({
                     }
                   }}
                   placeholder="מה קרה בפועל, בשפה של הלקוח"
-                  className="w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                  className="w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setEditingOutcome(true)}
-                  className="block max-w-full truncate text-start text-[11.5px] text-appNavy/60 hover:underline"
+                  className="block max-w-full truncate text-start text-[11.5px] text-app-text-secondary hover:underline"
                 >
                   {clientOutcome || "הוספת שורת תוצאה"}
                 </button>
@@ -568,7 +570,7 @@ export function TaskRow({
                       }
                     }}
                     placeholder="מי ביצע בפועל"
-                    className="w-40 max-w-full rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-[12px] text-appNavy outline-none focus:border-gold"
+                    className="w-40 max-w-full rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                   />
                   {(Object.keys(SUPPLIER_EXPERIENCE_LABELS) as SupplierExperience[]).map((key) => (
                     <button
@@ -576,7 +578,7 @@ export function TaskRow({
                       type="button"
                       disabled={portalPending || !supplierName.trim()}
                       onClick={() => saveSupplier(key)}
-                      className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/70 hover:border-gold disabled:opacity-40"
+                      className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11px] text-app-text-secondary hover:border-gold disabled:opacity-40"
                     >
                       {SUPPLIER_EXPERIENCE_LABELS[key]}
                     </button>
@@ -586,7 +588,7 @@ export function TaskRow({
                       type="button"
                       disabled={portalPending}
                       onClick={clearSupplier}
-                      className="text-[11px] text-appNavy/40 hover:text-error"
+                      className="text-[11px] text-app-text-tertiary hover:text-app-error"
                     >
                       הסרה
                     </button>
@@ -596,7 +598,7 @@ export function TaskRow({
                 <button
                   type="button"
                   onClick={() => setEditingSupplier(true)}
-                  className="block max-w-full truncate text-start text-[11.5px] text-gold-dim hover:underline"
+                  className="block max-w-full truncate text-start text-[11.5px] text-app-text-accent hover:underline"
                 >
                   {supplierName
                     ? `${supplierName}${supplierExperience ? ` · ${SUPPLIER_EXPERIENCE_LABELS[supplierExperience]}` : ""}`
@@ -610,16 +612,16 @@ export function TaskRow({
       {/* Below xl the date and the assignee share one line; from xl each
           is its own column. `contents` lets the two spans become grid
           cells on a desk while staying one flex line on a phone. */}
-      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-appNavy/55 [grid-area:meta] xl:contents">
-        <span data-cell="date" className="shrink-0 [grid-area:date] xl:text-end xl:text-xs xl:text-appNavy/50">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-app-text-secondary [grid-area:meta] xl:contents">
+        <span data-cell="date" className="shrink-0 [grid-area:date] xl:text-end xl:text-xs xl:text-app-text-tertiary">
           {dueLabel}
         </span>
-        <span aria-hidden className="text-appNavy/25 xl:hidden">
+        <span aria-hidden className="text-app-text-tertiary xl:hidden">
           ·
         </span>
         <span data-cell="assignee" className="max-w-full truncate [grid-area:assignee] xl:min-w-0 xl:text-xs">
-          <span className="text-appNavy/40 xl:hidden">אחראי: </span>
-          {task.assignedToName ?? <span className="text-appNavy/35">ללא אחראי</span>}
+          <span className="text-app-text-tertiary xl:hidden">אחראי: </span>
+          {task.assignedToName ?? <span className="text-app-text-tertiary">ללא אחראי</span>}
         </span>
       </div>
 
@@ -636,14 +638,14 @@ export function TaskRow({
           className={`shrink-0 justify-self-start rounded-full border-0 px-2.5 py-1 text-xs font-medium outline-none [grid-area:status] disabled:opacity-50 ${STATUS_TAG_CLASSES[status]}`}
         >
           {STATUS_OPTIONS.map((opt) => (
-            <option key={opt} value={opt} className="bg-white text-appNavy">
+            <option key={opt} value={opt} className="bg-white text-app-text-primary">
               {TASK_STATUS_LABELS[opt]}
             </option>
           ))}
         </select>
-        <span data-cell="supervisor" className="max-w-full truncate text-[12px] text-appNavy/55 [grid-area:supervisor] xl:min-w-0 xl:text-xs">
-          <span className="text-appNavy/40 xl:hidden">מפקח: </span>
-          {task.supervisorName ?? <span className="text-appNavy/35">ללא מפקח</span>}
+        <span data-cell="supervisor" className="max-w-full truncate text-[12px] text-app-text-secondary [grid-area:supervisor] xl:min-w-0 xl:text-xs">
+          <span className="text-app-text-tertiary xl:hidden">מפקח: </span>
+          {task.supervisorName ?? <span className="text-app-text-tertiary">ללא מפקח</span>}
         </span>
       </div>
 
@@ -663,8 +665,8 @@ export function TaskRow({
             onClick={toggleWaiting}
             className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
               blockedOn !== null
-                ? "border-warning/50 bg-warning-soft text-warning"
-                : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+                ? "border-app-warning/50 bg-app-warning-soft text-app-warning"
+                : "border-app-border bg-white text-app-text-tertiary hover:border-gold"
             }`}
           >
             <Hourglass size={15} strokeWidth={1.6} />
@@ -678,7 +680,7 @@ export function TaskRow({
           disabled={portalPending}
           onClick={toggleVisible}
           className={`shrink-0 rounded-full border p-1.5 transition-colors disabled:opacity-50 ${
-            clientVisible ? "border-gold/50 bg-gold/12 text-appNavy" : "border-lineDark bg-white text-appNavy/35 hover:border-gold"
+            clientVisible ? "border-gold/50 bg-gold/12 text-app-text-primary" : "border-app-border bg-white text-app-text-tertiary hover:border-gold"
           }`}
         >
           {clientVisible ? <Eye size={15} strokeWidth={1.6} /> : <EyeOff size={15} strokeWidth={1.6} />}

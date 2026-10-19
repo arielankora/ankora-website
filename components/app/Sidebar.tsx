@@ -2,13 +2,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search } from "lucide-react";
+import { ChevronUp, Home, Search } from "lucide-react";
 import { NAV_ICONS } from "./nav-icons";
 import { LogoutButton } from "./LogoutButton";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
 import { useActiveTimer } from "./ActiveTimerProvider";
 
 export type NavItem = { href: string; label: string; group?: string };
+
+/// Items in this group live in the menu under the person's name, not in the
+/// list (19.10.2026). BottomNav and the command palette still list them.
+export const ACCOUNT_GROUP = "חשבון";
 
 export type NavCounters = {
   importantDatesCount?: number;
@@ -75,12 +79,12 @@ export function Sidebar({
   let lastGroup: string | undefined;
 
   return (
-    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-appNavy md:sticky md:top-0 md:flex md:h-screen">
+    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-app-surface-nav md:sticky md:top-0 md:flex md:h-screen">
       <div className="flex items-center gap-2 px-5 pb-3 pt-6">
         <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-light">
           Ankora
         </Link>
-        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-cream/50">
+        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-[#B4B8BC]">
           OPS
         </span>
       </div>
@@ -93,14 +97,14 @@ export function Sidebar({
         >
           <Search size={15} strokeWidth={1.75} className="shrink-0" />
           <span className="flex-1 truncate">חיפוש או פעולה</span>
-          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-cream/40">
+          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-[#B4B8BC]">
             ⌘K
           </kbd>
         </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="ניווט ראשי">
-        {items.map((item) => {
+        {items.filter((item) => item.group !== ACCOUNT_GROUP).map((item) => {
           const showHeader = item.group && item.group !== lastGroup;
           lastGroup = item.group;
           const Icon = NAV_ICONS[item.href] ?? Home;
@@ -122,7 +126,7 @@ export function Sidebar({
           return (
             <div key={item.href}>
               {showHeader && (
-                <p className="mb-1 mt-4 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[rgba(248,244,236,0.32)] first:mt-1">
+                <p className="mb-1 mt-4 px-2.5 text-[10.5px] font-medium uppercase tracking-[0.1em] text-[#8F98A3] first:mt-1">
                   {item.group}
                 </p>
               )}
@@ -150,18 +154,46 @@ export function Sidebar({
               >
                 <Icon size={16} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" />
                 <span className="flex-1 truncate">{item.label}</span>
-                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-cream/45">{counter}</span>}
+                {counter && <span className="shrink-0 font-jbmono text-[10.5px] text-[#B4B8BC]">{counter}</span>}
               </Link>
             </div>
           );
         })}
       </nav>
 
-      <div className="border-t border-white/10 px-4 py-4">
-        <p className="truncate text-sm font-medium text-cream">{userName}</p>
-        <p className="mb-3 truncate text-xs text-cream/50">{roleLabel}</p>
-        <LogoutButton variant="dark" />
-      </div>
+      {/* 19.10.2026: the account menu opens from the name. A native
+          <details>, so it works before hydration and needs no state; the
+          links are plain anchors like the rest of the navigation. It opens
+          upward, since it sits at the bottom of the screen. */}
+      <details className="group relative border-t border-white/10">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-4 hover:bg-[rgba(248,244,236,0.06)] [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-light text-[13px] font-medium text-app-text-primary">
+            {/* The first letter, Hebrew or Latin: "[DEMO] ..." starts with a bracket. */}
+            {userName.replace(/^[^A-Za-z0-9\u0590-\u05FF]+/, "").charAt(0)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-cream">{userName}</span>
+            <span className="block truncate text-xs text-cream/60">{roleLabel}</span>
+          </span>
+          <ChevronUp size={14} aria-hidden="true" className="shrink-0 text-cream/60 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="absolute inset-x-3 bottom-full mb-2 rounded-xl border border-app-border bg-white p-1.5 shadow-lg">
+          {items
+            .filter((item) => item.group === ACCOUNT_GROUP)
+            .map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="block rounded-lg px-3 py-2 text-[13px] text-app-text-primary hover:bg-app-surface-sunken"
+              >
+                {item.label}
+              </a>
+            ))}
+          <div className="mt-1 border-t border-app-border px-1.5 pt-1.5">
+            <LogoutButton />
+          </div>
+        </div>
+      </details>
     </aside>
   );
 }

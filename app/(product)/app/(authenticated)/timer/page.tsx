@@ -7,6 +7,8 @@ import { listOpenPromises } from "@/lib/app-domain/tasks";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { Forbidden } from "@/components/app/Forbidden";
 import { TimerWidget, type TodayEntry } from "./TimerWidget";
+import { ViewTabs } from "@/components/app/ViewTabs";
+import { MyTimeView } from "../my-time/MyTimeView";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -35,7 +37,23 @@ async function loadTodayEntries(userId: string): Promise<TodayEntry[]> {
 
 // Spec 11.1 "Today / Timer" + 6.2 "Quick Timer" - the single most
 // important screen on mobile (spec 6.2: "במובייל זהו המסך החשוב ביותר").
-export default async function TimerPage() {
+// 19.10.2026: one screen for the clock and the week it fills, with
+// "הזמן שלי" as its second tab (canvas "Ankora App UI Round").
+const TIME_TABS = [
+  { key: "timer", label: "טיימר", href: "/app/timer" },
+  { key: "mine", label: "הזמן שלי", href: "/app/timer?tab=mine" },
+];
+
+export default async function TimerPage(props: { searchParams: Promise<{ tab?: string; week?: string }> }) {
+  const sp = await props.searchParams;
+  if (sp.tab === "mine") {
+    return (
+      <div className="space-y-5">
+        <ViewTabs tabs={TIME_TABS} active="mine" label="טיימר והזמן שלי" />
+        <MyTimeView searchParams={{ week: sp.week }} />
+      </div>
+    );
+  }
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {
@@ -69,9 +87,10 @@ export default async function TimerPage() {
   return (
     <>
       <div className="space-y-6">
+        <ViewTabs tabs={TIME_TABS} active="timer" label="טיימר והזמן שלי" />
         <div>
-          <h1 className="text-xl font-medium text-appNavy">טיימר</h1>
-          <p className="mt-1 text-sm text-appNavy/60">טיימרים פעילים, לקוח וקטגוריה, שילובים אחרונים.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">טיימר</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">טיימרים פעילים, לקוח וקטגוריה, שילובים אחרונים.</p>
         </div>
 
         <TimerWidget

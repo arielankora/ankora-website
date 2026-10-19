@@ -143,7 +143,7 @@ function ResolveLessonForm({ clientId, lesson }: { clientId: string; lesson: Pan
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={lesson.id} />
-      <p className="text-sm text-appNavy">{lesson.body}</p>
+      <p className="text-sm text-app-text-primary">{lesson.body}</p>
       <Field label="מה קרה איתה">
         <select name="status" defaultValue="APPLIED" className={INPUT}>
           <option value="APPLIED">{LESSON_STATUS_LABELS.APPLIED}</option>
@@ -153,8 +153,8 @@ function ResolveLessonForm({ clientId, lesson }: { clientId: string; lesson: Pan
       <Field label="במשפט אחד *">
         <input name="resolution" required placeholder="גרסה 4, שלב 2" className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירה"}
       </button>
     </form>
@@ -169,16 +169,16 @@ function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons:
     <div className="mt-2">
       {open.length > 0 && (
         <div className="rounded-lg border border-gold/40 bg-gold/[0.04] p-2.5">
-          <p className="text-xs font-medium text-appNavy">{open.length === 1 ? "הערה אחת מריצות, לגרסה הבאה" : `${open.length} הערות מריצות, לגרסה הבאה`}</p>
+          <p className="text-xs font-medium text-app-text-primary">{open.length === 1 ? "הערה אחת מריצות, לגרסה הבאה" : `${open.length} הערות מריצות, לגרסה הבאה`}</p>
           <ul className="mt-1.5 space-y-1.5">
             {open.map((l) => (
               <li key={l.id} className="flex flex-wrap items-start justify-between gap-2 text-xs">
-                <span className="min-w-0 flex-1 text-appNavy/80">
+                <span className="min-w-0 flex-1 text-app-text-primary">
                   {l.body}
-                  <span className="text-appNavy/45">
+                  <span className="text-app-text-tertiary">
                     {" "}
                     ({[l.authorName, day(l.createdAt), l.version ? `גרסה ${l.version}` : null].filter(Boolean).join(" · ")},{" "}
-                    <Link href={`/app/tasks/${l.taskId}`} className="text-gold-dim hover:underline">
+                    <Link href={`/app/tasks/${l.taskId}`} className="text-app-text-accent hover:underline">
                       לריצה
                     </Link>
                     )
@@ -195,7 +195,7 @@ function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons:
         </div>
       )}
       {done.length > 0 && (
-        <details className="mt-1.5 text-xs text-appNavy/55">
+        <details className="mt-1.5 text-xs text-app-text-secondary">
           <summary className="cursor-pointer">{done.length === 1 ? "הערה אחת שטופלה" : `${done.length} הערות שטופלו`}</summary>
           <ul className="mt-1 space-y-1">
             {done.map((l) => (
@@ -220,7 +220,7 @@ function CheckLines({ checks }: { checks: PanelCheck[] }) {
   return (
     <>
       {checks.map((c, i) => (
-        <p key={i} className={`mt-1 text-xs ${c.excepted ? "text-appNavy/50" : "text-red-700"}`}>
+        <p key={i} className={`mt-1 text-xs ${c.excepted ? "text-app-text-tertiary" : "text-app-error"}`}>
           {c.message}
           {c.severity === "EXCEPTION" && (c.excepted ? " (יש חריגה מאושרת לכלל.)" : " אפשר לאשר רק עם חריגה מאושרת לכלל.")}
         </p>
@@ -236,11 +236,11 @@ function day(iso: string) {
 }
 
 function Checks({ name, options, selected }: { name: string; options: Option[]; selected: string[] }) {
-  if (options.length === 0) return <p className="mt-1 text-[11px] text-appNavy/40">אין עדיין בתיק.</p>;
+  if (options.length === 0) return <p className="mt-1 text-[11px] text-app-text-tertiary">אין עדיין בתיק.</p>;
   return (
     <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
       {options.map((o) => (
-        <label key={o.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+        <label key={o.id} className="flex items-center gap-1.5 text-sm text-app-text-primary">
           <input type="checkbox" name={name} value={o.id} defaultChecked={selected.includes(o.id)} className="h-4 w-4 accent-gold" />
           {o.name}
         </label>
@@ -253,12 +253,12 @@ function Checks({ name, options, selected }: { name: string; options: Option[]; 
 /// needs there.
 function SystemChecks({ options, selected, permissions }: { options: Option[]; selected: string[]; permissions: Record<string, string> }) {
   const [on, setOn] = useState<string[]>(selected);
-  if (options.length === 0) return <p className="mt-1 text-[11px] text-appNavy/40">אין עדיין בתיק.</p>;
+  if (options.length === 0) return <p className="mt-1 text-[11px] text-app-text-tertiary">אין עדיין בתיק.</p>;
   return (
     <div className="mt-1.5 space-y-1.5">
       {options.map((o) => (
         <div key={o.id} className="grid grid-cols-[minmax(7rem,auto)_1fr] items-center gap-2">
-          <label className="flex items-center gap-1.5 text-sm text-appNavy">
+          <label className="flex items-center gap-1.5 text-sm text-app-text-primary">
             <input
               type="checkbox"
               name="requiredSystemIds"
@@ -314,7 +314,7 @@ function ProcessForm({
         <legend className={LABEL}>מה מפעיל אותו</legend>
         <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {(Object.keys(TRIGGER_LABELS) as TriggerLike[]).map((t) => (
-            <label key={t} className="flex items-center gap-1.5 text-sm text-appNavy">
+            <label key={t} className="flex items-center gap-1.5 text-sm text-app-text-primary">
               <input type="checkbox" name="triggerKinds" value={t} defaultChecked={existing?.triggerKinds.includes(t)} className="h-4 w-4 accent-gold" />
               {TRIGGER_LABELS[t]}
             </label>
@@ -383,7 +383,7 @@ function ProcessForm({
             ))}
           </select>
         </div>
-        <p className="mt-1 text-[11px] text-appNavy/50">מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.</p>
         <input name="approverText" defaultValue={existing?.approverText ?? ""} placeholder="או במילים: מורשה חתימה בבנק" className={INPUT} />
       </div>
       <div>
@@ -415,7 +415,7 @@ function ProcessForm({
             </option>
           ))}
         </select>
-        <span className="mt-1 block text-xs text-appNavy/50">הריצות והמועדים שפותחים את התהליך נספרים לפיו.</span>
+        <span className="mt-1 block text-xs text-app-text-tertiary">הריצות והמועדים שפותחים את התהליך נספרים לפיו.</span>
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="מי מבצע היום">
@@ -461,8 +461,8 @@ function ProcessForm({
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -491,22 +491,22 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
       <input type="hidden" name="processId" value={process.id} />
       <input type="hidden" name="baseVersion" value={process.latestVersion} />
       <input type="hidden" name="steps" value={JSON.stringify(steps.filter((s) => s.title.trim()))} />
-      <p className="text-xs text-appNavy/60">
+      <p className="text-xs text-app-text-secondary">
         נשמר כגרסה {process.latestVersion + 1}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.
       </p>
       <ol className="flex flex-col gap-3">
         {steps.map((st, i) => (
-          <li key={i} className="rounded-lg border border-lineDark p-3">
+          <li key={i} className="rounded-lg border border-app-border p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium text-appNavy/60">שלב {i + 1}</span>
-              <span className="flex gap-2 text-xs text-appNavy/50">
+              <span className="text-xs font-medium text-app-text-secondary">שלב {i + 1}</span>
+              <span className="flex gap-2 text-xs text-app-text-tertiary">
                 <button type="button" onClick={() => move(i, -1)} aria-label={`הזזת שלב ${i + 1} למעלה`}>
                   ↑
                 </button>
                 <button type="button" onClick={() => move(i, 1)} aria-label={`הזזת שלב ${i + 1} למטה`}>
                   ↓
                 </button>
-                <button type="button" onClick={() => setSteps((all) => all.filter((_, j) => j !== i))} className="hover:text-red-600">
+                <button type="button" onClick={() => setSteps((all) => all.filter((_, j) => j !== i))} className="hover:text-app-error">
                   הסרת שלב
                 </button>
               </span>
@@ -531,7 +531,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
             </div>
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
               {ACTION_TAGS.map((t) => (
-                <label key={t} className="flex items-center gap-1 text-xs text-appNavy/70">
+                <label key={t} className="flex items-center gap-1 text-xs text-app-text-secondary">
                   <input
                     type="checkbox"
                     checked={st.actionTags.includes(t)}
@@ -545,7 +545,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
             {systems.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
                 {systems.map((s) => (
-                  <label key={s.id} className="flex items-center gap-1 text-xs text-appNavy/70">
+                  <label key={s.id} className="flex items-center gap-1 text-xs text-app-text-secondary">
                     <input
                       type="checkbox"
                       checked={st.systemIds.includes(s.id)}
@@ -594,7 +594,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
             {st.mode === "AUTOMATED" && (
               <input value={st.verification ?? ""} onChange={(e) => set(i, { verification: e.target.value || null })} placeholder="איך אדם מוודא שזה קרה *" className={INPUT} />
             )}
-            <label className="mt-2 flex items-center gap-1.5 text-xs text-appNavy">
+            <label className="mt-2 flex items-center gap-1.5 text-xs text-app-text-primary">
               <input type="checkbox" checked={st.requiresApproval} onChange={(e) => set(i, { requiresApproval: e.target.checked })} className="h-4 w-4 accent-gold" />
               דורש אישור לפני ביצוע
             </label>
@@ -602,7 +602,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
         ))}
       </ol>
       {steps.length < MAX_PROCESS_STEPS && (
-        <button type="button" onClick={() => setSteps((all) => [...all, { ...EMPTY_STEP }])} className="self-start text-xs text-gold-dim hover:underline">
+        <button type="button" onClick={() => setSteps((all) => [...all, { ...EMPTY_STEP }])} className="self-start text-xs text-app-text-accent hover:underline">
           + שלב
         </button>
       )}
@@ -615,8 +615,8 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
       <Field label="מה השתנה ולמה">
         <input name="changeNote" className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירת טיוטה"}
       </button>
     </form>
@@ -630,10 +630,10 @@ function DatesForm({ clientId, process, dates }: { clientId: string; process: Pa
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="processId" value={process.id} />
-      <p className="text-xs text-appNavy/60">המועדים של הלקוח שמפעילים את התהליך. ריצה תיפתח מהם כשהנוהל מאושר.</p>
+      <p className="text-xs text-app-text-secondary">המועדים של הלקוח שמפעילים את התהליך. ריצה תיפתח מהם כשהנוהל מאושר.</p>
       <Checks name="dateIds" options={dates} selected={process.dateIds} />
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירה"}
       </button>
     </form>
@@ -647,14 +647,14 @@ function StartRunForm({ clientId, process }: { clientId: string; process: PanelP
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="processId" value={process.id} />
-      <p className="text-xs text-appNavy/60">
+      <p className="text-xs text-app-text-secondary">
         נפתחת משימה עם {process.current?.steps.length ?? 0} השלבים של נוהל גרסה {process.current?.version}, כל אחד ביום העסקים שלו.
       </p>
       <Field label="לאיזה יום *">
         <input name="day" type="date" required className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "פותח..." : "פתיחת הריצה"}
       </button>
     </form>
@@ -665,11 +665,11 @@ function StepList({ steps, systemName }: { steps: ProcessStep[]; systemName: Map
   return (
     <ol className="mt-1.5 space-y-1.5">
       {steps.map((st, i) => (
-        <li key={i} className="text-xs text-appNavy/80">
+        <li key={i} className="text-xs text-app-text-primary">
           <span className="font-medium">
             {i + 1}. {st.title}
           </span>
-          <span className="text-appNavy/50">
+          <span className="text-app-text-tertiary">
             {" · "}
             {STEP_MODE_LABELS[st.mode]}
             {st.offsetBusinessDays !== null && ` · ${st.offsetBusinessDays >= 0 ? `+${st.offsetBusinessDays}` : st.offsetBusinessDays} ימי עסקים`}
@@ -679,7 +679,7 @@ function StepList({ steps, systemName }: { steps: ProcessStep[]; systemName: Map
             {st.channel && ` · ב${CHANNEL_LABELS[st.channel]}`}
             {st.requiresApproval && " · דורש אישור"}
           </span>
-          {st.verification && <span className="block text-appNavy/50">אימות: {st.verification}</span>}
+          {st.verification && <span className="block text-app-text-tertiary">אימות: {st.verification}</span>}
         </li>
       ))}
     </ol>
@@ -727,53 +727,53 @@ export function ProcessesPanel({
 
   const form = { staff, contacts, systems, rules, entities, sourceOptions };
   return (
-    <div id="processes" className="rounded-2xl border border-lineDark bg-white p-6">
+    <div id="processes" className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">תהליכים ({processes.length})</h2>
+        <h2 className="text-sm font-medium text-app-text-primary">תהליכים ({processes.length})</h2>
         <Drawer triggerLabel="+ תהליך" title="תהליך" variant="link">
           <ProcessForm clientId={clientId} {...form} />
         </Drawer>
       </div>
       {processes.length > 0 && (
-        <p className="mt-1 text-[11px] text-appNavy/50">
+        <p className="mt-1 text-[11px] text-app-text-tertiary">
           {withUs} אצלנו · {handover} בחפיפה · שלמות ממוצעת {avg} מתוך 9
         </p>
       )}
       {processes.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">אין עדיין תהליכים. מה חוזר אצל הלקוח, מי אחראי, מה מפעיל את זה, ואיך עושים את זה.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין תהליכים. מה חוזר אצל הלקוח, מי אחראי, מה מפעיל את זה, ואיך עושים את זה.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark">
+        <ul className="mt-4 divide-y divide-app-border">
           {processes.map((p) => (
             <li key={p.id} className="py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-appNavy/50">{p.code}</span>
-                    <p className="text-sm font-medium text-appNavy">{p.title}</p>
+                    <span className="font-mono text-xs text-app-text-tertiary">{p.code}</span>
+                    <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
                     <StatusBadge label={TRANSITION_LABELS[p.transitionStatus]} tone={TONE[p.transitionStatus]} />
                     {p.status !== "ACTIVE" && (
                       <StatusBadge label={p.status === "DRAFT" ? "אין נוהל מאושר" : p.status === "PAUSED" ? "מושהה" : "בוטל"} tone="gray" />
                     )}
-                    <span className={`text-xs ${p.score >= 8 ? "text-emerald-700" : "text-warning"}`}>{p.score} מתוך 9</span>
+                    <span className={`text-xs ${p.score >= 8 ? "text-app-success" : "text-app-warning"}`}>{p.score} מתוך 9</span>
                     {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
                   </div>
                   {p.reviewReason && (
-                    <p className="mt-1 text-xs text-red-700">
+                    <p className="mt-1 text-xs text-app-error">
                       {REVIEW_REASON_LABELS[p.reviewReason]}
                       {p.reviewReason === "PERIODIC" && p.reviewEveryDays && ` (כל ${p.reviewEveryDays} ימים)`}.
                       {canApprove && p.reviewReason === "PERIODIC" && (
                         <button
                           type="button"
                           onClick={() => act(() => markProcessReviewedAction(p.id, clientId), "סומן כנסקר")}
-                          className="ms-2 font-medium text-gold-dim hover:underline"
+                          className="ms-2 font-medium text-app-text-accent hover:underline"
                         >
                           סימון שנסקר
                         </button>
                       )}
                     </p>
                   )}
-                  {!p.reviewReason && p.reviewDueAt && <p className="mt-1 text-[11px] text-appNavy/45">סקירה הבאה: {day(p.reviewDueAt)}</p>}
-                  <p className="mt-1 text-xs text-appNavy/60">
+                  {!p.reviewReason && p.reviewDueAt && <p className="mt-1 text-[11px] text-app-text-tertiary">סקירה הבאה: {day(p.reviewDueAt)}</p>}
+                  <p className="mt-1 text-xs text-app-text-secondary">
                     {[
                       p.triggerKinds.map((t) => TRIGGER_LABELS[t]).join(", ") || null,
                       p.triggerText,
@@ -790,7 +790,7 @@ export function ProcessesPanel({
                   {p.gaps.length > 0 && (
                     <ul className="mt-1.5 space-y-0.5">
                       {p.gaps.map((g) => (
-                        <li key={g} className="text-xs text-warning">
+                        <li key={g} className="text-xs text-app-warning">
                           {g}
                         </li>
                       ))}
@@ -802,14 +802,14 @@ export function ProcessesPanel({
 
                   {p.current ? (
                     <div className="mt-2">
-                      <p className="text-xs font-medium text-appNavy/70">
+                      <p className="text-xs font-medium text-app-text-secondary">
                         נוהל, גרסה {p.current.version}
                         {p.current.approvedByName && `, אושר על ידי ${p.current.approvedByName}`}
                         {p.current.approvedAt && ` ב-${day(p.current.approvedAt)}`}
                       </p>
                       {p.current.atApproval && (
                         <div className="mt-0.5" data-testid="approval-checks">
-                          <p className="text-[11px] text-appNavy/50">
+                          <p className="text-[11px] text-app-text-tertiary">
                             {p.current.atApproval.length === 0
                               ? "באישור: עמד בכל הכללים של הלקוח."
                               : `באישור: ${p.current.atApproval.length === 1 ? "חריגה אחת מאושרת" : `${p.current.atApproval.length} חריגות מאושרות`}.`}
@@ -818,25 +818,25 @@ export function ProcessesPanel({
                         </div>
                       )}
                       <StepList steps={p.current.steps} systemName={systemName} />
-                      {p.current.highlights && <p className="mt-1 text-xs text-appNavy/60">דגשים: {p.current.highlights}</p>}
+                      {p.current.highlights && <p className="mt-1 text-xs text-app-text-secondary">דגשים: {p.current.highlights}</p>}
                       {p.current.checks.some((c) => !c.excepted) && (
-                        <div className="mt-1.5 rounded-lg border border-red-200 bg-red-50/50 px-3 py-2">
-                          <p className="text-xs font-medium text-red-800">הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.</p>
+                        <div className="mt-1.5 rounded-lg border border-app-error/30 bg-app-error-soft px-3 py-2">
+                          <p className="text-xs font-medium text-app-error">הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.</p>
                           <CheckLines checks={p.current.checks.filter((c) => !c.excepted)} />
                         </div>
                       )}
                     </div>
                   ) : (
-                    !p.draft && <p className="mt-2 text-xs text-appNavy/50">עוד אין נוהל.</p>
+                    !p.draft && <p className="mt-2 text-xs text-app-text-tertiary">עוד אין נוהל.</p>
                   )}
 
                   {p.runs.length > 0 && (
-                    <p className="mt-1.5 text-xs text-appNavy/60">
+                    <p className="mt-1.5 text-xs text-app-text-secondary">
                       ריצות:{" "}
                       {p.runs.map((r, i) => (
                         <span key={r.id}>
                           {i > 0 && " · "}
-                          <Link href={`/app/tasks/${r.id}`} className="text-gold-dim hover:underline">
+                          <Link href={`/app/tasks/${r.id}`} className="text-app-text-accent hover:underline">
                             {r.dueDate ? day(r.dueDate) : r.title}
                           </Link>
                           {r.status === "DONE" && " (בוצע)"}
@@ -848,11 +848,11 @@ export function ProcessesPanel({
                   <Lessons clientId={clientId} lessons={p.lessons} canResolve={canApprove || (!!userId && p.ownerId === userId)} />
 
                   {p.checkEvery && (
-                    <p className="mt-1.5 text-xs text-appNavy/70">
+                    <p className="mt-1.5 text-xs text-app-text-secondary">
                       בדיקה {p.checkEvery}
                       {p.checkText && `: ${p.checkText}`}
                       {p.checkDue && (
-                        <span className={p.checkDue.state === "LATER" ? "text-appNavy/50" : "text-warning"}>
+                        <span className={p.checkDue.state === "LATER" ? "text-app-text-tertiary" : "text-app-warning"}>
                           {" · "}
                           {p.checkDue.state === "LATER" ? `הבאה ב-${day(p.checkDue.key)}` : `${CHECK_STATE_LABELS[p.checkDue.state]}${p.checkDue.state === "OVERDUE" ? `, מ-${day(p.checkDue.key)}` : ""}`}
                         </span>
@@ -862,14 +862,14 @@ export function ProcessesPanel({
                   {p.checks.length > 0 && (
                     <ul className="mt-1 space-y-0.5">
                       {p.checks.map((c) => (
-                        <li key={c.id} className={`text-xs ${c.outcome === "ISSUE" ? "text-warning" : "text-appNavy/60"}`}>
+                        <li key={c.id} className={`text-xs ${c.outcome === "ISSUE" ? "text-app-warning" : "text-app-text-secondary"}`}>
                           {day(c.createdAt)}
                           {c.checkedByName && `, ${c.checkedByName}`}: {c.outcome === "OK" ? "תקין" : "נמצאה בעיה"}
                           {c.note && `. ${c.note}`}
                           {c.taskId && (
                             <>
                               {" · "}
-                              <Link href={`/app/tasks/${c.taskId}`} className="text-gold-dim hover:underline">
+                              <Link href={`/app/tasks/${c.taskId}`} className="text-app-text-accent hover:underline">
                                 המשימה
                               </Link>
                             </>
@@ -880,8 +880,8 @@ export function ProcessesPanel({
                   )}
 
                   {p.draft && (
-                    <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-2">
-                      <p className="text-xs font-medium text-amber-900">
+                    <div className="mt-2 rounded-lg border border-app-warning/30 bg-app-warning-soft px-3 py-2">
+                      <p className="text-xs font-medium text-app-warning">
                         טיוטה, גרסה {p.draft.version}
                         {p.draft.changeNote && `: ${p.draft.changeNote}`}
                       </p>
@@ -891,7 +891,7 @@ export function ProcessesPanel({
                         <button
                           type="button"
                           onClick={() => act(() => approveProcessVersionAction(p.id, p.draft!.version, clientId), "הנוהל אושר")}
-                          className="mt-1.5 text-xs font-medium text-gold-dim hover:underline"
+                          className="mt-1.5 text-xs font-medium text-app-text-accent hover:underline"
                         >
                           אישור הנוהל
                         </button>
@@ -922,17 +922,17 @@ export function ProcessesPanel({
                     </Drawer>
                   )}
                   {canApprove && p.status === "ACTIVE" && (
-                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-appNavy/50 hover:text-appNavy">
+                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-app-text-tertiary hover:text-app-text-primary">
                       השהיה
                     </button>
                   )}
                   {canApprove && p.status === "PAUSED" && (
-                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-appNavy/50 hover:text-appNavy">
+                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-app-text-tertiary hover:text-app-text-primary">
                       חידוש
                     </button>
                   )}
                   {p.status === "DRAFT" && (
-                    <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-appNavy/50 hover:text-red-600">
+                    <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-app-text-tertiary hover:text-app-error">
                       הסרה
                     </button>
                   )}

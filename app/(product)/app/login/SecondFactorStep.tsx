@@ -26,7 +26,7 @@ import {
 // link.ts).
 
 const BUTTON =
-  "mt-5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50";
+  "mt-5 flex min-h-[50px] w-full items-center justify-center gap-2 rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50";
 
 function cancelled(err: unknown): boolean {
   const name = (err as { name?: string })?.name;
@@ -126,7 +126,7 @@ export function SecondFactorStep({
 
   return (
     <div>
-      <div className="flex items-center gap-2 text-appNavy">
+      <div className="flex items-center gap-2 text-app-text-primary">
         <Fingerprint size={20} strokeWidth={1.6} />
         <h2 className="text-[15px] font-medium">
           {mode === "passkey" ? "אימות דו-שלבי" : mode === "code" ? "הוספת המכשיר הזה" : "הגדרת אימות דו-שלבי"}
@@ -134,27 +134,27 @@ export function SecondFactorStep({
       </div>
 
       {mode === "passkey" ? (
-        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+        <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
           הסיסמה נכונה. עכשיו אישור במכשיר: טביעת אצבע, זיהוי פנים או קוד המכשיר.
         </p>
       ) : mode === "code" ? (
-        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+        <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
           במכשיר שבו אתם כבר מחוברים לאנקורה, למשל המחשב: הפרופיל שלי, &quot;הוספת מכשיר&quot;. אחרי טביעת אצבע יופיע שם
           קוד של 6 ספרות. הקלידו אותו כאן.
         </p>
       ) : linked ? (
-        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+        <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
           הקוד אושר. עכשיו רושמים את המכשיר הזה, ומהפעם הבאה נכנסים ממנו בסיסמה ובזיהוי פנים או טביעת אצבע.
         </p>
       ) : (
-        <p className="mt-2 text-[13.5px] leading-relaxed text-appNavy/65">
+        <p className="mt-2 text-[13.5px] leading-relaxed text-app-text-secondary">
           החשבון הזה דורש אימות במכשיר בכל כניסה. רושמים את המכשיר פעם אחת, ומעכשיו נכנסים בסיסמה ובטביעת
           אצבע. כדאי לרשום אחר כך גם מכשיר שני מתוך הפרופיל.
         </p>
       )}
 
       {error && (
-        <p className="mt-3.5 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-xs text-error">{error}</p>
+        <p className="mt-3.5 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-xs text-app-error">{error}</p>
       )}
 
       {expired ? (
@@ -173,7 +173,7 @@ export function SecondFactorStep({
               setError(null);
               setMode("code");
             }}
-            className="mt-4 block w-full text-center text-[13px] text-appNavy/60 underline-offset-4 hover:underline"
+            className="mt-4 block w-full text-center text-[13px] text-app-text-secondary underline-offset-4 hover:underline"
           >
             זה מכשיר חדש, ואין בו passkey
           </button>
@@ -183,7 +183,7 @@ export function SecondFactorStep({
         // name field below, and the typed code becomes the device's name.
         <form key="code" onSubmit={redeem}>
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs text-appNavy/60">קוד מהמכשיר המחובר</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">קוד מהמכשיר המחובר</span>
             <input
               name="code"
               type="text"
@@ -194,7 +194,7 @@ export function SecondFactorStep({
               required
               dir="ltr"
               placeholder="123456"
-              className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-center text-lg tracking-[0.3em] text-appNavy outline-none focus:border-gold"
+              className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-center text-lg tracking-[0.3em] text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>
@@ -206,7 +206,7 @@ export function SecondFactorStep({
               setError(null);
               setMode("passkey");
             }}
-            className="mt-4 block w-full text-center text-[13px] text-appNavy/60 underline-offset-4 hover:underline"
+            className="mt-4 block w-full text-center text-[13px] text-app-text-secondary underline-offset-4 hover:underline"
           >
             חזרה לאימות במכשיר
           </button>
@@ -214,14 +214,14 @@ export function SecondFactorStep({
       ) : (
         <form key="enroll" onSubmit={enroll}>
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs text-appNavy/60">שם למכשיר</span>
+            <span className="mb-1.5 block text-xs text-app-text-secondary">שם למכשיר</span>
             <input
               name="name"
               type="text"
               required
               maxLength={60}
               placeholder={linked ? "למשל: האייפון של דנה" : "למשל: MacBook של דנה"}
-              className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-sm text-appNavy outline-none focus:border-gold"
+              className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>

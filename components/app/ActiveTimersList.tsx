@@ -33,15 +33,15 @@ function MiniRow({ row, longTimerHours }: { row: ActiveTimerRow; longTimerHours:
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="h-1.5 w-1.5 shrink-0 animate-pulse-dot rounded-full bg-success" aria-hidden="true" />
-        <span className="truncate text-[12.5px] text-appNavy">
+        <span className="h-1.5 w-1.5 shrink-0 animate-pulse-dot rounded-full bg-app-success" aria-hidden="true" />
+        <span className="truncate text-[12.5px] text-app-text-primary">
           {row.userName}
-          <span className="text-appNavy/50"> · {row.clientName}</span>
+          <span className="text-app-text-tertiary"> · {row.clientName}</span>
         </span>
       </div>
       <span
         dir="ltr"
-        className={`shrink-0 font-jbmono text-[12.5px] ${isOverage ? "font-medium text-error" : "text-appNavy/70"}`}
+        className={`shrink-0 font-jbmono text-[12.5px] ${isOverage ? "font-medium text-app-error" : "text-app-text-secondary"}`}
         title={isOverage ? `רץ מעל ${longTimerHours} שעות ברצף` : undefined}
       >
         {elapsed === null ? "" : formatElapsed(elapsed)}
@@ -69,12 +69,12 @@ export function ActiveTimerMiniRows({
 }) {
   if (rows.length === 0) return null;
   return (
-    <div className="mt-2.5 border-t border-lineDark/70 pt-1.5">
+    <div className="mt-2.5 border-t border-app-border pt-1.5">
       {rows.map((row) => (
         <MiniRow key={row.id} row={row} longTimerHours={longTimerHours} />
       ))}
       {total > rows.length && (
-        <p className="mt-1 text-[11.5px] text-gold-dim">
+        <p className="mt-1 text-[11.5px] text-app-text-accent">
           {total - rows.length === 1 ? "ועוד טיימר אחד" : `ועוד ${total - rows.length} טיימרים`} ←
         </p>
       )}

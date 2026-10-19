@@ -57,7 +57,7 @@ export const viewport: Viewport = {
 export default function ProductRootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
-      <body className="bg-cream text-appNavy antialiased">
+      <body className="bg-app-surface-page text-app-text-primary antialiased">
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

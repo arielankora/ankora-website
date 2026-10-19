@@ -125,7 +125,7 @@ export function MessageClient({
       <button
         type="button"
         onClick={begin}
-        className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold"
+        className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
       >
         <MessageSquare size={14} strokeWidth={2} />
         {buttonLabel}
@@ -134,10 +134,10 @@ export function MessageClient({
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`הודעה ל${clientName}`}>
           <button type="button" aria-label="סגירה" onClick={dismiss} className="absolute inset-0 bg-appNavy/30" />
-          <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-lineDark bg-white shadow-lg">
-            <div className="flex items-center justify-between border-b border-lineDark px-5 py-4">
-              <h2 className="text-base font-medium text-appNavy">הודעה ל{clientName}</h2>
-              <button type="button" aria-label="סגירה" onClick={dismiss} className="text-appNavy/50 hover:text-appNavy">
+          <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-app-border bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
+              <h2 className="text-base font-medium text-app-text-primary">הודעה ל{clientName}</h2>
+              <button type="button" aria-label="סגירה" onClick={dismiss} className="text-app-text-tertiary hover:text-app-text-primary">
                 <X size={18} />
               </button>
             </div>
@@ -148,7 +148,7 @@ export function MessageClient({
                 // write has to see what this client said about being
                 // written to, and `never` is the field that exists to
                 // stop exactly this moment going wrong.
-                <div className="rounded-xl border border-gold/40 bg-[#FBF7F0] p-3 text-[12.5px] text-appNavy/75">
+                <div className="rounded-xl border border-gold/40 bg-app-surface-sunken p-3 text-[12.5px] text-app-text-secondary">
                   {preference && <p>{preference}</p>}
                   {never && <p className={preference ? "mt-1" : ""}>לא: {never}</p>}
                 </div>
@@ -156,14 +156,14 @@ export function MessageClient({
 
               {!chosen ? (
                 <div>
-                  <p className="text-[12.5px] text-appNavy/60">מה קרה?</p>
+                  <p className="text-[12.5px] text-app-text-secondary">מה קרה?</p>
                   <ul className="mt-2 space-y-1">
                     {drafts.map((d) => (
                       <li key={d.kind}>
                         <button
                           type="button"
                           onClick={() => start(d)}
-                          className="w-full rounded-lg px-2 py-2 text-start text-[13.5px] text-appNavy transition-colors hover:bg-cream/60"
+                          className="w-full rounded-lg px-2 py-2 text-start text-[13.5px] text-app-text-primary transition-colors hover:bg-cream/60"
                         >
                           {d.label}
                         </button>
@@ -178,14 +178,14 @@ export function MessageClient({
                     onChange={(e) => setText(e.target.value)}
                     aria-label="נוסח ההודעה"
                     rows={12}
-                    className="w-full rounded-xl border border-lineDark bg-white p-3 text-[13.5px] leading-relaxed text-appNavy outline-none focus:border-gold"
+                    className="w-full rounded-xl border border-app-border-strong bg-white p-3 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-gold"
                   />
-                  <p className="text-[11.5px] text-appNavy/50">
+                  <p className="text-[11.5px] text-app-text-tertiary">
                     מה שבסוגריים מרובעים צריך להשלים לפני השליחה.
                   </p>
 
                   {sent ? (
-                    <p className="rounded-xl border border-success/30 bg-success-soft px-3 py-2 text-[12.5px] text-appNavy">
+                    <p className="rounded-xl border border-app-success/30 bg-app-success-soft px-3 py-2 text-[12.5px] text-app-text-primary">
                       נרשם. ההודעה נשמרה על הלקוח{taskId ? " ועל המשימה" : ""}.
                     </p>
                   ) : (
@@ -196,7 +196,7 @@ export function MessageClient({
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={() => record("whatsapp")}
-                          className="rounded-full bg-gold-gradient px-4 py-2 text-[12.5px] font-medium text-navy"
+                          className="rounded-full bg-app-accent px-4 py-2 text-[12.5px] font-medium text-app-text-primary"
                         >
                           פתיחה בוואטסאפ
                         </a>
@@ -214,7 +214,7 @@ export function MessageClient({
                           }
                           await record("copied");
                         }}
-                        className="rounded-full border border-lineDark px-4 py-2 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold disabled:opacity-40"
+                        className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                       >
                         העתקה
                       </button>
@@ -223,7 +223,7 @@ export function MessageClient({
                           type="button"
                           disabled={busy}
                           onClick={() => record("email")}
-                          className="rounded-full border border-lineDark px-4 py-2 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold disabled:opacity-40"
+                          className="rounded-full border border-app-border px-4 py-2 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                         >
                           שליחה במייל
                         </button>
@@ -231,7 +231,7 @@ export function MessageClient({
                       <button
                         type="button"
                         onClick={() => setChosen(null)}
-                        className="rounded-full px-3 py-2 text-[12.5px] text-appNavy/55 hover:text-appNavy"
+                        className="rounded-full px-3 py-2 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
                       >
                         {/* Back to the six situations, even when the
                             screen opened on one of them: somebody who
@@ -243,7 +243,7 @@ export function MessageClient({
                   )}
 
                   {error && (
-                    <p className="rounded-xl border border-error/30 bg-error-soft px-3 py-2 text-[12.5px] text-error">
+                    <p className="rounded-xl border border-app-error/30 bg-app-error-soft px-3 py-2 text-[12.5px] text-app-error">
                       {error}
                     </p>
                   )}

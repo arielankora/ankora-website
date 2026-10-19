@@ -12,7 +12,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="shrink-0 rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="shrink-0 rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       style={{ marginInlineStart: "auto" }}
     >
       {pending ? "שומר..." : "הוספת דיווח"}
@@ -81,13 +81,13 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     <form
       ref={formRef}
       onSubmit={onSubmit}
-      className="rounded-2xl border border-lineDark bg-white p-5"
+      className="rounded-2xl border border-app-border bg-white p-5"
     >
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
-      <p className="mb-3 text-[13px] font-medium text-appNavy">הוספת דיווח - שורה אחת</p>
+      <p className="mb-3 text-[13px] font-medium text-app-text-primary">הוספת דיווח - שורה אחת</p>
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block" style={{ flex: "0 0 150px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">תאריך</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">תאריך</span>
           <input
             type="date"
             name="date"
@@ -95,35 +95,35 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             max={todayKey()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">מ־</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">מ־</span>
           <input
             type="time"
             name="startTime"
             required
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">עד</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">עד</span>
           <input
             type="time"
             name="endTime"
             required
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 180px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">לקוח *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">לקוח *</span>
           <select
             name="clientId"
             required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">בחירה</option>
             {clients.map((c) => (
@@ -134,12 +134,12 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 140px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">קטגוריה *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">קטגוריה *</span>
           <select
             name="categoryId"
             required
             disabled={!clientId}
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold disabled:opacity-40"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
           >
             <option value="">בחירה</option>
             {availableCategories.map((cat) => (
@@ -150,12 +150,12 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           </select>
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
-          <span className="mb-1.5 block text-[11px] text-appNavy/55">הערה *</span>
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">הערה *</span>
           <input
             name="note"
             required
             placeholder="מה נעשה עבור הלקוח?"
-            className="w-full rounded-[9px] border border-lineDark bg-white px-2.5 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <SubmitButton pending={pending} />
@@ -163,17 +163,17 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
 
       {isBackdated && (
         <div className="mt-3 flex items-center gap-2.5 rounded-[10px] border border-gold/35 bg-gold/8 px-3 py-2.5">
-          <span className="shrink-0 text-[12.5px] text-gold-dim">דיווח ליום קודם - נדרשת סיבה</span>
+          <span className="shrink-0 text-[12.5px] text-app-text-accent">דיווח ליום קודם - נדרשת סיבה</span>
           <input
             name="backdateReason"
             required
             placeholder="למשל: נשכח לדווח בזמן"
-            className="flex-1 rounded-lg border border-lineDark bg-white px-2.5 py-2 text-[13px] text-appNavy outline-none focus:border-gold"
+            className="flex-1 rounded-lg border border-app-border-strong bg-white px-2.5 py-2 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}
       {result?.overlapWarning && !warningDismissed && (
-        <div className="mt-3 rounded-[10px] border border-warning/35 bg-warning-soft px-3 py-2.5 text-[12.5px] text-warning">
+        <div className="mt-3 rounded-[10px] border border-app-warning/35 bg-app-warning-soft px-3 py-2.5 text-[12.5px] text-app-warning">
           <p>
             קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
             {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
@@ -183,14 +183,14 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             <button
               type="button"
               onClick={saveAnyway}
-              className="rounded-full border border-warning/45 px-3.5 py-1.5 text-[12px] font-medium text-warning hover:bg-warning/10"
+              className="rounded-full border border-app-warning/45 px-3.5 py-1.5 text-[12px] font-medium text-app-warning hover:bg-app-warning-soft"
             >
               שמירה בכל זאת
             </button>
             <button
               type="button"
               onClick={() => setWarningDismissed(true)}
-              className="text-[12px] text-appNavy/55 hover:text-appNavy"
+              className="text-[12px] text-app-text-secondary hover:text-app-text-primary"
             >
               ביטול
             </button>
@@ -198,7 +198,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
         </div>
       )}
       {result?.error && (
-        <p className="mt-3 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-[12.5px] text-error">
+        <p className="mt-3 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-[12.5px] text-app-error">
           {result.error}
         </p>
       )}

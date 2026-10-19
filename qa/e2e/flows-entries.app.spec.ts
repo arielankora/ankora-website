@@ -172,7 +172,7 @@ test.describe("filing time for someone else", () => {
     // all - it can resolve in the gap between the click and the request
     // the click causes.
     await expect(
-      page.locator("form p.text-red-600"),
+      page.locator("form p.text-app-error"),
       "the form neither refused the write nor said why",
     ).toBeVisible({ timeout: 30_000 });
 
