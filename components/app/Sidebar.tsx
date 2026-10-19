@@ -2,13 +2,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Search } from "lucide-react";
+import { ChevronUp, Home, Search } from "lucide-react";
 import { NAV_ICONS } from "./nav-icons";
 import { LogoutButton } from "./LogoutButton";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
 import { useActiveTimer } from "./ActiveTimerProvider";
 
 export type NavItem = { href: string; label: string; group?: string };
+
+/// Items in this group live in the menu under the person's name, not in the
+/// list (19.10.2026). BottomNav and the command palette still list them.
+export const ACCOUNT_GROUP = "חשבון";
 
 export type NavCounters = {
   importantDatesCount?: number;
@@ -100,7 +104,7 @@ export function Sidebar({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 pb-4" aria-label="ניווט ראשי">
-        {items.map((item) => {
+        {items.filter((item) => item.group !== ACCOUNT_GROUP).map((item) => {
           const showHeader = item.group && item.group !== lastGroup;
           lastGroup = item.group;
           const Icon = NAV_ICONS[item.href] ?? Home;
@@ -157,11 +161,38 @@ export function Sidebar({
         })}
       </nav>
 
-      <div className="border-t border-white/10 px-4 py-4">
-        <p className="truncate text-sm font-medium text-cream">{userName}</p>
-        <p className="mb-3 truncate text-xs text-cream/50">{roleLabel}</p>
-        <LogoutButton variant="dark" />
-      </div>
+      {/* 19.10.2026: the account menu opens from the name. A native
+          <details>, so it works before hydration and needs no state; the
+          links are plain anchors like the rest of the navigation. It opens
+          upward, since it sits at the bottom of the screen. */}
+      <details className="group relative border-t border-white/10">
+        <summary className="flex cursor-pointer list-none items-center gap-2.5 px-4 py-4 hover:bg-[rgba(248,244,236,0.06)] [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-light text-[13px] font-medium text-app-text-primary">
+            {userName.trim().charAt(0)}
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-cream">{userName}</span>
+            <span className="block truncate text-xs text-cream/60">{roleLabel}</span>
+          </span>
+          <ChevronUp size={14} aria-hidden="true" className="shrink-0 text-cream/60 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="absolute inset-x-3 bottom-full mb-2 rounded-xl border border-app-border bg-white p-1.5 shadow-lg">
+          {items
+            .filter((item) => item.group === ACCOUNT_GROUP)
+            .map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="block rounded-lg px-3 py-2 text-[13px] text-app-text-primary hover:bg-app-surface-sunken"
+              >
+                {item.label}
+              </a>
+            ))}
+          <div className="mt-1 border-t border-app-border px-1.5 pt-1.5">
+            <LogoutButton />
+          </div>
+        </div>
+      </details>
     </aside>
   );
 }

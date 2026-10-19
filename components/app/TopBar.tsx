@@ -41,7 +41,7 @@ export function TopBar({
         <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
         {showPrimaryCta && (
           <Link
-            href="/app/my-time"
+            href="/app/timer?tab=mine"
             className="flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-[13px] font-medium text-app-text-primary"
           >
             <Plus size={15} strokeWidth={2.25} />

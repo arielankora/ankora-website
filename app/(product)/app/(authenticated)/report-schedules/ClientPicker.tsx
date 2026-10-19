@@ -12,7 +12,7 @@ export function ClientPicker({ clients, current }: { clients: Option[]; current:
       <label className="block text-xs font-medium text-app-text-secondary">לקוח</label>
       <select
         defaultValue={current}
-        onChange={(e) => router.push(`/app/report-schedules?clientId=${e.target.value}`)}
+        onChange={(e) => router.push(`/app/reports?tab=schedules&clientId=${e.target.value}`)}
         className="mt-1.5 w-full max-w-sm rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       >
         <option value="">בחרו לקוח...</option>

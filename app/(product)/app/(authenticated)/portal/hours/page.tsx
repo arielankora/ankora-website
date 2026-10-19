@@ -4,6 +4,8 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
+import { ViewTabs } from "@/components/app/ViewTabs";
+import { MonthlyView } from "../monthly/MonthlyView";
 import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
 import { describeForecast } from "@/lib/prepaid-format";
 
@@ -42,7 +44,10 @@ const CATEGORY_BAR_COLORS = ["bg-gold", "bg-gold-light", "bg-gold/50"];
 // page would find a banner describing them in the third person
 // nonsensical. Isolation is still structural exactly as the README
 // requires, just silent rather than announced.
-export default async function PortalHoursPage() {
+export default async function PortalHoursPage(props: { searchParams: Promise<{ view?: string; monthOffset?: string }> }) {
+  // 19.10.2026: hours and the monthly report, one screen (canvas "Ankora App UI Round").
+  const sp = await props.searchParams;
+  if (sp.view === "monthly") return <MonthlyView searchParams={{ monthOffset: sp.monthOffset }} />;
   const user = await requireUser();
 
   let dashboard;
@@ -81,6 +86,14 @@ export default async function PortalHoursPage() {
   return (
     <div className="space-y-4">
       <PortalTabs active="hours" />
+        <ViewTabs
+          label="שעות ודוחות"
+          active="hours"
+          tabs={[
+            { key: "hours", label: "שעות", href: "/app/portal/hours" },
+            { key: "monthly", label: "דוח חודשי", href: "/app/portal/hours?view=monthly" },
+          ]}
+        />
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
         <p className="text-xl font-medium text-app-text-primary">שלום, {client.name}</p>
@@ -183,7 +196,7 @@ export default async function PortalHoursPage() {
               <Link href="/app/portal/weekly" className="text-xs text-app-text-accent hover:underline">
                 לפי ימים
               </Link>
-              <Link href="/app/portal/monthly" className="text-xs text-app-text-accent hover:underline">
+              <Link href="/app/portal/hours?view=monthly" className="text-xs text-app-text-accent hover:underline">
                 הורדת דוח חודשי
               </Link>
             </div>

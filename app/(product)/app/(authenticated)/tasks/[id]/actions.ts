@@ -209,7 +209,7 @@ export async function startTimerForTaskAction(input: {
 
     revalidatePath(`/app/tasks/${task.id}`);
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     revalidatePath("/app");
     return { ok: true as const, timeEntryId: entry.id, startAt: entry.startAt.toISOString() };
   } catch (err) {
@@ -228,7 +228,7 @@ export async function stopTimerForTaskAction(input: { taskId: string; timeEntryI
     await stopTimer(user, input.timeEntryId);
     revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath("/app/timer");
-    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
     revalidatePath("/app");
     return { ok: true as const };
   } catch (err) {
