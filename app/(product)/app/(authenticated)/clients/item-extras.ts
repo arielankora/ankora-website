@@ -1,4 +1,5 @@
 import { parseExternalRefs, type ExternalRef } from "@/lib/external-refs";
+import { fieldStatusFrom, ITEM_MISSING_FIELDS, type FieldStatusMap, type MissingFieldsTarget } from "@/lib/knowledge";
 
 // Spec 3.1: the owner and "visible to the client" fields of an item's form
 // (knowledge-ui.tsx, ItemExtras), read the same way by every action. A form
@@ -7,7 +8,7 @@ import { parseExternalRefs, type ExternalRef } from "@/lib/external-refs";
 export function itemExtrasFrom(
   f: FormData,
   selfId?: string
-): { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null; audienceUserIds?: string[]; externalRefs?: ExternalRef[]; audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED" } {
+): { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null; audienceUserIds?: string[]; externalRefs?: ExternalRef[]; audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED"; fieldStatus?: FieldStatusMap } {
   if (f.get("itemExtras") !== "1") return {};
   return {
     // Spec 3.1: RAID-002, ClickUp:86c1x, as the team writes them.
@@ -16,6 +17,7 @@ export function itemExtrasFrom(
     // ItemExtras). A form with its own field reads it itself.
     ...(f.get("itemAudience") === "1" ? { audience: audienceOf(f.get("audience")) } : {}),
     ...audiencePeopleFrom(f, selfId),
+    ...missingFieldsFrom(f),
     ...(f.get("itemDisclose") === "1" ? { doNotDisclose: String(f.get("doNotDisclose") ?? "").trim() || null } : {}),
     clientVisible: f.get("clientVisible") === "on",
     ...(f.has("itemOwnerId") ? { ownerId: String(f.get("itemOwnerId") ?? "").trim() || null } : {}),
@@ -36,4 +38,13 @@ export function audiencePeopleFrom(f: FormData, selfId?: string): { audienceUser
 
 function audienceOf(v: FormDataEntryValue | null): "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED" {
   return v === "ACCOUNT_TEAM" || v === "RESTRICTED" ? v : "ALL_STAFF";
+}
+
+/// Spec 3.1: the fields of a contact or a system marked missing
+/// (MissingFields in knowledge-ui).
+function missingFieldsFrom(f: FormData): { fieldStatus?: FieldStatusMap } {
+  const target = String(f.get("itemMissing") ?? "");
+  if (!(target in ITEM_MISSING_FIELDS)) return {};
+  const missing = f.getAll("itemMissingFields").map((v) => String(v));
+  return { fieldStatus: fieldStatusFrom(target as MissingFieldsTarget, missing, String(f.get("itemMissingToResolve") ?? "")) };
 }

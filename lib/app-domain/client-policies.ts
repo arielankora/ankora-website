@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
-import { changesSubstance, policyShapeError, type PolicyKindLike } from "@/lib/client-policies";
+import { changesSubstance, policyShapeError, policyVersions, type PolicyKindLike, type PolicyVersionView } from "@/lib/client-policies";
 import { entityIdsIn, paramsError, paramsKey, readParams, type PolicyParams } from "@/lib/policy-params";
 import { Prisma } from "@prisma/client";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
@@ -234,6 +234,26 @@ export async function listClientPolicies(actor: User, clientId: string): Promise
   return rows
     .filter((r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null))
     .sort((a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status]);
+}
+
+/// Spec 3.11: the earlier versions of the rules this person may see, by
+/// rule. Only rules already read through listClientPolicies are asked for.
+export async function policyHistory(actor: User, clientId: string, policies: { id: string; version: number }[]): Promise<Map<string, PolicyVersionView[]>> {
+  await assertClientAccess(actor, clientId);
+  const withPast = policies.filter((p) => p.version > 1);
+  const out = new Map<string, PolicyVersionView[]>();
+  if (!withPast.length) return out;
+  const events = await prisma.auditEvent.findMany({
+    where: { entityType: "ClientPolicy", entityId: { in: withPast.map((p) => p.id) }, clientId },
+    select: { entityId: true, createdAt: true, beforeJson: true, afterJson: true },
+    orderBy: { createdAt: "asc" },
+  });
+  for (const p of withPast) {
+    const mine = events.filter((e) => e.entityId === p.id).map((e) => ({ createdAt: e.createdAt, before: e.beforeJson, after: e.afterJson }));
+    const versions = policyVersions(mine, p.version);
+    if (versions.length) out.set(p.id, versions);
+  }
+  return out;
 }
 
 /// The rules in force of some kinds, for several clients at once, as this

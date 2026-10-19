@@ -189,3 +189,55 @@ export function exceptionShapeError(e: { what?: string | null; reason?: string |
 export function isExceptionInForce(e: { status: string; validUntil: Date }, now: Date): boolean {
   return e.status === "APPROVED" && e.validUntil.getTime() + 24 * 60 * 60 * 1000 > now.getTime();
 }
+
+/// Spec 3.11: a rule's earlier versions, read from what the audit log kept
+/// of it (every change records the rule as it was before and after). One
+/// entry per version, as it last stood, with who approved it and until
+/// when it held. The version in force now is not in the list.
+export type PolicyVersionView = {
+  version: number;
+  title: string;
+  statement: string;
+  interimStatement: string | null;
+  kind: string;
+  params: unknown;
+  status: string;
+  approvedById: string | null;
+  approvedAt: string | null;
+  /// When the next version replaced it.
+  until: string | null;
+};
+
+type Snap = Record<string, unknown>;
+
+export function policyVersions(events: { createdAt: Date; before: unknown; after: unknown }[], currentVersion: number): PolicyVersionView[] {
+  const byVersion = new Map<number, { snap: Snap; at: Date }>();
+  const firstSeen = new Map<number, Date>();
+  const sorted = [...events].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  for (const e of sorted) {
+    for (const raw of [e.before, e.after]) {
+      if (!raw || typeof raw !== "object") continue;
+      const snap = raw as Snap;
+      const v = typeof snap.version === "number" ? snap.version : null;
+      if (v === null) continue;
+      byVersion.set(v, { snap, at: e.createdAt });
+      if (!firstSeen.has(v)) firstSeen.set(v, e.createdAt);
+    }
+  }
+  const str = (x: unknown) => (typeof x === "string" ? x : null);
+  return [...byVersion.entries()]
+    .filter(([v]) => v < currentVersion)
+    .sort(([a], [b]) => b - a)
+    .map(([v, { snap }]) => ({
+      version: v,
+      title: str(snap.title) ?? "",
+      statement: str(snap.statement) ?? "",
+      interimStatement: str(snap.interimStatement),
+      kind: str(snap.kind) ?? "",
+      params: snap.params ?? null,
+      status: str(snap.status) ?? "",
+      approvedById: str(snap.approvedById),
+      approvedAt: str(snap.approvedAt),
+      until: firstSeen.get(v + 1)?.toISOString() ?? null,
+    }));
+}

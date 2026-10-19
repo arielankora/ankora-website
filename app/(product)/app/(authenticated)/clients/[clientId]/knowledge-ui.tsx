@@ -1,7 +1,7 @@
 "use client";
 import { createContext, useContext, useState } from "react";
 import { StatusBadge } from "@/components/app/StatusBadge";
-import { KNOWLEDGE_AUDIENCE_LABELS, KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
+import { ITEM_MISSING_FIELDS, KNOWLEDGE_AUDIENCE_LABELS, KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike, type MissingFieldsTarget } from "@/lib/knowledge";
 
 // The pieces every section of the client file draws the same way: the
 // form field, the status line with what would close it, and the sources.
@@ -104,6 +104,10 @@ export function EntitySelect({ entities, defaultValue }: { entities: EntityOptio
 export type StaffOption = { id: string; name: string };
 const StaffContext = createContext<StaffOption[]>([]);
 
+export function useItemStaff(): StaffOption[] {
+  return useContext(StaffContext);
+}
+
 export function ItemStaffProvider({ staff, children }: { staff: StaffOption[]; children: React.ReactNode }) {
   return <StaffContext.Provider value={staff}>{children}</StaffContext.Provider>;
 }
@@ -174,18 +178,58 @@ export function ItemExtras({
 }
 
 /// The two, as a line on the item. Nothing when neither is set.
+/// Spec 3.1: fields of a known item that are still missing, with what
+/// would close them. The item's own status stays; the file shows it as
+/// weak as its weakest field.
+export function MissingFields({
+  target,
+  existing,
+}: {
+  target: MissingFieldsTarget;
+  existing?: { missingFields?: string[]; missingToResolve?: string | null } | null;
+}) {
+  const labels = ITEM_MISSING_FIELDS[target] as Record<string, string>;
+  const [missing, setMissing] = useState<string[]>(existing?.missingFields ?? []);
+  return (
+    <div data-testid="missing-fields">
+      <input type="hidden" name="itemMissing" value={target} />
+      <p className="mb-1 text-xs text-appNavy/60">שדות שחסרים</p>
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {Object.entries(labels).map(([key, label]) => (
+          <label key={key} className="flex items-center gap-1.5 text-xs text-appNavy/70">
+            <input
+              type="checkbox"
+              name="itemMissingFields"
+              value={key}
+              checked={missing.includes(key)}
+              onChange={(e) => setMissing((m) => (e.target.checked ? [...m, key] : m.filter((x) => x !== key)))}
+              className="h-3.5 w-3.5 accent-gold"
+            />
+            {label}
+          </label>
+        ))}
+      </div>
+      {missing.length > 0 && (
+        <Field label="מה יסגור את השדות החסרים *">
+          <input name="itemMissingToResolve" required defaultValue={existing?.missingToResolve ?? ""} className={INPUT} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 export function ItemTags({
   item,
   disclose = false,
 }: {
-  item: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null; refs?: string[]; verifiedAt?: string | null };
+  item: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null; refs?: string[]; verifiedAt?: string | null; missing?: string | null };
   disclose?: boolean;
 }) {
   const staff = useContext(StaffContext);
   const owner = item.ownerId ? staff.find((u) => u.id === item.ownerId)?.name : null;
   const notToTell = disclose ? item.doNotDisclose?.trim() : null;
   const refs = item.refs ?? [];
-  if (!item.clientVisible && !owner && !notToTell && refs.length === 0 && !item.verifiedAt) return null;
+  if (!item.clientVisible && !owner && !notToTell && refs.length === 0 && !item.verifiedAt && !item.missing) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60" data-testid="item-tags">
       {refs.map((r) => (
@@ -194,6 +238,7 @@ export function ItemTags({
         </span>
       ))}
       {item.verifiedAt && <span>אומת: {new Date(item.verifiedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</span>}
+      {item.missing && <span className="w-full text-error" data-testid="missing-line">{item.missing}</span>}
       {notToTell && <span className="w-full text-red-700" data-testid="do-not-disclose">לא לספר: {notToTell}</span>}
       {item.clientVisible && <StatusBadge label="גלוי ללקוח" tone="green" />}
       {owner && <span>בעלים: {owner}</span>}

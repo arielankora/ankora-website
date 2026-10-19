@@ -217,6 +217,16 @@ export async function removeClientOrganization(actor: User, id: string) {
 // People
 // ---------------------------------------------------------------------------
 
+/// Spec 3.5: one of us in the client's file is linked to their user, so
+/// the file and the product name the same person. Only for Ankora
+/// people, and only staff.
+async function ankoraUser(relationship: ContactRelationship | undefined, userId: string | null | undefined): Promise<string | null> {
+  if (relationship !== "ANKORA" || !userId) return null;
+  const ok = await prisma.user.count({ where: { id: userId, deletedAt: null, role: { not: "CLIENT_USER" } } });
+  if (!ok) throw new Error("המשתמש שנבחר אינו איש צוות של אנקורה.");
+  return userId;
+}
+
 /// The person with one of these emails, else one of these phones, else a
 /// new one. Email first: an address is personal far more often than a
 /// switchboard number is. Details that are new are added; nothing typed
@@ -262,6 +272,8 @@ export interface ClientContactInput extends KnowledgeInput {
   isPrimary?: boolean;
   isDecisionMaker?: boolean;
   clientSideAddress?: string | null;
+  /// Ankora people only: the user in the product (spec 3.5).
+  userId?: string | null;
 }
 
 export async function addClientContact(actor: User, input: ClientContactInput) {
@@ -296,6 +308,7 @@ export async function addClientContact(actor: User, input: ClientContactInput) {
     isPrimary: input.isPrimary ?? false,
     isDecisionMaker: input.isDecisionMaker ?? false,
     clientSideAddress: input.clientSideAddress?.trim() || null,
+    userId: await ankoraUser(input.relationship, input.userId),
     ...knowledgeData(input),
     ...sourced,
   };
@@ -361,6 +374,7 @@ export async function updateClientContact(actor: User, id: string, input: Partia
       isPrimary: input.isPrimary ?? undefined,
       isDecisionMaker: input.isDecisionMaker ?? undefined,
       clientSideAddress: input.clientSideAddress !== undefined ? input.clientSideAddress?.trim() || null : undefined,
+      userId: input.userId !== undefined || input.relationship !== undefined ? await ankoraUser(input.relationship ?? before.relationship, input.userId !== undefined ? input.userId : before.userId) : undefined,
       ...knowledgeData(input),
       ...sourced,
     },

@@ -24,7 +24,7 @@ import { HolidayCalendarsPanel } from "../HolidayCalendarsPanel";
 import { TasksPanel } from "./TasksPanel";
 import { PeoplePanel } from "./PeoplePanel";
 import { listClientPeople, listOrganizationNames } from "@/lib/app-domain/client-contacts";
-import { effectiveStatus, parseFieldStatus } from "@/lib/knowledge";
+import { effectiveStatus, missingLine, parseFieldStatus, type MissingFieldsTarget } from "@/lib/knowledge";
 import { SourcesPanel } from "./SourcesPanel";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
@@ -42,7 +42,10 @@ import { ControlLine } from "./ControlLine";
 import { controlDetails, controlFrom, controlParts } from "@/lib/client-control";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
-import { listClientPolicies } from "@/lib/app-domain/client-policies";
+import { listClientPolicies, policyHistory } from "@/lib/app-domain/client-policies";
+import type { PolicyKind } from "@prisma/client";
+
+const POLICY_KINDS: PolicyKind[] = ["DATA_HANDLING", "DISCLOSURE", "COMMUNICATION", "SEPARATION", "APPROVAL_REQUIRED", "THRESHOLD", "REQUIRED_STEP", "TIMING", "FORBIDDEN", "INFO"];
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { listLessons } from "@/lib/app-domain/process-lessons";
@@ -64,6 +67,28 @@ import { listCredentials } from "@/lib/app-domain/credentials";
 import { clientTaskOverview } from "@/lib/app-domain/tasks";
 import { MessageClient } from "@/components/app/MessageClient";
 import { refLabel, refsText, teamRefs } from "@/lib/external-refs";
+
+/// Spec 3.9: the permission each required system needs.
+function permissionsOf(value: unknown): Record<string, string> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === "string"));
+}
+
+/// Spec 3.9: what the rules said when the procedure was approved; null
+/// for a version approved before this was kept.
+function approvalChecksOf(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  return value
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+    .map((c) => ({ code: String(c.code ?? ""), message: String(c.message ?? ""), severity: (c.severity === "BLOCK" ? "BLOCK" : "EXCEPTION") as "BLOCK" | "EXCEPTION", excepted: c.excepted === true }));
+}
+
+/// Spec 3.1: a contact's or a system's missing fields, for its form and
+/// its line.
+function missingOf(target: MissingFieldsTarget, value: unknown) {
+  const missing = Object.entries(parseFieldStatus(value)).filter(([, v]) => v.status === "MISSING");
+  return { missingFields: missing.map(([k]) => k), missingToResolve: missing[0]?.[1].toResolve ?? null, missing: missingLine(target, value) };
+}
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
 import { appBaseUrl } from "@/lib/email-templates";
 import { listCategories } from "@/lib/app-domain/categories";
@@ -208,6 +233,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const checksByProcess = new Map(
     await Promise.all(processes.filter((p) => p.triggerKinds.includes("CONTINUOUS")).map(async (p) => [p.id, await listProcessChecks(user, p.id)] as const))
   );
+  // Spec 3.11: what each rule said before, from the audit log.
+  const policyPast = await policyHistory(user, client.id, policies);
   // Spec 5.4: what people who closed runs said about each procedure.
   const lessons = await listLessons(processes.map((p) => p.id));
   const todayKey = localDateKey(new Date(), TIMEZONE);
@@ -407,7 +434,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   status: effectiveStatus(e.knowledgeStatus, fields),
                   ownStatus: e.knowledgeStatus,
                   toResolve: e.toResolve, clientVisible: e.clientVisible, ownerId: e.ownerId, doNotDisclose: e.doNotDisclose,
-                  externalRefs: refsText(e.externalRefs), refs: teamRefs(e.externalRefs).map(refLabel), audience: e.audience, audienceUserIds: e.audienceUserIds,
+                  externalRefs: refsText(e.externalRefs), refs: teamRefs(e.externalRefs).map(refLabel), audience: e.audience, audienceUserIds: e.audienceUserIds, verifiedAt: e.verifiedAt ? e.verifiedAt.toISOString() : null,
                   sources: readSourceRefs(e.sources).map(formatSourceRef),
                 };
               })}
@@ -433,9 +460,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 isPrimary: c.isPrimary,
                 isDecisionMaker: c.isDecisionMaker,
                 clientSideAddress: c.clientSideAddress,
+                userId: c.userId,
                 status: effectiveStatus(c.knowledgeStatus, parseFieldStatus(c.fieldStatus)),
                 toResolve: c.toResolve, clientVisible: c.clientVisible, ownerId: c.ownerId,
-                externalRefs: refsText(c.externalRefs), refs: teamRefs(c.externalRefs).map(refLabel),
+                externalRefs: refsText(c.externalRefs), refs: teamRefs(c.externalRefs).map(refLabel), verifiedAt: c.verifiedAt ? c.verifiedAt.toISOString() : null, ...missingOf("CONTACT", c.fieldStatus),
                 audience: c.audience, audienceUserIds: c.audienceUserIds,
                 doNotDisclose: c.doNotDisclose,
                 sensitive: c.sensitivity === "SENSITIVE",
@@ -452,7 +480,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 notes: o.notes,
                 status: effectiveStatus(o.knowledgeStatus, parseFieldStatus(o.fieldStatus)),
                 toResolve: o.toResolve, clientVisible: o.clientVisible, ownerId: o.ownerId, doNotDisclose: o.doNotDisclose,
-                externalRefs: refsText(o.externalRefs), refs: teamRefs(o.externalRefs).map(refLabel), audience: o.audience, audienceUserIds: o.audienceUserIds,
+                externalRefs: refsText(o.externalRefs), refs: teamRefs(o.externalRefs).map(refLabel), audience: o.audience, audienceUserIds: o.audienceUserIds, verifiedAt: o.verifiedAt ? o.verifiedAt.toISOString() : null,
                 sources: readSourceRefs(o.sources).map(formatSourceRef),
               }))}
             />
@@ -495,6 +523,15 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 externalPartyContactIds: p.externalPartyContactIds,
                 externalPartyText: p.externalPartyText,
                 requiredSystemIds: p.requiredSystemIds,
+                requiredSystemPermissions: permissionsOf(p.requiredSystemPermissions),
+                systemsLine: p.requiredSystemIds
+                  .map((id) => {
+                    const name = systems.find((x) => x.id === id)?.systemName;
+                    const perm = permissionsOf(p.requiredSystemPermissions)[id];
+                    return name ? (perm ? `${name} (${perm})` : name) : null;
+                  })
+                  .filter(Boolean)
+                  .join(", ") || null,
                 approverText: p.approverText,
                 approverUserId: p.approverUserId,
                 approverContactId: p.approverContactId,
@@ -504,10 +541,20 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 entityId: p.entityId,
                 businessCalendar: p.businessCalendar,
                 executorText: p.executorText,
+                executorUserId: p.executorUserId,
+                executorContactId: p.executorContactId,
+                executorName: p.executorUserId
+                  ? staffName.get(p.executorUserId) ?? null
+                  : p.executorContactId
+                    ? (() => {
+                        const c = people.contacts.find((x) => x.id === p.executorContactId);
+                        return c ? c.person.name ?? c.role ?? null : null;
+                      })()
+                    : null,
                 transitionStatus: p.transitionStatus,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
                 toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose,
-                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds,
+                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds, verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null, lastRunAt: p.lastRunAt ? p.lastRunAt.toISOString() : null,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
                 score: p.completeness.score,
                 gaps: p.gaps,
@@ -522,6 +569,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                       outputs: p.current.outputs,
                       approvedByName: p.current.approvedById ? staffName.get(p.current.approvedById) ?? null : null,
                       checks: p.current.checks,
+                      approvedAt: p.current.approvedAt ? p.current.approvedAt.toISOString() : null,
+                      atApproval: approvalChecksOf(p.current.approvalChecks),
                     }
                   : null,
                 runs: (runsByProcess.get(p.id) ?? []).map((r) => ({ id: r.id, title: r.title, status: r.status, dueDate: r.dueDate ? r.dueDate.toISOString() : null })),
@@ -608,8 +657,18 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 approvedAt: p.approvedAt ? p.approvedAt.toISOString() : null,
                 knowledgeStatus: effectiveStatus(p.knowledgeStatus, parseFieldStatus(p.fieldStatus)),
                 toResolve: p.toResolve, clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, ownerId: p.ownerId,
-                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds,
+                externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds, verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
+                history: (policyPast.get(p.id) ?? []).map((h) => ({
+                  version: h.version,
+                  title: h.title,
+                  statement: h.statement,
+                  interimStatement: h.interimStatement,
+                  checked: POLICY_KINDS.includes(h.kind as PolicyKind) ? paramsSummary(h.kind as PolicyKind, readParams(h.kind as PolicyKind, h.params), (id) => entityName.get(id) ?? "ישות שהוסרה") : null,
+                  approvedByName: h.approvedById ? staffName.get(h.approvedById) ?? null : null,
+                  approvedAt: h.approvedAt,
+                  until: h.until,
+                })),
               }))}
             />
 
@@ -637,7 +696,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 })(),
                 status: effectiveStatus(r.knowledgeStatus, parseFieldStatus(r.fieldStatus)),
                 toResolve: r.toResolve, clientVisible: r.clientVisible, ownerId: r.ownerId, doNotDisclose: r.doNotDisclose,
-                externalRefs: refsText(r.externalRefs), refs: teamRefs(r.externalRefs).map(refLabel), audience: r.audience, audienceUserIds: r.audienceUserIds,
+                externalRefs: refsText(r.externalRefs), refs: teamRefs(r.externalRefs).map(refLabel), audience: r.audience, audienceUserIds: r.audienceUserIds, verifiedAt: r.verifiedAt ? r.verifiedAt.toISOString() : null,
                 sources: readSourceRefs(r.sources).map(formatSourceRef),
               }))}
             />
@@ -669,7 +728,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 notes: s.notes,
                 status: effectiveStatus(s.knowledgeStatus, parseFieldStatus(s.fieldStatus)),
                 toResolve: s.toResolve, clientVisible: s.clientVisible, ownerId: s.ownerId,
-                externalRefs: refsText(s.externalRefs), refs: teamRefs(s.externalRefs).map(refLabel),
+                externalRefs: refsText(s.externalRefs), refs: teamRefs(s.externalRefs).map(refLabel), verifiedAt: s.verifiedAt ? s.verifiedAt.toISOString() : null, ...missingOf("SYSTEM", s.fieldStatus),
                 audience: s.audience, audienceUserIds: s.audienceUserIds,
                 doNotDisclose: s.doNotDisclose,
                 sources: readSourceRefs(s.sources).map(formatSourceRef),

@@ -53,6 +53,8 @@ export interface ProcessInput extends KnowledgeInput {
   externalPartyContactIds?: string[];
   externalPartyText?: string | null;
   requiredSystemIds?: string[];
+  /// Spec 3.9: the permission each required system needs, by its id.
+  requiredSystemPermissions?: Record<string, string>;
   approverText?: string | null;
   approverContactId?: string | null;
   /// Spec 5.3: who at Ankora signs an approval step, in the product.
@@ -64,6 +66,9 @@ export interface ProcessInput extends KnowledgeInput {
   /// "IL", "US", or null for the entity's country (decision 6).
   businessCalendar?: string | null;
   executorText?: string | null;
+  /// Spec 3.9: who does it today, linked: a person at Ankora or a contact.
+  executorUserId?: string | null;
+  executorContactId?: string | null;
   transitionStatus?: ProcessTransition;
   /// An ongoing process only: a check every N days, and what is checked.
   checkEveryDays?: number | null;
@@ -90,6 +95,11 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
   const systems = await check(input.requiredSystemIds, (ids) => prisma.systemAccess.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "מערכת");
   const policies = await check(input.approvalPolicyIds, (ids) => prisma.clientPolicy.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "כלל");
   if (input.approverContactId) await check([input.approverContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "המאשר");
+  if (input.executorContactId) await check([input.executorContactId], (ids) => prisma.clientContact.count({ where: { id: { in: ids }, clientId, deletedAt: null } }), "המבצע");
+  if (input.executorUserId) {
+    const ok = await prisma.user.count({ where: { id: input.executorUserId, deletedAt: null, role: { not: "CLIENT_USER" } } });
+    if (!ok) throw new Error("המבצע באנקורה צריך להיות איש צוות.");
+  }
   for (const id of [input.ownerId, input.backupOwnerId].filter((x): x is string => !!x)) {
     const ok = await prisma.user.count({ where: { id, deletedAt: null, role: { not: "CLIENT_USER" } } });
     if (!ok) throw new Error("אחראי או מחליף צריכים להיות אנשי צוות של אנקורה.");
@@ -104,6 +114,19 @@ async function assertIdsBelong(clientId: string, input: Partial<ProcessInput>) {
   }
   if (input.entityId !== undefined) await assertEntityBelongs(clientId, input.entityId);
   return { contacts, systems, policies };
+}
+
+/// Only for systems the process needs; a permission of a system taken off
+/// the list goes with it. Untouched when neither is given.
+function permissionsFor(input: Partial<ProcessInput>, systems: string[] | undefined): Prisma.InputJsonValue | undefined {
+  if (input.requiredSystemPermissions === undefined) return undefined;
+  const keep = systems ?? Object.keys(input.requiredSystemPermissions);
+  const out: Record<string, string> = {};
+  for (const [id, text] of Object.entries(input.requiredSystemPermissions)) {
+    const t = text?.trim().slice(0, 200);
+    if (t && keep.includes(id)) out[id] = t;
+  }
+  return out;
 }
 
 function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; systems?: string[]; policies?: string[] }) {
@@ -125,6 +148,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     externalPartyContactIds: ids.contacts,
     externalPartyText: input.externalPartyText !== undefined ? clean(input.externalPartyText) : undefined,
     requiredSystemIds: ids.systems,
+    requiredSystemPermissions: permissionsFor(input, ids.systems),
     approverText: input.approverText !== undefined ? clean(input.approverText) : undefined,
     approverContactId: input.approverContactId !== undefined ? input.approverContactId || null : undefined,
     approverUserId: input.approverUserId !== undefined ? input.approverUserId || null : undefined,
@@ -134,6 +158,8 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     entityId: input.entityId !== undefined ? input.entityId || null : undefined,
     businessCalendar: input.businessCalendar !== undefined ? input.businessCalendar || null : undefined,
     executorText: input.executorText !== undefined ? clean(input.executorText) : undefined,
+    executorUserId: input.executorUserId !== undefined ? input.executorUserId || null : undefined,
+    executorContactId: input.executorContactId !== undefined ? input.executorContactId || null : undefined,
     transitionStatus: input.transitionStatus ?? undefined,
     checkEveryDays: input.checkEveryDays !== undefined ? input.checkEveryDays : undefined,
     checkText: input.checkText !== undefined ? clean(input.checkText) : undefined,
@@ -415,18 +441,19 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
   if (!latest || latest.version !== version) throw new Error("זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
   if (latest.status !== "DRAFT") throw new Error("הגרסה הזו כבר מאושרת.");
-  const blocking = holdsApproval(await checkProcessVersion(process, latest));
+  const checks = await checkProcessVersion(process, latest);
+  const blocking = holdsApproval(checks);
   if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
   const now = new Date();
   await prisma.$transaction([
     prisma.processVersion.updateMany({ where: { processId, status: "APPROVED" }, data: { status: "SUPERSEDED" } }),
-    prisma.processVersion.update({ where: { id: latest.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: now } }),
+    prisma.processVersion.update({ where: { id: latest.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: now, approvalChecks: checks as unknown as Prisma.InputJsonValue } }),
     prisma.process.update({
       where: { id: processId },
       data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false, reviewReason: null },
     }),
   ]);
-  await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version } });
+  await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version, checks: checks.length } });
 }
 
 // ---------------------------------------------------------------------------

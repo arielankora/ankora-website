@@ -11,6 +11,8 @@ import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type
 // 7.5 of the client file (claude/org-brain-spec-2026-10-12.md, 3.7).
 
 export type PanelRequestType = {
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
