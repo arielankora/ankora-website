@@ -6,12 +6,11 @@ import { Home, Search } from "lucide-react";
 import { NAV_ICONS } from "./nav-icons";
 import { LogoutButton } from "./LogoutButton";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
+import { useActiveTimer } from "./ActiveTimerProvider";
 
 export type NavItem = { href: string; label: string; group?: string };
 
 export type NavCounters = {
-  /** ISO start time of the caller's own running timer, or null/undefined if none. */
-  activeTimerStartAt?: string | null;
   importantDatesCount?: number;
   alertsCount?: number;
   /// Tasks phase 2: how many tasks are waiting on this person's
@@ -69,7 +68,10 @@ export function Sidebar({
     window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
   }
 
-  const timerCounter = useTickingCounter(counters?.activeTimerStartAt);
+  // The running timer comes from the shared, live state rather than a
+  // prop the layout read once, so it stops when the timer stops in any tab.
+  const { summary: activeTimer } = useActiveTimer();
+  const timerCounter = useTickingCounter(activeTimer?.startAt);
   let lastGroup: string | undefined;
 
   return (

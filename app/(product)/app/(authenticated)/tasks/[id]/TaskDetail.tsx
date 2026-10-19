@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { useToast } from "@/components/app/toast/ToastProvider";
+import { useActiveTimer } from "@/components/app/ActiveTimerProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { TASK_BLOCKER_LABELS, waitingTitle } from "@/lib/app-domain/portal-labels";
 import {
@@ -1023,6 +1024,8 @@ function TimerButton({
   disabled?: boolean;
 }) {
   const { showToast } = useToast();
+  // Tells the top bar pill and the other open tabs (19.10.2026).
+  const { announce } = useActiveTimer();
   const [pending, setPending] = useState(false);
   const [elapsed, setElapsed] = useState(0);
 
@@ -1045,6 +1048,7 @@ function TimerButton({
       showToast({ tone: "error", title: "הטיימר לא הופעל", description: result.error });
       return;
     }
+    announce();
     showToast({
       tone: "success",
       title: opts.confirmParallel ? "הטיימר רץ במקביל" : "הטיימר רץ",
@@ -1061,6 +1065,7 @@ function TimerButton({
       showToast({ tone: "error", title: "העצירה נכשלה", description: result.error });
       return;
     }
+    announce();
     showToast({ tone: "success", title: "הטיימר נעצר", description: task.title });
   }
 

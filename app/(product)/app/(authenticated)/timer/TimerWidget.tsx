@@ -10,6 +10,7 @@ import {
   recordPromiseStageAction,
 } from "./actions";
 import { useToast } from "@/components/app/toast/ToastProvider";
+import { useActiveTimer } from "@/components/app/ActiveTimerProvider";
 import { MAX_PARALLEL_TIMERS, parallelSeconds } from "@/lib/app-domain/parallel-timers";
 import { formatClockMinutes } from "@/lib/hours-format";
 
@@ -121,7 +122,18 @@ export function TimerWidget({
   openPromises: OpenPromise[];
 }) {
   const { showToast } = useToast();
+  const { announce } = useActiveTimer();
   const [actives, setActives] = useState<ActiveTimer[]>(() => [...activeTimers].sort(byStart));
+  // 19.10.2026: the server's list wins whenever it changes. A timer
+  // stopped in another tab (or by Claude) reaches this screen as a page
+  // refresh from ActiveTimerProvider; without this the card would keep
+  // counting a timer that no longer exists.
+  const serverKey = activeTimers.map((t) => `${t.id}@${t.startAt}`).sort().join(",");
+  const [seenServerKey, setSeenServerKey] = useState(serverKey);
+  if (seenServerKey !== serverKey) {
+    setSeenServerKey(serverKey);
+    setActives([...activeTimers].sort(byStart));
+  }
   const [clientId, setClientId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   // The quick-start / start-form note. A running timer's note lives in
@@ -210,6 +222,7 @@ export function TimerWidget({
     }
 
     setActives((prev) => [...prev.filter((t) => t.id !== result.entry.id), toActive(result.entry)].sort(byStart));
+    announce();
     setClientId("");
     setCategoryId("");
     setTaskId("");
@@ -304,10 +317,14 @@ export function TimerWidget({
               clients={clients}
               categories={categories}
               openPromises={openPromises}
-              onStopped={(id) => setActives((prev) => prev.filter((t) => t.id !== id))}
-              onReopened={(entry) =>
-                setActives((prev) => [...prev.filter((t) => t.id !== entry.id), entry].sort(byStart))
-              }
+              onStopped={(id) => {
+                setActives((prev) => prev.filter((t) => t.id !== id));
+                announce();
+              }}
+              onReopened={(entry) => {
+                setActives((prev) => [...prev.filter((t) => t.id !== entry.id), entry].sort(byStart));
+                announce();
+              }}
             />
           ))
         )}
