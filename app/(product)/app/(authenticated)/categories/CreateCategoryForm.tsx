@@ -31,14 +31,14 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
         <input
           name="name"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
         <label className="block text-xs font-medium text-app-text-secondary">תיאור</label>
         <input
           name="description"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -47,7 +47,7 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
           name="visibility"
           value={visibility}
           onChange={(e) => setVisibility(e.target.value as "GLOBAL" | "CLIENT")}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="GLOBAL">כללית (כל הלקוחות)</option>
           <option value="CLIENT">ספציפית ללקוח</option>
@@ -58,7 +58,7 @@ export function CreateCategoryForm({ clients }: { clients: { id: string; name: s
         <select
           name="clientId"
           disabled={visibility === "GLOBAL"}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="">בחירת לקוח</option>
           {clients.map((c) => (

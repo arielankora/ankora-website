@@ -42,7 +42,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
         <select
           name="reportType"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           {REPORT_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -59,7 +59,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
           required
           value={frequency}
           onChange={(e) => setFrequency(e.target.value as "WEEKLY" | "MONTHLY")}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="WEEKLY">שבועי</option>
           <option value="MONTHLY">חודשי</option>
@@ -71,7 +71,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
           <label className="block text-xs font-medium text-app-text-secondary">יום בשבוע</label>
           <select
             name="dayOfWeek"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             {WEEKDAYS.map((label, i) => (
               <option key={i} value={i}>
@@ -89,7 +89,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
             min={1}
             max={28}
             defaultValue={1}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}
@@ -102,7 +102,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
           min={0}
           max={23}
           defaultValue={7}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <p className="mt-1 text-[11px] text-app-text-tertiary">בפועל נשלח פעם ביום; זהו תיעוד ההעדפה בלבד.</p>
       </div>
@@ -113,7 +113,7 @@ export function ScheduleForm({ clientId }: { clientId: string }) {
           name="recipients"
           required
           placeholder="finance@client.com, ops@ankora.co.il"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 

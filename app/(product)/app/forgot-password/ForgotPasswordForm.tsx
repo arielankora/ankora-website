@@ -50,7 +50,7 @@ export function ForgotPasswordForm() {
           dir="ltr"
           required
           placeholder="name@ankora.co.il"
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 

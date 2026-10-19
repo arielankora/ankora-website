@@ -44,7 +44,7 @@ export function ClientSummaryFilterBar({
         <select
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחרו לקוח...</option>
           {clients.map((c) => (
@@ -60,7 +60,7 @@ export function ClientSummaryFilterBar({
           type="date"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -69,7 +69,7 @@ export function ClientSummaryFilterBar({
           type="date"
           value={to}
           onChange={(e) => setTo(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div className="flex items-end gap-3">

@@ -49,7 +49,7 @@ export function BillingPolicyForm({
           min={0}
           defaultValue={policy?.minimumMinutes ?? 0}
           dir="ltr"
-          className="w-[70px] rounded-lg border border-app-border bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
+          className="w-[70px] rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
         />
         <span className="text-xs text-app-text-tertiary">דק&apos;</span>
       </label>
@@ -61,7 +61,7 @@ export function BillingPolicyForm({
           min={1}
           defaultValue={policy?.incrementMinutes ?? 1}
           dir="ltr"
-          className="w-[70px] rounded-lg border border-app-border bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
+          className="w-[70px] rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
         />
         <span className="text-xs text-app-text-tertiary">דק&apos;</span>
       </label>
@@ -70,7 +70,7 @@ export function BillingPolicyForm({
         <select
           name="roundingMode"
           defaultValue={policy?.roundingMode ?? "EXACT"}
-          className="rounded-lg border border-app-border bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+          className="rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
         >
           <option value="EXACT">מדויק</option>
           <option value="CEIL">כלפי מעלה</option>
@@ -82,7 +82,7 @@ export function BillingPolicyForm({
         <select
           name="aggregationScope"
           defaultValue={policy?.aggregationScope ?? "PER_ENTRY"}
-          className="rounded-lg border border-app-border bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+          className="rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
         >
           <option value="PER_ENTRY">לפי דיווח</option>
           <option value="PER_TASK_PER_DAY">לפי משימה/יום</option>

@@ -1,4 +1,5 @@
 "use client";
+import { TopBarBack } from "./BackSlot";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
@@ -75,9 +76,13 @@ export function TopBar({
       </div>
 
       {/* Left (end) side: breadcrumb + screen title. */}
-      <div className="min-w-0 text-end">
-        {current?.group && <p className="truncate text-[11px] text-app-text-tertiary">{current.group}</p>}
-        <p className="truncate text-[16.5px] font-medium text-app-text-primary">{current?.label ?? "Ankora"}</p>
+      <div className="flex min-w-0 items-center gap-3">
+        {/* 19.10.2026: a detail screen's way back, registered by PageBack. */}
+        <TopBarBack />
+        <div className="min-w-0 text-end">
+          {current?.group && <p className="truncate text-[11px] text-app-text-tertiary">{current.group}</p>}
+          <p className="truncate text-[16.5px] font-medium text-app-text-primary">{current?.label ?? "Ankora"}</p>
+        </div>
       </div>
     </header>
   );

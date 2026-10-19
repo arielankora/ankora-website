@@ -160,7 +160,7 @@ export function RevealCredential({ credentialId, taskId }: { credentialId: strin
                 required
                 autoFocus={!methods.passkey}
                 aria-label="הסיסמה שלך לאנקורה"
-                className="min-w-0 flex-1 rounded-lg border border-app-border bg-white px-3 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
               />
               <button type="submit" className="rounded-full bg-app-surface-nav px-4 py-1.5 text-xs font-medium text-cream">
                 אימות

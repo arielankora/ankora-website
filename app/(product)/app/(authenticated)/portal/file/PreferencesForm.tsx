@@ -64,7 +64,7 @@ export function PreferencesForm({
             rows={2}
             defaultValue={preferences[f.name] ?? ""}
             placeholder={f.placeholder}
-            className="w-full rounded-[10px] border border-app-border bg-white px-3 py-2.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-gold"
+            className="w-full rounded-[10px] border border-app-border-strong bg-white px-3 py-2.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-gold"
           />
         </label>
       ))}

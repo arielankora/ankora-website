@@ -64,7 +64,7 @@ function ClientBlock({ client }: { client: Extract<ExposureReportView, { ok: tru
           readOnly
           value={client.message}
           rows={Math.min(14, client.message.split("\n").length + 1)}
-          className="mt-2 w-full rounded-lg border border-app-border bg-cream-dim p-3 text-sm text-app-text-primary"
+          className="mt-2 w-full rounded-lg border border-app-border-strong bg-cream-dim p-3 text-sm text-app-text-primary"
         />
         <button
           type="button"

@@ -36,7 +36,7 @@ export function ChangePasswordForm({ lastChangedLabel }: { lastChangedLabel: str
             name="currentPassword"
             required
             autoComplete="current-password"
-            className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block">
@@ -46,7 +46,7 @@ export function ChangePasswordForm({ lastChangedLabel }: { lastChangedLabel: str
             name="newPassword"
             required
             autoComplete="new-password"
-            className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block">
@@ -56,7 +56,7 @@ export function ChangePasswordForm({ lastChangedLabel }: { lastChangedLabel: str
             name="confirmPassword"
             required
             autoComplete="new-password"
-            className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
 

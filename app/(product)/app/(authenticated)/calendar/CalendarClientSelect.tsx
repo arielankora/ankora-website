@@ -20,7 +20,7 @@ export function CalendarClientSelect({
       data-testid="calendar-client"
       value={value}
       onChange={(e) => router.push(hrefs[e.target.value] ?? hrefs[""])}
-      className="rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] text-app-text-primary"
+      className="rounded-full border border-app-border-strong bg-white px-4 py-2 text-[13.5px] text-app-text-primary"
     >
       <option value="">כל הלקוחות</option>
       {clients.map((c) => (

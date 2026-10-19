@@ -37,7 +37,7 @@ export function EditClientForm({
           name="name"
           defaultValue={client.name}
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -45,7 +45,7 @@ export function EditClientForm({
         <input
           name="legalName"
           defaultValue={client.legalName ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -53,7 +53,7 @@ export function EditClientForm({
         <input
           name="primaryContact"
           defaultValue={client.primaryContact ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -61,7 +61,7 @@ export function EditClientForm({
         <input
           name="timezone"
           defaultValue={client.timezone}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -69,7 +69,7 @@ export function EditClientForm({
         <select
           name="status"
           defaultValue={client.status}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="ACTIVE">פעיל</option>
           <option value="PAUSED">מושהה</option>
@@ -82,7 +82,7 @@ export function EditClientForm({
         <select
           name="kind"
           defaultValue={client.kind}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="BUSINESS">עסקי</option>
           <option value="PRIVATE">פרטי</option>
@@ -94,7 +94,7 @@ export function EditClientForm({
           name="industry"
           defaultValue={client.industry ?? ""}
           placeholder="חברה, סטארטאפ AI"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -124,7 +124,7 @@ export function EditClientForm({
             <select
               name="accountManagerId"
               defaultValue={client.accountManagerId ?? ""}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
               <option value="">לא הוגדר</option>
               {staff.map((s) => (
@@ -143,7 +143,7 @@ export function EditClientForm({
               dir="ltr"
               defaultValue={client.whatsappNumber ?? ""}
               placeholder="052-000-0000"
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
             />
             <span className="mt-1 block text-[11px] text-app-text-tertiary">
               הקו שהלקוח כבר מתכתב איתו. ריק: הפורטל יציג שהערוץ עוד לא מחובר.
@@ -158,7 +158,7 @@ export function EditClientForm({
               inputMode="decimal"
               defaultValue={client.approvalCeilingMinor !== null ? String(client.approvalCeilingMinor / 100) : ""}
               placeholder="500"
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
             />
             <span className="mt-1 block text-[11px] text-app-text-tertiary">
               {client.approvalCeilingMinor !== null
@@ -187,7 +187,7 @@ export function EditClientForm({
               name="preferenceContact"
               rows={2}
               defaultValue={client.preferenceContact ?? ""}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <label className="block">
@@ -196,7 +196,7 @@ export function EditClientForm({
               name="preferenceMatters"
               rows={2}
               defaultValue={client.preferenceMatters ?? ""}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <label className="block">
@@ -205,7 +205,7 @@ export function EditClientForm({
               name="preferenceNever"
               rows={2}
               defaultValue={client.preferenceNever ?? ""}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
         </div>

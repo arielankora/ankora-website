@@ -107,7 +107,7 @@ export function CreateTaskForm({
           required
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחירת לקוח</option>
           {clients.map((c) => (
@@ -137,7 +137,7 @@ export function CreateTaskForm({
         <input
           name="title"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       {/* 7.10.2026. A task handed to somebody arrives with what they need
@@ -151,7 +151,7 @@ export function CreateTaskForm({
           name="description"
           rows={3}
           placeholder="מה צריך לדעת כדי להתחיל: מה ביקשו, ממי, ומה כבר נעשה"
-          className="mt-1.5 w-full resize-y rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full resize-y rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -244,7 +244,7 @@ export function CreateTaskForm({
           <input
             name="clientTitle"
             placeholder="איך זה ייקרא אצל הלקוח. ברירת מחדל: שם המשימה"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
       </div>

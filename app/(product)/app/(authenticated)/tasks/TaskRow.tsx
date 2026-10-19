@@ -505,7 +505,7 @@ export function TaskRow({
                         if (e.key === "Escape") cancelClose();
                       }}
                       placeholder="משפט אחד, בשפה שלו"
-                      className="min-w-0 flex-1 rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
+                      className="min-w-0 flex-1 rounded-[8px] border border-app-border-strong bg-white px-2.5 py-1.5 text-[12px] text-app-text-primary outline-none focus:border-gold"
                     />
                     <button
                       type="button"

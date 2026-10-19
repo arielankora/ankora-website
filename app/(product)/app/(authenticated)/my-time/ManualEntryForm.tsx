@@ -95,7 +95,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             max={todayKey()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
@@ -104,7 +104,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             type="time"
             name="startTime"
             required
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block" style={{ flex: "0 0 108px" }}>
@@ -113,7 +113,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             type="time"
             name="endTime"
             required
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0" style={{ flex: "1 1 180px" }}>
@@ -123,7 +123,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             required
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">בחירה</option>
             {clients.map((c) => (
@@ -139,7 +139,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="categoryId"
             required
             disabled={!clientId}
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
           >
             <option value="">בחירה</option>
             {availableCategories.map((cat) => (
@@ -155,7 +155,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="note"
             required
             placeholder="מה נעשה עבור הלקוח?"
-            className="w-full rounded-[9px] border border-app-border bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <SubmitButton pending={pending} />
@@ -168,7 +168,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             name="backdateReason"
             required
             placeholder="למשל: נשכח לדווח בזמן"
-            className="flex-1 rounded-lg border border-app-border bg-white px-2.5 py-2 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="flex-1 rounded-lg border border-app-border-strong bg-white px-2.5 py-2 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}

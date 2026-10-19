@@ -136,7 +136,7 @@ export function ImportantDateForm({
           value={clientId}
           disabled={isEdit}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-60"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-60"
         >
           <option value="">בחירת לקוח</option>
           {clients.map((c) => (
@@ -153,7 +153,7 @@ export function ImportantDateForm({
           name="title"
           required
           defaultValue={existing?.title}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -165,7 +165,7 @@ export function ImportantDateForm({
             required
             value={category}
             onChange={(e) => setCategory(e.target.value as ImportantDateCategoryLike)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">בחירה</option>
             {Object.entries(IMPORTANT_DATE_CATEGORY_LABELS).map(([value, label]) => (
@@ -182,7 +182,7 @@ export function ImportantDateForm({
             list="important-date-type-examples"
             defaultValue={existing?.type}
             placeholder="לדוגמה: יום הולדת"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
           <datalist id="important-date-type-examples">
             {typeExamples.map((t) => (
@@ -199,7 +199,7 @@ export function ImportantDateForm({
             name="calendarType"
             value={calendarType}
             onChange={(e) => setCalendarType(e.target.value as "GREGORIAN" | "HEBREW")}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="GREGORIAN">לועזי</option>
             <option value="HEBREW">עברי</option>
@@ -211,7 +211,7 @@ export function ImportantDateForm({
             name="recurrence"
             value={recurrence}
             onChange={(e) => setRecurrence(e.target.value as typeof recurrence)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="ANNUAL">שנתי</option>
             <option value="MONTHLY">חודשי</option>
@@ -229,7 +229,7 @@ export function ImportantDateForm({
             name="precision"
             value={precision}
             onChange={(e) => setPrecision(e.target.value as typeof precision)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="EXACT">יום מדויק</option>
             <option value="APPROXIMATE">משוער (אחד מכמה ימים)</option>
@@ -256,7 +256,7 @@ export function ImportantDateForm({
             name="weekday"
             required
             defaultValue={existing?.weekday ?? 4}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             {WEEKDAY_OPTIONS.map((label, i) => (
               <option key={i} value={i}>
@@ -274,7 +274,7 @@ export function ImportantDateForm({
             name="onceDate"
             required
             defaultValue={toDateInputValue(existing?.onceDate ?? null)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       ) : (
@@ -290,7 +290,7 @@ export function ImportantDateForm({
               max={13}
               required
               defaultValue={existing?.month}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
             {calendarType === "HEBREW" && (
               <p className="mt-1 text-[11px] text-app-text-tertiary">1=ניסן ... 7=תשרי ... 12=אדר (א׳) ... 13=אדר ב׳</p>
@@ -308,7 +308,7 @@ export function ImportantDateForm({
                 inputMode="numeric"
                 placeholder="8, 9"
                 defaultValue={existing?.dayAlternatives?.join(", ") ?? ""}
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </div>
           ) : (
@@ -321,7 +321,7 @@ export function ImportantDateForm({
                 max={31}
                 required
                 defaultValue={existing?.day}
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </div>
           )}
@@ -331,7 +331,7 @@ export function ImportantDateForm({
               <select
                 name="intervalMonths"
                 defaultValue={existing?.intervalMonths ?? 1}
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               >
                 {INTERVAL_MONTH_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -349,7 +349,7 @@ export function ImportantDateForm({
                 name="customIntervalDays"
                 min={1}
                 defaultValue={existing?.customIntervalDays ?? undefined}
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </div>
           ) : (
@@ -360,7 +360,7 @@ export function ImportantDateForm({
                 name="originYear"
                 defaultValue={existing?.originYear ?? undefined}
                 placeholder="למשל 1990"
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </div>
           )}
@@ -379,7 +379,7 @@ export function ImportantDateForm({
           name="expectedFrom"
           defaultValue={existing?.expectedFrom ?? ""}
           placeholder="ממי? למשל: איילה, Nextage"
-          className="mt-2 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <p className="mt-1 text-[11px] text-app-text-tertiary">התזכורת והמשימה יבקשו מהאחראי לוודא שזה התקבל.</p>
       </div>
@@ -394,18 +394,18 @@ export function ImportantDateForm({
               name="conditionText"
               defaultValue={existing?.conditionText ?? ""}
               placeholder="למשל: לא עמדנו ב-SLA של החולשות ברבעון"
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
             <p className="mt-1 text-[11px] text-app-text-tertiary">במועד מותנה לא נפתחת משימה. האחראי מקבל שאלה אם התנאי מתקיים.</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-app-text-secondary">בתוקף מ</label>
-              <input type="date" name="rangeStart" defaultValue={toDateInputValue(existing?.rangeStart ?? null)} className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold" />
+              <input type="date" name="rangeStart" defaultValue={toDateInputValue(existing?.rangeStart ?? null)} className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold" />
             </div>
             <div>
               <label className="block text-xs font-medium text-app-text-secondary">עד</label>
-              <input type="date" name="rangeEnd" defaultValue={toDateInputValue(existing?.rangeEnd ?? null)} className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold" />
+              <input type="date" name="rangeEnd" defaultValue={toDateInputValue(existing?.rangeEnd ?? null)} className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold" />
             </div>
           </div>
         </div>
@@ -420,7 +420,7 @@ export function ImportantDateForm({
               <p className="mt-1.5 text-sm text-app-text-primary" data-testid="calendar-locked">{existing.calendarLockedBy}</p>
             </>
           ) : (
-            <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? "IL"} className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold">
+            <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? "IL"} className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold">
               <option value="IL">ישראל (ראשון עד חמישי)</option>
               <option value="US">ארה&quot;ב (שני עד שישי)</option>
             </select>
@@ -428,7 +428,7 @@ export function ImportantDateForm({
         </div>
         <div>
           <label className="block text-xs font-medium text-app-text-secondary">מועד שנופל ביום שאינו יום עבודה</label>
-          <select name="rollConvention" defaultValue={existing?.rollConvention ?? "NONE"} className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold">
+          <select name="rollConvention" defaultValue={existing?.rollConvention ?? "NONE"} className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold">
             <option value="NONE">נשאר כמו שהוא</option>
             <option value="PREVIOUS_BUSINESS_DAY">מוקדם ליום העבודה הקודם</option>
             <option value="NEXT_BUSINESS_DAY">נדחה ליום העבודה הבא</option>
@@ -442,7 +442,7 @@ export function ImportantDateForm({
           name="responsibleUserId"
           required
           defaultValue={existing?.responsibleUserId}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחירת אחראי</option>
           {users.map((u) => (
@@ -458,7 +458,7 @@ export function ImportantDateForm({
         <select
           name="sensitivity"
           defaultValue={existing?.sensitivity ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">ברירת מחדל לפי קטגוריה</option>
           <option value="NORMAL">רגיל</option>
@@ -473,7 +473,7 @@ export function ImportantDateForm({
           rows={2}
           defaultValue={existing?.notes ?? ""}
           placeholder="לעולם לא לרשום כאן מספרי דרכון/מסמך או פרטים רפואיים מפורטים."
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -501,13 +501,13 @@ export function ImportantDateForm({
                 name="autoTaskLeadDays"
                 min={0}
                 defaultValue={existing?.autoTaskLeadDays ?? 7}
-                className="w-20 rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="w-20 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
               <select
                 name="leadUnit"
                 aria-label="סוג הימים"
                 defaultValue={existing?.leadUnit ?? "CALENDAR_DAYS"}
-                className="flex-1 rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               >
                 <option value="CALENDAR_DAYS">ימים</option>
                 <option value="BUSINESS_DAYS">ימי עבודה</option>
@@ -519,7 +519,7 @@ export function ImportantDateForm({
             <select
               name="autoTaskCategoryId"
               defaultValue={existing?.autoTaskCategoryId ?? ""}
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
               <option value="">ללא קטגוריה</option>
               {availableAutoTaskCategories.map((c) => (

@@ -31,7 +31,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           type="date"
           name="cycleStart"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -40,7 +40,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           type="date"
           name="cycleEnd"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -51,7 +51,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           dir="ltr"
           placeholder="111 או 98.5"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -60,7 +60,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           name="rolloverMode"
           value={rolloverMode}
           onChange={(e) => setRolloverMode(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="NONE">ללא</option>
           <option value="FULL">מלא</option>
@@ -77,7 +77,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
             name="rolloverCapHours"
             inputMode="decimal"
             dir="ltr"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}
@@ -88,7 +88,7 @@ export function OpenCycleForm({ clientId }: { clientId: string }) {
           name="manualRolloverInHours"
           inputMode="decimal"
           dir="ltr"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <p className="mt-1 text-[11px] text-app-text-tertiary">רלוונטי רק אם המחזור הקודם הוגדר כ&quot;ידני&quot; - הזינו כאן כמה שעות יעברו אליו.</p>
       </div>

@@ -43,7 +43,7 @@ export type ReviewProposal = {
 
 export type ReviewStaff = { id: string; name: string }[];
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 
 /// The fields a reviewer may change, per kind of item.
 /// The kind of item, as the reviewer reads it: a fact by its kind, a rule

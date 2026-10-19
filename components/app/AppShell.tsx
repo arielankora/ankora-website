@@ -5,6 +5,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { BottomNav } from "./BottomNav";
 import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
+import { BackSlotProvider } from "./BackSlot";
 import { CommandPalette } from "./CommandPalette";
 import { ActiveTimerProvider, MobileTimerStrip } from "./ActiveTimerProvider";
 import { OfflineBanner } from "./states/Offline";
@@ -131,6 +132,7 @@ export function AppShell({
     <ActiveTimerProvider
       initial={activeTimer ? { startAt: activeTimer.startAt, extraCount: activeTimer.extraCount ?? 0 } : null}
     >
+    <BackSlotProvider>
     <div className="min-h-screen bg-app-surface-page md:flex">
       <Sidebar
         items={items}
@@ -175,6 +177,7 @@ export function AppShell({
 
       <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
     </div>
+    </BackSlotProvider>
     </ActiveTimerProvider>
   );
 }

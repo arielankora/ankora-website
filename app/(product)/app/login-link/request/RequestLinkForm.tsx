@@ -51,7 +51,7 @@ export function RequestLinkForm() {
           dir="ltr"
           required
           placeholder="name@example.com"
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 

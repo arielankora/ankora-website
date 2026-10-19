@@ -69,7 +69,7 @@ export default async function AuditLogPage(
             <select
               name="entityType"
               defaultValue={entityType ?? ""}
-              className="mt-1.5 rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
               <option value="">הכל</option>
               {ENTITY_TYPES.map((t) => (
@@ -85,7 +85,7 @@ export default async function AuditLogPage(
               name="q"
               defaultValue={q ?? ""}
               placeholder="פעולה, שם, לקוח או מזהה"
-              className="mt-1.5 w-64 max-w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-64 max-w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <button type="submit" className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold">

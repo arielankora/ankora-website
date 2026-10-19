@@ -51,3 +51,16 @@ export function listBackHref(base: string, keys: readonly string[], from?: strin
 /// here is simply not carried back, which is the safe way to fail.
 export const CLIENTS_LIST_KEYS = ["q"] as const;
 export const IMPORTANT_DATES_LIST_KEYS = ["tab"] as const;
+
+/// 19.10.2026: the words on the way back, naming the list as it was.
+const IMPORTANT_DATES_TABS: Record<string, string> = { all: "הכל", done: "טופלו" };
+
+export function clientsBackTitle(from?: string | string[] | null): string {
+  const q = typeof from === "string" ? new URLSearchParams(cleanListQuery(new URLSearchParams(from), CLIENTS_LIST_KEYS)).get("q")?.trim() : "";
+  return q ? `לקוחות · "${q.length > 40 ? `${q.slice(0, 40)}…` : q}"` : "לקוחות";
+}
+
+export function importantDatesBackTitle(from?: string | string[] | null): string {
+  const tab = typeof from === "string" ? new URLSearchParams(cleanListQuery(new URLSearchParams(from), IMPORTANT_DATES_LIST_KEYS)).get("tab") : null;
+  return tab && IMPORTANT_DATES_TABS[tab] ? `מועדים חשובים · ${IMPORTANT_DATES_TABS[tab]}` : "מועדים חשובים";
+}

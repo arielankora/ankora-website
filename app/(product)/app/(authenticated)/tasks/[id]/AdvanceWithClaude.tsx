@@ -120,7 +120,7 @@ export function AdvanceWithClaude({
             dir="rtl"
             rows={8}
             aria-label="הפרומט לקלוד"
-            className="mt-2 w-full resize-y rounded-lg border border-app-border bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-app-text-primary"
+            className="mt-2 w-full resize-y rounded-lg border border-app-border-strong bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-app-text-primary"
           />
           <div className="mt-2 flex items-center gap-2">
             <button

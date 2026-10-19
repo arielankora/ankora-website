@@ -394,7 +394,7 @@ export function TaskDetail({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="מה צריך לעשות, כתובת, מספר אסמכתא, מה כבר נוסה."
-              className="w-full rounded-lg border border-app-border px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
+              className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
             />
             {/* The subset, said once where somebody is typing it. Naming
                 what is supported is cheaper than letting a person
@@ -866,7 +866,7 @@ function BlockSection({
             onChange={(e) => setReason(e.target.value)}
             aria-label="סיבת ההמתנה"
             placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
-            className="w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+            className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
           />
           {on === "CLIENT" && task.clientVisible && (
             <p className="text-[12px] text-app-text-secondary">
@@ -1042,7 +1042,7 @@ function ClientSection({
             aria-label="משפט התוצאה לפני סגירה"
             value={clientOutcome}
             onChange={(e) => setClientOutcome(e.target.value)}
-            className="mt-3 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+            className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
           />
           <div className="mt-3 flex gap-2">
             <button

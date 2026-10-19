@@ -122,7 +122,7 @@ export function TaskThread({
           aria-label="הערה חדשה"
           onChange={(e) => setBody(e.target.value)}
           placeholder="מה קרה, מה נוסה, מה ענו. מה שהיה הולך לוואטסאפ."
-          className="w-full rounded-lg border border-app-border px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
+          className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button

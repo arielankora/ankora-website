@@ -69,7 +69,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           minLength={MIN_LENGTH}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
@@ -88,7 +88,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
           dir="ltr"
           required
           minLength={MIN_LENGTH}
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 

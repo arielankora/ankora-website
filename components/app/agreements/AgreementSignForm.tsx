@@ -76,7 +76,7 @@ export function AgreementSignForm({
           value={signedName}
           onChange={(e) => setSignedName(e.target.value)}
           autoComplete="name"
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
         />
         <span className="mt-1.5 block text-xs text-app-text-tertiary">כפי שהוא רשום בחשבון. ההקלדה היא החתימה.</span>
       </label>

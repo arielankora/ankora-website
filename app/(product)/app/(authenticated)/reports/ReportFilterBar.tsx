@@ -85,7 +85,7 @@ export function ReportFilterBar({
         <select
           value={type}
           onChange={(e) => setType(e.target.value as ReportType)}
-          className="mt-1.5 w-full max-w-md rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full max-w-md rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           {reportTypes.map((rt) => (
             <option key={rt.id} value={rt.id}>
@@ -101,7 +101,7 @@ export function ReportFilterBar({
           <select
             value={clientId}
             onChange={(e) => setClientId(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">כל הלקוחות</option>
             {clients.map((c) => (
@@ -116,7 +116,7 @@ export function ReportFilterBar({
           <select
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">כל אנשי הצוות</option>
             {users.map((u) => (
@@ -131,7 +131,7 @@ export function ReportFilterBar({
           <select
             value={categoryId}
             onChange={(e) => setCategoryId(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">כל הקטגוריות</option>
             {categories.map((c) => (
@@ -146,7 +146,7 @@ export function ReportFilterBar({
           <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="">הכול</option>
             <option value="MANUAL">דיווח ידני</option>
@@ -159,7 +159,7 @@ export function ReportFilterBar({
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
         <div>
@@ -168,7 +168,7 @@ export function ReportFilterBar({
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
         <div className="flex items-end gap-4">

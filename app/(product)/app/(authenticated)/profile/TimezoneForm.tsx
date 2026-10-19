@@ -43,7 +43,7 @@ export function TimezoneForm({ timezone }: { timezone: string }) {
         <select
           name="timezone"
           defaultValue={timezone}
-          className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           {options.map((tz) => (
             <option key={tz.value} value={tz.value}>

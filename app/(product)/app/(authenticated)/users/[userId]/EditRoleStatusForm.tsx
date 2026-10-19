@@ -54,7 +54,7 @@ export function EditRoleStatusForm({
           name="role"
           defaultValue={shown.role}
           disabled={isSelf}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="SUPER_ADMIN">מנהל-על</option>
           <option value="ANKORA_ADMIN">מנהל Ankora</option>
@@ -69,7 +69,7 @@ export function EditRoleStatusForm({
           name="status"
           defaultValue={shown.status}
           disabled={isSelf}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="INVITED">הוזמן</option>
           <option value="ACTIVE">פעיל</option>

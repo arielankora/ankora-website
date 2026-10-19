@@ -27,7 +27,7 @@ export function ImportantDateStatusSelect({ importantDateId, status }: { importa
         defaultValue={status}
         disabled={pending}
         onChange={() => formRef.current?.requestSubmit()}
-        className="rounded-lg border border-app-border bg-white px-2 py-1 text-xs text-app-text-primary outline-none focus:border-gold disabled:opacity-50"
+        className="rounded-lg border border-app-border-strong bg-white px-2 py-1 text-xs text-app-text-primary outline-none focus:border-gold disabled:opacity-50"
       >
         {STATUS_OPTIONS.map((opt) => (
           <option key={opt.value} value={opt.value}>
