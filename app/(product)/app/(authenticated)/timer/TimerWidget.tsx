@@ -330,11 +330,11 @@ export function TimerWidget({
         )}
 
         {actives.length > 0 && canStartAnother && (
-          <div className="rounded-2xl border border-lineDark bg-white p-[18px]">
+          <div className="rounded-2xl border border-app-border bg-white p-[18px]">
             {addOpen ? (
               <>
-                <p className="text-[13px] font-medium text-appNavy">טיימר נוסף, על לקוח אחר</p>
-                <p className="mb-3 mt-1 text-[11.5px] text-appNavy/55">
+                <p className="text-[13px] font-medium text-app-text-primary">טיימר נוסף, על לקוח אחר</p>
+                <p className="mb-3 mt-1 text-[11.5px] text-app-text-secondary">
                   שני הטיימרים ירוצו במקביל, וכל לקוח יחויב על הזמן המלא שלו.
                 </p>
                 {startFields("light")}
@@ -343,7 +343,7 @@ export function TimerWidget({
               <button
                 type="button"
                 onClick={() => setAddOpen(true)}
-                className="flex items-center gap-2 text-[13px] font-medium text-appNavy hover:text-gold-dim"
+                className="flex items-center gap-2 text-[13px] font-medium text-app-text-primary hover:text-app-text-accent"
               >
                 <Plus size={15} strokeWidth={2.25} />
                 הפעלת טיימר נוסף
@@ -353,7 +353,7 @@ export function TimerWidget({
         )}
 
         {!canStartAnother && (
-          <p className="rounded-2xl border border-lineDark bg-white px-[18px] py-3.5 text-[12.5px] text-appNavy/60">
+          <p className="rounded-2xl border border-app-border bg-white px-[18px] py-3.5 text-[12.5px] text-app-text-secondary">
             רצים {actives.length} טיימרים. כדי להתחיל עוד, עוצרים אחד.
           </p>
         )}
@@ -362,16 +362,16 @@ export function TimerWidget({
       {/* Right column */}
       <div className="flex flex-col gap-3.5">
         {canStartAnother && recent.length > 0 && (
-          <div className="rounded-2xl border border-lineDark bg-white p-[18px]">
-            <p className="text-[13px] font-medium text-appNavy">התחלה מהירה</p>
-            <p className="mb-2.5 mt-1 text-[11.5px] text-appNavy/55">
+          <div className="rounded-2xl border border-app-border bg-white p-[18px]">
+            <p className="text-[13px] font-medium text-app-text-primary">התחלה מהירה</p>
+            <p className="mb-2.5 mt-1 text-[11.5px] text-app-text-secondary">
               הערה קצרה עכשיו חוסכת שחזור בסוף החודש ונכנסת לדוח ללקוח.
             </p>
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="על מה עובדים? (מומלץ)"
-              className="mb-2.5 w-full rounded-[10px] border border-gold/45 bg-cream px-3 py-2.5 text-[13px] text-appNavy outline-none focus:border-gold"
+              className="mb-2.5 w-full rounded-[10px] border border-gold/45 bg-app-surface-page px-3 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
             />
             <div className="flex flex-col gap-2">
               {recent.map((r, i) => {
@@ -385,16 +385,16 @@ export function TimerWidget({
                     type="button"
                     onClick={() => handleQuickStart(r)}
                     disabled={pending || blocked}
-                    className="flex items-center gap-2.5 rounded-xl border border-lineDark bg-cream px-3.5 py-2.5 text-start transition-colors hover:border-gold hover:bg-white disabled:opacity-50 disabled:hover:border-lineDark disabled:hover:bg-cream"
+                    className="flex items-center gap-2.5 rounded-xl border border-app-border bg-app-surface-page px-3.5 py-2.5 text-start transition-colors hover:border-gold hover:bg-white disabled:opacity-50 disabled:hover:border-app-border disabled:hover:bg-app-surface-page"
                   >
-                    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-gold-dim">
+                    <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-gold/16 text-app-text-accent">
                       <ChevronLeft size={13} strokeWidth={2.25} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13px] text-appNavy">
+                      <span className="block truncate text-[13px] text-app-text-primary">
                         {r.clientName} · {r.categoryName}
                       </span>
-                      <span className="block text-[11px] text-appNavy/50">
+                      <span className="block text-[11px] text-app-text-tertiary">
                         {blocked ? "כבר רץ טיימר על הלקוח הזה" : `אחרון: ${formatLastUsed(r.lastUsedAt)}`}
                       </span>
                     </span>
@@ -409,22 +409,22 @@ export function TimerWidget({
             סכום". With parallel timers the sum can exceed the hours on
             the clock, so the part that ran in parallel is said out loud
             rather than left for someone to notice. */}
-        <div className="rounded-2xl border border-lineDark bg-white p-[18px]">
-          <p className="text-[13px] font-medium text-appNavy">היום</p>
-          <p className="mb-3.5 mt-1 text-[11.5px] text-appNavy/50">
+        <div className="rounded-2xl border border-app-border bg-white p-[18px]">
+          <p className="text-[13px] font-medium text-app-text-primary">היום</p>
+          <p className="mb-3.5 mt-1 text-[11.5px] text-app-text-tertiary">
             {todayEntries.length} דיווחים · סה&quot;כ {formatHM(today.totalSeconds)}
             {today.parallel >= 60 && <> · מתוכם {formatHM(today.parallel)} במקביל</>}
           </p>
           {todayEntries.length === 0 ? (
-            <p className="text-[12.5px] text-appNavy/45">אין עדיין דיווחים סגורים היום.</p>
+            <p className="text-[12.5px] text-app-text-tertiary">אין עדיין דיווחים סגורים היום.</p>
           ) : (
             <div className="flex flex-col gap-2.5">
               {todayEntries.map((entry) => (
                 <div key={entry.id} className="flex items-center gap-2.5 text-[12.5px]">
-                  <span className="flex-1 truncate text-appNavy/75">
+                  <span className="flex-1 truncate text-app-text-secondary">
                     {entry.clientName} · {entry.categoryName}
                   </span>
-                  <span className="font-jbmono text-appNavy">{formatHM(entry.actualSeconds)}</span>
+                  <span className="font-jbmono text-app-text-primary">{formatHM(entry.actualSeconds)}</span>
                 </div>
               ))}
             </div>
@@ -674,7 +674,7 @@ function RunningTimerCard({
           type="button"
           onClick={handleStop}
           disabled={pending || discarding}
-          className="rounded-full bg-gold-gradient px-6 py-3 text-[14.5px] font-medium text-navy disabled:opacity-50"
+          className="rounded-full bg-app-accent px-6 py-3 text-[14.5px] font-medium text-app-text-primary disabled:opacity-50"
         >
           {pending ? "עוצר..." : "עצירה ושמירה"}
         </button>
@@ -733,13 +733,13 @@ function StartFields({
   startLabel: string;
 }) {
   const dark = tone === "dark";
-  const label = dark ? "mb-1.5 block text-[11.5px] text-cream-warm/60" : "mb-1.5 block text-[11.5px] text-appNavy/60";
+  const label = dark ? "mb-1.5 block text-[11.5px] text-cream-warm/60" : "mb-1.5 block text-[11.5px] text-app-text-secondary";
   const field = dark
     ? "w-full rounded-[10px] border border-cream/18 bg-hairline px-3 py-2.5 text-sm text-cream outline-none focus:border-gold-light disabled:opacity-40"
-    : "w-full rounded-[10px] border border-lineDark bg-cream px-3 py-2.5 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40";
+    : "w-full rounded-[10px] border border-app-border bg-app-surface-page px-3 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40";
   const input = dark
     ? `${field} placeholder:text-cream-warm/40`
-    : `${field} placeholder:text-appNavy/35`;
+    : `${field} placeholder:text-app-text-tertiary`;
 
   return (
     <div>
@@ -747,11 +747,11 @@ function StartFields({
         <label className="block">
           <span className={label}>לקוח</span>
           <select value={clientId} onChange={(e) => onClient(e.target.value)} className={field}>
-            <option value="" className="text-appNavy">
+            <option value="" className="text-app-text-primary">
               בחירת לקוח
             </option>
             {clients.map((c) => (
-              <option key={c.id} value={c.id} className="text-appNavy">
+              <option key={c.id} value={c.id} className="text-app-text-primary">
                 {c.name}
               </option>
             ))}
@@ -760,11 +760,11 @@ function StartFields({
         <label className="block">
           <span className={label}>קטגוריה</span>
           <select value={categoryId} onChange={(e) => onCategory(e.target.value)} disabled={!clientId} className={field}>
-            <option value="" className="text-appNavy">
+            <option value="" className="text-app-text-primary">
               בחירת קטגוריה
             </option>
             {categories.map((cat) => (
-              <option key={cat.id} value={cat.id} className="text-appNavy">
+              <option key={cat.id} value={cat.id} className="text-app-text-primary">
                 {cat.name}
               </option>
             ))}
@@ -778,11 +778,11 @@ function StartFields({
           <label className="block">
             <span className={label}>הבטחה ללקוח</span>
             <select value={taskId} onChange={(e) => onTask(e.target.value)} className={field}>
-              <option value="" className="text-appNavy">
+              <option value="" className="text-app-text-primary">
                 לא משויך
               </option>
               {promises.map((t) => (
-                <option key={t.id} value={t.id} className="text-appNavy">
+                <option key={t.id} value={t.id} className="text-app-text-primary">
                   {t.label}
                 </option>
               ))}
@@ -796,7 +796,7 @@ function StartFields({
       </label>
       {error && (
         <p
-          className={`mt-3 flex items-center gap-2 rounded-[10px] px-3 py-2.5 text-[12.5px] ${dark ? "text-cream-warm" : "text-appNavy"}`}
+          className={`mt-3 flex items-center gap-2 rounded-[10px] px-3 py-2.5 text-[12.5px] ${dark ? "text-cream-warm" : "text-app-text-primary"}`}
           style={{ background: dark ? "rgba(179,38,30,.3)" : "rgba(179,38,30,.08)", border: "1px solid rgba(179,38,30,.5)" }}
         >
           {error}
@@ -806,7 +806,7 @@ function StartFields({
         type="button"
         onClick={onStart}
         disabled={pending || !clientId || !categoryId}
-        className="mt-5 rounded-full bg-gold-gradient px-7 py-3 text-[14.5px] font-medium text-navy disabled:opacity-50"
+        className="mt-5 rounded-full bg-app-accent px-7 py-3 text-[14.5px] font-medium text-app-text-primary disabled:opacity-50"
       >
         {pending ? "מתחיל..." : startLabel}
       </button>

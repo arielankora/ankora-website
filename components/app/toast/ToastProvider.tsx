@@ -83,12 +83,12 @@ const TONE_CONFIG: Record<
   // values in tailwind.config.ts - kept as literal values here (not a
   // Tailwind border-color class) because the accent bar below is applied
   // via inline style, see the comment on ToastCard's className.
-  success: { icon: Check, iconClass: "text-success", iconBg: "bg-success-soft", barColor: "#1F7A4D" },
-  error: { icon: AlertCircle, iconClass: "text-error", iconBg: "bg-error-soft", barColor: "#B3261E" },
-  warning: { icon: TriangleAlert, iconClass: "text-warning", iconBg: "bg-warning-soft", barColor: "#8A6F45" },
+  success: { icon: Check, iconClass: "text-app-success", iconBg: "bg-app-success-soft", barColor: "#1F7A4D" },
+  error: { icon: AlertCircle, iconClass: "text-app-error", iconBg: "bg-app-error-soft", barColor: "#B3261E" },
+  warning: { icon: TriangleAlert, iconClass: "text-app-warning", iconBg: "bg-app-warning-soft", barColor: "#8A6F45" },
   // No dedicated "info" tone in the handoff's color table - mapped to the
   // neutral token (closest semantic match: "ניטרלי").
-  info: { icon: Info, iconClass: "text-neutral", iconBg: "bg-neutral-soft", barColor: "rgba(27,42,61,0.55)" },
+  info: { icon: Info, iconClass: "text-app-text-secondary", iconBg: "bg-app-neutral-soft", barColor: "rgba(27,42,61,0.55)" },
 };
 
 type ToastContextValue = { showToast: (input: ShowToastInput) => void };
@@ -162,10 +162,10 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
 
   return (
     <div
-      className="animate-toast-in pointer-events-auto w-[min(420px,calc(100vw-48px))] rounded-[14px] border-e border-t border-b border-lineDark bg-white shadow-[0_14px_34px_rgba(11,27,51,0.16)]"
+      className="animate-toast-in pointer-events-auto w-[min(420px,calc(100vw-48px))] rounded-[14px] border-e border-t border-b border-app-border bg-white shadow-[0_14px_34px_rgba(11,27,51,0.16)]"
       // Spec's "inset 3px 0 0 <tone>" accent bar, done as a logical
       // border-inline-start (inline style, not a Tailwind class, so it
-      // can't collide with border-lineDark above which only targets the
+      // can't collide with border-app-border above which only targets the
       // other three sides via border-e/border-t/border-b) instead of a raw
       // box-shadow inset, so it lands on the correct side in this app's RTL
       // layout (visually the right edge) rather than always-left the way a
@@ -177,11 +177,11 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
           <Icon size={14} strokeWidth={2.25} className={iconClass} />
         </span>
         <div className="min-w-0 flex-1 pt-0.5">
-          <p className="text-[13.5px] font-medium text-appNavy">{toast.title}</p>
-          {toast.description && <p className="mt-0.5 text-xs text-appNavy/60">{toast.description}</p>}
+          <p className="text-[13.5px] font-medium text-app-text-primary">{toast.title}</p>
+          {toast.description && <p className="mt-0.5 text-xs text-app-text-secondary">{toast.description}</p>}
           {toast.ask && <ToastQuestion ask={toast.ask} onDone={onDismiss} />}
           {toast.link && !toast.ask && (
-            <a href={toast.link.href} className="mt-1.5 inline-block text-xs font-medium text-gold-dim hover:text-appNavy">
+            <a href={toast.link.href} className="mt-1.5 inline-block text-xs font-medium text-app-text-accent hover:text-app-text-primary">
               {toast.link.label}
             </a>
           )}
@@ -190,7 +190,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
               type="button"
               onClick={handleUndo}
               disabled={undoing}
-              className="mt-1.5 text-xs font-medium text-gold-dim hover:text-appNavy disabled:opacity-50"
+              className="mt-1.5 text-xs font-medium text-app-text-accent hover:text-app-text-primary disabled:opacity-50"
             >
               {undoing ? "מבטל…" : "ביטול"}
             </button>
@@ -200,7 +200,7 @@ function ToastCard({ toast, onDismiss }: { toast: ToastItem; onDismiss: () => vo
           type="button"
           onClick={onDismiss}
           aria-label="סגירה"
-          className="shrink-0 rounded-full p-1 text-appNavy/30 hover:bg-appNavy/5 hover:text-appNavy/60"
+          className="shrink-0 rounded-full p-1 text-app-text-tertiary hover:bg-app-surface-sunken hover:text-app-text-secondary"
         >
           <X size={14} strokeWidth={2} />
         </button>
@@ -235,7 +235,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
   if (choice?.prompt) {
     return (
       <div className="mt-2">
-        <p className="text-xs text-appNavy/60">{choice.prompt.label}</p>
+        <p className="text-xs text-app-text-secondary">{choice.prompt.label}</p>
         <div className="mt-1.5 flex items-center gap-1.5">
           <input
             autoFocus
@@ -247,13 +247,13 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
               if (e.key === "Escape") setChoice(null);
             }}
             placeholder={choice.prompt.placeholder}
-            className="min-w-0 flex-1 rounded-[8px] border border-lineDark bg-white px-2.5 py-1.5 text-xs text-appNavy outline-none focus:border-gold"
+            className="min-w-0 flex-1 rounded-[8px] border border-app-border bg-white px-2.5 py-1.5 text-xs text-app-text-primary outline-none focus:border-gold"
           />
           <button
             type="button"
             disabled={saving || !text.trim()}
             onClick={() => void answer(choice.value, text.trim())}
-            className="shrink-0 rounded-full bg-gold-gradient px-3 py-1.5 text-[11px] font-medium text-navy disabled:opacity-40"
+            className="shrink-0 rounded-full bg-app-accent px-3 py-1.5 text-[11px] font-medium text-app-text-primary disabled:opacity-40"
           >
             שמירה
           </button>
@@ -261,7 +261,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
             type="button"
             disabled={saving}
             onClick={() => setChoice(null)}
-            className="shrink-0 text-[11px] text-appNavy/40 hover:text-appNavy"
+            className="shrink-0 text-[11px] text-app-text-tertiary hover:text-app-text-primary"
           >
             חזרה
           </button>
@@ -272,7 +272,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
 
   return (
     <div className="mt-2">
-      <p className="text-xs text-appNavy/60">{ask.question}</p>
+      <p className="text-xs text-app-text-secondary">{ask.question}</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {ask.choices.map((c) => (
           <button
@@ -280,7 +280,7 @@ function ToastQuestion({ ask, onDone }: { ask: ToastAsk; onDone: () => void }) {
             type="button"
             disabled={saving}
             onClick={() => (c.prompt ? setChoice(c) : void answer(c.value))}
-            className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11px] text-appNavy/75 hover:border-gold disabled:opacity-40"
+            className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11px] text-app-text-secondary hover:border-gold disabled:opacity-40"
           >
             {c.label}
           </button>

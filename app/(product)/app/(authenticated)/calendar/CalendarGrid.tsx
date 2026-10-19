@@ -54,8 +54,8 @@ const GRID_COLUMNS = "grid-cols-[repeat(5,minmax(0,1fr))_repeat(2,minmax(0,0.7fr
 const PRIORITY_DOT: Record<CalendarTask["priority"], string> = {
   LOW: "bg-transparent",
   NORMAL: "bg-transparent",
-  HIGH: "bg-warning",
-  URGENT: "bg-error",
+  HIGH: "bg-app-warning",
+  URGENT: "bg-app-error",
 };
 
 type Props = {
@@ -184,7 +184,7 @@ export function CalendarGrid(props: Props) {
           <section
             data-day={props.days[0]}
             {...dropZone(props.days[0])}
-            className={`min-h-[320px] rounded-2xl border p-4 transition-colors ${over === props.days[0] ? "border-appNavy bg-appNavy/[0.04]" : "border-lineDark bg-white"}`}
+            className={`min-h-[320px] rounded-2xl border p-4 transition-colors ${over === props.days[0] ? "border-appNavy bg-app-surface-sunken" : "border-app-border bg-white"}`}
           >
             <DayItems
               tasks={byDay.get(props.days[0])?.tasks ?? []}
@@ -198,10 +198,10 @@ export function CalendarGrid(props: Props) {
           <>
             {/* Desk: the grid. Sunday is the first column, and in a
                 right-to-left page that is the right edge, as on paper. */}
-            <div className="hidden overflow-hidden rounded-2xl border border-lineDark bg-lineDark md:block">
+            <div className="hidden overflow-hidden rounded-2xl border border-app-border bg-app-border md:block">
               <div className={`grid gap-px ${GRID_COLUMNS}`}>
                 {WEEKDAY_LABELS.map((label) => (
-                  <div key={label} className="bg-cream-dim/40 px-2 py-1.5 text-center text-[12px] font-medium text-appNavy/55">
+                  <div key={label} className="bg-cream-dim/40 px-2 py-1.5 text-center text-[12px] font-medium text-app-text-secondary">
                     {label}
                   </div>
                 ))}
@@ -222,7 +222,7 @@ export function CalendarGrid(props: Props) {
                           : outside
                             ? "bg-cream-dim/30"
                             : day === props.today
-                              ? "bg-[#FDFBF7]"
+                              ? "bg-app-surface-sunken"
                               : weekend
                                 ? "bg-cream-dim/20"
                                 : "bg-white"
@@ -233,14 +233,14 @@ export function CalendarGrid(props: Props) {
                         draggable={false}
                         aria-label={`יום ${shortDate(day)}`}
                         className={`self-start rounded-full px-1.5 text-[12px] font-jbmono ${
-                          day === props.today ? "bg-appNavy text-cream" : outside ? "text-appNavy/35" : "text-appNavy/60 hover:text-appNavy"
+                          day === props.today ? "bg-app-surface-nav text-cream" : outside ? "text-app-text-tertiary" : "text-app-text-secondary hover:text-app-text-primary"
                         }`}
                       >
                         {props.view === "week" ? shortDate(day) : dayOfMonth(day)}
                       </a>
                       {capped}
                       {items.length > capped.length && (
-                        <a href={props.dayHrefs[day]} className="px-1 text-[11.5px] text-appNavy/50 hover:text-appNavy">
+                        <a href={props.dayHrefs[day]} className="px-1 text-[11.5px] text-app-text-tertiary hover:text-app-text-primary">
                           ועוד {items.length - capped.length}
                         </a>
                       )}
@@ -259,8 +259,8 @@ export function CalendarGrid(props: Props) {
                 .filter((day) => day === props.today || (byDay.get(day)!.tasks.length + byDay.get(day)!.dates.length > 0))
                 .filter((day) => props.view !== "month" || day.slice(0, 7) === anchorMonth)
                 .map((day) => (
-                  <section key={day} className="rounded-2xl border border-lineDark bg-white p-3">
-                    <a href={props.dayHrefs[day]} className={`text-[13px] font-medium ${day === props.today ? "text-appNavy" : "text-appNavy/60"}`}>
+                  <section key={day} className="rounded-2xl border border-app-border bg-white p-3">
+                    <a href={props.dayHrefs[day]} className={`text-[13px] font-medium ${day === props.today ? "text-app-text-primary" : "text-app-text-secondary"}`}>
                       {WEEKDAY_LABELS[new Date(`${day}T00:00:00Z`).getUTCDay()]} {shortDate(day)}
                       {day === props.today ? " · היום" : ""}
                     </a>
@@ -305,7 +305,7 @@ function DayItems({
   dateItem: (d: CalendarDate) => React.ReactNode;
   empty: string;
 }) {
-  if (tasks.length + dates.length === 0) return <p className="text-[12.5px] text-appNavy/40">{empty}</p>;
+  if (tasks.length + dates.length === 0) return <p className="text-[12.5px] text-app-text-tertiary">{empty}</p>;
   return (
     <div className="flex flex-col gap-1.5">
       {dates.map(dateItem)}
@@ -325,13 +325,13 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
       }}
       data-calendar-task={task.id}
       title={`${task.title} · ${task.clientName}${task.assigneeName ? ` · ${task.assigneeName}` : ""}${overdue ? " · באיחור" : ""}`}
-      className="cursor-grab rounded-lg border border-lineDark bg-white px-2 py-1 active:cursor-grabbing"
+      className="cursor-grab rounded-lg border border-app-border bg-white px-2 py-1 active:cursor-grabbing"
     >
       <div className="flex items-start gap-1.5">
         {/* Late is a dot, not a red card. A week with four late tasks
             used to be a red column that drowned out everything else on
             screen; the dot says the same thing and lets the week read. */}
-        <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${overdue ? "bg-error" : PRIORITY_DOT[task.priority]}`} />
+        <span className={`mt-[6px] h-1.5 w-1.5 shrink-0 rounded-full ${overdue ? "bg-app-error" : PRIORITY_DOT[task.priority]}`} />
         {/* A plain anchor, like the board: a soft navigation to a task was
             being cancelled by the router. The link does not carry the
             drag; the chip does. Two lines at most: the whole title is in
@@ -339,12 +339,12 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
         <a
           href={taskHref(task.id, from)}
           draggable={false}
-          className="line-clamp-2 min-w-0 flex-1 text-[12.5px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70"
+          className="line-clamp-2 min-w-0 flex-1 text-[12.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
         >
           {task.title}
         </a>
       </div>
-      <p className="truncate ps-3 text-[11px] text-appNavy/55">{task.clientName}</p>
+      <p className="truncate ps-3 text-[11px] text-app-text-secondary">{task.clientName}</p>
     </article>
   );
 }
@@ -394,7 +394,7 @@ function Drawer({
 
   const tabClass = (active: boolean) =>
     `flex-1 rounded-full px-3 py-1.5 text-center text-[12.5px] font-medium transition-colors ${
-      active ? "border border-lineDark bg-white text-appNavy" : "text-appNavy/60 hover:text-appNavy"
+      active ? "border border-app-border bg-white text-app-text-primary" : "text-app-text-secondary hover:text-app-text-primary"
     }`;
 
   return (
@@ -403,13 +403,13 @@ function Drawer({
       data-day="undated"
       {...zone}
       className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] ${
-        over ? "border-gold bg-gold/5" : "border-lineDark"
+        over ? "border-gold bg-gold/5" : "border-app-border"
       }`}
     >
-      <div className="flex flex-col gap-2.5 border-b border-lineDark p-3">
+      <div className="flex flex-col gap-2.5 border-b border-app-border p-3">
         <div className="flex items-center gap-2">
-          <h2 className="flex-1 text-[14px] font-medium text-appNavy">{tab === "undated" ? "בלי תאריך יעד" : "באיחור"}</h2>
-          <Link href={hrefs.close} aria-label="סגירת המגירה" data-testid="calendar-drawer-close" className="rounded-lg p-1.5 text-appNavy/60 hover:bg-cream-dim/40 hover:text-appNavy">
+          <h2 className="flex-1 text-[14px] font-medium text-app-text-primary">{tab === "undated" ? "בלי תאריך יעד" : "באיחור"}</h2>
+          <Link href={hrefs.close} aria-label="סגירת המגירה" data-testid="calendar-drawer-close" className="rounded-lg p-1.5 text-app-text-secondary hover:bg-cream-dim/40 hover:text-app-text-primary">
             <X size={16} strokeWidth={1.8} />
           </Link>
         </div>
@@ -421,7 +421,7 @@ function Drawer({
             באיחור <span className="font-jbmono text-[11.5px]">{overdue.length}{overdueMore ? "+" : ""}</span>
           </Link>
         </div>
-        <label className="flex items-center gap-2 rounded-lg border border-lineDark px-2.5 py-1.5 text-[13px] text-appNavy/60 focus-within:border-appNavy/40">
+        <label className="flex items-center gap-2 rounded-lg border border-app-border px-2.5 py-1.5 text-[13px] text-app-text-secondary focus-within:border-appNavy/40">
           <Search size={14} strokeWidth={1.8} />
           <span className="sr-only">חיפוש</span>
           <input
@@ -430,18 +430,18 @@ function Drawer({
             onChange={(e) => setQ(e.target.value)}
             placeholder="חיפוש לפי משימה או לקוח"
             data-testid="calendar-drawer-search"
-            className="min-w-0 flex-1 bg-transparent text-appNavy outline-none placeholder:text-appNavy/45"
+            className="min-w-0 flex-1 bg-transparent text-app-text-primary outline-none placeholder:text-app-text-tertiary"
           />
         </label>
-        <p className="text-[11.5px] text-appNavy/55">גוררים משימה ליום כדי לקבוע יעד. גרירה לכאן מסירה את היעד.</p>
+        <p className="text-[11.5px] text-app-text-secondary">גוררים משימה ליום כדי לקבוע יעד. גרירה לכאן מסירה את היעד.</p>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2 pb-3">
         {ordered.map(([client, list]) => (
           <section key={client}>
-            <h3 className="flex items-baseline gap-1.5 px-1.5 pb-1 pt-3 text-[11.5px] font-semibold tracking-wide text-appNavy/60">
+            <h3 className="flex items-baseline gap-1.5 px-1.5 pb-1 pt-3 text-[11.5px] font-semibold tracking-wide text-app-text-secondary">
               {client}
-              <span className="font-jbmono text-[11px] font-normal text-appNavy/45">{list.length}</span>
+              <span className="font-jbmono text-[11px] font-normal text-app-text-tertiary">{list.length}</span>
             </h3>
             {list.map((t) => (
               <DrawerRow key={t.id} task={t} from={from} disabled={disabled} showDue={tab === "overdue"} />
@@ -449,12 +449,12 @@ function Drawer({
           </section>
         ))}
         {shown.length === 0 && (
-          <p className="px-1.5 py-4 text-[12.5px] text-appNavy/45">
+          <p className="px-1.5 py-4 text-[12.5px] text-app-text-tertiary">
             {needle ? "אין משימה שמתאימה לחיפוש." : tab === "undated" ? "לכל המשימות הפתוחות יש תאריך." : "אין משימות באיחור."}
           </p>
         )}
         {(tab === "undated" ? undatedMore : overdueMore) && (
-          <Link href="/app/tasks" className="block px-1.5 pt-3 text-[12px] text-appNavy/55 hover:text-appNavy">
+          <Link href="/app/tasks" className="block px-1.5 pt-3 text-[12px] text-app-text-secondary hover:text-app-text-primary">
             יש עוד. לרשימת המשימות
           </Link>
         )}
@@ -476,7 +476,7 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
       className="group flex cursor-grab items-start gap-1.5 rounded-lg px-1.5 py-2 hover:bg-cream-dim/30 active:cursor-grabbing"
     >
       {/* The grip says "this moves" before anyone tries. */}
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mt-[3px] shrink-0 text-appNavy/30 group-hover:text-appNavy/55">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mt-[3px] shrink-0 text-app-text-tertiary group-hover:text-app-text-secondary">
         <circle cx="9" cy="6" r="1.6" />
         <circle cx="15" cy="6" r="1.6" />
         <circle cx="9" cy="12" r="1.6" />
@@ -484,11 +484,11 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
         <circle cx="9" cy="18" r="1.6" />
         <circle cx="15" cy="18" r="1.6" />
       </svg>
-      <a href={taskHref(task.id, from)} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70">
+      <a href={taskHref(task.id, from)} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary">
         {task.title}
       </a>
       {showDue && task.dueKey && (
-        <span className="mt-[2px] flex shrink-0 items-center gap-1 font-jbmono text-[11px] text-error">
+        <span className="mt-[2px] flex shrink-0 items-center gap-1 font-jbmono text-[11px] text-app-error">
           <Clock size={11} strokeWidth={1.8} />
           {shortDate(task.dueKey)}
         </span>
@@ -504,12 +504,12 @@ function DateChip({ date, from }: { date: CalendarDate; from: string }) {
       draggable={false}
       data-calendar-date={date.id}
       title={`${date.title} · ${date.clientName}`}
-      className="flex items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-[12.5px] leading-snug text-appNavy hover:bg-gold/20"
+      className="flex items-start gap-1.5 rounded-lg bg-gold/10 px-2 py-1 text-[12.5px] leading-snug text-app-text-primary hover:bg-gold/20"
     >
-      <CalendarDays size={12} strokeWidth={1.8} className="mt-[3px] shrink-0 text-gold-dim" />
+      <CalendarDays size={12} strokeWidth={1.8} className="mt-[3px] shrink-0 text-app-text-accent" />
       <span className="min-w-0 flex-1 [overflow-wrap:anywhere]">
         {date.title}
-        <span className="block truncate text-[11px] text-appNavy/45">{date.clientName}</span>
+        <span className="block truncate text-[11px] text-app-text-tertiary">{date.clientName}</span>
       </span>
     </a>
   );

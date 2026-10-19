@@ -171,8 +171,8 @@ export function Drawer({
         onClick={() => setOpen(true)}
         className={
           variant === "link"
-            ? `text-xs text-appNavy/60 hover:text-appNavy ${triggerClassName}`
-            : `inline-flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2.5 text-sm font-medium text-navy ${triggerClassName}`
+            ? `text-xs text-app-text-secondary hover:text-app-text-primary ${triggerClassName}`
+            : `inline-flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2.5 text-sm font-medium text-app-text-primary ${triggerClassName}`
         }
       >
         {variant === "primary" && <Plus size={16} strokeWidth={2.25} />}
@@ -187,14 +187,14 @@ export function Drawer({
             onClick={dismiss}
             className="absolute inset-0 bg-appNavy/30"
           />
-          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-lineDark bg-white shadow-lg sm:max-w-md">
-            <div className="flex items-center justify-between border-b border-lineDark px-5 py-4">
-              <h2 className="text-base font-medium text-appNavy">{title}</h2>
+          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white shadow-lg sm:max-w-md">
+            <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
+              <h2 className="text-base font-medium text-app-text-primary">{title}</h2>
               <button
                 type="button"
                 aria-label="סגירה"
                 onClick={dismiss}
-                className="text-appNavy/50 transition-colors hover:text-appNavy"
+                className="text-app-text-tertiary transition-colors hover:text-app-text-primary"
               >
                 <X size={18} />
               </button>

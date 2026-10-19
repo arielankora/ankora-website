@@ -50,18 +50,18 @@ export default async function PortalDecisionsPage(props: {
       <PortalTabs active="decisions" />
 
       {justAnswered && (
-        <div className="rounded-2xl border border-success/25 bg-success-soft px-[18px] py-3.5">
-          <p className="text-[13.5px] text-success">התשובה שלך נקלטה. תודה.</p>
+        <div className="rounded-2xl border border-app-success/25 bg-app-success-soft px-[18px] py-3.5">
+          <p className="text-[13.5px] text-app-success">התשובה שלך נקלטה. תודה.</p>
           {justAnswered.answer && (
-            <p className="mt-1 text-[12.5px] text-appNavy/60">נבחר: {justAnswered.answer.optionLabel}</p>
+            <p className="mt-1 text-[12.5px] text-app-text-secondary">נבחר: {justAnswered.answer.optionLabel}</p>
           )}
         </div>
       )}
 
       {decisions.open.length === 0 ? (
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
-          <p className="text-[13.5px] font-medium text-appNavy">אין כרגע החלטות שמחכות לך</p>
-          <p className="mt-1.5 text-[13px] text-appNavy/60">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
+          <p className="text-[13.5px] font-medium text-app-text-primary">אין כרגע החלטות שמחכות לך</p>
+          <p className="mt-1.5 text-[13px] text-app-text-secondary">
             כשנגיע לצומת שדורשת הכרעה שלך, היא תופיע כאן עם האפשרויות, המחירים וההמלצה שלנו.
           </p>
         </div>
@@ -89,22 +89,22 @@ export default async function PortalDecisionsPage(props: {
       )}
 
       {decisions.closed.length > 0 && (
-        <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-          <div className="border-b border-lineDark px-[18px] py-3.5 text-[13.5px] font-medium text-appNavy">
+        <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
+          <div className="border-b border-app-border px-[18px] py-3.5 text-[13.5px] font-medium text-app-text-primary">
             החלטות קודמות
           </div>
-          <div className="divide-y divide-lineDark/60">
+          <div className="divide-y divide-app-border">
             {decisions.closed.map((d) => (
               <div key={d.id} className="px-[18px] py-3.5">
-                <p className="text-sm text-appNavy">{d.question}</p>
+                <p className="text-sm text-app-text-primary">{d.question}</p>
                 {d.answer ? (
-                  <p className="mt-1 text-[12px] text-appNavy/60">
+                  <p className="mt-1 text-[12px] text-app-text-secondary">
                     נבחר: {d.answer.optionLabel}
                     {formatMinor(d.answer.amountMinor) ? ` · ${formatMinor(d.answer.amountMinor)}` : ""} · אושר על ידי{" "}
                     {d.answer.respondedByName} ב-{formatDate(d.answer.respondedAt)}
                   </p>
                 ) : (
-                  <p className="mt-1 text-[12px] text-appNavy/50">בוטל על ידי Ankora. לא נדרשה ממך החלטה.</p>
+                  <p className="mt-1 text-[12px] text-app-text-tertiary">בוטל על ידי Ankora. לא נדרשה ממך החלטה.</p>
                 )}
               </div>
             ))}

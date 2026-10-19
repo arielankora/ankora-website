@@ -51,7 +51,7 @@ export function RuleActions({ ruleId, enabled }: { ruleId: string; enabled: bool
         type="button"
         disabled={isPending}
         onClick={handleDelete}
-        className="text-xs font-medium text-error/80 underline decoration-error/30 underline-offset-2 disabled:opacity-50"
+        className="text-xs font-medium text-app-error underline decoration-app-error/30 underline-offset-2 disabled:opacity-50"
       >
         מחיקה
       </button>

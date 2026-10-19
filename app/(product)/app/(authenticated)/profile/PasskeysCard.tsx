@@ -15,7 +15,7 @@ import { deviceLinkIssueAction, deviceLinkOptionsAction, removePasskeyAction, se
 type Row = { id: string; name: string; createdAt: string; lastUsedAt: string | null; backedUp: boolean };
 
 const INPUT =
-  "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
+  "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 
 export function PasskeysCard({
   passkeys,
@@ -82,34 +82,34 @@ export function PasskeysCard({
   }
 
   return (
-    <div id="passkeys" className="rounded-2xl border border-lineDark bg-white p-6">
-      <h2 className="flex items-center gap-1.5 text-sm font-medium text-appNavy">
+    <div id="passkeys" className="rounded-2xl border border-app-border bg-white p-6">
+      <h2 className="flex items-center gap-1.5 text-sm font-medium text-app-text-primary">
         <Fingerprint size={16} strokeWidth={1.75} />
         Passkey (Touch ID)
       </h2>
-      <p className="mt-1 text-xs text-appNavy/60">
+      <p className="mt-1 text-xs text-app-text-secondary">
         {audience === "staff"
           ? "אימות דו-שלבי בכל כניסה, ואימות זהות לפני צפייה בפרטי גישה של לקוחות. בטביעת אצבע או בזיהוי פנים, והמפתח נשאר במכשיר שלך."
           : "שכבת הגנה נוספת לפורטל: אחרי הסיסמה או הקישור במייל, אישור בטביעת אצבע או בזיהוי פנים. המפתח נשאר במכשיר שלך."}
       </p>
       {audience === "staff" && required && passkeys.length === 0 && (
-        <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-appNavy/80">
+        <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-app-text-primary">
           כדי לצפות בגישות במערכות וגישות צריך להגדיר passkey אחד לפחות.
         </p>
       )}
       {passkeys.length === 1 && (
-        <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-appNavy/80">
+        <p className="mt-3 rounded-lg bg-cream-dim p-3 text-xs text-app-text-primary">
           מומלץ להוסיף מכשיר שני, למשל טלפון, כדי שאובדן של אחד מהם לא ינעל את הכניסה. מפיקים כאן קוד, ומקלידים אותו במכשיר החדש אחרי הסיסמה.
         </p>
       )}
 
       {passkeys.length > 0 && (
-        <ul className="mt-4 divide-y divide-lineDark/70">
+        <ul className="mt-4 divide-y divide-app-border">
           {passkeys.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
               <div className="min-w-0">
-                <p className="truncate text-sm text-appNavy">{p.name}</p>
-                <p className="text-xs text-appNavy/50">
+                <p className="truncate text-sm text-app-text-primary">{p.name}</p>
+                <p className="text-xs text-app-text-tertiary">
                   נוסף {p.createdAt}
                   {p.lastUsedAt ? ` · שימוש אחרון ${p.lastUsedAt}` : " · עוד לא בשימוש"}
                   {p.backedUp ? " · מגובה בחשבון המכשיר" : ""}
@@ -125,7 +125,7 @@ export function PasskeysCard({
                     else router.refresh();
                   })
                 }
-                className="shrink-0 text-xs text-appNavy/50 hover:text-error"
+                className="shrink-0 text-xs text-app-text-tertiary hover:text-app-error"
               >
                 הסרה
               </button>
@@ -136,27 +136,27 @@ export function PasskeysCard({
 
       {supported && passkeys.length > 0 && (
         <div className="mt-4">
-          <p className="flex items-center gap-1.5 text-sm text-appNavy">
+          <p className="flex items-center gap-1.5 text-sm text-app-text-primary">
             <Smartphone size={15} strokeWidth={1.75} />
             הוספת מכשיר
           </p>
-          <p className="mt-1 text-xs text-appNavy/60">
+          <p className="mt-1 text-xs text-app-text-secondary">
             לכניסה מטלפון או ממחשב אחר. מאשרים כאן בטביעת אצבע, ובמכשיר החדש מקלידים את הקוד אחרי הסיסמה, בלחיצה על
             &quot;זה מכשיר חדש&quot;.
           </p>
           {link ? (
             <div className="mt-3 rounded-lg bg-cream-dim p-4 text-center">
-              <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-appNavy">
+              <p dir="ltr" className="font-mono text-2xl tracking-[0.35em] text-app-text-primary">
                 {link.code.slice(0, 3)} {link.code.slice(3)}
               </p>
-              <p className="mt-1.5 text-xs text-appNavy/60">תקף עד {link.until}, לשימוש אחד.</p>
+              <p className="mt-1.5 text-xs text-app-text-secondary">תקף עד {link.until}, לשימוש אחד.</p>
             </div>
           ) : (
             <button
               type="button"
               onClick={onLink}
               disabled={linking}
-              className="mt-3 rounded-full bg-gold-gradient px-5 py-2 text-sm font-medium text-navy disabled:opacity-50"
+              className="mt-3 rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
             >
               {linking ? "ממתין למכשיר..." : "הפקת קוד למכשיר חדש"}
             </button>
@@ -164,26 +164,26 @@ export function PasskeysCard({
         </div>
       )}
       {!supported ? (
-        <p className="mt-4 text-xs text-appNavy/60">הדפדפן הזה לא תומך ב-passkey.</p>
+        <p className="mt-4 text-xs text-app-text-secondary">הדפדפן הזה לא תומך ב-passkey.</p>
       ) : adding ? (
         <form onSubmit={onAdd} className="mt-4 flex flex-col gap-3">
           <div>
-            <label className="block text-xs font-medium text-appNavy/60" htmlFor="pk-name">שם למכשיר</label>
+            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-name">שם למכשיר</label>
             <input id="pk-name" name="name" maxLength={60} placeholder="MacBook" className={INPUT} />
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60" htmlFor="pk-pass">הסיסמה שלך לאנקורה</label>
+            <label className="block text-xs font-medium text-app-text-secondary" htmlFor="pk-pass">הסיסמה שלך לאנקורה</label>
             <input id="pk-pass" name="password" type="password" required autoComplete="current-password" className={INPUT} />
           </div>
           <div className="flex gap-2">
             <button
               type="submit"
               disabled={busy}
-              className="rounded-full bg-gold-gradient px-5 py-2 text-sm font-medium text-navy disabled:opacity-50"
+              className="rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
             >
               {busy ? "ממתין למכשיר..." : "המשך ל-Touch ID"}
             </button>
-            <button type="button" onClick={() => setAdding(false)} className="px-3 text-sm text-appNavy/60">
+            <button type="button" onClick={() => setAdding(false)} className="px-3 text-sm text-app-text-secondary">
               ביטול
             </button>
           </div>
@@ -194,16 +194,16 @@ export function PasskeysCard({
           onClick={() => setAdding(true)}
           className={
             passkeys.length > 0
-              ? "mt-4 block text-xs text-appNavy/50 underline-offset-4 hover:underline"
-              : "mt-4 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5"
+              ? "mt-4 block text-xs text-app-text-tertiary underline-offset-4 hover:underline"
+              : "mt-4 rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:bg-app-surface-sunken"
           }
         >
           {passkeys.length > 0 ? "רישום מפתח נוסף בדפדפן או במכשיר הזה" : "הוספת passkey"}
         </button>
       )}
       {audience === "client" && passkeys.length > 0 && (
-        <div className="mt-5 border-t border-lineDark/70 pt-4">
-          <p className="text-sm text-appNavy">
+        <div className="mt-5 border-t border-app-border pt-4">
+          <p className="text-sm text-app-text-primary">
             אימות דו-שלבי בכל כניסה: <span className="font-medium">{loginRequired ? "פעיל" : "כבוי"}</span>
           </p>
           {toggling ? (
@@ -222,18 +222,18 @@ export function PasskeysCard({
               }}
             >
               <div>
-                <label className="block text-xs font-medium text-appNavy/60" htmlFor="lp-pass">הסיסמה שלך לאנקורה</label>
+                <label className="block text-xs font-medium text-app-text-secondary" htmlFor="lp-pass">הסיסמה שלך לאנקורה</label>
                 <input id="lp-pass" name="password" type="password" required autoComplete="current-password" className={INPUT} />
               </div>
               <div className="flex gap-2">
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-full bg-gold-gradient px-5 py-2 text-sm font-medium text-navy disabled:opacity-50"
+                  className="rounded-full bg-app-accent px-5 py-2 text-sm font-medium text-app-text-primary disabled:opacity-50"
                 >
                   {loginRequired ? "כיבוי" : "הפעלה"}
                 </button>
-                <button type="button" onClick={() => setToggling(false)} className="px-3 text-sm text-appNavy/60">
+                <button type="button" onClick={() => setToggling(false)} className="px-3 text-sm text-app-text-secondary">
                   ביטול
                 </button>
               </div>
@@ -242,7 +242,7 @@ export function PasskeysCard({
             <button
               type="button"
               onClick={() => setToggling(true)}
-              className="mt-3 rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy hover:bg-appNavy/5"
+              className="mt-3 rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:bg-app-surface-sunken"
             >
               {loginRequired ? "כיבוי אימות דו-שלבי" : "הפעלת אימות דו-שלבי"}
             </button>
@@ -250,9 +250,9 @@ export function PasskeysCard({
         </div>
       )}
       {audience === "staff" && loginRequired && (
-        <p className="mt-4 text-xs text-appNavy/50">לצוות אנקורה האימות הדו-שלבי פעיל תמיד.</p>
+        <p className="mt-4 text-xs text-app-text-tertiary">לצוות אנקורה האימות הדו-שלבי פעיל תמיד.</p>
       )}
-      {error && <p className="mt-3 text-xs text-error">{error}</p>}
+      {error && <p className="mt-3 text-xs text-app-error">{error}</p>}
     </div>
   );
 }

@@ -23,9 +23,9 @@ const VIEW_WINDOW_MS = 15 * 60 * 1000;
 function Unavailable() {
   return (
     <main className="mx-auto max-w-xl px-4 py-16 sm:px-6">
-      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
-      <h1 className="mt-8 text-xl font-medium text-appNavy">הקישור אינו זמין</h1>
-      <p className="mt-3 text-sm leading-7 text-appNavy/70">
+      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
+      <h1 className="mt-8 text-xl font-medium text-app-text-primary">הקישור אינו זמין</h1>
+      <p className="mt-3 text-sm leading-7 text-app-text-secondary">
         אי אפשר להעלות קובץ מהקישור הזה. אם עדיין צריך לשלוח את הטופס החתום, אפשר לפנות ל-ops@ankora.co.il ולבקש קישור חדש.
       </p>
     </main>
@@ -46,13 +46,13 @@ export default async function AgreementUploadPage(props: { params: Promise<{ tok
 
   return (
     <main className="mx-auto max-w-xl px-4 py-10 sm:px-6">
-      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
+      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
 
-      <h1 className="mt-8 text-2xl font-medium text-appNavy">העלאת {view.title} חתום</h1>
-      <p className="mt-3 text-sm leading-7 text-appNavy/70">
+      <h1 className="mt-8 text-2xl font-medium text-app-text-primary">העלאת {view.title} חתום</h1>
+      <p className="mt-3 text-sm leading-7 text-app-text-secondary">
         {view.userName}, כאן מעלים את הטופס ששלחנו במייל, אחרי קריאה וחתימה. אפשר חתימה דיגיטלית, או הדפסה, חתימה וסריקה.
       </p>
-      <p className="mt-2 text-xs text-appNavy/50" dir="auto">
+      <p className="mt-2 text-xs text-app-text-tertiary" dir="auto">
         גרסה {view.version} · <span dir="ltr">{view.code}</span>
       </p>
 
@@ -60,7 +60,7 @@ export default async function AgreementUploadPage(props: { params: Promise<{ tok
         <UploadForm token={token} />
       </div>
 
-      <p className="mt-4 text-xs text-appNavy/50">הקישור אישי ומיועד לשימוש אחד. הקובץ נשמר אצל אנקורה בלבד.</p>
+      <p className="mt-4 text-xs text-app-text-tertiary">הקישור אישי ומיועד לשימוש אחד. הקובץ נשמר אצל אנקורה בלבד.</p>
     </main>
   );
 }

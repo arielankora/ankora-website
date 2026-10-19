@@ -93,7 +93,7 @@ function inline(escaped: string): string {
   return rendered.replace(
     /\u0000C(\d+)\u0000/g,
     (_whole, index: string) =>
-      `<code class="rounded bg-appNavy/[0.06] px-1 py-0.5 text-[0.92em]">${codes[Number(index)]}</code>`
+      `<code class="rounded bg-app-surface-sunken px-1 py-0.5 text-[0.92em]">${codes[Number(index)]}</code>`
   );
 }
 
@@ -103,7 +103,7 @@ function applyInline(escaped: string): string {
       .replace(/\[([^\]\n]+)\]\(([^)\s]+)\)/g, (whole, text: string, href: string) => {
         const safe = safeHref(href);
         if (!safe) return text;
-        return `<a href="${safe}" target="_blank" rel="noopener noreferrer nofollow" class="text-gold-dim underline underline-offset-2 hover:text-appNavy">${text}</a>`;
+        return `<a href="${safe}" target="_blank" rel="noopener noreferrer nofollow" class="text-app-text-accent underline underline-offset-2 hover:text-app-text-primary">${text}</a>`;
       })
       .replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>")
       .replace(/__([^_\n]+)__/g, "<strong>$1</strong>")
@@ -157,7 +157,7 @@ export function renderMarkdownLite(source: string): string {
 
     if (fence) {
       if (trimmed.startsWith("```")) {
-        out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-cream p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
+        out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
         fence = null;
       } else {
         fence.push(line);
@@ -196,7 +196,7 @@ export function renderMarkdownLite(source: string): string {
     paragraph.push(trimmed);
   }
 
-  if (fence) out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-cream p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
+  if (fence) out.push(`<pre dir="auto" class="whitespace-pre-wrap rounded-lg bg-app-surface-page p-3 font-jbmono text-[12.5px] leading-6"><code>${fence.join("\n")}</code></pre>`);
   closeParagraph();
   closeList();
   return out.join("");

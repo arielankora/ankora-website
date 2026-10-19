@@ -124,13 +124,13 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div>
           <BackLink href={backHref} label="חזרה ללקוחות" />
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
+            <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
           </div>
         </div>
 
-        <div className="space-y-4 rounded-2xl border border-lineDark bg-white p-6">
-          <p className="text-sm text-appNavy/70">
+        <div className="space-y-4 rounded-2xl border border-app-border bg-white p-6">
+          <p className="text-sm text-app-text-secondary">
             {paused
               ? "הלקוח מושהה, ולכן המשימות, התיק והמסמכים שלו לא מוצגים כאן, והוא לא מופיע ברשימות העבודה. שום דבר לא נמחק: הכול חוזר כשהלקוח חוזר לפעיל."
               : "הלקוח בארכיון. שום דבר לא נמחק: המשימות, התיק והשעות חוזרים כשהלקוח חוזר לפעיל."}
@@ -138,7 +138,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           <RestoreClientButton clientId={client.id} />
         </div>
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
           <EditClientForm client={client} staff={staff} />
         </div>
       </div>
@@ -281,7 +281,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         <div>
           <BackLink href={backHref} label="חזרה ללקוחות" />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
+            <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             {/* The same button as on a task, on the screen somebody
                 opens when they want to write to a client without a task
                 in mind. Nothing here sends by itself. See
@@ -289,11 +289,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <div className="flex flex-wrap items-center gap-3">
               {/* The file to read, top to bottom, and to download. */}
               {pendingProposals > 0 && (
-                <Link href={tab === "file" ? `#client-pending` : `/app/clients/${client.id}?tab=file`} className="text-sm text-warning hover:underline">
+                <Link href={tab === "file" ? `#client-pending` : `/app/clients/${client.id}?tab=file`} className="text-sm text-app-warning hover:underline">
                   {pendingProposals === 1 ? "הצעה אחת ממתינה לאישור" : `${pendingProposals} הצעות ממתינות לאישור`}
                 </Link>
               )}
-              <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-gold-dim hover:underline">
+              <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
                 תיק הלקוח לקריאה
               </Link>
               {composer && <MessageClient clientId={client.id} {...composer} />}
@@ -335,7 +335,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             .map((p) => ({ id: p.id, title: p.title, text: ruleInForce(p)!.text, proposed: p.status === "PROPOSED" }))}
         />
 
-        <nav className="flex gap-1 border-b border-lineDark" aria-label="לשוניות הלקוח">
+        <nav className="flex gap-1 border-b border-app-border" aria-label="לשוניות הלקוח">
           {(
             [
               ["work", "עבודה שוטפת", `/app/clients/${client.id}`],
@@ -346,7 +346,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               key={key}
               href={href}
               aria-current={tab === key ? "page" : undefined}
-              className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-gold font-medium text-appNavy" : "border-transparent text-appNavy/55 hover:text-appNavy"}`}
+              className={`-mb-px border-b-2 px-3 py-2 text-sm ${tab === key ? "border-gold font-medium text-app-text-primary" : "border-transparent text-app-text-secondary hover:text-app-text-primary"}`}
             >
               {label}
             </Link>
@@ -356,8 +356,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         {tab === "file" && openBatches.length > 0 && (
           <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-medium text-appNavy">ממתין לאישור</h2>
-              <Link href={`/app/knowledge?clientId=${client.id}`} className="text-xs text-gold-dim hover:underline">
+              <h2 className="text-sm font-medium text-app-text-primary">ממתין לאישור</h2>
+              <Link href={`/app/knowledge?clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
                 במסך ההצעות, עם סינון
               </Link>
             </div>
@@ -694,7 +694,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
         {tab === "work" && (
           <>
-            <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <div className="rounded-2xl border border-app-border bg-white p-6">
               <EditClientForm client={client} staff={staff} />
             </div>
 
@@ -764,36 +764,36 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               }))}
             />
 
-            <div className="rounded-2xl border border-lineDark bg-white p-6">
-              <h2 className="text-sm font-medium text-appNavy">קטגוריות ({client.categories.length})</h2>
+            <div className="rounded-2xl border border-app-border bg-white p-6">
+              <h2 className="text-sm font-medium text-app-text-primary">קטגוריות ({client.categories.length})</h2>
               {client.categories.length === 0 ? (
-                <p className="mt-2 text-sm text-appNavy/50">אין עדיין קטגוריות ייעודיות ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין קטגוריות ייעודיות ללקוח זה.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
                   {client.categories.map((cat) => (
-                    <li key={cat.id} className="text-sm text-appNavy/70">
+                    <li key={cat.id} className="text-sm text-app-text-secondary">
                       {cat.name}
-                      {!cat.active && <span className="ms-2 text-xs text-appNavy/40">(לא פעיל)</span>}
+                      {!cat.active && <span className="ms-2 text-xs text-app-text-tertiary">(לא פעיל)</span>}
                     </li>
                   ))}
                 </ul>
               )}
             </div>
 
-            <div className="rounded-2xl border border-lineDark bg-white p-6">
+            <div className="rounded-2xl border border-app-border bg-white p-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-medium text-appNavy">מועדים חשובים ({clientDates.length})</h2>
-                <Link href={`/app/important-dates?clientId=${client.id}`} className="text-xs text-gold-dim underline underline-offset-4">
+                <h2 className="text-sm font-medium text-app-text-primary">מועדים חשובים ({clientDates.length})</h2>
+                <Link href={`/app/important-dates?clientId=${client.id}`} className="text-xs text-app-text-accent underline underline-offset-4">
                   לכל המועדים של הלקוח
                 </Link>
               </div>
               {clientDates.length === 0 ? (
-                <p className="mt-2 text-sm text-appNavy/50">אין עדיין מועדים חשובים ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מועדים חשובים ללקוח זה.</p>
               ) : (
                 <ul className="mt-3 space-y-2">
                   {clientDates.slice(0, 8).map((d) => (
                     <li key={d.id} className="flex items-center justify-between gap-3 text-sm">
-                      <Link href={`/app/important-dates/${d.id}`} className="text-appNavy hover:text-gold-dim">
+                      <Link href={`/app/important-dates/${d.id}`} className="text-app-text-primary hover:text-app-text-accent">
                         {d.title}
                       </Link>
                       <StatusBadge label={IMPORTANT_DATE_STATUS_LABELS[d.status]} tone={STATUS_TONE[d.status]} />
@@ -804,32 +804,32 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             </div>
 
             {canManageHolidayCalendars && (
-              <div className="rounded-2xl border border-lineDark bg-white p-6">
+              <div className="rounded-2xl border border-app-border bg-white p-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-appNavy">לוחות חגים</h2>
-                  <span className="text-xs text-appNavy/40">תזכורות ברירת מחדל: 30 ו-7 ימים לפני</span>
+                  <h2 className="text-sm font-medium text-app-text-primary">לוחות חגים</h2>
+                  <span className="text-xs text-app-text-tertiary">תזכורות ברירת מחדל: 30 ו-7 ימים לפני</span>
                 </div>
-                <p className="mt-1 text-xs text-appNavy/50">
+                <p className="mt-1 text-xs text-app-text-tertiary">
                   רישום הלקוח ללוח חג יוצר אוטומטית מועד חשוב לכל חג בלוח, ומתעדכן מדי שנה.
                 </p>
                 <HolidayCalendarsPanel clientId={client.id} calendars={holidayCalendars} subscriptions={holidaySubscriptions} />
               </div>
             )}
 
-            <div className="rounded-2xl border border-lineDark bg-white p-6">
-              <h2 className="text-sm font-medium text-appNavy">משתמשים מוקצים ({client.employeeAccess.length})</h2>
+            <div className="rounded-2xl border border-app-border bg-white p-6">
+              <h2 className="text-sm font-medium text-app-text-primary">משתמשים מוקצים ({client.employeeAccess.length})</h2>
               {client.employeeAccess.length === 0 ? (
-                <p className="mt-2 text-sm text-appNavy/50">אין עדיין אנשי צוות מוקצים ללקוח זה.</p>
+                <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין אנשי צוות מוקצים ללקוח זה.</p>
               ) : (
                 <ul className="mt-3 space-y-1.5">
                   {client.employeeAccess.map((access) => (
-                    <li key={access.id} className="text-sm text-appNavy/70">
-                      {access.user.name} <span className="text-xs text-appNavy/40">({access.user.email})</span>
+                    <li key={access.id} className="text-sm text-app-text-secondary">
+                      {access.user.name} <span className="text-xs text-app-text-tertiary">({access.user.email})</span>
                     </li>
                   ))}
                 </ul>
               )}
-              <p className="mt-3 text-xs text-appNavy/40">
+              <p className="mt-3 text-xs text-app-text-tertiary">
                 הקצאת אנשי צוות ללקוחות מתבצעת מעמוד{" "}
                 <Link href="/app/users" className="underline">
                   משתמשים

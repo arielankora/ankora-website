@@ -66,7 +66,7 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
         type="button"
         disabled={sending}
         onClick={handleSendNow}
-        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy transition-colors hover:border-gold disabled:opacity-50"
+        className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary transition-colors hover:border-gold disabled:opacity-50"
       >
         {sending ? "שולח..." : "שליחה עכשיו"}
       </button>
@@ -75,7 +75,7 @@ export function ScheduleActions({ scheduleId, enabled }: { scheduleId: string; e
         type="button"
         disabled={isPending}
         onClick={handleDelete}
-        className="text-xs font-medium text-error/80 underline decoration-error/30 underline-offset-2 disabled:opacity-50"
+        className="text-xs font-medium text-app-error underline decoration-app-error/30 underline-offset-2 disabled:opacity-50"
       >
         מחיקה
       </button>

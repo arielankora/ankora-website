@@ -45,7 +45,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 function MissingToggle({ field, missing, onChange }: { field: string; missing: boolean; onChange: (field: string, on: boolean) => void }) {
   return (
-    <label className="mt-1 flex items-center gap-1.5 text-[11px] text-appNavy/50">
+    <label className="mt-1 flex items-center gap-1.5 text-[11px] text-app-text-tertiary">
       <input
         type="checkbox"
         name="missingFields"
@@ -83,7 +83,7 @@ function EntityForm({
           name={name}
           disabled={missing.includes(name)}
           defaultValue={(existing?.[name as keyof PanelEntity] as string | null) ?? ""}
-          className={`${INPUT} disabled:bg-appNavy/5`}
+          className={`${INPUT} disabled:bg-app-surface-sunken`}
           {...props}
         />
       </Field>
@@ -138,8 +138,8 @@ function EntityForm({
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -156,25 +156,25 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
   }
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">ישויות משפטיות ({entities.length})</h2>
+        <h2 className="text-sm font-medium text-app-text-primary">ישויות משפטיות ({entities.length})</h2>
         <Drawer triggerLabel="+ ישות" title="ישות משפטית" variant="link">
           <EntityForm clientId={clientId} sourceOptions={sourceOptions} others={entities.map((e) => ({ id: e.id, name: e.name }))} />
         </Drawer>
       </div>
       {entities.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">אין עדיין ישויות. ללקוח עם יותר מישות אחת, אנשים ומערכות משויכים לישות הנכונה.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין ישויות. ללקוח עם יותר מישות אחת, אנשים ומערכות משויכים לישות הנכונה.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark">
+        <ul className="mt-4 divide-y divide-app-border">
           {entities.map((e) => (
             <li key={e.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-appNavy">
+                <p className="text-sm font-medium text-app-text-primary">
                   {e.name}
-                  {e.legalName && <span className="ms-2 text-xs font-normal text-appNavy/60">{e.legalName}</span>}
+                  {e.legalName && <span className="ms-2 text-xs font-normal text-app-text-secondary">{e.legalName}</span>}
                 </p>
-                <p className="text-xs text-appNavy/60">
+                <p className="text-xs text-app-text-secondary">
                   {[
                     e.registrationNumber ? <span key="r" dir="ltr">{e.registrationNumber}</span> : null,
                     e.country,
@@ -189,11 +189,11 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                       </span>
                     ))}
                 </p>
-                {e.billingAddress && <p className="mt-1 text-xs text-appNavy/70">{e.billingAddress}</p>}
+                {e.billingAddress && <p className="mt-1 text-xs text-app-text-secondary">{e.billingAddress}</p>}
                 {e.missingFields.length > 0 && (
-                  <p className="mt-1 text-xs text-error">
+                  <p className="mt-1 text-xs text-app-error">
                     חסר: {e.missingFields.map((f) => FIELD_LABELS[f] ?? f).join(", ")}
-                    {e.missingToResolve && <span className="text-appNavy/60"> · {e.missingToResolve}</span>}
+                    {e.missingToResolve && <span className="text-app-text-secondary"> · {e.missingToResolve}</span>}
                   </p>
                 )}
                 {e.ownStatus !== "CONFIRMED" && <StatusLine status={e.ownStatus} toResolve={e.toResolve} />}
@@ -209,7 +209,7 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
                     existing={e}
                   />
                 </Drawer>
-                <button type="button" onClick={() => remove(e)} className="text-appNavy/50 hover:text-red-600">
+                <button type="button" onClick={() => remove(e)} className="text-app-text-tertiary hover:text-app-error">
                   הסרה
                 </button>
               </div>

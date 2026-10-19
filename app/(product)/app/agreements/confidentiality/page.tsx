@@ -32,16 +32,16 @@ export default async function ConfidentialityPage() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div className="flex items-center justify-between gap-4">
-        <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
+        <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
         <LogoutButton />
       </div>
 
-      <h1 className="mt-8 text-2xl font-medium text-appNavy">{agreement.title}</h1>
-      <p className="mt-2 text-sm text-appNavy/60">
+      <h1 className="mt-8 text-2xl font-medium text-app-text-primary">{agreement.title}</h1>
+      <p className="mt-2 text-sm text-app-text-secondary">
         לפני הכניסה למערכת, {user.name}, יש לקרוא ולאשר את ההתחייבות. גרסה {agreement.version}.
       </p>
 
-      <div className="mt-8 rounded-2xl border border-lineDark bg-white p-6">
+      <div className="mt-8 rounded-2xl border border-app-border bg-white p-6">
         <AgreementText body={body} />
       </div>
 
@@ -53,7 +53,7 @@ export default async function ConfidentialityPage() {
         />
       </div>
 
-      <p className="mt-4 text-xs text-appNavy/50">
+      <p className="mt-4 text-xs text-app-text-tertiary">
         עם האישור נשמרים השם שהוקלד, התאריך והשעה, כתובת ה-IP, הדפדפן והגרסה, ועותק חתום נשמר בתיק איש הצוות.
       </p>
     </main>

@@ -322,7 +322,7 @@ export default async function AppHomePage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">שלום, {user.name.split(" ")[0]}</h1>
+          <h1 className="text-xl font-medium text-app-text-primary">שלום, {user.name.split(" ")[0]}</h1>
         </div>
 
         {/* Team adoption, mechanism two: the work this person is holding.
@@ -337,17 +337,17 @@ export default async function AppHomePage() {
             The eight rows are a cap, not a list: anyone holding more
             than that needs the Tasks screen, and the link is there. */}
         {myTasks && myTasks.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-            <div className="flex items-center justify-between gap-2.5 border-b border-lineDark px-[18px] py-3.5">
-              <span className="flex items-center gap-2 text-[13.5px] font-medium text-appNavy">
-                <ListChecks size={15} strokeWidth={2} className="text-appNavy/45" />
+          <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
+            <div className="flex items-center justify-between gap-2.5 border-b border-app-border px-[18px] py-3.5">
+              <span className="flex items-center gap-2 text-[13.5px] font-medium text-app-text-primary">
+                <ListChecks size={15} strokeWidth={2} className="text-app-text-tertiary" />
                 המשימות שלי
               </span>
-              <Link href="/app/tasks?mine=1" className="text-[11.5px] text-gold-dim hover:underline">
+              <Link href="/app/tasks?mine=1" className="text-[11.5px] text-app-text-accent hover:underline">
                 לכל המשימות שלי
               </Link>
             </div>
-            <div className="divide-y divide-lineDark/60">
+            <div className="divide-y divide-app-border">
               {myTasks.map((t) => (
                 // Each row opens its own task. It used to open the list,
                 // and Ariel had to find the task again (15.10.2026). The
@@ -355,7 +355,7 @@ export default async function AppHomePage() {
                 <Link
                   key={t.id}
                   href={taskHref(t.id, "mine=1")}
-                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-appNavy/[0.02]"
+                  className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3 transition-colors hover:bg-app-surface-sunken"
                 >
                   <span className="flex min-w-0 items-baseline gap-2">
                     {/* The mark the spec asks for: a promise the client
@@ -365,14 +365,14 @@ export default async function AppHomePage() {
                     {t.stale && (
                       <span
                         title={`לא זזה מעל ${STALE_PROMISE_HOURS} שעות, והלקוח רואה אותה`}
-                        className="shrink-0 text-warning"
+                        className="shrink-0 text-app-warning"
                       >
                         <TriangleAlert size={13} strokeWidth={2.25} />
                       </span>
                     )}
-                    <span className="truncate text-[13.5px] text-appNavy">{t.title}</span>
+                    <span className="truncate text-[13.5px] text-app-text-primary">{t.title}</span>
                   </span>
-                  <span className="flex items-center gap-2.5 text-[11.5px] text-appNavy/50">
+                  <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
                     <span className="truncate">{t.clientName}</span>
                     {t.dueDate && (
                       <span dir="ltr" className="font-jbmono">
@@ -396,25 +396,25 @@ export default async function AppHomePage() {
             task is a promise with a date, a routine is what keeps the
             promises from being needed. */}
         {routines && routines.length > 0 && (
-          <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-            <div className="flex items-center gap-2 border-b border-lineDark px-[18px] py-3.5 text-[13.5px] font-medium text-appNavy">
-              <Repeat size={15} strokeWidth={2} className="text-appNavy/45" />
+          <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
+            <div className="flex items-center gap-2 border-b border-app-border px-[18px] py-3.5 text-[13.5px] font-medium text-app-text-primary">
+              <Repeat size={15} strokeWidth={2} className="text-app-text-tertiary" />
               שגרה שוטפת
             </div>
-            <ul className="divide-y divide-lineDark/60">
+            <ul className="divide-y divide-app-border">
               {routines.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 px-[18px] py-3">
                   <span className="min-w-0">
-                    <Link href={`/app/clients/${r.clientId}?tab=file#processes`} className="text-[13.5px] text-appNavy hover:text-gold-dim">
-                      <span className="font-mono text-[11.5px] text-appNavy/50">{r.code}</span> {r.title}
+                    <Link href={`/app/clients/${r.clientId}?tab=file#processes`} className="text-[13.5px] text-app-text-primary hover:text-app-text-accent">
+                      <span className="font-mono text-[11.5px] text-app-text-tertiary">{r.code}</span> {r.title}
                     </Link>
-                    <span className="block text-[11.5px] text-appNavy/50">
+                    <span className="block text-[11.5px] text-app-text-tertiary">
                       {[r.clientName, r.checkEvery && `בדיקה ${r.checkEvery}${r.checkText ? `: ${r.checkText}` : ""}`, r.asBackup && "כמחליף"].filter(Boolean).join(" · ")}
                     </span>
                   </span>
                   <span className="flex items-center gap-3 text-[11.5px]">
                     {r.state && r.dueKey && (
-                      <span className={r.state === "LATER" ? "text-appNavy/50" : "font-medium text-warning"}>
+                      <span className={r.state === "LATER" ? "text-app-text-tertiary" : "font-medium text-app-warning"}>
                         {r.state === "LATER"
                           ? `הבאה ב-${r.dueKey.split("-").reverse().slice(0, 2).join(".")}`
                           : r.lastCheckedAt
@@ -449,12 +449,12 @@ export default async function AppHomePage() {
                 (metrics.parallelTimerPeopleCount > 0 || metrics.longRunningCount > 0 || metrics.activeTimersCount > 0) && (
                   <>
                     {metrics.parallelTimerPeopleCount > 0 && (
-                      <p className="mt-1.5 text-[11.5px] text-appNavy/55">
+                      <p className="mt-1.5 text-[11.5px] text-app-text-secondary">
                         {metrics.activeTimerPeopleCount} אנשי צוות, מתוכם {metrics.parallelTimerPeopleCount} עם שני טיימרים במקביל
                       </p>
                     )}
                     {metrics.longRunningCount > 0 && (
-                      <p className="mt-1.5 text-[11.5px] font-medium text-error">
+                      <p className="mt-1.5 text-[11.5px] font-medium text-app-error">
                         {metrics.longRunningCount} מהם רצים מעל {LONG_TIMER_HOURS} שעות ברצף (חריגה)
                       </p>
                     )}
@@ -481,17 +481,17 @@ export default async function AppHomePage() {
               value={formatMinutes(metrics.todayMinutes)}
               footer={
                 metrics.todayTopClients.length > 0 && (
-                  <div className="mt-2.5 border-t border-lineDark/70 pt-1.5">
+                  <div className="mt-2.5 border-t border-app-border pt-1.5">
                     {metrics.todayTopClients.map((c) => (
                       <div key={c.clientId} className="flex items-center justify-between gap-3 py-1.5">
-                        <span className="truncate text-[12.5px] text-appNavy">{c.name}</span>
-                        <span dir="ltr" className="shrink-0 font-jbmono text-[12.5px] text-appNavy/70">
+                        <span className="truncate text-[12.5px] text-app-text-primary">{c.name}</span>
+                        <span dir="ltr" className="shrink-0 font-jbmono text-[12.5px] text-app-text-secondary">
                           {formatMinutes(c.minutes)}
                         </span>
                       </div>
                     ))}
                     {metrics.todayClientCount > metrics.todayTopClients.length && (
-                      <p className="mt-1 text-[11.5px] text-gold-dim">
+                      <p className="mt-1 text-[11.5px] text-app-text-accent">
                         {metrics.todayClientCount - metrics.todayTopClients.length === 1
                           ? "ועוד לקוח אחד"
                           : `ועוד ${metrics.todayClientCount - metrics.todayTopClients.length} לקוחות`}{" "}
@@ -510,7 +510,7 @@ export default async function AppHomePage() {
               footer={
                 metrics.avgUtilizationPct !== null && (
                   <div className="mt-2.5">
-                    <p className="-mt-1.5 mb-2.5 text-[12px] text-appNavy/60">
+                    <p className="-mt-1.5 mb-2.5 text-[12px] text-app-text-secondary">
                       <span className="font-jbmono">{wholeHours(metrics.bankConsumedMinutes)}</span> מתוך{" "}
                       <span className="font-jbmono">{wholeHours(metrics.bankTotalMinutes)}</span> שעות
                     </p>
@@ -520,7 +520,7 @@ export default async function AppHomePage() {
                       markerAt={metrics.expectedUtilizationPct ?? undefined}
                     />
                     {metrics.expectedUtilizationPct !== null && (
-                      <p className="mt-1.5 text-[11.5px] text-appNavy/55">
+                      <p className="mt-1.5 text-[11.5px] text-app-text-secondary">
                         צפי להיום: <span className="font-jbmono">{metrics.expectedUtilizationPct}%</span>
                         {/* Said in words, not only by colour: ahead of the
                             pace is where a bank runs out before its cycle
@@ -533,14 +533,14 @@ export default async function AppHomePage() {
                       </p>
                     )}
                     {metrics.packagesEndingSoon > 0 && (
-                      <p className="mt-1.5 text-[11.5px] font-medium text-warning">
+                      <p className="mt-1.5 text-[11.5px] font-medium text-app-warning">
                         {metrics.packagesEndingSoon === 1
                           ? `חבילת שעות אחת צפויה להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`
                           : `${metrics.packagesEndingSoon} חבילות שעות צפויות להיגמר בתוך ${PACKAGE_ENDING_SOON_DAYS} יום`}
                       </p>
                     )}
                     {metrics.clientsNearLimitCount > 0 && (
-                      <p className="mt-1.5 text-[11.5px] font-medium text-error">
+                      <p className="mt-1.5 text-[11.5px] font-medium text-app-error">
                         {metrics.clientsNearLimitCount === 1
                           ? "לקוח אחד מעל 90% ניצול"
                           : `${metrics.clientsNearLimitCount} לקוחות מעל 90% ניצול`}
@@ -558,17 +558,17 @@ export default async function AppHomePage() {
                 value={alerts?.count ?? 0}
                 footer={
                   alerts && (
-                    <div className="mt-2.5 border-t border-lineDark/70 pt-1.5">
+                    <div className="mt-2.5 border-t border-app-border pt-1.5">
                       {alerts.count > 0 ? (
                         <>
                           {alerts.top.map((a) => (
                             <div key={a.id} className="py-1.5">
-                              <p className="truncate text-[12.5px] text-appNavy">{a.clientName}</p>
-                              <p className="truncate text-[11.5px] text-error">{a.description}</p>
+                              <p className="truncate text-[12.5px] text-app-text-primary">{a.clientName}</p>
+                              <p className="truncate text-[11.5px] text-app-error">{a.description}</p>
                             </div>
                           ))}
                           {alerts.count > alerts.top.length && (
-                            <p className="mt-1 text-[11.5px] text-gold-dim">
+                            <p className="mt-1 text-[11.5px] text-app-text-accent">
                               {alerts.count - alerts.top.length === 1
                                 ? "ועוד התראה אחת"
                                 : `ועוד ${alerts.count - alerts.top.length} התראות`}{" "}
@@ -577,7 +577,7 @@ export default async function AppHomePage() {
                           )}
                         </>
                       ) : alerts.ruleCount > 0 ? (
-                        <p className="py-1.5 text-[12px] text-appNavy/60">
+                        <p className="py-1.5 text-[12px] text-app-text-secondary">
                           {/* 10.10.2026: not "הכל תקין". An alert someone marked as
                               handled is closed even while the client is still past
                               the threshold (RIMED at 107% on the day this shipped),
@@ -587,7 +587,7 @@ export default async function AppHomePage() {
                           <span className="font-jbmono">{alerts.clientCount}</span> לקוחות
                         </p>
                       ) : (
-                        <p className="py-1.5 text-[12px] font-medium text-warning">לא הוגדרו כללי התראה</p>
+                        <p className="py-1.5 text-[12px] font-medium text-app-warning">לא הוגדרו כללי התראה</p>
                       )}
                     </div>
                   )
@@ -624,28 +624,28 @@ export default async function AppHomePage() {
             read before knowing whether the day is fine, and the whole
             value of this card is that it can be read in one glance. */}
         {stalled && (
-          <div className="rounded-2xl border border-lineDark bg-white p-5">
+          <div className="rounded-2xl border border-app-border bg-white p-5">
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <h2 className="text-sm font-medium text-appNavy/70">הבטחות שלא זזו היום</h2>
+              <h2 className="text-sm font-medium text-app-text-secondary">הבטחות שלא זזו היום</h2>
               <span
-                className={`font-jbmono text-[22px] font-medium ${stalledTotal > 0 ? "text-warning" : "text-success"}`}
+                className={`font-jbmono text-[22px] font-medium ${stalledTotal > 0 ? "text-app-warning" : "text-app-success"}`}
               >
                 {stalledTotal}
               </span>
             </div>
             {stalledTotal === 0 ? (
-              <p className="mt-1.5 text-[12.5px] text-appNavy/55">
+              <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
                 כל ההבטחות שהלקוחות רואים זזו היום. זה מה שהפורטל אמור להראות.
                 {stalledWaiting > 0 && ` ${stalledWaiting} ממתינות ללקוחות עצמם.`}
               </p>
             ) : (
               <>
-                <p className="mt-1.5 text-[12.5px] text-appNavy/55">
+                <p className="mt-1.5 text-[12.5px] text-app-text-secondary">
                   הלקוחות האלה רואים אצלם משימה פתוחה שלא נגענו בה היום.
                   {stalledOverdue > 0 && (
                     <>
                       {" "}
-                      <span className="text-warning">
+                      <span className="text-app-warning">
                         {stalledOverdue} מהן כבר עברו את תאריך היעד.
                       </span>
                     </>
@@ -657,11 +657,11 @@ export default async function AppHomePage() {
                     <Link
                       key={row.clientId}
                       href={`/app/tasks?clientId=${row.clientId}`}
-                      className="rounded-full border border-lineDark bg-white px-2.5 py-1 text-[11.5px] text-appNavy/70 transition-colors hover:border-gold"
+                      className="rounded-full border border-app-border bg-white px-2.5 py-1 text-[11.5px] text-app-text-secondary transition-colors hover:border-gold"
                     >
                       {row.clientName} · {row.count}
-                      {row.overdue > 0 && <span className="text-warning"> · {row.overdue} באיחור</span>}
-                      {row.waiting > 0 && <span className="text-appNavy/45"> · {row.waiting} ממתינות להם</span>}
+                      {row.overdue > 0 && <span className="text-app-warning"> · {row.overdue} באיחור</span>}
+                      {row.waiting > 0 && <span className="text-app-text-tertiary"> · {row.waiting} ממתינות להם</span>}
                     </Link>
                   ))}
                 </div>
@@ -676,25 +676,25 @@ export default async function AppHomePage() {
             {trend && <HoursTrendChart data={trend} />}
 
             {upcomingDates && upcomingDates.length > 0 && (
-              <div className="flex flex-col rounded-2xl border border-lineDark bg-white p-5">
+              <div className="flex flex-col rounded-2xl border border-app-border bg-white p-5">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-medium text-appNavy/70">מועדים חשובים קרובים</h2>
-                  <Link href="/app/important-dates" className="text-xs text-gold-dim hover:text-appNavy">
+                  <h2 className="text-sm font-medium text-app-text-secondary">מועדים חשובים קרובים</h2>
+                  <Link href="/app/important-dates" className="text-xs text-app-text-accent hover:text-app-text-primary">
                     לכל המועדים
                   </Link>
                 </div>
-                <div className="mt-3 flex-1 divide-y divide-lineDark/70">
+                <div className="mt-3 flex-1 divide-y divide-app-border">
                   {upcomingDates.map((d) => {
                     const urgent = isUrgentDate(d.nextOccurrenceAt);
                     return (
                       <Link
                         key={d.id}
                         href={`/app/important-dates/${d.id}`}
-                        className="flex items-center gap-3 py-2.5 transition-colors hover:bg-cream"
+                        className="flex items-center gap-3 py-2.5 transition-colors hover:bg-app-surface-page"
                       >
                         <div
                           className={`flex h-[42px] w-[42px] shrink-0 flex-col items-center justify-center rounded-xl text-center leading-none ${
-                            urgent ? "bg-error-soft text-error" : "bg-cream text-appNavy/70"
+                            urgent ? "bg-app-error-soft text-app-error" : "bg-app-surface-page text-app-text-secondary"
                           }`}
                         >
                           {d.nextOccurrenceAt ? (
@@ -711,8 +711,8 @@ export default async function AppHomePage() {
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-appNavy">{d.title}</p>
-                          <p className="truncate text-xs text-appNavy/50">{d.client.name}</p>
+                          <p className="truncate text-sm font-medium text-app-text-primary">{d.title}</p>
+                          <p className="truncate text-xs text-app-text-tertiary">{d.client.name}</p>
                         </div>
                       </Link>
                     );
@@ -732,7 +732,7 @@ export default async function AppHomePage() {
         )}
 
         {canSeeAudit && (
-          <Link href="/app/audit-log" className="inline-block text-sm text-gold-dim hover:text-appNavy">
+          <Link href="/app/audit-log" className="inline-block text-sm text-app-text-accent hover:text-app-text-primary">
             צפייה ביומן הפעולות
           </Link>
         )}

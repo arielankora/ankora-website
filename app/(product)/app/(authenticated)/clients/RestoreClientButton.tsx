@@ -29,11 +29,11 @@ export function RestoreClientButton({ clientId }: { clientId: string }) {
         type="button"
         onClick={restore}
         disabled={pending}
-        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold disabled:opacity-50"
+        className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
       >
         {pending ? "מחזיר..." : "החזרה לפעיל"}
       </button>
-      {error && <span className="text-xs text-error">{error}</span>}
+      {error && <span className="text-xs text-app-error">{error}</span>}
     </div>
   );
 }

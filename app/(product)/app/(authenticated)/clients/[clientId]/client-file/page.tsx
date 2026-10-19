@@ -20,18 +20,18 @@ function Item({ item }: { item: DocItem }) {
   const details = (item.details ?? []).filter((d): d is string => !!d && !!d.trim());
   const weak = item.status === "UNCERTAIN" || item.status === "MISSING";
   return (
-    <li className="py-1.5 text-sm leading-relaxed text-appNavy">
+    <li className="py-1.5 text-sm leading-relaxed text-app-text-primary">
       {item.text}
-      {details.length > 0 && <span className="text-appNavy/60"> ({details.join(" · ")})</span>}
+      {details.length > 0 && <span className="text-app-text-secondary"> ({details.join(" · ")})</span>}
       {weak && (
-        <span className={`ms-1.5 text-xs font-medium ${item.status === "MISSING" ? "text-error" : "text-warning"}`}>
+        <span className={`ms-1.5 text-xs font-medium ${item.status === "MISSING" ? "text-app-error" : "text-app-warning"}`}>
           {KNOWLEDGE_STATUS_LABELS[item.status!]}
           {item.toResolve ? `: ${item.toResolve}` : ""}
         </span>
       )}
-      {item.doNotDisclose && <span className="ms-1.5 text-xs font-medium text-red-700">לא לספר: {item.doNotDisclose}</span>}
+      {item.doNotDisclose && <span className="ms-1.5 text-xs font-medium text-app-error">לא לספר: {item.doNotDisclose}</span>}
       {item.sources && item.sources.length > 0 && (
-        <span className="ms-1.5 text-[11px] text-appNavy/45" dir="ltr">
+        <span className="ms-1.5 text-[11px] text-app-text-tertiary" dir="ltr">
           [{item.sources.join(", ")}]
         </span>
       )}
@@ -56,12 +56,12 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
       <div>
         <BackLink href={`/app/clients/${clientId}`} label="חזרה ללקוח" />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-xl font-medium text-appNavy">תיק לקוח: {doc.clientName}</h1>
+          <h1 className="text-xl font-medium text-app-text-primary">תיק לקוח: {doc.clientName}</h1>
           <div className="flex items-center gap-4">
-            <a href={`/api/clients/${clientId}/client-file?format=pdf`} className="text-sm text-gold-dim hover:underline">
+            <a href={`/api/clients/${clientId}/client-file?format=pdf`} className="text-sm text-app-text-accent hover:underline">
               הורדה כ-PDF
             </a>
-            <a href={`/api/clients/${clientId}/client-file`} className="text-sm text-gold-dim hover:underline">
+            <a href={`/api/clients/${clientId}/client-file`} className="text-sm text-app-text-accent hover:underline">
               הורדה כ-Markdown
             </a>
           </div>
@@ -71,7 +71,7 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
             <ControlLine parts={doc.control} />
           </div>
         )}
-        <p className="mt-2 text-xs leading-relaxed text-appNavy/60">{HOW_TO_READ}</p>
+        <p className="mt-2 text-xs leading-relaxed text-app-text-secondary">{HOW_TO_READ}</p>
         <div className="mt-3">
           <ExtractWithClaude prompt={extractPrompt} />
         </div>
@@ -84,20 +84,20 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
         if (s.items.length === 0) {
           return (
             <section key={`${s.number}-${s.title}`} className="flex flex-wrap items-baseline gap-x-2 px-6 text-sm">
-              <h2 className="font-normal text-appNavy/60">
-                {s.number && <span className="me-2 font-mono text-gold-dim/70">{s.number}</span>}
+              <h2 className="font-normal text-app-text-secondary">
+                {s.number && <span className="me-2 font-mono text-app-text-accent">{s.number}</span>}
                 {s.title}
               </h2>
-              <p className="text-appNavy/45">{s.empty}</p>
+              <p className="text-app-text-tertiary">{s.empty}</p>
             </section>
           );
         }
         const ungrouped = s.items.filter((i) => !i.group);
         const groups = [...new Set(s.items.filter((i) => i.group).map((i) => i.group!))];
         return (
-          <section key={`${s.number}-${s.title}`} className="rounded-2xl border border-lineDark bg-white p-6">
-            <h2 className="text-sm font-medium text-appNavy">
-              {s.number && <span className="me-2 font-mono text-gold-dim">{s.number}</span>}
+          <section key={`${s.number}-${s.title}`} className="rounded-2xl border border-app-border bg-white p-6">
+            <h2 className="text-sm font-medium text-app-text-primary">
+              {s.number && <span className="me-2 font-mono text-app-text-accent">{s.number}</span>}
               {s.title}
             </h2>
             {ungrouped.length > 0 && (
@@ -109,7 +109,7 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
             )}
             {groups.map((g) => (
               <div key={g} className="mt-3">
-                <h3 className="text-xs font-medium text-appNavy/60">{g}</h3>
+                <h3 className="text-xs font-medium text-app-text-secondary">{g}</h3>
                 <ul className="mt-1 list-disc ps-5">
                   {s.items
                     .filter((i) => i.group === g)
@@ -123,19 +123,19 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
         );
       })}
 
-      <section className="rounded-2xl border border-lineDark bg-white p-6">
-        <h2 className="text-sm font-medium text-appNavy">מקרא מקורות</h2>
+      <section className="rounded-2xl border border-app-border bg-white p-6">
+        <h2 className="text-sm font-medium text-app-text-primary">מקרא מקורות</h2>
         {doc.legend.length === 0 ? (
-          <p className="mt-2 text-sm text-appNavy/45">אין עדיין מקורות במרשם.</p>
+          <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין מקורות במרשם.</p>
         ) : (
           <ul className="mt-2 space-y-1">
             {doc.legend.map((l) => (
-              <li key={l.code} className="text-sm text-appNavy">
-                <span className="me-2 font-mono text-gold-dim" dir="ltr">
+              <li key={l.code} className="text-sm text-app-text-primary">
+                <span className="me-2 font-mono text-app-text-accent" dir="ltr">
                   {l.code}
                 </span>
                 {l.title}
-                {l.details && <span className="text-appNavy/60"> ({l.details})</span>}
+                {l.details && <span className="text-app-text-secondary"> ({l.details})</span>}
               </li>
             ))}
           </ul>

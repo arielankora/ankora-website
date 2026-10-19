@@ -31,7 +31,7 @@ export function CredentialRowShell({ id, children }: { id: string; children: Rea
 
   if (hidden) return null;
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-5" data-credential-row={id}>
+    <div className="rounded-2xl border border-app-border bg-white p-5" data-credential-row={id}>
       <HideContext.Provider value={() => setHidden(true)}>{children}</HideContext.Provider>
     </div>
   );

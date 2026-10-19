@@ -10,14 +10,14 @@ type Category = { id: string; name: string; clientId: string | null };
 type Person = { id: string; name: string };
 
 const SELECT_CLASS =
-  "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40";
+  "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40";
 
 function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "נוצרת..." : "הוספת משימה"}
     </button>
@@ -101,13 +101,13 @@ export function CreateTaskForm({
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">לקוח *</label>
         <select
           name="clientId"
           required
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחירת לקוח</option>
           {clients.map((c) => (
@@ -118,7 +118,7 @@ export function CreateTaskForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">קטגוריה</label>
+        <label className="block text-xs font-medium text-app-text-secondary">קטגוריה</label>
         <select
           name="categoryId"
           disabled={!clientId}
@@ -133,17 +133,17 @@ export function CreateTaskForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שם המשימה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שם המשימה *</label>
         <input
           name="title"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       {/* 7.10.2026. A task handed to somebody arrives with what they need
           to start, not with a title and a comment hidden below it. */}
       <div>
-        <label htmlFor="create-task-description" className="block text-xs font-medium text-appNavy/60">
+        <label htmlFor="create-task-description" className="block text-xs font-medium text-app-text-secondary">
           פרטים
         </label>
         <textarea
@@ -151,7 +151,7 @@ export function CreateTaskForm({
           name="description"
           rows={3}
           placeholder="מה צריך לדעת כדי להתחיל: מה ביקשו, ממי, ומה כבר נעשה"
-          className="mt-1.5 w-full resize-y rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full resize-y rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -160,7 +160,7 @@ export function CreateTaskForm({
           cuts most Hebrew names in half. */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="create-task-assignee" className="block text-xs font-medium text-appNavy/60">
+          <label htmlFor="create-task-assignee" className="block text-xs font-medium text-app-text-secondary">
             אחראי
           </label>
           <select
@@ -180,7 +180,7 @@ export function CreateTaskForm({
           </select>
         </div>
         <div>
-          <label htmlFor="create-task-supervisor" className="block text-xs font-medium text-appNavy/60">
+          <label htmlFor="create-task-supervisor" className="block text-xs font-medium text-app-text-secondary">
             מפקח
           </label>
           <select
@@ -200,24 +200,24 @@ export function CreateTaskForm({
           </select>
         </div>
       </div>
-      {peopleError && <p className="-mt-2 text-xs text-red-600">{peopleError}</p>}
+      {peopleError && <p className="-mt-2 text-xs text-app-error">{peopleError}</p>}
 
       {/* Urgent is the one thing that does not wait for the morning
           digest, so the person choosing it is told what it will do, and
           the person not choosing it is told when it will be seen. */}
       <div>
-        <label className="flex items-center gap-2.5 text-sm text-appNavy">
+        <label className="flex items-center gap-2.5 text-sm text-app-text-primary">
           <input
             type="checkbox"
             name="urgent"
             checked={urgent}
             onChange={(e) => setUrgent(e.target.checked)}
-            className="h-4 w-4 rounded border-lineDark accent-gold"
+            className="h-4 w-4 rounded border-app-border accent-gold"
           />
           דחופה
         </label>
         {assigneeName && (
-          <p className="mt-1.5 text-xs text-appNavy/55">
+          <p className="mt-1.5 text-xs text-app-text-secondary">
             {urgent
               ? `${assigneeName} יקבל/תקבל הודעה עכשיו, עם קישור למשימה.`
               : `${assigneeName} יראה/תראה אותה בתקציר הבוקר הבא.`}
@@ -230,26 +230,26 @@ export function CreateTaskForm({
           field that decides what a client sees. The client-facing title
           is optional - left empty, the portal falls back to the task's
           own title rather than showing a blank row. */}
-      <div className="rounded-lg border border-lineDark bg-cream-dim/40 p-3">
-        <label className="flex items-center gap-2.5 text-xs text-appNavy">
+      <div className="rounded-lg border border-app-border bg-cream-dim/40 p-3">
+        <label className="flex items-center gap-2.5 text-xs text-app-text-primary">
           <input
             type="checkbox"
             name="clientVisible"
-            className="h-4 w-4 rounded border-lineDark accent-gold"
+            className="h-4 w-4 rounded border-app-border accent-gold"
           />
           הצגה ללקוח בפורטל
         </label>
         <label className="mt-2.5 block">
-          <span className="block text-xs font-medium text-appNavy/60">כותרת ללקוח</span>
+          <span className="block text-xs font-medium text-app-text-secondary">כותרת ללקוח</span>
           <input
             name="clientTitle"
             placeholder="איך זה ייקרא אצל הלקוח. ברירת מחדל: שם המשימה"
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-app-error">{error}</p>}
       <SubmitButton pending={pending} />
     </form>
   );

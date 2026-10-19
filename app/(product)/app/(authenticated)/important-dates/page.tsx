@@ -133,8 +133,8 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-appNavy">מועדים חשובים</h1>
-            <p className="mt-1 text-sm text-appNavy/60">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
+            <h1 className="text-xl font-medium text-app-text-primary">מועדים חשובים</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">ימי הולדת, מסמכים, חידושים וחגים - לפי לקוח, עם תזכורות אוטומטיות.</p>
           </div>
           <Drawer triggerLabel="מועד חדש" title="מועד חשוב חדש">
             {/* `users` is mapped down to the three fields the form declares,
@@ -154,13 +154,13 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-full border border-lineDark bg-white p-[3px]">
+          <div className="flex rounded-full border border-app-border bg-white p-[3px]">
             {TABS.map((t) => (
               <a
                 key={t.value}
                 href={t.value === "upcoming" ? "/app/important-dates" : `/app/important-dates?tab=${t.value}`}
                 className={`rounded-full px-4 py-1.5 text-[13px] transition-colors ${
-                  tab === t.value ? "bg-appNavy text-cream font-medium" : "text-appNavy/60 hover:text-appNavy"
+                  tab === t.value ? "bg-app-surface-nav text-cream font-medium" : "text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >
                 {t.label}
@@ -171,7 +171,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
 
         <div className="space-y-3">
           {rows.length === 0 ? (
-            <p className="rounded-2xl border border-lineDark bg-white p-8 text-center text-sm text-appNavy/50">
+            <p className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
               אין מועדים להצגה בתצוגה הזו.
             </p>
           ) : (
@@ -179,7 +179,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
           )}
         </div>
 
-        <p className="text-xs text-appNavy/50">מועדים חוזרים מחושבים אוטומטית, כולל התאמה ללוח השנה העברי ולימי חג.</p>
+        <p className="text-xs text-app-text-tertiary">מועדים חוזרים מחושבים אוטומטית, כולל התאמה ללוח השנה העברי ולימי חג.</p>
       </div>
     </>
   );

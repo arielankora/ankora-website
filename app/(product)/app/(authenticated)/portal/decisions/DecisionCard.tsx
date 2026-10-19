@@ -36,21 +36,21 @@ function SubmitOption({
       type="submit"
       disabled={pending || locked || !canAnswer}
       className={`w-full rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
-        option.recommended ? "border-gold/50 bg-gold/10 hover:border-gold" : "border-lineDark bg-white hover:border-gold"
+        option.recommended ? "border-gold/50 bg-gold/10 hover:border-gold" : "border-app-border bg-white hover:border-gold"
       }`}
     >
       <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-sm text-appNavy">
+        <span className="text-sm text-app-text-primary">
           {pending ? "נשלח..." : option.label}
-          {option.recommended && !pending && <span className="mr-2 text-[11px] text-gold-dim">ההמלצה שלנו</span>}
+          {option.recommended && !pending && <span className="mr-2 text-[11px] text-app-text-accent">ההמלצה שלנו</span>}
         </span>
         {price && (
-          <span dir="ltr" className="font-jbmono text-[12.5px] text-appNavy/60">
+          <span dir="ltr" className="font-jbmono text-[12.5px] text-app-text-secondary">
             {price}
           </span>
         )}
       </span>
-      {option.detail && <span className="mt-1 block text-[12px] text-appNavy/55">{option.detail}</span>}
+      {option.detail && <span className="mt-1 block text-[12px] text-app-text-secondary">{option.detail}</span>}
     </button>
   );
 }
@@ -92,7 +92,7 @@ function OptionForm({
       <input type="hidden" name="optionId" value={option.id} />
       <SubmitOption option={option} canAnswer={canAnswer} pending={pending} locked={locked} />
       {error && (
-        <p className="mt-2 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2 text-xs text-error">
+        <p className="mt-2 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2 text-xs text-app-error">
           {error}
         </p>
       )}
@@ -172,16 +172,16 @@ export function DecisionCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/40 bg-[#FBF7F0] p-5">
-      {decision.taskTitle && <p className="text-[11.5px] text-appNavy/50">{decision.taskTitle}</p>}
-      <p className="mt-1 text-[15px] font-medium text-appNavy">{decision.question}</p>
-      {decision.background && <p className="mt-1.5 text-[13px] leading-relaxed text-appNavy/65">{decision.background}</p>}
+    <div className="rounded-2xl border border-gold/40 bg-app-surface-sunken p-5">
+      {decision.taskTitle && <p className="text-[11.5px] text-app-text-tertiary">{decision.taskTitle}</p>}
+      <p className="mt-1 text-[15px] font-medium text-app-text-primary">{decision.question}</p>
+      {decision.background && <p className="mt-1.5 text-[13px] leading-relaxed text-app-text-secondary">{decision.background}</p>}
 
       {decision.aboveCeiling && (
         // The service agreement asks for the client's approval in writing
         // above the ceiling they set. Saying so on the card is what turns
         // a required signature into an obvious one.
-        <p className="mt-3 rounded-[10px] border border-gold/40 bg-white px-3 py-2 text-[12px] text-appNavy/70">
+        <p className="mt-3 rounded-[10px] border border-gold/40 bg-white px-3 py-2 text-[12px] text-app-text-secondary">
           הסכום גבוה מהתקרה שסוכמה איתך ({formatMinor(decision.ceilingMinor)}), ולכן ההחלטה הזו שלך.
         </p>
       )}
@@ -199,9 +199,9 @@ export function DecisionCard({
         ))}
       </div>
 
-      {answered && <p className="mt-2.5 text-[12px] text-appNavy/60">התשובה נקלטה. תודה.</p>}
+      {answered && <p className="mt-2.5 text-[12px] text-app-text-secondary">התשובה נקלטה. תודה.</p>}
 
-      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-appNavy/50">
+      <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-app-text-tertiary">
         <span>
           {decision.dueAt
             ? `נשמח לתשובה עד ${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(new Date(decision.dueAt))}`
@@ -210,16 +210,16 @@ export function DecisionCard({
         {/* Not a text box. Someone who wants to explain would rather talk,
             and the line they already use is one tap away. */}
         {whatsappHref ? (
-          <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="text-gold-dim hover:underline">
+          <a href={whatsappHref} target="_blank" rel="noopener noreferrer" className="text-app-text-accent hover:underline">
             לדבר על זה
           </a>
         ) : (
-          <span className="text-appNavy/35">לדבר על זה: זמין בקרוב</span>
+          <span className="text-app-text-tertiary">לדבר על זה: זמין בקרוב</span>
         )}
       </div>
 
       {!canAnswer && (
-        <p className="mt-2.5 text-[11.5px] text-appNavy/50">
+        <p className="mt-2.5 text-[11.5px] text-app-text-tertiary">
           רק מנהל הלקוח יכול לאשר. אפשר להעביר את זה אליו, או לדבר איתנו.
         </p>
       )}

@@ -76,18 +76,18 @@ export default async function CalendarPage(props: {
 
   const segment = (active: boolean) =>
     `shrink-0 whitespace-nowrap rounded-full px-4 py-2 text-[13.5px] font-medium transition-colors ${
-      active ? "bg-appNavy text-cream" : "text-appNavy/60 hover:text-appNavy"
+      active ? "bg-app-surface-nav text-cream" : "text-app-text-secondary hover:text-app-text-primary"
     }`;
 
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="text-xl font-medium text-appNavy">יומן</h1>
-        <p className="mt-1 text-sm text-appNavy/60">משימות לפי תאריך יעד ומועדים לפי היום שבו הם חלים. גוררים משימה ליום אחר כדי לשנות לה את היעד.</p>
+        <h1 className="text-xl font-medium text-app-text-primary">יומן</h1>
+        <p className="mt-1 text-sm text-app-text-secondary">משימות לפי תאריך יעד ומועדים לפי היום שבו הם חלים. גוררים משימה ליום אחר כדי לשנות לה את היעד.</p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5">
-        <div data-testid="calendar-view" className="flex rounded-full border border-lineDark bg-white p-[3px]">
+        <div data-testid="calendar-view" className="flex rounded-full border border-app-border bg-white p-[3px]">
           {CALENDAR_VIEWS.map((v) => (
             <Link key={v.view} href={href({ view: v.view })} className={segment(state.view === v.view)} aria-current={state.view === v.view ? "page" : undefined}>
               {v.label}
@@ -95,7 +95,7 @@ export default async function CalendarPage(props: {
           ))}
         </div>
 
-        <div data-testid="calendar-show" className="flex rounded-full border border-lineDark bg-white p-[3px]">
+        <div data-testid="calendar-show" className="flex rounded-full border border-app-border bg-white p-[3px]">
           {CALENDAR_SHOWS.map((s) => (
             <Link key={s.show} href={href({ show: s.show })} className={segment(state.show === s.show)} aria-current={state.show === s.show ? "page" : undefined}>
               {s.label}
@@ -103,7 +103,7 @@ export default async function CalendarPage(props: {
           ))}
         </div>
 
-        <div data-testid="calendar-mine" className="flex rounded-full border border-lineDark bg-white p-[3px]">
+        <div data-testid="calendar-mine" className="flex rounded-full border border-app-border bg-white p-[3px]">
           {MINE_OPTIONS.map((option) => (
             <Link key={option.scope} href={href({ mine: option.scope })} className={segment(state.mine === option.scope)} aria-current={state.mine === option.scope ? "page" : undefined}>
               {option.label}
@@ -116,16 +116,16 @@ export default async function CalendarPage(props: {
 
       <div className="flex flex-wrap items-center gap-3">
         {/* Right is "back" in Hebrew, so the right arrow goes to the past. */}
-        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label="הקודם" data-testid="calendar-prev" className="rounded-full border border-lineDark bg-white p-2 text-appNavy/70 hover:text-appNavy">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, -1) })} aria-label="הקודם" data-testid="calendar-prev" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronRight size={16} />
         </Link>
-        <Link href={href({ date: today })} className="rounded-full border border-lineDark bg-white px-4 py-1.5 text-[13px] font-medium text-appNavy/70 hover:text-appNavy">
+        <Link href={href({ date: today })} className="rounded-full border border-app-border bg-white px-4 py-1.5 text-[13px] font-medium text-app-text-secondary hover:text-app-text-primary">
           היום
         </Link>
-        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label="הבא" data-testid="calendar-next" className="rounded-full border border-lineDark bg-white p-2 text-appNavy/70 hover:text-appNavy">
+        <Link href={href({ date: shiftAnchor(state.view, state.date, 1) })} aria-label="הבא" data-testid="calendar-next" className="rounded-full border border-app-border bg-white p-2 text-app-text-secondary hover:text-app-text-primary">
           <ChevronLeft size={16} />
         </Link>
-        <h2 data-testid="calendar-title" className="text-[15px] font-medium text-appNavy">
+        <h2 data-testid="calendar-title" className="text-[15px] font-medium text-app-text-primary">
           {rangeTitle(state.view, state.date)}
         </h2>
 
@@ -139,7 +139,7 @@ export default async function CalendarPage(props: {
               data-testid="calendar-overdue-button"
               aria-pressed={state.drawer === "overdue"}
               className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                state.drawer === "overdue" ? "border-appNavy bg-appNavy text-cream" : "border-error/35 bg-white text-error hover:border-error/60"
+                state.drawer === "overdue" ? "border-appNavy bg-app-surface-nav text-cream" : "border-app-error/35 bg-white text-app-error hover:border-app-error/60"
               }`}
             >
               <Clock size={14} strokeWidth={1.8} />
@@ -151,7 +151,7 @@ export default async function CalendarPage(props: {
               data-testid="calendar-undated-button"
               aria-pressed={state.drawer === "undated"}
               className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                state.drawer === "undated" ? "border-appNavy bg-appNavy text-cream" : "border-gold bg-white text-appNavy hover:border-gold-dim"
+                state.drawer === "undated" ? "border-appNavy bg-app-surface-nav text-cream" : "border-gold bg-white text-app-text-primary hover:border-gold-dim"
               }`}
             >
               <Inbox size={14} strokeWidth={1.8} />

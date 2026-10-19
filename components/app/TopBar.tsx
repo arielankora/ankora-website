@@ -33,7 +33,7 @@ export function TopBar({
   const current = [...items].reverse().find((item) => (item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href)));
 
   return (
-    <header className="sticky top-0 z-30 hidden min-h-[62px] flex-wrap items-center justify-between gap-4 border-b border-lineDark bg-white/92 px-7 py-[11px] backdrop-blur-[8px] md:flex">
+    <header className="sticky top-0 z-30 hidden min-h-[62px] flex-wrap items-center justify-between gap-4 border-b border-app-border bg-white/92 px-7 py-[11px] backdrop-blur-[8px] md:flex">
       {/* Right (start) side: live timer pill, notification bell, primary CTA. */}
       <div className="flex items-center gap-3">
         {/* Live: kept in step with the other tabs and the server (ActiveTimerProvider). */}
@@ -42,7 +42,7 @@ export function TopBar({
         {showPrimaryCta && (
           <Link
             href="/app/my-time"
-            className="flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-[13px] font-medium text-navy"
+            className="flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-[13px] font-medium text-app-text-primary"
           >
             <Plus size={15} strokeWidth={2.25} />
             דיווח חדש
@@ -66,7 +66,7 @@ export function TopBar({
                 if (!detail.handled) (window as unknown as Record<string, unknown>)[PENDING_OPEN_KEY] = NEW_TASK_KEY;
               }
             }}
-            className="flex items-center gap-1.5 rounded-full border border-gold/60 bg-white px-4 py-2 text-[13px] font-medium text-navy hover:border-gold"
+            className="flex items-center gap-1.5 rounded-full border border-gold/60 bg-white px-4 py-2 text-[13px] font-medium text-app-text-primary hover:border-gold"
           >
             <Plus size={15} strokeWidth={2.25} />
             משימה חדשה
@@ -76,8 +76,8 @@ export function TopBar({
 
       {/* Left (end) side: breadcrumb + screen title. */}
       <div className="min-w-0 text-end">
-        {current?.group && <p className="truncate text-[11px] text-appNavy/45">{current.group}</p>}
-        <p className="truncate text-[16.5px] font-medium text-appNavy">{current?.label ?? "Ankora"}</p>
+        {current?.group && <p className="truncate text-[11px] text-app-text-tertiary">{current.group}</p>}
+        <p className="truncate text-[16.5px] font-medium text-app-text-primary">{current?.label ?? "Ankora"}</p>
       </div>
     </header>
   );

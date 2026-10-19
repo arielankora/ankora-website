@@ -27,8 +27,8 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
         aria-expanded={open}
         className={
           primary
-            ? "flex items-center gap-1.5 rounded-full bg-gold-gradient px-4 py-2 text-sm font-medium text-navy"
-            : "flex items-center gap-1.5 rounded-full border border-lineDark px-4 py-2 text-sm font-medium text-appNavy transition-colors hover:border-gold"
+            ? "flex items-center gap-1.5 rounded-full bg-app-accent px-4 py-2 text-sm font-medium text-app-text-primary"
+            : "flex items-center gap-1.5 rounded-full border border-app-border px-4 py-2 text-sm font-medium text-app-text-primary transition-colors hover:border-gold"
         }
       >
         <Download size={15} strokeWidth={1.75} />
@@ -41,7 +41,7 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
           <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="fixed inset-0 z-10" />
           <div
             role="menu"
-            className="absolute end-0 z-20 mt-1.5 w-36 overflow-hidden rounded-lg border border-lineDark bg-white shadow-lg"
+            className="absolute end-0 z-20 mt-1.5 w-36 overflow-hidden rounded-lg border border-app-border bg-white shadow-lg"
           >
             {items.map((item) => (
               <a
@@ -49,7 +49,7 @@ export function ExportMenu({ baseHref, primary = false }: { baseHref: string; pr
                 href={item.format ? `${baseHref}&format=${item.format}` : baseHref}
                 role="menuitem"
                 onClick={() => setOpen(false)}
-                className="block px-4 py-2.5 text-sm text-appNavy hover:bg-cream"
+                className="block px-4 py-2.5 text-sm text-app-text-primary hover:bg-app-surface-page"
               >
                 {item.label}
               </a>

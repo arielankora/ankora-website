@@ -55,9 +55,9 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
       {grants.map((grant) => {
         const confirming = confirmingId === grant.id;
         return (
-          <li key={grant.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-appNavy/60">
+          <li key={grant.id} className="flex flex-wrap items-center justify-between gap-2 text-xs text-app-text-secondary">
             <span className="min-w-0">
-              <span className="font-medium text-appNavy/80">
+              <span className="font-medium text-app-text-primary">
                 {grant.label}
                 {grant.isBridge ? " (גשר מקומי)" : ""}
               </span>
@@ -70,7 +70,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                   type="button"
                   disabled={pending}
                   onClick={() => revoke(grant)}
-                  className="rounded-full bg-error-soft px-3 py-1 text-xs font-medium text-error transition-opacity hover:opacity-80 disabled:opacity-50"
+                  className="rounded-full bg-app-error-soft px-3 py-1 text-xs font-medium text-app-error transition-opacity hover:opacity-80 disabled:opacity-50"
                 >
                   {pending ? "מנתק…" : "אישור ניתוק"}
                 </button>
@@ -78,7 +78,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                   type="button"
                   disabled={pending}
                   onClick={() => setConfirmingId(null)}
-                  className="rounded-full px-2 py-1 text-xs text-appNavy/50 hover:text-appNavy"
+                  className="rounded-full px-2 py-1 text-xs text-app-text-tertiary hover:text-app-text-primary"
                 >
                   ביטול
                 </button>
@@ -88,7 +88,7 @@ export function ClaudeGrantList({ grants }: { grants: GrantRow[] }) {
                 type="button"
                 disabled={pending}
                 onClick={() => setConfirmingId(grant.id)}
-                className="rounded-full border border-lineDark px-3 py-1 text-xs font-medium text-appNavy/60 transition-colors hover:border-error hover:text-error disabled:opacity-50"
+                className="rounded-full border border-app-border px-3 py-1 text-xs font-medium text-app-text-secondary transition-colors hover:border-app-error hover:text-app-error disabled:opacity-50"
               >
                 ניתוק
               </button>

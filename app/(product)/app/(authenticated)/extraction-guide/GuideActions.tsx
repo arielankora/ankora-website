@@ -4,7 +4,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { approveGuideAction, proposeGuideAction, rejectGuideAction } from "./actions";
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 
 function ProposeForm({ current }: { current: string }) {
   const close = useDrawerClose();
@@ -12,16 +12,16 @@ function ProposeForm({ current }: { current: string }) {
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">ההנחיות, הנחיה בשורה</span>
+        <span className="block text-xs font-medium text-app-text-secondary">ההנחיות, הנחיה בשורה</span>
         <textarea name="body" rows={14} defaultValue={current} className={INPUT} />
       </label>
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">מה השתנה ולמה *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">מה השתנה ולמה *</span>
         <input name="note" required placeholder="הוספתי דוגמה לשאלה פתוחה" className={INPUT} />
       </label>
-      <p className="-mt-2 text-[11px] text-appNavy/40">מה שהשרת אוכף (חובת מקור, בלי סודות, לא דורסים) נשאר בקוד, ושום גרסה לא משנה אותו.</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">מה שהשרת אוכף (חובת מקור, בלי סודות, לא דורסים) נשאר בקוד, ושום גרסה לא משנה אותו.</p>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שליחה לאישור"}
       </button>
     </form>
@@ -35,11 +35,11 @@ function RejectForm({ id }: { id: string }) {
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="id" value={id} />
       <label className="block">
-        <span className="block text-xs font-medium text-appNavy/60">למה, בשורה אחת *</span>
+        <span className="block text-xs font-medium text-app-text-secondary">למה, בשורה אחת *</span>
         <input name="reason" required className={INPUT} />
       </label>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "דחייה"}
       </button>
     </form>
@@ -63,7 +63,7 @@ export function DecideGuide({ id }: { id: string }) {
   }
   return (
     <div className="flex items-center gap-3 text-xs">
-      <button type="button" onClick={approve} className="rounded-full bg-gold-gradient px-3.5 py-1.5 font-medium text-navy">
+      <button type="button" onClick={approve} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary">
         אישור
       </button>
       <Drawer triggerLabel="דחייה" title="דחיית גרסה" variant="link">

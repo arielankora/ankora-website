@@ -39,7 +39,7 @@ export default async function PortalActivityPage() {
         promises={timeline.promises}
         emptyText="עדיין אין פעילות להצגה."
         action={
-          <Link href="/app/portal/hours" className="text-xs text-gold-dim hover:underline">
+          <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
             שעות ודוחות
           </Link>
         }

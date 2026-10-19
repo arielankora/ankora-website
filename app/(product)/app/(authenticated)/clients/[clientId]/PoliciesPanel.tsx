@@ -90,7 +90,7 @@ function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="policyId" value={policy.id} />
-      <p className="text-xs text-appNavy/60">
+      <p className="text-xs text-app-text-secondary">
         הכלל: {policy.statement}
       </p>
       <Field label="מה עושים אחרת *">
@@ -102,9 +102,9 @@ function ExceptionForm({ clientId, policy, maxDays }: { clientId: string; policy
       <Field label="עד (כולל) *">
         <input name="validUntil" type="date" required className={INPUT} />
       </Field>
-      <p className="-mt-2 text-[11px] text-appNavy/50">עד {maxDays} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">עד {maxDays} יום. לתקופה ארוכה יותר משנים את הכלל עצמו.</p>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שולח..." : "שליחת הבקשה"}
       </button>
     </form>
@@ -118,12 +118,12 @@ function RejectExceptionForm({ clientId, exception }: { clientId: string; except
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={exception.id} />
-      <p className="text-sm text-appNavy">{exception.what}</p>
+      <p className="text-sm text-app-text-primary">{exception.what}</p>
       <Field label="למה לא, בשורה אחת *">
         <input name="note" required className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "דחיית הבקשה"}
       </button>
     </form>
@@ -136,19 +136,19 @@ function ApproversForm({ clientId, staff, selected }: { clientId: string; staff:
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
-      <p className="text-xs text-appNavy/60">
+      <p className="text-xs text-app-text-secondary">
         רק כשהלקוח קבע מי מאשר. בלי בחירה, מאשר כל מי שקיבל את ההרשאה &quot;אישור חריגות ומידע רגיש&quot; בדף המשתמש.
       </p>
       <fieldset className="flex flex-col gap-1.5">
         {staff.map((u) => (
-          <label key={u.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+          <label key={u.id} className="flex items-center gap-1.5 text-sm text-app-text-primary">
             <input type="checkbox" name="approver" value={u.id} defaultChecked={selected.includes(u.id)} className="h-4 w-4 accent-gold" />
             {u.name}
           </label>
         ))}
       </fieldset>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירה"}
       </button>
     </form>
@@ -177,7 +177,7 @@ function PolicyForm({
       <input type="hidden" name="clientId" value={clientId} />
       {existing && <input type="hidden" name="id" value={existing.id} />}
       {existing?.status === "ACTIVE" && (
-        <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <p className="rounded-lg bg-app-warning-soft px-3 py-2 text-xs text-app-warning">
           הכלל בתוקף. שינוי בשם, בסוג, בנוסח או במה שנבדק מחזיר אותו ל&quot;מוצע&quot;, ומנהל צריך לאשר אותו שוב.
         </p>
       )}
@@ -190,7 +190,7 @@ function PolicyForm({
           ))}
         </select>
       </Field>
-      <p className="-mt-2 text-[11px] text-appNavy/50">{POLICY_KIND_HINTS[kind]}</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">{POLICY_KIND_HINTS[kind]}</p>
       <Field label="שם הכלל *">
         <input name="title" required defaultValue={existing?.title ?? ""} placeholder="פגישות הנהלה" className={INPUT} />
       </Field>
@@ -207,7 +207,7 @@ function PolicyForm({
           className={INPUT}
         />
       </Field>
-      <p className="-mt-2 text-[11px] text-appNavy/50">הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">הכלל הזהיר שחל עד שמנהל מאשר. בלי כלל ביניים, הכלל חל כפי שהוא כתוב.</p>
       <PolicyParamsFields
         key={kind}
         kind={kind}
@@ -226,7 +226,7 @@ function PolicyForm({
           <input type="date" name="reviewBy" defaultValue={existing?.reviewBy ?? ""} className={INPUT} />
         </Field>
       </div>
-      <p className="-mt-2 text-[11px] text-appNavy/50">ריק: חל מיד, בלי מועד סקירה. שינוי של יום הכניסה לתוקף בכלל שבתוקף מחזיר אותו לאישור מנהל.</p>
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">ריק: חל מיד, בלי מועד סקירה. שינוי של יום הכניסה לתוקף בכלל שבתוקף מחזיר אותו לאישור מנהל.</p>
       <Field label="מה ידוע על הכלל">
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
           <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
@@ -241,8 +241,8 @@ function PolicyForm({
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -256,12 +256,12 @@ function RetireForm({ clientId, policy }: { clientId: string; policy: PanelPolic
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="id" value={policy.id} />
-      <p className="text-sm text-appNavy">{policy.title}</p>
+      <p className="text-sm text-app-text-primary">{policy.title}</p>
       <Field label="למה מבטלים, בשורה אחת *">
         <input name="reason" required placeholder="אורן ביטל את המגבלה בפגישה מ-20.10" className={INPUT} />
       </Field>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full border border-lineDark px-5 py-2.5 text-sm font-medium text-appNavy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "ביטול הכלל"}
       </button>
     </form>
@@ -323,14 +323,14 @@ export function PoliciesPanel({
   }
 
   return (
-    <div id="rules" className="rounded-2xl border border-lineDark bg-white p-6">
+    <div id="rules" className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">כללים של הלקוח ({live.length})</h2>
+        <h2 className="text-sm font-medium text-app-text-primary">כללים של הלקוח ({live.length})</h2>
         <Drawer triggerLabel="+ כלל" title="כלל של הלקוח" variant="link">
           <PolicyForm clientId={clientId} sourceOptions={sourceOptions} entities={entities} />
         </Drawer>
       </div>
-      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-appNavy/50">
+      <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-app-text-tertiary">
         <span>
           חריגות ומידע רגיש מאשר/ת: {approvers.length ? approvers.map((a) => a.name).join(", ") : "עוד אין מי שמאשר. נותנים הרשאה בדף המשתמש."}
           {clientApproverIds.length > 0 && " (לפי מה שהלקוח קבע)"}
@@ -342,49 +342,49 @@ export function PoliciesPanel({
         )}
       </p>
       {live.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">
+        <p className="mt-2 text-sm text-app-text-tertiary">
           אין עדיין כללים. מה מותר ומה אסור אצל הלקוח, מי מאשר, מה לא מספרים למי, ומה לא נכנס לתיק בכלל.
         </p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark">
+        <ul className="mt-4 divide-y divide-app-border">
           {live.map((p) => (
             <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-sm font-medium text-appNavy">{p.title}</p>
+                  <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
                   <StatusBadge label={POLICY_STATUS_LABELS[p.status]} tone={STATUS_TONE[p.status]} />
-                  <span className="text-[11px] text-appNavy/50">
+                  <span className="text-[11px] text-app-text-tertiary">
                     {POLICY_KIND_LABELS[p.kind]}
                     {p.version > 1 && ` · גרסה ${p.version}`}
                   </span>
                 </div>
                 {p.status === "PROPOSED" && p.interimStatement ? (
                   <>
-                    <p className="mt-1 text-xs text-appNavy/80">
+                    <p className="mt-1 text-xs text-app-text-primary">
                       <span className="font-medium">עד שיאושר: </span>
                       {p.interimStatement}
                     </p>
-                    <p className="mt-0.5 text-xs text-appNavy/55">הכלל המוצע: {p.statement}</p>
+                    <p className="mt-0.5 text-xs text-app-text-secondary">הכלל המוצע: {p.statement}</p>
                   </>
                 ) : (
-                  <p className="mt-1 text-xs text-appNavy/80">{p.statement}</p>
+                  <p className="mt-1 text-xs text-app-text-primary">{p.statement}</p>
                 )}
-                {p.rationale && <p className="mt-0.5 text-xs text-appNavy/55">למה: {p.rationale}</p>}
+                {p.rationale && <p className="mt-0.5 text-xs text-app-text-secondary">למה: {p.rationale}</p>}
                 {p.checked ? (
-                  <p className="mt-0.5 text-xs text-appNavy/70">
+                  <p className="mt-0.5 text-xs text-app-text-secondary">
                     <span className="font-medium">נבדק מול הנהלים: </span>
                     {p.checked}
                   </p>
                 ) : (
-                  kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-appNavy/45">טקסט בלבד: השרת לא בודק את הכלל הזה.</p>
+                  kindTakesParams(p.kind) && <p className="mt-0.5 text-[11px] text-app-text-tertiary">טקסט בלבד: השרת לא בודק את הכלל הזה.</p>
                 )}
                 {p.datesLine && (
-                  <p className={`mt-0.5 text-[11px] ${p.reviewDue ? "text-warning" : "text-appNavy/55"}`} data-testid="policy-dates">
+                  <p className={`mt-0.5 text-[11px] ${p.reviewDue ? "text-app-warning" : "text-app-text-secondary"}`} data-testid="policy-dates">
                     {p.datesLine}
                   </p>
                 )}
                 {p.status === "ACTIVE" && p.approvedByName && (
-                  <p className="mt-0.5 text-[11px] text-appNavy/45">
+                  <p className="mt-0.5 text-[11px] text-app-text-tertiary">
                     אושר על ידי {p.approvedByName}
                     {p.approvedAt && `, ${new Date(p.approvedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}`}
                   </p>
@@ -395,12 +395,12 @@ export function PoliciesPanel({
                 {exceptions
                   .filter((e) => e.policyId === p.id)
                   .map((e) => (
-                    <div key={e.id} className="mt-2 rounded-lg border border-lineDark bg-appNavy/[0.02] px-3 py-2 text-xs">
+                    <div key={e.id} className="mt-2 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2 text-xs">
                       <div className="flex flex-wrap items-center gap-2">
                         <StatusBadge label={e.status === "APPROVED" ? `חריגה עד ${dayLabel(e.validUntil)}` : "בקשה לחריגה"} tone={e.status === "APPROVED" ? "gray" : "amber"} />
-                        <span className="text-appNavy">{e.what}</span>
+                        <span className="text-app-text-primary">{e.what}</span>
                       </div>
-                      <p className="mt-1 text-appNavy/55">
+                      <p className="mt-1 text-app-text-secondary">
                         למה: {e.reason}
                         {e.status === "REQUESTED" && ` · עד ${dayLabel(e.validUntil)}`}
                         {e.requestedByName && ` · ביקש/ה ${e.requestedByName}`}
@@ -411,7 +411,7 @@ export function PoliciesPanel({
                         <div className="mt-1.5 flex flex-wrap items-center gap-3">
                           {canDecideExceptions && (
                             <>
-                              <button type="button" onClick={() => decide(e)} className="font-medium text-gold-dim hover:underline">
+                              <button type="button" onClick={() => decide(e)} className="font-medium text-app-text-accent hover:underline">
                                 אישור החריגה
                               </button>
                               <Drawer triggerLabel="דחיית החריגה" title="דחיית בקשה לחריגה" variant="link">
@@ -420,7 +420,7 @@ export function PoliciesPanel({
                             </>
                           )}
                           {e.requestedById === viewerId && (
-                            <button type="button" onClick={() => withdraw(e)} className="text-appNavy/50 hover:text-appNavy">
+                            <button type="button" onClick={() => withdraw(e)} className="text-app-text-tertiary hover:text-app-text-primary">
                               משיכת הבקשה
                             </button>
                           )}
@@ -431,7 +431,7 @@ export function PoliciesPanel({
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
                 {canApprove && p.status === "PROPOSED" && (
-                  <button type="button" onClick={() => approve(p)} className="font-medium text-gold-dim hover:underline">
+                  <button type="button" onClick={() => approve(p)} className="font-medium text-app-text-accent hover:underline">
                     אישור הכלל
                   </button>
                 )}
@@ -447,7 +447,7 @@ export function PoliciesPanel({
                   </Drawer>
                 )}
                 {p.status === "PROPOSED" && (
-                  <button type="button" onClick={() => remove(p)} className="text-appNavy/50 hover:text-red-600">
+                  <button type="button" onClick={() => remove(p)} className="text-app-text-tertiary hover:text-app-error">
                     הסרה
                   </button>
                 )}
@@ -458,10 +458,10 @@ export function PoliciesPanel({
       )}
       {retired.length > 0 && (
         <details className="mt-3">
-          <summary className="cursor-pointer text-xs text-appNavy/50">כללים שבוטלו ({retired.length})</summary>
+          <summary className="cursor-pointer text-xs text-app-text-tertiary">כללים שבוטלו ({retired.length})</summary>
           <ul className="mt-2 space-y-1.5">
             {retired.map((p) => (
-              <li key={p.id} className="text-xs text-appNavy/50">
+              <li key={p.id} className="text-xs text-app-text-tertiary">
                 {p.title}: {p.statement}
               </li>
             ))}
@@ -477,14 +477,14 @@ export function PoliciesPanel({
 export function DisclosureBanner({ rules }: { rules: { id: string; title: string; text: string; proposed: boolean }[] }) {
   if (rules.length === 0) return null;
   return (
-    <div role="note" className="rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4">
-      <p className="text-sm font-medium text-amber-900">לפני שמדברים עם מישהו אצל הלקוח</p>
+    <div role="note" className="rounded-2xl border border-app-warning/30 bg-app-warning-soft px-5 py-4">
+      <p className="text-sm font-medium text-app-warning">לפני שמדברים עם מישהו אצל הלקוח</p>
       <ul className="mt-1.5 space-y-1">
         {rules.map((r) => (
-          <li key={r.id} className="text-xs text-amber-900">
+          <li key={r.id} className="text-xs text-app-warning">
             <span className="font-medium">{r.title}: </span>
             {r.text}
-            {r.proposed && <span className="text-amber-800/70"> (מוצע)</span>}
+            {r.proposed && <span className="text-app-warning"> (מוצע)</span>}
           </li>
         ))}
       </ul>

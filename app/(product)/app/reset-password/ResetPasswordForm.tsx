@@ -17,7 +17,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "שומר…" : "שמירה וכניסה"}
     </button>
@@ -41,15 +41,15 @@ export function ResetPasswordForm({ token }: { token: string }) {
   const [password, setPassword] = useState("");
 
   const score = password.length >= STRONG_LENGTH ? 3 : password.length >= MIN_LENGTH ? 2 : password.length > 0 ? 1 : 0;
-  const barColor = score === 1 ? "bg-error" : score === 2 ? "bg-gold" : score === 3 ? "bg-success" : "bg-lineDark";
+  const barColor = score === 1 ? "bg-app-error" : score === 2 ? "bg-gold" : score === 3 ? "bg-app-success" : "bg-app-border";
   const label =
     score === 0 ? "בחרו סיסמה" : score === 1 ? "חלשה — קצרה מדי" : score === 2 ? "בינונית" : "חזקה";
 
   if (state?.done) {
     return (
       <div className="space-y-4">
-        <p className="text-[13px] text-appNavy/70">הסיסמה נקבעה בהצלחה.</p>
-        <Link href="/app/login" className="block text-center text-sm text-gold-dim underline">
+        <p className="text-[13px] text-app-text-secondary">הסיסמה נקבעה בהצלחה.</p>
+        <Link href="/app/login" className="block text-center text-sm text-app-text-accent underline">
           מעבר להתחברות
         </Link>
       </div>
@@ -60,7 +60,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
     <form action={formAction}>
       <input type="hidden" name="token" value={token} />
       <label className="block">
-        <span className="mb-1.5 block text-xs text-appNavy/60">סיסמה חדשה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">סיסמה חדשה</span>
         <input
           name="password"
           type="password"
@@ -69,31 +69,31 @@ export function ResetPasswordForm({ token }: { token: string }) {
           minLength={MIN_LENGTH}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
       <div className="mt-2 flex gap-1.5">
         {[1, 2, 3].map((i) => (
-          <span key={i} className={`h-1 flex-1 rounded-full ${score >= i ? barColor : "bg-lineDark"}`} />
+          <span key={i} className={`h-1 flex-1 rounded-full ${score >= i ? barColor : "bg-app-border"}`} />
         ))}
       </div>
-      <p className="mt-1.5 text-xs text-appNavy/55">{label}</p>
+      <p className="mt-1.5 text-xs text-app-text-secondary">{label}</p>
 
       <label className="mt-3.5 block">
-        <span className="mb-1.5 block text-xs text-appNavy/60">אימות סיסמה</span>
+        <span className="mb-1.5 block text-xs text-app-text-secondary">אימות סיסמה</span>
         <input
           name="confirm"
           type="password"
           dir="ltr"
           required
           minLength={MIN_LENGTH}
-          className="w-full rounded-[10px] border border-lineDark bg-white px-3.5 py-3 text-end text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-end text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
       {state?.error && (
-        <p className="mt-3.5 rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-xs text-error">
+        <p className="mt-3.5 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-xs text-app-error">
           {state.error}
         </p>
       )}

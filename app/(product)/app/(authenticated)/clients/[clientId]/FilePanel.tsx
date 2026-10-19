@@ -65,25 +65,25 @@ export function DocumentsPanel({
   const [rowError, setRowError] = useState<string | null>(null);
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-6">
+    <section className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-medium text-appNavy">מסמכים</h2>
-        <p className="text-[11.5px] text-appNavy/50">הלקוח מוריד אותם מהתיק שלו. אנחנו היחידים שמעלים.</p>
+        <h2 className="text-[15px] font-medium text-app-text-primary">מסמכים</h2>
+        <p className="text-[11.5px] text-app-text-tertiary">הלקוח מוריד אותם מהתיק שלו. אנחנו היחידים שמעלים.</p>
       </div>
 
       {documents.length > 0 && (
-        <ul className="mt-4 divide-y divide-lineDark/60">
+        <ul className="mt-4 divide-y divide-app-border">
           {documents.map((d) => (
             <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3">
-              <span className="text-sm text-appNavy">
+              <span className="text-sm text-app-text-primary">
                 {d.title}
-                <span className="text-appNavy/55">
+                <span className="text-app-text-secondary">
                   {" · "}
                   {DOCUMENT_KIND_LABELS[d.kind]}
                   {d.taskTitle ? ` · ${d.taskTitle}` : ""}
                 </span>
               </span>
-              <span className="flex items-center gap-2.5 text-[11.5px] text-appNavy/50">
+              <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
                 {d.uploadedByName && <span>{d.uploadedByName}</span>}
                 <span dir="ltr" className="font-jbmono">
                   {formatSize(d.sizeBytes)}
@@ -99,8 +99,8 @@ export function DocumentsPanel({
                   }
                   className={`rounded-full border px-2.5 py-1 ${
                     d.clientVisible
-                      ? "border-success/25 bg-success-soft text-success"
-                      : "border-lineDark bg-appNavy/5 text-appNavy/60"
+                      ? "border-app-success/25 bg-app-success-soft text-app-success"
+                      : "border-app-border bg-app-surface-sunken text-app-text-secondary"
                   }`}
                 >
                   {d.clientVisible ? "הלקוח רואה" : "מוסתר"}
@@ -114,7 +114,7 @@ export function DocumentsPanel({
                       setRowError(res.ok ? null : res.error);
                     })
                   }
-                  className="text-appNavy/45 hover:text-error"
+                  className="text-app-text-tertiary hover:text-app-error"
                 >
                   הסרה
                 </button>
@@ -124,10 +124,10 @@ export function DocumentsPanel({
         </ul>
       )}
 
-      {rowError && <p className="mt-3 text-sm text-error">{rowError}</p>}
+      {rowError && <p className="mt-3 text-sm text-app-error">{rowError}</p>}
 
       {!storageReady && (
-        <p className="mt-4 rounded-[10px] border border-gold/40 bg-[#FBF7F0] px-3 py-2.5 text-[12.5px] text-appNavy/70">
+        <p className="mt-4 rounded-[10px] border border-gold/40 bg-app-surface-sunken px-3 py-2.5 text-[12.5px] text-app-text-secondary">
           אחסון המסמכים עדיין בפיתוח. הטופס למטה מוכן, ומה שנשאר הוא לפתוח את התיקייה המשותפת ולשתף אותה. עד אז אפשר
           לשלוח מסמך בוואטסאפ כרגיל.
         </p>
@@ -137,21 +137,21 @@ export function DocumentsPanel({
         <input type="hidden" name="clientId" value={clientId} />
 
         <label className="block sm:col-span-2">
-          <span className="block text-xs font-medium text-appNavy/60">שם המסמך</span>
+          <span className="block text-xs font-medium text-app-text-secondary">שם המסמך</span>
           <input
             name="title"
             required
             placeholder="פוליסת רכב 2026"
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
 
         <label className="block">
-          <span className="block text-xs font-medium text-appNavy/60">סוג</span>
+          <span className="block text-xs font-medium text-app-text-secondary">סוג</span>
           <select
             name="kind"
             defaultValue="OTHER"
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             {(Object.keys(DOCUMENT_KIND_LABELS) as ClientDocumentKind[]).map((k) => (
               <option key={k} value={k}>
@@ -162,26 +162,26 @@ export function DocumentsPanel({
         </label>
 
         <label className="block">
-          <span className="block text-xs font-medium text-appNavy/60">קובץ (עד 4MB)</span>
+          <span className="block text-xs font-medium text-app-text-secondary">קובץ (עד 4MB)</span>
           <input
             type="file"
             name="file"
             required
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-1.5 text-xs text-appNavy outline-none file:me-2 file:rounded-full file:border-0 file:bg-appNavy/5 file:px-3 file:py-1.5 file:text-xs"
+            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-1.5 text-xs text-app-text-primary outline-none file:me-2 file:rounded-full file:border-0 file:bg-app-surface-sunken file:px-3 file:py-1.5 file:text-xs"
           />
         </label>
 
         <div className="flex items-center gap-4 sm:col-span-4">
-          <label className="flex items-center gap-2 text-sm text-appNavy">
-            <input type="checkbox" name="clientVisible" defaultChecked className="h-4 w-4 rounded border-lineDark" />
+          <label className="flex items-center gap-2 text-sm text-app-text-primary">
+            <input type="checkbox" name="clientVisible" defaultChecked className="h-4 w-4 rounded border-app-border" />
             הלקוח רואה את זה בתיק שלו
           </label>
-          {error && <p className="text-sm text-error">{error}</p>}
-          {ok && <p className="text-sm text-success">המסמך נוסף לתיק.</p>}
+          {error && <p className="text-sm text-app-error">{error}</p>}
+          {ok && <p className="text-sm text-app-success">המסמך נוסף לתיק.</p>}
           <button
             type="submit"
             disabled={pending}
-            className="ms-auto rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+            className="ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
             {pending ? "מעלה..." : "צירוף מסמך"}
           </button>
@@ -204,10 +204,10 @@ export function SummaryPanel({
   const latest = summaries[0];
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-6">
+    <section className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-[15px] font-medium text-appNavy">סיכום חודשי</h2>
-        <p className="text-[11.5px] text-appNavy/50">נבנה מהרשומות. מגיע ללקוח רק אחרי שמישהו אישר.</p>
+        <h2 className="text-[15px] font-medium text-app-text-primary">סיכום חודשי</h2>
+        <p className="text-[11.5px] text-app-text-tertiary">נבנה מהרשומות. מגיע ללקוח רק אחרי שמישהו אישר.</p>
       </div>
 
       <form onSubmit={generate.onSubmit} className="mt-4 flex flex-wrap items-center gap-3">
@@ -215,20 +215,20 @@ export function SummaryPanel({
         <button
           type="submit"
           disabled={generate.pending}
-          className="rounded-full border border-lineDark px-4 py-2 text-[13px] text-appNavy hover:border-gold disabled:opacity-50"
+          className="rounded-full border border-app-border px-4 py-2 text-[13px] text-app-text-primary hover:border-gold disabled:opacity-50"
         >
           {generate.pending ? "מפיק..." : "הפקת טיוטה לחודש הנוכחי"}
         </button>
-        {generate.error && <p className="text-sm text-error">{generate.error}</p>}
+        {generate.error && <p className="text-sm text-app-error">{generate.error}</p>}
       </form>
 
       {latest ? <SummaryEditor key={latest.id} summary={latest} clientId={clientId} composer={composer} /> : null}
 
       {summaries.length > 1 && (
-        <ul className="mt-4 space-y-2 border-t border-lineDark pt-4">
+        <ul className="mt-4 space-y-2 border-t border-app-border pt-4">
           {summaries.slice(1).map((s) => (
-            <li key={s.id} className="text-[12.5px] text-appNavy/60">
-              <span className="font-medium text-appNavy/75">{s.periodLabel}</span>
+            <li key={s.id} className="text-[12.5px] text-app-text-secondary">
+              <span className="font-medium text-app-text-secondary">{s.periodLabel}</span>
               {" · "}
               {s.status === "APPROVED"
                 ? `אושר על ידי ${s.approvedByName ?? "מנהל התיק"}`
@@ -262,10 +262,10 @@ function SummaryEditor({
   const [discardError, setDiscardError] = useState<string | null>(null);
 
   return (
-    <div className="mt-4 rounded-[14px] border border-lineDark bg-appNavy/[0.03] p-4">
+    <div className="mt-4 rounded-[14px] border border-app-border bg-app-surface-sunken p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-[13px] font-medium text-appNavy">{summary.periodLabel}</p>
-        <p className="text-[11.5px] text-appNavy/50">
+        <p className="text-[13px] font-medium text-app-text-primary">{summary.periodLabel}</p>
+        <p className="text-[11.5px] text-app-text-tertiary">
           {summary.status === "APPROVED"
             ? `אושר על ידי ${summary.approvedByName ?? "מנהל התיק"}`
             : summary.status === "DISCARDED"
@@ -280,13 +280,13 @@ function SummaryEditor({
           name="draft"
           rows={4}
           defaultValue={summary.draft}
-          className="w-full rounded-lg border border-lineDark bg-white px-3 py-2.5 text-sm leading-relaxed text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border bg-white px-3 py-2.5 text-sm leading-relaxed text-app-text-primary outline-none focus:border-gold"
         />
 
         <div className="flex flex-wrap items-center gap-3">
-          {error && <p className="text-sm text-error">{error}</p>}
-          {discardError && <p className="text-sm text-error">{discardError}</p>}
-          {ok && <p className="text-sm text-success">אושר. הלקוח יראה את זה בדוח החודשי.</p>}
+          {error && <p className="text-sm text-app-error">{error}</p>}
+          {discardError && <p className="text-sm text-app-error">{discardError}</p>}
+          {ok && <p className="text-sm text-app-success">אושר. הלקוח יראה את זה בדוח החודשי.</p>}
 
           <button
             type="button"
@@ -297,7 +297,7 @@ function SummaryEditor({
                 setDiscardError(res.ok ? null : res.error);
               })
             }
-            className="text-[13px] text-appNavy/55 hover:text-error"
+            className="text-[13px] text-app-text-secondary hover:text-app-error"
           >
             ביטול הטיוטה
           </button>
@@ -317,7 +317,7 @@ function SummaryEditor({
           <button
             type="submit"
             disabled={pending}
-            className="ms-auto rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+            className="ms-auto rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
           >
             {/* Not "שליחה". Approving publishes the summary to the
                 portal; nothing leaves the building. The button beside

@@ -16,8 +16,8 @@ import { useActionForm } from "@/components/app/useActionForm";
 // password manager, which is where it would otherwise end up.
 
 const INPUT =
-  "mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold";
-const LABEL = "block text-xs font-medium text-appNavy/60";
+  "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+const LABEL = "block text-xs font-medium text-app-text-secondary";
 
 type Existing = {
   id: string;
@@ -76,13 +76,13 @@ export function CredentialForm({
           aria-describedby="cred-url-help"
           className={INPUT}
         />
-        <p id="cred-url-help" className="mt-1 text-xs text-appNavy/50">
+        <p id="cred-url-help" className="mt-1 text-xs text-app-text-tertiary">
           כתובת האתר שנכנסים בו. לקובץ או למערכת בלי כתובת, להשאיר ריק ולכתוב את הפרטים בהערות.
         </p>
       </div>
 
-      <div className="rounded-xl border border-lineDark bg-cream-dim p-4">
-        <p className="text-xs text-appNavy/60">שלושת השדות האלה נשמרים מוצפנים, ומוצגים רק אחרי אימות זהות.</p>
+      <div className="rounded-xl border border-app-border bg-cream-dim p-4">
+        <p className="text-xs text-app-text-secondary">שלושת השדות האלה נשמרים מוצפנים, ומוצגים רק אחרי אימות זהות.</p>
         <div className="mt-3 flex flex-col gap-4">
           <div>
             <label className={LABEL} htmlFor="cred-user">שם משתמש</label>
@@ -119,7 +119,7 @@ export function CredentialForm({
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 aria-label={showPassword ? "הסתרת הסיסמה שמוקלדת" : "הצגת הסיסמה שמוקלדת"}
-                className="absolute inset-y-0 left-2 mt-1.5 flex items-center text-appNavy/50 hover:text-appNavy"
+                className="absolute inset-y-0 left-2 mt-1.5 flex items-center text-app-text-tertiary hover:text-app-text-primary"
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
@@ -141,11 +141,11 @@ export function CredentialForm({
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-app-error">{error}</p>}
       <button
         type="submit"
         disabled={pending}
-        className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+        className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       >
         {pending ? "נשמר..." : existing ? "שמירת השינויים" : "הוספת הגישה"}
       </button>
@@ -155,7 +155,7 @@ export function CredentialForm({
 
 function ClearBox({ name, label }: { name: string; label: string }) {
   return (
-    <label className="mt-2 flex items-center gap-2 text-xs text-appNavy/60">
+    <label className="mt-2 flex items-center gap-2 text-xs text-app-text-secondary">
       <input type="checkbox" name={name} className="accent-appNavy" />
       {label}
     </label>

@@ -12,7 +12,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "שומר..." : "הוספת דיווח לאיש צוות"}
     </button>
@@ -79,7 +79,7 @@ export function AdminCreateEntryForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-full border border-lineDark bg-white px-5 py-2.5 text-sm font-medium text-appNavy hover:border-gold"
+        className="rounded-full border border-app-border bg-white px-5 py-2.5 text-sm font-medium text-app-text-primary hover:border-gold"
       >
         + דיווח עבור איש צוות
       </button>
@@ -89,16 +89,16 @@ export function AdminCreateEntryForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="grid grid-cols-1 gap-4 rounded-2xl border border-lineDark bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
+      className="grid grid-cols-1 gap-4 rounded-2xl border border-app-border bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">איש צוות *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">איש צוות *</label>
         <select
           name="userId"
           required
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחירה</option>
           {users.map((u) => (
@@ -109,7 +109,7 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">תאריך *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">תאריך *</label>
         <input
           type="date"
           name="date"
@@ -117,35 +117,35 @@ export function AdminCreateEntryForm({
           max={todayKey()}
           value={date}
           onChange={(e) => setDate(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שעת התחלה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שעת התחלה *</label>
         <input
           type="time"
           name="startTime"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">שעת סיום *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">שעת סיום *</label>
         <input
           type="time"
           name="endTime"
           required
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">לקוח *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">לקוח *</label>
         <select
           name="clientId"
           required
           value={clientId}
           onChange={(e) => setClientId(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           <option value="">בחירה</option>
           {clients.map((c) => (
@@ -156,12 +156,12 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div>
-        <label className="block text-xs font-medium text-appNavy/60">קטגוריה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">קטגוריה *</label>
         <select
           name="categoryId"
           required
           disabled={!clientId}
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold disabled:opacity-40"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
         >
           <option value="">בחירה</option>
           {availableCategories.map((cat) => (
@@ -172,35 +172,35 @@ export function AdminCreateEntryForm({
         </select>
       </div>
       <div className="sm:col-span-2">
-        <label className="block text-xs font-medium text-appNavy/60">הערה *</label>
+        <label className="block text-xs font-medium text-app-text-secondary">הערה *</label>
         <input
           name="note"
           required
           placeholder="מה נעשה עבור הלקוח?"
-          className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       {isBackdated && (
         <div className="sm:col-span-2">
-          <label className="block text-xs font-medium text-appNavy/60">סיבת דיווח ליום קודם *</label>
+          <label className="block text-xs font-medium text-app-text-secondary">סיבת דיווח ליום קודם *</label>
           <input
             name="backdateReason"
             required
-            className="mt-1.5 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
       )}
       <div className="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
         <input type="checkbox" id="allowOverlapOverride" name="allowOverlapOverride" className="h-4 w-4" />
-        <label htmlFor="allowOverlapOverride" className="text-xs text-appNavy/60">
+        <label htmlFor="allowOverlapOverride" className="text-xs text-app-text-secondary">
           לאפשר שמירה גם אם קיימת חפיפה עם דיווח אחר (override)
         </label>
       </div>
 
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-app-error">{error}</p>}
         <div className="ms-auto flex gap-3">
-          <button type="button" onClick={() => setOpen(false)} className="text-sm text-appNavy/60 hover:text-appNavy">
+          <button type="button" onClick={() => setOpen(false)} className="text-sm text-app-text-secondary hover:text-app-text-primary">
             ביטול
           </button>
           <SubmitButton pending={pending} />

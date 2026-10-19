@@ -10,10 +10,10 @@ import { PORTAL_STAGE_LABELS, type PortalPromise } from "@/lib/app-domain/client
 // client reads their outcome, not our workflow.
 
 const STAGE_TONE: Record<PortalPromise["stage"], string> = {
-  WAITING_ON_CLIENT: "border-gold/45 bg-gold/12 text-appNavy",
-  IN_PROGRESS: "border-lineDark bg-appNavy/5 text-appNavy/70",
-  RECEIVED: "border-lineDark bg-appNavy/5 text-appNavy/70",
-  DONE: "border-success/25 bg-success-soft text-success",
+  WAITING_ON_CLIENT: "border-gold/45 bg-gold/12 text-app-text-primary",
+  IN_PROGRESS: "border-app-border bg-app-surface-sunken text-app-text-secondary",
+  RECEIVED: "border-app-border bg-app-surface-sunken text-app-text-secondary",
+  DONE: "border-app-success/25 bg-app-success-soft text-app-success",
 };
 
 function formatDay(date: Date) {
@@ -37,7 +37,7 @@ function waitingLabel(since: Date): string {
 export function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5">
-      <span className="min-w-0 flex-1 text-sm text-appNavy">
+      <span className="min-w-0 flex-1 text-sm text-app-text-primary">
         {promise.title}
         {/* Team adoption: what came of it.
 
@@ -47,20 +47,20 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
             line is the answer, and it is why closing a visible promise
             without one is refused upstream rather than nudged. */}
         {promise.outcome && (
-          <span className="mt-1 block text-[12.5px] leading-relaxed text-appNavy/60">{promise.outcome}</span>
+          <span className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">{promise.outcome}</span>
         )}
         {/* What is being asked of the client, and the shortest way to do
             it. The title says what the task is called; this says what to
             do, so the row can be acted on in ten seconds. */}
         {promise.stage === "WAITING_ON_CLIENT" && promise.waitingFor && (
-          <span className="mt-1 block text-[12.5px] leading-relaxed text-appNavy/75">
+          <span className="mt-1 block text-[12.5px] leading-relaxed text-app-text-secondary">
             מה צריך ממך: {promise.waitingFor}
           </span>
         )}
         {promise.stage !== "DONE" && promise.openDecisions > 0 && (
           <Link
             href="/app/portal/decisions"
-            className="mt-1.5 inline-block rounded-full border border-gold/50 bg-white px-3 py-1 text-[12px] font-medium text-appNavy hover:border-gold"
+            className="mt-1.5 inline-block rounded-full border border-gold/50 bg-white px-3 py-1 text-[12px] font-medium text-app-text-primary hover:border-gold"
           >
             {promise.openDecisions === 1 ? "לענות על ההחלטה" : `לענות על ${promise.openDecisions} החלטות`}
           </Link>
@@ -68,15 +68,15 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
       </span>
       <span className="flex items-center gap-2.5">
         {promise.stage === "WAITING_ON_CLIENT" && promise.waitingSince && (
-          <span className="text-[11.5px] text-appNavy/55">{waitingLabel(promise.waitingSince)}</span>
+          <span className="text-[11.5px] text-app-text-secondary">{waitingLabel(promise.waitingSince)}</span>
         )}
         {promise.stage === "DONE" && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.movedAt)}
           </span>
         )}
         {promise.stage !== "DONE" && promise.dueDate && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-appNavy/45">
+          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.dueDate)}
           </span>
         )}
@@ -113,17 +113,17 @@ export function PromiseList({
   return (
     <div
       className={`overflow-hidden rounded-2xl border ${
-        tone === "attention" ? "border-gold/40 bg-[#FBF7F0]" : "border-lineDark bg-white"
+        tone === "attention" ? "border-gold/40 bg-app-surface-sunken" : "border-app-border bg-white"
       }`}
     >
-      <div className="flex items-center justify-between gap-2.5 border-b border-lineDark px-[18px] py-3.5">
-        <span className="text-[13.5px] font-medium text-appNavy">{title}</span>
+      <div className="flex items-center justify-between gap-2.5 border-b border-app-border px-[18px] py-3.5">
+        <span className="text-[13.5px] font-medium text-app-text-primary">{title}</span>
         {action}
       </div>
       {promises.length === 0 ? (
-        <p className="px-[18px] py-8 text-center text-sm text-appNavy/50">{emptyText}</p>
+        <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">{emptyText}</p>
       ) : (
-        <div className="divide-y divide-lineDark/60">
+        <div className="divide-y divide-app-border">
           {promises.map((p) => (
             <PromiseRow key={p.id} promise={p} showStage={showStage} />
           ))}

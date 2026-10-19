@@ -11,7 +11,7 @@ function Submit() {
     <button
       type="submit"
       disabled={pending}
-      className="mt-5 min-h-[50px] w-full rounded-full bg-gold-gradient text-[15px] font-medium text-navy disabled:opacity-50"
+      className="mt-5 min-h-[50px] w-full rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "מתחבר…" : "כניסה לפורטל"}
     </button>
@@ -56,19 +56,19 @@ export function LoginLinkConsumer({ token }: { token: string }) {
 
       {state?.error ? (
         <>
-          <p className="rounded-[10px] border border-error/30 bg-error-soft px-3 py-2.5 text-xs text-error">
+          <p className="rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-xs text-app-error">
             {state.error}
           </p>
           <Link
             href="/app/login-link/request"
-            className="mt-5 flex min-h-[50px] w-full items-center justify-center rounded-full bg-gold-gradient text-[15px] font-medium text-navy"
+            className="mt-5 flex min-h-[50px] w-full items-center justify-center rounded-full bg-app-accent text-[15px] font-medium text-app-text-primary"
           >
             שליחת קישור חדש
           </Link>
         </>
       ) : (
         <>
-          <p className="text-[13.5px] text-appNavy/60">רגע אחד, מכניסים אותך לפורטל.</p>
+          <p className="text-[13.5px] text-app-text-secondary">רגע אחד, מכניסים אותך לפורטל.</p>
           <Submit />
         </>
       )}

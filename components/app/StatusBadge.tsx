@@ -4,10 +4,10 @@
 // pill in the app draws from the same palette as toasts and inline
 // validation, rather than a separate ad-hoc set of greens/reds.
 const TONE_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
-  green: "bg-success-soft text-success",
-  amber: "bg-warning-soft text-warning",
-  gray: "bg-neutral-soft text-neutral",
-  red: "bg-error-soft text-error",
+  green: "bg-app-success-soft text-app-success",
+  amber: "bg-app-warning-soft text-app-warning",
+  gray: "bg-app-neutral-soft text-app-text-secondary",
+  red: "bg-app-error-soft text-app-error",
 };
 
 // Redesign direction A: added a leading tone dot (previously text-only
@@ -20,10 +20,10 @@ const TONE_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
 // Entries, Notifications, Client Portal history) - one change here
 // reaches all of them.
 const DOT_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
-  green: "bg-success",
-  amber: "bg-warning",
+  green: "bg-app-success",
+  amber: "bg-app-warning",
   gray: "bg-neutral",
-  red: "bg-error",
+  red: "bg-app-error",
 };
 
 export function StatusBadge({ label, tone }: { label: string; tone: "green" | "amber" | "gray" | "red" }) {

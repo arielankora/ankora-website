@@ -9,7 +9,7 @@ export function LogoutButton({ variant = "light" }: { variant?: "light" | "dark"
   const className =
     variant === "dark"
       ? "w-full rounded-full border border-white/15 px-4 py-2 text-xs font-medium text-cream/70 transition-colors hover:border-gold hover:text-cream"
-      : "rounded-full border border-lineDark px-4 py-2 text-xs font-medium text-appNavy/70 transition-colors hover:border-gold hover:text-appNavy";
+      : "rounded-full border border-app-border px-4 py-2 text-xs font-medium text-app-text-secondary transition-colors hover:border-gold hover:text-app-text-primary";
   return (
     <button onClick={() => signOut({ callbackUrl: "/app/login" })} className={className}>
       התנתקות

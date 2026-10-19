@@ -11,8 +11,8 @@ export default async function GuidePage() {
     <>
       <div className="space-y-10">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">מדריך שימוש</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="text-xl font-medium text-app-text-primary">מדריך שימוש</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             הסבר מלא על כל יכולות המערכת - מה כל מסך עושה, מי יכול לגשת אליו, ואיך עובדים איתו.
           </p>
         </div>

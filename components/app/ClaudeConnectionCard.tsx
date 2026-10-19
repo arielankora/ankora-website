@@ -66,11 +66,11 @@ export function ClaudeConnectionCard({
   const lastUsedLabel = formatDateTime(status.lastUsedAt);
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-medium text-appNavy">Claude</h2>
-          <p className="mt-0.5 text-xs text-appNavy/50">Model Context Protocol</p>
+          <h2 className="text-base font-medium text-app-text-primary">Claude</h2>
+          <p className="mt-0.5 text-xs text-app-text-tertiary">Model Context Protocol</p>
         </div>
         <StatusBadge
           label={status.connected ? "מחובר" : "לא מחובר"}
@@ -78,21 +78,21 @@ export function ClaudeConnectionCard({
         />
       </div>
 
-      <p className="mt-3 text-sm leading-relaxed text-appNavy/60">
+      <p className="mt-3 text-sm leading-relaxed text-app-text-secondary">
         {status.connected
           ? "Claude מחובר לחשבון שלכם ויכול להפעיל טיימר, לדווח זמן ולקרוא את הדיווחים שלכם - תמיד בהרשאות שלכם בלבד."
           : "אפשר לחבר את Claude לחשבון שלכם ולנהל דיווחי זמן בשיחה - להפעיל טיימר, לסגור אותו ולדווח שעות, בלי לפתוח את המערכת."}
       </p>
 
       {status.connected ? (
-        <dl className="mt-4 space-y-2 border-t border-lineDark pt-4 text-sm">
+        <dl className="mt-4 space-y-2 border-t border-app-border pt-4 text-sm">
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-appNavy/50">חיבורים פעילים</dt>
-            <dd className="font-medium text-appNavy">{status.grants.length}</dd>
+            <dt className="text-app-text-tertiary">חיבורים פעילים</dt>
+            <dd className="font-medium text-app-text-primary">{status.grants.length}</dd>
           </div>
           <div className="flex items-center justify-between gap-3">
-            <dt className="text-appNavy/50">פעילות אחרונה</dt>
-            <dd className="font-medium text-appNavy">{lastUsedLabel ?? "טרם היה שימוש"}</dd>
+            <dt className="text-app-text-tertiary">פעילות אחרונה</dt>
+            <dd className="font-medium text-app-text-primary">{lastUsedLabel ?? "טרם היה שימוש"}</dd>
           </div>
           {/* Listed one by one because "two connections" with no way to
               tell them apart is not actionable - a person revoking an old
@@ -108,20 +108,20 @@ export function ClaudeConnectionCard({
           </div>
         </dl>
       ) : (
-        <div className="mt-4 space-y-2 border-t border-lineDark pt-4">
-          <p className="text-xs font-medium text-appNavy/50">כתובת החיבור</p>
+        <div className="mt-4 space-y-2 border-t border-app-border pt-4">
+          <p className="text-xs font-medium text-app-text-tertiary">כתובת החיבור</p>
           <CopyValue value={MCP_CONNECTOR_URL} label="העתקת כתובת החיבור" />
         </div>
       )}
 
       {orgSummary && (
-        <p className="mt-4 rounded-lg bg-appNavy/[0.03] px-3 py-2 text-xs text-appNavy/60">
+        <p className="mt-4 rounded-lg bg-app-surface-sunken px-3 py-2 text-xs text-app-text-secondary">
           {orgSummary.connectedUsers} מתוך {orgSummary.eligibleUsers} משתמשי Ankora חיברו את Claude לחשבון שלהם.
         </p>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-4">
-        <Link href={MCP_GUIDE_HREF} className="text-sm font-medium text-gold-dim hover:underline">
+        <Link href={MCP_GUIDE_HREF} className="text-sm font-medium text-app-text-accent hover:underline">
           איך מחברים את Claude →
         </Link>
         {/* The card now owns disconnection (the "ניתוק" button on each
@@ -129,7 +129,7 @@ export function ClaudeConnectionCard({
             missing control - it just names the other paths that also end
             a grant, which people do still run into. */}
         {status.connected && (
-          <span className="text-xs text-appNavy/50">
+          <span className="text-xs text-app-text-tertiary">
             ניתוק כאן מבטל את ההרשאה מיידית. גם שינוי סיסמה עושה זאת.
           </span>
         )}

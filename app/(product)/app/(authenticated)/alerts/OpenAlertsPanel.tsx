@@ -57,9 +57,9 @@ export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[];
   const visible = alerts.filter((a) => !hidden.has(a.id));
   if (visible.length === 0) {
     return (
-      <div className="flex items-center gap-2.5 rounded-2xl border border-lineDark bg-white px-5 py-4">
-        <span className="h-2 w-2 shrink-0 rounded-full bg-success" aria-hidden="true" />
-        <p className="text-sm text-appNavy/70">{emptyText}</p>
+      <div className="flex items-center gap-2.5 rounded-2xl border border-app-border bg-white px-5 py-4">
+        <span className="h-2 w-2 shrink-0 rounded-full bg-app-success" aria-hidden="true" />
+        <p className="text-sm text-app-text-secondary">{emptyText}</p>
       </div>
     );
   }
@@ -67,24 +67,24 @@ export function OpenAlertsPanel({ alerts, emptyText }: { alerts: OpenAlertRow[];
   return (
     <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
       {visible.map((alert) => (
-        <div key={alert.id} className="rounded-2xl border border-error/30 bg-white p-5">
+        <div key={alert.id} className="rounded-2xl border border-app-error/30 bg-white p-5">
           <div className="flex items-center justify-between gap-2.5">
-            <span className="text-xs text-error">דורש החלטה</span>
-            <span className="text-[11px] text-appNavy/45">{alert.triggeredAgo}</span>
+            <span className="text-xs text-app-error">דורש החלטה</span>
+            <span className="text-[11px] text-app-text-tertiary">{alert.triggeredAgo}</span>
           </div>
-          <p className="mt-2.5 text-sm text-appNavy">{alert.description}</p>
-          <p className="mt-1 text-xs text-appNavy/55">{alert.clientName}</p>
+          <p className="mt-2.5 text-sm text-app-text-primary">{alert.description}</p>
+          <p className="mt-1 text-xs text-app-text-secondary">{alert.clientName}</p>
           <div className="mt-3.5 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => resolve(alert)}
-              className="rounded-full bg-gold-gradient px-4 py-2 text-xs font-medium text-navy"
+              className="rounded-full bg-app-accent px-4 py-2 text-xs font-medium text-app-text-primary"
             >
               סימון כטופל
             </button>
             <Link
               href={`/app/hour-banks?clientId=${alert.clientId}`}
-              className="rounded-full border border-lineDark px-4 py-2 text-xs text-appNavy transition-colors hover:border-gold"
+              className="rounded-full border border-app-border px-4 py-2 text-xs text-app-text-primary transition-colors hover:border-gold"
             >
               פתיחת בנק השעות
             </Link>

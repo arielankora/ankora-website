@@ -123,8 +123,8 @@ export function TaskFilters({
         <input key={key} type="hidden" name={key} value={value} />
       ))}
 
-      <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-full border border-lineDark bg-white px-4 py-2">
-        <Search size={15} className="shrink-0 text-appNavy/40" />
+      <div className="flex min-w-[260px] flex-1 items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2">
+        <Search size={15} className="shrink-0 text-app-text-tertiary" />
         <input
           // Nameless while empty, so an empty box is not submitted at
           // all. A form sends every named field it has, and `?q=` is a
@@ -135,7 +135,7 @@ export function TaskFilters({
           onChange={(e) => setText(e.target.value)}
           aria-label="חיפוש במשימות"
           placeholder="חיפוש בכותרת, בתיאור, בשרשור ובשם הלקוח"
-          className="min-w-0 flex-1 bg-transparent text-[13.5px] text-appNavy outline-none placeholder:text-appNavy/35"
+          className="min-w-0 flex-1 bg-transparent text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary"
         />
         {text && (
           // A plain anchor, and NOT next/link.
@@ -163,7 +163,7 @@ export function TaskFilters({
             // The box empties before the navigation lands, so the control
             // does not sit there still showing the word it is removing.
             onClick={() => setText("")}
-            className="shrink-0 text-appNavy/40 hover:text-appNavy"
+            className="shrink-0 text-app-text-tertiary hover:text-app-text-primary"
           >
             <X size={14} />
           </a>
@@ -218,8 +218,8 @@ function Select({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex items-center gap-2 rounded-full border border-lineDark bg-white px-3 py-2 text-[13px]">
-      <span className="text-appNavy/50">{label}</span>
+    <label className="flex items-center gap-2 rounded-full border border-app-border bg-white px-3 py-2 text-[13px]">
+      <span className="text-app-text-tertiary">{label}</span>
       <select
         // Same reason as the search box: an unset dropdown contributes
         // nothing to the query string rather than `?clientId=`.
@@ -231,7 +231,7 @@ function Select({
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="max-w-[160px] cursor-pointer truncate bg-transparent font-medium text-appNavy outline-none"
+        className="max-w-[160px] cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

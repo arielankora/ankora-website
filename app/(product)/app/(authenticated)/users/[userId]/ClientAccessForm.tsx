@@ -9,7 +9,7 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "נשמר..." : "עדכון גישה"}
     </button>
@@ -49,26 +49,26 @@ export function ClientAccessForm({
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="userId" value={userId} />
       {clients.length === 0 ? (
-        <p className="text-sm text-appNavy/50">אין עדיין לקוחות במערכת.</p>
+        <p className="text-sm text-app-text-tertiary">אין עדיין לקוחות במערכת.</p>
       ) : (
         <>
           <div className="flex items-center gap-3 text-xs">
-            <button type="button" onClick={() => setAllChecked(true)} className="text-gold-dim underline">
+            <button type="button" onClick={() => setAllChecked(true)} className="text-app-text-accent underline">
               בחר הכל
             </button>
-            <button type="button" onClick={() => setAllChecked(false)} className="text-appNavy/50 underline">
+            <button type="button" onClick={() => setAllChecked(false)} className="text-app-text-tertiary underline">
               נקה הכל
             </button>
           </div>
           <div ref={checkboxContainerRef} className="flex flex-wrap gap-3">
             {clients.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-sm text-appNavy/70">
+              <label key={c.id} className="flex items-center gap-1.5 text-sm text-app-text-secondary">
                 <input
                   type="checkbox"
                   name="clientIds"
                   value={c.id}
                   defaultChecked={assignedClientIds.includes(c.id)}
-                  className="h-4 w-4 rounded border-lineDark"
+                  className="h-4 w-4 rounded border-app-border"
                 />
                 {c.name}
               </label>
@@ -78,8 +78,8 @@ export function ClientAccessForm({
       )}
 
       <div className="flex items-center gap-4">
-        {state?.error && <p className="text-sm text-red-600">{state.error}</p>}
-        {state?.ok && <p className="text-sm text-emerald-700">עודכן בהצלחה.</p>}
+        {state?.error && <p className="text-sm text-app-error">{state.error}</p>}
+        {state?.ok && <p className="text-sm text-app-success">עודכן בהצלחה.</p>}
         {clients.length > 0 && <SubmitButton />}
       </div>
     </form>

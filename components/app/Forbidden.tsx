@@ -9,12 +9,12 @@ import { ShieldAlert } from "lucide-react";
 // does pass it, the current role is shown per spec.
 export function Forbidden({ roleLabel }: { roleLabel?: string }) {
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl border border-lineDark bg-white px-6 py-14 text-center">
-      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-error-soft">
-        <ShieldAlert size={20} strokeWidth={1.75} className="text-error" />
+    <div className="flex flex-col items-center gap-3 rounded-2xl border border-app-border bg-white px-6 py-14 text-center">
+      <span className="flex h-11 w-11 items-center justify-center rounded-full bg-app-error-soft">
+        <ShieldAlert size={20} strokeWidth={1.75} className="text-app-error" />
       </span>
-      <p className="text-[15px] font-medium text-appNavy">אין לך הרשאה לצפות בעמוד זה</p>
-      {roleLabel && <p className="text-sm text-appNavy/60">התפקיד הנוכחי שלך: {roleLabel}</p>}
+      <p className="text-[15px] font-medium text-app-text-primary">אין לך הרשאה לצפות בעמוד זה</p>
+      {roleLabel && <p className="text-sm text-app-text-secondary">התפקיד הנוכחי שלך: {roleLabel}</p>}
     </div>
   );
 }

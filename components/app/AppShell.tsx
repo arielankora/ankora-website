@@ -167,7 +167,7 @@ export function AppShell({
     <ActiveTimerProvider
       initial={activeTimer ? { startAt: activeTimer.startAt, extraCount: activeTimer.extraCount ?? 0 } : null}
     >
-    <div className="min-h-screen bg-cream md:flex">
+    <div className="min-h-screen bg-app-surface-page md:flex">
       <Sidebar
         items={items}
         userName={user.name}
@@ -182,9 +182,9 @@ export function AppShell({
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
 
       <div className="min-w-0 flex-1">
-        <header className="border-b border-lineDark bg-white md:hidden">
+        <header className="border-b border-app-border bg-white md:hidden">
           <div className="flex items-center justify-between gap-4 px-6 py-4">
-            <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-dim">
+            <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
               Ankora
             </Link>
             <NotificationsBell notifications={notifications} unreadCount={unreadCount} />

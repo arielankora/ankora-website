@@ -8,12 +8,12 @@ export function ClientPicker({ clients, current }: { clients: Option[]; current:
   const router = useRouter();
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
-      <label className="block text-xs font-medium text-appNavy/60">לקוח</label>
+    <div className="rounded-2xl border border-app-border bg-white p-6">
+      <label className="block text-xs font-medium text-app-text-secondary">לקוח</label>
       <select
         defaultValue={current}
         onChange={(e) => router.push(`/app/report-schedules?clientId=${e.target.value}`)}
-        className="mt-1.5 w-full max-w-sm rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        className="mt-1.5 w-full max-w-sm rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       >
         <option value="">בחרו לקוח...</option>
         {clients.map((c) => (

@@ -31,13 +31,13 @@ export default async function CategoryDetailPage(props: { params: Promise<{ cate
       <div className="space-y-6">
         <div>
           <BackLink href="/app/categories" label="חזרה לקטגוריות" />
-          <h1 className="mt-3 text-xl font-medium text-appNavy">{category.name}</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="mt-3 text-xl font-medium text-app-text-primary">{category.name}</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             {category.visibility === "GLOBAL" ? "קטגוריה כללית" : `ספציפית ללקוח: ${category.client?.name ?? ""}`}
           </p>
         </div>
 
-        <div className="rounded-2xl border border-lineDark bg-white p-6">
+        <div className="rounded-2xl border border-app-border bg-white p-6">
           <EditCategoryForm category={category} />
         </div>
       </div>
