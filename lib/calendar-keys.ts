@@ -129,7 +129,17 @@ export type CalendarState = {
   clientId?: string;
   /// false = everyone's work. Written as `mine=0`, like the tasks screen.
   mine: boolean;
+  /// 20.10.2026: the drawer, and which of its two lists. Absent = closed,
+  /// which is the default: the grid gets the whole width until somebody
+  /// is planning.
+  drawer?: CalendarDrawer;
 };
+
+export type CalendarDrawer = "undated" | "overdue";
+
+export function parseDrawer(value?: string | null): CalendarDrawer | undefined {
+  return value === "undated" || value === "overdue" ? value : undefined;
+}
 
 export function calendarHref(state: CalendarState, today: string): string {
   const p = new URLSearchParams();
@@ -138,12 +148,13 @@ export function calendarHref(state: CalendarState, today: string): string {
   if (state.show !== "all") p.set("show", state.show);
   if (state.clientId) p.set("clientId", state.clientId);
   if (!state.mine) p.set("mine", "0");
+  if (state.drawer) p.set("drawer", state.drawer);
   const qs = p.toString();
   return qs ? `/app/calendar?${qs}` : "/app/calendar";
 }
 
 /// The calendar's own keys, the only ones carried in a `from` link.
-export const CALENDAR_QUERY_KEYS = ["view", "date", "show", "clientId", "mine"] as const;
+export const CALENDAR_QUERY_KEYS = ["view", "date", "show", "clientId", "mine", "drawer"] as const;
 
 /// Prefix of a `from` value that points back at the calendar rather than
 /// at the tasks list. See list-query.ts.

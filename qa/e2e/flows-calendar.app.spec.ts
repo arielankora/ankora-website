@@ -26,7 +26,7 @@ const TASK = "demo-task-calendar-fixture";
 
 // A fixed week far from today, so nothing else seeded lands in it and
 // the cells the spec drops on are always drawn. 6.1.2030 is a Sunday.
-const WEEK = "/app/calendar?date=2030-01-08&mine=0&show=tasks";
+const WEEK = "/app/calendar?date=2030-01-08&mine=0&show=tasks&drawer=undated";
 const DAY = "2030-01-09";
 
 async function dragTo(page: import("@playwright/test").Page, taskId: string, day: string) {
@@ -53,7 +53,7 @@ function inCell(page: import("@playwright/test").Page, day: string) {
 }
 
 function inPanel(page: import("@playwright/test").Page) {
-  return page.locator(`[data-testid="calendar-undated"] [data-calendar-task="${TASK}"]`);
+  return page.locator(`[data-testid="calendar-drawer"] [data-calendar-task="${TASK}"]`);
 }
 
 /// Waited on BEFORE any reload: the move is optimistic, so the screen
@@ -63,17 +63,30 @@ function nextWrite(page: import("@playwright/test").Page) {
   return page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400, { timeout: 30_000 });
 }
 
-test("the calendar draws a week with its controls and the undated panel", async ({ page }) => {
+test("the calendar draws a week, and the drawer opens from its button and closes again", async ({ page }) => {
   await page.goto("/app/calendar", { waitUntil: "domcontentloaded" });
   await expect(page.getByRole("heading", { name: "יומן", level: 1 })).toBeVisible({ timeout: 30_000 });
-  for (const testId of ["calendar-view", "calendar-show", "calendar-mine", "calendar-client", "calendar-undated"]) {
+  for (const testId of ["calendar-view", "calendar-show", "calendar-mine", "calendar-client", "calendar-undated-button", "calendar-overdue-button"]) {
     await expect(page.getByTestId(testId)).toBeVisible();
   }
+  // Closed by default: the grid has the width.
+  await expect(page.getByTestId("calendar-drawer")).toHaveCount(0);
+
+  await page.getByTestId("calendar-undated-button").click();
+  await page.waitForURL(/drawer=undated/, { timeout: 30_000 });
+  await expect(page.getByTestId("calendar-drawer")).toBeVisible({ timeout: 30_000 });
+
+  await page.getByTestId("calendar-drawer-tab-overdue").click();
+  await page.waitForURL(/drawer=overdue/, { timeout: 30_000 });
+
+  await page.getByTestId("calendar-drawer-close").click();
+  await expect(page.getByTestId("calendar-drawer")).toHaveCount(0, { timeout: 30_000 });
+  expect(new URL(page.url()).search).not.toContain("drawer");
 });
 
-test("a task dragged from the panel gets that day, and back again loses it", async ({ page }) => {
+test("a task dragged from the drawer gets that day, and back again loses it", async ({ page }) => {
   await page.goto(WEEK, { waitUntil: "domcontentloaded" });
-  await expect(page.getByTestId("calendar-undated")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("calendar-drawer")).toBeVisible({ timeout: 30_000 });
 
   // A retry can find the task where the last attempt left it.
   if ((await inCell(page, DAY).count()) > 0) {
@@ -100,7 +113,7 @@ test("a task dragged from the panel gets that day, and back again loses it", asy
 });
 
 test("opening a task and going back keeps the view and the filters", async ({ page }) => {
-  const MONTH = "/app/calendar?view=month&date=2030-01-08&show=tasks&mine=0";
+  const MONTH = "/app/calendar?view=month&date=2030-01-08&show=tasks&mine=0&drawer=undated";
   await page.goto(MONTH, { waitUntil: "domcontentloaded" });
   await expect(inPanel(page)).toBeVisible({ timeout: 30_000 });
 
@@ -112,12 +125,12 @@ test("opening a task and going back keeps the view and the filters", async ({ pa
   await expect(back).toHaveText(/חזרה ליומן/, { timeout: 30_000 });
   await back.click();
   await page.waitForURL(/\/app\/calendar\?/, { timeout: 30_000 });
-  expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0");
+  expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0&drawer=undated");
 
   // And the browser's back button, from the task again.
   await inPanel(page).locator("a").click();
   await page.waitForURL(new RegExp(`/app/tasks/${TASK}`), { timeout: 30_000 });
   await page.goBack({ waitUntil: "domcontentloaded" });
-  expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0");
+  expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0&drawer=undated");
   await expect(page.getByTestId("calendar-title")).toHaveText(/ינואר 2030/, { timeout: 30_000 });
 });

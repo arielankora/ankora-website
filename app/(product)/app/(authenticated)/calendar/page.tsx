@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Clock, Inbox } from "lucide-react";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { loadCalendar, UNDATED_LIMIT } from "@/lib/app-domain/calendar";
+import { loadCalendar, OVERDUE_LIMIT, UNDATED_LIMIT } from "@/lib/app-domain/calendar";
 import { timed } from "@/lib/slow-log";
 import { localDateKey } from "@/lib/timezone";
 import {
@@ -11,6 +11,7 @@ import {
   CALENDAR_VIEWS,
   calendarHref,
   isDayKey,
+  parseDrawer,
   parseShow,
   parseView,
   rangeTitle,
@@ -38,7 +39,7 @@ export const metadata = { robots: { index: false, follow: false } };
 // Gated like the two screens it draws from (time_entry.create_self).
 
 export default async function CalendarPage(props: {
-  searchParams: Promise<{ view?: string; date?: string; show?: string; clientId?: string; mine?: string }>;
+  searchParams: Promise<{ view?: string; date?: string; show?: string; clientId?: string; mine?: string; drawer?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
@@ -55,11 +56,14 @@ export default async function CalendarPage(props: {
     clientId,
     // "שלי" is the default, like the tasks screen. `mine=0` is everyone.
     mine: searchParams.mine !== "0",
+    // The drawer belongs to tasks, so it has nothing to show under
+    // "מועדים" and stays shut there.
+    drawer: parseShow(searchParams.show) === "dates" ? undefined : parseDrawer(searchParams.drawer),
   };
 
   const data = await timed(
     "screen.calendar.load",
-    () => loadCalendar(user, state),
+    () => loadCalendar(user, { ...state, today }),
     (r) => (r ? `${r.tasks.length} tasks, ${r.dates.length} dates, ${r.undated.length} undated, ${state.view}` : "(failed)")
   );
 
@@ -123,6 +127,38 @@ export default async function CalendarPage(props: {
         <h2 data-testid="calendar-title" className="text-[15px] font-medium text-appNavy">
           {rangeTitle(state.view, state.date)}
         </h2>
+
+        {/* 20.10.2026: the two lists that used to be a fixed column. A
+            button each, with its count, so the grid keeps the width until
+            somebody wants them. A second press closes. */}
+        {state.show !== "dates" && (
+          <div className="ms-auto flex flex-wrap items-center gap-2">
+            <Link
+              href={href({ drawer: state.drawer === "overdue" ? undefined : "overdue" })}
+              data-testid="calendar-overdue-button"
+              aria-pressed={state.drawer === "overdue"}
+              className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                state.drawer === "overdue" ? "border-appNavy bg-appNavy text-cream" : "border-error/35 bg-white text-error hover:border-error/60"
+              }`}
+            >
+              <Clock size={14} strokeWidth={1.8} />
+              באיחור
+              <span className="font-jbmono text-[12px]">{data.overdueTotal}{data.overdueTotal > OVERDUE_LIMIT ? "+" : ""}</span>
+            </Link>
+            <Link
+              href={href({ drawer: state.drawer === "undated" ? undefined : "undated" })}
+              data-testid="calendar-undated-button"
+              aria-pressed={state.drawer === "undated"}
+              className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
+                state.drawer === "undated" ? "border-appNavy bg-appNavy text-cream" : "border-gold bg-white text-appNavy hover:border-gold-dim"
+              }`}
+            >
+              <Inbox size={14} strokeWidth={1.8} />
+              בלי תאריך
+              <span className="font-jbmono text-[12px]">{data.undatedTotal}{data.undatedTotal > UNDATED_LIMIT ? "+" : ""}</span>
+            </Link>
+          </div>
+        )}
       </div>
 
       <CalendarGrid
@@ -130,13 +166,23 @@ export default async function CalendarPage(props: {
         anchor={state.date}
         today={today}
         days={data.days}
-        tasks={state.show === "dates" ? [] : [...data.tasks, ...data.undated]}
+        tasks={state.show === "dates" ? [] : uniqueById([...data.tasks, ...data.undated, ...data.overdue])}
         dates={data.dates}
-        showTasks={state.show !== "dates"}
-        undatedCapped={data.undated.length >= UNDATED_LIMIT}
+        drawer={state.drawer}
+        drawerHrefs={{ undated: href({ drawer: "undated" }), overdue: href({ drawer: "overdue" }), close: href({ drawer: undefined }) }}
+        undatedMore={data.undatedTotal > data.undated.length}
+        overdueMore={data.overdueTotal > data.overdue.length}
         query={query}
         dayHrefs={Object.fromEntries(data.days.map((d) => [d, href({ view: "day", date: d })]))}
       />
     </div>
   );
+}
+
+/// An overdue task due inside the range on screen arrives twice: once on
+/// its day and once in the overdue list. The grid and the drawer read one
+/// list, so it is one row.
+function uniqueById<T extends { id: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  return rows.filter((r) => (seen.has(r.id) ? false : (seen.add(r.id), true)));
 }
