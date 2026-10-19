@@ -9,6 +9,7 @@ import { test, expect } from "./fixtures";
 //
 // @covers action:(product)/app/(authenticated)/knowledge/actions
 // @covers screen:/app/knowledge
+// @covers screen:/app/brain-metrics
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -76,5 +77,12 @@ test.describe("knowledge/actions", () => {
     const row = section.locator("li", { hasText: "[DEMO] הצעה" }).first();
     await expect(row.getByRole("button", { name: "אישור", exact: true })).toBeVisible();
     await expect(row.getByRole("button", { name: "למשימה" })).toBeVisible();
+  });
+
+  test("a manager reads the measures of every client's file", async ({ page }) => {
+    await page.goto("/app/brain-metrics");
+    await expect(page.getByRole("heading", { level: 1, name: "מדדי התיק" })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("metrics-all").getByText("שלמות תהליכים")).toBeVisible();
+    await expect(page.getByTestId("metrics-clients")).toBeVisible();
   });
 });

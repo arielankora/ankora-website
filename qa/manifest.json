@@ -1819,6 +1819,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-19",
       "riskReason": "Changes items already in a client file from an approved proposal; only the fields it names change, sources add up, and a changed rule goes back to proposed"
+    },
+    "domain:brain-metrics": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-19",
+      "riskReason": "Reads every client's file across the team for managers only; a wrong count misleads the decision whether the file works"
+    },
+    "screen:/app/brain-metrics": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-19",
+      "riskReason": "Manager-only screen with numbers from every client; must refuse anyone else"
     }
   },
   "waivers": {},

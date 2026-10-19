@@ -94,6 +94,14 @@ export default async function KnowledgeReviewPage(props: { searchParams: Promise
           <Link href="/app/extraction-guide" className="text-gold-dim hover:underline">
             הנחיות החילוץ
           </Link>
+          {canManageClients(user.role) && (
+            <>
+              {" · "}
+              <Link href="/app/brain-metrics" className="text-gold-dim hover:underline">
+                מדדי התיק
+              </Link>
+            </>
+          )}
         </p>
         {quality && (
           <p className={`mt-1.5 text-xs ${quality.tone === "warn" ? "text-warning" : quality.tone === "good" ? "text-success" : "text-appNavy/55"}`} data-testid="proposal-quality">
