@@ -324,7 +324,7 @@ describe("the timer around the conversation (19.10.2026)", () => {
   it("puts what has to be seen inside the card's question, not above it (19.10.2026)", () => {
     const rules = timerRules(base, "advance").join("\n");
     expect(rules).toContain("כרטיס שאלה מוצג לי בלי הטקסט שלפניו");
-    expect(rules).toContain(`להפעיל טיימר על NUX, המשימה "${base.title}", עם ההערה "<ההערה המוצעת>"?`);
+    expect(rules).toContain(`להפעיל טיימר על NUX, המשימה "${base.title}", בקטגוריה "כספים", עם ההערה "<ההערה המוצעת>"?`);
     expect(rules).toContain("רץ טיימר על <לקוח> מ-<שעה>. מה לעשות?");
     expect(rules).toContain('הטיימר רץ <משך>. לעצור עם ההערה "<ההערה>"?');
     expect(rules).not.toContain("מעל הכרטיס מה ייכנס");
@@ -369,5 +369,13 @@ describe("a new procedure reaches the client file (19.10.2026)", () => {
   it("still has no em-dash or en-dash with the new rules", () => {
     const text = buildAdvancePrompt({ ...base, mapping: true });
     expect(text).not.toMatch(/[\u2013\u2014]/);
+  });
+
+  it("names the category inside the question, and says when it will be picked (19.10.2026)", () => {
+    expect(timerRules(base, "advance").join("\n")).toContain('בקטגוריה "כספים"');
+    const none = timerRules({ ...base, categoryName: null }, "advance").join("\n");
+    expect(none).toContain("בקטגוריה שתיבחר אוטומטית");
+    expect(none).not.toContain('בקטגוריה "');
+    expect(none).toContain("הקטגוריה שהטיימר רץ בה (מהתשובה של start_timer) נכנסת לשאלה של הכרטיס הבא");
   });
 });
