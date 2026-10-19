@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { withFrom } from "@/lib/list-back";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { setImportantDateStatusAction } from "./actions";
 import type { ImportantDateStatus } from "@prisma/client";
@@ -32,7 +33,7 @@ const TONE_CLASSES: Record<DateRow["tone"], string> = {
 // כטופל" and "פתיחה מחדש", not a one-way action), so the undo here calls
 // the real domain status-setter with the date's previous status rather
 // than just rewinding local state.
-export function ImportantDateRow({ date }: { date: DateRow }) {
+export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery?: string }) {
   const { showToast } = useToast();
   const [status, setStatus] = useState(date.status);
   const [pending, setPending] = useState(false);
@@ -68,7 +69,7 @@ export function ImportantDateRow({ date }: { date: DateRow }) {
         <span className="block text-[10.5px]">{date.month}</span>
       </span>
       <div className="min-w-0 flex-1 basis-[220px]">
-        <Link href={`/app/important-dates/${date.id}`} className="block truncate text-sm text-appNavy hover:text-gold-dim">
+        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} className="block truncate text-sm text-appNavy hover:text-gold-dim">
           {date.title}
         </Link>
         <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">{date.meta}</p>

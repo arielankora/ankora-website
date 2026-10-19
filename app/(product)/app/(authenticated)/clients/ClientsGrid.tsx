@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { withFrom } from "@/lib/list-back";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { archiveClientAction, restoreClientAction } from "./actions";
 import { startPortalPreviewAction } from "../portal/actions";
@@ -110,7 +111,7 @@ export function ClientsGrid({
             return (
               <div key={client.id} className="rounded-2xl border border-lineDark bg-white p-5">
                 <div className="flex items-center justify-between gap-2.5">
-                  <Link href={`/app/clients/${client.id}`} className="text-[15px] font-medium text-appNavy hover:text-gold-dim">
+                  <Link href={withFrom(`/app/clients/${client.id}`, query.trim() ? new URLSearchParams({ q: query.trim() }).toString() : "")} className="text-[15px] font-medium text-appNavy hover:text-gold-dim">
                     {client.name}
                   </Link>
                   <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${STATUS_BADGE[client.status]}`}>

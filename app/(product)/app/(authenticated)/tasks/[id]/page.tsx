@@ -1,4 +1,5 @@
-import { ArrowRight, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
+import { BackLink } from "@/components/app/BackLink";
 import { backLabel, carriedListQuery, tasksListHref } from "../list-query";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -180,14 +181,7 @@ export default async function TaskDetailPage(props: {
           Hebrew. A plain anchor, like the links that lead here, so the
           navigation cannot be quietly cancelled (see TaskRow). */}
       <nav className="flex items-center gap-1.5 text-[13px] text-appNavy/50">
-        <a
-          href={backHref}
-          data-testid="task-back"
-          className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 font-medium text-appNavy/70 transition-colors hover:border-appNavy/30 hover:text-appNavy"
-        >
-          <ArrowRight size={14} />
-          {backText}
-        </a>
+        <BackLink href={backHref} label={backText} testId="task-back" />
         <ChevronLeft size={14} className="text-appNavy/30" />
         <span className="truncate text-appNavy/70">{task.client.name}</span>
       </nav>
