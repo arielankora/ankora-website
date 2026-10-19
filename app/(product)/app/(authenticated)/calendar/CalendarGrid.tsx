@@ -45,10 +45,11 @@ type DropZone = {
 /// not a list; the day view is the list.
 const MONTH_CELL_CAP = 4;
 
-/// Sunday to Thursday full width, Friday and Saturday a little over half:
+/// Sunday to Thursday full width, Friday and Saturday at 0.7 (0.55 until
+/// 20.10.2026, which left a Friday task two words wide with the drawer open):
 /// the weekend is where almost nothing is due, and equal columns spent a
 /// fifth of the grid on two near-empty days.
-const GRID_COLUMNS = "grid-cols-[repeat(5,minmax(0,1fr))_repeat(2,minmax(0,0.55fr))]";
+const GRID_COLUMNS = "grid-cols-[repeat(5,minmax(0,1fr))_repeat(2,minmax(0,0.7fr))]";
 
 const PRIORITY_DOT: Record<CalendarTask["priority"], string> = {
   LOW: "bg-transparent",
@@ -351,9 +352,9 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
 /// The drawer: one of two lists, searchable, grouped by client.
 ///
 /// Beside the grid and not over it, so nothing it is dragged onto is
-/// hidden by it. Rows are one line each: the drawer is for finding a task
-/// and putting it on a day, and nineteen two-line cards were a column you
-/// scrolled instead of read.
+/// hidden by it. Rows are up to two lines, 360px wide: one line at 300px
+/// (the first version) cut most titles to their first three words, and a
+/// task you cannot recognise is a task you cannot place (Ariel, 20.10.2026).
 function Drawer({
   tab,
   hrefs,
@@ -399,7 +400,7 @@ function Drawer({
       data-testid="calendar-drawer"
       data-day="undated"
       {...zone}
-      className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] ${
+      className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[360px] ${
         over ? "border-gold bg-gold/5" : "border-lineDark"
       }`}
     >
@@ -470,10 +471,10 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
       }}
       data-calendar-task={task.id}
       title={`${task.title} · ${task.clientName}`}
-      className="group flex cursor-grab items-center gap-1.5 rounded-lg px-1.5 py-1.5 hover:bg-cream-dim/30 active:cursor-grabbing"
+      className="group flex cursor-grab items-start gap-1.5 rounded-lg px-1.5 py-2 hover:bg-cream-dim/30 active:cursor-grabbing"
     >
       {/* The grip says "this moves" before anyone tries. */}
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="shrink-0 text-appNavy/30 group-hover:text-appNavy/55">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mt-[3px] shrink-0 text-appNavy/30 group-hover:text-appNavy/55">
         <circle cx="9" cy="6" r="1.6" />
         <circle cx="15" cy="6" r="1.6" />
         <circle cx="9" cy="12" r="1.6" />
@@ -481,11 +482,11 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
         <circle cx="9" cy="18" r="1.6" />
         <circle cx="15" cy="18" r="1.6" />
       </svg>
-      <a href={taskHref(task.id, from)} draggable={false} className="min-w-0 flex-1 truncate text-[13px] text-appNavy hover:text-appNavy/70">
+      <a href={taskHref(task.id, from)} draggable={false} className="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70">
         {task.title}
       </a>
       {showDue && task.dueKey && (
-        <span className="flex shrink-0 items-center gap-1 font-jbmono text-[11px] text-error">
+        <span className="mt-[2px] flex shrink-0 items-center gap-1 font-jbmono text-[11px] text-error">
           <Clock size={11} strokeWidth={1.8} />
           {shortDate(task.dueKey)}
         </span>
