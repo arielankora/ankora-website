@@ -67,4 +67,14 @@ test.describe("knowledge/actions", () => {
     await filters.getByRole("link", { name: "ניקוי הסינון" }).click();
     await expect(page).toHaveURL(/\/app\/knowledge$/, { timeout: 30_000 });
   });
+
+  test("the client's file tab shows what waits for it, with the same actions", async ({ page }) => {
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const section = page.getByTestId("client-pending-proposals");
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    await expect(section.getByRole("heading", { name: "ממתין לאישור" })).toBeVisible();
+    const row = section.locator("li", { hasText: "[DEMO] הצעה" }).first();
+    await expect(row.getByRole("button", { name: "אישור", exact: true })).toBeVisible();
+    await expect(row.getByRole("button", { name: "למשימה" })).toBeVisible();
+  });
 });

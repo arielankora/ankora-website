@@ -32,7 +32,9 @@ import { SystemsPanel } from "./SystemsPanel";
 import { FactsPanel, type PanelFact } from "./FactsPanel";
 import { EntitiesPanel } from "./EntitiesPanel";
 import { listClientEntities } from "@/lib/app-domain/client-entities";
-import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
+import { countPendingProposals, listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
+import { ReviewBatch } from "../../knowledge/ReviewBatch";
+import { batchHeader, reviewProposals } from "../../knowledge/review-view";
 import { RequestTypesPanel } from "./RequestTypesPanel";
 import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
 import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/process-review";
@@ -196,6 +198,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     // Spec 7.6: when the extraction last delivered.
     daysSinceLastBatch(client.id),
   ]);
+  // Spec 5.2: a tab in every client. What waits for this file, on the file
+  // tab, with the same card and actions as on "ממתין לאישור".
+  const openBatches = tab === "file" && pendingProposals > 0 ? (await listOpenBatches(user, { clientId: client.id })).filter((b) => b.proposals.some((p) => p.state === "PENDING")) : [];
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
   // And of each ongoing one, its last checks.
@@ -283,7 +288,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <div className="flex flex-wrap items-center gap-3">
               {/* The file to read, top to bottom, and to download. */}
               {pendingProposals > 0 && (
-                <Link href={`/app/knowledge?clientId=${client.id}`} className="text-sm text-warning hover:underline">
+                <Link href={tab === "file" ? `#client-pending` : `/app/clients/${client.id}?tab=file`} className="text-sm text-warning hover:underline">
                   {pendingProposals === 1 ? "הצעה אחת ממתינה לאישור" : `${pendingProposals} הצעות ממתינות לאישור`}
                 </Link>
               )}
@@ -346,6 +351,20 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             </Link>
           ))}
         </nav>
+
+        {tab === "file" && openBatches.length > 0 && (
+          <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-sm font-medium text-appNavy">ממתין לאישור</h2>
+              <Link href={`/app/knowledge?clientId=${client.id}`} className="text-xs text-gold-dim hover:underline">
+                במסך ההצעות, עם סינון
+              </Link>
+            </div>
+            {openBatches.map((b) => (
+              <ReviewBatch key={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
+            ))}
+          </section>
+        )}
 
         {tab === "file" && (
           <ItemStaffProvider staff={staff.map((u) => ({ id: u.id, name: u.name }))}>
