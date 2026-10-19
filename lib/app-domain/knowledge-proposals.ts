@@ -36,6 +36,7 @@ import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
+import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 
 // Org brain, phase 2: proposals to the client file
@@ -156,6 +157,10 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   }
   if (item.target === "TASK" && typeof item.payload.assigneeName === "string" && item.payload.assigneeName.trim() && !(await ownerByName(item.payload.assigneeName))) {
     flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.assigneeName.trim()}". המשימה תיפתח על מי שמאשר, אלא אם מתקנים את השם.` });
+  }
+  const unlinked = (await resolveLinks(clientId, item.target, item.payload)).missing;
+  if (unlinked.length) {
+    flags.push({ code: "LINK", message: `לא נמצא בתיק: ${unlinked.join("; ")}. אם הוא ייכנס לתיק לפני האישור, הוא יקושר. אחרת הפריט ייכנס בלי הקישור הזה.` });
   }
   if (item.target !== "TASK" && sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
@@ -461,6 +466,30 @@ export async function ownerByName(name: unknown): Promise<string | null> {
   return found.length === 1 ? found[0].id : null;
 }
 
+/// A rule's parameters as Claude sends them, with entities by name
+/// (entityName, entityNames) turned into the ids the checks read. An
+/// entity that is not in the file is left out: the rule is then checked
+/// for every entity, which is the careful reading.
+async function paramsWithEntities(clientId: string, value: Record<string, unknown> | null | undefined) {
+  if (!value) return null;
+  const { entityName, entityNames, ...rest } = value as Record<string, unknown> & { entityName?: unknown; entityNames?: unknown };
+  const out: Record<string, unknown> = { ...rest };
+  if (typeof entityName === "string" && entityName.trim()) {
+    const id = await entityByName(clientId, entityName.trim());
+    if (id) out.entityId = id;
+  }
+  if (Array.isArray(entityNames)) {
+    const ids: string[] = [];
+    for (const n of entityNames) {
+      if (typeof n !== "string" || !n.trim()) continue;
+      const id = await entityByName(clientId, n.trim());
+      if (id) ids.push(id);
+    }
+    if (ids.length) out.entityIds = ids;
+  }
+  return out;
+}
+
 async function apply(
   actor: User,
   p: { clientId: string; target: string; action: string; targetId: string | null; batchId: string; reason: string | null; quote: string | null },
@@ -471,24 +500,30 @@ async function apply(
   const ownerId = await ownerByName(payload.ownerName);
   // Named, or nothing: an item without an owner keeps the one it has.
   const owner = ownerId ? { ownerId } : {};
+  // Contacts, systems, entities and processes it names, found in the file
+  // now: something approved earlier in the same batch is found too.
+  const links = await resolveLinks(p.clientId, p.target, payload);
+  const linked = links.fields;
   if (p.target === "FACT") {
-    const f = PAYLOADS.FACT.parse(payload);
+    const f = withoutLinkNames(PAYLOADS.FACT.parse(payload));
     const { ownerName: _o, ...fact } = f;
-    const input = { ...fact, ...owner, sources, validUntil: date(f.validUntil), decidedAt: date(f.decidedAt) };
+    const input = { ...fact, ...linked, ...owner, sources, validUntil: date(f.validUntil), decidedAt: date(f.decidedAt) };
     if (p.action === "SUPERSEDE") return (await supersedeClientFact(actor, p.targetId!, input)).id;
     if (p.action === "CONTRADICT") return (await recordContradiction(actor, p.targetId!, { value: f.body, sources })).id;
     return (await addClientFact(actor, { ...input, clientId: p.clientId })).id;
   }
-  if (p.target === "CONTACT") return (await addClientContact(actor, { ...withoutOwnerName(PAYLOADS.CONTACT.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "CONTACT") return (await addClientContact(actor, { ...withoutLinkNames(withoutOwnerName(PAYLOADS.CONTACT.parse(payload))), ...linked, ...owner, sources, clientId: p.clientId })).id;
   if (p.target === "ORGANIZATION") return (await addClientOrganization(actor, { ...withoutOwnerName(PAYLOADS.ORGANIZATION.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
-  if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...withoutOwnerName(PAYLOADS.REQUEST_TYPE.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "REQUEST_TYPE") return (await addRequestType(actor, { ...withoutLinkNames(withoutOwnerName(PAYLOADS.REQUEST_TYPE.parse(payload))), ...linked, ...owner, sources, clientId: p.clientId })).id;
   // A rule enters the file as "proposed": approving the proposal records
   // what the client said; making it binding is a manager's separate step.
   if (p.target === "POLICY") {
     const r = withoutOwnerName(PAYLOADS.POLICY.parse(payload));
-    return (await addClientPolicy(actor, { ...r, effectiveFrom: date(r.effectiveFrom), reviewBy: date(r.reviewBy), ...owner, sources, clientId: p.clientId })).id;
+    const params = await paramsWithEntities(p.clientId, r.params);
+    const interimParams = await paramsWithEntities(p.clientId, r.interimParams);
+    return (await addClientPolicy(actor, { ...r, params, interimParams, effectiveFrom: date(r.effectiveFrom), reviewBy: date(r.reviewBy), ...owner, sources, clientId: p.clientId })).id;
   }
-  if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...withoutOwnerName(PAYLOADS.SYSTEM.parse(payload)), ...owner, sources, clientId: p.clientId })).id;
+  if (p.target === "SYSTEM") return (await addSystemAccess(actor, { ...withoutLinkNames(withoutOwnerName(PAYLOADS.SYSTEM.parse(payload))), ...linked, ...owner, sources, clientId: p.clientId })).id;
   if (p.target === "ENTITY") {
     const { parentName, ownerName: _o, ...e } = PAYLOADS.ENTITY.parse(payload);
     let parentId: string | null = null;
@@ -514,9 +549,12 @@ async function apply(
   // approving the proposal records what was described; a manager approves
   // the procedure separately, after the checks (spec 3.9, decision 1).
   if (p.target === "PROCESS") {
-    const { steps, highlights, outputs, ownerName: _o, ...proc } = PAYLOADS.PROCESS.parse(payload);
-    const process = await addProcess(actor, { ...proc, ...owner, sources, clientId: p.clientId });
-    if (steps?.length) await saveProcessVersion(actor, process.id, { steps, highlights, outputs, baseVersion: 0 });
+    const { steps, highlights, outputs, ownerName: _o, ...proc } = withoutLinkNames(PAYLOADS.PROCESS.parse(payload));
+    const process = await addProcess(actor, { ...proc, ...linked, ...owner, sources, clientId: p.clientId });
+    if (steps?.length) {
+      const withSystems = steps.map(({ systemNames: _s, ...st }, i) => ({ ...st, systemIds: links.stepSystemIds[i] ?? [] }));
+      await saveProcessVersion(actor, process.id, { steps: withSystems, highlights, outputs, baseVersion: 0 });
+    }
     return process.id;
   }
   if (p.target === "DOMAIN") return (await addClientDomain(actor, { ...PAYLOADS.DOMAIN.parse(payload), clientId: p.clientId })).id;

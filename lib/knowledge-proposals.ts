@@ -37,6 +37,8 @@ export const FactPayload = z.object({
   validUntilEvent: z.string().max(300).nullish(),
   decidedAt: day,
   decidedBy: z.string().max(200).nullish(),
+  /// A preference's someone: a contact or a firm in the file, by name.
+  subjectName: z.string().max(200).nullish(),
   ...knowledge,
 });
 
@@ -51,6 +53,8 @@ export const ContactPayload = z.object({
   channelOrder: z.array(z.string().max(50)).max(10).optional(),
   isPrimary: z.boolean().optional(),
   isDecisionMaker: z.boolean().optional(),
+  /// The client's legal entity this person works with, by name.
+  entityName: z.string().max(200).nullish(),
   ...knowledge,
 });
 
@@ -75,6 +79,14 @@ export const SystemPayload = z.object({
   blocker: z.string().max(500).nullish(),
   clientAdmin: z.string().max(300).nullish(),
   notes: z.string().max(2000).nullish(),
+  entityName: z.string().max(200).nullish(),
+  /// Spec 3.6: how a SaaS is billed. The last four digits only, never a
+  /// whole card number (the secret scan drops one anyway).
+  billingCycle: z.enum(["MONTHLY", "ANNUAL", "OTHER"]).nullish(),
+  billingCostMinor: z.number().int().nonnegative().nullish(),
+  billingCurrency: z.enum(["ILS", "USD", "EUR"]).nullish(),
+  cardLast4: z.string().regex(/^\d{4}$/, "4 ספרות").nullish(),
+  invoiceTo: z.string().max(300).nullish(),
   ...knowledge,
 });
 
@@ -83,6 +95,10 @@ export const RequestTypePayload = z.object({
   fromWho: z.string().max(200).nullish(),
   arrivesVia: z.string().max(200).nullish(),
   handling: z.string().min(1).max(2000),
+  /// Spec 3.7, by name: who it goes to, the process it sets off, its entity.
+  routeToNames: z.array(z.string().max(200)).max(10).optional(),
+  processName: z.string().max(200).nullish(),
+  entityName: z.string().max(200).nullish(),
   ...knowledge,
 });
 
@@ -95,6 +111,10 @@ export const PolicyPayload = z.object({
   /// Spec 3.11: from when it binds, and when it is looked at again.
   effectiveFrom: day,
   reviewBy: day,
+  /// What the server can check (lib/policy-params.ts): an amount, tags, a
+  /// channel. Read for the kind; keys the kind does not take are dropped.
+  params: z.record(z.string(), z.unknown()).nullish(),
+  interimParams: z.record(z.string(), z.unknown()).nullish(),
   ...knowledge,
 });
 
@@ -131,6 +151,7 @@ const ProposedStep = z.object({
   output: z.string().max(500).nullish(),
   verification: z.string().max(500).nullish(),
   requiresApproval: z.boolean().optional(),
+  systemNames: z.array(z.string().max(200)).max(10).optional(),
 });
 
 /// A process (spec 3.8), with its procedure when it was described. It
@@ -151,6 +172,12 @@ export const ProcessPayload = z.object({
   steps: z.array(ProposedStep).max(15).optional(),
   highlights: z.string().max(4000).nullish(),
   outputs: z.string().max(2000).nullish(),
+  /// Spec 3.8, by name: resolved in the client's file when it is approved.
+  entityName: z.string().max(200).nullish(),
+  externalPartyNames: z.array(z.string().max(200)).max(10).optional(),
+  systemNames: z.array(z.string().max(200)).max(20).optional(),
+  approverName: z.string().max(200).nullish(),
+  approvalPolicyTitles: z.array(z.string().max(200)).max(10).optional(),
   ...knowledge,
 });
 
@@ -383,8 +410,29 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
 /// an entity's identifiers, the whole of a long text. Empty for the rest.
 export function proposalDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
   // Spec 3.1, on every kind of item.
-  const common = [payload.clientVisible === true ? "גלוי ללקוח" : "", typeof payload.ownerName === "string" && payload.ownerName.trim() ? `בעלים: ${payload.ownerName.trim()}` : ""].filter(Boolean);
+  const common = [...linkDetails(payload), payload.clientVisible === true ? "גלוי ללקוח" : "", typeof payload.ownerName === "string" && payload.ownerName.trim() ? `בעלים: ${payload.ownerName.trim()}` : ""].filter(Boolean);
   return [...itemDetails(target, payload), ...common];
+}
+
+/// What the proposal names in the file, as the reviewer reads it. Linked
+/// when approved (lib/app-domain/proposal-links.ts).
+export function linkDetails(payload: Record<string, unknown>): string[] {
+  const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string).trim() : "");
+  const l = (k: string) => (Array.isArray(payload[k]) ? (payload[k] as unknown[]).filter((x): x is string => typeof x === "string" && !!x.trim()) : []);
+  const CYCLE: Record<string, string> = { MONTHLY: "חודשי", ANNUAL: "שנתי", OTHER: "אחר" };
+  const cost = typeof payload.billingCostMinor === "number" ? `${(payload.billingCostMinor / 100).toLocaleString("he-IL")} ${s("billingCurrency")}`.trim() : "";
+  return [
+    s("entityName") && `ישות: ${s("entityName")}`,
+    s("subjectName") && `של: ${s("subjectName")}`,
+    l("routeToNames").length > 0 && `מפנים אל: ${l("routeToNames").join(", ")}`,
+    s("processName") && `מפעיל את: ${s("processName")}`,
+    l("externalPartyNames").length > 0 && `גורם חיצוני: ${l("externalPartyNames").join(", ")}`,
+    l("systemNames").length > 0 && `מערכות: ${l("systemNames").join(", ")}`,
+    s("approverName") && `מאשר: ${s("approverName")}`,
+    l("approvalPolicyTitles").length > 0 && `כללי אישור: ${l("approvalPolicyTitles").join(", ")}`,
+    (s("billingCycle") || cost) && `חיוב: ${[CYCLE[s("billingCycle")] ?? "", cost, s("cardLast4") && `כרטיס ${s("cardLast4")}`].filter(Boolean).join(", ")}`,
+    s("invoiceTo") && `חשבונית אל: ${s("invoiceTo")}`,
+  ].filter((x): x is string => !!x);
 }
 
 function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
@@ -403,7 +451,7 @@ function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown
     return [
       s("triggerText") && `מה מפעיל: ${s("triggerText")}`,
       s("slaText") && `SLA: ${s("slaText")}`,
-      ...steps.map((st, i) => `${i + 1}. ${typeof st.title === "string" ? st.title : ""}${st.requiresApproval ? " (דורש אישור)" : ""}`),
+      ...steps.map((st, i) => `${i + 1}. ${typeof st.title === "string" ? st.title : ""}${st.requiresApproval ? " (דורש אישור)" : ""}${Array.isArray((st as { systemNames?: unknown }).systemNames) && ((st as { systemNames: unknown[] }).systemNames).length ? ` [${((st as { systemNames: unknown[] }).systemNames).join(", ")}]` : ""}`),
     ].filter((x): x is string => !!x);
   }
   if (target === "ENTITY") {

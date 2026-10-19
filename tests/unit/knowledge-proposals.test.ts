@@ -141,3 +141,13 @@ describe("a task proposed by Claude", () => {
     expect(t.description.split("\n\n").slice(0, 2)).toEqual(["הגרסה מ-12.10", "למה: אורן ביקש"]);
   });
 });
+
+describe("what a proposal names in the file", () => {
+  it("says it on the card, linked when approved", async () => {
+    const { linkDetails } = await import("@/lib/knowledge-proposals");
+    expect(
+      linkDetails({ entityName: "NUX Inc", routeToNames: ["איילה"], processName: "P1", systemNames: ["Doka"], approverName: "הדס", billingCycle: "ANNUAL", billingCostMinor: 120000, billingCurrency: "USD", cardLast4: "4242", invoiceTo: "billing-us@nux.ai" })
+    ).toEqual(["ישות: NUX Inc", "מפנים אל: איילה", "מפעיל את: P1", "מערכות: Doka", "מאשר: הדס", "חיוב: שנתי, 1,200 USD, כרטיס 4242", "חשבונית אל: billing-us@nux.ai"]);
+    expect(linkDetails({ title: "x" })).toEqual([]);
+  });
+});
