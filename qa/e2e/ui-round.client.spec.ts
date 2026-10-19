@@ -31,6 +31,9 @@ test("hours and the monthly report are one screen, and the month stays", async (
   // The address in the monthly email still lands on the same month.
   await page.goto("/app/portal/monthly?monthOffset=-1", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/app\/portal\/hours\?view=monthly&monthOffset=-1$/);
+  // And the address without a month, and with something it should not carry.
+  await page.goto("/app/portal/monthly?next=https://evil.test", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/app\/portal\/hours\?view=monthly$/);
 });
 
 for (const route of ["/app/portal", "/app/portal/hours", "/app/portal/hours?view=monthly", "/app/portal/decisions"]) {

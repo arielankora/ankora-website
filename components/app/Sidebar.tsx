@@ -84,7 +84,7 @@ export function Sidebar({
         <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-light">
           Ankora
         </Link>
-        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-cream/50">
+        <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-[#B4B8BC]">
           OPS
         </span>
       </div>
@@ -97,7 +97,7 @@ export function Sidebar({
         >
           <Search size={15} strokeWidth={1.75} className="shrink-0" />
           <span className="flex-1 truncate">חיפוש או פעולה</span>
-          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-[#8F98A3]">
+          <kbd className="shrink-0 rounded border border-[rgba(243,234,219,0.18)] px-1 font-jbmono text-[10px] text-[#B4B8BC]">
             ⌘K
           </kbd>
         </button>

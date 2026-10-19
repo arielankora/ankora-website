@@ -16,7 +16,8 @@ test("four groups, and the alert rules are called what they are", async ({ page 
   await page.goto("/app", { waitUntil: "domcontentloaded" });
   const nav = page.locator(SIDEBAR);
   for (const group of ["עבודה", "לקוחות", "בקרה", "הגדרות"]) {
-    await expect(nav.getByText(group, { exact: true })).toBeVisible();
+    // The header, not the link of the same name ("לקוחות" is both).
+    await expect(nav.locator("p", { hasText: new RegExp(`^${group}$`) })).toBeVisible();
   }
   await expect(nav.getByRole("link", { name: "כללי התראה", exact: true })).toBeVisible();
   for (const gone of ["התראות", "דוחות מתוזמנים", "הזמן שלי"]) {

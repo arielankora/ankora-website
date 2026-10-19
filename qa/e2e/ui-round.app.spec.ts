@@ -16,7 +16,7 @@ const SIDEBAR = 'aside nav[aria-label="ניווט ראשי"]';
 test("the menu has the new groups, and the account lives under the name", async ({ page }) => {
   await page.goto("/app", { waitUntil: "domcontentloaded" });
   const nav = page.locator(SIDEBAR);
-  await expect(nav.getByText("עבודה", { exact: true })).toBeVisible();
+  await expect(nav.locator("p", { hasText: /^עבודה$/ })).toBeVisible();
   for (const label of ["בית", "טיימר", "משימות", "יומן"]) {
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   }
@@ -26,7 +26,7 @@ test("the menu has the new groups, and the account lives under the name", async 
   }
   // The old group names are gone with them.
   for (const group of ["העבודה שלי", "ניהול", "דיווח ובקרה", "חשבון"]) {
-    await expect(nav.getByText(group, { exact: true })).toHaveCount(0);
+    await expect(nav.locator("p", { hasText: new RegExp(`^${group}$`) })).toHaveCount(0);
   }
 
   const account = page.locator("aside details");
