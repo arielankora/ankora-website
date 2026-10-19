@@ -1,5 +1,6 @@
 import { RECEIPT_LABEL } from "@/lib/date-receipt";
-import Link from "next/link";
+import { BackLink } from "@/components/app/BackLink";
+import { IMPORTANT_DATES_LIST_KEYS, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -46,6 +47,8 @@ export default async function ImportantDateDetailPage(props: {
   // same view and filters. See lib/calendar-keys.ts.
   const rawFrom = (await props.searchParams).from;
   const calendarBack = calendarBackHref(typeof rawFrom === "string" ? rawFrom : undefined);
+  // Or from the list, with its tab (19.10.2026, lib/list-back.ts).
+  const backHref = calendarBack ?? listBackHref("/app/important-dates", IMPORTANT_DATES_LIST_KEYS, rawFrom);
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {
@@ -76,10 +79,8 @@ export default async function ImportantDateDetailPage(props: {
     <>
       <div className="space-y-6">
         <div>
-          <Link href={calendarBack ?? "/app/important-dates"} className="text-xs text-appNavy/50 hover:text-gold-dim">
-            {calendarBack ? "← חזרה ליומן" : "← חזרה למועדים חשובים"}
-          </Link>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
+          <BackLink href={backHref} label={calendarBack ? "חזרה ליומן" : "חזרה למועדים חשובים"} />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-xl font-medium text-appNavy">{date.title}</h1>
               <p className="mt-1 text-sm text-appNavy/60">

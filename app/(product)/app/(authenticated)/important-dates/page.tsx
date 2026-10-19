@@ -9,6 +9,7 @@ import { listCategories } from "@/lib/app-domain/categories";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
 import { ImportantDateForm } from "./ImportantDateForm";
+import { IMPORTANT_DATES_LIST_KEYS, listQueryOf } from "@/lib/list-back";
 import { ImportantDateRow, type DateRow } from "./ImportantDateRow";
 import type { ImportantDateStatus, RecurrenceType } from "@prisma/client";
 import { formatDayAlternatives } from "@/lib/app-domain/important-dates-recurrence";
@@ -78,6 +79,8 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
   }
 
   const tab: Tab = searchParams.tab === "all" ? "all" : searchParams.tab === "done" ? "done" : "upcoming";
+  // Carried to each date, so its way back returns to this tab (lib/list-back.ts).
+  const listQuery = listQueryOf(searchParams, IMPORTANT_DATES_LIST_KEYS);
 
   // The last unmeasured segment of the chain. Every write on this screen
   // revalidates it, and Next ships that re-render back inside the action's
@@ -172,7 +175,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
               אין מועדים להצגה בתצוגה הזו.
             </p>
           ) : (
-            rows.map((row) => <ImportantDateRow key={row.id} date={row} />)
+            rows.map((row) => <ImportantDateRow key={row.id} date={row} listQuery={listQuery} />)
           )}
         </div>
 

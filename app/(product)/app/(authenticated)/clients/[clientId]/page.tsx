@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { BackLink } from "@/components/app/BackLink";
+import { CLIENTS_LIST_KEYS, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -112,12 +114,15 @@ function serverNow(): number {
   return Date.now();
 }
 
-export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string }> }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; from?: string | string[] }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
   // file. The file has a dozen sections, and on one long page they would
   // bury the tasks people open this screen for.
-  const tab = (await props.searchParams)?.tab === "file" ? "file" : "work";
+  const sp = await props.searchParams;
+  const tab = sp?.tab === "file" ? "file" : "work";
+  // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
+  const backHref = listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
   const user = await requireUser();
 
   if (!can(user.role, "client.manage")) {
@@ -143,10 +148,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     return (
       <div className="space-y-6">
         <div>
-          <Link href="/app/clients" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה לרשימת הלקוחות
-          </Link>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
+          <BackLink href={backHref} label="חזרה ללקוחות" />
+          <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
             <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
           </div>
@@ -305,10 +308,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/clients" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה לרשימת הלקוחות
-          </Link>
-          <div className="mt-2 flex flex-wrap items-center justify-between gap-3">
+          <BackLink href={backHref} label="חזרה ללקוחות" />
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-medium text-appNavy">{client.name}</h1>
             {/* The same button as on a task, on the screen somebody
                 opens when they want to write to a client without a task

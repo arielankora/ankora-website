@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { BackLink } from "@/components/app/BackLink";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -84,10 +84,8 @@ export default async function UserDetailPage(props: { params: Promise<{ userId: 
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/users" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה לרשימת המשתמשים
-          </Link>
-          <h1 className="mt-2 text-xl font-medium text-appNavy">{targetUser.name}</h1>
+          <BackLink href="/app/users" label="חזרה למשתמשים" />
+          <h1 className="mt-3 text-xl font-medium text-appNavy">{targetUser.name}</h1>
           <p className="mt-1 text-sm text-appNavy/60">{targetUser.email}</p>
         </div>
 
