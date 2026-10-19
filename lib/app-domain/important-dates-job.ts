@@ -1,4 +1,5 @@
 import "server-only";
+import { autoTaskTitle, reminderTitle } from "@/lib/date-receipt";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
@@ -377,7 +378,8 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
     const daysBefore = Math.round((date.nextOccurrenceAt!.getTime() - occ.occurrenceDate.getTime()) / 86_400_000) + (occ.reminderRule?.daysBefore ?? 0);
     const messageInput = {
       clientName: date.client.name,
-      dateTitle: date.title,
+      // Spec 3.10: a date that expects something says so first.
+      dateTitle: reminderTitle(date),
       occurrenceDate: localDateKey(occ.occurrenceDate, TIMEZONE).split("-").reverse().join("/"),
       daysBefore: occ.reminderRule?.daysBefore ?? 0,
     };
@@ -389,7 +391,7 @@ export async function sendPendingReminders(now = new Date()): Promise<{ sent: nu
           data: {
             userId: occ.recipientUserId ?? date.responsibleUserId,
             type: "important_date.reminder",
-            title: date.title,
+            title: reminderTitle(date),
             body: buildInAppReminderMessage(messageInput),
             entityType: "ImportantDate",
             entityId: date.id,
@@ -541,7 +543,7 @@ export async function createDueAutoTasks(now = new Date()): Promise<{ created: n
         data: {
           clientId: date.clientId,
           categoryId: date.autoTaskCategoryId,
-          title: date.title,
+          title: autoTaskTitle(date),
           assignedToId: date.responsibleUserId,
           dueDate: date.nextOccurrenceAt,
           importantDateId: date.id,

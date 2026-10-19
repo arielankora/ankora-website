@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { RECEIPT_LABEL } from "@/lib/date-receipt";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { canSendToAi, effectiveStatus, parseFieldStatus, type KnowledgeAudienceLike } from "@/lib/knowledge";
 import { formatSourceRef, readSourceRefs, SOURCE_KIND_LABELS, SOURCE_WEIGHT_LABELS } from "@/lib/knowledge-sources";
@@ -373,7 +374,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "אין מועדים.",
       items: dates
         .filter((d) => d.status === "ACTIVE" && (!ai || d.sensitivity !== "SENSITIVE"))
-        .map((d) => ({ text: d.title, details: [d.nextOccurrenceAt ? `הבא: ${day(d.nextOccurrenceAt)}` : null] })),
+        .map((d) => ({ text: d.title, details: [d.nextOccurrenceAt ? `הבא: ${day(d.nextOccurrenceAt)}` : null, d.expectsReceipt ? `${RECEIPT_LABEL}${d.expectedFrom ? ` מ-${d.expectedFrom}` : ""}` : null] })),
     },
     {
       number: "11",

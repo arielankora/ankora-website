@@ -1,3 +1,4 @@
+import { RECEIPT_LABEL } from "@/lib/date-receipt";
 import { requireUser } from "@/lib/app-auth/session";
 import { timed } from "@/lib/slow-log";
 import { can } from "@/lib/app-auth/permissions";
@@ -112,6 +113,7 @@ export default async function ImportantDatesPage(props: { searchParams: Promise<
         d.precision === "APPROXIMATE" && d.dayAlternatives.length > 1 ? `משוער: ${formatDayAlternatives(d.dayAlternatives)}` : null,
         d.precision === "UNKNOWN" ? "מועד חסר" : null,
         d.conditionText ? "מותנה" : null,
+        d.expectsReceipt ? (d.expectedFrom ? `${RECEIPT_LABEL} מ-${d.expectedFrom}` : RECEIPT_LABEL) : null,
       ]
         .filter(Boolean)
         .join(" · "),

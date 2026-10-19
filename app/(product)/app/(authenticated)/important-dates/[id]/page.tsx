@@ -1,3 +1,4 @@
+import { RECEIPT_LABEL } from "@/lib/date-receipt";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
@@ -125,6 +126,8 @@ export default async function ImportantDateDetailPage(props: {
                   precision: date.precision,
                   dayAlternatives: date.dayAlternatives,
                   conditionText: date.conditionText,
+                  expectsReceipt: date.expectsReceipt,
+                  expectedFrom: date.expectedFrom,
                   rangeStart: date.rangeStart,
                   rangeEnd: date.rangeEnd,
                   updatedAt: date.updatedAt,
@@ -151,6 +154,12 @@ export default async function ImportantDateDetailPage(props: {
                     )}
                   </dd>
                 </div>
+                {date.expectsReceipt && (
+                  <div className="col-span-2">
+                    <dt className="text-xs text-appNavy/50">{RECEIPT_LABEL}</dt>
+                    <dd className="text-appNavy">{date.expectedFrom ? `מ-${date.expectedFrom}. ` : ""}האחראי מוודא שזה התקבל.</dd>
+                  </div>
+                )}
                 {date.conditionText && (
                   <div className="col-span-2">
                     <dt className="text-xs text-appNavy/50">בתנאי ש</dt>

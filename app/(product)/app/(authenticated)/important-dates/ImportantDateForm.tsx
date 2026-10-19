@@ -42,6 +42,8 @@ export interface ExistingImportantDate {
   precision: "EXACT" | "APPROXIMATE" | "UNKNOWN";
   dayAlternatives: number[];
   conditionText: string | null;
+  expectsReceipt?: boolean;
+  expectedFrom?: string | null;
   rangeStart: Date | null;
   rangeEnd: Date | null;
   updatedAt: Date;
@@ -364,6 +366,23 @@ export function ImportantDateForm({
           )}
         </div>
       )}
+
+      {/* Spec 3.10: something due to reach us on the date. */}
+      <div className="rounded-lg border border-lineDark px-3 py-2" data-testid="date-receipt">
+        <input type="hidden" name="receiptShown" value="1" />
+        <label className="flex items-center gap-2 text-sm text-appNavy">
+          <input type="checkbox" name="expectsReceipt" defaultChecked={!!existing?.expectsReceipt} className="h-4 w-4 accent-gold" />
+          ממתין לקבלה: במועד הזה משהו אמור להגיע אלינו
+        </label>
+        <input
+          type="text"
+          name="expectedFrom"
+          defaultValue={existing?.expectedFrom ?? ""}
+          placeholder="ממי? למשל: איילה, Nextage"
+          className="mt-2 w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+        />
+        <p className="mt-1 text-[11px] text-appNavy/40">התזכורת והמשימה יבקשו מהאחראי לוודא שזה התקבל.</p>
+      </div>
 
       <details className="rounded-lg border border-lineDark px-3 py-2" open={Boolean(existing?.conditionText || existing?.rangeStart || existing?.rangeEnd)}>
         <summary className="cursor-pointer text-xs font-medium text-appNavy/60">תנאי ותקופה (לא חובה)</summary>

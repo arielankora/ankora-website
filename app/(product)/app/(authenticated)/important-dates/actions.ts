@@ -90,6 +90,10 @@ function parseImportantDateFormData(formData: FormData) {
       .filter(Boolean)
       .map(Number),
     conditionText: formData.has("conditionText") ? String(formData.get("conditionText") || "").trim() || null : undefined,
+    // Spec 3.10: "ממתין לקבלה". The form marks that it shows the box, so an
+    // unchecked box is a "no" and not a field that was not there.
+    expectsReceipt: formData.has("receiptShown") ? formData.get("expectsReceipt") === "on" : undefined,
+    expectedFrom: formData.has("receiptShown") ? String(formData.get("expectedFrom") || "").trim() || null : undefined,
     rangeStart: formData.has("rangeStart") ? (rangeStartRaw ? new Date(`${rangeStartRaw}T00:00:00Z`) : null) : undefined,
     rangeEnd: formData.has("rangeEnd") ? (rangeEndRaw ? new Date(`${rangeEndRaw}T00:00:00Z`) : null) : undefined,
     // Same fix as the document visibility toggle, and the same bug: an

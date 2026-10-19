@@ -1921,6 +1921,12 @@ model ImportantDate {
   /// to 31.8.2027). Both optional; no occurrence falls outside them.
   rangeStart DateTime?
   rangeEnd   DateTime?
+  /// Spec 3.10, "ממתין לקבלה": on this date something is due to reach us
+  /// from outside (a supplier's monthly report). The person responsible
+  /// checks that it arrived; the reminder and the task say so.
+  expectsReceipt Boolean @default(false)
+  /// Who sends it, in words: "איילה, Nextage".
+  expectedFrom   String?
   /// Only meaningful when recurrence = ONCE - the exact one-time date;
   /// month/day/calendarType above are ignored for ONCE dates.
   onceDate DateTime?
