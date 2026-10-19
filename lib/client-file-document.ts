@@ -22,6 +22,9 @@ export type DocItem = {
   /// Spec 3.1: shown to the client in the portal, and who keeps it right.
   clientVisible?: boolean;
   owner?: string | null;
+  /// The item's id, printed in Claude's version only, so a proposal can
+  /// name the item it changes (action SUPERSEDE, targetId).
+  ref?: string;
 };
 
 export type DocSection = {
@@ -59,7 +62,7 @@ function statusNote(item: DocItem): string | null {
 
 /// One item as plain text, the way it is written in Markdown and read
 /// aloud: the line, its details, its status, its sources.
-export function itemLine(item: DocItem): string {
+export function itemLine(item: DocItem, withRef = false): string {
   const parts = [item.text.trim()];
   const details = (item.details ?? []).filter((d): d is string => !!d && !!d.trim());
   if (details.length) parts.push(`(${details.join(" · ")})`);
@@ -69,6 +72,7 @@ export function itemLine(item: DocItem): string {
   const kept = [item.clientVisible ? "גלוי ללקוח" : null, item.owner ? `בעלים: ${item.owner}` : null].filter(Boolean);
   if (kept.length) parts.push(`{${kept.join(" · ")}}`);
   if (item.sources?.length) parts.push(`[${item.sources.join(", ")}]`);
+  if (withRef && item.ref) parts.push(`(id: ${item.ref})`);
   return parts.join(" ");
 }
 
@@ -106,14 +110,14 @@ export function toMarkdown(doc: ClientFileDoc): string {
     }
     const ungrouped = section.items.filter((i) => !i.group);
     const groups = [...new Set(section.items.filter((i) => i.group).map((i) => i.group!))];
-    for (const item of ungrouped) out.push(`- ${oneLine(itemLine(item))}`);
+    for (const item of ungrouped) out.push(`- ${oneLine(itemLine(item, doc.audience === "ai"))}`);
     for (const g of groups) {
       if (ungrouped.length || groups.length > 1) {
         out.push("");
         out.push(`### ${g}`);
         out.push("");
       }
-      for (const item of section.items.filter((i) => i.group === g)) out.push(`- ${oneLine(itemLine(item))}`);
+      for (const item of section.items.filter((i) => i.group === g)) out.push(`- ${oneLine(itemLine(item, doc.audience === "ai"))}`);
     }
   }
   out.push("");

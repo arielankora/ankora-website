@@ -137,6 +137,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const now = new Date();
 
   const factItem = (f: ClientFact): DocItem & { group?: string } => ({
+    ref: f.id,
     text: f.body,
     details: [
       f.subjectContactId || f.subjectOrgId ? subjectName.get((f.subjectContactId ?? f.subjectOrgId)!) : null,
@@ -164,6 +165,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const ruleItem = (p: (typeof rules)[number]): DocItem & { group?: string; proposed?: boolean } => {
     const now = ruleInForce(p)!;
     return {
+      ref: p.id,
       text: `${p.title}: ${now.text}`,
       details: [
         p.status === "PROPOSED" ? (now.interim ? `${POLICY_STATUS_LABELS.PROPOSED}, זה כלל הביניים. הכלל המוצע: ${p.statement}` : `${POLICY_STATUS_LABELS.PROPOSED}, עוד לא אושר`) : null,
@@ -197,6 +199,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
         { text: client.legalName ? `${client.name} (${client.legalName})` : client.name, details: [client.kind === "PRIVATE" ? "לקוח פרטי" : "לקוח עסקי", client.industry] },
         ...(primary ? [{ text: `איש קשר ראשי: ${primary.person.name ?? primary.role}`, details: [primary.role] }] : []),
         ...entities.filter(shown).map((e) => ({
+          ref: e.id,
           text: `ישות: ${e.name}`,
           details: [e.legalName, e.registrationNumber, e.country, e.currency, e.parent ? `בת של ${e.parent.name}` : null],
           ...knowledge(e),
@@ -225,6 +228,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       title: "אנשים ויחסים",
       empty: "אין עדיין אנשי קשר בתיק.",
       items: contacts.map((c) => ({
+        ref: c.id,
         text: c.person.name ?? c.role ?? "",
         details: [
           c.person.name ? c.role : null,
@@ -252,6 +256,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       title: "מערכות וגישות",
       empty: "אין עדיין מערכות במפה.",
       items: systems.filter(shown).map((s) => ({
+        ref: s.id,
         text: s.systemName,
         details: [
           s.purpose,
@@ -298,6 +303,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       // it: trigger, owner, where it stands, how complete, what is missing,
       // and the steps of the approved procedure.
       items: processes.filter(shown).map((p) => ({
+        ref: p.id,
         text: `${p.code} ${p.title}`,
         details: [
           p.purpose,
@@ -336,6 +342,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       title: "סוגי פניות ודרכי מענה",
       empty: "עוד לא נכתב מה מגיע, ממי ואיך עונים.",
       items: requestTypes.filter(shown).map((r) => ({
+        ref: r.id,
         text: r.title,
         details: [
           r.fromWho ? `מ: ${r.fromWho}` : null,
