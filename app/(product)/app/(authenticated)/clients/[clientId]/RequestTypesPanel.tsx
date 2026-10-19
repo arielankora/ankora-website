@@ -80,10 +80,10 @@ function RequestTypeForm({
       </Field>
       {contacts.length > 0 && (
         <fieldset>
-          <legend className="block text-xs font-medium text-appNavy/60">למי מפנים</legend>
+          <legend className="block text-xs font-medium text-app-text-secondary">למי מפנים</legend>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
             {contacts.map((c) => (
-              <label key={c.id} className="flex items-center gap-1.5 text-sm text-appNavy">
+              <label key={c.id} className="flex items-center gap-1.5 text-sm text-app-text-primary">
                 <input type="checkbox" name="routeTo" value={c.id} defaultChecked={existing?.routeToContactIds.includes(c.id)} className="h-4 w-4 accent-gold" />
                 {c.name}
               </label>
@@ -118,8 +118,8 @@ function RequestTypeForm({
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
@@ -152,27 +152,27 @@ export function RequestTypesPanel({
     else showToast({ tone: "info", title: "הוסר מהתיק", description: r.title });
   }
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <h2 className="text-sm font-medium text-appNavy">סוגי פניות ודרכי מענה ({requestTypes.length})</h2>
+        <h2 className="text-sm font-medium text-app-text-primary">סוגי פניות ודרכי מענה ({requestTypes.length})</h2>
         <Drawer triggerLabel="+ סוג פנייה" title="סוג פנייה" variant="link">
           <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} />
         </Drawer>
       </div>
       {requestTypes.length === 0 ? (
-        <p className="mt-2 text-sm text-appNavy/50">אין עדיין סוגי פניות. מה מגיע, ממי, ואיך עונים: מה שמנהל תפעול חדש צריך ביום הראשון.</p>
+        <p className="mt-2 text-sm text-app-text-tertiary">אין עדיין סוגי פניות. מה מגיע, ממי, ואיך עונים: מה שמנהל תפעול חדש צריך ביום הראשון.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-lineDark">
+        <ul className="mt-4 divide-y divide-app-border">
           {requestTypes.map((r) => (
             <li key={r.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-appNavy">{r.title}</p>
-                <p className="text-xs text-appNavy/60">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
-                <p className="mt-1 text-xs text-appNavy/80">{r.handling}</p>
-                {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-appNavy/60">מפנים ל: {r.routeToNames.join(", ")}</p>}
-                {r.processName && <p className="mt-1 text-xs text-appNavy/60">מפעיל: {r.processName}</p>}
+                <p className="text-sm font-medium text-app-text-primary">{r.title}</p>
+                <p className="text-xs text-app-text-secondary">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
+                <p className="mt-1 text-xs text-app-text-primary">{r.handling}</p>
+                {r.routeToNames.length > 0 && <p className="mt-1 text-xs text-app-text-secondary">מפנים ל: {r.routeToNames.join(", ")}</p>}
+                {r.processName && <p className="mt-1 text-xs text-app-text-secondary">מפעיל: {r.processName}</p>}
                 {(ruleWarnings[r.id] ?? []).map((w, i) => (
-                  <p key={i} className="mt-1 text-xs text-red-700">
+                  <p key={i} className="mt-1 text-xs text-app-error">
                     {w}
                   </p>
                 ))}
@@ -184,7 +184,7 @@ export function RequestTypesPanel({
                 <Drawer triggerLabel="עריכה" title={`עריכה: ${r.title}`} variant="link">
                   <RequestTypeForm clientId={clientId} contacts={contacts} entities={entities} processes={processes} sourceOptions={sourceOptions} existing={r} />
                 </Drawer>
-                <button type="button" onClick={() => remove(r)} className="text-appNavy/50 hover:text-red-600">
+                <button type="button" onClick={() => remove(r)} className="text-app-text-tertiary hover:text-app-error">
                   הסרה
                 </button>
               </div>

@@ -43,10 +43,10 @@ export function OfflineBanner({ pendingSyncCount }: { pendingSyncCount?: number 
 
   return (
     <div
-      className="flex items-center gap-2.5 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-appNavy"
+      className="flex items-center gap-2.5 rounded-xl border border-app-warning/30 bg-app-warning-soft px-4 py-3 text-sm text-app-text-primary"
       role="status"
     >
-      <WifiOff size={16} strokeWidth={1.75} className="shrink-0 text-warning" />
+      <WifiOff size={16} strokeWidth={1.75} className="shrink-0 text-app-warning" />
       <p>
         אין חיבור לרשת. הטיימר ממשיך לרוץ מקומית.
         {typeof pendingSyncCount === "number" && pendingSyncCount > 0 && (

@@ -34,9 +34,9 @@ function NarrativeForm({ clientId, n }: { clientId: string; n: PanelNarrative })
       <input type="hidden" name="kind" value={n.kind} />
       <input type="hidden" name="baseVersion" value={n.version} />
       <textarea name="body" rows={10} defaultValue={n.body} placeholder={TITLES[n.kind].placeholder} className={INPUT} />
-      <p className="-mt-2 text-[11px] text-appNavy/40">מקורות בסוגריים, למשל [S1 08:13]. קוד שלא קיים במרשם נחסם. הגרסה הקודמת נשמרת.</p>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      <p className="-mt-2 text-[11px] text-app-text-tertiary">מקורות בסוגריים, למשל [S1 08:13]. קוד שלא קיים במרשם נחסם. הגרסה הקודמת נשמרת.</p>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "שמירת גרסה חדשה"}
       </button>
     </form>
@@ -45,32 +45,32 @@ function NarrativeForm({ clientId, n }: { clientId: string; n: PanelNarrative })
 
 export function NarrativesPanel({ clientId, narratives }: { clientId: string; narratives: PanelNarrative[] }) {
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
-      <h2 className="text-sm font-medium text-appNavy">סקירה, רקע ותפקידנו</h2>
+    <div className="rounded-2xl border border-app-border bg-white p-6">
+      <h2 className="text-sm font-medium text-app-text-primary">סקירה, רקע ותפקידנו</h2>
       <div className="mt-3 space-y-5">
         {narratives.map((n) => (
           <section key={n.kind}>
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-xs font-medium text-appNavy/60">
+              <h3 className="text-xs font-medium text-app-text-secondary">
                 {TITLES[n.kind].title}
-                {n.meta && <span className="ms-2 font-normal text-appNavy/40">{n.meta}</span>}
+                {n.meta && <span className="ms-2 font-normal text-app-text-tertiary">{n.meta}</span>}
               </h3>
               <Drawer triggerLabel={n.version ? "עריכה" : "כתיבה"} title={TITLES[n.kind].title} variant="link">
                 <NarrativeForm clientId={clientId} n={n} />
               </Drawer>
             </div>
             {n.version ? (
-              <div className="mt-1 text-sm leading-relaxed text-appNavy" dangerouslySetInnerHTML={{ __html: n.html }} />
+              <div className="mt-1 text-sm leading-relaxed text-app-text-primary" dangerouslySetInnerHTML={{ __html: n.html }} />
             ) : (
-              <p className="mt-1 text-sm text-appNavy/45">{TITLES[n.kind].empty}</p>
+              <p className="mt-1 text-sm text-app-text-tertiary">{TITLES[n.kind].empty}</p>
             )}
             {n.history.length > 0 && (
               <details className="mt-1.5">
-                <summary className="cursor-pointer text-[11px] text-appNavy/45">גרסאות קודמות ({n.history.length})</summary>
+                <summary className="cursor-pointer text-[11px] text-app-text-tertiary">גרסאות קודמות ({n.history.length})</summary>
                 <ul className="mt-1.5 space-y-2">
                   {n.history.map((h) => (
-                    <li key={h.version} className="text-xs text-appNavy/55">
-                      <p className="text-[11px] text-appNavy/40">{h.meta}</p>
+                    <li key={h.version} className="text-xs text-app-text-secondary">
+                      <p className="text-[11px] text-app-text-tertiary">{h.meta}</p>
                       <div dangerouslySetInnerHTML={{ __html: h.html }} />
                     </li>
                   ))}

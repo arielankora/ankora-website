@@ -38,7 +38,7 @@ function TagBoxes({ kind, value, onChange }: { kind: PolicyKindLike; value: Acti
     <Field label={TAG_LABEL[kind] ?? "פעולות"}>
       <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
         {ACTION_TAGS.map((t) => (
-          <label key={t} className="flex items-center gap-1 text-xs text-appNavy/70">
+          <label key={t} className="flex items-center gap-1 text-xs text-app-text-secondary">
             <input
               type="checkbox"
               checked={value.includes(t)}
@@ -84,15 +84,15 @@ export function PolicyParamsFields({
     on && kind === "THRESHOLD" && textToMinor(interimAmount) !== undefined ? { ...value, amountMinor: textToMinor(interimAmount) } : {};
 
   return (
-    <div className="rounded-lg border border-lineDark px-3 py-2.5">
+    <div className="rounded-lg border border-app-border px-3 py-2.5">
       <input type="hidden" name="params" value={JSON.stringify(value)} />
       <input type="hidden" name="interimParams" value={JSON.stringify(interim)} />
-      <label className="flex items-center gap-1.5 text-xs font-medium text-appNavy">
+      <label className="flex items-center gap-1.5 text-xs font-medium text-app-text-primary">
         <input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} className="h-4 w-4 accent-gold" />
         לבדוק את הכלל מול הנהלים
       </label>
       {!on ? (
-        <p className="mt-1 text-[11px] text-appNavy/50">בלי זה הכלל נקרא על ידי אנשים ועל ידי Claude, והשרת לא בודק אותו.</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">בלי זה הכלל נקרא על ידי אנשים ועל ידי Claude, והשרת לא בודק אותו.</p>
       ) : (
         <div className="mt-2 flex flex-col gap-3">
           {kind === "THRESHOLD" && (
@@ -144,7 +144,7 @@ export function PolicyParamsFields({
               <Field label="ערוצים מותרים">
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   {CHANNELS.map((c) => (
-                    <label key={c} className="flex items-center gap-1 text-xs text-appNavy/70">
+                    <label key={c} className="flex items-center gap-1 text-xs text-app-text-secondary">
                       <input
                         type="checkbox"
                         checked={(p.channels ?? []).includes(c)}
@@ -176,11 +176,11 @@ export function PolicyParamsFields({
           {kind === "SEPARATION" ? (
             <Field label="אילו ישויות נשארות מופרדות *">
               {entities.length < 2 ? (
-                <p className="mt-1 text-[11px] text-appNavy/50">צריך לפחות שתי ישויות משפטיות בתיק.</p>
+                <p className="mt-1 text-[11px] text-app-text-tertiary">צריך לפחות שתי ישויות משפטיות בתיק.</p>
               ) : (
                 <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
                   {entities.map((e) => (
-                    <label key={e.id} className="flex items-center gap-1 text-xs text-appNavy/70">
+                    <label key={e.id} className="flex items-center gap-1 text-xs text-app-text-secondary">
                       <input
                         type="checkbox"
                         checked={(p.entityIds ?? []).includes(e.id)}

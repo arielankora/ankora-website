@@ -65,8 +65,8 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
       <div className="space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-xl font-medium text-appNavy">לקוחות</h1>
-            <p className="mt-1 text-sm text-appNavy/60">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
+            <h1 className="text-xl font-medium text-app-text-primary">לקוחות</h1>
+            <p className="mt-1 text-sm text-app-text-secondary">ניהול לקוחות Ankora, סטטוס וניצול בנק השעות.</p>
           </div>
           <Drawer triggerLabel="לקוח חדש" title="לקוח חדש">
             <CreateClientForm />
@@ -85,14 +85,14 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
         />
 
         {archived.length > 0 && (
-          <details className="rounded-2xl border border-lineDark bg-white p-5">
-            <summary className="cursor-pointer text-sm font-medium text-appNavy">
+          <details className="rounded-2xl border border-app-border bg-white p-5">
+            <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
               בארכיון ({archived.length})
             </summary>
-            <ul className="mt-3 divide-y divide-lineDark">
+            <ul className="mt-3 divide-y divide-app-border">
               {archived.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
-                  <span className="text-sm text-appNavy">{c.name}</span>
+                  <span className="text-sm text-app-text-primary">{c.name}</span>
                   <RestoreClientButton clientId={c.id} />
                 </li>
               ))}

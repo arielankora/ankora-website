@@ -55,7 +55,7 @@ function SegToggle<T extends string>({
           onClick={() => onChange(opt.value)}
           aria-pressed={value === opt.value}
           className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-            value === opt.value ? "bg-appNavy text-cream" : "text-appNavy/55 hover:text-appNavy"
+            value === opt.value ? "bg-app-surface-nav text-cream" : "text-app-text-secondary hover:text-app-text-primary"
           }`}
         >
           {opt.label}
@@ -83,15 +83,15 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
   const hasData = grandTotal > 0;
 
   return (
-    <div className="rounded-2xl border border-lineDark bg-white p-6">
+    <div className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-sm text-appNavy/60">
+          <p className="text-sm text-app-text-secondary">
             {basis === "actual" ? "שעות בפועל" : "שעות לחיוב"} ·{" "}
             {unit === "day" ? "14 הימים האחרונים" : "7 השבועות האחרונים, כולל השבוע"}
           </p>
-          <p className="mt-1 text-3xl font-medium text-appNavy">
-            {formatHours(grandTotal)} <span className="text-base font-normal text-appNavy/50">שעות</span>
+          <p className="mt-1 text-3xl font-medium text-app-text-primary">
+            {formatHours(grandTotal)} <span className="text-base font-normal text-app-text-tertiary">שעות</span>
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -124,7 +124,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
       </div>
 
       {!hasData ? (
-        <p className="mt-8 py-8 text-center text-sm text-appNavy/50">אין נתוני שעות בתקופה זו.</p>
+        <p className="mt-8 py-8 text-center text-sm text-app-text-tertiary">אין נתוני שעות בתקופה זו.</p>
       ) : (
         <>
           <div dir="ltr" className="mt-8 flex h-48 items-end gap-2 sm:gap-4" role="img" aria-label={`גרף שעות מדווחות, ${series.buckets.map((b) => `${b.label}: ${formatHours(b.segments.reduce((s, x) => s + x.hours, 0))} שעות`).join(", ")}`}>
@@ -145,7 +145,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                     <div
                       id={`${tooltipBaseId}-${i}`}
                       dir="rtl"
-                      className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-appNavy px-3 py-2 text-xs text-cream shadow-lg"
+                      className="absolute bottom-full z-10 mb-2 w-max max-w-[200px] rounded-lg bg-app-surface-nav px-3 py-2 text-xs text-cream shadow-lg"
                     >
                       <p className="font-medium">{bucket.label}</p>
                       <p className="mb-1 text-cream/60">
@@ -167,7 +167,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                     </div>
                   )}
                   {total > 0 && (
-                    <span className="mb-1 text-[10px] font-medium text-appNavy/55">{formatHours(total)}</span>
+                    <span className="mb-1 text-[10px] font-medium text-app-text-secondary">{formatHours(total)}</span>
                   )}
                   {/* A running day or week keeps its colors and gets a thin
                       dashed cap instead: "still growing". It used to be
@@ -206,16 +206,16 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
           </div>
           <div dir="ltr" className="mt-2 flex gap-2 sm:gap-4 text-center">
             {series.buckets.map((bucket, i) => (
-              <span key={bucket.label + i} className="flex flex-1 flex-col truncate text-[11px] text-appNavy/45">
+              <span key={bucket.label + i} className="flex flex-1 flex-col truncate text-[11px] text-app-text-tertiary">
                 <span className="truncate">{bucket.label}</span>
-                <span className="truncate text-[10px] text-appNavy/35">{bucket.range}</span>
+                <span className="truncate text-[10px] text-app-text-tertiary">{bucket.range}</span>
               </span>
             ))}
           </div>
 
-          <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-lineDark pt-4">
+          <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-2 border-t border-app-border pt-4">
             {series.legend.map((l, i) => (
-              <div key={l.key} className="flex items-center gap-1.5 text-xs text-appNavy/70">
+              <div key={l.key} className="flex items-center gap-1.5 text-xs text-app-text-secondary">
                 <span className="inline-block h-2 w-2 shrink-0 rounded-full" style={{ background: colorFor(l.key, i) }} />
                 {l.name}
               </div>

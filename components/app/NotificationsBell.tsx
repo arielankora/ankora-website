@@ -74,26 +74,26 @@ export function NotificationsBell({
         onClick={() => setOpen((v) => !v)}
         aria-label="התראות"
         aria-expanded={open}
-        className="relative flex h-9 w-9 items-center justify-center rounded-full text-appNavy/60 hover:bg-appNavy/5 hover:text-appNavy"
+        className="relative flex h-9 w-9 items-center justify-center rounded-full text-app-text-secondary hover:bg-app-surface-sunken hover:text-app-text-primary"
       >
         <Bell size={18} strokeWidth={1.75} />
         {unreadCount > 0 && (
-          <span className="absolute -top-0.5 -end-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-error px-1 font-jbmono text-[10px] font-medium text-white">
+          <span className="absolute -top-0.5 -end-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-app-error px-1 font-jbmono text-[10px] font-medium text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute end-0 top-11 z-50 w-[330px] rounded-2xl border border-lineDark bg-white shadow-[0_18px_44px_rgba(11,27,51,0.14)]">
-          <div className="flex items-center justify-between border-b border-lineDark px-4 py-3">
-            <p className="text-sm font-medium text-appNavy">התראות</p>
+        <div className="absolute end-0 top-11 z-50 w-[330px] rounded-2xl border border-app-border bg-white shadow-[0_18px_44px_rgba(11,27,51,0.14)]">
+          <div className="flex items-center justify-between border-b border-app-border px-4 py-3">
+            <p className="text-sm font-medium text-app-text-primary">התראות</p>
             {unreadCount > 0 && (
               <button
                 type="button"
                 onClick={handleMarkAllRead}
                 disabled={pending}
-                className="text-xs font-medium text-gold-dim hover:text-appNavy disabled:opacity-50"
+                className="text-xs font-medium text-app-text-accent hover:text-app-text-primary disabled:opacity-50"
               >
                 סימון הכל כנקרא
               </button>
@@ -101,16 +101,16 @@ export function NotificationsBell({
           </div>
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-appNavy/50">אין התראות</p>
+              <p className="px-4 py-8 text-center text-sm text-app-text-tertiary">אין התראות</p>
             ) : (
               notifications.slice(0, 8).map((n) => {
                 const inner = (
                   <div className="flex items-start gap-2">
                     {!n.readAt && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-gold" aria-hidden="true" />}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[13px] font-medium text-appNavy">{n.title}</p>
-                      <p className="mt-0.5 text-xs text-appNavy/60">{n.body}</p>
-                      <p className="mt-1 font-jbmono text-[10.5px] text-appNavy/40">{relativeTime(n.createdAt)}</p>
+                      <p className="text-[13px] font-medium text-app-text-primary">{n.title}</p>
+                      <p className="mt-0.5 text-xs text-app-text-secondary">{n.body}</p>
+                      <p className="mt-1 font-jbmono text-[10.5px] text-app-text-tertiary">{relativeTime(n.createdAt)}</p>
                     </div>
                   </div>
                 );
@@ -122,23 +122,23 @@ export function NotificationsBell({
                     key={n.id}
                     href={n.href}
                     onClick={() => setOpen(false)}
-                    className="block border-b border-lineDark/60 px-4 py-3 last:border-b-0 hover:bg-appNavy/[0.03]"
+                    className="block border-b border-app-border px-4 py-3 last:border-b-0 hover:bg-app-surface-sunken"
                   >
                     {inner}
                   </Link>
                 ) : (
-                  <div key={n.id} className="border-b border-lineDark/60 px-4 py-3 last:border-b-0">
+                  <div key={n.id} className="border-b border-app-border px-4 py-3 last:border-b-0">
                     {inner}
                   </div>
                 );
               })
             )}
           </div>
-          <div className="border-t border-lineDark px-4 py-2.5 text-center">
+          <div className="border-t border-app-border px-4 py-2.5 text-center">
             <Link
               href="/app/notifications"
               onClick={() => setOpen(false)}
-              className="text-xs font-medium text-gold-dim hover:text-appNavy"
+              className="text-xs font-medium text-app-text-accent hover:text-app-text-primary"
             >
               כל ההתראות
             </Link>

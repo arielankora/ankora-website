@@ -43,8 +43,8 @@ export function DailyDigestPreferenceForm({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div>
-        <p className="text-sm text-appNavy">מייל יומי בבוקר</p>
-        <p className="mt-0.5 text-xs text-appNavy/50">
+        <p className="text-sm text-app-text-primary">מייל יומי בבוקר</p>
+        <p className="mt-0.5 text-xs text-app-text-tertiary">
           מה שעליך היום: מה שבאיחור, מה שנפתח עליך מאז המייל הקודם, ומה שמחכה לחתימה שלך. לא נשלח
           בימים שאין בהם כלום.
         </p>
@@ -80,8 +80,8 @@ export function NotificationPreferenceForm({ enabled }: { enabled: boolean }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1">
       <div>
-        <p className="text-sm text-appNavy">התראת מייל על טיימר שרץ זמן ארוך</p>
-        <p className="mt-0.5 text-xs text-appNavy/50">
+        <p className="text-sm text-app-text-primary">התראת מייל על טיימר שרץ זמן ארוך</p>
+        <p className="mt-0.5 text-xs text-app-text-tertiary">
           נוסף על ההתראה בתוך המערכת (מסך &quot;התראות שלי&quot;), כשטיימר רץ יותר מ-{LONG_TIMER_HOURS} שעות ברציפות.
         </p>
       </div>

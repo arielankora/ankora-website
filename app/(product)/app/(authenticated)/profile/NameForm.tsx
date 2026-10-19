@@ -7,7 +7,7 @@ function SubmitButton({ pending }: { pending: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="mt-4 w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+      className="mt-4 w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
     >
       {pending ? "נשמר..." : "שמירה"}
     </button>
@@ -24,18 +24,18 @@ export function NameForm({ name }: { name: string }) {
   return (
     <form onSubmit={onSubmit}>
       <label className="block">
-        <span className="mb-1.5 block text-xs font-medium text-appNavy/60">שם לתצוגה</span>
+        <span className="mb-1.5 block text-xs font-medium text-app-text-secondary">שם לתצוגה</span>
         <input
           name="name"
           defaultValue={name}
           required
           maxLength={100}
-          className="w-full rounded-lg border border-lineDark bg-white px-3.5 py-2.5 text-sm text-appNavy outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 
-      {error && <p className="mt-2 text-xs text-error">{error}</p>}
-      {ok && <p className="mt-2 text-xs text-success">השם עודכן.</p>}
+      {error && <p className="mt-2 text-xs text-app-error">{error}</p>}
+      {ok && <p className="mt-2 text-xs text-app-success">השם עודכן.</p>}
 
       <SubmitButton pending={pending} />
     </form>

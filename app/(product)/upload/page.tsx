@@ -17,15 +17,15 @@ export const dynamic = "force-dynamic";
 export default function UploadPage() {
   return (
     <main className="mx-auto max-w-xl px-4 py-10 sm:px-6">
-      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-gold-dim">ANKORA</span>
-      <h1 className="mt-8 text-2xl font-medium text-appNavy">העלאת מסמך חתום</h1>
-      <p className="mt-3 text-sm leading-7 text-appNavy/70">
+      <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
+      <h1 className="mt-8 text-2xl font-medium text-app-text-primary">העלאת מסמך חתום</h1>
+      <p className="mt-3 text-sm leading-7 text-app-text-secondary">
         מקלידים את הקוד שקיבלת במייל, ואז מעלים את קובץ ה-PDF החתום. אפשר חתימה דיגיטלית, או הדפסה, חתימה וסריקה.
       </p>
       <div className="mt-8">
         <UploadCodeForm />
       </div>
-      <p className="mt-4 text-xs text-appNavy/50">
+      <p className="mt-4 text-xs text-app-text-tertiary">
         הקוד אישי ומיועד לשימוש אחד. הקובץ נשמר אצל אנקורה בלבד. בעיה בקוד? אפשר לפנות ל-ops@ankora.co.il.
       </p>
     </main>

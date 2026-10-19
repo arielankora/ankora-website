@@ -44,9 +44,9 @@ export function PreferencesForm({
       <div className="space-y-3.5">
         {FIELDS.map((f) => (
           <div key={f.name}>
-            <p className="text-[11.5px] text-appNavy/55">{f.label}</p>
-            <p className="mt-1 whitespace-pre-line text-[13.5px] text-appNavy">
-              {preferences[f.name]?.trim() || <span className="text-appNavy/40">עוד לא נרשם</span>}
+            <p className="text-[11.5px] text-app-text-secondary">{f.label}</p>
+            <p className="mt-1 whitespace-pre-line text-[13.5px] text-app-text-primary">
+              {preferences[f.name]?.trim() || <span className="text-app-text-tertiary">עוד לא נרשם</span>}
             </p>
           </div>
         ))}
@@ -58,24 +58,24 @@ export function PreferencesForm({
     <form onSubmit={onSubmit} className="space-y-3.5">
       {FIELDS.map((f) => (
         <label key={f.name} className="block">
-          <span className="mb-1.5 block text-[11.5px] text-appNavy/55">{f.label}</span>
+          <span className="mb-1.5 block text-[11.5px] text-app-text-secondary">{f.label}</span>
           <textarea
             name={f.name}
             rows={2}
             defaultValue={preferences[f.name] ?? ""}
             placeholder={f.placeholder}
-            className="w-full rounded-[10px] border border-lineDark bg-white px-3 py-2.5 text-[13.5px] text-appNavy outline-none placeholder:text-appNavy/30 focus:border-gold"
+            className="w-full rounded-[10px] border border-app-border bg-white px-3 py-2.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-gold"
           />
         </label>
       ))}
 
-      {error && <p className="text-[12.5px] text-error">{error}</p>}
-      {ok && <p className="text-[12.5px] text-success">נשמר. מנהל התיק שלך קיבל על זה הודעה.</p>}
+      {error && <p className="text-[12.5px] text-app-error">{error}</p>}
+      {ok && <p className="text-[12.5px] text-app-success">נשמר. מנהל התיק שלך קיבל על זה הודעה.</p>}
 
       <button
         type="submit"
         disabled={pending}
-        className="rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50"
+        className="rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50"
       >
         {pending ? "שומר..." : "שמירה"}
       </button>
@@ -92,7 +92,7 @@ export function DigestForm({ digest, canEdit }: { digest: PortalDigest; canEdit:
   const { onSubmit, pending, error, ok } = useActionForm(saveDigestAction);
 
   if (!canEdit) {
-    return <p className="text-[13.5px] text-appNavy">{DIGEST_LABELS[digest]}</p>;
+    return <p className="text-[13.5px] text-app-text-primary">{DIGEST_LABELS[digest]}</p>;
   }
 
   return (
@@ -103,7 +103,7 @@ export function DigestForm({ digest, canEdit }: { digest: PortalDigest; canEdit:
           <label
             key={key}
             className={`flex cursor-pointer items-center gap-2.5 rounded-[10px] border px-3 py-2.5 text-[13.5px] ${
-              value === key ? "border-gold bg-gold/10 text-appNavy" : "border-lineDark bg-white text-appNavy/70"
+              value === key ? "border-gold bg-gold/10 text-app-text-primary" : "border-app-border bg-white text-app-text-secondary"
             }`}
           >
             <input
@@ -118,13 +118,13 @@ export function DigestForm({ digest, canEdit }: { digest: PortalDigest; canEdit:
         ))}
       </div>
 
-      {error && <p className="text-[12.5px] text-error">{error}</p>}
-      {ok && <p className="text-[12.5px] text-success">עודכן.</p>}
+      {error && <p className="text-[12.5px] text-app-error">{error}</p>}
+      {ok && <p className="text-[12.5px] text-app-success">עודכן.</p>}
 
       <button
         type="submit"
         disabled={pending || value === digest}
-        className="rounded-full border border-lineDark px-4 py-2 text-[13px] text-appNavy disabled:opacity-40"
+        className="rounded-full border border-app-border px-4 py-2 text-[13px] text-app-text-primary disabled:opacity-40"
       >
         {pending ? "שומר..." : "שמירת התדירות"}
       </button>

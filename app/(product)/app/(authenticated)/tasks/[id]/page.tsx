@@ -180,10 +180,10 @@ export default async function TaskDetailPage(props: {
           every filter. The arrow points right because right is back in
           Hebrew. A plain anchor, like the links that lead here, so the
           navigation cannot be quietly cancelled (see TaskRow). */}
-      <nav className="flex items-center gap-1.5 text-[13px] text-appNavy/50">
+      <nav className="flex items-center gap-1.5 text-[13px] text-app-text-tertiary">
         <BackLink href={backHref} label={backText} testId="task-back" />
-        <ChevronLeft size={14} className="text-appNavy/30" />
-        <span className="truncate text-appNavy/70">{task.client.name}</span>
+        <ChevronLeft size={14} className="text-app-text-tertiary" />
+        <span className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>
 
       <TaskDetail
@@ -304,14 +304,14 @@ export default async function TaskDetailPage(props: {
       />
 
       {credentials.length > 0 && (
-        <details className="rounded-2xl border border-lineDark bg-white p-5">
-          <summary className="cursor-pointer text-sm font-medium text-appNavy">
+        <details className="rounded-2xl border border-app-border bg-white p-5">
+          <summary className="cursor-pointer text-sm font-medium text-app-text-primary">
             גישות למערכות של {task.client.name} ({credentials.length})
           </summary>
           <ul className="mt-4 space-y-4">
             {credentials.map((c) => (
               <li key={c.id} className="flex flex-col gap-2">
-                <span className="text-sm text-appNavy">
+                <span className="text-sm text-app-text-primary">
                   {c.systemName}
                   {c.url && (
                     <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-gold hover:underline">

@@ -20,9 +20,9 @@ export function ProgressBar({
   const clamped = Math.max(0, Math.min(100, percent));
   const isDanger = dangerAt != null && percent >= dangerAt;
   const bar = (
-    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-lineDark/60 ${markerAt == null ? className : ""}`}>
+    <div className={`h-1.5 w-full overflow-hidden rounded-full bg-app-border ${markerAt == null ? className : ""}`}>
       <div
-        className={`h-full rounded-full ${isDanger ? "bg-error" : "bg-gold-gradient"}`}
+        className={`h-full rounded-full ${isDanger ? "bg-app-error" : "bg-gold-gradient"}`}
         style={{ width: `${clamped}%` }}
       />
     </div>

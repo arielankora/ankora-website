@@ -30,9 +30,9 @@ export function ProcessCheckForm({
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="processId" value={processId} />
       {from && <input type="hidden" name="from" value={from} />}
-      {checkText && <p className="text-sm text-appNavy">{checkText}</p>}
+      {checkText && <p className="text-sm text-app-text-primary">{checkText}</p>}
       {steps.length > 0 && (
-        <ol className="list-decimal space-y-0.5 pr-5 text-xs text-appNavy/70">
+        <ol className="list-decimal space-y-0.5 pr-5 text-xs text-app-text-secondary">
           {steps.map((s, i) => (
             <li key={i}>{s}</li>
           ))}
@@ -40,11 +40,11 @@ export function ProcessCheckForm({
       )}
       <fieldset className="flex flex-col gap-2">
         <legend className="sr-only">מה נמצא</legend>
-        <label className="flex items-center gap-2 text-sm text-appNavy">
+        <label className="flex items-center gap-2 text-sm text-app-text-primary">
           <input type="radio" name="outcome" value="OK" checked={outcome === "OK"} onChange={() => setOutcome("OK")} className="h-4 w-4 accent-gold" />
           נבדק, הכול תקין
         </label>
-        <label className="flex items-center gap-2 text-sm text-appNavy">
+        <label className="flex items-center gap-2 text-sm text-app-text-primary">
           <input type="radio" name="outcome" value="ISSUE" checked={outcome === "ISSUE"} onChange={() => setOutcome("ISSUE")} className="h-4 w-4 accent-gold" />
           נמצאה בעיה
         </label>
@@ -52,9 +52,9 @@ export function ProcessCheckForm({
       <Field label={outcome === "ISSUE" ? "מה נמצא *" : "הערה"}>
         <textarea name="note" rows={3} required={outcome === "ISSUE"} maxLength={1000} className={INPUT} placeholder={outcome === "ISSUE" ? "שתי חשבוניות של Notion לא הגיעו ל-billing" : ""} />
       </Field>
-      {outcome === "ISSUE" && <p className="text-xs text-appNavy/60">תיפתח לך משימה עם מה שנמצא, להיום.</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
+      {outcome === "ISSUE" && <p className="text-xs text-app-text-secondary">תיפתח לך משימה עם מה שנמצא, להיום.</p>}
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : "רישום הבדיקה"}
       </button>
     </form>

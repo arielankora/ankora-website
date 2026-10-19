@@ -82,89 +82,89 @@ export default async function PortalHoursPage() {
     <div className="space-y-4">
       <PortalTabs active="hours" />
 
-      <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
-        <p className="text-xl font-medium text-appNavy">שלום, {client.name}</p>
+      <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
+        <p className="text-xl font-medium text-app-text-primary">שלום, {client.name}</p>
         {snapshot && isPrepaid ? (
-          <div className="mt-1.5 space-y-1 text-[13.5px] text-appNavy/60">
+          <div className="mt-1.5 space-y-1 text-[13.5px] text-app-text-secondary">
             <p>
               חבילת שעות שנטענה ב-{formatDate(snapshot.bank.cycleStart)} · בתוקף עד {formatDate(snapshot.bank.cycleEnd)}
               {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום התוקף`}
             </p>
-            {forecastText && <p className="text-appNavy/75">{forecastText}</p>}
+            {forecastText && <p className="text-app-text-secondary">{forecastText}</p>}
           </div>
         ) : snapshot ? (
-          <p className="mt-1.5 text-[13.5px] text-appNavy/60">
+          <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
             מחזור נוכחי: {formatDate(snapshot.bank.cycleStart)} עד {formatDate(snapshot.bank.cycleEnd)}
             {daysUntilCycleEnd !== null && ` · ${daysUntilCycleEnd} ימים לסיום`}
           </p>
         ) : (
-          <p className="mt-1.5 text-[13.5px] text-appNavy/60">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
+          <p className="mt-1.5 text-[13.5px] text-app-text-secondary">טרם הוגדר מחזור בנק שעות. פנו למנהל התיק שלכם ב-Ankora.</p>
         )}
 
         {snapshot && figures && (
           <>
             <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ בבנק</>}</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{figures.total}</p>
+              <div className="rounded-[14px] border border-app-border bg-white p-4">
+                <span className="text-xs text-app-text-secondary">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ בבנק</>}</span>
+                <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{figures.total}</p>
               </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">נוצל</span>
-                <p className="mt-2 font-jbmono text-2xl text-appNavy">{figures.consumed}</p>
+              <div className="rounded-[14px] border border-app-border bg-white p-4">
+                <span className="text-xs text-app-text-secondary">נוצל</span>
+                <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{figures.consumed}</p>
               </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">נותר</span>
+              <div className="rounded-[14px] border border-app-border bg-white p-4">
+                <span className="text-xs text-app-text-secondary">נותר</span>
                 {/* <bdi dir="ltr"> keeps a negative balance's minus on the left
                     while the figure stays aligned under its label, like the
                     other three tiles. */}
-                <p className={`mt-2 font-jbmono text-2xl ${figures.overdrawn ? "text-error" : "text-appNavy"}`}>
+                <p className={`mt-2 font-jbmono text-2xl ${figures.overdrawn ? "text-app-error" : "text-app-text-primary"}`}>
                   <bdi dir="ltr">{figures.remaining}</bdi>
                 </p>
               </div>
-              <div className="rounded-[14px] border border-lineDark bg-white p-4">
-                <span className="text-xs text-appNavy/55">ניצול</span>
-                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-error" : "text-appNavy"}`}>
+              <div className="rounded-[14px] border border-app-border bg-white p-4">
+                <span className="text-xs text-app-text-secondary">ניצול</span>
+                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-app-error" : "text-app-text-primary"}`}>
                   {snapshot.utilization.utilizationPct}%
                 </p>
-                <p className="mt-1 text-[11.5px] text-appNavy/50">
+                <p className="mt-1 text-[11.5px] text-app-text-tertiary">
                   {figures.consumed} שעות מתוך {figures.total}
                 </p>
               </div>
             </div>
-            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-appNavy/8">
+            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-app-surface-sunken">
               <span
-                className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-error" : "bg-gold-gradient"}`}
+                className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-app-error" : "bg-gold-gradient"}`}
                 style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
               />
             </div>
             {isPrepaid && carry !== 0 && (
-              <p className="mt-3 text-[12px] text-appNavy/55">
+              <p className="mt-3 text-[12px] text-app-text-secondary">
                 {carry < 0 ? "כולל קיזוז של " : "כולל יתרה של "}
                 <bdi dir="ltr">{formatDecimalHours(Math.abs(carry))}</bdi>
                 {carry < 0 ? " שעות שנוצלו מעבר לחבילה הקודמת." : " שעות שעברו מהחבילה הקודמת ומנוצלות ראשונות."}
               </p>
             )}
-            <p className="mt-3 text-[11.5px] text-appNavy/45">בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.</p>
+            <p className="mt-3 text-[11.5px] text-app-text-tertiary">בשעות עשרוניות: 0.50 הן חצי שעה, 0.25 הן רבע שעה.</p>
           </>
         )}
       </div>
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        <div className="rounded-2xl border border-lineDark bg-white p-5">
-          <p className="mb-4 text-[13.5px] font-medium text-appNavy">פילוח לפי תחום · החודש</p>
+        <div className="rounded-2xl border border-app-border bg-white p-5">
+          <p className="mb-4 text-[13.5px] font-medium text-app-text-primary">פילוח לפי תחום · החודש</p>
           {categorySummary.rows.length === 0 ? (
-            <p className="text-sm text-appNavy/50">אין עדיין נתונים לחודש הנוכחי.</p>
+            <p className="text-sm text-app-text-tertiary">אין עדיין נתונים לחודש הנוכחי.</p>
           ) : (
             <div className="flex flex-col gap-3.5">
               {categorySummary.rows.map((row, i) => (
                 <div key={row.category}>
                   <div className="flex justify-between text-sm">
-                    <span className="text-appNavy">{row.category}</span>
-                    <span className="font-jbmono text-appNavy/60">
+                    <span className="text-app-text-primary">{row.category}</span>
+                    <span className="font-jbmono text-app-text-secondary">
                       {formatDecimalHours(row.minutes)} · {row.pctOfTotal}%
                     </span>
                   </div>
-                  <span className="mt-1.5 block h-1.5 rounded-full bg-appNavy/7">
+                  <span className="mt-1.5 block h-1.5 rounded-full bg-app-border">
                     <span
                       className={`block h-full rounded-full ${CATEGORY_BAR_COLORS[i % CATEGORY_BAR_COLORS.length]}`}
                       style={{ width: `${totalCategoryMinutes > 0 ? row.pctOfTotal : 0}%` }}
@@ -176,30 +176,30 @@ export default async function PortalHoursPage() {
           )}
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-lineDark bg-white">
-          <div className="flex items-center justify-between border-b border-lineDark px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-appNavy">פעילות השבוע</span>
+        <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
+          <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
+            <span className="text-[13.5px] font-medium text-app-text-primary">פעילות השבוע</span>
             <div className="flex items-center gap-3">
-              <Link href="/app/portal/weekly" className="text-xs text-gold-dim hover:underline">
+              <Link href="/app/portal/weekly" className="text-xs text-app-text-accent hover:underline">
                 לפי ימים
               </Link>
-              <Link href="/app/portal/monthly" className="text-xs text-gold-dim hover:underline">
+              <Link href="/app/portal/monthly" className="text-xs text-app-text-accent hover:underline">
                 הורדת דוח חודשי
               </Link>
             </div>
           </div>
           {weekly.topActivities.length === 0 ? (
-            <p className="px-[18px] py-8 text-center text-sm text-appNavy/50">אין עדיין פעילות השבוע.</p>
+            <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">אין עדיין פעילות השבוע.</p>
           ) : (
             weekly.topActivities.map((a, i) => (
               <div
                 key={a.activity}
                 className={`flex justify-between gap-2.5 px-[18px] py-3 text-sm ${
-                  i < weekly.topActivities.length - 1 ? "border-b border-lineDark/60" : ""
+                  i < weekly.topActivities.length - 1 ? "border-b border-app-border" : ""
                 }`}
               >
-                <span className="text-appNavy">{a.activity}</span>
-                <span className="font-jbmono text-appNavy/60">{formatDecimalHours(a.minutes)}</span>
+                <span className="text-app-text-primary">{a.activity}</span>
+                <span className="font-jbmono text-app-text-secondary">{formatDecimalHours(a.minutes)}</span>
               </div>
             ))
           )}

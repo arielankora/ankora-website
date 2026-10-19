@@ -24,7 +24,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         <span className="relative text-[11.5px] text-cream-warm/40">Tel Aviv, Israel</span>
       </div>
 
-      <div className="flex flex-col items-center justify-center bg-cream px-8 py-12 sm:px-10">
+      <div className="flex flex-col items-center justify-center bg-app-surface-page px-8 py-12 sm:px-10">
         <div className="w-full max-w-[380px]">{children}</div>
       </div>
     </div>

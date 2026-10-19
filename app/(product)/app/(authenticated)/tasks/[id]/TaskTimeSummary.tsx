@@ -24,32 +24,32 @@ export function TaskTimeSummary({
   };
 }) {
   return (
-    <section id="task-time" className="scroll-mt-24 rounded-2xl border border-lineDark bg-white p-5">
+    <section id="task-time" className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-5">
       <div className="flex items-center justify-between">
-        <h2 className="flex items-center gap-2 text-sm font-medium text-appNavy/70">
-          <Clock size={15} strokeWidth={1.75} className="text-appNavy/40" />
+        <h2 className="flex items-center gap-2 text-sm font-medium text-app-text-secondary">
+          <Clock size={15} strokeWidth={1.75} className="text-app-text-tertiary" />
           שעות על המשימה
         </h2>
-        <span className="font-jbmono text-[22px] font-medium text-appNavy">
+        <span className="font-jbmono text-[22px] font-medium text-app-text-primary">
           {formatDuration(time.totalSeconds)}
         </span>
       </div>
 
       {time.entryCount === 0 ? (
-        <p className="mt-4 text-sm text-appNavy/55">עדיין לא דווח זמן על המשימה הזו.</p>
+        <p className="mt-4 text-sm text-app-text-secondary">עדיין לא דווח זמן על המשימה הזו.</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {time.byUser.map((row) => (
             <li key={row.userId} className="flex items-center justify-between text-[13.5px]">
-              <span className="truncate text-appNavy">{row.userName}</span>
-              <span className="font-jbmono text-appNavy/70">{formatDuration(row.seconds)}</span>
+              <span className="truncate text-app-text-primary">{row.userName}</span>
+              <span className="font-jbmono text-app-text-secondary">{formatDuration(row.seconds)}</span>
             </li>
           ))}
         </ul>
       )}
 
       {time.runningCount > 0 && (
-        <p className="mt-3 border-t border-lineDark pt-3 text-[12.5px] text-warning">
+        <p className="mt-3 border-t border-app-border pt-3 text-[12.5px] text-app-warning">
           {time.runningCount === 1
             ? "טיימר אחד רץ על המשימה הזו כרגע, והזמן שלו ייספר בעצירה."
             : `${time.runningCount} טיימרים רצים על המשימה הזו כרגע, והזמן שלהם ייספר בעצירה.`}

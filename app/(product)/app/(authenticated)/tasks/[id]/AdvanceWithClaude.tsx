@@ -89,19 +89,19 @@ export function AdvanceWithClaude({
           type="button"
           onClick={copy}
           title={hint}
-          className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold"
+          className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
         >
-          {state === "copied" ? <Check size={14} className="text-gold-dim" /> : <Sparkles size={14} className="text-gold-dim" />}
+          {state === "copied" ? <Check size={14} className="text-app-text-accent" /> : <Sparkles size={14} className="text-app-text-accent" />}
           {label}
         </button>
         {state === "copied" && (
-          <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-appNavy/65" role="status">
+          <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-app-text-secondary" role="status">
             הפרומט הועתק. הדביקו אותו בשיחה חדשה בחשבון הארגוני של אנקורה בקלוד.
             <a
               href={CLAUDE_NEW_CHAT}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-medium text-gold-dim hover:text-appNavy"
+              className="inline-flex items-center gap-1 font-medium text-app-text-accent hover:text-app-text-primary"
             >
               פתיחת קלוד
               <ExternalLink size={12} />
@@ -111,8 +111,8 @@ export function AdvanceWithClaude({
       </div>
 
       {state === "manual" && (
-        <div className="rounded-xl border border-lineDark bg-cream/40 p-3">
-          <p className="text-[12.5px] text-appNavy/70">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.</p>
+        <div className="rounded-xl border border-app-border bg-cream/40 p-3">
+          <p className="text-[12.5px] text-app-text-secondary">הדפדפן לא אפשר העתקה אוטומטית. הטקסט מסומן, אפשר להעתיק אותו מכאן ולהדביק בחשבון הארגוני של אנקורה בקלוד.</p>
           <textarea
             ref={boxRef}
             readOnly
@@ -120,13 +120,13 @@ export function AdvanceWithClaude({
             dir="rtl"
             rows={8}
             aria-label="הפרומט לקלוד"
-            className="mt-2 w-full resize-y rounded-lg border border-lineDark bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-appNavy/80"
+            className="mt-2 w-full resize-y rounded-lg border border-app-border bg-white p-2 font-jbmono text-[11.5px] leading-relaxed text-app-text-primary"
           />
           <div className="mt-2 flex items-center gap-2">
             <button
               type="button"
               onClick={copyFromBox}
-              className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold"
+              className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold"
             >
               <Copy size={13} />
               העתקה
@@ -134,7 +134,7 @@ export function AdvanceWithClaude({
             <button
               type="button"
               onClick={() => setState("idle")}
-              className="rounded-full px-3 py-1.5 text-[12.5px] text-appNavy/55 hover:text-appNavy"
+              className="rounded-full px-3 py-1.5 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
             >
               סגירה
             </button>

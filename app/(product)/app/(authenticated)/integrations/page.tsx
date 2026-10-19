@@ -52,8 +52,8 @@ export default async function IntegrationsPage() {
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">אינטגרציות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">
+          <h1 className="text-xl font-medium text-app-text-primary">אינטגרציות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">
             חיבור מערכות חיצוניות לאפליקציית ניהול הזמן.
           </p>
         </div>

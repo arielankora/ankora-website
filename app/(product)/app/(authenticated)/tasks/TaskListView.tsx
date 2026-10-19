@@ -98,13 +98,13 @@ export function TaskListView({
       <div className="space-y-5">
         {groupByClient(rows).map(([clientName, inClient]) => (
           <section key={clientName}>
-            <h2 className="text-sm font-medium text-appNavy">
+            <h2 className="text-sm font-medium text-app-text-primary">
               {clientName}
-              <span className="mr-2 font-normal text-appNavy/45">{inClient.length}</span>
+              <span className="mr-2 font-normal text-app-text-tertiary">{inClient.length}</span>
             </h2>
-            <div className="mt-2 rounded-2xl border border-lineDark bg-white">
+            <div className="mt-2 rounded-2xl border border-app-border bg-white">
               <ColumnHeader />
-              <div className="divide-y divide-lineDark">
+              <div className="divide-y divide-app-border">
                 {inClient.map((row) => (
                   <TaskRow key={row.id} task={row} />
                 ))}
@@ -120,9 +120,9 @@ export function TaskListView({
     // The header sits outside the divided list: a hidden first child
     // still counts for `divide-y`, and gave the first card a stray top
     // border on a phone.
-    <div className="rounded-2xl border border-lineDark bg-white">
+    <div className="rounded-2xl border border-app-border bg-white">
       <ColumnHeader />
-      <div className="divide-y divide-lineDark">
+      <div className="divide-y divide-app-border">
         {rows.map((row) => (
           <TaskRow key={row.id} task={row} />
         ))}
@@ -142,7 +142,7 @@ function ColumnHeader() {
     <div
       aria-hidden
       data-testid="task-columns"
-      className="hidden border-b border-lineDark grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-appNavy/45 xl:grid"
+      className="hidden border-b border-app-border grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-app-text-tertiary xl:grid"
     >
       <span />
       <span>לקוח</span>

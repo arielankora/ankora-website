@@ -24,19 +24,19 @@ export function ControlLine({ parts, details = {}, clientId }: { parts: ControlP
   const anchor = open ? SECTION[open] : undefined;
   return (
     <div>
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-appNavy/60" aria-label="בקרה">
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-app-text-secondary" aria-label="בקרה">
         {parts.map((p, i) => {
           const names = p.key ? details[p.key] : undefined;
-          const tone = p.warn ? "font-medium text-warning" : "";
+          const tone = p.warn ? "font-medium text-app-warning" : "";
           return (
             <span key={i} className="flex items-center gap-x-2">
-              {i > 0 && <span className="text-appNavy/25">·</span>}
+              {i > 0 && <span className="text-app-text-tertiary">·</span>}
               {names?.length ? (
                 <button
                   type="button"
                   onClick={() => setOpen(open === p.key ? null : p.key!)}
                   aria-expanded={open === p.key}
-                  className={`underline decoration-dotted underline-offset-2 hover:text-appNavy ${tone} ${open === p.key ? "text-appNavy" : ""}`}
+                  className={`underline decoration-dotted underline-offset-2 hover:text-app-text-primary ${tone} ${open === p.key ? "text-app-text-primary" : ""}`}
                   data-testid={`control-${p.key}`}
                 >
                   {p.text}
@@ -49,14 +49,14 @@ export function ControlLine({ parts, details = {}, clientId }: { parts: ControlP
         })}
       </p>
       {open && shown.length > 0 && (
-        <div className="mt-2 rounded-lg border border-lineDark bg-white px-3 py-2 text-xs text-appNavy/75" data-testid="control-details">
+        <div className="mt-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs text-app-text-secondary" data-testid="control-details">
           <ul className="space-y-0.5">
             {shown.map((n, i) => (
               <li key={i}>• {n}</li>
             ))}
           </ul>
           {clientId && (
-            <a href={`/app/clients/${clientId}?tab=file${anchor ? `#${anchor}` : ""}`} className="mt-1.5 inline-block text-gold-dim hover:underline">
+            <a href={`/app/clients/${clientId}?tab=file${anchor ? `#${anchor}` : ""}`} className="mt-1.5 inline-block text-app-text-accent hover:underline">
               לתיק הלקוח
             </a>
           )}

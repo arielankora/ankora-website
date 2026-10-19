@@ -59,17 +59,17 @@ export default async function AuditLogPage(
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">יומן פעולות</h1>
-          <p className="mt-1 text-sm text-appNavy/60">רשומה בלתי ניתנת לעריכה של כל הפעולות הרגישות במערכת.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">יומן פעולות</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">רשומה בלתי ניתנת לעריכה של כל הפעולות הרגישות במערכת.</p>
         </div>
 
-        <form method="get" className="flex flex-wrap items-end gap-4 rounded-2xl border border-lineDark bg-white p-4">
+        <form method="get" className="flex flex-wrap items-end gap-4 rounded-2xl border border-app-border bg-white p-4">
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">סוג ישות</label>
+            <label className="block text-xs font-medium text-app-text-secondary">סוג ישות</label>
             <select
               name="entityType"
               defaultValue={entityType ?? ""}
-              className="mt-1.5 rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1.5 rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             >
               <option value="">הכל</option>
               {ENTITY_TYPES.map((t) => (
@@ -80,29 +80,29 @@ export default async function AuditLogPage(
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-appNavy/60">חיפוש</label>
+            <label className="block text-xs font-medium text-app-text-secondary">חיפוש</label>
             <input
               name="q"
               defaultValue={q ?? ""}
               placeholder="פעולה, שם, לקוח או מזהה"
-              className="mt-1.5 w-64 max-w-full rounded-lg border border-lineDark bg-white px-3 py-2 text-sm text-appNavy outline-none focus:border-gold"
+              className="mt-1.5 w-64 max-w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
-          <button type="submit" className="rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy/70 hover:border-gold">
+          <button type="submit" className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold">
             סינון
           </button>
           <a
             href={`/api/audit-log/export${entityType || q ? `?${new URLSearchParams({ ...(entityType ? { entityType } : {}), ...(q ? { q } : {}) }).toString()}` : ""}`}
-            className="ms-auto rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy/70 transition-colors hover:border-gold"
+            className="ms-auto rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary transition-colors hover:border-gold"
           >
             ייצוא
           </a>
         </form>
 
-        <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
+        <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
           <table className="w-full min-w-[820px] text-start text-sm">
             <thead>
-              <tr className="border-b border-lineDark text-xs text-appNavy/50">
+              <tr className="border-b border-app-border text-xs text-app-text-tertiary">
                 <th className="px-5 py-3 font-medium">סוג</th>
                 <th className="px-5 py-3 font-medium">פעולה</th>
                 <th className="px-5 py-3 font-medium">בוצע ע&quot;י</th>
@@ -113,7 +113,7 @@ export default async function AuditLogPage(
             <tbody>
               {events.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-appNavy/50">
+                  <td colSpan={5} className="px-5 py-8 text-center text-app-text-tertiary">
                     לא נמצאו רשומות התואמות לסינון.
                   </td>
                 </tr>
@@ -121,20 +121,20 @@ export default async function AuditLogPage(
               {events.map((event) => {
                 const kind = classifyAction(event.action);
                 return (
-                  <tr key={event.id} className="border-b border-lineDark last:border-0 align-top">
+                  <tr key={event.id} className="border-b border-app-border last:border-0 align-top">
                     <td className="whitespace-nowrap px-5 py-3">
                       <StatusBadge label={kind.label} tone={kind.tone} />
                     </td>
-                    <td className="px-5 py-3 text-appNavy">
+                    <td className="px-5 py-3 text-app-text-primary">
                       {ACTION_LABEL[event.action] ?? event.action}
-                      <p className="mt-0.5 text-xs text-appNavy/40">
+                      <p className="mt-0.5 text-xs text-app-text-tertiary">
                         {event.entityType}
                         {event.entityId && ` #${event.entityId.slice(-6)}`}
                       </p>
                     </td>
-                    <td className="px-5 py-3 text-appNavy/70">{event.actor?.name ?? "מערכת"}</td>
-                    <td className="px-5 py-3 text-appNavy/70">{event.client?.name ?? "-"}</td>
-                    <td dir="ltr" className="whitespace-nowrap px-5 py-3 text-end font-jbmono text-xs text-appNavy/50">
+                    <td className="px-5 py-3 text-app-text-secondary">{event.actor?.name ?? "מערכת"}</td>
+                    <td className="px-5 py-3 text-app-text-secondary">{event.client?.name ?? "-"}</td>
+                    <td dir="ltr" className="whitespace-nowrap px-5 py-3 text-end font-jbmono text-xs text-app-text-tertiary">
                       {formatDateTime(event.createdAt)}
                     </td>
                   </tr>
@@ -145,11 +145,11 @@ export default async function AuditLogPage(
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-center gap-4 text-sm text-appNavy/60">
+          <div className="flex items-center justify-center gap-4 text-sm text-app-text-secondary">
             {page > 1 && (
               <Link
                 href={{ pathname: "/app/audit-log", query: { entityType, q, page: page - 1 } }}
-                className="rounded-full border border-lineDark px-3 py-1.5 hover:border-gold"
+                className="rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
               >
                 הקודם
               </Link>
@@ -160,7 +160,7 @@ export default async function AuditLogPage(
             {page < totalPages && (
               <Link
                 href={{ pathname: "/app/audit-log", query: { entityType, q, page: page + 1 } }}
-                className="rounded-full border border-lineDark px-3 py-1.5 hover:border-gold"
+                className="rounded-full border border-app-border px-3 py-1.5 hover:border-gold"
               >
                 הבא
               </Link>
@@ -168,7 +168,7 @@ export default async function AuditLogPage(
           </div>
         )}
 
-        <p className="text-xs text-appNavy/50">היומן נשמר לשנתיים ואינו ניתן לעריכה או למחיקה.</p>
+        <p className="text-xs text-app-text-tertiary">היומן נשמר לשנתיים ואינו ניתן לעריכה או למחיקה.</p>
       </div>
     </>
   );

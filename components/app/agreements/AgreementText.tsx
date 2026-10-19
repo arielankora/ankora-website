@@ -15,13 +15,13 @@ export function AgreementText({ body }: { body: string }) {
   }
 
   return (
-    <div className="space-y-5 text-[14px] leading-7 text-appNavy/85">
+    <div className="space-y-5 text-[14px] leading-7 text-app-text-primary">
       {sections.map((section, i) => {
         const text = section.text.join("\n").trim();
         if (!section.heading && !text) return null;
         return (
           <section key={i}>
-            {section.heading && <h2 className="mb-2 text-[15px] font-medium text-appNavy">{section.heading}</h2>}
+            {section.heading && <h2 className="mb-2 text-[15px] font-medium text-app-text-primary">{section.heading}</h2>}
             {text && (
               <div
                 className="space-y-3"

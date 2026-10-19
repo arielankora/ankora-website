@@ -75,7 +75,7 @@ export function Sidebar({
   let lastGroup: string | undefined;
 
   return (
-    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-appNavy md:sticky md:top-0 md:flex md:h-screen">
+    <aside className="hidden w-[252px] shrink-0 flex-col border-e border-white/10 bg-app-surface-nav md:sticky md:top-0 md:flex md:h-screen">
       <div className="flex items-center gap-2 px-5 pb-3 pt-6">
         <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-gold-light">
           Ankora

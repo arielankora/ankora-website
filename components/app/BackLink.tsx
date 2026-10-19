@@ -11,7 +11,7 @@ export function BackLink({ href, label, testId }: { href: string; label: string;
     <a
       href={href}
       data-testid={testId}
-      className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[13px] font-medium text-appNavy/70 transition-colors hover:border-appNavy/30 hover:text-appNavy"
+      className="inline-flex items-center gap-1.5 rounded-full border border-app-border bg-white px-3 py-1.5 text-[13px] font-medium text-app-text-secondary transition-colors hover:border-appNavy/30 hover:text-app-text-primary"
     >
       <ArrowRight size={14} />
       {label}

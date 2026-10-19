@@ -119,22 +119,22 @@ export function TaskPlanPanel({
   }
 
   return (
-    <section className="rounded-2xl border border-lineDark bg-white p-5" data-testid="task-plan">
+    <section className="rounded-2xl border border-app-border bg-white p-5" data-testid="task-plan">
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-sm font-medium text-appNavy/70">תוכנית עבודה</h2>
-        <span className="text-[12px] text-appNavy/50">{metaLine(plan)}</span>
+        <h2 className="text-sm font-medium text-app-text-secondary">תוכנית עבודה</h2>
+        <span className="text-[12px] text-app-text-tertiary">{metaLine(plan)}</span>
       </div>
-      {plan.changeNote && <p className="mt-1 text-[12px] text-appNavy/55">מה השתנה: {plan.changeNote}</p>}
+      {plan.changeNote && <p className="mt-1 text-[12px] text-app-text-secondary">מה השתנה: {plan.changeNote}</p>}
 
       {plan.status === "DRAFT" && (
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-cream/50 px-3 py-2">
-          <span className="text-[12.5px] text-appNavy/75">התוכנית הזו עדיין טיוטה ולא אושרה.</span>
+          <span className="text-[12.5px] text-app-text-secondary">התוכנית הזו עדיין טיוטה ולא אושרה.</span>
           {editable && (
             <button
               type="button"
               disabled={busy}
               onClick={approve}
-              className="rounded-full bg-gold-gradient px-3 py-1 text-[12px] font-medium text-navy disabled:opacity-40"
+              className="rounded-full bg-app-accent px-3 py-1 text-[12px] font-medium text-app-text-primary disabled:opacity-40"
             >
               אישור התוכנית
             </button>
@@ -145,23 +145,23 @@ export function TaskPlanPanel({
       {editing ? (
         <div className="mt-3 space-y-3">
           <label className="block">
-            <span className="text-[12px] text-appNavy/60">התוכנית</span>
+            <span className="text-[12px] text-app-text-secondary">התוכנית</span>
             <textarea
               value={draftBody}
               onChange={(e) => setDraftBody(e.target.value)}
               rows={14}
               dir="rtl"
-              className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] leading-relaxed text-appNavy outline-none focus:border-appNavy"
+              className="mt-1 w-full resize-y rounded-lg border border-app-border p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy"
             />
           </label>
           <label className="block">
-            <span className="text-[12px] text-appNavy/60">שלבים מוצעים, שורה לכל שלב</span>
+            <span className="text-[12px] text-app-text-secondary">שלבים מוצעים, שורה לכל שלב</span>
             <textarea
               value={draftSteps}
               onChange={(e) => setDraftSteps(e.target.value)}
               rows={6}
               dir="rtl"
-              className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] text-appNavy outline-none focus:border-appNavy"
+              className="mt-1 w-full resize-y rounded-lg border border-app-border p-2 text-[13.5px] text-app-text-primary outline-none focus:border-appNavy"
             />
           </label>
           <div className="flex gap-2">
@@ -169,7 +169,7 @@ export function TaskPlanPanel({
               type="button"
               disabled={busy || !draftBody.trim()}
               onClick={save}
-              className="rounded-full bg-gold-gradient px-4 py-1.5 text-[13px] font-medium text-navy disabled:opacity-40"
+              className="rounded-full bg-app-accent px-4 py-1.5 text-[13px] font-medium text-app-text-primary disabled:opacity-40"
             >
               {busy ? "שומר..." : "שמירה כגרסה חדשה"}
             </button>
@@ -181,7 +181,7 @@ export function TaskPlanPanel({
                 setDraftSteps(plan.steps.join("\n"));
                 setError(null);
               }}
-              className="rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/60"
+              className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
             >
               ביטול
             </button>
@@ -191,7 +191,7 @@ export function TaskPlanPanel({
         <>
           <div className="relative">
             <div
-              className={`mt-3 space-y-2 text-[14px] leading-relaxed text-appNavy/85 [&_p]:m-0 ${
+              className={`mt-3 space-y-2 text-[14px] leading-relaxed text-app-text-primary [&_p]:m-0 ${
                 isLong && !expanded ? "max-h-72 overflow-hidden" : ""
               }`}
               // Same renderer and the same escaping as the description and
@@ -207,22 +207,22 @@ export function TaskPlanPanel({
             <button
               type="button"
               onClick={() => setExpanded((v) => !v)}
-              className="mt-2 text-[12.5px] text-gold-dim hover:text-appNavy"
+              className="mt-2 text-[12.5px] text-app-text-accent hover:text-app-text-primary"
             >
               {expanded ? "צמצום" : "הצגת התוכנית המלאה"}
             </button>
           )}
 
           {plan.steps.length > 0 && (
-            <div className="mt-4 border-t border-lineDark/70 pt-3">
-              <p className="text-[12.5px] font-medium text-appNavy/70">שלבים מוצעים ({plan.steps.length})</p>
-              <ol className="mt-1.5 list-decimal space-y-0.5 ps-5 text-[13px] text-appNavy/80">
+            <div className="mt-4 border-t border-app-border pt-3">
+              <p className="text-[12.5px] font-medium text-app-text-secondary">שלבים מוצעים ({plan.steps.length})</p>
+              <ol className="mt-1.5 list-decimal space-y-0.5 ps-5 text-[13px] text-app-text-primary">
                 {plan.steps.map((s, i) => (
                   <li key={i}>{s}</li>
                 ))}
               </ol>
               {plan.stepsAppliedAt && (
-                <p className="mt-1.5 text-[11.5px] text-appNavy/50">הועתקו לשלבים של המשימה ב-{day(plan.stepsAppliedAt)}.</p>
+                <p className="mt-1.5 text-[11.5px] text-app-text-tertiary">הועתקו לשלבים של המשימה ב-{day(plan.stepsAppliedAt)}.</p>
               )}
             </div>
           )}
@@ -234,7 +234,7 @@ export function TaskPlanPanel({
                   type="button"
                   disabled={busy}
                   onClick={() => (openStepCount > 0 ? setConfirmApply(true) : applySteps())}
-                  className="rounded-full border border-lineDark px-3 py-1.5 text-[12.5px] font-medium text-appNavy transition-colors hover:border-gold disabled:opacity-40"
+                  className="rounded-full border border-app-border px-3 py-1.5 text-[12.5px] font-medium text-app-text-primary transition-colors hover:border-gold disabled:opacity-40"
                 >
                   {plan.stepsAppliedAt ? "העתקה מחדש לשלבים" : "הפיכה לשלבים במשימה"}
                 </button>
@@ -243,7 +243,7 @@ export function TaskPlanPanel({
                 <button
                   type="button"
                   onClick={() => setEditing(true)}
-                  className="rounded-full px-3 py-1.5 text-[12.5px] text-appNavy/55 hover:text-appNavy"
+                  className="rounded-full px-3 py-1.5 text-[12.5px] text-app-text-secondary hover:text-app-text-primary"
                 >
                   עריכה
                 </button>
@@ -252,8 +252,8 @@ export function TaskPlanPanel({
           )}
 
           {confirmApply && (
-            <div className="mt-3 rounded-xl border border-lineDark bg-cream/40 p-3">
-              <p className="text-[12.5px] text-appNavy/75">
+            <div className="mt-3 rounded-xl border border-app-border bg-cream/40 p-3">
+              <p className="text-[12.5px] text-app-text-secondary">
                 זה יחליף את {openStepCount} השלבים הקיימים בשלבי התוכנית. שלבים שבוצעו או שדווח עליהם זמן נשארים.
               </p>
               <div className="mt-2 flex gap-2">
@@ -261,14 +261,14 @@ export function TaskPlanPanel({
                   type="button"
                   disabled={busy}
                   onClick={applySteps}
-                  className="rounded-full bg-gold-gradient px-3 py-1 text-[12px] font-medium text-navy disabled:opacity-40"
+                  className="rounded-full bg-app-accent px-3 py-1 text-[12px] font-medium text-app-text-primary disabled:opacity-40"
                 >
                   {busy ? "מעדכן..." : "המשך"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirmApply(false)}
-                  className="rounded-full px-3 py-1 text-[12px] text-appNavy/55 hover:text-appNavy"
+                  className="rounded-full px-3 py-1 text-[12px] text-app-text-secondary hover:text-app-text-primary"
                 >
                   ביטול
                 </button>
@@ -278,21 +278,21 @@ export function TaskPlanPanel({
         </>
       )}
 
-      {error && <p className="mt-2 text-[12px] text-error">{error}</p>}
+      {error && <p className="mt-2 text-[12px] text-app-error">{error}</p>}
 
       {history.length > 0 && (
-        <details className="mt-4 border-t border-lineDark/70 pt-3">
-          <summary className="cursor-pointer text-[12.5px] text-appNavy/60">גרסאות קודמות ({history.length})</summary>
+        <details className="mt-4 border-t border-app-border pt-3">
+          <summary className="cursor-pointer text-[12.5px] text-app-text-secondary">גרסאות קודמות ({history.length})</summary>
           <ul className="mt-2 space-y-2">
             {history.map((h) => (
               <li key={h.version}>
                 <details className="rounded-lg bg-cream/30 px-3 py-2">
-                  <summary className="cursor-pointer text-[12px] text-appNavy/70">
+                  <summary className="cursor-pointer text-[12px] text-app-text-secondary">
                     {metaLine(h)}
                     {h.changeNote ? ` · ${h.changeNote}` : ""}
                   </summary>
                   <div
-                    className="mt-2 space-y-2 text-[13px] leading-relaxed text-appNavy/75 [&_p]:m-0"
+                    className="mt-2 space-y-2 text-[13px] leading-relaxed text-app-text-secondary [&_p]:m-0"
                     dangerouslySetInnerHTML={{ __html: renderMarkdownLite(h.body) }}
                   />
                 </details>
@@ -343,7 +343,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="self-center text-[12.5px] text-appNavy/50 transition-colors hover:text-appNavy"
+        className="self-center text-[12.5px] text-app-text-tertiary transition-colors hover:text-app-text-primary"
       >
         או לכתוב תוכנית ידנית
       </button>
@@ -351,30 +351,30 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
   }
 
   return (
-    <section className="w-full rounded-2xl border border-lineDark bg-white p-5" data-testid="task-plan-new">
-      <h2 className="text-sm font-medium text-appNavy/70">תוכנית עבודה חדשה</h2>
-      <p className="mt-1 text-[12px] text-appNavy/55">
+    <section className="w-full rounded-2xl border border-app-border bg-white p-5" data-testid="task-plan-new">
+      <h2 className="text-sm font-medium text-app-text-secondary">תוכנית עבודה חדשה</h2>
+      <p className="mt-1 text-[12px] text-app-text-secondary">
         מודגש עם **כוכביות**, רשימות עם מקף או מספר. נשמרת כגרסה 1, מאושרת על שמכם.
       </p>
       <label className="mt-3 block">
-        <span className="text-[12px] text-appNavy/60">התוכנית</span>
+        <span className="text-[12px] text-app-text-secondary">התוכנית</span>
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={10}
           dir="rtl"
           placeholder={"**מטרה**\n...\n\n**שלבים**\n1. ...\n2. ..."}
-          className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] leading-relaxed text-appNavy outline-none placeholder:text-appNavy/30 focus:border-appNavy"
+          className="mt-1 w-full resize-y rounded-lg border border-app-border p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
         />
       </label>
       <label className="mt-3 block">
-        <span className="text-[12px] text-appNavy/60">שלבים מוצעים, שורה לכל שלב (לא חובה)</span>
+        <span className="text-[12px] text-app-text-secondary">שלבים מוצעים, שורה לכל שלב (לא חובה)</span>
         <textarea
           value={steps}
           onChange={(e) => setSteps(e.target.value)}
           rows={5}
           dir="rtl"
-          className="mt-1 w-full resize-y rounded-lg border border-lineDark p-2 text-[13.5px] text-appNavy outline-none focus:border-appNavy"
+          className="mt-1 w-full resize-y rounded-lg border border-app-border p-2 text-[13.5px] text-app-text-primary outline-none focus:border-appNavy"
         />
       </label>
       <div className="mt-3 flex gap-2">
@@ -382,7 +382,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
           type="button"
           disabled={busy || !body.trim()}
           onClick={save}
-          className="rounded-full bg-gold-gradient px-4 py-1.5 text-[13px] font-medium text-navy disabled:opacity-40"
+          className="rounded-full bg-app-accent px-4 py-1.5 text-[13px] font-medium text-app-text-primary disabled:opacity-40"
         >
           {busy ? "שומר..." : "שמירה"}
         </button>
@@ -392,12 +392,12 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
             setOpen(false);
             setError(null);
           }}
-          className="rounded-full border border-lineDark px-4 py-1.5 text-[13px] text-appNavy/60"
+          className="rounded-full border border-app-border px-4 py-1.5 text-[13px] text-app-text-secondary"
         >
           ביטול
         </button>
       </div>
-      {error && <p className="mt-2 text-[12px] text-error">{error}</p>}
+      {error && <p className="mt-2 text-[12px] text-app-error">{error}</p>}
     </section>
   );
 }

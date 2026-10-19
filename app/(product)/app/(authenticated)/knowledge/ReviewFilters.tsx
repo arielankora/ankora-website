@@ -18,8 +18,8 @@ import { SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
 export type FilterOption = { value: string; label: string; count: number };
 
 const CHIP = "inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-[12.5px] transition-colors";
-const CHIP_OFF = "border-lineDark bg-white text-appNavy/70 hover:border-gold/60 hover:text-appNavy";
-const CHIP_ON = "border-gold bg-gold/10 font-medium text-appNavy";
+const CHIP_OFF = "border-app-border bg-white text-app-text-secondary hover:border-gold/60 hover:text-app-text-primary";
+const CHIP_ON = "border-gold bg-gold/10 font-medium text-app-text-primary";
 
 export function ReviewFilterBar({
   filters,
@@ -73,18 +73,18 @@ export function ReviewFilterBar({
             title="רגיש, משנה פריט קיים, אולי כבר בתיק, או שכלל סימן אותו"
             className={`${CHIP} ${filters.attention ? CHIP_ON : CHIP_OFF}`}
           >
-            <span className={`h-1.5 w-1.5 rounded-full ${filters.attention ? "bg-gold" : "bg-warning"}`} aria-hidden />
-            דורש תשומת לב <span className="text-appNavy/45">{attentionCount}</span>
+            <span className={`h-1.5 w-1.5 rounded-full ${filters.attention ? "bg-gold" : "bg-app-warning"}`} aria-hidden />
+            דורש תשומת לב <span className="text-app-text-tertiary">{attentionCount}</span>
           </a>
         ) : null}
 
-        <span className="mx-1 hidden h-5 w-px bg-lineDark sm:block" aria-hidden />
+        <span className="mx-1 hidden h-5 w-px bg-app-border sm:block" aria-hidden />
 
         {kinds.map((k) => {
           const on = filters.kinds.includes(k.value);
           return (
             <a key={k.value} href={toggleKind(k.value)} aria-current={on ? "true" : undefined} className={`${CHIP} ${on ? CHIP_ON : CHIP_OFF}`}>
-              {k.label} <span className="text-appNavy/45">{k.count}</span>
+              {k.label} <span className="text-app-text-tertiary">{k.count}</span>
             </a>
           );
         })}
@@ -93,14 +93,14 @@ export function ReviewFilterBar({
           .filter((k) => !kinds.some((o) => o.value === k))
           .map((k) => (
             <a key={k} href={toggleKind(k)} aria-current="true" className={`${CHIP} ${CHIP_ON}`}>
-              {k} <span className="text-appNavy/45">0</span>
+              {k} <span className="text-app-text-tertiary">0</span>
             </a>
           ))}
       </div>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
         <details open={more} className="group">
-          <summary className="cursor-pointer list-none text-appNavy/60 hover:text-appNavy">
+          <summary className="cursor-pointer list-none text-app-text-secondary hover:text-app-text-primary">
             עוד סינונים<span className="ms-1 inline-block transition-transform group-open:rotate-180">▾</span>
           </summary>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -128,7 +128,7 @@ export function ReviewFilterBar({
           </div>
         </details>
         {any && (
-          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-gold-dim hover:underline">
+          <a href={reviewFiltersHref({ clientId: null, kinds: [], attention: false, source: null, by: null, age: null })} className="text-app-text-accent hover:underline">
             ניקוי הסינון
           </a>
         )}
@@ -151,8 +151,8 @@ function Select({
   onChange: () => void;
 }) {
   return (
-    <label className="flex items-center gap-2 rounded-full border border-lineDark bg-white px-3 py-1.5 text-[12.5px]">
-      <span className="text-appNavy/50">{label}</span>
+    <label className="flex items-center gap-2 rounded-full border border-app-border bg-white px-3 py-1.5 text-[12.5px]">
+      <span className="text-app-text-tertiary">{label}</span>
       <select
         // Unset contributes nothing to the URL rather than `?source=`.
         name={value ? name : undefined}
@@ -163,7 +163,7 @@ function Select({
           e.currentTarget.name = e.currentTarget.value ? name : "";
           onChange();
         }}
-        className="max-w-[200px] cursor-pointer truncate bg-transparent font-medium text-appNavy outline-none"
+        className="max-w-[200px] cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

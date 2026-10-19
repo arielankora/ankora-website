@@ -116,37 +116,37 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
     <>
       <div className="space-y-6">
         <div>
-          <h1 className="text-xl font-medium text-appNavy">הזמן שלי</h1>
-          <p className="mt-1 text-sm text-appNavy/60">רצועת השבוע, הוספת דיווח בשורה אחת, ורשימה לפי יום.</p>
+          <h1 className="text-xl font-medium text-app-text-primary">הזמן שלי</h1>
+          <p className="mt-1 text-sm text-app-text-secondary">רצועת השבוע, הוספת דיווח בשורה אחת, ורשימה לפי יום.</p>
         </div>
 
         {/* App redesign (handoff README, screen 3): "פס שבוע" - nav +
             total-vs-target header, then a 7-cell day strip with today
             outlined in gold. */}
-        <div className="rounded-2xl border border-lineDark bg-white p-4">
+        <div className="rounded-2xl border border-app-border bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
               <Link
                 href={`/app/my-time?week=${prevWeek}`}
                 aria-label="שבוע קודם"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-appNavy hover:border-gold"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ›
               </Link>
-              <span className="text-[13.5px] font-medium text-appNavy">
+              <span className="text-[13.5px] font-medium text-app-text-primary">
                 {formatDay(days[0])} - {formatDay(days[6])}
               </span>
               <Link
                 href={`/app/my-time?week=${nextWeek}`}
                 aria-label="שבוע הבא"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-lineDark text-appNavy hover:border-gold"
+                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ‹
               </Link>
             </div>
-            <span className="text-[12.5px] text-appNavy/60">
+            <span className="text-[12.5px] text-app-text-secondary">
               סה&quot;כ השבוע{" "}
-              <span className="font-jbmono text-sm text-appNavy">{formatDuration(weekTotalSeconds)}</span> · יעד{" "}
+              <span className="font-jbmono text-sm text-app-text-primary">{formatDuration(weekTotalSeconds)}</span> · יעד{" "}
               {WEEKLY_TARGET_HOURS}:00
             </span>
           </div>
@@ -162,15 +162,15 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
                 <div
                   key={key}
                   className={`rounded-xl p-2.5 text-center ${
-                    isToday ? "border-2 border-gold bg-gold/6" : "border border-lineDark"
+                    isToday ? "border-2 border-gold bg-gold/6" : "border border-app-border"
                   }`}
                 >
-                  <span className={`block text-[11px] ${isToday ? "text-gold-dim" : "text-appNavy/50"}`}>
+                  <span className={`block text-[11px] ${isToday ? "text-app-text-accent" : "text-app-text-tertiary"}`}>
                     {weekday}׳ {dayMonth}
                   </span>
                   <span
                     className={`mt-1.5 block font-jbmono text-sm ${
-                      isToday ? "font-medium text-appNavy" : daySeconds > 0 ? "text-appNavy" : "text-appNavy/35"
+                      isToday ? "font-medium text-app-text-primary" : daySeconds > 0 ? "text-app-text-primary" : "text-app-text-tertiary"
                     }`}
                   >
                     {daySeconds > 0 ? formatDuration(daySeconds) : "—"}
@@ -214,19 +214,19 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
               0
             );
             return (
-              <div key={key} className="rounded-2xl border border-lineDark bg-white">
-                <div className="flex items-center justify-between border-b border-lineDark bg-cream px-5 py-3">
-                  <p className="text-sm font-medium text-appNavy">{formatDay(day)}</p>
-                  <span className="text-sm text-appNavy">
+              <div key={key} className="rounded-2xl border border-app-border bg-white">
+                <div className="flex items-center justify-between border-b border-app-border bg-app-surface-page px-5 py-3">
+                  <p className="text-sm font-medium text-app-text-primary">{formatDay(day)}</p>
+                  <span className="text-sm text-app-text-primary">
                     <span className="font-jbmono">{formatDuration(dayTotalSeconds)}</span>
                     {dayBillableSeconds !== dayClosedActualSeconds && (
-                      <span className="ms-2 text-[12px] text-gold-dim" data-testid="day-billable">
+                      <span className="ms-2 text-[12px] text-app-text-accent" data-testid="day-billable">
                         לחיוב <span className="font-jbmono">{formatDuration(dayBillableSeconds)}</span>
                       </span>
                     )}
                   </span>
                 </div>
-                <div className="divide-y divide-lineDark">
+                <div className="divide-y divide-app-border">
                   {dayEntries.map((entry) => (
                     <EntryRow
                       key={entry.id}
@@ -251,8 +251,8 @@ export default async function MyTimePage(props: { searchParams: Promise<{ week?:
             );
           })}
           {entries.length === 0 && (
-            <div className="rounded-2xl border border-lineDark bg-white p-8 text-center">
-              <p className="text-sm text-appNavy/50">אין עדיין דיווחים השבוע.</p>
+            <div className="rounded-2xl border border-app-border bg-white p-8 text-center">
+              <p className="text-sm text-app-text-tertiary">אין עדיין דיווחים השבוע.</p>
             </div>
           )}
         </div>

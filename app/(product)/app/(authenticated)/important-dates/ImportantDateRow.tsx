@@ -20,10 +20,10 @@ export type DateRow = {
 };
 
 const TONE_CLASSES: Record<DateRow["tone"], string> = {
-  red: "bg-error-soft text-error",
-  gold: "bg-warning-soft text-warning",
-  gray: "bg-neutral-soft text-neutral",
-  green: "bg-success-soft text-success",
+  red: "bg-app-error-soft text-app-error",
+  gold: "bg-app-warning-soft text-app-warning",
+  gray: "bg-app-neutral-soft text-app-text-secondary",
+  green: "bg-app-success-soft text-app-success",
 };
 
 // App redesign (handoff README, screen 7 "מועדים חשובים"): row = date
@@ -63,26 +63,26 @@ export function ImportantDateRow({ date, listQuery }: { date: DateRow; listQuery
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-lineDark bg-white p-4">
+    <div className="flex flex-wrap items-center gap-3.5 rounded-2xl border border-app-border bg-white p-4">
       <span className={`w-[46px] shrink-0 rounded-[10px] py-1.5 text-center ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
         <span className="block font-jbmono text-[17px]">{date.day}</span>
         <span className="block text-[10.5px]">{date.month}</span>
       </span>
       <div className="min-w-0 flex-1 basis-[220px]">
-        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} className="block truncate text-sm text-appNavy hover:text-gold-dim">
+        <Link href={withFrom(`/app/important-dates/${date.id}`, listQuery)} className="block truncate text-sm text-app-text-primary hover:text-app-text-accent">
           {date.title}
         </Link>
-        <p className="mt-0.5 truncate text-[11.5px] text-appNavy/50">{date.meta}</p>
+        <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">{date.meta}</p>
       </div>
       <span className={`rounded-full px-2.5 py-1 text-[11.5px] font-medium ${TONE_CLASSES[isHandled ? "green" : date.tone]}`}>
         {isHandled ? "טופל" : date.tag}
       </span>
-      <span className="text-[11.5px] text-appNavy/50">{date.remind}</span>
+      <span className="text-[11.5px] text-app-text-tertiary">{date.remind}</span>
       <button
         type="button"
         disabled={pending}
         onClick={() => changeStatus(isHandled ? date.previousStatus : "HANDLED_CURRENT")}
-        className="rounded-full border border-lineDark px-3.5 py-2 text-xs text-appNavy hover:border-gold disabled:opacity-50"
+        className="rounded-full border border-app-border px-3.5 py-2 text-xs text-app-text-primary hover:border-gold disabled:opacity-50"
       >
         {isHandled ? "פתיחה מחדש" : "סימון כטופל"}
       </button>

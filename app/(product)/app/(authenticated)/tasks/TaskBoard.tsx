@@ -47,8 +47,8 @@ const COLUMNS: { status: TaskStatus; label: string }[] = [
 const PRIORITY_DOT: Record<TaskPriority, string> = {
   LOW: "bg-transparent",
   NORMAL: "bg-transparent",
-  HIGH: "bg-warning",
-  URGENT: "bg-error",
+  HIGH: "bg-app-warning",
+  URGENT: "bg-app-error",
 };
 
 /// How many cards a column draws before it stops.
@@ -186,12 +186,12 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
             }}
             data-column={column.status}
             className={`flex w-[264px] shrink-0 flex-col rounded-2xl border p-2.5 transition-colors ${
-              over === column.status ? "border-appNavy bg-appNavy/[0.04]" : "border-lineDark bg-cream-dim/30"
+              over === column.status ? "border-appNavy bg-app-surface-sunken" : "border-app-border bg-cream-dim/30"
             }`}
           >
-            <h2 className="flex items-baseline gap-2 px-1.5 pb-2 text-[13px] font-medium text-appNavy">
+            <h2 className="flex items-baseline gap-2 px-1.5 pb-2 text-[13px] font-medium text-app-text-primary">
               {column.label}
-              <span className="font-jbmono text-[11px] text-appNavy/45">{rows.length}</span>
+              <span className="font-jbmono text-[11px] text-app-text-tertiary">{rows.length}</span>
             </h2>
 
             <div className="flex flex-col gap-2">
@@ -199,12 +199,12 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
                 <Card key={card.id} card={card} disabled={pending} />
               ))}
               {rows.length > shown.length && (
-                <p className="px-1.5 py-1 text-[12px] text-appNavy/45">
+                <p className="px-1.5 py-1 text-[12px] text-app-text-tertiary">
                   ועוד {rows.length - shown.length}. אפשר לצמצם עם החיפוש או עם מסנן הלקוח.
                 </p>
               )}
               {rows.length === 0 && (
-                <p className="px-1.5 py-3 text-[12px] text-appNavy/35">ריק</p>
+                <p className="px-1.5 py-3 text-[12px] text-app-text-tertiary">ריק</p>
               )}
             </div>
           </section>
@@ -227,7 +227,7 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         e.dataTransfer.effectAllowed = "move";
       }}
       data-task-card={card.id}
-      className="cursor-grab rounded-xl border border-lineDark bg-white p-3 active:cursor-grabbing"
+      className="cursor-grab rounded-xl border border-app-border bg-white p-3 active:cursor-grabbing"
     >
       <div className="flex items-start gap-2">
         {/* Only where it means something: NORMAL is most cards, and a dot
@@ -244,20 +244,20 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
           // `overflow-wrap: anywhere`: a title that is one long link
           // (a pasted Facebook URL, 26.9.2026) has no space to break at,
           // and ran out of its card across the next column.
-          className="min-w-0 flex-1 text-[13.5px] leading-snug text-appNavy [overflow-wrap:anywhere] hover:text-appNavy/70"
+          className="min-w-0 flex-1 text-[13.5px] leading-snug text-app-text-primary [overflow-wrap:anywhere] hover:text-app-text-secondary"
         >
           {card.title}
         </a>
       </div>
 
-      <p className="mt-1.5 truncate text-[12px] text-appNavy/50">{card.clientName}</p>
+      <p className="mt-1.5 truncate text-[12px] text-app-text-tertiary">{card.clientName}</p>
 
       {/* A line on the card, not a fifth column. A blocked task has not
           left the stage it is in - somebody is still on it, they are
           just waiting - and a column called "חסום" is where cards go to
           be forgotten. See the schema comment on Task.blockedOn. */}
       {card.blockedOn && (
-        <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-warning">
+        <p className="mt-1.5 flex items-center gap-1 text-[11.5px] text-app-warning">
           <Hourglass size={12} strokeWidth={1.8} />
           {waitingTitle(card.blockedOn, card.blockedSince)}
         </p>
@@ -267,10 +267,10 @@ function Card({ card, disabled }: { card: BoardCard; disabled: boolean }) {
         <div className="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[11.5px]">
           {/* Labelled, because there are two names on the card now and
               an unlabelled pair of names reads as two assignees. */}
-          {card.assignedToName && <span className="text-appNavy/55">אחראי: {card.assignedToName}</span>}
-          {card.supervisorName && <span className="text-appNavy/55">מפקח: {card.supervisorName}</span>}
+          {card.assignedToName && <span className="text-app-text-secondary">אחראי: {card.assignedToName}</span>}
+          {card.supervisorName && <span className="text-app-text-secondary">מפקח: {card.supervisorName}</span>}
           {card.dueDate && (
-            <span className={overdue ? "font-medium text-error" : "text-appNavy/45"}>
+            <span className={overdue ? "font-medium text-app-error" : "text-app-text-tertiary"}>
               {formatDue(card.dueDate)}
             </span>
           )}

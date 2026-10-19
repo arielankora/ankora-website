@@ -82,28 +82,28 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
         // it. An unapproved draft does not exist as far as this page is
         // concerned - which is the whole of the spec's first rule about
         // generated text, expressed as a query rather than as a promise.
-        <div className="rounded-[20px] border border-gold/28 bg-[#FBF7F0] p-6 sm:p-7">
-          <p className="text-[13.5px] leading-relaxed text-appNavy">{summary.draft}</p>
+        <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
+          <p className="text-[13.5px] leading-relaxed text-app-text-primary">{summary.draft}</p>
         </div>
       )}
 
-      <div className="rounded-2xl border border-lineDark bg-white p-5 sm:p-6">
+      <div className="rounded-2xl border border-app-border bg-white p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-[15px] font-medium text-appNavy">דוח {formatMonthTitle(referenceDate)}</p>
-            {report.autoSendLabel && <p className="mt-1.5 text-xs text-appNavy/60">{report.autoSendLabel}</p>}
+            <p className="text-[15px] font-medium text-app-text-primary">דוח {formatMonthTitle(referenceDate)}</p>
+            {report.autoSendLabel && <p className="mt-1.5 text-xs text-app-text-secondary">{report.autoSendLabel}</p>}
           </div>
           <div className="flex flex-wrap gap-2">
             <a
               href={`/app/portal/monthly?monthOffset=${monthOffset - 1}`}
-              className="rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy/70 hover:border-gold"
+              className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold"
             >
               חודש קודם
             </a>
             {monthOffset < 0 && (
               <a
                 href={`/app/portal/monthly?monthOffset=${monthOffset + 1}`}
-                className="rounded-full border border-lineDark px-4 py-2 text-sm text-appNavy/70 hover:border-gold"
+                className="rounded-full border border-app-border px-4 py-2 text-sm text-app-text-secondary hover:border-gold"
               >
                 חודש הבא
               </a>
@@ -113,25 +113,25 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl border border-lineDark p-3.5">
-            <span className="text-[11.5px] text-appNavy/55">שעות החודש</span>
-            <p className="mt-1.5 font-jbmono text-xl text-appNavy">{formatHours(report.totalMinutes)}</p>
+          <div className="rounded-xl border border-app-border p-3.5">
+            <span className="text-[11.5px] text-app-text-secondary">שעות החודש</span>
+            <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{formatHours(report.totalMinutes)}</p>
           </div>
-          <div className="rounded-xl border border-lineDark p-3.5">
-            <span className="text-[11.5px] text-appNavy/55">משימות שהושלמו</span>
-            <p className="mt-1.5 font-jbmono text-xl text-appNavy">{report.tasksCompleted}</p>
+          <div className="rounded-xl border border-app-border p-3.5">
+            <span className="text-[11.5px] text-app-text-secondary">משימות שהושלמו</span>
+            <p className="mt-1.5 font-jbmono text-xl text-app-text-primary">{report.tasksCompleted}</p>
           </div>
         </div>
       </div>
 
-      <p className="text-sm text-appNavy/60">
+      <p className="text-sm text-app-text-secondary">
         {formatDate(report.from)} - {formatDate(new Date(report.to.getTime() - 86_400_000))}
       </p>
 
-      <div className="overflow-x-auto rounded-2xl border border-lineDark bg-white">
+      <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
         <table className="w-full min-w-[640px] text-start text-sm">
           <thead>
-            <tr className="border-b border-lineDark text-xs text-appNavy/50">
+            <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">פעילות</th>
               <th className="px-5 py-3 font-medium">קטגוריה</th>
@@ -142,18 +142,18 @@ export default async function PortalMonthlyPage(props: { searchParams: Promise<{
           <tbody>
             {report.rows.length === 0 && (
               <tr>
-                <td colSpan={report.showEmployeeNames ? 5 : 4} className="px-5 py-8 text-center text-appNavy/50">
+                <td colSpan={report.showEmployeeNames ? 5 : 4} className="px-5 py-8 text-center text-app-text-tertiary">
                   אין עדיין דיווחים לחודש זה.
                 </td>
               </tr>
             )}
             {report.rows.map((row, i) => (
-              <tr key={i} className="border-b border-lineDark last:border-0">
-                <td className="px-5 py-3 text-appNavy/70">{row.date}</td>
-                <td className="px-5 py-3 text-appNavy/80">{row.activity}</td>
-                <td className="px-5 py-3 text-appNavy/70">{row.category}</td>
-                {report.showEmployeeNames && <td className="px-5 py-3 text-appNavy/70">{row.employee}</td>}
-                <td className="px-5 py-3 text-appNavy/70">{row.billableMinutes}</td>
+              <tr key={i} className="border-b border-app-border last:border-0">
+                <td className="px-5 py-3 text-app-text-secondary">{row.date}</td>
+                <td className="px-5 py-3 text-app-text-primary">{row.activity}</td>
+                <td className="px-5 py-3 text-app-text-secondary">{row.category}</td>
+                {report.showEmployeeNames && <td className="px-5 py-3 text-app-text-secondary">{row.employee}</td>}
+                <td className="px-5 py-3 text-app-text-secondary">{row.billableMinutes}</td>
               </tr>
             ))}
           </tbody>
