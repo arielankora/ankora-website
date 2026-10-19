@@ -119,6 +119,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge_proposal.approve": "אישור הצעה לתיק הלקוח",
   "knowledge_proposal.reject": "דחיית הצעה לתיק הלקוח",
   "knowledge_proposal.to_task": "הצעה לתיק הלקוח הפכה למשימה",
+  "brain_metrics.weekly_email": "נשלח מייל שבועי של מדדי התיק",
   "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",
   "request_type.remove": "הסרת סוג פנייה מתיק הלקוח",

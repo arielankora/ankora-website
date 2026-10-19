@@ -5,6 +5,11 @@ import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { BATCH_WINDOW_DAYS, COVERAGE_WINDOW_DAYS, RUNS_WINDOW_DAYS, metricsReport, type ClientMetricsInput } from "@/lib/brain-metrics";
+import { metricsSubject, renderMetricsEmail } from "@/lib/brain-metrics-email";
+import { sendEmail } from "@/lib/email";
+import { appBaseUrl } from "@/lib/email-templates";
+import { recordAudit } from "@/lib/app-auth/audit";
+import { localDateKey, TIMEZONE } from "@/lib/timezone";
 
 // Spec section 11, for managers: the measures of every client's file, read
 // from what the product already records. Nothing here is typed in.
@@ -65,4 +70,42 @@ export async function brainMetrics(actor: User, now = new Date()) {
     });
   }
   return metricsReport(inputs, now);
+}
+
+// ---------------------------------------------------------------------------
+// The weekly email (Ariel, 19.10.2026): the same measures, every Sunday
+// morning, to Ankora's admins. On the daily cron, so it goes out on the
+// first run of the week in Israel; a send is recorded, so a second run that
+// day, or a retry, does not send it twice.
+// ---------------------------------------------------------------------------
+
+export const WEEKLY_METRICS_ACTION = "brain_metrics.weekly_email";
+
+/// Sunday in Israel.
+export function isMetricsDay(now: Date): boolean {
+  const weekday = new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: TIMEZONE }).format(now);
+  return weekday === "Sun";
+}
+
+export async function sendWeeklyBrainMetrics(now = new Date(), options: { force?: boolean } = {}): Promise<{ sent: number; skipped?: string }> {
+  if (!options.force && !isMetricsDay(now)) return { sent: 0, skipped: "not Sunday" };
+  const admins = await prisma.user.findMany({ where: { role: "ANKORA_ADMIN", status: "ACTIVE", deletedAt: null }, orderBy: { createdAt: "asc" } });
+  const weekLabel = localDateKey(now, TIMEZONE).split("-").reverse().join(".");
+  const base = appBaseUrl();
+  let sent = 0;
+  for (const admin of admins) {
+    if (!admin.email) continue;
+    const already = await prisma.auditEvent.findFirst({
+      where: { action: WEEKLY_METRICS_ACTION, entityId: admin.id, createdAt: { gte: new Date(now.getTime() - 6 * DAY) } },
+      select: { id: true },
+    });
+    if (already) continue;
+    const report = await brainMetrics(admin, now);
+    const { html, text } = renderMetricsEmail(report, admin.name, base, weekLabel);
+    const result = await sendEmail({ to: [admin.email], subject: metricsSubject(report, weekLabel), text, html });
+    if (!result.ok) continue;
+    await recordAudit({ actorId: null, action: "brain_metrics.weekly_email", entityType: "User", entityId: admin.id, after: { week: weekLabel } });
+    sent++;
+  }
+  return { sent };
 }
