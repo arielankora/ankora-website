@@ -30,11 +30,11 @@ export function TopBarBack() {
 /// it in the page where there is no top bar (a phone) or not yet (before
 /// hydration).
 export function PageBack({ href, label, testId }: { href: string; label: string; testId?: string }) {
-  const { setBack } = useContext(BackContext);
-  const [registered, setRegistered] = useState(false);
+  const { back, setBack } = useContext(BackContext);
+  // Registered once the top bar holds this very link: derived, not stored.
+  const registered = back?.href === href && back?.label === label;
   useEffect(() => {
     setBack({ href, label, testId });
-    setRegistered(true);
     return () => setBack(null);
   }, [href, label, testId, setBack]);
   return (
