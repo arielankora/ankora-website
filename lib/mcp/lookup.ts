@@ -89,10 +89,14 @@ export async function usableCategories(clientId: string) {
   const all = await listCategories();
   return all
     .filter((c: CategoryRow) => c.active && (c.visibility === "GLOBAL" || c.clientId === clientId))
-    .map((c: CategoryRow) => ({
+    .map((c: CategoryRow & { description?: string | null }) => ({
       id: c.id,
       name: c.name,
       scope: c.visibility === "GLOBAL" ? "all clients" : "this client",
+      // What goes there, in the admin's words (19.10.2026). A name like
+      // "תקשורת מול הלקוח" says little on a client whose own work is
+      // building the product; the description is what tells them apart.
+      ...(c.description?.trim() ? { description: c.description.trim() } : {}),
     }));
 }
 
@@ -119,7 +123,7 @@ export async function autoPickCategory(actor: User, clientId: string, text: stri
   const accessible: Named[] = await listAccessibleClients(actor);
   const since = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000);
 
-  const [tasks, notes, usage] = await Promise.all([
+  const [tasks, notes, usage, taskUsage] = await Promise.all([
     prisma.task.findMany({
       where: {
         deletedAt: null,
@@ -142,15 +146,24 @@ export async function autoPickCategory(actor: User, clientId: string, text: stri
       where: { deletedAt: null, clientId, startAt: { gte: since } },
       _count: { _all: true },
     }),
+    // Tasks count too (19.10.2026): on a client where most work is not
+    // timed, such as the internal one, time alone made a fallback of a
+    // category a handful of entries happened to use.
+    prisma.task.groupBy({
+      by: ["categoryId"],
+      where: { deletedAt: null, parentId: null, clientId, categoryId: { in: usableIds }, createdAt: { gte: since } },
+      _count: { _all: true },
+    }),
   ]);
 
   const history: PickHistory[] = [
     ...tasks.map((t: { categoryId: string | null; title: string }) => ({ categoryId: t.categoryId as string, text: t.title })),
     ...notes.map((n: { categoryId: string; note: string | null }) => ({ categoryId: n.categoryId, text: n.note ?? "" })),
   ];
-  const clientUsage = new Map<string, number>(
-    usage.map((u: { categoryId: string; _count: { _all: number } }) => [u.categoryId, u._count._all])
-  );
+  const clientUsage = new Map<string, number>();
+  for (const u of [...usage, ...taskUsage] as { categoryId: string | null; _count: { _all: number } }[]) {
+    if (u.categoryId) clientUsage.set(u.categoryId, (clientUsage.get(u.categoryId) ?? 0) + u._count._all);
+  }
 
   return pickCategory({ text, candidates, history, clientUsage });
 }

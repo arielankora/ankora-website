@@ -32,6 +32,11 @@ export type CategoryPick = {
   id: string;
   name: string;
   basis: PickBasis;
+  /// "low" when the words did not single out one category: nothing
+  /// matched, or two categories matched about equally (19.10.2026). The
+  /// task still gets a category, because a timer cannot run without one,
+  /// but the answer tells the user to check it.
+  confidence: "high" | "low";
   /// The earlier item that tipped it, when basis is "similar".
   example?: string;
 };
@@ -43,6 +48,11 @@ const HEBREW_FINALS: Record<string, string> = { ך: "כ", ם: "מ", ן: "נ", ף
 const STOPWORDS = new Set([
   "על", "של", "את", "עם", "אל", "לא", "כל", "גם", "או", "אם", "זה", "זו", "מה", "יש", "אין", "עד",
   "לגבי", "בנושא", "צריך", "צריכה", "לבדוק", "בדיקה", "לטפל", "טיפול", "משימה", "חדש", "חדשה",
+  // Verbs of deciding and doing, and "מעבר" (a review, a move, a
+  // migration): they say what is being done, not what kind of work it is.
+  // "מעבר" alone filed a repo migration under "מעבר וארגון על מייל
+  // ארגוני" on 15.10.2026, because two category names contain it.
+  "להחליט", "לבצע", "לעשות", "לסיים", "להמשיך", "לקדם", "לוודא", "מעבר",
   "the", "a", "an", "of", "to", "and", "for", "in", "on", "with", "check", "task", "new",
 ]);
 
@@ -62,7 +72,7 @@ export function tokenize(text: string): string[][] {
   const out: string[][] = [];
   const seen = new Set<string>();
   for (const word of clean.split(" ")) {
-    if (word.length < 2 || STOPWORDS.has(word) || seen.has(word)) continue;
+    if (word.length < 2 || seen.has(word)) continue;
     seen.add(word);
     const forms = [word];
     if (word.length >= 4 && PREFIXES.has(word[0])) {
@@ -71,6 +81,8 @@ export function tokenize(text: string): string[][] {
     } else if (word.length >= 3 && word[0] === "ו" && /^[a-z]/.test(word.slice(1))) {
       forms.push(word.slice(1)); // "וhr"
     }
+    // A filler word stays filler behind a prefix: "ולבצע", "המעבר".
+    if (forms.some((f) => STOPWORDS.has(f))) continue;
     out.push(forms);
   }
   return out;
@@ -127,8 +139,8 @@ export function pickCategory(input: {
     byCategory.set(h.categoryId, list);
   }
 
-  let best: { c: PickCandidate; total: number; name: number; similar: number; example?: string; usage: number } | null =
-    null;
+  type Scored = { c: PickCandidate; total: number; evidence: number; name: number; similar: number; example?: string; usage: number };
+  const scored: Scored[] = [];
 
   for (const c of candidates) {
     // The category's own name is the strongest evidence; its description
@@ -141,13 +153,13 @@ export function pickCategory(input: {
     let similar = 0;
     let example: string | undefined;
     if (words.length) {
-      const scored = (byCategory.get(c.id) ?? [])
+      const closest = (byCategory.get(c.id) ?? [])
         .map((h) => ({ text: h.text, s: h.tokens.length ? overlap(words, h.tokens) / Math.min(words.length, h.tokens.length) : 0 }))
         .filter((h) => h.s > 0)
         .sort((a, b) => b.s - a.s)
         .slice(0, 3);
-      similar = 3 * scored.reduce((sum, h) => sum + h.s, 0);
-      example = scored[0]?.text;
+      similar = 3 * closest.reduce((sum, h) => sum + h.s, 0);
+      example = closest[0]?.text;
     }
 
     // What this client's work usually is: a tie-breaker, never more than
@@ -155,21 +167,55 @@ export function pickCategory(input: {
     const used = usage.get(c.id) ?? 0;
     const prior = maxUsage > 0 ? Math.log1p(used) / Math.log1p(maxUsage) : 0;
 
-    const total = name + similar + prior;
-    if (!best || total > best.total) best = { c, total, name, similar, example, usage: used };
+    scored.push({ c, total: name + similar + prior, evidence: name + similar, name, similar, example, usage: used });
   }
 
-  if (!best) return null;
+  // How sure the words are (19.10.2026, Ariel). Before this, the highest
+  // score won however thin it was: one shared word in two category names
+  // was enough, and the tie went to whichever came first in the list.
+  // Now the words have to single out one category: enough evidence, and
+  // a clear lead over the runner-up. When they do not, the task still
+  // gets a category (a timer cannot run without one), chosen by what this
+  // client's work usually is, and the pick says it is a low-confidence
+  // one so the user is told to check it.
+  const topEvidence = Math.max(...scored.map((s) => s.evidence));
+  const contenders = topEvidence > 0 ? scored.filter((s) => topEvidence - s.evidence < LEAD) : [];
+  const confident = topEvidence >= MIN_EVIDENCE && contenders.length === 1;
+
+  const byUsage = (a: Scored, b: Scored) => b.usage - a.usage; // stable: list order breaks ties
+  const best = confident
+    ? contenders[0]
+    : contenders.length > 0
+      ? [...contenders].sort(byUsage)[0]
+      : [...scored].sort(byUsage)[0];
+
   const { c } = best;
-  if (best.name > 0) return { id: c.id, name: c.name, basis: "title" };
-  if (best.similar > 0) return { id: c.id, name: c.name, basis: "similar", example: best.example };
-  if (best.usage > 0) return { id: c.id, name: c.name, basis: "client-usage" };
-  return { id: c.id, name: c.name, basis: "default" };
+  const confidence = confident ? "high" : "low";
+  if (best.name > 0) return { id: c.id, name: c.name, basis: "title", confidence };
+  if (best.similar > 0) return { id: c.id, name: c.name, basis: "similar", example: best.example, confidence };
+  if (best.usage > 0) return { id: c.id, name: c.name, basis: "client-usage", confidence };
+  return { id: c.id, name: c.name, basis: "default", confidence };
 }
+
+/// One word of a category's description scores 2, of its name 5; one
+/// closely similar earlier task scores up to 3. Less than one
+/// description word is not evidence.
+const MIN_EVIDENCE = 2;
+
+/// The winner has to lead the runner-up by at least this much. Two
+/// categories that each match one word of the task are a tie, not a pick.
+const LEAD = 2;
 
 /// One line for the tool's answer, in English like the rest of the tool
 /// surface; the model says it to the user in their language.
 export function describePick(pick: CategoryPick): string {
+  const line = describeBasis(pick);
+  return pick.confidence === "low"
+    ? `${line} Low confidence: tell the user plainly that this category is a guess and ask them to check it.`
+    : line;
+}
+
+function describeBasis(pick: CategoryPick): string {
   switch (pick.basis) {
     case "title":
       return `Chosen automatically: the task's wording matches "${pick.name}".`;

@@ -717,7 +717,7 @@ describe("create_decision linked by task id", () => {
 // 15.10.2026 (Ariel): a task opened through Claude without a category
 // could not be timed. Ankora now picks one, says which, and links the task.
 describe("a task always gets a category", () => {
-  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const };
+  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const, confidence: "high" as const };
 
   it("create_task picks one when the user named none, and says it was automatic", async () => {
     lookup.autoPickCategory.mockResolvedValueOnce(PICK);
@@ -729,6 +729,31 @@ describe("a task always gets a category", () => {
     expect(out.categoryAutoPicked).toBe(true);
     expect(out.categoryNote).toContain("Chosen automatically");
     expect(out.url).toBe("https://www.ankora.co.il/app/tasks/t-new");
+  });
+
+  // 19.10.2026 (Ariel): words filed product work under operational
+  // categories. The model gets the alternatives, with what each is for,
+  // so it can correct a poor pick without a listing call first.
+  it("create_task returns the other categories next to an automatic pick", async () => {
+    lookup.autoPickCategory.mockResolvedValueOnce({ ...PICK, confidence: "low" });
+    lookup.usableCategories.mockResolvedValueOnce([
+      { id: "cat-bank", name: "בנקאות ותשלומים", scope: "all clients" },
+      { id: "cat-product", name: "פיתוח מוצר", scope: "this client", description: "בנייה ושינוי של יכולות" },
+      { id: "cat-client", name: "תקשורת מול הלקוח", scope: "all clients" },
+    ]);
+    const out = await call("create_task", { client: "NUX", title: "להגדיר את מבנה תיק הלקוח" });
+
+    expect(lookup.usableCategories).toHaveBeenCalledWith("c-nux");
+    expect(out.categoryOptions).toEqual([
+      { name: "פיתוח מוצר", description: "בנייה ושינוי של יכולות" },
+      { name: "תקשורת מול הלקוח" },
+    ]);
+  });
+
+  it("create_task with a named category returns no options", async () => {
+    lookup.lookupCategory.mockResolvedValueOnce({ ok: true, value: { id: "cat-hr", name: "גיוס וhr" } });
+    const out = await call("create_task", { client: "NUX", title: "x", category: "גיוס" });
+    expect(out).not.toHaveProperty("categoryOptions");
   });
 
   it("create_task uses the named category and does not second-guess it", async () => {
@@ -752,6 +777,8 @@ describe("a task always gets a category", () => {
     const description = tools.get("create_task")!.config.description as string;
     expect(description).toContain("do not ask them for it");
     expect(description).toContain("`url`");
+    expect(description).toContain("`categoryOptions`");
+    expect(description).toContain("low confidence");
   });
 
   describe("update_task", () => {

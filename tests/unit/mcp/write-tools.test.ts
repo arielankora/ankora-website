@@ -652,7 +652,7 @@ describe("no tool tells the model to call another one first", () => {
 // 15.10.2026 (Ariel): a timer or an entry on a task takes the task's own
 // category, so "start a timer on X" needs nothing more.
 describe("time against a task takes the task's category", () => {
-  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const };
+  const PICK = { id: "cat-bank", name: "בנקאות ותשלומים", basis: "title" as const, confidence: "high" as const };
   const start = (args: Record<string, unknown>) => tools.get("start_timer")!.handler(args, CTX).then(payload);
 
   beforeEach(() => {
