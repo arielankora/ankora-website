@@ -1760,8 +1760,43 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-10-07"
+    },
+    "action:(product)/app/(authenticated)/calendar/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-19"
+    },
+    "domain:calendar": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-19"
+    },
+    "domain:calendar-occurrences": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-19"
+    },
+    "domain:code-backup": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-19"
+    },
+    "screen:/app/calendar": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-10-19"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-18"
+  "lastScan": "2026-10-19"
 }

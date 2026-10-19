@@ -402,6 +402,21 @@ async function main() {
     },
   });
 
+  // The calendar spec's own task, for the same reason as the board's: a
+  // task whose due date the spec moves is a task nothing else may move.
+  // Starts with no due date, so it begins in the side panel.
+  await prisma.task.upsert({
+    where: { id: "demo-task-calendar-fixture" },
+    update: {},
+    create: {
+      id: "demo-task-calendar-fixture",
+      clientId: clientB.id,
+      title: "[DEMO] תיאום טכנאי למזגן",
+      status: "OPEN",
+      priority: "NORMAL",
+    },
+  });
+
   await prisma.task.upsert({
     where: { id: "demo-task-old-proposal" },
     update: {},

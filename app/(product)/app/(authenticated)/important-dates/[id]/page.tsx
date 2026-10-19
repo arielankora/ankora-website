@@ -17,6 +17,7 @@ import { ImportantDateStatusSelect } from "../ImportantDateStatusSelect";
 import { snoozeImportantDateAction, deleteImportantDateAction } from "../actions";
 import type { ImportantDateStatus } from "@prisma/client";
 import { lockedCalendarFor } from "@/lib/app-domain/date-calendars";
+import { calendarBackHref } from "@/lib/calendar-keys";
 import { BUSINESS_CALENDAR_LABELS, calendarSourceLine, isBusinessCalendarKey } from "@/lib/business-calendar";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -35,8 +36,15 @@ function formatDate(date: Date | null): string {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-export default async function ImportantDateDetailPage(props: { params: Promise<{ id: string }> }) {
+export default async function ImportantDateDetailPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string | string[] }>;
+}) {
   const params = await props.params;
+  // 19.10.2026: a date opened from the calendar goes back to it, with the
+  // same view and filters. See lib/calendar-keys.ts.
+  const rawFrom = (await props.searchParams).from;
+  const calendarBack = calendarBackHref(typeof rawFrom === "string" ? rawFrom : undefined);
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) {
@@ -67,8 +75,8 @@ export default async function ImportantDateDetailPage(props: { params: Promise<{
     <>
       <div className="space-y-6">
         <div>
-          <Link href="/app/important-dates" className="text-xs text-appNavy/50 hover:text-gold-dim">
-            ← חזרה למועדים חשובים
+          <Link href={calendarBack ?? "/app/important-dates"} className="text-xs text-appNavy/50 hover:text-gold-dim">
+            {calendarBack ? "← חזרה ליומן" : "← חזרה למועדים חשובים"}
           </Link>
           <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
             <div>

@@ -14,6 +14,12 @@
 // Only the list's own keys survive the trip. `from` is read off the
 // address bar, so it is treated as input: anything else is dropped, and
 // the result is always a path under /app/tasks, never somewhere else.
+//
+// 19.10.2026: or under /app/calendar. A task opened from the calendar
+// carries `from=calendar:<its query>` (see lib/calendar-keys.ts), and
+// "back" returns to the same view, day and filters.
+
+import { calendarBackHref, CALENDAR_FROM_PREFIX, cleanCalendarQuery } from "@/lib/calendar-keys";
 
 /// Every key the tasks list reads. A filter added to page.tsx that is
 /// not listed here is simply not carried back, which is the safe way to
@@ -51,6 +57,8 @@ export function taskHref(id: string, listQuery?: string | null): string {
 /// when there is none or nothing in it survives.
 export function tasksListHref(from?: string | null): string {
   if (!from) return "/app/tasks";
+  const calendar = calendarBackHref(from);
+  if (calendar) return calendar;
   const query = clean(new URLSearchParams(from));
   return query ? `/app/tasks?${query}` : "/app/tasks";
 }
@@ -58,5 +66,13 @@ export function tasksListHref(from?: string | null): string {
 /// The `from` to hand on from a task screen to the next task it links
 /// to (a step), so the way back still leads to the same list.
 export function carriedListQuery(from?: string | null): string {
+  if (from && from.startsWith(CALENDAR_FROM_PREFIX)) {
+    return `${CALENDAR_FROM_PREFIX}${cleanCalendarQuery(from.slice(CALENDAR_FROM_PREFIX.length))}`;
+  }
   return from ? clean(new URLSearchParams(from)) : "";
+}
+
+/// The words on the way back: the calendar or the list.
+export function backLabel(from?: string | null): string {
+  return calendarBackHref(from) ? "חזרה ליומן" : "חזרה למשימות";
 }

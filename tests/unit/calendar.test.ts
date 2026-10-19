@@ -11,6 +11,8 @@ import {
 import { occurrencesInRange, type OccurrenceRow } from "@/lib/app-domain/calendar-occurrences";
 import { computeHolidayOccurrencesForYear } from "@/lib/app-domain/important-dates-holidays";
 import { localDateKey } from "@/lib/timezone";
+import { backLabel, carriedListQuery, tasksListHref } from "@/app/(product)/app/(authenticated)/tasks/list-query";
+import { calendarBackHref, calendarFrom } from "@/lib/calendar-keys";
 
 // 19.10.2026, the calendar screen. No Prisma here: calendar-keys.ts is
 // plain key arithmetic and calendar-occurrences.ts only walks the
@@ -148,5 +150,29 @@ describe("occurrencesInRange", () => {
 
   it("an unknown holiday key yields nothing rather than throwing", () => {
     expect(occurrencesInRange({ ...base, source: "HOLIDAY" as const, holidayKey: "no-such-holiday" }, "2026-01-01", "2026-12-31")).toEqual([]);
+  });
+});
+
+describe("the way back to the calendar", () => {
+  const from = calendarFrom("view=month&date=2026-11-01&show=tasks&mine=0");
+
+  it("a task opened from the calendar goes back to the same calendar", () => {
+    expect(tasksListHref(from)).toBe("/app/calendar?view=month&date=2026-11-01&show=tasks&mine=0");
+    expect(backLabel(from)).toBe("חזרה ליומן");
+  });
+
+  it("a step opened from that task still leads back to the calendar", () => {
+    expect(tasksListHref(carriedListQuery(from))).toBe("/app/calendar?view=month&date=2026-11-01&show=tasks&mine=0");
+  });
+
+  it("only the calendar's own keys survive, and the path is always the calendar", () => {
+    expect(calendarBackHref("calendar:view=day&next=https://evil.example&q=x")).toBe("/app/calendar?view=day");
+    expect(calendarBackHref("calendar:")).toBe("/app/calendar");
+  });
+
+  it("a list `from` is untouched", () => {
+    expect(tasksListHref("status=DONE")).toBe("/app/tasks?status=DONE");
+    expect(backLabel("status=DONE")).toBe("חזרה למשימות");
+    expect(calendarBackHref("status=DONE")).toBeNull();
   });
 });

@@ -58,6 +58,9 @@ function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
   // Tasks screen - same gate as Timer/My Time (see lib/app-domain/tasks.ts
   // for why no dedicated permission exists).
   if (can(role, "time_entry.create_self")) items.push({ href: "/app/tasks", label: "משימות", group: "העבודה שלי" });
+  // 19.10.2026: the calendar. Tasks by due date and important dates by
+  // occurrence, on one screen. Same gate as the two it shows.
+  if (can(role, "time_entry.create_self")) items.push({ href: "/app/calendar", label: "יומן", group: "העבודה שלי" });
   // "בפיקוח שלי" had its own row here from tasks phase 2 until
   // 15.10.2026 (Ariel): the tasks screen's "בפיקוח" shows the same work,
   // and two places for one list is one too many. What the row carried

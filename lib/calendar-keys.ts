@@ -141,3 +141,34 @@ export function calendarHref(state: CalendarState, today: string): string {
   const qs = p.toString();
   return qs ? `/app/calendar?${qs}` : "/app/calendar";
 }
+
+/// The calendar's own keys, the only ones carried in a `from` link.
+export const CALENDAR_QUERY_KEYS = ["view", "date", "show", "clientId", "mine"] as const;
+
+/// Prefix of a `from` value that points back at the calendar rather than
+/// at the tasks list. See list-query.ts.
+export const CALENDAR_FROM_PREFIX = "calendar:";
+
+/// The calendar's current query, cleaned to its own keys. Treated as
+/// input: it comes back off the address bar of the next screen.
+export function cleanCalendarQuery(query: string): string {
+  const input = new URLSearchParams(query);
+  const out = new URLSearchParams();
+  for (const key of CALENDAR_QUERY_KEYS) {
+    const value = input.get(key);
+    if (value && value.length <= 200) out.set(key, value);
+  }
+  return out.toString();
+}
+
+/// `from` for a link the calendar hands out.
+export function calendarFrom(query: string): string {
+  return `${CALENDAR_FROM_PREFIX}${cleanCalendarQuery(query)}`;
+}
+
+/// The calendar's address from such a `from`, or null when it is not one.
+export function calendarBackHref(from?: string | null): string | null {
+  if (!from || !from.startsWith(CALENDAR_FROM_PREFIX)) return null;
+  const query = cleanCalendarQuery(from.slice(CALENDAR_FROM_PREFIX.length));
+  return query ? `/app/calendar?${query}` : "/app/calendar";
+}
