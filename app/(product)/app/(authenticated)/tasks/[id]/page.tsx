@@ -1,5 +1,5 @@
 import { ArrowRight, ChevronLeft } from "lucide-react";
-import { carriedListQuery, tasksListHref } from "../list-query";
+import { backLabel, carriedListQuery, tasksListHref } from "../list-query";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
@@ -73,6 +73,7 @@ export default async function TaskDetailPage(props: {
   const from = typeof rawFrom === "string" ? rawFrom : undefined;
   const backHref = tasksListHref(from);
   const listQuery = carriedListQuery(from);
+  const backText = backLabel(from);
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
@@ -88,7 +89,7 @@ export default async function TaskDetailPage(props: {
         title="המשימה לא נמצאה"
         description="ייתכן שהמשימה נמחקה, או שהיא שייכת ללקוח שאינו משויך אליך."
         backHref={backHref}
-        backLabel="חזרה למשימות"
+        backLabel={backText}
       />
     );
   }
@@ -185,7 +186,7 @@ export default async function TaskDetailPage(props: {
           className="inline-flex items-center gap-1.5 rounded-full border border-lineDark bg-white px-3 py-1.5 font-medium text-appNavy/70 transition-colors hover:border-appNavy/30 hover:text-appNavy"
         >
           <ArrowRight size={14} />
-          חזרה למשימות
+          {backText}
         </a>
         <ChevronLeft size={14} className="text-appNavy/30" />
         <span className="truncate text-appNavy/70">{task.client.name}</span>

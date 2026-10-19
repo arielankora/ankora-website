@@ -110,6 +110,12 @@ export type TaskFilters = {
   assignedToId?: string;
   /// Only tasks that HAVE a due date, at or before this instant.
   dueBefore?: Date;
+  /// 19.10.2026, the calendar: only tasks due at or after this instant.
+  /// Combines with `dueBefore` into a range.
+  dueFrom?: Date;
+  /// The calendar's side panel: only tasks with NO due date. Wins over
+  /// `dueBefore` and `dueFrom`, since the two cannot both hold.
+  noDueDate?: boolean;
   /// Only tasks with no assignee. Cannot be combined with assignedToId.
   unassigned?: boolean;
   /// Tasks phase 1: only work at this priority or above. A single floor
@@ -186,6 +192,18 @@ function searchWhere(q: string) {
 /// comparison - an enum has no > operator Prisma will write for us.
 const PRIORITY_ORDER: TaskPriority[] = ["LOW", "NORMAL", "HIGH", "URGENT"];
 
+/// The due-date part of `listTasks`' query. `null` asks Prisma for
+/// "no due date"; `undefined` leaves the column out.
+function dueDateWhere(filters: TaskFilters) {
+  if (filters.noDueDate) return null;
+  if (!filters.dueBefore && !filters.dueFrom) return undefined;
+  return {
+    not: null,
+    ...(filters.dueFrom ? { gte: filters.dueFrom } : {}),
+    ...(filters.dueBefore ? { lte: filters.dueBefore } : {}),
+  };
+}
+
 function priorityAtLeast(floor: TaskPriority): TaskPriority[] {
   return PRIORITY_ORDER.slice(PRIORITY_ORDER.indexOf(floor));
 }
@@ -221,7 +239,7 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // `not: null` is not redundant next to `lte`: without it a task with
       // no due date would be excluded anyway, but stating it keeps the
       // intent readable and survives someone adding an `OR` here later.
-      dueDate: filters.dueBefore ? { not: null, lte: filters.dueBefore } : undefined,
+      dueDate: dueDateWhere(filters),
       priority: filters.minPriority ? { in: priorityAtLeast(filters.minPriority) } : undefined,
       supervisorId: filters.supervisorId || undefined,
       // Steps only when asked for them by name; otherwise none at all.
