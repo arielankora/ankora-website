@@ -8,7 +8,6 @@ import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
 import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel } from "@/lib/advance-prompt";
-import { isMappingTask } from "@/lib/procedure-to-file";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
 // into the prompt. One extra read, the decisions filed against the task;
@@ -129,7 +128,8 @@ export async function advancePromptFor(
     plan: plan
       ? { version: plan.version, approved: plan.status === "APPROVED", body: plan.body, steps: plan.steps }
       : null,
-    mapping: isMappingTask(task.description),
+    // The task's own flag, the same one the closing check reads.
+    mapping: task.mappingTask && !task.parentId,
     requestedBy: actor.name,
     todayLabel: day.format(new Date()),
   });

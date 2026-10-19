@@ -2,7 +2,6 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { TaskStatus } from "@prisma/client";
 import {
-  isMappingTask,
   looksLikeProcedure,
   procedureReminderKind,
   reminderForClaude,
@@ -36,7 +35,7 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
 
   const task = await prisma.task.findUnique({
     where: { id: taskId },
-    select: { id: true, clientId: true, parentId: true, description: true, mappingTask: true },
+    select: { id: true, clientId: true, parentId: true, mappingTask: true },
   });
   // Steps are checklist lines; the task above them is what gets filed.
   if (!task || task.parentId) return null;
@@ -52,9 +51,11 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
   const namedProcedureDocumentIds = documents
     .filter((d) => d.kind !== "PROCEDURE" && looksLikeProcedure(d.title))
     .map((d) => d.id);
-  // The flag, and the description line for a task the flag has not
-  // reached yet (one written straight to the database, say).
-  const isMapping = task.mappingTask || isMappingTask(task.description);
+  // The flag alone (20.10.2026). The description line only sets it, when
+  // a task is created or its description rewritten; reading the line here
+  // as well meant that switching the flag off on the task screen changed
+  // nothing while the line was still in the description.
+  const isMapping = task.mappingTask;
   // Nothing to look for: skip the register entirely, which is the common
   // case for an ordinary task closing.
   if (procedureDocumentIds.length === 0 && namedProcedureDocumentIds.length === 0 && !isMapping) return null;

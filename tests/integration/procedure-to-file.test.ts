@@ -130,4 +130,17 @@ describe("procedureReminderFor()", () => {
     const off = await updateTask(user, task.id, { mappingTask: false });
     expect(off.mappingTask).toBe(false);
   });
+
+  it("the flag decides: switched off, a task whose description still has the line is quiet (20.10.2026)", async () => {
+    const { user, task } = await setup("**HND-032** | שלב: מיפוי וצפייה");
+    expect((await procedureReminderFor(task.id, "DONE"))?.kind).toBe("MAPPING");
+    await updateTask(user, task.id, { mappingTask: false });
+    expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
+  });
+
+  it("a description that only quotes the stage does not mark the task", async () => {
+    const { task } = await setup('הזיהוי מתבסס על השורה "שלב: מיפוי וצפייה" בתיאור.');
+    expect(task.mappingTask).toBe(false);
+    expect(await procedureReminderFor(task.id, "DONE")).toBeNull();
+  });
 });

@@ -24,7 +24,10 @@
 /// flag (Task.mappingTask), and this only marks it when it is created or
 /// its description is rewritten. Narrow on purpose: the stage name itself,
 /// after "שלב:", and not any task that mentions mapping in its title.
-const MAPPING_STAGE = /שלב:\s*מיפוי\s+וצפייה/;
+// 20.10.2026: the field the handover line is made of, "| שלב: ...", and
+// not the words alone. A task that only quotes the stage, in a sentence
+// explaining it, was marked as mapping by the looser pattern.
+const MAPPING_STAGE = /\|\s*שלב:\s*מיפוי\s+וצפייה/;
 
 export function isMappingTask(description: string | null | undefined): boolean {
   return !!description && MAPPING_STAGE.test(description);
