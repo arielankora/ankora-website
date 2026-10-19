@@ -78,8 +78,13 @@ describe("pickCategory", () => {
 
 describe("describePick", () => {
   it("says why, in one line", () => {
-    expect(describePick({ id: "q", name: "הצעת מחיר", basis: "title" })).toContain("הצעת מחיר");
-    expect(describePick({ id: "q", name: "x", basis: "similar", example: "y" })).toContain('"y"');
+    expect(describePick({ id: "q", name: "הצעת מחיר", basis: "title", confidence: "high" })).toContain("הצעת מחיר");
+    expect(describePick({ id: "q", name: "x", basis: "similar", example: "y", confidence: "high" })).toContain('"y"');
+  });
+
+  it("asks the user to check a low-confidence pick, and only then", () => {
+    expect(describePick({ id: "q", name: "x", basis: "client-usage", confidence: "low" })).toContain("Low confidence");
+    expect(describePick({ id: "q", name: "x", basis: "title", confidence: "high" })).not.toContain("Low confidence");
   });
 });
 
@@ -98,5 +103,74 @@ describe("demo categories", () => {
   it("are recognised by their prefix", () => {
     expect(isDemoName("[DEMO] x")).toBe(true);
     expect(isDemoName("DEMO x")).toBe(false);
+  });
+});
+
+// 19.10.2026 (Ariel): a pick has to be earned. One shared word in two
+// category names used to win on list order; now it is a low-confidence
+// pick, and the internal client has categories for development and
+// infrastructure work, described so that the picker can find them.
+describe("confidence", () => {
+  const INTERNAL = [
+    ...CATS,
+    { id: "mail", name: "מעבר וארגון על מייל ארגוני" },
+    { id: "review", name: "מעבר על משימות ומענה" },
+    { id: "staff", name: "מענה וטיפול - עובדים" },
+    { id: "client", name: "תקשורת מול הלקוח" },
+    { id: "handover", name: "חפיפה" },
+    {
+      id: "product",
+      name: "פיתוח מוצר",
+      description:
+        "בנייה ושינוי של יכולות שמשתמשים מקבלים: מסכים, פיצ'רים, דוחות, כלים וחיבורים חדשים באפליקציה ובמחבר ה-MCP, כולל תיקון באגים ביכולת קיימת.",
+    },
+    {
+      id: "infra",
+      name: "תשתית ואבטחה",
+      description:
+        "שמירה על הבסיס יציב ומאובטח: סקירות אבטחה, הרשאות וטוקנים, גיבויים, שדרוגי גרסאות ותלויות, ריפו, דומיין ושרתים, ניטור והרצת בדיקות רגרסיה.",
+    },
+  ];
+  const internal = (text: string, extra: Partial<Parameters<typeof pickCategory>[0]> = {}) =>
+    pickCategory({ text, candidates: INTERNAL, ...extra });
+
+  it("no longer files a repo migration under organisational email", () => {
+    const out = internal("להחליט ולבצע: מעבר ankora-website לריפו פרטי");
+    expect(out).toMatchObject({ id: "infra", confidence: "high" });
+  });
+
+  it("reads 'מעבר' as filler behind a prefix too", () => {
+    expect(tokenize("המעבר ולבצע").length).toBe(0);
+  });
+
+  it("finds infrastructure work by its description", () => {
+    expect(internal("גיבוי למערכת קלוד")).toMatchObject({ id: "infra", confidence: "high" });
+    expect(internal("טיפול בנושאי אבטחה")).toMatchObject({ id: "infra" });
+    expect(internal("לבדוק אם לרכוש את הדומיין ankora360.com")).toMatchObject({ id: "infra" });
+  });
+
+  it("finds product work by its description", () => {
+    expect(internal("סידור ה-UI של האפליקציה: ניווט חזרה, תפריט צד וצבעים")).toMatchObject({ id: "product" });
+    expect(internal('פיתוח יכולת "נהלי עבודה" ברמת לקוח')).toMatchObject({ id: "product" });
+  });
+
+  it("calls a tie between two names low confidence, and breaks it by usage", () => {
+    const clientUsage = new Map([["orders", 12], ["files", 2]]);
+    expect(pick("תיוק הזמנות", { clientUsage })).toMatchObject({ id: "orders", confidence: "low" });
+    expect(pick("תיוק הזמנות")).toMatchObject({ id: "orders", confidence: "low" });
+  });
+
+  it("calls a pick with no evidence low confidence", () => {
+    const clientUsage = new Map([["product", 9], ["handover", 4]]);
+    expect(internal("שיחה עם יוסי", { clientUsage })).toMatchObject({
+      id: "product",
+      basis: "client-usage",
+      confidence: "low",
+    });
+  });
+
+  it("keeps a clear match high confidence", () => {
+    expect(pick("להכין הצעת מחיר לספק")).toMatchObject({ id: "quote", confidence: "high" });
+    expect(pick("תשלום לספק דרך הבנק")).toMatchObject({ id: "bank", confidence: "high" });
   });
 });

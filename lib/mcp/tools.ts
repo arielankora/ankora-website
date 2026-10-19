@@ -139,6 +139,20 @@ type EntryCategory =
   | { ok: true; id: string; name: string; from: "named" | "task" | "auto"; pick: CategoryPick | null; taskUpdated: boolean }
   | { ok: false; message: string };
 
+/// The other categories a task could have had, with what each is for,
+/// returned next to an automatic pick (19.10.2026, Ariel). The pick reads
+/// words; the model reads meaning. On the internal client, product work
+/// is titled with the words of the operational categories ("תיק הלקוח",
+/// "משימות", "יומן"), so words alone filed 17 of 25 real tasks wrongly.
+/// With the options in hand the model can correct a poor pick in one
+/// update_task call, without a listing call before every new task.
+async function categoryOptions(clientId: string, pickedId: string): Promise<{ name: string; description?: string }[]> {
+  const all = (await usableCategories(clientId)) ?? [];
+  return all
+    .filter((c: { id: string }) => c.id !== pickedId)
+    .map((c: { name: string; description?: string }) => (c.description ? { name: c.name, description: c.description } : { name: c.name }));
+}
+
 async function resolveEntryCategory(
   actor: Parameters<typeof lookupCategory>[0],
   clientId: string,
@@ -215,7 +229,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "List categories for a client",
       description:
-        "Lists the activity categories usable when logging time against one client. Every time entry needs one. Use this when the user asks what the options are, or when a category name could not be matched - the write tools match category names themselves. Some categories are global and some belong to a single client, so pass the client you are logging against.",
+        "Lists the activity categories usable when logging time against one client, with what each is for when an admin described it. Every time entry needs one. Use this when the user asks what the options are, or when a category name could not be matched - the write tools match category names themselves. Some categories are global and some belong to a single client, so pass the client you are logging against.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
       }),
@@ -837,7 +851,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Open a task",
       description:
-        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying. Every task gets a category, because a timer cannot run on a task without one: when the user did not name a category, do not ask them for it - pass the one you judge fits best if you know this client's categories, or omit it and Ankora picks one from the task's wording and how similar work was filed. The result includes the new task's `url` in the Ankora app (staff sign-in required, not for clients). After creating, always tell the user which category the task got (say it was chosen automatically when `categoryAutoPicked` is true, so they know they can change it) and give them the `url`, quoted exactly.",
+        "Creates a new Ankora task on one client, optionally with its steps, a supervisor and portal visibility in the same call. The task is visible to everyone who works on that client; the client sees it on their portal only if `clientVisible` is true. Assigning it, or naming a supervisor, is allowed only for colleagues with access to that client; pass the name the user said and Ankora will refuse with the usable names if it does not match. Calling this twice creates two tasks, so confirm the title, client and owner with the user before retrying. Every task gets a category, because a timer cannot run on a task without one: when the user did not name a category, do not ask them for it - pass the one you judge fits best if you know this client's categories, or omit it and Ankora picks one from the task's wording and how similar work was filed. An automatic pick comes back with `categoryOptions`, the client's other categories and what each is for: if one of them clearly fits the work better, set it with update_task. The result includes the new task's `url` in the Ankora app (staff sign-in required, not for clients). After creating, always tell the user which category the task got (say it was chosen automatically when `categoryAutoPicked` is true, so they know they can change it, and say plainly when `categoryNote` calls it low confidence) and give them the `url`, quoted exactly.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it. Ankora matches it and says so if it is unrecognised or ambiguous."),
         title: z.string().min(1).describe("What needs to be done. One line, as a person would write it."),
@@ -1000,7 +1014,9 @@ export function registerAnkoraTools(server: McpServer): void {
           client: client.value.name,
           category: categoryName,
           categoryAutoPicked: autoCategory !== null,
-          ...(autoCategory ? { categoryNote: describePick(autoCategory) } : {}),
+          ...(autoCategory
+            ? { categoryNote: describePick(autoCategory), categoryOptions: await categoryOptions(client.value.id, autoCategory.id) }
+            : {}),
           assignedTo: assigneeName,
           supervisor: supervisorName,
           requiresApproval: task.requiresApproval,
@@ -1023,7 +1039,7 @@ export function registerAnkoraTools(server: McpServer): void {
     {
       title: "Update a task",
       description:
-        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal. A task that still has no category gets one chosen automatically with any change (a timer cannot run without it); when `categoryAutoPicked` is true, tell the user which category was set. Always give the user the task's `url`, quoted exactly.",
+        "Changes an existing Ankora task: its status, owner, supervisor, due date, title, category, portal visibility or what it is waiting on. Identify the task by its title; if two tasks share one, Ankora will say so rather than guess. Only the fields you pass are changed - omitting a field leaves it alone. Use `clearAssignee` or `clearDue` to empty a field rather than passing an empty string. Finishing a task the client can see also needs `outcome`, one sentence in their language saying what came of it; Ankora refuses the close without it, because that sentence is what the client reads on their portal. A task that still has no category gets one chosen automatically with any change (a timer cannot run without it); when `categoryAutoPicked` is true, tell the user which category was set, and if one of `categoryOptions` clearly fits the work better, set that one instead. Always give the user the task's `url`, quoted exactly.",
       inputSchema: z.object({
         task: z.string().optional().describe("The task's title, or enough of it to identify it. Not needed when `taskId` is given."),
         taskId: z
@@ -1269,7 +1285,9 @@ export function registerAnkoraTools(server: McpServer): void {
           changed: Object.keys(patch),
           ...(categoryName ? { category: categoryName } : {}),
           categoryAutoPicked: autoCategory !== null,
-          ...(autoCategory ? { categoryNote: describePick(autoCategory) } : {}),
+          ...(autoCategory
+            ? { categoryNote: describePick(autoCategory), categoryOptions: await categoryOptions(taskClientId, autoCategory.id) }
+            : {}),
         });
       } catch (err) {
         console.error("[mcp] update_task failed", err);
