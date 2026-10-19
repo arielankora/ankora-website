@@ -95,7 +95,7 @@ export function ClientsGrid({
           mirrorQuery(e.target.value.trim());
         }}
         placeholder="חיפוש לקוח"
-        className="w-full max-w-xs rounded-full border border-app-border bg-white px-4 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-auto"
+        className="w-full max-w-xs rounded-full border border-app-border-strong bg-white px-4 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-auto"
       />
 
       {filtered.length === 0 ? (

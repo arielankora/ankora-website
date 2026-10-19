@@ -178,7 +178,7 @@ export function MessageClient({
                     onChange={(e) => setText(e.target.value)}
                     aria-label="נוסח ההודעה"
                     rows={12}
-                    className="w-full rounded-xl border border-app-border bg-white p-3 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-gold"
+                    className="w-full rounded-xl border border-app-border-strong bg-white p-3 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-gold"
                   />
                   <p className="text-[11.5px] text-app-text-tertiary">
                     מה שבסוגריים מרובעים צריך להשלים לפני השליחה.

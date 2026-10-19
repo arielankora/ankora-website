@@ -4,7 +4,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { approveGuideAction, proposeGuideAction, rejectGuideAction } from "./actions";
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 
 function ProposeForm({ current }: { current: string }) {
   const close = useDrawerClose();

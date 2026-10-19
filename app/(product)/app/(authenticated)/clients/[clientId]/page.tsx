@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { BackLink } from "@/components/app/BackLink";
-import { CLIENTS_LIST_KEYS, listBackHref } from "@/lib/list-back";
+import { PageBack } from "@/components/app/BackSlot";
+import { CLIENTS_LIST_KEYS, clientsBackTitle, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -122,7 +122,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     return (
       <div className="space-y-6">
         <div>
-          <BackLink href={backHref} label="חזרה ללקוחות" />
+          <PageBack href={backHref} label={clientsBackTitle(sp?.from)} />
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
@@ -279,7 +279,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     <>
       <div className="space-y-6">
         <div>
-          <BackLink href={backHref} label="חזרה ללקוחות" />
+          <PageBack href={backHref} label={clientsBackTitle(sp?.from)} />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             {/* The same button as on a task, on the screen somebody

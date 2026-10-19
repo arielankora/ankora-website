@@ -168,7 +168,7 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
         onChange={(e) => setTitle(e.target.value)}
         aria-label="שלב חדש"
         placeholder="מה צריך לקרות"
-        className="min-w-0 flex-1 border-b border-app-border bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
+        className="min-w-0 flex-1 border-b border-app-border-strong bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
       />
       <button
         type="submit"

@@ -37,7 +37,7 @@ export function RunLessonCard({ taskId, processName }: { taskId: string; process
         maxLength={MAX_LESSON}
         rows={3}
         placeholder="למשל: שלב 2 צריך להתחיל יום עבודה קודם, כי איילה לא עונה בימי שישי."
-        className="mt-3 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+        className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       />
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <button

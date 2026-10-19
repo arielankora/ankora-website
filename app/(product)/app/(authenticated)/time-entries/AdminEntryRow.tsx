@@ -163,7 +163,7 @@ export function AdminEntryRow({
                   defaultValue={dateKeyOf(entry.startAt)}
                   max={todayKey()}
                   required
-                  className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
               </div>
               <div>
@@ -173,7 +173,7 @@ export function AdminEntryRow({
                   name="startTime"
                   defaultValue={timeKey(entry.startAt)}
                   required
-                  className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
               </div>
               <div>
@@ -183,7 +183,7 @@ export function AdminEntryRow({
                   name="endTime"
                   defaultValue={entry.endAt ? timeKey(entry.endAt) : ""}
                   required
-                  className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
               </div>
               <div>
@@ -191,7 +191,7 @@ export function AdminEntryRow({
                 <input
                   name="note"
                   defaultValue={entry.note ?? ""}
-                  className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
               </div>
             </div>
@@ -200,7 +200,7 @@ export function AdminEntryRow({
                 <label className="block text-xs font-medium text-app-text-secondary">סיבת עריכה</label>
                 <input
                   name="reason"
-                  className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
               </div>
               <div className="flex items-center gap-2">

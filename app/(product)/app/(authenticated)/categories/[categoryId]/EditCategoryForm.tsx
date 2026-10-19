@@ -28,7 +28,7 @@ export function EditCategoryForm({ category }: { category: Category }) {
           name="name"
           defaultValue={category.name}
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -36,7 +36,7 @@ export function EditCategoryForm({ category }: { category: Category }) {
         <input
           name="description"
           defaultValue={category.description ?? ""}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div>
@@ -45,7 +45,7 @@ export function EditCategoryForm({ category }: { category: Category }) {
           name="sortOrder"
           type="number"
           defaultValue={category.sortOrder}
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div className="flex items-center gap-2 self-end pb-2">

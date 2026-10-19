@@ -45,7 +45,7 @@ export type PanelDomain = {
   organizationName: string | null;
 };
 
-const INPUT = "mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
+const INPUT = "mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 const LABEL = "block text-xs font-medium text-app-text-secondary";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

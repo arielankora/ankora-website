@@ -37,7 +37,7 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
             placeholder="1.5"
             required
             dir="ltr"
-            className="w-full rounded-lg border border-app-border bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-lg border border-app-border-strong bg-white px-2 py-1.5 text-center font-jbmono text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0 flex-1">
@@ -46,7 +46,7 @@ export function AdjustmentForm({ clientId, currentHourBankId }: { clientId: stri
             name="reason"
             required
             placeholder="למשל: זיכוי חד-פעמי"
-            className="w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <SubmitButton />

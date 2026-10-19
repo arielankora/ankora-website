@@ -1,4 +1,4 @@
-import { BackLink } from "@/components/app/BackLink";
+import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -54,7 +54,7 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
   return (
     <article className="mx-auto max-w-3xl space-y-6">
       <div>
-        <BackLink href={`/app/clients/${clientId}`} label="חזרה ללקוח" />
+        <PageBack href={`/app/clients/${clientId}`} label={doc.clientName} />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-xl font-medium text-app-text-primary">תיק לקוח: {doc.clientName}</h1>
           <div className="flex items-center gap-4">

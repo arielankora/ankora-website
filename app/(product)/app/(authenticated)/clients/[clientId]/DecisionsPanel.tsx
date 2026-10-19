@@ -38,14 +38,14 @@ function OptionFields({ index, required }: { index: number; required: boolean })
         name={`optionLabel${index}`}
         required={required}
         placeholder={required ? `אפשרות ${index + 1} (חובה)` : `אפשרות ${index + 1}`}
-        className="rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+        className="rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
       />
       <input
         name={`optionAmount${index}`}
         dir="ltr"
         inputMode="decimal"
         placeholder="₪"
-        className="rounded-lg border border-app-border bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+        className="rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
       />
       <label className="flex items-center gap-2 px-1 text-xs text-app-text-secondary">
         <input type="radio" name="recommended" value={String(index)} className="h-4 w-4 accent-gold" />
@@ -112,7 +112,7 @@ export function DecisionsPanel({
               name="question"
               required
               placeholder="באיזה מועד לקבוע את ביקור הטכנאי?"
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <label className="block">
@@ -121,7 +121,7 @@ export function DecisionsPanel({
               name="background"
               rows={2}
               placeholder="עד שלושה משפטים. מה הביא לצומת הזו."
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
 
@@ -139,7 +139,7 @@ export function DecisionsPanel({
                 dir="ltr"
                 inputMode="decimal"
                 placeholder="ריק אם ההחלטה אינה כספית"
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-end text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </label>
             <label className="block">
@@ -147,7 +147,7 @@ export function DecisionsPanel({
               <input
                 name="dueAt"
                 type="date"
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               />
             </label>
           </div>

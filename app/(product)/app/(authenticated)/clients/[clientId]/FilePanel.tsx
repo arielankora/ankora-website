@@ -142,7 +142,7 @@ export function DocumentsPanel({
             name="title"
             required
             placeholder="פוליסת רכב 2026"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </label>
 
@@ -151,7 +151,7 @@ export function DocumentsPanel({
           <select
             name="kind"
             defaultValue="OTHER"
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             {(Object.keys(DOCUMENT_KIND_LABELS) as ClientDocumentKind[]).map((k) => (
               <option key={k} value={k}>
@@ -280,7 +280,7 @@ function SummaryEditor({
           name="draft"
           rows={4}
           defaultValue={summary.draft}
-          className="w-full rounded-lg border border-app-border bg-white px-3 py-2.5 text-sm leading-relaxed text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2.5 text-sm leading-relaxed text-app-text-primary outline-none focus:border-gold"
         />
 
         <div className="flex flex-wrap items-center gap-3">

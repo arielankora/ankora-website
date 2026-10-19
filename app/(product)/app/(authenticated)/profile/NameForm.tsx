@@ -30,7 +30,7 @@ export function NameForm({ name }: { name: string }) {
           defaultValue={name}
           required
           maxLength={100}
-          className="w-full rounded-lg border border-app-border bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-lg border border-app-border-strong bg-white px-3.5 py-2.5 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </label>
 

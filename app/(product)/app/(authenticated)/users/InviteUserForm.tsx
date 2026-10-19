@@ -65,7 +65,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
           <input
             name="name"
             required
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
         <div>
@@ -74,7 +74,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             name="email"
             type="email"
             required
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           />
         </div>
         {/* Employee agreements: the address the deletion declaration is
@@ -87,7 +87,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
               name="personalEmail"
               type="email"
               dir="ltr"
-              className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
             <p className="mt-1 text-[11px] text-app-text-tertiary">לא חובה. משמש רק לשליחת מסמכים בסיום העבודה.</p>
           </div>
@@ -99,7 +99,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
             required
             value={role}
             onChange={(e) => setRole(e.target.value)}
-            className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
           >
             <option value="" disabled>
               בחירת תפקיד
@@ -123,7 +123,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
                 name="clientIds"
                 required
                 defaultValue=""
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               >
                 <option value="" disabled>
                   בחירת לקוח
@@ -141,7 +141,7 @@ export function InviteUserForm({ clients }: { clients: { id: string; name: strin
                 name="clientUserRole"
                 required
                 defaultValue="VIEWER"
-                className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
               >
                 <option value="VIEWER">צפייה בלבד</option>
                 <option value="ADMIN">מנהל לקוח (יכול לערוך נמענים לדוחות)</option>

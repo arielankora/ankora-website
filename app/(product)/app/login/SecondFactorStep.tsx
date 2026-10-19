@@ -194,7 +194,7 @@ export function SecondFactorStep({
               required
               dir="ltr"
               placeholder="123456"
-              className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-center text-lg tracking-[0.3em] text-app-text-primary outline-none focus:border-gold"
+              className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-center text-lg tracking-[0.3em] text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>
@@ -221,7 +221,7 @@ export function SecondFactorStep({
               required
               maxLength={60}
               placeholder={linked ? "למשל: האייפון של דנה" : "למשל: MacBook של דנה"}
-              className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </label>
           <button type="submit" disabled={busy} className={BUTTON}>

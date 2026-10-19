@@ -1,6 +1,6 @@
 import { RECEIPT_LABEL } from "@/lib/date-receipt";
-import { BackLink } from "@/components/app/BackLink";
-import { IMPORTANT_DATES_LIST_KEYS, listBackHref } from "@/lib/list-back";
+import { PageBack } from "@/components/app/BackSlot";
+import { IMPORTANT_DATES_LIST_KEYS, importantDatesBackTitle, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -79,7 +79,7 @@ export default async function ImportantDateDetailPage(props: {
     <>
       <div className="space-y-6">
         <div>
-          <BackLink href={backHref} label={calendarBack ? "חזרה ליומן" : "חזרה למועדים חשובים"} />
+          <PageBack href={backHref} label={calendarBack ? "יומן" : importantDatesBackTitle(rawFrom)} />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-4">
             <div>
               <h1 className="text-xl font-medium text-app-text-primary">{date.title}</h1>
@@ -251,7 +251,7 @@ export default async function ImportantDateDetailPage(props: {
                   type="date"
                   name="snoozedUntil"
                   required
-                  className="w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
                 <button type="submit" className="whitespace-nowrap rounded-full border border-app-border px-4 py-2 text-sm text-app-text-primary hover:border-gold">
                   דחייה

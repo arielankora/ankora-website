@@ -46,7 +46,7 @@ export function RecipientsForm({
           name="recipients"
           defaultValue={recipients.join(", ")}
           placeholder="אימיילים מופרדים בפסיקים"
-          className="w-full rounded-full border border-app-border px-4 py-2 text-sm sm:max-w-sm"
+          className="w-full rounded-full border border-app-border-strong px-4 py-2 text-sm sm:max-w-sm"
         />
         <SaveButton />
       </div>

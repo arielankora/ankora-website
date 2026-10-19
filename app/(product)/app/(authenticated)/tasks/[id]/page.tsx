@@ -1,6 +1,7 @@
 import { ChevronLeft } from "lucide-react";
-import { BackLink } from "@/components/app/BackLink";
-import { backLabel, carriedListQuery, tasksListHref } from "../list-query";
+import { PageBack } from "@/components/app/BackSlot";
+import { backLabel, backTitle, carriedListQuery, tasksListHref } from "../list-query";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { getTaskDetail, assignableUsers } from "@/lib/app-domain/tasks";
@@ -97,6 +98,24 @@ export default async function TaskDetailPage(props: {
 
   const { task, time, thread, commentCount, subtasks } = detail;
 
+  // The way back names the list it returns to (19.10.2026). A client or a
+  // category is named only if this person can see it: an id they cannot
+  // reach, typed into the address, adds nothing to the label.
+  const fromQuery = new URLSearchParams(listQuery);
+  const backNames: { client?: string; category?: string } = {};
+  const fromClientId = fromQuery.get("clientId");
+  const fromCategoryId = fromQuery.get("categoryId");
+  if (fromClientId || fromCategoryId) {
+    const [reachable, allCategories] = await Promise.all([listAccessibleClients(user), fromCategoryId ? listCategories() : Promise.resolve([])]);
+    const reachableIds = new Set(reachable.map((c) => c.id));
+    backNames.client = reachable.find((c) => c.id === fromClientId)?.name;
+    const category = allCategories.find((c) => c.id === fromCategoryId);
+    if (category && (category.visibility === "GLOBAL" || (category.clientId && reachableIds.has(category.clientId)))) {
+      backNames.category = category.name;
+    }
+  }
+  const backTitleText = backTitle(from, backNames);
+
   // Opening the task is reading what the bell said about it.
   await markTaskNotificationsRead(user.id, task.id);
 
@@ -181,7 +200,7 @@ export default async function TaskDetailPage(props: {
           Hebrew. A plain anchor, like the links that lead here, so the
           navigation cannot be quietly cancelled (see TaskRow). */}
       <nav className="flex items-center gap-1.5 text-[13px] text-app-text-tertiary">
-        <BackLink href={backHref} label={backText} testId="task-back" />
+        <PageBack href={backHref} label={backTitleText} testId="task-back" />
         <ChevronLeft size={14} className="text-app-text-tertiary" />
         <span className="truncate text-app-text-secondary">{task.client.name}</span>
       </nav>

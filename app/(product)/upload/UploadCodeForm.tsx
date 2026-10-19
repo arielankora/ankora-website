@@ -77,7 +77,7 @@ function CodeStep({ initialError }: { initialError?: string }) {
           dir="ltr"
           placeholder="XXXX-XXXX"
           maxLength={20}
-          className="w-full rounded-[10px] border border-app-border bg-white px-3.5 py-3 text-center font-jbmono text-lg tracking-[0.2em] text-app-text-primary outline-none focus:border-gold"
+          className="w-full rounded-[10px] border border-app-border-strong bg-white px-3.5 py-3 text-center font-jbmono text-lg tracking-[0.2em] text-app-text-primary outline-none focus:border-gold"
         />
       </label>
       <ErrorLine state={state} />

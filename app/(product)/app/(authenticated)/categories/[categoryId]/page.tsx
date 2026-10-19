@@ -1,4 +1,4 @@
-import { BackLink } from "@/components/app/BackLink";
+import { PageBack } from "@/components/app/BackSlot";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -30,7 +30,7 @@ export default async function CategoryDetailPage(props: { params: Promise<{ cate
     <>
       <div className="space-y-6">
         <div>
-          <BackLink href="/app/categories" label="חזרה לקטגוריות" />
+          <PageBack href="/app/categories" label="קטגוריות" />
           <h1 className="mt-3 text-xl font-medium text-app-text-primary">{category.name}</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
             {category.visibility === "GLOBAL" ? "קטגוריה כללית" : `ספציפית ללקוח: ${category.client?.name ?? ""}`}

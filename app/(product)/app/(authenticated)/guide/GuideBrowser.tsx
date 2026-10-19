@@ -69,7 +69,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
               if (e.key === "Escape") setQuery("");
             }}
             placeholder="חיפוש במדריך, למשל: מפקח, בנק שעות, ייצוא"
-            className="w-full rounded-full border border-app-border bg-white py-3 pe-11 ps-11 text-sm text-app-text-primary outline-none focus:border-gold [&::-webkit-search-cancel-button]:hidden"
+            className="w-full rounded-full border border-app-border-strong bg-white py-3 pe-11 ps-11 text-sm text-app-text-primary outline-none focus:border-gold [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button

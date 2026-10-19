@@ -161,7 +161,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
               defaultValue={dateKeyOf(entry.startAt)}
               max={todayKey()}
               required
-              className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
@@ -171,7 +171,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
               name="startTime"
               defaultValue={timeKey(entry.startAt)}
               required
-              className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
@@ -181,7 +181,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
               name="endTime"
               defaultValue={entry.endAt ? timeKey(entry.endAt) : ""}
               required
-              className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
           <div>
@@ -189,7 +189,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             <input
               name="note"
               defaultValue={entry.note ?? ""}
-              className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
+              className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
         </div>
@@ -197,7 +197,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
           <label className="block text-xs font-medium text-app-text-secondary">סיבת עריכה (מומלץ)</label>
           <input
             name="reason"
-            className="mt-1 w-full rounded-lg border border-app-border bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-1/2"
+            className="mt-1 w-full rounded-lg border border-app-border-strong bg-white px-2.5 py-1.5 text-sm text-app-text-primary outline-none focus:border-gold sm:w-1/2"
           />
         </div>
         {result?.overlapWarning && !warningDismissed && (

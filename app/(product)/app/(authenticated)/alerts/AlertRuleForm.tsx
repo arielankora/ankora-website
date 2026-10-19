@@ -38,7 +38,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
         <select
           name="type"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         >
           {THRESHOLD_TYPES.map((t) => (
             <option key={t.value} value={t.value}>
@@ -54,7 +54,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
           type="number"
           name="thresholdValue"
           required
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
@@ -70,7 +70,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
         <input
           name="recipientsAnkora"
           placeholder="ops@ankora.co.il, manager@ankora.co.il"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
       <div className="sm:col-span-2 lg:col-span-2">
@@ -78,7 +78,7 @@ export function AlertRuleForm({ clientId }: { clientId: string }) {
         <input
           name="recipientsClient"
           placeholder="finance@client.com"
-          className="mt-1.5 w-full rounded-lg border border-app-border bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
         />
       </div>
 
