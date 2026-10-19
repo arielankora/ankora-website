@@ -27,7 +27,7 @@ describe("backTitle (tasks)", () => {
   });
 
   it("says the calendar when it came from the calendar", () => {
-    expect(backTitle("calendar:view=week")).toBe("חזרה ליומן");
+    expect(backTitle("calendar:view=week")).toBe("יומן");
   });
 });
 

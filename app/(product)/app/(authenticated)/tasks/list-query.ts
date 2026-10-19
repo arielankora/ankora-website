@@ -93,7 +93,7 @@ export const STATUS_WORDS: Record<string, string> = {
 const MINE_WORDS: Record<string, string> = { "0": "כולם", assigned: "לביצוע", supervising: "בפיקוח" };
 
 export function backTitle(from: string | null | undefined, names: { client?: string; category?: string } = {}): string {
-  if (calendarBackHref(from)) return "חזרה ליומן";
+  if (calendarBackHref(from)) return "יומן";
   const q = new URLSearchParams(from ? clean(new URLSearchParams(from)) : "");
   const parts = ["משימות"];
   const mine = q.get("mine");
