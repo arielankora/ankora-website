@@ -127,4 +127,33 @@ describe("client file attention", () => {
     const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
     expect(toHadas.body).toBe("הגיע מועד הסקירה של כלל אחד.");
   });
+
+  it("proposals waiting more than a week tell the manager about all, and the sender about theirs (20.10.2026)", async () => {
+    const { client, manager, hadas } = await setup();
+    const batch = await prisma.knowledgeBatch.create({ data: { clientId: client.id, createdById: hadas.id } });
+    const proposal = (state: "PENDING" | "APPROVED", ageDays: number) =>
+      prisma.knowledgeProposal.create({
+        data: { batchId: batch.id, clientId: client.id, target: "PROCESS", payload: { title: "קליטה" }, state, createdAt: morning(-ageDays) },
+      });
+    await proposal("PENDING", 9);
+    await proposal("PENDING", 10);
+    await proposal("PENDING", 2);
+    await proposal("APPROVED", 30);
+    const other = await prisma.knowledgeBatch.create({ data: { clientId: client.id, createdById: manager.id } });
+    await prisma.knowledgeProposal.create({ data: { batchId: other.id, clientId: client.id, target: "FACT", payload: { body: "x" }, createdAt: morning(-8) } });
+
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 2, unowned: 0 });
+    const toManager = await prisma.notification.findFirstOrThrow({ where: { userId: manager.id, type: ATTENTION_TYPE } });
+    expect(toManager.body).toBe("3 הצעות מחכות במסך הבדיקה כבר יותר מ-7 ימים, ועד שיאושרו הן לא בתיק.");
+    const toHadas = await prisma.notification.findFirstOrThrow({ where: { userId: hadas.id, type: ATTENTION_TYPE } });
+    expect(toHadas.body).toBe("2 הצעות מחכות במסך הבדיקה כבר יותר מ-7 ימים, ועד שיאושרו הן לא בתיק.");
+  });
+
+  it("a file with no account manager still reaches whoever sent the waiting proposals", async () => {
+    const { client, hadas } = await setup(false);
+    const batch = await prisma.knowledgeBatch.create({ data: { clientId: client.id, createdById: hadas.id } });
+    await prisma.knowledgeProposal.create({ data: { batchId: batch.id, clientId: client.id, target: "PROCESS", payload: { title: "קליטה" }, createdAt: morning(-8) } });
+    expect(await notifyClientFileAttention(morning())).toEqual({ notified: 1, unowned: 0 });
+  });
 });
+

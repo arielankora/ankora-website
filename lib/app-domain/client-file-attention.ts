@@ -6,8 +6,10 @@ import {
   DAY_MS,
   attentionSentence,
   hasAttention,
+  isStaleProposal,
   isStaleProposedRule,
   isStaleUncertain,
+  PROPOSAL_WAIT_DAYS,
   type Attention,
 } from "@/lib/client-file-attention";
 import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
@@ -43,7 +45,8 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
   const stale = { knowledgeStatus: "UNCERTAIN" as const, updatedAt: { lt: staleBefore } };
   const row = { clientId: true, knowledgeStatus: true, updatedAt: true, ownerId: true } as const;
 
-  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies] = await Promise.all([
+  const proposalsBefore = new Date(now.getTime() - PROPOSAL_WAIT_DAYS * DAY_MS);
+  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies, proposals] = await Promise.all([
     prisma.clientFact.findMany({
       where: {
         ...live,
@@ -65,6 +68,12 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     prisma.clientPolicy.findMany({
       where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: staleBefore } }, { reviewBy: { lte: now } }] },
       select: { ...row, status: true, createdAt: true, reviewBy: true },
+    }),
+    // Proposals waiting on the review screen (20.10.2026). A batch still
+    // waiting for a person to pick its client has no proposals yet.
+    prisma.knowledgeProposal.findMany({
+      where: { state: "PENDING", createdAt: { lt: proposalsBefore }, batch: { client: { status: "ACTIVE", deletedAt: null } } },
+      select: { clientId: true, state: true, createdAt: true, batch: { select: { createdById: true } } },
     }),
   ]);
 
@@ -125,6 +134,19 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
         const t = theirs(b, rule.ownerId);
         t.rulesDueReview = (t.rulesDueReview ?? 0) + 1;
       }
+    }
+  }
+
+  // Waiting proposals: the account manager hears about all of them, and
+  // whoever sent a batch about their own (Ariel, 20.10.2026), so a file
+  // with no account manager, like Ankora's own, still reaches someone.
+  for (const p of proposals) {
+    if (!isStaleProposal(p, now)) continue;
+    const b = bucket(p.clientId);
+    b.all.staleProposals = (b.all.staleProposals ?? 0) + 1;
+    if (p.batch.createdById) {
+      const t = theirs(b, p.batch.createdById);
+      t.staleProposals = (t.staleProposals ?? 0) + 1;
     }
   }
 

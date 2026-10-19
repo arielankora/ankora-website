@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attentionSentence, hasAttention, isStaleProposedRule, isStaleUncertain } from "@/lib/client-file-attention";
+import { attentionSentence, hasAttention, isStaleProposal, isStaleProposedRule, isStaleUncertain } from "@/lib/client-file-attention";
 
 describe("client file attention", () => {
   const now = new Date("2026-10-14T05:00:00Z");
@@ -26,5 +26,15 @@ describe("client file attention", () => {
     expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date("2026-10-10T00:00:00Z") }, now)).toBe(false);
     expect(attentionSentence({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 1 })).toBe("כלל מוצע אחד מחכה לאישור כבר יותר מ-14 יום, ועד אז חל רק כלל הביניים.");
     expect(hasAttention({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 2 })).toBe(true);
+  });
+
+  it("a proposal waiting more than a week on the review screen is said (20.10.2026)", () => {
+    expect(isStaleProposal({ state: "PENDING", createdAt: new Date(now.getTime() - 8 * 86400000) }, now)).toBe(true);
+    expect(isStaleProposal({ state: "PENDING", createdAt: new Date(now.getTime() - 6 * 86400000) }, now)).toBe(false);
+    expect(isStaleProposal({ state: "REJECTED", createdAt: new Date("2026-01-01T00:00:00Z") }, now)).toBe(false);
+    const a = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 };
+    expect(hasAttention({ ...a, staleProposals: 1 })).toBe(true);
+    expect(attentionSentence({ ...a, staleProposals: 1 })).toBe("הצעה אחת מחכה במסך הבדיקה כבר יותר מ-7 ימים, ועד שתאושר היא לא בתיק.");
+    expect(attentionSentence({ ...a, staleProposals: 3 })).toBe("3 הצעות מחכות במסך הבדיקה כבר יותר מ-7 ימים, ועד שיאושרו הן לא בתיק.");
   });
 });

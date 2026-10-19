@@ -69,8 +69,15 @@ export async function procedureReminderFor(taskId: string, newStatus: TaskStatus
     select: { id: true, externalRefs: true },
   });
   const sourceIds = sources.filter((s) => refersTo(s.externalRefs, ids)).map((s) => s.id);
+  // 20.10.2026: a batch counts only while something in it still stands,
+  // waiting or approved. A batch whose every proposal was rejected left
+  // nothing in the file, and counting it meant a procedure rejected by
+  // mistake was never mentioned again.
   const hasProposalFromTask =
-    sourceIds.length > 0 && (await prisma.knowledgeBatch.count({ where: { clientId: task.clientId, sourceId: { in: sourceIds } } })) > 0;
+    sourceIds.length > 0 &&
+    (await prisma.knowledgeBatch.count({
+      where: { clientId: task.clientId, sourceId: { in: sourceIds }, proposals: { some: { state: { not: "REJECTED" } } } },
+    })) > 0;
 
   const kind = procedureReminderKind({ closing: true, procedureDocumentIds, namedProcedureDocumentIds, isMapping, hasProposalFromTask });
   if (!kind) return null;
