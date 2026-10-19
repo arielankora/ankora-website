@@ -352,9 +352,11 @@ function TaskChip({ task, today, from, disabled }: { task: CalendarTask; today: 
 /// The drawer: one of two lists, searchable, grouped by client.
 ///
 /// Beside the grid and not over it, so nothing it is dragged onto is
-/// hidden by it. Rows are up to two lines, 360px wide: one line at 300px
-/// (the first version) cut most titles to their first three words, and a
-/// task you cannot recognise is a task you cannot place (Ariel, 20.10.2026).
+/// hidden by it. 300px wide, rows up to two lines: one line cut most
+/// titles to their first three words, and a task you cannot recognise is a
+/// task you cannot place. The width stays 300 on purpose: 360 was tried
+/// on 20.10.2026 and took from the grid exactly what this drawer exists
+/// to give back (Ariel).
 function Drawer({
   tab,
   hrefs,
@@ -400,7 +402,7 @@ function Drawer({
       data-testid="calendar-drawer"
       data-day="undated"
       {...zone}
-      className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[360px] ${
+      className={`flex w-full shrink-0 flex-col overflow-hidden rounded-2xl border bg-white transition-colors lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:w-[300px] ${
         over ? "border-gold bg-gold/5" : "border-lineDark"
       }`}
     >
