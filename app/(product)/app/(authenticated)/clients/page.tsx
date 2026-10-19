@@ -18,8 +18,12 @@ export const metadata = { robots: { index: false, follow: false } };
 // number of employees assigned to the client (the same _count the old
 // table already showed as "משתמשים מוקצים") - a real, honest number
 // instead of fabricating a manager designation the schema doesn't have.
-export default async function ClientsPage() {
+export default async function ClientsPage(props: { searchParams: Promise<{ q?: string | string[] }> }) {
   const user = await requireUser();
+  // The search lives in the address bar (19.10.2026), so a client opened
+  // from a narrowed list comes back to the same list. See ClientsGrid.
+  const rawQ = (await props.searchParams).q;
+  const initialQuery = typeof rawQ === "string" ? rawQ.slice(0, 200) : "";
 
   if (!can(user.role, "client.manage")) {
     return (
@@ -75,6 +79,7 @@ export default async function ClientsPage() {
         <ClientsGrid
           key={cards.map((c) => c.id).join(",")}
           cards={cards}
+          initialQuery={initialQuery}
           canManageBanks={canManageBanks}
           canViewReports={canViewReports}
         />

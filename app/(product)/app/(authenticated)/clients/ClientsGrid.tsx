@@ -31,17 +31,32 @@ const STATUS_LABEL: Record<ClientStatus, string> = {
 // Client-side filtering only - listClients() already returns every
 // non-archived client, a small enough set for this to be instant without
 // a server round-trip per keystroke.
+//
+// 19.10.2026: the search is mirrored into `?q=` with replaceState, so
+// opening a client and coming back (browser back or the screen's own
+// back link) lands on the same narrowed list. replaceState, not the
+// router: no navigation, no RSC fetch, nothing that can be aborted, and
+// no history entry per keystroke.
+function mirrorQuery(q: string) {
+  const url = new URL(window.location.href);
+  if (q) url.searchParams.set("q", q);
+  else url.searchParams.delete("q");
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+}
+
 export function ClientsGrid({
   cards,
+  initialQuery = "",
   canManageBanks,
   canViewReports,
 }: {
   cards: ClientCard[];
+  initialQuery?: string;
   canManageBanks: boolean;
   canViewReports: boolean;
 }) {
   const { showToast } = useToast();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [items, setItems] = useState(cards);
 
   const filtered = useMemo(() => {
@@ -74,7 +89,10 @@ export function ClientsGrid({
     <div className="space-y-4">
       <input
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          mirrorQuery(e.target.value.trim());
+        }}
         placeholder="חיפוש לקוח"
         className="w-full max-w-xs rounded-full border border-lineDark bg-white px-4 py-2.5 text-sm text-appNavy outline-none focus:border-gold sm:w-auto"
       />
