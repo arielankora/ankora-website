@@ -63,6 +63,33 @@ export function parseFieldStatus(value: unknown): FieldStatusMap {
   return out;
 }
 
+/// Spec 3.1, per field: what may be marked missing on an item that is
+/// otherwise known (an entity has its own list, in its form).
+export const ITEM_MISSING_FIELDS = {
+  CONTACT: { emails: "מייל", phones: "טלפון", role: "תפקיד", clientSideAddress: "כתובת אצל הלקוח" },
+  SYSTEM: { url: "כתובת", accountUsed: "החשבון שלנו", clientAdmin: "מנהל אצל הלקוח", billing: "חיוב" },
+} as const;
+export type MissingFieldsTarget = keyof typeof ITEM_MISSING_FIELDS;
+
+/// The fields marked missing, with what would close them. Unknown fields
+/// are dropped; a mark without a reason gets "לברר", never nothing.
+export function fieldStatusFrom(target: MissingFieldsTarget, missing: string[], toResolve: string | null | undefined): FieldStatusMap {
+  const allowed = Object.keys(ITEM_MISSING_FIELDS[target]);
+  const why = toResolve?.trim() || "לברר";
+  const out: FieldStatusMap = {};
+  for (const f of missing) if (allowed.includes(f)) out[f] = { status: "MISSING", toResolve: why };
+  return out;
+}
+
+/// "חסר: מייל, טלפון · לבקש מגיא", or null.
+export function missingLine(target: MissingFieldsTarget, value: unknown): string | null {
+  const labels = ITEM_MISSING_FIELDS[target] as Record<string, string>;
+  const entries = Object.entries(parseFieldStatus(value)).filter(([k, v]) => v.status === "MISSING" && labels[k]);
+  if (!entries.length) return null;
+  const why = entries[0][1].toResolve;
+  return `חסר: ${entries.map(([k]) => labels[k]).join(", ")}${why ? ` · ${why}` : ""}`;
+}
+
 /// Rule 1: the weakest of the item's own status and its fields' statuses.
 export function effectiveStatus(itemStatus: KnowledgeStatusLike, fieldStatus: FieldStatusMap): KnowledgeStatusLike {
   if (itemStatus === "SUPERSEDED") return "SUPERSEDED";

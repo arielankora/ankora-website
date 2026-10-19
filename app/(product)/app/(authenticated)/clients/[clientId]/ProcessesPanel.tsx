@@ -55,6 +55,10 @@ import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-cal
 type Option = { id: string; name: string };
 
 export type PanelProcess = {
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
+  /// When a run was last closed, as ISO.
+  lastRunAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
@@ -76,6 +80,10 @@ export type PanelProcess = {
   externalPartyContactIds: string[];
   externalPartyText: string | null;
   requiredSystemIds: string[];
+  /// Spec 3.9: the permission each needs, by system id.
+  requiredSystemPermissions?: Record<string, string>;
+  executorUserId?: string | null;
+  executorContactId?: string | null;
   approverText: string | null;
   approverUserId: string | null;
   approverContactId: string | null;
@@ -85,6 +93,9 @@ export type PanelProcess = {
   entityId: string | null;
   businessCalendar: string | null;
   executorText: string | null;
+  /// Linked executor's name, and the systems with their permissions, as read.
+  executorName?: string | null;
+  systemsLine?: string | null;
   transitionStatus: TransitionLike;
   knowledgeStatus: KnowledgeStatusLike;
   toResolve: string | null;
@@ -94,7 +105,7 @@ export type PanelProcess = {
   nextDate: string | null;
   dateIds: string[];
   latestVersion: number;
-  current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[] } | null;
+  current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
   draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[] } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
@@ -238,6 +249,35 @@ function Checks({ name, options, selected }: { name: string; options: Option[]; 
   );
 }
 
+/// Spec 3.9: the systems a process needs, each with the permission it
+/// needs there.
+function SystemChecks({ options, selected, permissions }: { options: Option[]; selected: string[]; permissions: Record<string, string> }) {
+  const [on, setOn] = useState<string[]>(selected);
+  if (options.length === 0) return <p className="mt-1 text-[11px] text-appNavy/40">אין עדיין בתיק.</p>;
+  return (
+    <div className="mt-1.5 space-y-1.5">
+      {options.map((o) => (
+        <div key={o.id} className="grid grid-cols-[minmax(7rem,auto)_1fr] items-center gap-2">
+          <label className="flex items-center gap-1.5 text-sm text-appNavy">
+            <input
+              type="checkbox"
+              name="requiredSystemIds"
+              value={o.id}
+              checked={on.includes(o.id)}
+              onChange={(e) => setOn((cur) => (e.target.checked ? [...cur, o.id] : cur.filter((x) => x !== o.id)))}
+              className="h-4 w-4 accent-gold"
+            />
+            {o.name}
+          </label>
+          {on.includes(o.id) && (
+            <input name={`systemPermission:${o.id}`} defaultValue={permissions[o.id] ?? ""} placeholder="איזו הרשאה צריך" aria-label={`הרשאה ב-${o.name}`} className={INPUT} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function ProcessForm({
   clientId,
   existing,
@@ -316,7 +356,7 @@ function ProcessForm({
       </div>
       <div>
         <span className={LABEL}>מערכות</span>
-        <Checks name="requiredSystemIds" options={systems} selected={existing?.requiredSystemIds ?? []} />
+        <SystemChecks options={systems} selected={existing?.requiredSystemIds ?? []} permissions={existing?.requiredSystemPermissions ?? {}} />
       </div>
       <div>
         <span className={LABEL}>גורם חיצוני</span>
@@ -379,7 +419,23 @@ function ProcessForm({
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="מי מבצע היום">
-          <input name="executorText" defaultValue={existing?.executorText ?? ""} placeholder="גיא" className={INPUT} />
+          <select name="executorUserId" defaultValue={existing?.executorUserId ?? ""} aria-label="מבצע באנקורה" className={INPUT}>
+            <option value="">אף אחד באנקורה</option>
+            {staff.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </select>
+          <select name="executorContactId" defaultValue={existing?.executorContactId ?? ""} aria-label="מבצע אצל הלקוח" className={`${INPUT} mt-1.5`}>
+            <option value="">אף אחד אצל הלקוח</option>
+            {contacts.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input name="executorText" defaultValue={existing?.executorText ?? ""} placeholder="או במילים: גיא" className={`${INPUT} mt-1.5`} />
         </Field>
         <Field label="איפה בחפיפה">
           <select name="transitionStatus" defaultValue={existing?.transitionStatus ?? "WITH_CLIENT"} className={INPUT}>
@@ -723,8 +779,10 @@ export function ProcessesPanel({
                       p.triggerText,
                       p.ownerId ? `בעלים: ${staffName.get(p.ownerId) ?? ""}` : null,
                       p.backupOwnerId ? `מחליף: ${staffName.get(p.backupOwnerId) ?? ""}` : null,
-                      p.executorText ? `מבצע היום: ${p.executorText}` : null,
+                      p.executorName || p.executorText ? `מבצע היום: ${p.executorName ?? p.executorText}` : null,
+                      p.systemsLine ? `מערכות: ${p.systemsLine}` : null,
                       p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
+                      p.lastRunAt ? `ריצה אחרונה: ${day(p.lastRunAt)}` : null,
                     ]
                       .filter(Boolean)
                       .join(" · ")}
@@ -739,7 +797,7 @@ export function ProcessesPanel({
                     </ul>
                   )}
                   <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
-                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, refs: p.refs }} disclose />
+                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, refs: p.refs, verifiedAt: p.verifiedAt }} disclose />
                   <SourceCodes sources={p.sources} options={sourceOptions} />
 
                   {p.current ? (
@@ -747,7 +805,18 @@ export function ProcessesPanel({
                       <p className="text-xs font-medium text-appNavy/70">
                         נוהל, גרסה {p.current.version}
                         {p.current.approvedByName && `, אושר על ידי ${p.current.approvedByName}`}
+                        {p.current.approvedAt && ` ב-${day(p.current.approvedAt)}`}
                       </p>
+                      {p.current.atApproval && (
+                        <div className="mt-0.5" data-testid="approval-checks">
+                          <p className="text-[11px] text-appNavy/50">
+                            {p.current.atApproval.length === 0
+                              ? "באישור: עמד בכל הכללים של הלקוח."
+                              : `באישור: ${p.current.atApproval.length === 1 ? "חריגה אחת מאושרת" : `${p.current.atApproval.length} חריגות מאושרות`}.`}
+                          </p>
+                          {p.current.atApproval.length > 0 && <CheckLines checks={p.current.atApproval} />}
+                        </div>
+                      )}
                       <StepList steps={p.current.steps} systemName={systemName} />
                       {p.current.highlights && <p className="mt-1 text-xs text-appNavy/60">דגשים: {p.current.highlights}</p>}
                       {p.current.checks.some((c) => !c.excepted) && (

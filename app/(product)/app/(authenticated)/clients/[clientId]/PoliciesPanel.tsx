@@ -39,6 +39,10 @@ import { kindTakesParams, type PolicyParams } from "@/lib/policy-params";
 // client has not confirmed.
 
 export type PanelPolicy = {
+  /// Spec 3.11: what it said before, newest first.
+  history?: { version: number; title: string; statement: string; interimStatement: string | null; checked: string | null; approvedByName: string | null; approvedAt: string | null; until: string | null }[];
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
@@ -273,6 +277,34 @@ function RetireForm({ clientId, policy }: { clientId: string; policy: PanelPolic
   );
 }
 
+const shortDay = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
+
+/// Spec 3.11: the rule's earlier versions, folded, so what was agreed
+/// before can be read without the audit log.
+function PolicyHistory({ history }: { history: NonNullable<PanelPolicy["history"]> }) {
+  return (
+    <details className="mt-1.5" data-testid="policy-history">
+      <summary className="cursor-pointer text-[11px] text-appNavy/55">גרסאות קודמות ({history.length})</summary>
+      <ul className="mt-1 space-y-1.5 border-s border-lineDark ps-3">
+        {history.map((h) => (
+          <li key={h.version} className="text-xs text-appNavy/70">
+            <p className="font-medium">
+              גרסה {h.version}
+              {h.title ? `: ${h.title}` : ""}
+            </p>
+            <p>{h.statement}</p>
+            {h.interimStatement && <p className="text-appNavy/55">עד שאושר: {h.interimStatement}</p>}
+            {h.checked && <p className="text-appNavy/55">נבדק: {h.checked}</p>}
+            <p className="text-[11px] text-appNavy/45">
+              {[h.approvedByName ? `אושר על ידי ${h.approvedByName}${h.approvedAt ? `, ${shortDay(h.approvedAt)}` : ""}` : "לא אושר", h.until ? `הוחלף ב-${shortDay(h.until)}` : null].filter(Boolean).join(" · ")}
+            </p>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function PoliciesPanel({
   clientId,
   policies,
@@ -396,6 +428,7 @@ export function PoliciesPanel({
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
                 <ItemTags item={p} disclose />
+                {p.history && p.history.length > 0 && <PolicyHistory history={p.history} />}
                 <SourceCodes sources={p.sources} options={sourceOptions} />
                 {exceptions
                   .filter((e) => e.policyId === p.id)

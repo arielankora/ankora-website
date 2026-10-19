@@ -314,7 +314,20 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.ownerId ? `בעלים: ${ownerName.get(p.ownerId) ?? ""}` : null,
           p.backupOwnerId ? `מחליף: ${ownerName.get(p.backupOwnerId) ?? ""}` : null,
           TRANSITION_LABELS[p.transitionStatus],
-          p.executorText ? `מבצע היום: ${p.executorText}` : null,
+          (() => {
+            const who = p.executorUserId ? ownerName.get(p.executorUserId) : p.executorContactId ? contactName.get(p.executorContactId) : null;
+            return who || p.executorText ? `מבצע היום: ${who ?? p.executorText}` : null;
+          })(),
+          (() => {
+            const perms = (p.requiredSystemPermissions ?? {}) as Record<string, unknown>;
+            const list = p.requiredSystemIds
+              .map((id) => {
+                const name = systems.find((x) => x.id === id && shown(x))?.systemName;
+                return name ? (typeof perms[id] === "string" ? `${name} (${perms[id]})` : name) : null;
+              })
+              .filter(Boolean);
+            return list.length ? `מערכות: ${list.join(", ")}` : null;
+          })(),
           p.slaText ? `SLA: ${p.slaText}` : null,
           (() => {
             const who = [p.approverUserId ? ownerName.get(p.approverUserId) : null, p.approverContactId ? contactName.get(p.approverContactId) : null, p.approverText].filter(Boolean);

@@ -3677,6 +3677,9 @@ model Process {
 
   /// SystemAccess rows of this client the process needs.
   requiredSystemIds String[] @default([])
+  /// Spec 3.9: the permission each of them needs, by system id:
+  /// { "<systemAccessId>": "העלאת חשבוניות וצפייה בתשלומים" }.
+  requiredSystemPermissions Json @default("{}")
 
   /// Who approves: in words, and the contact when known.
   approverText      String?
@@ -3702,6 +3705,11 @@ model Process {
 
   /// Who runs it today, in words ("Guy", "Nextage").
   executorText     String?
+  /// Spec 3.9: who does it today, when it is someone in the file: a
+  /// person at Ankora, or a contact of the client. executorText stays for
+  /// what has no one to link to.
+  executorUserId    String?
+  executorContactId String?
   transitionStatus ProcessTransition @default(WITH_CLIENT)
 
   status         ProcessStatus @default(DRAFT)
@@ -3844,6 +3852,11 @@ model ProcessVersion {
   createdAt    DateTime  @default(now())
   approvedById String?
   approvedAt   DateTime?
+  /// Spec 3.9: the checks against the client's rules at the moment it was
+  /// approved, as they were: [{ code, message, severity, policyId?,
+  /// excepted? }]. The live checks may say otherwise later; this says what
+  /// the approver saw.
+  approvalChecks Json?
 
   process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
 

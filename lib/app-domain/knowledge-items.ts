@@ -66,8 +66,20 @@ export async function sourcedFields(
     sources: resolved.sources as Prisma.InputJsonValue,
     knowledgeStatus: resolved.knowledgeStatus,
     toResolve: resolved.toResolve,
+    ...(verified(resolved.knowledgeStatus, resolved.sources, before) ? { verifiedAt: new Date() } : {}),
     ...(await visibilityAndOwner(input, before)),
   };
+}
+
+/// Spec 3.1, "verified at": when a person last confirmed the item with a
+/// source. It enters confirmed, becomes confirmed, or a confirmed item
+/// gets a new source. Fixing a typo is not a new confirmation.
+function verified(status: KnowledgeStatus, sources: unknown, before?: Before): boolean {
+  if (status !== "CONFIRMED") return false;
+  if (!before || before.knowledgeStatus !== "CONFIRMED") return true;
+  const key = (r: { code: string; at?: string | null }) => `${r.code}@${r.at ?? ""}`;
+  const had = new Set(readSourceRefs(before.sources).map(key));
+  return readSourceRefs(sources).some((r) => !had.has(key(r)));
 }
 
 type Before = { knowledgeStatus: KnowledgeStatus; sources: unknown; toResolve: string | null; clientVisible?: boolean; sensitivity?: string; audience?: KnowledgeAudience; doNotDisclose?: string | null };

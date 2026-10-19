@@ -65,6 +65,10 @@ function parseProcess(f: FormData, selfId?: string): { error?: string; value?: O
       externalPartyContactIds: list(f, "externalPartyContactIds"),
       externalPartyText: text(f, "externalPartyText"),
       requiredSystemIds: list(f, "requiredSystemIds"),
+      // Spec 3.9: "systemPermission:<id>", next to each system.
+      requiredSystemPermissions: Object.fromEntries(
+        [...f.keys()].filter((k) => k.startsWith("systemPermission:")).map((k) => [k.slice("systemPermission:".length), String(f.get(k) ?? "")])
+      ),
       approverText: text(f, "approverText"),
       approverUserId: text(f, "approverUserId"),
       approverContactId: text(f, "approverContactId"),
@@ -74,6 +78,8 @@ function parseProcess(f: FormData, selfId?: string): { error?: string; value?: O
       entityId: text(f, "entityId"),
       businessCalendar: text(f, "businessCalendar"),
       executorText: text(f, "executorText"),
+      executorUserId: text(f, "executorUserId"),
+      executorContactId: text(f, "executorContactId"),
       transitionStatus: (TRANSITIONS as string[]).includes(transition) ? (transition as ProcessTransition) : undefined,
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(f, "toResolve"),

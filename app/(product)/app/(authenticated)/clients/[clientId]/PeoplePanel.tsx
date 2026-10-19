@@ -5,7 +5,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { formatMinor } from "@/lib/money";
 import { KNOWLEDGE_STATUS_LABELS, KNOWLEDGE_AUDIENCE_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField, MissingFields, useItemStaff } from "./knowledge-ui";
 import {
   addClientContactAction,
   updateClientContactAction,
@@ -37,6 +37,12 @@ const RELATIONSHIP_LABELS: Record<Relationship, string> = {
 export type { SourceOption };
 
 export type PanelContact = {
+  /// Spec 3.1: fields still missing, and the line that says so.
+  missingFields?: string[];
+  missingToResolve?: string | null;
+  missing?: string | null;
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
@@ -56,6 +62,8 @@ export type PanelContact = {
   isPrimary: boolean;
   isDecisionMaker: boolean;
   clientSideAddress: string | null;
+  /// Ankora people only: their user in the product.
+  userId?: string | null;
   status: KnowledgeStatusLike;
   toResolve: string | null;
   audience: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
@@ -67,6 +75,8 @@ export type PanelContact = {
 };
 
 export type PanelOrganization = {
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
@@ -105,6 +115,7 @@ function ContactForm({
   const { onSubmit, pending, error } = useActionForm(existing ? updateClientContactAction : addClientContactAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
   const [relationship, setRelationship] = useState<Relationship>(existing?.relationship ?? "CLIENT_STAFF");
+  const staff = useItemStaff();
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
@@ -157,9 +168,21 @@ function ContactForm({
         <textarea name="context" rows={2} defaultValue={existing?.context ?? ""} className={INPUT} />
       </Field>
       {relationship === "ANKORA" && (
-        <Field label="הכתובת שלו אצל הלקוח">
-          <input name="clientSideAddress" dir="ltr" defaultValue={existing?.clientSideAddress ?? ""} placeholder="office@client.com" className={INPUT} />
-        </Field>
+        <>
+          <Field label="המשתמש שלו במערכת">
+            <select name="userId" defaultValue={existing?.userId ?? ""} className={INPUT}>
+              <option value="">לא מקושר</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="הכתובת שלו אצל הלקוח">
+            <input name="clientSideAddress" dir="ltr" defaultValue={existing?.clientSideAddress ?? ""} placeholder="office@client.com" className={INPUT} />
+          </Field>
+        </>
       )}
       <div className="flex flex-wrap gap-4 text-sm text-appNavy">
         <label className="flex items-center gap-2">
@@ -187,6 +210,7 @@ function ContactForm({
         <AudienceField existing={existing} />
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <MissingFields target="CONTACT" existing={existing} />
       <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">

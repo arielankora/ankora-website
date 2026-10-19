@@ -15,6 +15,8 @@ import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption,
 // ask. The entity then reads as missing too, until it is filled.
 
 export type PanelEntity = {
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];

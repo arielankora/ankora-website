@@ -18,7 +18,7 @@ import {
   type SystemPermissionLike,
 } from "@/lib/system-map";
 import { addSystemAccessAction, updateSystemAccessAction, removeSystemAccessAction } from "../system-actions";
-import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField } from "./knowledge-ui";
+import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags, AudienceField, MissingFields } from "./knowledge-ui";
 
 // Org brain, phase 2: the system map, section 7.1 of the client file
 // (claude/org-brain-spec-2026-10-12.md, 3.6).
@@ -29,6 +29,12 @@ import { EntitySelect, Field, INPUT, SourceCodes, SourcesField, StatusLine, type
 // before they reach for it.
 
 export type PanelSystem = {
+  /// Spec 3.1: fields still missing, and the line that says so.
+  missingFields?: string[];
+  missingToResolve?: string | null;
+  missing?: string | null;
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
   /// Spec 3.1: the team's refs, as form text and as labels.
   externalRefs?: string;
   refs?: string[];
@@ -191,6 +197,7 @@ function SystemForm({
         <AudienceField existing={existing} />
       </div>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <MissingFields target="SYSTEM" existing={existing} />
       <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">

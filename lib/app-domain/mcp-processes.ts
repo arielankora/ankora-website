@@ -101,7 +101,15 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
       const c = await calendarOfProcess(p);
       return c ? BUSINESS_CALENDAR_LABELS[c.key] : "לפי לוח המועד (ברירת מחדל: ישראל)";
     })(),
-    executorToday: p.executorText,
+    executorToday: p.executorUserId ? (user.get(p.executorUserId) ?? p.executorText) : p.executorText,
+    // Spec 3.9: what each system it needs must let us do.
+    systemPermissions: await (async () => {
+      const perms = (p.requiredSystemPermissions ?? {}) as Record<string, unknown>;
+      const ids = Object.keys(perms).filter((id) => p.requiredSystemIds.includes(id) && typeof perms[id] === "string");
+      if (!ids.length) return [];
+      const rows = await prisma.systemAccess.findMany({ where: { id: { in: ids }, deletedAt: null }, select: { id: true, systemName: true } });
+      return rows.map((r) => ({ system: r.systemName, permission: perms[r.id] as string }));
+    })(),
     // Who signs an approval step: at Ankora in the product, at the client
     // by name (a contact Claude may not see is not named).
     approver: await (async () => {
