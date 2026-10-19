@@ -10,6 +10,7 @@ import { localDateKey } from "@/lib/timezone";
 import { appBaseUrl } from "@/lib/email-templates";
 import { FILE_TICKET_TTL_MINUTES, MAX_INLINE_UPLOAD_BYTES, decodeInlineFile, fileTicketUrl } from "@/lib/mcp/file-ticket";
 import { resolveByName } from "@/lib/mcp/resolve";
+import { setClientDocumentKind } from "@/lib/app-domain/client-documents";
 import {
   MAX_INLINE_IMAGE_BYTES,
   fileDocumentFromMcp,
@@ -158,6 +159,43 @@ export function registerDocumentTools(server: McpServer): void {
         return toolJson({ count: docs.length, documents: docs.map((d) => serializeDocument(d, tz)) });
       } catch (err) {
         console.error("[mcp] list_documents failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "set_document_kind",
+    {
+      title: "Change a document's kind",
+      description:
+        "Changes what a filed document is: POLICY (an insurance policy), PROCEDURE (a procedure or process Ankora wrote), CERTIFICATE, CONTRACT, INVOICE or OTHER. Use it when a document was filed with the wrong kind, for instance a procedure filed as POLICY or OTHER; the closing reminder says when that happened. Identify the document by `documentId` (list_documents). Internal: the client sees the new kind's label on their portal only if the document is visible to them.",
+      inputSchema: z.object({
+        documentId: z.string().min(1).describe("The document's exact id, from list_documents."),
+        kind: z.enum(KINDS).describe("The kind it should be."),
+      }),
+      annotations: TOOL_ANNOTATIONS.set_document_kind,
+    },
+    async (args: { documentId: string; kind: ClientDocumentKind }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        // The same lookup read_document uses, so a document on a client
+        // this person cannot see is "not found", not "forbidden".
+        const doc = await findDocumentForMcp(actor, args.documentId);
+        if (!doc) return toolText(`No document with id "${args.documentId}" that you can see. Call list_documents to find it.`);
+        const before = doc.kind;
+        await setClientDocumentKind(actor, doc.id, args.kind);
+        return toolJson({
+          updated: before !== args.kind,
+          documentId: doc.id,
+          title: doc.title,
+          kind: args.kind,
+          kindLabel: KIND_LABELS[args.kind],
+          previousKind: before,
+          client: doc.client.name,
+        });
+      } catch (err) {
+        console.error("[mcp] set_document_kind failed", err);
         return toolFailure(err);
       }
     }

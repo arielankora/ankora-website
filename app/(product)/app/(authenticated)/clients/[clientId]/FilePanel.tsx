@@ -6,6 +6,7 @@ import {
   discardSummaryAction,
   generateSummaryAction,
   removeClientDocumentAction,
+  setClientDocumentKindAction,
   setClientDocumentVisibilityAction,
 } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -79,7 +80,27 @@ export function DocumentsPanel({
                 {d.title}
                 <span className="text-appNavy/55">
                   {" · "}
-                  {DOCUMENT_KIND_LABELS[d.kind]}
+                  {/* 20.10.2026: the kind can be corrected after filing. A
+                      procedure filed as "פוליסה" used to stay one. */}
+                  <select
+                    aria-label={`סוג המסמך: ${d.title}`}
+                    value={d.kind}
+                    disabled={busy}
+                    onChange={(e) => {
+                      const kind = e.target.value as ClientDocumentKind;
+                      startTransition(async () => {
+                        const res = await setClientDocumentKindAction(d.id, kind);
+                        setRowError(res.ok ? null : res.error);
+                      });
+                    }}
+                    className="cursor-pointer appearance-none bg-transparent text-appNavy/55 underline decoration-dotted underline-offset-2 outline-none hover:text-appNavy disabled:opacity-50"
+                  >
+                    {(Object.keys(DOCUMENT_KIND_LABELS) as ClientDocumentKind[]).map((k) => (
+                      <option key={k} value={k}>
+                        {DOCUMENT_KIND_LABELS[k]}
+                      </option>
+                    ))}
+                  </select>
                   {d.taskTitle ? ` · ${d.taskTitle}` : ""}
                 </span>
               </span>

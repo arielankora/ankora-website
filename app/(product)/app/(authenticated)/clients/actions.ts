@@ -9,6 +9,7 @@ import { createDecision, cancelDecision } from "@/lib/app-domain/decisions";
 import {
   addClientDocument,
   removeClientDocument,
+  setClientDocumentKind,
   setClientDocumentVisibility,
   DriveNotConfiguredError,
 } from "@/lib/app-domain/client-documents";
@@ -235,6 +236,17 @@ export async function setClientDocumentVisibilityAction(documentId: string, clie
     const doc = await setClientDocumentVisibility(user, documentId, clientVisible);
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const, clientVisible: doc.clientVisible };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function setClientDocumentKindAction(documentId: string, kind: ClientDocumentKind) {
+  const user = await requireUser();
+  try {
+    const doc = await setClientDocumentKind(user, documentId, kind);
+    revalidatePath(`/app/clients/${doc.clientId}`);
+    return { ok: true as const, kind: doc.kind };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

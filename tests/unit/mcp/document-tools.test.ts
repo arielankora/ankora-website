@@ -44,7 +44,11 @@ const lookup = vi.hoisted(() => ({
 
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
+// 20.10.2026: set_document_kind writes through the client-documents domain.
+const documents = vi.hoisted(() => ({ setClientDocumentKind: vi.fn() }));
+
 vi.mock("@/lib/app-domain/mcp-files", () => files);
+vi.mock("@/lib/app-domain/client-documents", () => documents);
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: [] }));
 vi.mock("@/lib/app-domain/decisions", () => ({}));
@@ -244,5 +248,27 @@ describe("read_document", () => {
     files.listDocumentsForMcp.mockResolvedValue([DOC, { ...DOC, id: "doc-2" }]);
     const out = await json("read_document", { title: "טופס 101 חתום", taskId: "t1" });
     expect(out.text).toContain("documentId doc-2");
+  });
+});
+
+describe("set_document_kind (20.10.2026)", () => {
+  it("is a write that can be repeated safely", () => {
+    expect(TOOL_ANNOTATIONS.set_document_kind.readOnlyHint).toBe(false);
+    expect(TOOL_ANNOTATIONS.set_document_kind.idempotentHint).toBe(true);
+  });
+
+  it("changes the kind of a document this person can see, and says what it was", async () => {
+    const out = await json("set_document_kind", { documentId: "doc-1", kind: "PROCEDURE" });
+    expect(files.findDocumentForMcp).toHaveBeenCalledWith(ACTOR, "doc-1");
+    expect(documents.setClientDocumentKind).toHaveBeenCalledWith(ACTOR, "doc-1", "PROCEDURE");
+    expect(out.kindLabel).toBe("נוהל");
+    expect(out.previousKind).toBe(DOC.kind);
+  });
+
+  it("changes nothing for a document it cannot find", async () => {
+    files.findDocumentForMcp.mockResolvedValueOnce(null);
+    const out = await json("set_document_kind", { documentId: "nope", kind: "PROCEDURE" });
+    expect(out.text).toContain("No document");
+    expect(documents.setClientDocumentKind).not.toHaveBeenCalled();
   });
 });

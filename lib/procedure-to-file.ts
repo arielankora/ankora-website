@@ -87,7 +87,7 @@ export function reminderForClaude(
     return [
       "The task closed, but its procedure was not proposed to the client file.",
       ...(opts.misfiled
-        ? ["It was filed with a kind other than PROCEDURE; tell the user, so the next procedure is filed as PROCEDURE."]
+        ? [`It was filed with a kind other than PROCEDURE: fix it with set_document_kind (documentId ${documentIds[0]}, kind PROCEDURE), which needs no permission, and tell the user.`]
         : []),
       `Propose it now with propose_knowledge: the procedure as a PROCESS item (and SYSTEM, REQUEST_TYPE or POLICY items as needed), with newSource kind ANKORA_DOCUMENT and documentId ${documentIds[0]}.`,
       "Proposals wait for approval on the review screen, so no permission is needed to send them. Then remind the user to approve them. If it was already proposed from another source, tell the user and ignore this.",
@@ -104,5 +104,5 @@ export function reminderForClaude(
 export function reminderForScreen(kind: ProcedureReminderKind, opts: { misfiled?: boolean } = {}): string {
   if (kind === "MAPPING") return "המשימה נסגרה, אבל מה שמופה בה עוד לא הוצע לתיק הלקוח. כדאי להציע את הממצאים, ולאשר במסך הבדיקה.";
   const base = "המשימה נסגרה, אבל הנוהל שתויק בה עוד לא הוצע לתיק הלקוח. כדאי להציע אותו כתהליך, ולאשר במסך הבדיקה.";
-  return opts.misfiled ? `${base} הנוהל תויק בסוג אחר, ובפעם הבאה כדאי לתייק נוהל בסוג "נוהל".` : base;
+  return opts.misfiled ? `${base} הנוהל תויק בסוג אחר. אפשר לשנות אותו ל"נוהל" ברשימת המסמכים בתיק הלקוח.` : base;
 }

@@ -154,6 +154,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "extraction_guide.reject": "דחיית גרסה של הנחיות החילוץ",
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
+  "client_document.kind": "שינוי סוג מסמך",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",
   "client_document.read": "קריאת מסמך מתיק הלקוח דרך קלוד",
   "portal_summary.generate": "הפקת טיוטת סיכום חודשי",

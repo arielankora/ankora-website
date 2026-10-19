@@ -102,8 +102,9 @@ describe("a procedure filed as another kind (20.10.2026)", () => {
   it("says it was misfiled, to Claude and on the screen", () => {
     expect(reminderForClaude("PROCEDURE", "t1", ["d2"], { misfiled: true })).toContain("PROCEDURE");
     expect(reminderForClaude("PROCEDURE", "t1", ["d2"], { misfiled: true })).toContain("documentId d2");
-    expect(reminderForScreen("PROCEDURE", { misfiled: true })).toContain('בסוג "נוהל"');
-    expect(reminderForScreen("PROCEDURE")).not.toContain('בסוג "נוהל"');
+    expect(reminderForClaude("PROCEDURE", "t1", ["d2"], { misfiled: true })).toContain("set_document_kind");
+    expect(reminderForScreen("PROCEDURE", { misfiled: true })).toContain('לשנות אותו ל"נוהל"');
+    expect(reminderForScreen("PROCEDURE")).not.toContain('לשנות אותו ל"נוהל"');
     expect(reminderForScreen("PROCEDURE", { misfiled: true })).not.toMatch(/[\u2013\u2014]/);
   });
 });

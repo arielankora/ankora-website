@@ -173,6 +173,33 @@ export async function setClientDocumentVisibility(actor: User, documentId: strin
   return doc;
 }
 
+/// 20.10.2026: what a filed document is, changed after the fact. Until
+/// then the kind could only be chosen at upload, so a procedure filed as
+/// "פוליסה" stayed one unless it was uploaded again, and the closing check
+/// (lib/procedure-to-file.ts) had to keep guessing from its name.
+export async function setClientDocumentKind(actor: User, documentId: string, kind: ClientDocumentKind) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
+  if (!existing) throw new Error("המסמך לא נמצא.");
+  await assertClientAccess(actor, existing.clientId);
+  if (existing.kind === kind) return existing;
+
+  const doc = await prisma.clientDocument.update({ where: { id: documentId }, data: { kind } });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_document.kind",
+    entityType: "ClientDocument",
+    entityId: doc.id,
+    clientId: doc.clientId,
+    before: { kind: existing.kind },
+    after: { kind: doc.kind },
+  });
+
+  return doc;
+}
+
 /// Soft delete, like everything else here. The bytes stay in Drive: this
 /// removes the document from the product, and removing it from storage is
 /// a retention decision with a DPA attached to it, not a click.
