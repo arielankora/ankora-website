@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { createTask, removeTaskSteps } from "@/lib/app-domain/tasks";
+import { createTask, removeTaskSteps, updateTask } from "@/lib/app-domain/tasks";
 import { TaskPlanRuleError, normalizePlanBody, normalizePlanSteps, planVersionConflict } from "@/lib/task-plan-rules";
 
 // "קדם עם קלוד" (10.10.2026): the work plan of a task.
@@ -126,7 +126,7 @@ export async function saveTaskPlan(
     changeNote?: string | null;
     origin: EntryOrigin;
   }
-): Promise<TaskPlanRow> {
+): Promise<SavedTaskPlan> {
   const task = await writableTask(actor, taskId);
   const body = normalizePlanBody(input.body);
   const steps = normalizePlanSteps(input.steps);
@@ -184,7 +184,39 @@ export async function saveTaskPlan(
     clientId: task.clientId,
     after: { planVersion: saved.version, planStatus: saved.status, origin: saved.origin, stepCount: steps.length },
   });
-  return applyStepsIfTaskHasNone(actor, task.id, saved);
+  return afterApproval(actor, task.id, saved);
+}
+
+/// A saved or approved plan, plus whether that approval moved the task
+/// from OPEN to IN_PROGRESS.
+export type SavedTaskPlan = TaskPlanRow & { taskStarted: boolean };
+
+/// What an approved plan does to its task, on save through MCP and on
+/// approval on the screen alike: steps when it has none, and the status.
+async function afterApproval(actor: User, taskId: string, plan: TaskPlanRow): Promise<SavedTaskPlan> {
+  const withSteps = await applyStepsIfTaskHasNone(actor, taskId, plan);
+  const taskStarted = await startTaskIfOpen(actor, taskId, withSteps);
+  return { ...withSteps, taskStarted };
+}
+
+/// An approved plan moves an OPEN task to IN_PROGRESS (Ariel, 19.10.2026).
+///
+/// Agreeing on how the work will be done is the moment it begins, and a
+/// task that still says "פתוחה" after that tells the client portal and
+/// the team that nobody has picked it up. Enforced here rather than asked
+/// of Claude in the prompt, for the same reason as the steps: a rule the
+/// model has to remember is a rule that is sometimes forgotten.
+///
+/// Only from OPEN. A task that is waiting for approval, finished or
+/// archived is never moved by a plan, and a draft moves nothing. It goes
+/// through updateTask, so startedAt, the audit trail and everything else
+/// a status change does happen exactly as they do on the screen.
+async function startTaskIfOpen(actor: User, taskId: string, plan: TaskPlanRow): Promise<boolean> {
+  if (plan.status !== "APPROVED") return false;
+  const task = await prisma.task.findFirst({ where: { id: taskId, deletedAt: null }, select: { status: true } });
+  if (task?.status !== "OPEN") return false;
+  await updateTask(actor, taskId, { status: "IN_PROGRESS" });
+  return true;
 }
 
 /// When a task has no steps at all, an approved plan's steps become its
@@ -213,7 +245,7 @@ async function applyStepsIfTaskHasNone(actor: User, taskId: string, plan: TaskPl
 /// Agrees to a draft. Only the latest version can be approved: approving
 /// an older one would be agreeing to something that has already been
 /// rewritten.
-export async function approveTaskPlan(actor: User, taskId: string, version: number): Promise<TaskPlanRow> {
+export async function approveTaskPlan(actor: User, taskId: string, version: number): Promise<SavedTaskPlan> {
   const task = await writableTask(actor, taskId);
   const latest = await prisma.taskPlan.findFirst({
     where: { taskId: task.id },
@@ -237,7 +269,7 @@ export async function approveTaskPlan(actor: User, taskId: string, version: numb
     clientId: task.clientId,
     after: { planVersion: approved.version },
   });
-  return applyStepsIfTaskHasNone(actor, task.id, approved);
+  return afterApproval(actor, task.id, approved);
 }
 
 /// Makes the current plan's proposed steps the task's steps.

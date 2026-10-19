@@ -330,8 +330,9 @@ export async function saveTaskPlanAction(input: {
       origin: "APP",
     });
     revalidatePath(`/app/tasks/${input.taskId}`);
-    // A task with no steps gets the plan's steps on save.
-    if (saved.stepsAppliedAt) revalidatePath("/app/tasks");
+    // A task with no steps gets the plan's steps on save, and an open one
+    // moves to in progress: both change what the task list shows.
+    if (saved.stepsAppliedAt || saved.taskStarted) revalidatePath("/app/tasks");
     return { ok: true as const, version: saved.version, stepsAdded: saved.stepsAppliedAt !== null };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
@@ -354,8 +355,9 @@ export async function recordAdvancePromptCopiedAction(input: { taskId: string; m
 export async function approveTaskPlanAction(input: { taskId: string; version: number }) {
   const user = await requireUser();
   try {
-    await approveTaskPlan(user, input.taskId, input.version);
+    const approved = await approveTaskPlan(user, input.taskId, input.version);
     revalidatePath(`/app/tasks/${input.taskId}`);
+    if (approved.stepsAppliedAt || approved.taskStarted) revalidatePath("/app/tasks");
     return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
