@@ -24,6 +24,10 @@ describe("isMappingTask()", () => {
     expect(isMappingTask("פרטים\n\n---\n\n**HND-029** | שלב: מיפוי וצפייה | מאשר: אריאל")).toBe(true);
   });
 
+  it("is not fooled by a description that only quotes the stage (20.10.2026)", () => {
+    expect(isMappingTask('זיהוי משימת מיפוי מתבסס על הטקסט "שלב: מיפוי וצפייה" בתיאור.')).toBe(false);
+  });
+
   it("is not fooled by a task that only mentions mapping", () => {
     expect(isMappingTask("מיפוי SaaS, Admin ומשתמשים")).toBe(false);
     expect(isMappingTask("**HND-010** | שלב: ביצוע עצמאי")).toBe(false);
