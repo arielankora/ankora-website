@@ -55,6 +55,11 @@ import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-cal
 type Option = { id: string; name: string };
 
 export type PanelProcess = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
+  audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   clientVisible?: boolean;
   doNotDisclose?: string | null;
   id: string;
@@ -394,7 +399,7 @@ function ProcessForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} owner={false} disclose />
+      <ItemExtras existing={existing} owner={false} disclose audience />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
@@ -734,7 +739,7 @@ export function ProcessesPanel({
                     </ul>
                   )}
                   <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
-                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose }} disclose />
+                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, refs: p.refs }} disclose />
                   <SourceCodes sources={p.sources} options={sourceOptions} />
 
                   {p.current ? (

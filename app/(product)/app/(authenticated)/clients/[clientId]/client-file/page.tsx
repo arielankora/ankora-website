@@ -30,6 +30,11 @@ function Item({ item }: { item: DocItem }) {
         </span>
       )}
       {item.doNotDisclose && <span className="ms-1.5 text-xs font-medium text-red-700">לא לספר: {item.doNotDisclose}</span>}
+      {item.refs && item.refs.length > 0 && (
+        <span className="ms-1.5 font-jbmono text-[11px] text-appNavy/60" dir="ltr" data-testid="external-ref">
+          {item.refs.join(", ")}
+        </span>
+      )}
       {item.sources && item.sources.length > 0 && (
         <span className="ms-1.5 text-[11px] text-appNavy/45" dir="ltr">
           [{item.sources.join(", ")}]

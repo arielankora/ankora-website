@@ -37,7 +37,7 @@ import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
-import { applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
+import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 
 // Org brain, phase 2: proposals to the client file
@@ -270,7 +270,8 @@ export async function proposeKnowledge(
       continue;
     }
     // A change to an item already in the file says only what changes.
-    const updating = item.action === "SUPERSEDE" && isUpdatable(item.target);
+    // So does a contradiction of one: what was said otherwise.
+    const updating = (item.action === "SUPERSEDE" || item.action === "CONTRADICT") && isUpdatable(item.target);
     const parsed = updating ? (schema as unknown as { partial: () => typeof schema }).partial().safeParse(item.payload) : schema.safeParse(item.payload);
     if (!parsed.success) {
       dropped.push({ index, reason: `הפריט לא בנוי נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` });
@@ -283,7 +284,7 @@ export async function proposeKnowledge(
       }
     } else if (item.action !== "CREATE") {
       if (item.target !== "FACT" || !item.targetId) {
-        dropped.push({ index, reason: "סתירה היא רק של עובדה קיימת. עדכון (SUPERSEDE) הוא של עובדה, איש קשר, מערכת, סוג פנייה, כלל, ישות או תהליך, עם המזהה שלהם." });
+        dropped.push({ index, reason: "עדכון (SUPERSEDE) וסתירה (CONTRADICT) הם של פריט קיים: עובדה, איש קשר, ארגון, מערכת, סוג פנייה, כלל, ישות או תהליך, עם המזהה שלו." });
         continue;
       }
       const fact = await prisma.clientFact.findFirst({ where: { id: item.targetId, clientId: input.clientId, deletedAt: null, knowledgeStatus: { not: "SUPERSEDED" } } });
@@ -523,6 +524,9 @@ async function apply(
   // now: something approved earlier in the same batch is found too.
   const links = await resolveLinks(p.clientId, p.target, payload);
   const linked = links.fields;
+  if (p.action === "CONTRADICT" && p.targetId && isUpdatable(p.target)) {
+    return applyContradiction(actor, { clientId: p.clientId, target: p.target, targetId: p.targetId }, proposalHeadline(p.target as ProposalTargetLike, payload), sources);
+  }
   if (p.action === "SUPERSEDE" && p.targetId && isUpdatable(p.target)) {
     const schema = PAYLOADS[p.target] as unknown as { partial: () => { parse: (v: unknown) => Record<string, unknown> } };
     const { steps, highlights, outputs, ownerName: _o, params, interimParams, effectiveFrom, reviewBy, ...rest } = withoutLinkNames(schema.partial().parse(payload)) as Record<string, unknown>;

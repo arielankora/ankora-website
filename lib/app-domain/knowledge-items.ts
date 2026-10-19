@@ -19,6 +19,9 @@ export interface KnowledgeInput {
   audienceUserIds?: string[];
   doNotDisclose?: string | null;
   sensitivity?: KnowledgeSensitivity;
+  /// Spec 3.1: RAID-002, HND-014, ClickUp (lib/external-refs.ts). The
+  /// team's refs only; the product's own are kept by whoever writes.
+  externalRefs?: { system: string; id: string }[];
   /// Codes in the client's source register (spec 3.2). Required unless
   /// the item is "missing".
   sources?: SourceRef[];
@@ -40,6 +43,7 @@ export function knowledgeData(input: KnowledgeInput) {
     audienceUserIds: input.audienceUserIds ?? undefined,
     doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose?.trim() || null : undefined,
     sensitivity: input.sensitivity ?? undefined,
+    externalRefs: input.externalRefs !== undefined ? (input.externalRefs as Prisma.InputJsonValue) : undefined,
   };
 }
 

@@ -148,6 +148,54 @@ export async function addClientOrganization(actor: User, input: ClientOrganizati
   return link;
 }
 
+/// Spec 3.1: what the file says about an organization changes like any
+/// other item. The organization's name is its identity across Ankora and
+/// stays; its domains are shared like a person's email (decision 8), so a
+/// domain that belongs to another organization is refused.
+export async function updateClientOrganization(actor: User, id: string, input: Partial<Omit<ClientOrganizationInput, "clientId" | "name">>) {
+  assertCan(actor.role, "time_entry.create_self");
+  const before = await prisma.clientOrganization.findUnique({ where: { id }, include: { organization: true } });
+  if (!before || before.deletedAt) throw new Error("הארגון לא נמצא בתיק.");
+  await assertClientAccess(actor, before.clientId);
+  assertResolvable(input.knowledgeStatus ?? before.knowledgeStatus, input.toResolve !== undefined ? input.toResolve : before.toResolve);
+  if (input.monthlyCostMinor != null && (!Number.isInteger(input.monthlyCostMinor) || input.monthlyCostMinor < 0)) {
+    throw new Error("עלות חודשית לא תקינה.");
+  }
+  const sourced = await sourcedFields(before.clientId, input, [input.notes !== undefined ? input.notes : before.notes], before);
+
+  if (input.domains !== undefined) {
+    const domains = cleanList(input.domains, normalizeDomain);
+    const clash = domains.length
+      ? await prisma.organization.findFirst({ where: { id: { not: before.organizationId }, deletedAt: null, domains: { hasSome: domains } } })
+      : null;
+    if (clash) throw new Error(`הדומיין כבר שייך ל-${clash.name}.`);
+    await prisma.organization.update({ where: { id: before.organizationId }, data: { domains } });
+  }
+
+  const updated = await prisma.clientOrganization.update({
+    where: { id },
+    data: {
+      role: input.role !== undefined ? input.role?.trim() || null : undefined,
+      relationship: input.relationship ?? undefined,
+      monthlyCostMinor: input.monthlyCostMinor !== undefined ? input.monthlyCostMinor : undefined,
+      currency: input.currency !== undefined ? input.currency?.trim() || null : undefined,
+      notes: input.notes !== undefined ? input.notes?.trim() || null : undefined,
+      ...knowledgeData(input),
+      ...sourced,
+    },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_organization.update",
+    entityType: "ClientOrganization",
+    entityId: id,
+    clientId: before.clientId,
+    before,
+    after: updated,
+  });
+  return updated;
+}
+
 export async function removeClientOrganization(actor: User, id: string) {
   assertCan(actor.role, "time_entry.create_self");
   const link = await prisma.clientOrganization.findUnique({ where: { id } });

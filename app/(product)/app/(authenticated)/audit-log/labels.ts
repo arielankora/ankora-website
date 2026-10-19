@@ -92,6 +92,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_contact.remove": "הסרת איש קשר מתיק הלקוח",
   "client_organization.add": "הוספת ארגון לתיק הלקוח",
   "client_organization.remove": "הסרת ארגון מתיק הלקוח",
+  "client_organization.update": "עדכון ארגון בתיק הלקוח",
   "client_source.add": "הוספת מקור למרשם המקורות",
   "client_source.update": "עדכון מקור במרשם המקורות",
   "client_source.remove": "הסרת מקור ממרשם המקורות",

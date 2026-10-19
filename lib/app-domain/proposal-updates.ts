@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, User } from "@prisma/client";
 import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import { proposalHeadline, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { updateClientContact } from "@/lib/app-domain/client-contacts";
+import { updateClientContact, updateClientOrganization } from "@/lib/app-domain/client-contacts";
 import { updateSystemAccess } from "@/lib/app-domain/system-map";
 import { updateRequestType } from "@/lib/app-domain/request-types";
 import { updateClientPolicy } from "@/lib/app-domain/client-policies";
@@ -21,7 +21,7 @@ import { saveProcessVersion, updateProcess } from "@/lib/app-domain/processes";
 // manager approves it again. Only what the proposal says changes; the
 // sources it brings are added to the ones the item has.
 
-export const UPDATABLE_TARGETS = ["CONTACT", "SYSTEM", "REQUEST_TYPE", "POLICY", "ENTITY", "PROCESS"] as const;
+export const UPDATABLE_TARGETS = ["CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE", "POLICY", "ENTITY", "PROCESS"] as const;
 export type UpdatableTarget = (typeof UPDATABLE_TARGETS)[number];
 
 export function isUpdatable(target: string): target is UpdatableTarget {
@@ -36,6 +36,10 @@ export async function currentItem(clientId: string, target: string, id: string):
   if (target === "CONTACT") {
     const c = await prisma.clientContact.findFirst({ where: base, select: { role: true, sources: true, person: { select: { name: true } } } });
     return c ? { id, body: line("CONTACT", { name: c.person.name, role: c.role }), sources: c.sources } : null;
+  }
+  if (target === "ORGANIZATION") {
+    const o = await prisma.clientOrganization.findFirst({ where: base, select: { role: true, sources: true, organization: { select: { name: true } } } });
+    return o ? { id, body: line("ORGANIZATION", { name: o.organization.name, role: o.role }), sources: o.sources } : null;
   }
   if (target === "SYSTEM") {
     const s = await prisma.systemAccess.findFirst({ where: base, select: { systemName: true, purpose: true, accessStatus: true, sources: true } });
@@ -83,6 +87,13 @@ export async function applyUpdate(
   if (!now) throw new Error("הפריט שההצעה מעדכנת כבר לא בתיק. דוחים את ההצעה.");
   const input = { ...given(fields), sources: mergedSources(now.sources, added) };
   if (p.target === "CONTACT") await updateClientContact(actor, p.targetId, input as Parameters<typeof updateClientContact>[2]);
+  if (p.target === "ORGANIZATION") {
+    // The name is the organization's identity across Ankora: not changed
+    // from one client's meeting.
+    const { name: _name, ...org } = input as Record<string, unknown>;
+    void _name;
+    await updateClientOrganization(actor, p.targetId, org as Parameters<typeof updateClientOrganization>[2]);
+  }
   if (p.target === "SYSTEM") await updateSystemAccess(actor, p.targetId, input as Parameters<typeof updateSystemAccess>[2]);
   if (p.target === "REQUEST_TYPE") await updateRequestType(actor, p.targetId, input as Parameters<typeof updateRequestType>[2]);
   if (p.target === "POLICY") await updateClientPolicy(actor, p.targetId, input as Parameters<typeof updateClientPolicy>[2]);
@@ -103,4 +114,18 @@ export async function applyUpdate(
     }
   }
   return p.targetId;
+}
+
+/// Spec 5.2: someone said otherwise about an item, and it is not clear
+/// which is right. Nothing is overwritten: the item becomes "uncertain",
+/// with what was said beside it as what would close it, and the source
+/// that said it is added to its sources.
+export function contradictionNote(headline: string): string {
+  const said = headline.trim().replace(/\s+/g, " ");
+  const note = `נאמר אחרת: ${said}. לברר מה נכון.`;
+  return note.length > 500 ? `${note.slice(0, 497)}...` : note;
+}
+
+export async function applyContradiction(actor: User, p: { clientId: string; target: UpdatableTarget; targetId: string }, headline: string, added: SourceRef[]): Promise<string> {
+  return applyUpdate(actor, p, { knowledgeStatus: "UNCERTAIN", toResolve: contradictionNote(headline) }, added);
 }

@@ -114,16 +114,37 @@ export function ItemExtras({
   existing,
   owner = true,
   disclose = false,
+  audience = false,
 }: {
-  existing?: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null } | null;
+  existing?: {
+    clientVisible?: boolean;
+    ownerId?: string | null;
+    doNotDisclose?: string | null;
+    externalRefs?: string;
+    audience?: Audience;
+    audienceUserIds?: string[];
+  } | null;
   owner?: boolean;
   /// Spec 3.1, 6.1: "not to tell", for the forms that have no field of their own.
   disclose?: boolean;
+  /// Spec 3.1: who sees it, for the forms that have no field of their own.
+  audience?: boolean;
 }) {
   const staff = useContext(StaffContext);
   return (
     <div className="grid grid-cols-2 gap-3">
       <input type="hidden" name="itemExtras" value="1" />
+      {audience && (
+        <>
+          <input type="hidden" name="itemAudience" value="1" />
+          <AudienceField existing={existing} />
+        </>
+      )}
+      <div className="col-span-2">
+        <Field label="הפניות חיצוניות (RAID-002, ClickUp:86c1x)">
+          <input name="externalRefs" defaultValue={existing?.externalRefs ?? ""} placeholder="RAID-002, HND-014" className={INPUT} dir="ltr" />
+        </Field>
+      </div>
       {disclose && (
         <div className="col-span-2">
           <input type="hidden" name="itemDisclose" value="1" />
@@ -153,13 +174,26 @@ export function ItemExtras({
 }
 
 /// The two, as a line on the item. Nothing when neither is set.
-export function ItemTags({ item, disclose = false }: { item: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null }; disclose?: boolean }) {
+export function ItemTags({
+  item,
+  disclose = false,
+}: {
+  item: { clientVisible?: boolean; ownerId?: string | null; doNotDisclose?: string | null; refs?: string[]; verifiedAt?: string | null };
+  disclose?: boolean;
+}) {
   const staff = useContext(StaffContext);
   const owner = item.ownerId ? staff.find((u) => u.id === item.ownerId)?.name : null;
   const notToTell = disclose ? item.doNotDisclose?.trim() : null;
-  if (!item.clientVisible && !owner && !notToTell) return null;
+  const refs = item.refs ?? [];
+  if (!item.clientVisible && !owner && !notToTell && refs.length === 0 && !item.verifiedAt) return null;
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-appNavy/60" data-testid="item-tags">
+      {refs.map((r) => (
+        <span key={r} dir="ltr" className="rounded border border-lineDark px-1.5 py-0.5 font-jbmono text-[11px]" data-testid="external-ref">
+          {r}
+        </span>
+      ))}
+      {item.verifiedAt && <span>אומת: {new Date(item.verifiedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}</span>}
       {notToTell && <span className="w-full text-red-700" data-testid="do-not-disclose">לא לספר: {notToTell}</span>}
       {item.clientVisible && <StatusBadge label="גלוי ללקוח" tone="green" />}
       {owner && <span>בעלים: {owner}</span>}

@@ -9,6 +9,7 @@ import { factShapeError } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
 import { blockingChecks, readSteps } from "@/lib/process-rules";
 import { clientVisibleBlocker } from "@/lib/knowledge";
+import { parseExternalRefs, readExternalRefs, refLabel } from "@/lib/external-refs";
 
 const knowledge = {
   knowledgeStatus: z.enum(["CONFIRMED", "UNCERTAIN", "MISSING"]).optional(),
@@ -21,6 +22,14 @@ const knowledge = {
   clientVisible: z.boolean().optional(),
   /// Spec 3.1: who at Ankora keeps the item right, by name.
   ownerName: z.string().max(200).nullish(),
+  /// Spec 3.1: where the item lives elsewhere, as said ("RAID-002",
+  /// "ClickUp:86c1x"). Kept as { system, id }.
+  /// Stored already read, so it parses again when approved.
+  externalRefs: z
+    .array(z.union([z.string().max(120), z.object({ system: z.string().max(60), id: z.string().max(120) })]))
+    .max(20)
+    .optional()
+    .transform((v) => (v === undefined ? undefined : parseExternalRefs(v.map((r) => (typeof r === "string" ? r : `${r.system}:${r.id}`)).join(","))))
 };
 
 const day = z
@@ -408,9 +417,14 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
 
 /// What a reviewer needs beyond the headline to decide: a process's steps,
 /// an entity's identifiers, the whole of a long text. Empty for the rest.
+function refsDetail(v: unknown): string {
+  const refs = readExternalRefs(v).map(refLabel);
+  return refs.length ? `הפניות: ${refs.join(", ")}` : "";
+}
+
 export function proposalDetails(target: ProposalTargetLike, payload: Record<string, unknown>): string[] {
   // Spec 3.1, on every kind of item.
-  const common = [...linkDetails(payload), payload.clientVisible === true ? "גלוי ללקוח" : "", typeof payload.ownerName === "string" && payload.ownerName.trim() ? `בעלים: ${payload.ownerName.trim()}` : ""].filter(Boolean);
+  const common = [...linkDetails(payload), payload.clientVisible === true ? "גלוי ללקוח" : "", typeof payload.ownerName === "string" && payload.ownerName.trim() ? `בעלים: ${payload.ownerName.trim()}` : "", refsDetail(payload.externalRefs)].filter(Boolean);
   return [...itemDetails(target, payload), ...common];
 }
 

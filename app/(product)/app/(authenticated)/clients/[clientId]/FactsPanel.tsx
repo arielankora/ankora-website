@@ -35,6 +35,11 @@ import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption,
 // "היסטוריה", so the file can always say what we thought before.
 
 export type PanelFact = {
+  /// When a person last confirmed it, as ISO.
+  verifiedAt?: string | null;
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
   clientVisible?: boolean;
   ownerId?: string | null;
   id: string;

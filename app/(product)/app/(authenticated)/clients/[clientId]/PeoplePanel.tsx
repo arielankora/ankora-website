@@ -11,6 +11,7 @@ import {
   updateClientContactAction,
   removeClientContactAction,
   addClientOrganizationAction,
+  updateClientOrganizationAction,
   removeClientOrganizationAction,
 } from "../people-actions";
 
@@ -36,6 +37,9 @@ const RELATIONSHIP_LABELS: Record<Relationship, string> = {
 export type { SourceOption };
 
 export type PanelContact = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
   clientVisible?: boolean;
   ownerId?: string | null;
   id: string;
@@ -63,6 +67,11 @@ export type PanelContact = {
 };
 
 export type PanelOrganization = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
+  audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   clientVisible?: boolean;
   doNotDisclose?: string | null;
   ownerId?: string | null;
@@ -200,19 +209,22 @@ function OrganizationForm({
   clientId,
   organizationNames,
   sourceOptions,
+  existing,
 }: {
   clientId: string;
   organizationNames: string[];
   sourceOptions: SourceOption[];
+  existing?: PanelOrganization;
 }) {
   const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(addClientOrganizationAction, close);
-  const [status, setStatus] = useState<KnowledgeStatusLike>("CONFIRMED");
+  const { onSubmit, pending, error } = useActionForm(existing ? updateClientOrganizationAction : addClientOrganizationAction, close);
+  const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.status ?? "CONFIRMED");
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       <input type="hidden" name="clientId" value={clientId} />
-      <Field label="שם הארגון *">
-        <input name="name" required list="org-form-names" placeholder="Nextage" className={INPUT} />
+      {existing && <input type="hidden" name="id" value={existing.id} />}
+      <Field label={existing ? "שם הארגון (משותף לכל אנקורה, לא נערך כאן)" : "שם הארגון *"}>
+        <input name="name" required={!existing} readOnly={!!existing} defaultValue={existing?.name ?? ""} list="org-form-names" placeholder="Nextage" className={INPUT} />
         <datalist id="org-form-names">
           {organizationNames.map((n) => (
             <option key={n} value={n} />
@@ -220,14 +232,14 @@ function OrganizationForm({
         </datalist>
       </Field>
       <Field label="דומיין">
-        <input name="domains" dir="ltr" placeholder="nextage.co.il" className={INPUT} />
+        <input name="domains" dir="ltr" defaultValue={existing?.domains.join(", ") ?? ""} placeholder="nextage.co.il" className={INPUT} />
       </Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="מה הוא ללקוח">
-          <input name="role" placeholder="הנהלת חשבונות ושכר" className={INPUT} />
+          <input name="role" defaultValue={existing?.role ?? ""} placeholder="הנהלת חשבונות ושכר" className={INPUT} />
         </Field>
         <Field label="סוג">
-          <select name="relationship" defaultValue="PROVIDER" className={INPUT}>
+          <select name="relationship" defaultValue={existing?.relationship ?? "PROVIDER"} className={INPUT}>
             <option value="PROVIDER">{RELATIONSHIP_LABELS.PROVIDER}</option>
             <option value="ADVISOR">{RELATIONSHIP_LABELS.ADVISOR}</option>
             <option value="SUPPLIER">{RELATIONSHIP_LABELS.SUPPLIER}</option>
@@ -237,17 +249,17 @@ function OrganizationForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Field label="עלות חודשית">
-          <input name="monthlyCost" dir="ltr" inputMode="decimal" placeholder="22000" className={INPUT} />
+          <input name="monthlyCost" dir="ltr" inputMode="decimal" defaultValue={existing?.monthlyCostMinor != null ? String(existing.monthlyCostMinor / 100) : ""} placeholder="22000" className={INPUT} />
         </Field>
         <Field label="מטבע">
-          <select name="currency" defaultValue="ILS" className={INPUT}>
+          <select name="currency" defaultValue={existing?.currency ?? "ILS"} className={INPUT}>
             <option value="ILS">₪</option>
             <option value="USD">$</option>
           </select>
         </Field>
       </div>
       <Field label="הערות">
-        <textarea name="notes" rows={2} className={INPUT} />
+        <textarea name="notes" rows={2} defaultValue={existing?.notes ?? ""} className={INPUT} />
       </Field>
       <Field label="סטטוס">
         <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
@@ -256,16 +268,16 @@ function OrganizationForm({
           <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
         </select>
       </Field>
-      <SourcesField options={sourceOptions} status={status} />
-      <ItemExtras disclose />
+      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
-          <input name="toResolve" required className={INPUT} />
+          <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
         </Field>
       )}
       {error && <p className="text-sm text-red-600">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-gold-gradient px-5 py-2.5 text-sm font-medium text-navy disabled:opacity-50">
-        {pending ? "שומר..." : "הוספה לתיק"}
+        {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
       </button>
     </form>
   );
@@ -379,9 +391,14 @@ export function PeoplePanel({
                   <ItemTags item={o} disclose />
                   <SourceCodes sources={o.sources} options={sourceOptions} />
                 </div>
-                <button type="button" onClick={() => removeOrganization(o)} className="shrink-0 text-xs text-appNavy/50 hover:text-red-600">
-                  הסרה
-                </button>
+                <div className="flex shrink-0 items-center gap-3">
+                  <Drawer triggerLabel="עריכה" title={`עריכת ${o.name}`} variant="link">
+                    <OrganizationForm clientId={clientId} organizationNames={organizationNames} sourceOptions={sourceOptions} existing={o} />
+                  </Drawer>
+                  <button type="button" onClick={() => removeOrganization(o)} className="text-xs text-appNavy/50 hover:text-red-600">
+                    הסרה
+                  </button>
+                </div>
               </li>
             ))}
           </ul>

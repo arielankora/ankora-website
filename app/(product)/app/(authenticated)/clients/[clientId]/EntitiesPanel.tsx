@@ -15,6 +15,11 @@ import { Field, INPUT, SourceCodes, SourcesField, StatusLine, type SourceOption,
 // ask. The entity then reads as missing too, until it is filled.
 
 export type PanelEntity = {
+  /// Spec 3.1: the team's refs, as form text and as labels.
+  externalRefs?: string;
+  refs?: string[];
+  audience?: "ALL_STAFF" | "ACCOUNT_TEAM" | "RESTRICTED";
+  audienceUserIds?: string[];
   clientVisible?: boolean;
   doNotDisclose?: string | null;
   ownerId?: string | null;
@@ -132,7 +137,7 @@ function EntityForm({
         </select>
       </Field>
       <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
-      <ItemExtras existing={existing} disclose />
+      <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">
           <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />

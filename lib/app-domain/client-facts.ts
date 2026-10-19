@@ -1,4 +1,5 @@
 import "server-only";
+import { teamRefs, withInternalRefs } from "@/lib/external-refs";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -135,6 +136,9 @@ export async function supersedeClientFact(actor: User, id: string, input: Omit<C
     ...input,
     ownerId: input.ownerId !== undefined ? input.ownerId : old.ownerId,
     clientVisible: input.clientVisible ?? (old.clientVisible && !clientVisibleBlocker({ sensitivity: input.sensitivity ?? old.sensitivity, audience: input.audience ?? old.audience, doNotDisclose: input.doNotDisclose !== undefined ? input.doNotDisclose : old.doNotDisclose })),
+    // Spec 3.1: the team's refs as given, or as they were; the product's
+    // own (a date's question) always carried over.
+    externalRefs: withInternalRefs(old.externalRefs, input.externalRefs ?? teamRefs(old.externalRefs)),
   });
 
   const now = new Date();
