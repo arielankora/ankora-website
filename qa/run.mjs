@@ -22,6 +22,7 @@ import { accessibility, buildPresent } from "./checks/a11y.mjs";
 import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
+import { urlNumbers } from "./checks/boundary.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
 import { isShard, ALWAYS, shardsFor, splitFor, PLAN, MAIN_SHARD } from "./lib/shards.mjs";
@@ -199,10 +200,19 @@ async function main() {
   // deps / rbac / boundary / perf land in a later stage; the runner
   // reserves their slots so adding one is a one-line change here. e2e and
   // a11y are no longer among them - both are implemented.
+  // The reserved `boundary` slot, filled. Blocking, and level 1: it is a
+  // source scan that costs a second, and the two bugs it exists to stop were
+  // both shipped to production on screens a client could reach. A gate that
+  // waits for Sunday to tell you is not the gate for this one.
+  await run.check(
+    "boundary",
+    { label: "Boundary & data integrity", level: 1 },
+    urlNumbers,
+  );
+
   for (const [id, label, lvl] of [
     ["deps", "Dependency advisories", 2],
     ["rbac", "Permission matrix", 3],
-    ["boundary", "Boundary & data integrity", 3],
     ["perf", "Performance budgets", 3],
   ]) {
     await run.check(id, { label, level: lvl, blocking: false, skipIf: async () => "not implemented yet (stage 2)" }, async () => []);

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
+import { parsePageNumber } from "@/lib/url-numbers";
 import { can } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -35,7 +36,10 @@ export default async function AuditLogPage(
 
   const entityType = searchParams.entityType && ENTITY_TYPES.includes(searchParams.entityType) ? searchParams.entityType : undefined;
   const q = searchParams.q?.trim();
-  const page = Math.max(1, Number(searchParams.page) || 1);
+  // Parsed, not coerced. `Math.max(1, Number(raw) || 1)` lets `?page=1.001`
+  // and `?page=1e999` through, and both reach Prisma as a `skip` that is not
+  // a whole number, which is a 500 on this screen. See lib/url-numbers.ts.
+  const page = parsePageNumber(searchParams.page);
 
   const where = {
     ...(entityType ? { entityType } : {}),
