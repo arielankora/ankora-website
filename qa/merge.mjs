@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "./lib/discover.mjs";
 import { Run, finding } from "./lib/report.mjs";
-import { SHARDS, ALWAYS } from "./lib/shards.mjs";
+import { SHARDS, ALWAYS, SHARD_CHECKS } from "./lib/shards.mjs";
 
 function arg(name, fallback = null) {
   const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
@@ -54,6 +54,16 @@ export function readShards(dir) {
     try {
       const payload = JSON.parse(fs.readFileSync(file, "utf8"));
       const name = payload.shard ?? path.basename(file).replace(/^shard-|\.json$/g, "");
+      // A report with no rows in it is not a report.
+      //
+      // Run #510 found out how one gets here: a unit test constructed a
+      // Run for the `utc` shard and called persist(), which wrote a real
+      // shard-utc.json into qa/reports - inside the `main` job, whose
+      // artefact then carried it. The merge downloaded two files claiming
+      // to be the utc shard, and which one won came down to whose
+      // timestamp was later. The test is fixed; this is so that the next
+      // stray file cannot shadow a real shard either.
+      if (!Array.isArray(payload.checks) || payload.checks.length === 0) continue;
       // Two files for one shard means a re-run left an old artefact behind.
       // Keep the one that started later; say nothing, because this is normal.
       const prev = found.get(name);
@@ -96,6 +106,36 @@ export function missingShardChecks(expected, found, broken) {
       ],
     });
   }
+  // A shard that reported, but without the checks it exists to run.
+  //
+  // Stronger than counting shards: a shard can arrive complete-looking and
+  // still be missing the one pass it owns, which is how a quarter of the
+  // hunt disappears while every job shows a tick.
+  for (const [name, payload] of found) {
+    const owned = SHARD_CHECKS[name] ?? [];
+    const present = new Set((payload.checks ?? []).map((c) => c.id));
+    const absent = owned.filter((id) => !present.has(id));
+    if (absent.length === 0) continue;
+    rows.push({
+      id: `shard-${name}-incomplete`,
+      label: `Shard: ${name}`,
+      status: "fail",
+      blocking: true,
+      ms: 0,
+      findings: [
+        finding(
+          "blocker",
+          `the "${name}" shard reported without ${absent.join(", ")}`,
+          [
+            `qa/lib/shards.mjs says this shard runs: ${owned.join(", ")}.`,
+            `Its report does not contain: ${absent.join(", ")}.`,
+            "Either the runner did not get that far, or another file claiming to be this shard was merged in its place.",
+          ].join("\n"),
+        ),
+      ],
+    });
+  }
+
   for (const why of broken) {
     rows.push({
       id: "shard-unreadable",

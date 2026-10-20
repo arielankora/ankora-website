@@ -66,11 +66,26 @@ describe("Run, sharded", () => {
     expect(run.checks).toEqual([]);
   });
 
+  // persist() writes into the real qa/reports and appends to the real job
+  // summary, so this test has to clean up after itself. Run #510 is why:
+  // this very test left a shard-utc.json in qa/reports inside the `main`
+  // job, the job's artefact carried it, and the merge then had two files
+  // claiming to be the utc shard. A unit test is not allowed to put
+  // evidence into the run it is being run by.
   it("writes only its own file, never last.json", () => {
-    const run = new Run(3, { shard: "utc" });
-    const out = run.persist();
-    expect(out).toContain("shard-utc.json");
-    expect(out).not.toContain("last.json");
+    const summary = process.env.GITHUB_STEP_SUMMARY;
+    delete process.env.GITHUB_STEP_SUMMARY;
+    const file = path.join(process.cwd(), "qa", "reports", "shard-utc.json");
+    const existed = fs.existsSync(file);
+    try {
+      const run = new Run(3, { shard: "utc" });
+      const out = run.persist();
+      expect(out).toContain("shard-utc.json");
+      expect(out).not.toContain("last.json");
+    } finally {
+      if (!existed) fs.rmSync(file, { force: true });
+      if (summary !== undefined) process.env.GITHUB_STEP_SUMMARY = summary;
+    }
   });
 });
 
@@ -108,6 +123,32 @@ describe("merging the shards", () => {
       ["coverage", payload("coverage", "2026-10-25T03:00:00.000Z", 1000, [{ id: "coverage" }])],
     ]);
     expect(missingShardChecks(["main", "coverage"], found, [])).toEqual([]);
+  });
+
+  it("ignores a report with no rows in it, so a stray file cannot shadow a shard", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-merge-"));
+    fs.mkdirSync(path.join(dir, "real"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "stray"), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "real", "shard-utc.json"),
+      JSON.stringify(payload("utc", "2026-10-25T03:00:00.000Z", 1000, [{ id: "integration-utc" }])),
+    );
+    // Later timestamp, no checks: exactly what a unit test's persist() left
+    // in the main shard's artefact in run #510.
+    fs.writeFileSync(
+      path.join(dir, "stray", "shard-utc.json"),
+      JSON.stringify(payload("utc", "2026-10-25T09:00:00.000Z", 0, [])),
+    );
+    const { found } = readShards(dir);
+    expect(found.get("utc")!.checks.map((c: Check) => c.id)).toEqual(["integration-utc"]);
+  });
+
+  it("fails a shard that reported without the check it owns", () => {
+    const found = new Map([["utc", payload("utc", "2026-10-25T03:00:00.000Z", 1000, [{ id: "preflight" }])]]);
+    const rows = missingShardChecks(["utc"], found, []);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].findings[0].title).toContain("integration-utc");
+    expect(rows[0].blocking).toBe(true);
   });
 
   it("calls an unreadable report a blocker rather than dropping it", () => {
