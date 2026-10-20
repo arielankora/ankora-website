@@ -301,7 +301,7 @@ function FactRow({
   ].filter(Boolean);
 
   return (
-    <li className={`py-3 ${closed ? "opacity-60" : ""}`}>
+    <li id={`item-${fact.id}`} className={`py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${closed ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-app-text-primary">{fact.body}</p>

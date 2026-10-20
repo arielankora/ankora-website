@@ -349,7 +349,7 @@ export function PeoplePanel({
         ) : (
           <ul className="mt-4 divide-y divide-app-border">
             {contacts.map((c) => (
-              <li key={c.id} className="py-3">
+              <li key={c.id} id={`item-${c.id}`} className="py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-app-text-primary">
@@ -399,7 +399,7 @@ export function PeoplePanel({
         ) : (
           <ul className="mt-4 divide-y divide-app-border">
             {organizations.map((o) => (
-              <li key={o.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+              <li key={o.id} id={`item-${o.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-app-text-primary">{o.name}</p>
                   <p className="text-xs text-app-text-secondary">

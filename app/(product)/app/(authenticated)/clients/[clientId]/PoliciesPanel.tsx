@@ -385,7 +385,7 @@ export function PoliciesPanel({
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {live.map((p) => (
-            <li key={p.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+            <li key={p.id} id={`item-${p.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-app-text-primary">{p.title}</p>

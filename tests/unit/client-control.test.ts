@@ -118,7 +118,7 @@ describe("what is behind each count (spec 7.6)", () => {
   });
 
   it("names the same rows the counts come from", () => {
-    const d = controlDetails({
+    const full = controlDetails({
       processes: [
         { code: "P1", title: "תשלומי ספקים", transitionStatus: "WITH_ANKORA", completeness: { score: 9 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
         { code: "P2", title: "דוח רבעוני", transitionStatus: "IN_HANDOVER", completeness: { score: 6 }, needsReview: true, reviewLabel: "כלל השתנה", backupOwnerId: null, status: "ACTIVE", clientVisible: true },
@@ -132,9 +132,13 @@ describe("what is behind each count (spec 7.6)", () => {
       otherItems: [{ label: "Mercury", knowledgeStatus: "CONFIRMED", fieldStatus: {}, clientVisible: true }],
       systems: [{ systemName: "Doka", accessStatus: "PENDING" }],
     });
+    const d = Object.fromEntries(Object.entries(full).map(([k, v]) => [k, v!.map((x) => x.text)])) as Record<string, string[]>;
+    expect(full.completeness![0].note).toBe("6 מתוך 9");
+    expect(full.needsReview![0].note).toBe("כלל השתנה");
+    expect(full.systemsWithoutAccess![0].note).toBe("הגישה ממתינה");
     expect(d.processes).toEqual(["P1 תשלומי ספקים", "P2 דוח רבעוני"]);
-    expect(d.completeness).toEqual(["P2 דוח רבעוני: 6 מתוך 9"]);
-    expect(d.needsReview).toEqual(["P2 דוח רבעוני: כלל השתנה"]);
+    expect(d.completeness).toEqual(["P2 דוח רבעוני"]);
+    expect(d.needsReview).toEqual(["P2 דוח רבעוני"]);
     expect(d.noBackup).toEqual(["P2 דוח רבעוני"]);
     expect(d.exceptionsRequested).toEqual(["סף: תשלום בלי אישור"]);
     expect(d.uncertain).toEqual(["מגבלת Justworks"]);
@@ -148,6 +152,22 @@ describe("what is behind each count (spec 7.6)", () => {
     const many = Array.from({ length: CONTROL_DETAIL_LIMIT + 5 }, (_, i) => ({ label: `פריט ${i}`, knowledgeStatus: "CONFIRMED" as const, fieldStatus: {} }));
     const d = controlDetails({ processes: [], exceptions: [], facts: [], otherItems: many, systems: [] });
     expect(d.noOwner).toHaveLength(CONTROL_DETAIL_LIMIT + 1);
-    expect(d.noOwner!.at(-1)).toBe("ועוד 5");
+    expect(d.noOwner!.at(-1)).toEqual({ text: "ועוד 5" });
+  });
+});
+
+describe("control details lead to the item", () => {
+  it("each name carries the item's id, and why it is listed", () => {
+    const d = controlDetails({
+      processes: [],
+      exceptions: [{ status: "APPROVED", what: "בלי אישור עד 1.11", ruleTitle: "סף", policyId: "pol1" }],
+      facts: [{ id: "f1", kind: "NOTE", body: "מגבלת Justworks", answeredAt: null, closedAt: null, knowledgeStatus: "UNCERTAIN", fieldStatus: {}, ownerId: null, toResolve: "לשאול את שני" }],
+      otherItems: [],
+      systems: [{ id: "s1", systemName: "Mercury", accessStatus: "NO_ACCESS" }],
+    });
+    expect(d.uncertain).toEqual([{ text: "מגבלת Justworks", id: "f1", note: "לשאול את שני" }]);
+    expect(d.noOwner).toEqual([{ text: "מגבלת Justworks", id: "f1" }]);
+    expect(d.exceptionsInForce).toEqual([{ text: "סף: בלי אישור עד 1.11", id: "pol1" }]);
+    expect(d.systemsWithoutAccess).toEqual([{ text: "Mercury", id: "s1", note: "אין גישה" }]);
   });
 });

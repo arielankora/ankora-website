@@ -141,36 +141,48 @@ export function controlFrom(input: {
 export const CONTROL_DETAIL_LIMIT = 30;
 
 export type DetailInput = {
-  processes: { code: string; title: string; transitionStatus: string; completeness: { score: number }; needsReview: boolean; reviewLabel?: string | null; backupOwnerId: string | null; status: string; clientVisible?: boolean }[];
-  exceptions: { status: string; what: string; ruleTitle?: string | null }[];
-  facts: (Item & { kind: string; body: string; answeredAt: Date | null; closedAt: Date | null })[];
-  otherItems: (Item & { label: string })[];
-  systems: { systemName: string; accessStatus: string }[];
+  processes: { id?: string; code: string; title: string; transitionStatus: string; completeness: { score: number }; needsReview: boolean; reviewLabel?: string | null; backupOwnerId: string | null; status: string; clientVisible?: boolean }[];
+  exceptions: { status: string; what: string; ruleTitle?: string | null; policyId?: string | null }[];
+  facts: (Item & { id?: string; kind: string; body: string; answeredAt: Date | null; closedAt: Date | null; toResolve?: string | null })[];
+  otherItems: (Item & { id?: string; label: string; toResolve?: string | null })[];
+  systems: { id?: string; systemName: string; accessStatus: string }[];
 };
 
-export function controlDetails(input: DetailInput): Partial<Record<ControlKey, string[]>> {
+/// One name behind a count, and where it lives in the file, so a click
+/// opens the item itself, where it is understood and fixed (Ariel,
+/// 20.10.2026: the list was only text). `note` says why it is listed,
+/// when the name alone does not.
+export type ControlDetail = { text: string; id?: string; note?: string };
+
+const ACCESS_NOTE: Record<string, string> = { NO_ACCESS: "אין גישה", PENDING: "הגישה ממתינה" };
+
+export function controlDetails(input: DetailInput): Partial<Record<ControlKey, ControlDetail[]>> {
   const live = input.processes.filter((p) => p.status !== "RETIRED");
   const name = (p: { code: string; title: string }) => `${p.code} ${p.title}`;
+  const proc = (p: (typeof live)[number], note?: string): ControlDetail => ({ text: name(p), id: p.id, ...(note ? { note } : {}) });
   const facts = input.facts.filter((f) => f.kind !== "QUESTION" && !f.closedAt).map((f) => ({ ...f, label: f.body }));
   const items = [...facts, ...input.otherItems];
+  const item = (i: (typeof items)[number], note?: string | null): ControlDetail => ({ text: i.label, id: i.id, ...(note?.trim() ? { note: note.trim() } : {}) });
   const uncertain = (i: Item) => {
     const s = effectiveStatus(i.knowledgeStatus, parseFieldStatus(i.fieldStatus));
     return s === "UNCERTAIN" || s === "MISSING";
   };
-  const cap = (xs: string[]) => (xs.length > CONTROL_DETAIL_LIMIT ? [...xs.slice(0, CONTROL_DETAIL_LIMIT), `ועוד ${xs.length - CONTROL_DETAIL_LIMIT}`] : xs);
-  const out: Partial<Record<ControlKey, string[]>> = {
-    processes: live.map(name),
-    completeness: live.filter((p) => p.completeness.score < 9).sort((a, b) => a.completeness.score - b.completeness.score).map((p) => `${name(p)}: ${p.completeness.score} מתוך 9`),
-    needsReview: live.filter((p) => p.needsReview).map((p) => (p.reviewLabel ? `${name(p)}: ${p.reviewLabel}` : name(p))),
-    noBackup: live.filter((p) => !p.backupOwnerId).map(name),
-    exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").map((e) => (e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what)),
-    exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").map((e) => (e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what)),
-    uncertain: items.filter(uncertain).map((i) => i.label),
-    openQuestions: input.facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).map((f) => f.body),
-    clientVisible: [...live.filter((p) => p.clientVisible).map(name), ...items.filter((i) => i.clientVisible).map((i) => i.label)],
-    noOwner: items.filter((i) => !i.ownerId).map((i) => i.label),
-    systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").map((s) => s.systemName),
+  const cap = (xs: ControlDetail[]) => (xs.length > CONTROL_DETAIL_LIMIT ? [...xs.slice(0, CONTROL_DETAIL_LIMIT), { text: `ועוד ${xs.length - CONTROL_DETAIL_LIMIT}` }] : xs);
+  const exception = (e: DetailInput["exceptions"][number]): ControlDetail => ({ text: e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what, id: e.policyId ?? undefined });
+  const out: Partial<Record<ControlKey, ControlDetail[]>> = {
+    processes: live.map((p) => proc(p)),
+    completeness: live.filter((p) => p.completeness.score < 9).sort((a, b) => a.completeness.score - b.completeness.score).map((p) => proc(p, `${p.completeness.score} מתוך 9`)),
+    needsReview: live.filter((p) => p.needsReview).map((p) => proc(p, p.reviewLabel ?? undefined)),
+    noBackup: live.filter((p) => !p.backupOwnerId).map((p) => proc(p)),
+    exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").map(exception),
+    exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").map(exception),
+    uncertain: items.filter(uncertain).map((i) => item(i, i.toResolve)),
+    openQuestions: input.facts.filter((f) => f.kind === "QUESTION" && !f.answeredAt).map((f) => ({ text: f.body, id: f.id })),
+    clientVisible: [...live.filter((p) => p.clientVisible).map((p) => proc(p)), ...items.filter((i) => i.clientVisible).map((i) => item(i))],
+    noOwner: items.filter((i) => !i.ownerId).map((i) => item(i)),
+    systemsWithoutAccess: input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").map((s) => ({ text: s.systemName, id: s.id, note: ACCESS_NOTE[s.accessStatus] })),
   };
-  for (const k of Object.keys(out) as ControlKey[]) out[k] = cap(out[k]!.map((x) => (x.length > 140 ? `${x.slice(0, 139)}…` : x)));
+  const short = (x: string) => (x.length > 140 ? `${x.slice(0, 139)}…` : x);
+  for (const k of Object.keys(out) as ControlKey[]) out[k] = cap(out[k]!.map((d) => ({ ...d, text: short(d.text), ...(d.note ? { note: short(d.note) } : {}) })));
   return out;
 }

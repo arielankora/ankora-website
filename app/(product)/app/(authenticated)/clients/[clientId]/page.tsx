@@ -348,7 +348,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           clientId={client.id}
           details={controlDetails({
             processes: processes.map((p) => ({ ...p, reviewLabel: readReviewReason(p.reviewReason) ? REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!] : null })),
-            exceptions: exceptions.map((e) => ({ status: e.status, what: e.what, ruleTitle: policies.find((r) => r.id === e.policyId)?.title ?? null })),
+            exceptions: exceptions.map((e) => ({ status: e.status, what: e.what, ruleTitle: policies.find((r) => r.id === e.policyId)?.title ?? null, policyId: e.policyId })),
             facts: facts.current,
             otherItems: [
               ...people.contacts.map((c) => ({ ...c, label: c.person.name ?? c.role ?? "איש קשר" })),

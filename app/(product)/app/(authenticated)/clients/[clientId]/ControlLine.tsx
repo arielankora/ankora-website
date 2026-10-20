@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
-import type { ControlKey, ControlPart } from "@/lib/client-control";
+import type { ControlDetail, ControlKey, ControlPart } from "@/lib/client-control";
 
 // The control line at the top of a client (spec 7.6): where the handover
 // stands and what needs a person, in one line. A count that has names
 // behind it opens them, under the line, and links to the section that
-// holds them: the line answers "how many", one click answers "which".
+// holds them: the line answers "how many", one click answers "which", and
+// a click on a name opens that item in the file, where it is fixed.
 
 /// Where each count lives in the file tab.
 const SECTION: Partial<Record<ControlKey, string>> = {
@@ -17,7 +18,7 @@ const SECTION: Partial<Record<ControlKey, string>> = {
   exceptionsRequested: "rules",
 };
 
-export function ControlLine({ parts, details = {}, clientId }: { parts: ControlPart[]; details?: Partial<Record<ControlKey, string[]>>; clientId?: string }) {
+export function ControlLine({ parts, details = {}, clientId }: { parts: ControlPart[]; details?: Partial<Record<ControlKey, ControlDetail[]>>; clientId?: string }) {
   const [open, setOpen] = useState<ControlKey | null>(null);
   if (parts.length === 0) return null;
   const shown = open ? (details[open] ?? []) : [];
@@ -52,7 +53,17 @@ export function ControlLine({ parts, details = {}, clientId }: { parts: ControlP
         <div className="mt-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs text-app-text-secondary" data-testid="control-details">
           <ul className="space-y-0.5">
             {shown.map((n, i) => (
-              <li key={i}>• {n}</li>
+              <li key={i}>
+                •{" "}
+                {n.id && clientId ? (
+                  <a href={`/app/clients/${clientId}?tab=file#item-${n.id}`} className="text-app-text-primary underline decoration-dotted underline-offset-2 hover:text-app-text-accent" data-testid="control-detail-link">
+                    {n.text}
+                  </a>
+                ) : (
+                  n.text
+                )}
+                {n.note && <span className="text-app-text-tertiary"> · {n.note}</span>}
+              </li>
             ))}
           </ul>
           {clientId && (
