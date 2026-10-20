@@ -136,9 +136,20 @@ async function main() {
     { label: "Unit tests (UTC, like the server)", level: 1, skipIf: needs.prisma },
     vitest.unitUtc,
   );
+  // Not blocking, and that is a deliberate narrowing made on 20.10.2026.
+  //
+  // This is the only check in the suite whose ability to run depends on a
+  // machine nobody here controls. It reaches www.ankora.co.il, so a runner
+  // with no egress, a DNS blip or an ordinary deploy window makes it skip.
+  //
+  // A skipped blocking check now exits non-zero (see the end of this file),
+  // which is the rule this suite has wanted since September. Applying that
+  // rule to a check gated on the public internet would turn the pull-request
+  // gate red for weather. What the probe FINDS still carries its own
+  // severity; only "it could not run at all" stops being fatal.
   await run.check(
     "production",
-    { label: "Production probe", level: 1, skipIf: production.skipIfUnreachable },
+    { label: "Production probe", level: 1, blocking: false, skipIf: production.skipIfUnreachable },
     production.probe,
   );
 
@@ -262,7 +273,35 @@ async function main() {
     }
   }
 
-  process.exit(run.failed ? 1 : 0);
+  // INCOMPLETE exits non-zero, at every level.
+  //
+  // It did not, until today. `Run.verdict` has said "INCOMPLETE - some checks
+  // did not run" since September, written after a run reported PASS while the
+  // integration suite and the entire browser suite had quietly skipped
+  // themselves on a preflight bug. The verdict was fixed and the exit code
+  // was left alone, so the words said one thing and the green tick said
+  // another, and the green tick is what people read.
+  //
+  // It cost a weekly hunt on 20.10: three sharded jobs reported success with
+  // nothing run. The merge was taught this rule the same day; this is the
+  // same rule everywhere else, which is where it belonged.
+  //
+  // The one check that would have made this noisy for reasons outside the
+  // repository, the production probe, stopped blocking above.
+  if (run.incomplete) {
+    const skipped = run.checks.filter((c) => c.blocking && c.status === "skipped");
+    process.stderr.write(
+      [
+        "",
+        "  INCOMPLETE: a blocking check did not run.",
+        ...skipped.map((c) => `    ${c.id}: ${c.reason ?? "no reason given"}`),
+        "",
+        "  A skipped check is not a passed check.",
+        "",
+      ].join("\n"),
+    );
+  }
+  process.exit(run.shouldFail ? 1 : 0);
 }
 
 main();

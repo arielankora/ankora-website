@@ -225,7 +225,7 @@ function main() {
       ].join("\n"),
     );
   }
-  process.exit(run.failed || run.incomplete ? 1 : 0);
+  process.exit(run.shouldFail ? 1 : 0);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();
