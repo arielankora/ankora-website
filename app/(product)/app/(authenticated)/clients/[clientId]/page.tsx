@@ -41,6 +41,8 @@ import { RequestTypesPanel } from "./RequestTypesPanel";
 import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
 import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { ControlLine } from "./ControlLine";
+import { PossibleDuplicates } from "./PossibleDuplicates";
+import { duplicatePairs } from "@/lib/name-match";
 import { controlDetails, controlFrom, controlParts } from "@/lib/client-control";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
@@ -399,6 +401,17 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               <ReviewBatch key={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
             ))}
           </section>
+        )}
+
+        {tab === "file" && (
+          <PossibleDuplicates
+            pairs={[
+              ...duplicatePairs("CONTACT", people.contacts.flatMap((c) => (c.person.name ? [{ id: c.id, name: c.person.name }] : []))),
+              ...duplicatePairs("ORGANIZATION", people.organizations.map((o) => ({ id: o.id, name: o.organization.name }))),
+              ...duplicatePairs("SYSTEM", systems.map((x) => ({ id: x.id, name: x.systemName }))),
+              ...duplicatePairs("ENTITY", entities.map((e) => ({ id: e.id, name: e.name }))),
+            ]}
+          />
         )}
 
         {tab === "file" && (

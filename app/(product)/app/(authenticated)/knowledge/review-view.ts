@@ -21,7 +21,7 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
   const proposals: ReviewProposal[] = b.proposals.map((p) => {
     const payload = p.payload as Record<string, unknown>;
     const at = readSourceRefs(payload.sources)[0]?.at ?? null;
-    const flags = (Array.isArray(p.flags) ? p.flags : []) as { code: string; message: string; block?: boolean }[];
+    const flags = (Array.isArray(p.flags) ? p.flags : []) as ReviewProposal["flags"];
     // Spec 5.2: how sure, as the reviewer should read it, and where it
     // goes on the card.
     const confidence = reviewConfidence({ confidence: p.confidence, flags, payload, at, sourceKind: b.source?.kind ?? null, sourceRestriction: b.source?.restriction ?? null });

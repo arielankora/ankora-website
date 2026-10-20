@@ -253,7 +253,14 @@ export const ACTION_LABELS: Record<ProposalActionLike, string> = {
 /// `block`: approving it as it stands would break a rule that is not
 /// waived (spec 5.2: "הפרה של כלל חובה: האישור חסום"). It can be edited
 /// and approved, or rejected. Everything else is advice for the reviewer.
-export type ProposalFlag = { code: string; message: string; block?: boolean };
+export type ProposalFlag = {
+  code: string;
+  message: string;
+  block?: boolean;
+  /// SIMILAR, by name: the item in the file it may be, so the reviewer
+  /// can add the proposal to it instead of a second item.
+  match?: { id: string; name: string };
+};
 
 /// What stops a proposal from entering the file as it stands, found
 /// without asking anybody (spec 5.2, 7.2). The same checks the file's own
@@ -310,7 +317,7 @@ export const MAX_BULK = 60;
 export function bulkApproveBlocker(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown> }): string | null {
   if (p.flags.some((f) => f.block)) return "יש בה משהו שחוסם אישור";
   if (p.action !== "CREATE") return "משנה פריט שכבר בתיק";
-  if (p.flags.some((f) => f.code === "DUPLICATE")) return "ייתכן שכבר בתיק";
+  if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return "ייתכן שכבר בתיק";
   if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return "מידע רגיש";
   return null;
 }

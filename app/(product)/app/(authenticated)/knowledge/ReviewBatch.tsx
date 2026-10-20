@@ -8,7 +8,7 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
+import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -25,7 +25,7 @@ export type ReviewProposal = {
   sources: string[];
   reason: string | null;
   quote: string | null;
-  flags: { code: string; message: string; block?: boolean }[];
+  flags: { code: string; message: string; block?: boolean; match?: { id: string; name: string } }[];
   link: string | null;
   existing: { body: string } | null;
   /// A new item that is already in the file, as it stands now: what is
@@ -295,6 +295,12 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
     else showToast({ tone: "info", title: p.alreadyIn?.addsSources ? "המקור נוסף לפריט שבתיק" : "נסגר: כבר בתיק", description: p.alreadyIn?.body.slice(0, 80) });
   }
 
+  async function merge(m: { id: string; name: string }) {
+    const r = await mergeProposalAction(p.id, m.id);
+    if (r.error) showToast({ tone: "error", title: "ההוספה נכשלה", description: r.error });
+    else showToast({ tone: "info", title: `נוסף אל ${m.name}`, description: p.headline.slice(0, 80) });
+  }
+
   if (p.state !== "PENDING") {
     return (
       <li className="py-2.5 text-xs text-app-text-tertiary">
@@ -319,7 +325,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
     );
   }
 
-  const doubtful = p.flags.some((f) => f.code === "DUPLICATE");
+  const doubtful = p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR");
   const blocked = p.flags.some((f) => f.block);
   const alone = bulkApproveBlocker(p);
   return (
@@ -376,6 +382,12 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           {p.flags.filter((f) => !(p.alreadyIn && f.code === "DUPLICATE")).map((f, i) => (
             <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`}>
               {f.message}
+              {/* The same item under another spelling: added to it, not a second one. */}
+              {f.match && !blocked && (
+                <button type="button" onClick={() => merge(f.match!)} className="ms-2 font-medium text-app-text-accent hover:underline" data-testid="proposal-merge">
+                  להוסיף אל {f.match.name}
+                </button>
+              )}
             </p>
           ))}
         </div>
