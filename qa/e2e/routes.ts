@@ -139,6 +139,28 @@ export const CREDENTIAL_PATTERNS: { pattern: RegExp; what: string }[] = [
   // key, and it would look like harmless binary on screen.
   { pattern: /secretCiphertext|secretIv|secretTag|wrappedDek/, what: "an encrypted vault column" },
 
+  // Added 20.10.2026, during the weekly level-3 hunt.
+  //
+  // Found by comparing this list against prisma/schema.prisma rather than
+  // against memory: four credential columns were not covered by anything
+  // above. `/tokenHash/` is case-sensitive, and the columns are spelled
+  // accessTokenHash and refreshTokenHash with a capital T, so the pattern
+  // that looks like it covers them does not.
+  //
+  // No leak was found today - lib/app-domain/mcp-connections.ts selects
+  // its columns explicitly and reaches for none of these. That is the
+  // point: the sweep is what would say so if that ever changed, and for
+  // these four it would have stayed quiet.
+  //
+  // tests/unit/credential-sweep-schema.test.ts now derives the expected
+  // coverage from the schema, so the next credential column to be added
+  // fails that test until someone decides about it. A list maintained by
+  // remembering is a list that lags, and this one lagged for five weeks.
+  {
+    pattern: /accessTokenHash|refreshTokenHash|clientSecretHash|codeHash/,
+    what: "an OAuth or MCP credential hash column",
+  },
+
   // MCP bearer capabilities. Both prefixes exist so that secret scanners
   // can match them (see lib/mcp/file-ticket.ts) - this is that scanner.
   // Imported rather than typed out, so a change to either prefix cannot
