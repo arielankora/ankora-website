@@ -247,7 +247,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
   const entityName = new Map(entities.map((e) => [e.id, e.name]));
-  const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title }));
+  const sourceOptions = sources.map((s) => ({ code: s.code, title: s.title, secondary: s.weight === "SECONDARY" }));
   // Whose preference a fact is: someone already in this client's file.
   const subjects = [
     ...people.contacts.map((c) => ({ value: `contact:${c.id}`, label: c.person.name ?? c.role ?? "" })),
