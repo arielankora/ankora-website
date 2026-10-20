@@ -117,6 +117,7 @@ export async function resolveLinks(clientId: string, target: string, payload: Re
     await list("routeToNames", "למי מפנים", contactByName, "routeToContactIds");
     await one("processName", "תהליך", processByName, "processId");
   }
+  if (target === "DATE") await one("processName", "תהליך", processByName, "processId");
   const stepSystemIds: string[][] = [];
   if (target === "PROCESS") {
     await list("externalPartyNames", "גורם חיצוני", contactByName, "externalPartyContactIds");

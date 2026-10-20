@@ -3233,6 +3233,8 @@ enum ProposalTarget {
   DOMAIN
   /// Something to do, not to know: approving it opens a task.
   TASK
+  /// A client's own date (spec 3.10): approving it adds it to the dates.
+  DATE
 }
 
 /// What approving a proposal does.
