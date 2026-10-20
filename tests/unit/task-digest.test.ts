@@ -272,3 +272,63 @@ describe("the day boundary, where this kind of email actually breaks", () => {
     expect(since.getTime()).toBeLessThan(now.getTime());
   });
 });
+
+describe("stage 2: what the bell knows, in the same list", () => {
+  const routine = (id: string, dueKey: string) => ({
+    ...task(`routine:${id}`, `P1 בדיקה ${id}`),
+    dueDate: day(dueKey),
+    href: `/app/clients/c1?tab=file#processes`,
+  });
+  const date = (id: string, key: string) => ({ ...task(`date:${id}`, `מועד ${id}`), dueDate: day(key), href: `/app/important-dates/${id}` });
+
+  it("is not empty when only the bell has something", () => {
+    expect(isDigestEmpty({ ...EMPTY, dates: [date("d", "2026-10-22")] })).toBe(false);
+    expect(isDigestEmpty({ ...EMPTY, exceptions: [], routines: [], dates: [], reviews: [] })).toBe(true);
+  });
+
+  it("puts an exception to decide with the signatures, and names who asked", () => {
+    const d: Digest = {
+      ...EMPTY,
+      today: [task("t")],
+      exceptions: [{ ...task("exception:e1", "חשבוניות: לשלוח לאיילה"), since: day("2026-10-19"), assigneeName: "הדס", href: "/app/clients/c1?tab=file#rules" }],
+    };
+    const [first] = rankDigest(d, NOW);
+    expect(first.task.id).toBe("exception:e1");
+    expect(first.reason).toBe("בקשת חריגה מחכה להחלטה שלך יום אחד · ביקש/ה הדס");
+    expect(first.action).toBe("להחליט");
+    expect(digestLead(d, rankDigest(d, NOW))).toBe("2 דברים דורשים אותך היום. אחד מהם עוצר מישהו אחר.");
+  });
+
+  it("merges late work from every source, the latest first", () => {
+    const d: Digest = {
+      ...EMPTY,
+      overdue: [task("late3", "x", day("2026-10-17"))],
+      routines: [routine("r10", "2026-10-10"), routine("rToday", "2026-10-20")],
+      dates: [date("past5", "2026-10-15"), date("in1", "2026-10-21"), date("in5", "2026-10-25")],
+      fresh: [task("fresh")],
+    };
+    expect(rankDigest(d, NOW).map((i) => i.task.id)).toEqual([
+      "routine:r10",
+      "date:past5",
+      "late3",
+      "routine:rToday",
+      "date:in1",
+      "fresh",
+      "date:in5",
+    ]);
+  });
+
+  it("says what each kind is", () => {
+    const items = rankDigest(
+      { ...EMPTY, routines: [routine("a", "2026-10-20")], dates: [date("b", "2026-10-21"), date("c", "2026-10-24")], reviews: [task("review:p", "P2 נוהל")] },
+      NOW
+    );
+    expect(items.map((i) => i.reason)).toEqual(["בדיקה שגרתית להיום", "מועד מחר", "מועד בעוד 4 ימים", "נוהל לבדיקה"]);
+  });
+
+  it("links each line to where it is handled, not to a task", () => {
+    const { html, text } = renderDigestEmail({ ...EMPTY, dates: [date("abc", "2026-10-21")] }, "אריאל", NOW);
+    expect(html).toContain("/app/important-dates/abc");
+    expect(text).not.toContain("/app/tasks/date:");
+  });
+});
