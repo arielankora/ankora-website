@@ -128,7 +128,8 @@ describe("changes grouped under their task", () => {
 
   it("marks urgent work in the email", () => {
     const { text } = renderDigestEmail({ ...EMPTY, updated: [t("t1", { priority: "URGENT" })] }, "אריאל");
-    expect(text).toContain("דחופה · דווח שעות שנוצלו");
+    expect(text).toContain("1. דחופה · עודכנה");
+    expect(text).toContain("דווח שעות שנוצלו · RIMED");
   });
 });
 
@@ -138,9 +139,10 @@ describe("a digest with only updates is still a digest", () => {
   });
 
   it("says so in the subject", () => {
-    expect(digestSubject({ ...EMPTY, updated: [t("t1")] })).toBe("משימה אחת שלך עודכנה");
-    expect(digestSubject({ ...EMPTY, updated: [t("t1"), t("t2")] })).toBe("2 משימות שלך עודכנו");
-    expect(digestSubject({ ...EMPTY, today: [t("a")], updated: [t("b"), t("c")] })).toBe("משימה אחת עליך, 2 עודכנו");
+    expect(digestSubject({ ...EMPTY, updated: [t("t1")] })).toBe("עודכנה: דווח שעות שנוצלו");
+    expect(digestSubject({ ...EMPTY, updated: [t("t1"), t("t2")] })).toBe("עודכנה: דווח שעות שנוצלו, ועוד אחת");
+    // Work due today outranks an update.
+    expect(digestSubject({ ...EMPTY, today: [t("a")], updated: [t("b"), t("c")] })).toBe("להיום: דווח שעות שנוצלו, ועוד 2");
   });
 });
 

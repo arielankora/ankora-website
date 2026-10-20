@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  LINES_PER_GROUP,
+  RANKED_LINES,
   type Digest,
-  digestGroups,
+  daysBetween,
+  digestLead,
   digestSubject,
+  rankDigest,
+  safeText,
   freshSince,
   isDigestEmpty,
   isWorkingDay,
@@ -88,46 +91,110 @@ describe("an email that is never sent empty", () => {
   });
 });
 
+// 08:00 in Israel on Tuesday 20.10.2026, the morning the email was
+// rebuilt around one ranked list.
+const NOW = new Date("2026-10-20T05:00:00Z");
+const day = (key: string) => new Date(`${key}T09:00:00Z`);
+
 describe("the subject line, which is often the whole message", () => {
-  it("leads with the count, and says when something is late", () => {
-    expect(digestSubject({ ...EMPTY, today: [task("a"), task("b")] })).toBe("2 משימות עליך");
-    expect(digestSubject({ ...EMPTY, overdue: [task("a")], today: [task("b"), task("c")] })).toBe(
-      "3 משימות עליך, אחת באיחור"
-    );
+  it("names the first thing to handle, with its reason, and counts the rest", () => {
+    // 20.10.2026: "משימה אחת עליך, אחת באיחור" said how much, not what.
+    const d = { ...EMPTY, overdue: [task("a", "לבדוק אם לרכוש את הדומיין", day("2026-10-03"))], today: [task("b")] };
+    expect(digestSubject(d, NOW)).toBe("באיחור 17 ימים: לבדוק אם לרכוש את הדומיין, ועוד אחת");
+    expect(digestSubject({ ...EMPTY, today: [task("a", "לתאם טכנאי")] }, NOW)).toBe("להיום: לתאם טכנאי");
   });
 
-  it("falls back to whatever the person is actually needed for", () => {
-    // Nothing assigned, but somebody else's work is stopped on their
-    // signature. A subject that said "0 משימות" would be read as
-    // nothing to do.
-    expect(digestSubject({ ...EMPTY, awaitingMySignature: [task("a")] })).toBe("משימה אחת מחכה לחתימה שלך");
-    expect(digestSubject({ ...EMPTY, staleWaits: 3 })).toBe("יש מה להזכיר ללקוחות");
+  it("puts somebody else's stopped work first", () => {
+    const d = { ...EMPTY, overdue: [task("a", "x", day("2026-10-10"))], awaitingMySignature: [task("b", "הצעת מחיר")] };
+    expect(digestSubject(d, NOW)).toBe("מחכה לאישור שלך: הצעת מחיר, ועוד אחת");
+  });
+
+  it("cuts a long title, never the reason", () => {
+    const subject = digestSubject({ ...EMPTY, today: [task("a", "א".repeat(120))] }, NOW);
+    expect(subject.startsWith("להיום: ")).toBe(true);
+    expect(subject.endsWith("…")).toBe(true);
+  });
+
+  it("still says something when the only news is a long wait", () => {
+    expect(digestSubject({ ...EMPTY, staleWaits: 3 }, NOW)).toBe("3 משימות ממתינות יותר משבוע");
   });
 });
 
-describe("five lines to a group, then a number", () => {
+describe("one list, in order of importance", () => {
+  it("counts late days by the Israel calendar", () => {
+    // Due yesterday at 23:59 Israel is one day late at 08:00, not zero.
+    expect(daysBetween(new Date("2026-10-19T20:59:00Z"), NOW)).toBe(1);
+    expect(daysBetween(day("2026-10-03"), NOW)).toBe(17);
+  });
+
+  it("ranks: signature, urgent, late (latest first), today, new, long waits, updated", () => {
+    const d: Digest = {
+      overdue: [task("late2", "x", day("2026-10-18")), task("late17", "x", day("2026-10-03"))],
+      today: [task("today")],
+      fresh: [task("fresh")],
+      updated: [task("updated")],
+      awaitingMySignature: [task("sign")],
+      staleWaits: 1,
+      waiting: [{ ...task("wait"), blockedOn: "CLIENT", since: day("2026-10-11") }],
+    };
+    d.today.push({ ...task("urgentToday"), priority: "URGENT" });
+    expect(rankDigest(d, NOW).map((i) => i.task.id)).toEqual([
+      "sign",
+      "urgentToday",
+      "late17",
+      "late2",
+      "today",
+      "fresh",
+      "wait",
+      "updated",
+    ]);
+  });
+
+  it("says how late, and asks for a decision after a week", () => {
+    const [item] = rankDigest({ ...EMPTY, overdue: [task("a", "x", day("2026-10-03"))] }, NOW);
+    expect(item.reason).toBe("באיחור 17 ימים");
+    expect(item.hint).toBe("לבצע, לדחות את התאריך, או לסגור?");
+    const [fresh] = rankDigest({ ...EMPTY, overdue: [task("b", "x", day("2026-10-19"))] }, NOW);
+    expect(fresh.reason).toBe("באיחור יום אחד");
+    expect(fresh.hint).toBeUndefined();
+  });
+
+  it("names who is stopped on the signature, and for how long", () => {
+    const [item] = rankDigest(
+      { ...EMPTY, awaitingMySignature: [{ ...task("a"), assigneeName: "הדס", since: day("2026-10-18") }] },
+      NOW
+    );
+    expect(item.reason).toBe("מחכה לאישור שלך יומיים · עוצר את הדס");
+    expect(item.action).toBe("לאשר");
+  });
+
+  it("names a long wait and offers the reminder", () => {
+    const [item] = rankDigest(
+      { ...EMPTY, staleWaits: 1, waiting: [{ ...task("a"), blockedOn: "CLIENT", since: day("2026-10-11") }] },
+      NOW
+    );
+    expect(item.reason).toBe("ממתינה ללקוח 9 ימים");
+    expect(item.action).toBe("להזכיר");
+  });
+
+  it("lists a task once, at its highest rank", () => {
+    const t = task("a", "x", day("2026-10-10"));
+    expect(rankDigest({ ...EMPTY, overdue: [t], updated: [t] }, NOW)).toHaveLength(1);
+  });
+
+  it("says how much, and whether somebody is stopped", () => {
+    const d = { ...EMPTY, today: [task("a"), task("b")], awaitingMySignature: [task("c")] };
+    expect(digestLead(d, rankDigest(d, NOW))).toBe("3 דברים דורשים אותך היום. אחד מהם עוצר מישהו אחר.");
+    const u = { ...EMPTY, updated: [task("a")] };
+    expect(digestLead(u, rankDigest(u, NOW))).toBe("משימה אחת שלך עודכנה.");
+  });
+
   it("does not send a list of twenty", () => {
-    const many = Array.from({ length: 9 }, (_, i) => task(`t${i}`, `משימה ${i}`));
-    const [group] = digestGroups({ ...EMPTY, overdue: many });
-    expect(group.tasks).toHaveLength(LINES_PER_GROUP);
-    expect(group.more).toBe(4);
-  });
-
-  it("leaves out a group with nothing in it", () => {
-    const groups = digestGroups({ ...EMPTY, fresh: [task("t1")] });
-    expect(groups.map((g) => g.heading)).toEqual(["חדש אצלך"]);
-  });
-
-  it("asks the questions in the order somebody asks them at eight", () => {
-    const groups = digestGroups({
-      overdue: [task("a")],
-      today: [task("b")],
-      fresh: [task("c")],
-      updated: [task("e")],
-      awaitingMySignature: [task("d")],
-      staleWaits: 0,
-    });
-    expect(groups.map((g) => g.heading)).toEqual(["באיחור", "להיום", "חדש אצלך", "עודכן אצלך", "מחכה לחתימה שלך"]);
+    const many = Array.from({ length: 12 }, (_, i) => task(`t${i}`, `משימה ${i}`));
+    const { text } = renderDigestEmail({ ...EMPTY, today: many }, "הדס", NOW);
+    expect(text).toContain(`${RANKED_LINES}. להיום`);
+    expect(text).not.toContain(`${RANKED_LINES + 1}. להיום`);
+    expect(text).toContain("ועוד 5 משימות ברשימה.");
   });
 });
 
@@ -140,9 +207,26 @@ describe("the email itself", () => {
     expect(text).toContain("לתאם טכנאי");
   });
 
-  it("says the waiting line as a sentence, not as a list", () => {
-    const { text } = renderDigestEmail({ ...EMPTY, staleWaits: 4 }, "אנה");
-    expect(text).toContain("4 משימות שלך ממתינות למישהו יותר משבוע");
+  it("counts the waits it did not name", () => {
+    const { text } = renderDigestEmail({ ...EMPTY, staleWaits: 4 }, "אנה", NOW);
+    expect(text).toContain("4 משימות ממתינות למישהו יותר משבוע");
+  });
+
+  it("opens the day, and gives every line one action", () => {
+    const { html, text } = renderDigestEmail({ ...EMPTY, today: [task("abc", "לתאם טכנאי")] }, "הדס", NOW);
+    expect(html).toContain("/app/calendar?view=day");
+    expect(html).toContain("פתח את היום שלי");
+    expect(text).toContain("לפתוח: ");
+  });
+
+  it("keeps a domain in a title from becoming its own link", () => {
+    // 20.10.2026: Gmail turned "ankora360.com" inside the task's link
+    // into a link to the website.
+    expect(safeText("לרכוש את ankora360.com")).toBe("לרכוש את ankora360.&#8203;com");
+    expect(safeText("יעד 3.10")).toBe("יעד 3.10");
+    const { html, text } = renderDigestEmail({ ...EMPTY, today: [task("x", "לרכוש את ankora360.com")] }, "אריאל", NOW);
+    expect(html).not.toContain("ankora360.com</a>");
+    expect(text).toContain("לרכוש את ankora360.com");
   });
 
   it("escapes a task title that contains markup", () => {
