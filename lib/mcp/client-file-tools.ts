@@ -17,6 +17,8 @@ import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
 import { prisma } from "@/lib/prisma";
+import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-live";
+import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 
 /// A process of one client, by its code ("P3") or its title, the way the
@@ -58,7 +60,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get client file",
       description:
-        "Returns a client's file as one Markdown document, in Ankora's standard order: identity and legal entities, scope, people, preferences, requirements, the client's rules (follow them; a proposed rule's interim rule applies until it is approved), systems and access, suppliers, processes (with each one's approved procedure, completeness and gaps), finance, communication, dates, temporary information, one-off decisions, open questions, items awaiting confirmation, recent updates, and the source legend. Lines not yet confirmed say so, with what would confirm them; sources appear as [S1 08:13]. Contact details and sensitive items are left out. Read it before working on a client you have not worked on in this conversation, and before drafting anything to the client or their suppliers.",
+        "Returns a client's file as one Markdown document, in Ankora's standard order: identity and legal entities, scope, people, preferences, requirements, the client's rules (follow them; a proposed rule's interim rule applies until it is approved), systems and access, suppliers, processes (with each one's approved procedure, completeness and gaps), finance, communication, dates, temporary information, one-off decisions, open questions, items awaiting confirmation, recent updates, and the source legend. Lines not yet confirmed say so, with what would confirm them; sources appear as [S1 08:13]. Contact details and sensitive items are left out. Read it before working on a client you have not worked on in this conversation, and before drafting anything to the client or their suppliers. Read earlier in the conversation: get_client_changes says what changed since.",
       inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
       annotations: TOOL_ANNOTATIONS.get_client_file,
     },
@@ -71,6 +73,56 @@ export function registerClientFileTools(server: McpServer): void {
         return toolText(toMarkdown(doc));
       } catch (err) {
         console.error("[mcp] get_client_file failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_client_brief",
+    {
+      title: "Get client brief",
+      description:
+        "A one-page brief of a client's file: who they are, their preferences and requirements, the rules to follow, finance and approval rules, how to communicate with them, what is temporary, open questions and specific working rules in full; people, systems, suppliers and processes by name and id; the next dates; and every \"do not tell\" in one list. Use it for a short question or a short message. For a process, a supplier, a document or anything longer, read get_client_file. Same rules as the file: no contact details, nothing sensitive.",
+      inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
+      annotations: TOOL_ANNOTATIONS.get_client_brief,
+    },
+    async (args: { client: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        return toolText(await clientBrief(actor, client.value.id));
+      } catch (err) {
+        console.error("[mcp] get_client_brief failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "get_client_changes",
+    {
+      title: "Get client file changes",
+      description:
+        "What changed in a client's file since a date: every item added or changed, as it is now and in its section, and what left the file (removed, replaced by a new version, retired). Use it when you read the file earlier in this conversation, or in a run that repeats (pass the time of the last run), instead of reading the whole file again. since: YYYY-MM-DD or an ISO time, at most 90 days back; omitted, the last 7 days.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        since: z.string().optional().describe("YYYY-MM-DD or ISO time. Default: 7 days ago."),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_client_changes,
+    },
+    async (args: { client: string; since?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const now = new Date();
+        const since = readSince(args.since, now);
+        if ("error" in since) return toolText(since.error);
+        return toolText(await clientFileChanges(actor, client.value.id, since.since, now));
+      } catch (err) {
+        console.error("[mcp] get_client_changes failed", err);
         return toolFailure(err);
       }
     }

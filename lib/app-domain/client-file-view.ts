@@ -283,6 +283,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "אין עדיין ספקים או נותני שירות קבועים.",
       items: [
         ...orgs.map((o) => ({
+          ref: o.id,
           text: o.organization.name,
           details: [
             o.role,
@@ -389,7 +390,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       empty: "אין מועדים.",
       items: dates
         .filter((d) => d.status === "ACTIVE" && (!ai || d.sensitivity !== "SENSITIVE"))
-        .map((d) => ({ text: d.title, details: [d.nextOccurrenceAt ? `הבא: ${day(d.nextOccurrenceAt)}` : null, d.expectsReceipt ? `${RECEIPT_LABEL}${d.expectedFrom ? ` מ-${d.expectedFrom}` : ""}` : null] })),
+        .map((d) => ({ ref: d.id, text: d.title, details: [d.nextOccurrenceAt ? `הבא: ${day(d.nextOccurrenceAt)}` : null, d.expectsReceipt ? `${RECEIPT_LABEL}${d.expectedFrom ? ` מ-${d.expectedFrom}` : ""}` : null] })),
     },
     {
       number: "11",

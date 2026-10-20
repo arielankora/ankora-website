@@ -89,6 +89,7 @@ const handler = createMcpHandler(registerAnkoraTools, {
     "Writes create real records that colleagues and clients see. Confirm the client, category and times with the user before calling a write tool, and never call create_time_entry twice for the same work - it makes two entries.",
     "Tasks are the exception for category: never ask the user for a task's category. When they did not name one, choose it yourself or let create_task and update_task choose it, then tell the user which category was set and give the task's link, so they can change it if they want.",
     "Documents in a client's file can be listed (list_documents), read (read_document) and filed (start_document_upload when you can run curl, upload_document otherwise). Read a task's documents when they matter to the work.",
+    "Each client has a file in Ankora that the team keeps current: people, rules, processes, dates, what not to tell whom. It is the source of truth, and it changes every day. Before you answer about a client, draft anything to or about them, or work on their task, read it: get_client_brief for a short question or message, get_client_file for anything deeper. Do not rely on what you remember from an earlier conversation or a saved note. Already read in this conversation, or in a run that repeats: get_client_changes since then. Follow the client's rules and every \"do not tell\" in it.",
   ].join(" "),
   verboseLogs: !isProductionBuild(),
 });

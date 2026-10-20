@@ -1841,8 +1841,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-19",
       "riskReason": "Manager-only screen with numbers from every client; must refuse anyone else"
+    },
+    "domain:client-file-live": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "Sends the client file to Claude; must keep sensitive, restricted and removed items out and refuse clients the person cannot reach"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-19"
+  "lastScan": "2026-10-20"
 }

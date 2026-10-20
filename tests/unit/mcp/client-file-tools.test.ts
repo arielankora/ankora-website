@@ -11,6 +11,7 @@ const proposals = vi.hoisted(() => ({ proposeKnowledge: vi.fn() }));
 const assignment = vi.hoisted(() => ({ proposeAwaitingAssignment: vi.fn() }));
 const contacts = vi.hoisted(() => ({ lookupContact: vi.fn() }));
 const brief = vi.hoisted(() => ({ extractionBrief: vi.fn() }));
+const live = vi.hoisted(() => ({ clientBrief: vi.fn(async () => "# תקציר תיק: NUX"), clientFileChanges: vi.fn(async () => "# מה השתנה בתיק: NUX") }));
 const lookup = vi.hoisted(() => ({
   lookupClient: vi.fn(),
   lookupCategory: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock("@/lib/app-domain/knowledge-proposals", () => proposals);
 vi.mock("@/lib/app-domain/batch-assignment", () => assignment);
 vi.mock("@/lib/app-domain/client-contacts", () => contacts);
 vi.mock("@/lib/app-domain/extraction-brief", () => brief);
+vi.mock("@/lib/app-domain/client-file-live", () => live);
 vi.mock("@/lib/app-domain/mcp-files", () => ({}));
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/tasks", () => ({ OPEN_STATUSES: [] }));
@@ -188,3 +190,27 @@ describe("get_extraction_brief", () => {
   });
 });
 
+
+describe("get_client_brief and get_client_changes", () => {
+  it("are reads", () => {
+    expect(TOOL_ANNOTATIONS.get_client_brief.readOnlyHint).toBe(true);
+    expect(TOOL_ANNOTATIONS.get_client_changes.readOnlyHint).toBe(true);
+  });
+
+  it("brief: for the client the name resolves to", async () => {
+    const r = await tools.get("get_client_brief")!.handler({ client: "nux" }, CTX);
+    expect(live.clientBrief).toHaveBeenCalledWith(ACTOR, "c-nux");
+    expect(r.content[0].text).toContain("תקציר תיק");
+  });
+
+  it("changes: a week by default, a date when given, and a bad date as a sentence", async () => {
+    await tools.get("get_client_changes")!.handler({ client: "nux" }, CTX);
+    const [, , since, now] = live.clientFileChanges.mock.calls[0] as unknown as [unknown, string, Date, Date];
+    expect(Math.round((now.getTime() - since.getTime()) / 86_400_000)).toBe(7);
+    await tools.get("get_client_changes")!.handler({ client: "nux", since: "2026-10-18" }, CTX);
+    expect((live.clientFileChanges.mock.calls[1] as unknown as [unknown, string, Date])[2].toISOString()).toBe("2026-10-18T00:00:00.000Z");
+    const bad = await tools.get("get_client_changes")!.handler({ client: "nux", since: "yesterday" }, CTX);
+    expect(bad.content[0].text).toContain("not a date");
+    expect(live.clientFileChanges).toHaveBeenCalledTimes(2);
+  });
+});

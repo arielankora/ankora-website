@@ -97,6 +97,10 @@ export const TOOL_ANNOTATIONS = {
   // The client file as one document (lib/mcp/client-file-tools.ts,
   // 14.10.2026). Assembled on each call; nothing is written.
   get_client_file: READ_ONLY,
+  // The same document, cut (lib/client-file-live.ts, 20.10.2026): a brief,
+  // and what changed since a date. Nothing is written.
+  get_client_brief: READ_ONLY,
+  get_client_changes: READ_ONLY,
   // Each call adds a batch of proposals (and may register a source). It
   // writes nothing into the file itself: a person approves on the screen.
   propose_knowledge: WRITES,
