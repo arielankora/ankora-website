@@ -96,6 +96,7 @@ function missingOf(target: MissingFieldsTarget, value: unknown) {
 import { messageComposerProps } from "@/lib/app-domain/client-messages";
 import { appBaseUrl } from "@/lib/email-templates";
 import { listCategories } from "@/lib/app-domain/categories";
+import { countApprovalsForClient } from "@/lib/app-domain/approvals";
 import type { ImportantDateStatus } from "@prisma/client";
 
 const STATUS_TONE: Record<ImportantDateStatus, "green" | "amber" | "gray" | "red"> = {
@@ -232,6 +233,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   ]);
   // Spec 5.2: a tab in every client. What waits for this file, on the file
   // tab, with the same card and actions as on "ממתין לאישור".
+  // Everything on this client waiting on this person, on "אישורים".
+  const approvalsHere = await countApprovalsForClient(user, client.id).catch(() => 0);
   const openBatches = tab === "file" && pendingProposals > 0 ? (await listOpenBatches(user, { clientId: client.id })).filter((b) => b.proposals.some((p) => p.state === "PENDING")) : [];
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
@@ -320,9 +323,15 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 claude/client-communication-rule-2026-09-25.md. */}
             <div className="flex flex-wrap items-center gap-3">
               {/* The file to read, top to bottom, and to download. */}
-              {pendingProposals > 0 && (
-                <Link href={tab === "file" ? `#client-pending` : `/app/clients/${client.id}?tab=file`} className="text-sm text-app-warning hover:underline">
-                  {pendingProposals === 1 ? "הצעה אחת ממתינה לאישור" : `${pendingProposals} הצעות ממתינות לאישור`}
+              {/* Every approval on this client, in one place (20.10.2026). */}
+              {approvalsHere > 0 && (
+                <Link href={`/app/approvals?clientId=${client.id}`} className="text-sm text-app-warning hover:underline" data-testid="client-approvals-link">
+                  {approvalsHere === 1 ? "דבר אחד ממתין לאישור שלך" : `${approvalsHere} ממתינים לאישור שלך`}
+                </Link>
+              )}
+              {pendingProposals > 0 && tab !== "file" && (
+                <Link href={`/app/clients/${client.id}?tab=file#client-pending`} className="text-sm text-app-text-accent hover:underline">
+                  {pendingProposals === 1 ? "הצעה אחת לתיק" : `${pendingProposals} הצעות לתיק`}
                 </Link>
               )}
               <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
@@ -348,6 +357,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             })
           )}
           clientId={client.id}
+          approvalsHref={`/app/approvals?clientId=${client.id}`}
           details={controlDetails({
             processes: processes.map((p) => ({ ...p, reviewLabel: readReviewReason(p.reviewReason) ? REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!] : null })),
             exceptions: exceptions.map((e) => ({ status: e.status, what: e.what, ruleTitle: policies.find((r) => r.id === e.policyId)?.title ?? null, policyId: e.policyId })),
@@ -393,8 +403,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-app-text-primary">ממתין לאישור</h2>
-              <Link href={`/app/knowledge?clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
-                במסך ההצעות, עם סינון
+              <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
+                בלשונית ידע מהחילוץ, עם סינון
               </Link>
             </div>
             {openBatches.map((b) => (

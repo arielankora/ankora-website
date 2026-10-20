@@ -352,12 +352,24 @@ describe("stage 3: the clients, and the person's own records", () => {
     expect(digestLead(d, rankDigest(d, NOW))).toBe("אין משימות שדורשות אותך היום.");
   });
 
+  // "אישורים" (20.10.2026): one line under the opening, with the link.
+  it("says how many things wait on an approval, and sends on that alone", () => {
+    const d = { ...EMPTY, approvals: 12 };
+    expect(isDigestEmpty(d)).toBe(false);
+    expect(digestSubject(d, NOW)).toBe("12 דברים מחכים לאישור שלך");
+    const { html, text } = renderDigestEmail(d, "אריאל", NOW);
+    expect(html).toContain("12 דברים מחכים לאישור שלך.");
+    expect(html).toContain("/app/approvals\"");
+    expect(text).toContain("12 דברים מחכים לאישור שלך.");
+    expect(renderDigestEmail({ ...EMPTY, today: [task("t1")] }, "אריאל", NOW).html).not.toContain("לאישור שלך");
+  });
+
   it("keeps the ranked list first and the blocks under it, each line with its link", () => {
     const { html, text } = renderDigestEmail(
       {
         ...EMPTY,
         today: [task("t1", "לתאם טכנאי")],
-        clients: [line("NUX", "6 הצעות לתיק מחכות לבדיקה.", "/app/knowledge?clientId=c2")],
+        clients: [line("NUX", "6 הצעות לתיק מחכות לבדיקה.", "/app/approvals?tab=knowledge&clientId=c2")],
         housekeeping: [{ text: "לא דווחו שעות ביום חמישי, 16.10.", linkText: "לדווח", href: "/app/my-time" }],
       },
       "אריאל",
@@ -365,7 +377,7 @@ describe("stage 3: the clients, and the person's own records", () => {
     );
     expect(html.indexOf("לתאם טכנאי")).toBeLessThan(html.indexOf("הלקוחות שלך"));
     expect(html.indexOf("הלקוחות שלך")).toBeLessThan(html.indexOf("סדר בית"));
-    expect(html).toContain("/app/knowledge?clientId=c2");
+    expect(html).toContain("/app/approvals?tab=knowledge&clientId=c2");
     expect(html).toContain("/app/my-time");
     expect(text).toContain("NUX: 6 הצעות לתיק מחכות לבדיקה.");
   });

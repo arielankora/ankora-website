@@ -16,6 +16,9 @@ const CASES = [
   { from: "/app/my-time?week=2026-10-12&next=https://evil.test", to: "/app/timer", expect: { tab: "mine", week: "2026-10-12" } },
   { from: "/app/my-time", to: "/app/timer", expect: { tab: "mine" } },
   { from: "/app/report-schedules?clientId=demo-client-a", to: "/app/reports", expect: { tab: "schedules", clientId: "demo-client-a" } },
+  // 20.10.2026: "ממתין לאישור" is the tab "ידע מהחילוץ" of "אישורים". Its
+  // filters come along, a repeated kind included, and nothing else does.
+  { from: "/app/knowledge?clientId=demo-client-b&kind=FACT.NOTE&evil=1", to: "/app/approvals", expect: { tab: "knowledge", clientId: "demo-client-b", kind: "FACT.NOTE" } },
 ];
 
 for (const c of CASES) {

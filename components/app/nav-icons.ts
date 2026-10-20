@@ -33,7 +33,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/my-time": History,
   "/app/tasks": ListChecks,
   "/app/calendar": CalendarDays,
-  "/app/knowledge": Inbox,
+  "/app/approvals": Inbox,
   "/app/credentials": KeyRound,
   "/app/clients": Users,
   "/app/categories": Tag,

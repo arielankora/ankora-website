@@ -42,7 +42,7 @@ describe("review filters", () => {
     const f = parseReviewFilters({ clientId: "c1", kind: ["FACT.FINANCE", "SYSTEM"], attention: "1", source: "TRANSCRIPT", by: "u1", age: "3" });
     const href = reviewFiltersHref(f);
     expect(parseReviewFilters(Object.fromEntries([...new URLSearchParams(href.split("?")[1]).keys()].map((k) => [k, new URLSearchParams(href.split("?")[1]).getAll(k)])))).toEqual(f);
-    expect(reviewFiltersHref(none)).toBe("/app/knowledge");
+    expect(reviewFiltersHref(none)).toBe("/app/approvals?tab=knowledge");
   });
 
   it("names a fact by its kind and everything else by what it is", () => {

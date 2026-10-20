@@ -18,7 +18,19 @@ const SECTION: Partial<Record<ControlKey, string>> = {
   exceptionsRequested: "rules",
 };
 
-export function ControlLine({ parts, details = {}, clientId }: { parts: ControlPart[]; details?: Partial<Record<ControlKey, ControlDetail[]>>; clientId?: string }) {
+/// `approvalsHref`: "אישורים" for this client (20.10.2026), where the
+/// uncertain items, the rules and the procedures above are also decided.
+export function ControlLine({
+  parts,
+  details = {},
+  clientId,
+  approvalsHref,
+}: {
+  parts: ControlPart[];
+  details?: Partial<Record<ControlKey, ControlDetail[]>>;
+  clientId?: string;
+  approvalsHref?: string;
+}) {
   const [open, setOpen] = useState<ControlKey | null>(null);
   if (parts.length === 0) return null;
   const shown = open ? (details[open] ?? []) : [];
@@ -48,6 +60,14 @@ export function ControlLine({ parts, details = {}, clientId }: { parts: ControlP
             </span>
           );
         })}
+        {approvalsHref && (
+          <span className="flex items-center gap-x-2">
+            <span className="text-app-text-tertiary">·</span>
+            <a href={approvalsHref} className="text-app-text-accent hover:underline" data-testid="control-approvals">
+              לאישורים ולבדיקה
+            </a>
+          </span>
+        )}
       </p>
       {open && shown.length > 0 && (
         <div className="mt-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs text-app-text-secondary" data-testid="control-details">
@@ -69,6 +89,11 @@ export function ControlLine({ parts, details = {}, clientId }: { parts: ControlP
           {clientId && (
             <a href={`/app/clients/${clientId}?tab=file${anchor ? `#${anchor}` : ""}`} className="mt-1.5 inline-block text-app-text-accent hover:underline">
               לתיק הלקוח
+            </a>
+          )}
+          {approvalsHref && (
+            <a href={approvalsHref} className="ms-3 mt-1.5 inline-block text-app-text-accent hover:underline">
+              לאישורים
             </a>
           )}
         </div>

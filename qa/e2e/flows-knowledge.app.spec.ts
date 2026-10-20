@@ -1,6 +1,8 @@
 import { test, expect } from "./fixtures";
 
 // Org brain, phase 2 (14.10.2026): "ממתין לאישור", submitted for real.
+// Since 20.10.2026 it is the tab "ידע מהחילוץ" of "אישורים"; the old
+// address redirects there, which these tests go through on purpose.
 // The Preview seed puts six demo proposals back to pending on every build
 // (see the seed's own comment); this file edits and approves one and
 // rejects another, whichever are still pending, so a retry still has two.
@@ -9,6 +11,7 @@ import { test, expect } from "./fixtures";
 //
 // @covers action:(product)/app/(authenticated)/knowledge/actions
 // @covers screen:/app/knowledge
+// @covers screen:/app/approvals
 // @covers screen:/app/brain-metrics
 
 test.describe.configure({ timeout: 90_000 });
@@ -18,7 +21,8 @@ const CLIENT = "demo-client-b";
 test.describe("knowledge/actions", () => {
   test("a proposal edited and approved enters the file; a rejected one does not", async ({ page }) => {
     await page.goto(`/app/knowledge?clientId=${CLIENT}`);
-    await expect(page.getByRole("heading", { level: 1, name: "ממתין לאישור" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "אישורים" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "סוגי אישורים" }).getByRole("link", { name: /^ידע מהחילוץ/ })).toHaveAttribute("aria-current", "page");
     const pending = page.locator("li", { hasText: "[DEMO] הצעה" }).filter({ has: page.getByRole("button", { name: "אישור", exact: true }) });
     expect(await pending.count(), "the Preview seed should leave demo proposals pending").toBeGreaterThanOrEqual(2);
 
@@ -88,7 +92,7 @@ test.describe("knowledge/actions", () => {
     await expect(page).toHaveURL(/kind=FACT\.NOTE/);
 
     await filters.getByRole("link", { name: "ניקוי הסינון" }).click();
-    await expect(page).toHaveURL(/\/app\/knowledge$/, { timeout: 30_000 });
+    await expect(page).toHaveURL(/\/app\/approvals\?tab=knowledge$/, { timeout: 30_000 });
   });
 
   test("the client's file tab shows what waits for it, with the same actions", async ({ page }) => {

@@ -107,5 +107,5 @@ export async function procedureReminderForScreen(
     console.error("[procedure-to-file] closing check failed", err);
     return null;
   });
-  return reminder ? { text: reminder.forScreen, reviewHref: `/app/knowledge?clientId=${encodeURIComponent(clientId)}` } : null;
+  return reminder ? { text: reminder.forScreen, reviewHref: `/app/approvals?tab=knowledge&clientId=${encodeURIComponent(clientId)}` } : null;
 }

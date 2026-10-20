@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
+import { countApprovals } from "@/lib/app-domain/approvals";
 import type { Notification, Client } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
@@ -72,7 +72,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
     alertsCount,
     accessibleClients,
     supervising,
-    proposals,
+    approvals,
   ] = await Promise.all([
       canTrackTime ? getActiveTimers(user.id) : Promise.resolve([]),
       listNotificationsForUser(user.id),
@@ -94,9 +94,9 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       // enough to run on every page because a person who supervises
       // nothing still only pays for one count.
       canTrackTime ? supervisionCounts(user) : Promise.resolve({ total: 0, pending: 0 }),
-      // Org brain (spec 5.2): one count, and the nav row exists only
-      // while it is above zero.
-      canTrackTime ? countPendingProposals(user) : Promise.resolve(0),
+      // "אישורים": everything waiting on this person's approval. A count
+      // that fails is a menu without a number, never a page that fails.
+      canTrackTime ? countApprovals(user).catch(() => 0) : Promise.resolve(0),
     ]);
 
   return (
@@ -121,7 +121,7 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       importantDatesCount={importantDates.length}
       alertsCount={alertsCount}
       supervising={supervising}
-      proposals={proposals}
+      approvals={approvals}
       clients={accessibleClients.map((c: Client) => ({ id: c.id, name: c.name }))}
     >
       {children}
