@@ -51,16 +51,16 @@ export function narrowsItems(f: ReviewFilters): boolean {
   return f.kinds.length > 0 || f.attention || !!f.source || !!f.by || f.age !== null;
 }
 
+/// The tab "ידע מהחילוץ" of "אישורים" (20.10.2026), with the filters.
 export function reviewFiltersHref(f: ReviewFilters): string {
-  const q = new URLSearchParams();
+  const q = new URLSearchParams({ tab: "knowledge" });
   if (f.clientId) q.set("clientId", f.clientId);
   for (const k of f.kinds) q.append("kind", k);
   if (f.attention) q.set("attention", "1");
   if (f.source) q.set("source", f.source);
   if (f.by) q.set("by", f.by);
   if (f.age !== null) q.set("age", String(f.age));
-  const s = q.toString();
-  return s ? `/app/knowledge?${s}` : "/app/knowledge";
+  return `/app/approvals?${q.toString()}`;
 }
 
 type KindLike = { target: ProposalTargetLike; payload: Record<string, unknown> };

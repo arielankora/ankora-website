@@ -52,7 +52,7 @@ function friendlyError(err: unknown): string {
 }
 
 function done(): FormState {
-  revalidatePath("/app/knowledge");
+  revalidatePath("/app/approvals");
   revalidatePath("/app", "layout");
   return { ok: true };
 }
@@ -148,7 +148,7 @@ export async function approveProposalsAction(ids: string[]): Promise<BulkState> 
   const user = await requireUser();
   try {
     const r = await decideProposals(user, ids, { approve: true });
-    revalidatePath("/app/knowledge");
+    revalidatePath("/app/approvals");
     revalidatePath("/app", "layout");
     return { ok: r.failed.length === 0, done: r.done.length, failed: r.failed };
   } catch (err) {
@@ -160,7 +160,7 @@ export async function rejectProposalsAction(_prev: BulkState | undefined, formDa
   const user = await requireUser();
   try {
     const r = await decideProposals(user, formData.getAll("id").map(String), { approve: false, reason: String(formData.get("reason") ?? "") });
-    revalidatePath("/app/knowledge");
+    revalidatePath("/app/approvals");
     revalidatePath("/app", "layout");
     if (r.failed.length) return { error: `${r.failed.length} לא נדחו: ${r.failed[0].error}`, done: r.done.length, failed: r.failed };
     return { ok: true, done: r.done.length };

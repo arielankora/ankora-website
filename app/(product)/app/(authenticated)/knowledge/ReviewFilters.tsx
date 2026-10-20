@@ -50,7 +50,9 @@ export function ReviewFilterBar({
     : clients;
 
   return (
-    <form ref={formRef} method="get" action="/app/knowledge" aria-label="סינון הצעות" className="space-y-2.5">
+    <form ref={formRef} method="get" action="/app/approvals" aria-label="סינון הצעות" className="space-y-2.5">
+      {/* The review screen is a tab of "אישורים" (20.10.2026). */}
+      <input type="hidden" name="tab" value="knowledge" />
       {/* What the chips own, carried so a select change keeps them. */}
       {filters.kinds.map((k) => (
         <input key={k} type="hidden" name="kind" value={k} />

@@ -1883,6 +1883,38 @@
       "riskAssigned": true,
       "riskReason": "קריאה בלבד של שמות בתיק לסימון כפילויות. האיחוד עצמו עובר דרך אישור הצעה ועדכון פריט, שנבדקים בבדיקות האינטגרציה.",
       "firstSeen": "2026-10-20"
+    },
+    "action:(product)/app/(authenticated)/approvals/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "מאשר ודוחה כללים, חריגות, נהלים, משימות, תוכניות, סיכומים לפורטל וגרסאות הנחיות. כל החלטה עוברת דרך אותה פונקציה של המסך המקורי, עם אותן בדיקות הרשאה ותיעוד."
+    },
+    "domain:approvals": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "קובע מה כל אחד רואה לאישור ולבדיקה. חייב להראות לכל אחד רק מה שמותר לו להחליט, ולא להציג לקוח שאין לו גישה אליו."
+    },
+    "domain:task-approval-times": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "קריאה בלבד מיומן הפעולות: ממתי משימה מחכה לחתימה. משמש את המייל של הבוקר ואת מסך האישורים."
+    },
+    "screen:/app/approvals": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "מסך שמרכז את כל האישורים. חייב לסנן לפי הרשאה ולפי לקוח, והלשונית של ידע מהחילוץ היא מסך האישור של התיק."
     }
   },
   "waivers": {},

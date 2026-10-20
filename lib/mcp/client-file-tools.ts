@@ -245,7 +245,7 @@ export function registerClientFileTools(server: McpServer): void {
             ...waiting,
             next:
               waiting.waiting > 0
-                ? `${waiting.waiting} items are waiting for a person to say whose meeting this was, on Ankora's review screen (/app/knowledge). They enter no file, and no register, until then.`
+                ? `${waiting.waiting} items are waiting for a person to say whose meeting this was, on Ankora's approvals screen (/app/approvals, tab "ידע מהחילוץ"). They enter no file, and no register, until then.`
                 : "Nothing was kept.",
           });
         }
@@ -278,7 +278,7 @@ export function registerClientFileTools(server: McpServer): void {
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
         const next =
           (proposed > 0
-            ? `${proposed} proposals are waiting for a person to approve them on Ankora's review screen (/app/knowledge). Nothing is in the file yet.`
+            ? `${proposed} proposals are waiting for a person to approve them on Ankora's approvals screen (/app/approvals, tab "ידע מהחילוץ"). Nothing is in the file yet.`
             : "Nothing was proposed.") +
           (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "");
         return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });

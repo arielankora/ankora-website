@@ -73,7 +73,7 @@ export default async function NotificationsPage() {
                       {n.title}
                     </Link>
                   ) : n.entityType === "Knowledge" && n.entityId ? (
-                    <Link href={`/app/knowledge?clientId=${n.entityId}`} className="font-medium text-app-text-primary hover:text-app-text-accent">
+                    <Link href={`/app/approvals?tab=knowledge&clientId=${n.entityId}`} className="font-medium text-app-text-primary hover:text-app-text-accent">
                       {n.title}
                     </Link>
                   ) : (

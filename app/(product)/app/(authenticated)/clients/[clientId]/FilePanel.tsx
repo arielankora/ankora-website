@@ -225,7 +225,7 @@ export function SummaryPanel({
   const latest = summaries[0];
 
   return (
-    <section className="rounded-2xl border border-app-border bg-white p-6">
+    <section id="portal-summary" className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-[15px] font-medium text-app-text-primary">סיכום חודשי</h2>
         <p className="text-[11.5px] text-app-text-tertiary">נבנה מהרשומות. מגיע ללקוח רק אחרי שמישהו אישר.</p>

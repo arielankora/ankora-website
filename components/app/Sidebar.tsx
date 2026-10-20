@@ -20,8 +20,8 @@ export type NavCounters = {
   /// Tasks phase 2: how many tasks are waiting on this person's
   /// approval. Zero prints nothing, like every other counter here.
   supervisingCount?: number;
-  /// Org brain: proposals to client files waiting for a person.
-  knowledgeCount?: number;
+  /// Everything waiting on this person's approval.
+  approvalsCount?: number;
 };
 
 /** Ticks a "H:MM" counter from an ISO start time - mirrors LiveTimerPill's own tick, kept separate since this one renders a shorter format for the nav row. */
@@ -123,8 +123,8 @@ export function Sidebar({
                 ? String(counters.importantDatesCount)
                 : item.href === "/app/tasks" && counters?.supervisingCount
                 ? String(counters.supervisingCount)
-                : item.href === "/app/knowledge" && counters?.knowledgeCount
-                ? String(counters.knowledgeCount)
+                : item.href === "/app/approvals" && counters?.approvalsCount
+                ? String(counters.approvalsCount)
                 : item.href === "/app/alerts" && counters?.alertsCount
                   ? String(counters.alertsCount)
                   : null;

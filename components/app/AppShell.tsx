@@ -18,7 +18,7 @@ const ROLE_LABELS: Record<User["role"], string> = {
   CLIENT_USER: "לקוח",
 };
 
-function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
+function navItemsFor(role: User["role"]): NavItem[] {
   // 19.10.2026 (canvas "Ankora App UI Round", task cmvddvqqv000plc08l6qzt2ho):
   // four groups instead of six, by what the person came to do, and the
   // account items moved out of the list into the menu under the person's
@@ -53,8 +53,10 @@ function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
   if (tracks) items.push({ href: "/app/timer", label: "טיימר", group: "עבודה" });
   if (tracks) items.push({ href: "/app/tasks", label: "משימות", group: "עבודה" });
   if (tracks) items.push({ href: "/app/calendar", label: "יומן", group: "עבודה" });
-  // Org brain (spec 5.2): there only while something waits.
-  if (proposals > 0) items.push({ href: "/app/knowledge", label: "ממתין לאישור", group: "עבודה" });
+  // 20.10.2026: every approval in one place, with what waits on this
+  // person beside it. Always there, unlike "ממתין לאישור" before it, so
+  // the way to it does not move while the count is zero.
+  if (tracks) items.push({ href: "/app/approvals", label: "אישורים", group: "עבודה" });
 
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "לקוחות" });
   if (tracks) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "לקוחות" });
@@ -110,7 +112,7 @@ export function AppShell({
   importantDatesCount,
   alertsCount,
   supervising,
-  proposals = 0,
+  approvals = 0,
   clients,
   children,
 }: {
@@ -123,12 +125,12 @@ export function AppShell({
   /// Tasks phase 2. `pending`, the tasks waiting on this person's
   /// sign-off, is printed beside "משימות".
   supervising: { total: number; pending: number };
-  /// Proposals to client files waiting for a person (spec 5.2).
-  proposals?: number;
+  /// Everything waiting on this person's approval (lib/approvals.ts).
+  approvals?: number;
   clients: { id: string; name: string }[];
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role, proposals);
+  const items = navItemsFor(user.role);
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
@@ -145,7 +147,7 @@ export function AppShell({
           importantDatesCount,
           alertsCount,
           supervisingCount: supervising.pending,
-          knowledgeCount: proposals,
+          approvalsCount: approvals,
         }}
       />
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />

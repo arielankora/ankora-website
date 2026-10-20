@@ -15,6 +15,9 @@ import { attentionSentence, hasAttention } from "@/lib/client-file-attention";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { STALE_BUSINESS_DAYS } from "@/lib/client-control";
 import { formatClockMinutes } from "@/lib/hours-format";
+import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
+import { countApprovals } from "@/lib/app-domain/approvals";
+import { approvalsLine } from "@/lib/approvals";
 
 // The morning digest.
 //
@@ -159,6 +162,11 @@ export type Digest = {
   clients?: DigestClientLine[];
   /// "סדר בית": this person's own time records.
   housekeeping?: DigestNote[];
+
+  /// Everything waiting on this person's approval, the number beside
+  /// "אישורים" in the menu (20.10.2026). One line under the opening, with
+  /// the link: the list itself is on the screen, not in the email.
+  approvals?: number;
 };
 
 export type DigestClientLine = {
@@ -204,7 +212,8 @@ export function isDigestEmpty(d: Digest): boolean {
     (d.dates?.length ?? 0) === 0 &&
     (d.reviews?.length ?? 0) === 0 &&
     (d.clients?.length ?? 0) === 0 &&
-    (d.housekeeping?.length ?? 0) === 0
+    (d.housekeeping?.length ?? 0) === 0 &&
+    (d.approvals ?? 0) === 0
   );
 }
 
@@ -224,6 +233,8 @@ export function digestSubject(d: Digest, now: Date = new Date()): string {
     if (c) return clip(`${c.clientName}: ${c.text.replace(/\.$/, "")}`, SUBJECT_TITLE_CHARS + 20);
     const h = d.housekeeping?.[0];
     if (h) return h.text.replace(/\.$/, "");
+    const waiting = approvalsLine(d.approvals ?? 0);
+    if (waiting) return waiting.replace(/\.$/, "");
     return "הבוקר שלך";
   }
   const [first] = items;
@@ -444,31 +455,6 @@ async function excerptsFor(taskIds: string[]): Promise<Map<string, string>> {
   return out;
 }
 
-/// When each task was sent for approval, from the audit log.
-///
-/// Not updatedAt: any edit moves it, and "waiting on your signature for
-/// two days" has to mean two days since it was handed over, not since
-/// somebody fixed a typo. Falls back to updatedAt where the log has no row.
-async function sentForApprovalAt(taskIds: string[]): Promise<Map<string, Date>> {
-  const out = new Map<string, Date>();
-  if (taskIds.length === 0) return out;
-  const rows = await prisma.auditEvent.findMany({
-    where: { entityType: "Task", entityId: { in: taskIds }, action: { in: ["task.update", "task.status_change"] } },
-    orderBy: { createdAt: "desc" },
-    select: { entityId: true, beforeJson: true, afterJson: true, createdAt: true },
-  });
-  // The newest row that MOVED the task into approval. A later edit that
-  // left it there writes the whole row too, and is not the handover.
-  const statusOf = (row: unknown) => (row && typeof row === "object" ? (row as Record<string, unknown>).status : undefined);
-  for (const r of rows) {
-    if (!r.entityId || out.has(r.entityId)) continue;
-    if (statusOf(r.afterJson) === "PENDING_APPROVAL" && statusOf(r.beforeJson) !== "PENDING_APPROVAL") {
-      out.set(r.entityId, r.createdAt);
-    }
-  }
-  return out;
-}
-
 /// Everything in the digest that is not a task: exceptions to decide,
 /// routine checks, important dates, procedures to review.
 ///
@@ -478,7 +464,7 @@ async function sentForApprovalAt(taskIds: string[]): Promise<Map<string, Date>> 
 async function beyondTasks(
   userId: string,
   now: Date
-): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews" | "clients" | "housekeeping">> {
+): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews" | "clients" | "housekeeping" | "approvals">> {
   const actor = await prisma.user.findUnique({ where: { id: userId } });
   if (!actor) return {};
   const safe = async <T>(name: string, run: () => Promise<T[]>): Promise<T[]> => {
@@ -540,7 +526,13 @@ async function beyondTasks(
     safe("clients", () => myClientLines(userId, clientName, now)),
     safe("housekeeping", () => myHousekeeping(userId, now)),
   ]);
-  return { exceptions, routines, dates, reviews, clients: clientLines, housekeeping };
+  let approvals = 0;
+  try {
+    approvals = await countApprovals(actor);
+  } catch (err) {
+    console.error("daily digest: approvals failed", err);
+  }
+  return { exceptions, routines, dates, reviews, clients: clientLines, housekeeping, approvals };
 }
 
 /// "הלקוחות שלך". Four questions, in the order they cost money or trust:
@@ -587,7 +579,7 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
     lines.push({
       clientName: name.get(clientId) ?? "",
       text: n === 1 ? "הצעה אחת לתיק מחכה לבדיקה." : `${n} הצעות לתיק מחכות לבדיקה.`,
-      href: `/app/knowledge?clientId=${clientId}`,
+      href: `/app/approvals?tab=knowledge&clientId=${clientId}`,
       tone: "blue",
     });
   }
@@ -609,7 +601,7 @@ async function myClientLines(userId: string, accessible: Map<string, string>, no
     lines.push({
       clientName: c.name,
       text: `לא הגיע חילוץ כבר ${since} ימי עבודה.`,
-      href: `/app/knowledge?clientId=${c.id}`,
+      href: `/app/approvals?tab=knowledge&clientId=${c.id}`,
       tone: "gray",
     });
   }
@@ -1134,7 +1126,9 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
   const lead = digestLead(d, all);
   const dayHref = `${base}/app/calendar?view=day`;
 
-  const textLines: string[] = [`בוקר טוב ${name},`, "", lead, `היום שלך: ${dayHref}`, ""];
+  const approvalsHref = `${base}/app/approvals`;
+  const waiting = approvalsLine(d.approvals ?? 0);
+  const textLines: string[] = [`בוקר טוב ${name},`, "", lead, `היום שלך: ${dayHref}`, ...(waiting ? [`${waiting} ${approvalsHref}`] : []), ""];
   const rows: string[] = [];
 
   items.forEach((item, i) => {
@@ -1248,6 +1242,11 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
                 <p style="margin:10px 0 4px;font-size:20px;font-weight:600;color:${INK};">בוקר טוב ${escapeHtml(name)}</p>
                 <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3B4A5E;">${escapeHtml(lead)}</p>
                 <a href="${dayHref}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;">פתח את היום שלי</a>
+                ${
+                  waiting
+                    ? `<p style="margin:12px 0 0;font-size:13.5px;line-height:1.6;color:#3B4A5E;">${escapeHtml(waiting)} <a href="${approvalsHref}" style="color:${INK};font-weight:600;">למסך האישורים</a></p>`
+                    : ""
+                }
               </td>
             </tr>
             <tr>
