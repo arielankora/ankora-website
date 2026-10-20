@@ -105,6 +105,12 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
     { key: "assigneeName", label: "אחראי באנקורה (שם)" },
     { key: "dueDate", label: "תאריך יעד (2026-10-22)" },
   ],
+  DATE: [
+    { key: "title", label: "מה המועד" },
+    { key: "date", label: "תאריך (2026-10-22), לחד-פעמי או שנתי" },
+    { key: "responsibleName", label: "אחראי באנקורה (שם)" },
+    { key: "notes", label: "הערות", long: true },
+  ],
 };
 
 function str(v: unknown): string {
@@ -131,7 +137,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
             )}
           </label>
         ))}
-      {p.target !== "TASK" && (p.target !== "FACT" || p.payload.kind !== "QUESTION") ? (
+      {p.target !== "TASK" && p.target !== "DATE" && (p.target !== "FACT" || p.payload.kind !== "QUESTION") ? (
         <>
           <label className="block">
             <span className="block text-xs font-medium text-app-text-secondary">סטטוס</span>
@@ -147,7 +153,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
           </label>
         </>
       ) : null}
-      {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && (
+      {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && p.target !== "DATE" && (
         <div className="grid grid-cols-2 gap-3">
           <label className="block">
             <span className="block text-xs font-medium text-app-text-secondary">בעלים באנקורה (שם)</span>

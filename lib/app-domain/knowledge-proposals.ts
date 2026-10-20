@@ -29,13 +29,15 @@ import {
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
-import { addProcess, saveProcessVersion } from "@/lib/app-domain/processes";
+import { addProcess, linkProcessDates, saveProcessVersion } from "@/lib/app-domain/processes";
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
 import { addClientFact, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
+import { createImportantDate } from "@/lib/app-domain/important-dates";
+import { dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
@@ -163,7 +165,7 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   if (unlinked.length) {
     flags.push({ code: "LINK", message: `לא נמצא בתיק: ${unlinked.join("; ")}. אם הוא ייכנס לתיק לפני האישור, הוא יקושר. אחרת הפריט ייכנס בלי הקישור הזה.` });
   }
-  if (item.target !== "TASK" && sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
+  if (item.target !== "TASK" && item.target !== "DATE" && sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
   }
   if (item.target === "FACT" && item.action === "CREATE") {
@@ -206,6 +208,14 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
     const known = await prisma.process.findMany({ where: { clientId, deletedAt: null, status: { not: "RETIRED" } }, select: { title: true } });
     if (known.some((k) => normalizeForMatch(k.title) === title)) flags.push({ code: "DUPLICATE", message: "תהליך בשם הזה כבר בתיק." });
     flags.push({ code: "PROCESS", message: "באישור, התהליך נכנס כטיוטה. הנוהל רץ רק אחרי שמנהל מאשר אותו במסך התהליכים." });
+  }
+  if (item.target === "DATE") {
+    if (typeof item.payload.responsibleName === "string" && item.payload.responsibleName.trim() && !(await ownerByName(item.payload.responsibleName))) {
+      flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.responsibleName.trim()}". האחראי יהיה מי שמאשר, אלא אם מתקנים את השם.` });
+    }
+    const title = normalizeForMatch(String(item.payload.title ?? ""));
+    const known = await prisma.importantDate.findMany({ where: { clientId, deletedAt: null, status: { not: "ARCHIVED" }, holidayKey: null }, select: { title: true } });
+    if (known.some((k) => normalizeForMatch(k.title) === title)) flags.push({ code: "DUPLICATE", message: "מועד בשם הזה כבר אצל הלקוח." });
   }
   if (item.target === "DOMAIN") {
     const domain = normalizeDomain(String(item.payload.domain ?? ""));
@@ -518,8 +528,11 @@ async function apply(
   const date = (v: unknown) => (typeof v === "string" && v ? new Date(`${v}T00:00:00Z`) : null);
   const sources = readSourceRefs(payload.sources);
   const ownerId = await ownerByName(payload.ownerName);
-  // Named, or nothing: an item without an owner keeps the one it has.
-  const owner = ownerId ? { ownerId } : {};
+  // A change names its owner or keeps the one the item has. A new item
+  // nobody named an owner for is kept by the client's account manager
+  // (spec 3.1): an item with no owner is an item nobody keeps right.
+  const manager = ownerId || p.action !== "CREATE" ? null : (await prisma.client.findUnique({ where: { id: p.clientId }, select: { accountManagerId: true } }))?.accountManagerId ?? null;
+  const owner = ownerId ? { ownerId } : manager ? { ownerId: manager } : {};
   // Contacts, systems, entities and processes it names, found in the file
   // now: something approved earlier in the same batch is found too.
   const links = await resolveLinks(p.clientId, p.target, payload);
@@ -595,6 +608,34 @@ async function apply(
       await saveProcessVersion(actor, process.id, { steps: withSystems, highlights, outputs, baseVersion: 0 });
     }
     return process.id;
+  }
+  // A client's own date: into the dates, with its reminders, linked to the
+  // process it starts. Who is responsible, by name, or whoever approves.
+  if (p.target === "DATE") {
+    const d = PAYLOADS.DATE.parse(payload);
+    const responsible = (await ownerByName(d.responsibleName)) ?? actor.id;
+    const created = await createImportantDate(actor, {
+      clientId: p.clientId,
+      title: d.title,
+      type: "CLIENT",
+      category: d.category ?? "BUSINESS_FINANCE",
+      ...dateSchedule(d),
+      responsibleUserId: responsible,
+      sensitivity: d.sensitivity ?? undefined,
+      notes: d.notes ?? null,
+      conditionText: d.conditionText ?? null,
+      expectsReceipt: d.expectsReceipt ?? false,
+      expectedFrom: d.expectedFrom ?? null,
+      createAutoTask: d.taskDaysBefore != null,
+      autoTaskLeadDays: d.taskDaysBefore ?? null,
+      useDefaultReminders: true,
+    });
+    if (linked.processId) {
+      const now = await prisma.importantDate.findMany({ where: { processId: linked.processId as string, deletedAt: null }, select: { id: true } });
+      await linkProcessDates(actor, linked.processId as string, [...now.map((x) => x.id), created.id]);
+    }
+    if (d.clientVisible) await prisma.importantDate.update({ where: { id: created.id }, data: { clientVisible: true } });
+    return created.id;
   }
   if (p.target === "DOMAIN") return (await addClientDomain(actor, { ...PAYLOADS.DOMAIN.parse(payload), clientId: p.clientId })).id;
   // Something to do: a task on the client, with where it came from, so it

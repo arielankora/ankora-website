@@ -9,6 +9,7 @@ import { factShapeError } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
 import { blockingChecks, readSteps } from "@/lib/process-rules";
 import { clientVisibleBlocker } from "@/lib/knowledge";
+import { DatePayload, dateShapeError, dateWhen } from "@/lib/date-proposals";
 import { parseExternalRefs, readExternalRefs, refLabel } from "@/lib/external-refs";
 
 const knowledge = {
@@ -223,6 +224,7 @@ export const PAYLOADS = {
   PROCESS: ProcessPayload,
   DOMAIN: DomainPayload,
   TASK: TaskPayload,
+  DATE: DatePayload,
 } as const;
 export type ProposalTargetLike = keyof typeof PAYLOADS;
 export type ProposalActionLike = "CREATE" | "SUPERSEDE" | "CONTRADICT";
@@ -239,6 +241,7 @@ export const TARGET_LABELS: Record<ProposalTargetLike, string> = {
   PROCESS: "תהליך",
   DOMAIN: "דומיין",
   TASK: "משימה",
+  DATE: "מועד",
 };
 
 export const ACTION_LABELS: Record<ProposalActionLike, string> = {
@@ -271,6 +274,10 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : null);
   if (target === "FACT") {
     const shape = factShapeError({ kind: payload.kind as never, body: s("body") ?? "", validUntil: s("validUntil") ? new Date(s("validUntil")!) : null, validUntilEvent: s("validUntilEvent"), decidedAt: s("decidedAt") ? new Date(s("decidedAt")!) : null });
+    if (shape) out.push({ code: "SHAPE", block: true, message: `${shape} משלימים בעריכה, או דוחים.` });
+  }
+  if (target === "DATE") {
+    const shape = dateShapeError(payload);
     if (shape) out.push({ code: "SHAPE", block: true, message: `${shape} משלימים בעריכה, או דוחים.` });
   }
   if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
@@ -412,6 +419,8 @@ export function proposalHeadline(target: ProposalTargetLike, payload: Record<str
       return [s("domain"), s("organizationName")].filter(Boolean).join(", ");
     case "TASK":
       return s("title");
+    case "DATE":
+      return [s("title"), dateWhen(payload)].filter(Boolean).join(": ");
   }
 }
 
@@ -466,6 +475,17 @@ function itemDetails(target: ProposalTargetLike, payload: Record<string, unknown
       s("triggerText") && `מה מפעיל: ${s("triggerText")}`,
       s("slaText") && `SLA: ${s("slaText")}`,
       ...steps.map((st, i) => `${i + 1}. ${typeof st.title === "string" ? st.title : ""}${st.requiresApproval ? " (דורש אישור)" : ""}${Array.isArray((st as { systemNames?: unknown }).systemNames) && ((st as { systemNames: unknown[] }).systemNames).length ? ` [${((st as { systemNames: unknown[] }).systemNames).join(", ")}]` : ""}`),
+    ].filter((x): x is string => !!x);
+  }
+  if (target === "DATE") {
+    const days = typeof payload.taskDaysBefore === "number" ? payload.taskDaysBefore : null;
+    return [
+      s("conditionText") && `בתנאי: ${s("conditionText")}`,
+      payload.expectsReceipt === true && `ממתין לקבלה${s("expectedFrom") ? ` מ-${s("expectedFrom")}` : ""}`,
+      s("ifNotBusinessDay") && (s("ifNotBusinessDay") === "BEFORE" ? "ביום עסקים לפני, אם נופל על יום חופש" : "ביום העסקים הבא, אם נופל על יום חופש"),
+      s("responsibleName") && `אחראי: ${s("responsibleName")}`,
+      days !== null && `משימה ${days === 0 ? "ביום עצמו" : `${days} ימים לפני`}`,
+      s("notes"),
     ].filter((x): x is string => !!x);
   }
   if (target === "ENTITY") {
