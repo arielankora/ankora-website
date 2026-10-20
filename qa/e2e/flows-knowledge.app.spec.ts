@@ -50,6 +50,28 @@ test.describe("knowledge/actions", () => {
     await expect(page.getByText(edited).first(), "the approved proposal did not reach the file").toBeVisible({ timeout: 15_000 });
   });
 
+  // 20.10.2026: the bulk reject drawer opened clipped inside the sticky
+  // selection bar (a backdrop filter there trapped its fixed position),
+  // so the reason field was out of reach. Opened and dismissed, nothing
+  // written, so the seed's pending proposals are left for the test above.
+  test("rejecting several at once opens a full drawer with the reason field", async ({ page }) => {
+    await page.goto(`/app/knowledge?clientId=${CLIENT}`);
+    const batch = page.locator("section", { hasText: "[DEMO] הצעות לדוגמה" }).first();
+    const all = batch.getByRole("checkbox", { name: /^הכול/ });
+    test.skip((await all.count()) === 0, "fewer than two demo proposals still pending");
+    await all.check();
+    await batch.getByRole("button", { name: /^דחיית \d+$/ }).click();
+    const dialog = page.getByRole("dialog", { name: "דחיית הצעות" });
+    const reason = dialog.locator('input[name="reason"]');
+    await expect(reason).toBeVisible();
+    await expect(reason).toBeInViewport();
+    await expect(dialog.getByRole("button", { name: "דחייה", exact: true })).toBeInViewport();
+    const box = await dialog.locator("div.absolute.inset-y-0").boundingBox();
+    expect(box?.height ?? 0, "the drawer should be as tall as the viewport, not the selection bar").toBeGreaterThan(300);
+    await dialog.getByRole("button", { name: "סגירה" }).last().click();
+    await expect(dialog).toHaveCount(0);
+  });
+
   // Filters (claude/knowledge-review-filters-spec-2026-10-17.md). The demo
   // proposals are all notes, so a kind chip narrows to them, a narrowing
   // filter hides decided rows, and a select change lands in the URL.
