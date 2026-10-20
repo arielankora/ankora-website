@@ -10,10 +10,12 @@ import {
   isStaleProposedRule,
   isStaleUncertain,
   PROPOSAL_WAIT_DAYS,
+  RULE_WAIT_DAYS,
   type Attention,
 } from "@/lib/client-file-attention";
 import { UNCERTAIN_REMINDER_DAYS } from "@/lib/client-facts";
 import { ruleReviewDue } from "@/lib/client-policies";
+import { ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 
 // Org brain, phase 2: the daily look at every client file
 // (claude/org-brain-spec-2026-10-12.md, 3.4 and 5.4). Runs on the existing
@@ -66,7 +68,7 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     prisma.requestType.findMany({ where: { ...live, ...stale }, select: row }),
     prisma.process.findMany({ where: { ...live, ...stale, status: { not: "RETIRED" } }, select: row }),
     prisma.clientPolicy.findMany({
-      where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: staleBefore } }, { reviewBy: { lte: now } }] },
+      where: { ...live, status: { not: "RETIRED" }, OR: [stale, { status: "PROPOSED", createdAt: { lt: new Date(now.getTime() - RULE_WAIT_DAYS * DAY_MS) } }, { reviewBy: { lte: now } }] },
       select: { ...row, status: true, createdAt: true, reviewBy: true },
     }),
     // Proposals waiting on the review screen (20.10.2026). A batch still
@@ -122,9 +124,16 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     if (item.ownerId) theirs(b, item.ownerId).staleUncertain++;
   }
   // A rule the client set, still waiting for a manager: the account
-  // manager's to chase.
+  // manager chases it, and the managers who approve rules for this client
+  // hear it themselves (Ariel, 20.10.2026).
+  const approversOf = new Map<string, string[]>();
   for (const rule of policies) {
-    if (isStaleProposedRule(rule, now)) bucket(rule.clientId).all.staleProposedRules++;
+    if (isStaleProposedRule(rule, now)) {
+      const b = bucket(rule.clientId);
+      b.all.staleProposedRules++;
+      if (!approversOf.has(rule.clientId)) approversOf.set(rule.clientId, (await ruleApproversFor(rule.clientId)).map((u) => u.id));
+      for (const id of approversOf.get(rule.clientId)!) theirs(b, id).staleProposedRules++;
+    }
     // Spec 3.11: its review date passed. The manager and its owner hear,
     // every week, until someone reviews it and sets the next date.
     if (ruleReviewDue(rule, now)) {

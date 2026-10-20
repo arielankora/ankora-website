@@ -8,8 +8,8 @@
 // - temporary information whose date has passed ("still true?"),
 // - uncertain items nobody has confirmed for two weeks,
 // - open questions nobody has answered,
-// - a client's rule proposed and not approved for two weeks, while only
-//   its interim rule applies,
+// - a client's rule proposed and not approved for three days: it does not
+//   bind until a manager approves it, so the managers who approve it hear,
 // - proposals waiting on the review screen for more than a week
 //   (20.10.2026): a procedure proposed and never approved is no more in
 //   the file than one never proposed.
@@ -65,8 +65,8 @@ export function attentionSentence(a: Attention): string {
   if (a.staleProposedRules) {
     parts.push(
       a.staleProposedRules === 1
-        ? `כלל מוצע אחד מחכה לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חל רק כלל הביניים.`
-        : `${a.staleProposedRules} כללים מוצעים מחכים לאישור כבר יותר מ-${UNCERTAIN_REMINDER_DAYS} יום, ועד אז חלים רק כללי הביניים.`
+        ? `כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-${RULE_WAIT_DAYS} ימים, ועד אז הוא לא מחייב.`
+        : `${a.staleProposedRules} כללים מוצעים מחכים לאישור מנהל כבר יותר מ-${RULE_WAIT_DAYS} ימים, ועד אז הם לא מחייבים.`
     );
   }
   if (a.staleProposals) {
@@ -84,6 +84,11 @@ export function attentionSentence(a: Attention): string {
 
 /// A rule proposed more than two weeks ago (spec 7.1): the client said
 /// something binding, and Ankora still works by the careful interim rule.
+/// How long a client's rule may wait for a manager before the managers
+/// who approve it hear again (Ariel, 20.10.2026: three days; it was two
+/// weeks, and only the account manager heard, who cannot approve it).
+export const RULE_WAIT_DAYS = 3;
+
 export function isStaleProposedRule(rule: { status: string; createdAt: Date }, now: Date): boolean {
-  return rule.status === "PROPOSED" && now.getTime() - rule.createdAt.getTime() > UNCERTAIN_REMINDER_DAYS * DAY_MS;
+  return rule.status === "PROPOSED" && now.getTime() - rule.createdAt.getTime() > RULE_WAIT_DAYS * DAY_MS;
 }

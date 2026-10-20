@@ -1851,6 +1851,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-20",
       "riskReason": "Sends the client file to Claude; must keep sensitive, restricted and removed items out and refuse clients the person cannot reach"
+    },
+    "domain:handover-readiness": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "riskReason": "Reads a client's processes and systems; must respect item visibility and refuse clients the person cannot reach",
+      "firstSeen": "2026-10-20"
+    },
+    "screen:/app/clients/[clientId]/handover": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "riskReason": "Client screen; must refuse anyone not on the client",
+      "firstSeen": "2026-10-20"
     }
   },
   "waivers": {},

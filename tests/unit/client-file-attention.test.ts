@@ -20,11 +20,12 @@ describe("client file attention", () => {
     expect(hasAttention({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0 })).toBe(false);
   });
 
-  it("a rule proposed two weeks ago and not approved is said, with what applies meanwhile", () => {
+  it("a rule proposed more than three days ago and not approved is said: it does not bind yet", () => {
     expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date("2026-09-29T05:00:00Z") }, now)).toBe(true);
     expect(isStaleProposedRule({ status: "ACTIVE", createdAt: new Date("2026-01-01T00:00:00Z") }, now)).toBe(false);
-    expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date("2026-10-10T00:00:00Z") }, now)).toBe(false);
-    expect(attentionSentence({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 1 })).toBe("כלל מוצע אחד מחכה לאישור כבר יותר מ-14 יום, ועד אז חל רק כלל הביניים.");
+    expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date(now.getTime() - 2 * 86_400_000) }, now)).toBe(false);
+    expect(isStaleProposedRule({ status: "PROPOSED", createdAt: new Date(now.getTime() - 4 * 86_400_000) }, now)).toBe(true);
+    expect(attentionSentence({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 1 })).toBe("כלל מוצע אחד מחכה לאישור מנהל כבר יותר מ-3 ימים, ועד אז הוא לא מחייב.");
     expect(hasAttention({ pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 2 })).toBe(true);
   });
 
