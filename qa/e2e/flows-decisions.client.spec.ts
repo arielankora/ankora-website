@@ -85,9 +85,17 @@ test("the decision screen shows the question, the options and our recommendation
   await expect(page.getByText("גבוה מהתקרה שסוכמה איתך")).toBeVisible();
 });
 
+// 20.10.2026 (portal round): home no longer has a banner that counts the
+// decisions. Its headline counts everything that waits, and one button
+// leads to the decisions. That button is what points at it.
+const HOME_ACTION = '[data-testid="portal-home-decisions"]';
+
 test("the home screen points at it", async ({ page }) => {
   await page.goto(HOME, { waitUntil: "domcontentloaded" });
-  await expect(page.getByText(WAITING_BANNER).first()).toBeVisible();
+  const action = page.locator(HOME_ACTION);
+  await expect(action).toBeVisible();
+  await expect(action).toHaveAttribute("href", DECISIONS);
+  await expect(action).toHaveText(/לצפייה ב/);
 });
 
 test("answering records the choice and closes the decision", async ({ page }) => {
@@ -157,4 +165,5 @@ test("the home screen stops asking once it is answered", async ({ page }) => {
   // is absent from it: on an unpainted page every absence is true.
   await expect(page.getByText("שלום,").first()).toBeVisible();
   await expect(page.getByText(WAITING_BANNER)).toHaveCount(0);
+  await expect(page.locator(HOME_ACTION)).toHaveCount(0);
 });

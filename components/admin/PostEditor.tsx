@@ -183,21 +183,21 @@ export function PostEditor({
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-3xl">
-      <h1 className="text-2xl font-medium text-appNavy">{mode === "new" ? "New article" : "Edit article"}</h1>
+      <h1 className="text-2xl font-medium text-app-text-primary">{mode === "new" ? "New article" : "Edit article"}</h1>
 
       <div className="mt-8 grid gap-6 md:grid-cols-2">
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-appNavy/70">Title</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Title</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-appNavy/70">Slug (URL)</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Slug (URL)</label>
           <input
             value={derivedSlug}
             onChange={(e) => {
@@ -205,20 +205,20 @@ export function PostEditor({
               setSlug(sanitizeSlugChars(e.target.value));
             }}
             disabled={mode === "edit"}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold disabled:bg-appNavy/5 disabled:text-appNavy/40"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold disabled:bg-app-surface-sunken disabled:text-app-text-tertiary"
           />
-          <p className="mt-1 text-xs text-appNavy/40">
+          <p className="mt-1 text-xs text-app-text-tertiary">
             /{locale}/blog/{derivedSlug || "…"} &middot; Latin letters, numbers and hyphens only (Hebrew titles are fine - just not in the URL)
           </p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-appNavy/70">Language</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Language</label>
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value as "he" | "en")}
             disabled={mode === "edit"}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold disabled:bg-appNavy/5"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold disabled:bg-app-surface-sunken"
           >
             <option value="he">Hebrew</option>
             <option value="en">English</option>
@@ -226,11 +226,11 @@ export function PostEditor({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-appNavy/70">Category</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Category</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value as any)}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           >
             {BLOG_CATEGORY_SLUGS.map((c) => (
               <option key={c} value={c}>
@@ -241,45 +241,45 @@ export function PostEditor({
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-appNavy/70">Excerpt (meta description, 1-2 sentences)</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Excerpt (meta description, 1-2 sentences)</label>
           <textarea
             value={excerpt}
             onChange={(e) => setExcerpt(e.target.value)}
             rows={2}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-appNavy/70">Author</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Author</label>
           <input
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-appNavy/70">Publish date</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Publish date</label>
           <input
             type="date"
             value={publishedAt}
             onChange={(e) => setPublishedAt(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-appNavy/70">Tags (comma separated, optional)</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Tags (comma separated, optional)</label>
           <input
             value={tags}
             onChange={(e) => setTags(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+            className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
           />
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-appNavy/70">Cover image</label>
+          <label className="block text-sm font-medium text-app-text-secondary">Cover image</label>
           <div className="mt-2 flex items-center gap-4">
             <input
               type="file"
@@ -287,13 +287,13 @@ export function PostEditor({
               onChange={(e) => e.target.files?.[0] && onUploadImage(e.target.files[0])}
               disabled={uploading}
             />
-            {uploading && <span className="text-sm text-appNavy/40">Uploading…</span>}
+            {uploading && <span className="text-sm text-app-text-tertiary">Uploading…</span>}
           </div>
 
           {coverImage && (
             <div className="mt-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-appNavy/50">
+                <span className="text-xs font-medium text-app-text-tertiary">
                   Exactly how the crop will look on the site
                 </span>
                 <div className="flex gap-1">
@@ -305,7 +305,7 @@ export function PostEditor({
                       className={`rounded-md border px-2.5 py-1 text-xs font-medium capitalize ${
                         coverImagePosition === pos
                           ? "border-gold bg-gold-gradient text-navy"
-                          : "border-lineDark bg-white text-appNavy/60 hover:border-gold"
+                          : "border-app-border bg-white text-app-text-secondary hover:border-gold"
                       }`}
                     >
                       {pos}
@@ -317,12 +317,12 @@ export function PostEditor({
               {/* Same box + crop rules as the article hero (app/[locale]/blog/[slug]/page.tsx) -
                   this form shares the site's max-w-3xl width, so this is a true 1:1 preview. */}
               <div className="mt-2">
-                <span className="text-xs text-appNavy/40">Article page</span>
+                <span className="text-xs text-app-text-tertiary">Article page</span>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={coverImage}
                   alt=""
-                  className={`mt-1 w-full rounded-xl border border-lineDark object-cover ${coverPositionClass(
+                  className={`mt-1 w-full rounded-xl border border-app-border object-cover ${coverPositionClass(
                     coverImagePosition
                   )}`}
                   style={{ maxHeight: 520 }}
@@ -331,8 +331,8 @@ export function PostEditor({
 
               {/* Same aspect ratio as BlogCard.tsx - crop is identical regardless of thumbnail size. */}
               <div className="mt-3 w-48">
-                <span className="text-xs text-appNavy/40">Blog card</span>
-                <div className="relative mt-1 aspect-[16/10] w-full overflow-hidden rounded-xl border border-lineDark bg-appNavy/5">
+                <span className="text-xs text-app-text-tertiary">Blog card</span>
+                <div className="relative mt-1 aspect-[16/10] w-full overflow-hidden rounded-xl border border-app-border bg-app-surface-sunken">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={coverImage}
@@ -347,14 +347,14 @@ export function PostEditor({
       </div>
 
       <div className="mt-8">
-        <label className="block text-sm font-medium text-appNavy/70">Article body (Markdown)</label>
+        <label className="block text-sm font-medium text-app-text-secondary">Article body (Markdown)</label>
         <div className="mt-2 flex gap-1">
           {TOOLBAR.map((t) => (
             <button
               key={t.label}
               type="button"
               onClick={() => insertAtCursor(t.wrap[0], t.wrap[1])}
-              className="rounded-md border border-lineDark bg-white px-3 py-1.5 text-xs font-medium text-appNavy/70 hover:border-gold"
+              className="rounded-md border border-app-border bg-white px-3 py-1.5 text-xs font-medium text-app-text-secondary hover:border-gold"
             >
               {t.label}
             </button>
@@ -367,21 +367,21 @@ export function PostEditor({
           onPaste={handlePaste}
           rows={18}
           dir="auto"
-          className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-3 font-mono text-sm text-appNavy outline-none focus:border-gold"
+          className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-3 font-mono text-sm text-app-text-primary outline-none focus:border-gold"
         />
-        <p className="mt-1 text-xs text-appNavy/40">
+        <p className="mt-1 text-xs text-app-text-tertiary">
           Paste directly from ChatGPT, Google Docs, or Word - headings, bold, links and lists convert to Markdown automatically.
         </p>
       </div>
 
       <div className="mt-6 flex items-center gap-2">
         <input id="draft" type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
-        <label htmlFor="draft" className="text-sm text-appNavy/70">
+        <label htmlFor="draft" className="text-sm text-app-text-secondary">
           Save as draft (won&apos;t appear on the live site or sitemap until unchecked)
         </label>
       </div>
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-app-error">{error}</p>}
 
       <div className="mt-8 flex items-center gap-4">
         <button
@@ -391,7 +391,7 @@ export function PostEditor({
         >
           {saving ? "Saving…" : draft ? "Save draft" : "Publish"}
         </button>
-        <span className="text-xs text-appNavy/40">
+        <span className="text-xs text-app-text-tertiary">
           {draft ? "Draft posts are private until you publish them." : "This will go live on ankora.co.il within about a minute."}
         </span>
       </div>

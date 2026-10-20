@@ -122,7 +122,7 @@ export function TaskThread({
           aria-label="הערה חדשה"
           onChange={(e) => setBody(e.target.value)}
           placeholder="מה קרה, מה נוסה, מה ענו. מה שהיה הולך לוואטסאפ."
-          className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
+          className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-app-accent"
         />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <button
@@ -266,7 +266,7 @@ function Dot({ kind }: { kind: ThreadEntry["kind"] }) {
   const filled = kind === "comment";
   return (
     <span
-      className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${filled ? "bg-appNavy/70" : "bg-appNavy/25"}`}
+      className={`mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full ${filled ? "bg-app-text-secondary" : "bg-app-border-strong"}`}
     />
   );
 }

@@ -843,7 +843,9 @@
       "area": "app",
       "risk": "high",
       "riskAssigned": false,
-      "firstSeen": "2026-09-20"
+      "firstSeen": "2026-09-20",
+      "redirectsTo": "/app/portal/hours?view=weekly",
+      "note": "Since 20.10.2026 a redirect only (task cmvddvqqv000plc08l6qzt2ho). The week by days is the hours screen's tab; the redirect and the week it carries are covered by qa/e2e/ui-round.client.spec.ts."
     },
     "screen:/app/profile": {
       "kind": "screen",

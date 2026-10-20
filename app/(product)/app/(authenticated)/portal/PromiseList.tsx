@@ -10,10 +10,12 @@ import { PORTAL_STAGE_LABELS, type PortalPromise } from "@/lib/app-domain/client
 // client reads their outcome, not our workflow.
 
 const STAGE_TONE: Record<PortalPromise["stage"], string> = {
-  WAITING_ON_CLIENT: "border-gold/45 bg-gold/12 text-app-text-primary",
-  IN_PROGRESS: "border-app-border bg-app-surface-sunken text-app-text-secondary",
-  RECEIVED: "border-app-border bg-app-surface-sunken text-app-text-secondary",
-  DONE: "border-app-success/25 bg-app-success-soft text-app-success",
+  // 20.10.2026: the app's status tones (StatusBadge, TaskRow): waiting is the
+  // warning tone, in progress the info tone, received the neutral one.
+  WAITING_ON_CLIENT: "border-transparent bg-app-warning-soft text-app-warning",
+  IN_PROGRESS: "border-transparent bg-app-info-soft text-app-info",
+  RECEIVED: "border-transparent bg-app-neutral-soft text-app-text-secondary",
+  DONE: "border-transparent bg-app-success-soft text-app-success",
 };
 
 function formatDay(date: Date) {
@@ -113,17 +115,17 @@ export function PromiseList({
   return (
     <div
       className={`overflow-hidden rounded-2xl border ${
-        tone === "attention" ? "border-gold/40 bg-app-surface-sunken" : "border-app-border bg-white"
+        tone === "attention" ? "border-app-warning/25 bg-app-warning-soft" : "border-app-border bg-white"
       }`}
     >
-      <div className="flex items-center justify-between gap-2.5 border-b border-app-border px-[18px] py-3.5">
-        <span className="text-[13.5px] font-medium text-app-text-primary">{title}</span>
+      <div className={`flex items-center justify-between gap-2.5 border-b px-[18px] py-3.5 ${tone === "attention" ? "border-app-warning/25" : "border-app-border"}`}>
+        <span className={`text-[13.5px] font-medium ${tone === "attention" ? "text-app-warning" : "text-app-text-primary"}`}>{title}</span>
         {action}
       </div>
       {promises.length === 0 ? (
         <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">{emptyText}</p>
       ) : (
-        <div className="divide-y divide-app-border">
+        <div className={`divide-y ${tone === "attention" ? "divide-app-warning/25" : "divide-app-border"}`}>
           {promises.map((p) => (
             <PromiseRow key={p.id} promise={p} showStage={showStage} />
           ))}

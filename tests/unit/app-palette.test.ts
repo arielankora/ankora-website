@@ -22,7 +22,13 @@ function files(dir: string, acc: string[] = []): string[] {
   return acc;
 }
 
-const APP = [...files("app/(product)"), ...files("components/app")];
+const APP = [
+  ...files("app/(product)"),
+  ...files("components/app"),
+  // The blog admin is an internal screen on the same light palette.
+  ...files("components/admin"),
+  ...files("app/[locale]/admin"),
+];
 
 function offenders(pattern: RegExp): string[] {
   const out: string[] = [];
@@ -57,5 +63,20 @@ describe("app palette", () => {
       .map((line) => line.replace(/^.*?-(app-[a-z-]+)(?:\/\d+)?$/, "$1"))
       .filter((name) => !known.has(name));
     expect([...new Set(used)]).toEqual([]);
+  });
+
+  // 20.10.2026 (gap check after the UI round): gold is #B08D57, 3.1:1 on white
+  // and 2.8:1 on the page ground, so as text it fails 4.5:1. Links and small
+  // actions in gold use app-text-accent (#7A5F38). gold-light on the dark
+  // sidebar is fine and is not matched.
+  it("no gold text on the light surfaces", () => {
+    expect(offenders(/(?<![\w-])(?:[a-z-]+:)*text-gold(?![\w-])/g)).toEqual([]);
+  });
+
+  it("the pre-role tokens are gone, in code and in the config", () => {
+    expect(offenders(/(?<![\w-])(?:[a-z-]+:)*[a-z]+-(?:appNavy|lineDark)\b/g)).toEqual([]);
+    const colors = (config as any).theme.extend.colors;
+    for (const name of ["appNavy", "lineDark", "success", "warning", "neutral"]) expect(colors[name]).toBeUndefined();
+    expect(Object.keys(colors.error)).toEqual(["on-dark"]);
   });
 });

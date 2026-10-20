@@ -35,22 +35,22 @@ function SubmitOption({
     <button
       type="submit"
       disabled={pending || locked || !canAnswer}
-      className={`w-full rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
-        option.recommended ? "border-gold/50 bg-gold/10 hover:border-gold" : "border-app-border bg-white hover:border-gold"
+      // 20.10.2026 (canvas, portal boards): the recommendation is a tag, and
+      // every price sits in the same column so the options compare at a glance.
+      className={`grid w-full grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 gap-y-1 rounded-[14px] border px-4 py-3 text-right transition-colors disabled:opacity-50 ${
+        option.recommended ? "border-app-accent bg-app-accent-soft" : "border-app-border-strong bg-white hover:border-app-accent"
       }`}
     >
-      <span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <span className="text-sm text-app-text-primary">
-          {pending ? "נשלח..." : option.label}
-          {option.recommended && !pending && <span className="mr-2 text-[11px] text-app-text-accent">ההמלצה שלנו</span>}
-        </span>
-        {price && (
-          <span dir="ltr" className="font-jbmono text-[12.5px] text-app-text-secondary">
-            {price}
-          </span>
+      <span className="flex flex-wrap items-center gap-2 text-sm font-medium text-app-text-primary">
+        {pending ? "נשלח..." : option.label}
+        {option.recommended && !pending && (
+          <span className="rounded-full bg-app-accent px-2 py-0.5 text-[11px] font-medium text-app-text-primary">ההמלצה שלנו</span>
         )}
       </span>
-      {option.detail && <span className="mt-1 block text-[12px] text-app-text-secondary">{option.detail}</span>}
+      <span dir="ltr" className="min-w-[96px] text-left font-jbmono text-[13px] text-app-text-primary">
+        {price ?? ""}
+      </span>
+      {option.detail && <span className="col-span-2 block text-[12.5px] text-app-text-secondary">{option.detail}</span>}
     </button>
   );
 }
@@ -172,8 +172,16 @@ export function DecisionCard({
   }
 
   return (
-    <div className="rounded-2xl border border-gold/40 bg-app-surface-sunken p-5">
-      {decision.taskTitle && <p className="text-[11.5px] text-app-text-tertiary">{decision.taskTitle}</p>}
+    <div className="rounded-2xl border border-app-border bg-white p-5">
+      <div className="flex flex-wrap items-center gap-2">
+        {decision.taskTitle && <p className="text-[11.5px] text-app-text-tertiary">{decision.taskTitle}</p>}
+        {decision.dueAt && (
+          <span className="rounded-full bg-app-warning-soft px-2.5 py-0.5 text-[11.5px] font-medium text-app-warning">
+            נשמח לתשובה עד{" "}
+            {new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(new Date(decision.dueAt))}
+          </span>
+        )}
+      </div>
       <p className="mt-1 text-[15px] font-medium text-app-text-primary">{decision.question}</p>
       {decision.background && <p className="mt-1.5 text-[13px] leading-relaxed text-app-text-secondary">{decision.background}</p>}
 
@@ -181,7 +189,7 @@ export function DecisionCard({
         // The service agreement asks for the client's approval in writing
         // above the ceiling they set. Saying so on the card is what turns
         // a required signature into an obvious one.
-        <p className="mt-3 rounded-[10px] border border-gold/40 bg-white px-3 py-2 text-[12px] text-app-text-secondary">
+        <p className="mt-3 rounded-[10px] bg-app-info-soft px-3 py-2 text-[12.5px] text-app-info">
           הסכום גבוה מהתקרה שסוכמה איתך ({formatMinor(decision.ceilingMinor)}), ולכן ההחלטה הזו שלך.
         </p>
       )}
@@ -202,11 +210,7 @@ export function DecisionCard({
       {answered && <p className="mt-2.5 text-[12px] text-app-text-secondary">התשובה נקלטה. תודה.</p>}
 
       <div className="mt-3.5 flex flex-wrap items-center justify-between gap-2 text-[11.5px] text-app-text-tertiary">
-        <span>
-          {decision.dueAt
-            ? `נשמח לתשובה עד ${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(new Date(decision.dueAt))}`
-            : "אין תאריך יעד להחלטה הזו"}
-        </span>
+        <span>{decision.dueAt ? "" : "אין תאריך יעד להחלטה הזו"}</span>
         {/* Not a text box. Someone who wants to explain would rather talk,
             and the line they already use is one tap away. */}
         {whatsappHref ? (

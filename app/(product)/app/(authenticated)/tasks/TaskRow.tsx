@@ -47,7 +47,7 @@ const PRIORITY_LABELS: Record<TaskPriority, string> = {
 };
 
 const PRIORITY_DOTS: Record<TaskPriority, string> = {
-  LOW: "bg-appNavy/20",
+  LOW: "bg-app-border-strong",
   NORMAL: "bg-transparent",
   HIGH: "bg-app-warning",
   URGENT: "bg-app-error",

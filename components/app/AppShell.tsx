@@ -41,6 +41,9 @@ function navItemsFor(role: User["role"], proposals = 0): NavItem[] {
       { href: "/app/portal/activity", label: "פעילות" },
       { href: "/app/portal/hours", label: "שעות ודוחות" },
       { href: "/app/portal/history", label: "היסטוריה" },
+      // 20.10.2026: the portal's own tab bar is gone; the menu is its one
+      // navigation, so the client file joins it.
+      { href: "/app/portal/file", label: "התיק שלי" },
       ...accountItems(),
     ];
   }

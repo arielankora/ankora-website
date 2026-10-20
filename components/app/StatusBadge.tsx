@@ -22,7 +22,7 @@ const TONE_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
 const DOT_CLASSES: Record<"green" | "amber" | "gray" | "red", string> = {
   green: "bg-app-success",
   amber: "bg-app-warning",
-  gray: "bg-neutral",
+  gray: "bg-app-text-tertiary",
   red: "bg-app-error",
 };
 

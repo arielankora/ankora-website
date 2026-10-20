@@ -99,7 +99,7 @@ export default async function CredentialsPage(props: { searchParams: Promise<{ c
                       target="_blank"
                       rel="noopener noreferrer"
                       dir="ltr"
-                      className="block truncate text-start text-xs text-gold hover:underline"
+                      className="block truncate text-start text-xs text-app-text-accent hover:underline"
                     >
                       {row.url}
                     </a>

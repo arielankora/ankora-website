@@ -46,19 +46,12 @@ const config: Config = {
           strong: "#7C8EA3",
         },
         hairline: "rgba(248,244,236,0.08)",
-        // Internal product app (light theme, its own handoff). Namespaced so the brand
-        // palette above can hold the role names.
-        appNavy: "#1B2A3D",
-        lineDark: "rgba(27,42,61,0.14)",
+        // Used by the site's secondary button (components/ui/Button.tsx).
         lineGold: "rgba(176,141,87,0.4)",
-        // App redesign (design_handoff_ankora_app_redesign/README.md, "Design
-        // Tokens"): semantic tones for toasts, StatusBadge, inline validation and KPI
-        // overage states. Tone-mapped from the existing palette, not new brand colors.
-        // Nested `soft` key is each tone's low-opacity background pair.
-        success: { DEFAULT: "#1F7A4D", soft: "rgba(31,122,77,0.1)" },
-        error: { DEFAULT: "#B3261E", soft: "rgba(179,38,30,0.08)", "on-dark": "#E5847E" },
-        warning: { DEFAULT: "#8A6F45", soft: "rgba(176,141,87,0.16)" },
-        neutral: { DEFAULT: "rgba(27,42,61,0.55)", soft: "rgba(27,42,61,0.07)" },
+        // Error text on the dark site (ContactForm). The app's own error tone is
+        // app.error below; the older appNavy, lineDark, success, warning and
+        // neutral tokens were removed on 20.10.2026 once nothing used them.
+        error: { "on-dark": "#E5847E" },
         // App palette by role (19.10.2026, canvas "Ankora App UI Round", task
         // cmvddvqqv000plc08l6qzt2ho; claude/app-ui-conflicts-2026-10-19.md).
         // Solid values, not opacities of appNavy: three text levels instead of

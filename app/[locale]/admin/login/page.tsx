@@ -9,7 +9,7 @@ export default async function AdminLoginPage(props: { params: Promise<{ locale: 
   return (
     <div className="bg-cream px-6 py-32">
       <div className="mx-auto max-w-content">
-        <h1 className="text-center text-2xl font-medium text-appNavy">Ankora blog admin</h1>
+        <h1 className="text-center text-2xl font-medium text-app-text-primary">Ankora blog admin</h1>
         <AdminLoginForm redirectTo={`/${locale}/admin`} />
       </div>
     </div>

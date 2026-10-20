@@ -48,8 +48,8 @@ export function AdminDashboard({
     <div>
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-medium text-appNavy">Blog admin</h1>
-          <p className="mt-1 text-sm text-appNavy/50">{posts.length} article{posts.length === 1 ? "" : "s"}</p>
+          <h1 className="text-2xl font-medium text-app-text-primary">Blog admin</h1>
+          <p className="mt-1 text-sm text-app-text-tertiary">{posts.length} article{posts.length === 1 ? "" : "s"}</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
@@ -58,27 +58,27 @@ export function AdminDashboard({
           >
             New article
           </Link>
-          <button onClick={onLogout} className="text-sm text-appNavy/50 hover:text-appNavy">
+          <button onClick={onLogout} className="text-sm text-app-text-tertiary hover:text-app-text-primary">
             Log out
           </button>
         </div>
       </div>
 
       {!githubConfigured && (
-        <div className="mt-6 rounded-xl border border-amber-400/50 bg-amber-50 px-5 py-4 text-sm text-amber-800">
+        <div className="mt-6 rounded-xl border border-app-warning/40 bg-app-warning-soft px-5 py-4 text-sm text-app-warning">
           Publishing isn&apos;t connected yet. Set GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO in your environment
           to enable creating, editing, and deleting articles.
         </div>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-sm text-app-error">{error}</p>}
 
-      <div className="mt-8 overflow-hidden rounded-2xl border border-lineDark">
+      <div className="mt-8 overflow-hidden rounded-2xl border border-app-border">
         {posts.length === 0 ? (
-          <div className="px-8 py-16 text-center text-appNavy/40">No articles yet.</div>
+          <div className="px-8 py-16 text-center text-app-text-tertiary">No articles yet.</div>
         ) : (
           <table className="w-full text-sm">
-            <thead className="bg-appNavy/5 text-start text-xs uppercase tracking-wide text-appNavy/40">
+            <thead className="bg-app-surface-sunken text-start text-xs uppercase tracking-wide text-app-text-tertiary">
               <tr>
                 <th className="px-5 py-3 text-start">Title</th>
                 <th className="px-5 py-3 text-start">Locale</th>
@@ -92,22 +92,22 @@ export function AdminDashboard({
               {posts.map((post) => {
                 const key = `${post.locale}/${post.slug}`;
                 return (
-                  <tr key={key} className="border-t border-lineDark">
-                    <td className="px-5 py-3 font-medium text-appNavy">{post.title}</td>
-                    <td className="px-5 py-3 uppercase text-appNavy/50">{post.locale}</td>
-                    <td className="px-5 py-3 text-appNavy/60">{post.category}</td>
+                  <tr key={key} className="border-t border-app-border">
+                    <td className="px-5 py-3 font-medium text-app-text-primary">{post.title}</td>
+                    <td className="px-5 py-3 uppercase text-app-text-tertiary">{post.locale}</td>
+                    <td className="px-5 py-3 text-app-text-secondary">{post.category}</td>
                     <td className="px-5 py-3">
                       <span
                         className={
                           post.draft
-                            ? "rounded-full bg-appNavy/10 px-2.5 py-1 text-xs text-appNavy/60"
-                            : "rounded-full bg-emerald-100 px-2.5 py-1 text-xs text-emerald-700"
+                            ? "rounded-full bg-app-surface-sunken px-2.5 py-1 text-xs text-app-text-secondary"
+                            : "rounded-full bg-app-success-soft px-2.5 py-1 text-xs text-app-success"
                         }
                       >
                         {post.draft ? "Draft" : "Published"}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-appNavy/50">{post.publishedAt}</td>
+                    <td className="px-5 py-3 text-app-text-tertiary">{post.publishedAt}</td>
                     <td className="px-5 py-3 text-end">
                       <Link
                         href={`${basePath}/posts/edit?locale=${post.locale}&slug=${post.slug}`}
@@ -118,7 +118,7 @@ export function AdminDashboard({
                       <button
                         onClick={() => onDelete(post.locale, post.slug, post.title)}
                         disabled={busySlug === key}
-                        className="text-red-600 hover:underline disabled:opacity-40"
+                        className="text-app-error hover:underline disabled:opacity-40"
                       >
                         {busySlug === key ? "Deleting…" : "Delete"}
                       </button>

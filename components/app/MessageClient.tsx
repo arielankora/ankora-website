@@ -133,7 +133,7 @@ export function MessageClient({
 
       {open && (
         <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={`הודעה ל${clientName}`}>
-          <button type="button" aria-label="סגירה" onClick={dismiss} className="absolute inset-0 bg-appNavy/30" />
+          <button type="button" aria-label="סגירה" onClick={dismiss} className="absolute inset-0 bg-app-surface-nav/30" />
           <div className="absolute inset-y-0 end-0 flex w-full max-w-md flex-col border-s border-app-border bg-white shadow-lg">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
               <h2 className="text-base font-medium text-app-text-primary">הודעה ל{clientName}</h2>

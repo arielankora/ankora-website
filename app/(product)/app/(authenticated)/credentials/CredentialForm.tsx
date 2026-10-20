@@ -156,7 +156,7 @@ export function CredentialForm({
 function ClearBox({ name, label }: { name: string; label: string }) {
   return (
     <label className="mt-2 flex items-center gap-2 text-xs text-app-text-secondary">
-      <input type="checkbox" name={name} className="accent-appNavy" />
+      <input type="checkbox" name={name} className="accent-app-text-primary" />
       {label}
     </label>
   );

@@ -5,7 +5,6 @@ import { resolvePortalClient } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { formatMinor } from "@/lib/money";
 import { whatsappHref } from "@/lib/whatsapp";
-import { PortalTabs } from "../PortalTabs";
 import { DecisionCard } from "./DecisionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -47,7 +46,6 @@ export default async function PortalDecisionsPage(props: {
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="decisions" />
 
       {justAnswered && (
         <div className="rounded-2xl border border-app-success/25 bg-app-success-soft px-[18px] py-3.5">
