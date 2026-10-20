@@ -41,7 +41,7 @@ const PATHS = [
 ];
 
 /** Runs in the page. Kept as one function so it can be passed to page.evaluate. */
-function auditPage() {
+export function auditPage() {
   const parse = (c) => {
     const m = String(c).match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/);
     return m ? [+m[1], +m[2], +m[3], m[4] === undefined ? 1 : +m[4]] : null;
@@ -95,7 +95,24 @@ function auditPage() {
   }
 
   for (const el of document.querySelectorAll('a,button,input,select,textarea,[role="button"]')) {
-    const r = el.getBoundingClientRect();
+    // A control inside a <label> is not the target. The label is: clicking
+    // anywhere on it activates the control, which is the whole point of the
+    // pattern. So measure the label.
+    //
+    // 20.10.2026, run #510. The contact form offers six areas as chips, each
+    // a 44px-tall <label> wrapping an sr-only checkbox. Tailwind's sr-only
+    // clips that input to one pixel square, so this rule measured the input,
+    // called a correct and accessible chip a 1x1 target, and did it six
+    // times in two languages at four widths: 48 identical minor findings in
+    // every level-3 report, all of them wrong.
+    //
+    // That is the failure this file already warns about forty lines up, in
+    // the note about "305x24 below the 24x24 floor": a reader who can see a
+    // finding is nonsense learns to skim the section, and then the real ones
+    // go past too.
+    const labelled = el.closest("label");
+    const target = labelled && labelled !== el ? labelled : el;
+    const r = target.getBoundingClientRect();
     if (!r.width || !r.height) continue;
     const p = el.parentElement;
     const inlineInSentence =
@@ -111,7 +128,7 @@ function auditPage() {
     const MIN = 23.5;
     if (r.width < MIN || r.height < MIN) {
       out.targets.push({
-        text: (el.textContent || el.getAttribute("aria-label") || "").trim().slice(0, 30),
+        text: (target.textContent || target.getAttribute("aria-label") || el.getAttribute("aria-label") || "").trim().slice(0, 30),
         w: +r.width.toFixed(1),
         h: +r.height.toFixed(1),
       });
