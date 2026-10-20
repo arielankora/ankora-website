@@ -42,6 +42,8 @@ import { dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
+import { isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
+import { findNameMatches, nameTokens } from "@/lib/name-match";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -107,6 +109,9 @@ export type ProposeResult = {
   proposed: number;
   dropped: { index: number; reason: string }[];
   secretTaskId: string | null;
+  /// Items whose name may be one already in the file: send them again as
+  /// SUPERSEDE with that targetId, or the reviewer adds them to it.
+  possibleMatches: { index: number; target: string; name: string; existing: { id: string; name: string }[] }[];
 };
 
 const MAX_ITEMS = 60;
@@ -171,7 +176,22 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   }
   // The same match the card and the decision ask again later
   // (proposal-existing.ts): an item can enter the file after this.
-  if (await findExisting(clientId, item.target, item.action ?? "CREATE", item.payload)) flags.push(duplicateFlag(item.target));
+  const exact = await findExisting(clientId, item.target, item.action ?? "CREATE", item.payload);
+  if (exact) flags.push(duplicateFlag(item.target));
+  // A name that may be an item already in the file, written otherwise:
+  // "איילה" and "איילה מנצור" (lib/name-match.ts). Its own code, so the
+  // exact check asked again on the card does not drop it.
+  if (item.action === "CREATE" && isNamedTarget(item.target)) {
+    const name = String(item.payload[nameFieldOf(item.target)] ?? "").trim();
+    for (const m of name ? findNameMatches(name, await namesInFile(clientId, item.target)) : []) {
+      if (m.id === exact?.id) continue;
+      flags.push({
+        code: "SIMILAR",
+        match: { id: m.id, name: m.name },
+        message: m.kind === "SAME" ? `"${m.name}" כבר בתיק. אפשר להוסיף את ההצעה אליו במקום פריט שני.` : `ייתכן שזה "${m.name}" הקיים. אפשר להוסיף את ההצעה אליו במקום פריט חדש.`,
+      });
+    }
+  }
   if (isSensitive(item.payload)) {
     flags.push({ code: "R6", message: "מידע רגיש: רק מי שמאשר מידע רגיש אצל הלקוח רואה את הפריט ומחליט עליו." });
   }
@@ -213,6 +233,7 @@ export async function proposeKnowledge(
   const codes = await registerCodes(input.clientId);
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
+  const possibleMatches: ProposeResult["possibleMatches"] = [];
 
   for (const [i, raw] of input.items.entries()) {
     const index = options.indexes?.[i] ?? i;
@@ -275,7 +296,10 @@ export async function proposeKnowledge(
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    accepted.push({ item, payload, flags: await flagsFor(input.clientId, { ...item, payload }, source.weight, codes) });
+    const flags = await flagsFor(input.clientId, { ...item, payload }, source.weight, codes);
+    const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
+    if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
+    accepted.push({ item, payload, flags });
   }
 
   let secretTaskId: string | null = null;
@@ -293,7 +317,7 @@ export async function proposeKnowledge(
   }
 
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.code, proposed: 0, dropped, secretTaskId };
+    return { batchId: null, sourceCode: source.code, proposed: 0, dropped, secretTaskId, possibleMatches };
   }
 
   const batch = await prisma.knowledgeBatch.create({
@@ -338,7 +362,7 @@ export async function proposeKnowledge(
     clientId: input.clientId,
     after: { sourceCode: source.code, proposed: accepted.length, dropped: dropped.length },
   });
-  return { batchId: batch.id, sourceCode: source.code, proposed: accepted.length, dropped, secretTaskId };
+  return { batchId: batch.id, sourceCode: source.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches };
 }
 
 // ---------------------------------------------------------------------------
@@ -716,6 +740,51 @@ export async function attachProposalToExisting(actor: User, id: string) {
     after: { resultId: existing.id, existing: existing.body, sources: sources.map((r) => r.code), headline: proposalHeadline(proposal.target, payload) },
   });
   return updated;
+}
+
+/// The proposal is an item already in the file under another spelling
+/// ("איילה" and "איילה מנצור"): approve it as a change to that item,
+/// not as a second one. The longer name stays, the emails, phones and
+/// domains are added to the item's, and the rest is an ordinary update,
+/// with every check the update makes.
+export async function mergeProposal(actor: User, id: string, targetId: string) {
+  assertCan(actor.role, "time_entry.create_self");
+  const proposal = await findPending(actor, id);
+  if (proposal.action !== "CREATE" || !isNamedTarget(proposal.target)) throw new Error("רק הצעה לפריט חדש עם שם אפשר להוסיף לפריט קיים.");
+  const target = proposal.target;
+  const now = await currentItem(proposal.clientId, target, targetId);
+  if (!now) throw new Error("הפריט הקיים כבר לא בתיק.");
+  const existing = (await namesInFile(proposal.clientId, target)).find((n) => n.id === targetId);
+  const payload = { ...(proposal.payload as Record<string, unknown>) };
+  const field = nameFieldOf(target);
+  if (existing && nameTokens(String(payload[field] ?? "")).length <= nameTokens(existing.name).length) delete payload[field];
+  for (const [k, had] of Object.entries(await listsOf(target, targetId))) {
+    if (Array.isArray(payload[k])) payload[k] = [...new Set([...had, ...(payload[k] as string[])])];
+  }
+  const flags = (Array.isArray(proposal.flags) ? (proposal.flags as ProposalFlag[]) : []).filter((f) => f.code !== "DUPLICATE" && f.code !== "SIMILAR");
+  await prisma.knowledgeProposal.update({
+    where: { id },
+    data: { action: "SUPERSEDE", targetId, payload: payload as Prisma.InputJsonValue, flags: flags as Prisma.InputJsonValue },
+  });
+  try {
+    const approved = await approveProposal(actor, id);
+    await recordAudit({
+      actorId: actor.id,
+      action: "knowledge_proposal.merge",
+      entityType: "KnowledgeProposal",
+      entityId: id,
+      clientId: proposal.clientId,
+      after: { targetId, into: existing?.name ?? null },
+    });
+    return approved;
+  } catch (err) {
+    // Not approved: the proposal goes back to what it was.
+    await prisma.knowledgeProposal.update({
+      where: { id },
+      data: { action: "CREATE", targetId: null, payload: proposal.payload as Prisma.InputJsonValue, flags: (proposal.flags ?? []) as Prisma.InputJsonValue },
+    });
+    throw err;
+  }
 }
 
 export async function rejectProposal(actor: User, id: string, reason: string, options: { bulk?: boolean } = {}) {

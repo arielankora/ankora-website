@@ -1875,6 +1875,14 @@
       "riskAssigned": true,
       "riskReason": "Client screen; must refuse anyone not on the client",
       "firstSeen": "2026-10-20"
+    },
+    "domain:name-duplicates": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "riskReason": "קריאה בלבד של שמות בתיק לסימון כפילויות. האיחוד עצמו עובר דרך אישור הצעה ועדכון פריט, שנבדקים בבדיקות האינטגרציה.",
+      "firstSeen": "2026-10-20"
     }
   },
   "waivers": {},

@@ -118,6 +118,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge_batch.assign": "שיחה שויכה ללקוח",
   "knowledge_batch.discard": "שיחה שממתינה לשיוך הוסרה",
   "knowledge_proposal.approve": "אישור הצעה לתיק הלקוח",
+  "knowledge_proposal.merge": "הוספת הצעה לפריט קיים בתיק",
   "knowledge_proposal.reject": "דחיית הצעה לתיק הלקוח",
   "knowledge_proposal.attach": "הצעה שכבר בתיק: המקור נוסף לפריט הקיים",
   "knowledge_proposal.to_task": "הצעה לתיק הלקוח הפכה למשימה",

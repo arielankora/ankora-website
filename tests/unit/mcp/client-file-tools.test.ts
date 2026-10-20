@@ -105,7 +105,7 @@ describe("propose_knowledge", () => {
   const ITEM = { target: "FACT", payload: { kind: "NOTE", body: "x" } };
 
   beforeEach(() => {
-    proposals.proposeKnowledge.mockResolvedValue({ batchId: "b1", sourceCode: "S4", proposed: 1, dropped: [], secretTaskId: null });
+    proposals.proposeKnowledge.mockResolvedValue({ batchId: "b1", sourceCode: "S4", proposed: 1, dropped: [], secretTaskId: null, possibleMatches: [] });
   });
 
   it("is a write, and says plainly that nothing is in the file yet", async () => {
