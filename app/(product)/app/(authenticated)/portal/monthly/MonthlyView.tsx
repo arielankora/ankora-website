@@ -5,8 +5,8 @@ import { getMonthlyDetailed } from "@/lib/app-domain/client-portal";
 import { getApprovedSummaries } from "@/lib/app-domain/portal-summary";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ExportMenu } from "@/components/app/ExportMenu";
-import { PortalTabs } from "../PortalTabs";
 import { ViewTabs } from "@/components/app/ViewTabs";
+import { HOURS_TABS } from "../hours/tabs";
 
 
 function formatDate(date: Date) {
@@ -76,15 +76,7 @@ export async function MonthlyView({ searchParams }: { searchParams: { monthOffse
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="hours" />
-        <ViewTabs
-          label="שעות ודוחות"
-          active="monthly"
-          tabs={[
-            { key: "hours", label: "שעות", href: "/app/portal/hours" },
-            { key: "monthly", label: "דוח חודשי", href: "/app/portal/hours?view=monthly" },
-          ]}
-        />
+        <ViewTabs label="שעות ודוחות" active="monthly" tabs={HOURS_TABS} />
 
       {summary && (
         // Only for the month on screen, and only when a person approved

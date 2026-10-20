@@ -3,7 +3,6 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalTimeline } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
-import { PortalTabs } from "../PortalTabs";
 import { PromiseList } from "../PromiseList";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -32,7 +31,6 @@ export default async function PortalActivityPage() {
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="activity" />
 
       <PromiseList
         title="הפעילות שלך"

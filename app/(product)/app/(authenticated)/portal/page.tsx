@@ -4,7 +4,6 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { whatsappHref } from "@/lib/whatsapp";
-import { PortalTabs } from "./PortalTabs";
 import { PromiseList } from "./PromiseList";
 import { portalHeadline } from "@/lib/app-domain/portal-labels";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
@@ -44,13 +43,25 @@ export default async function PortalHomePage() {
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="home" />
-
-      <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-        <p className="text-xl font-medium text-app-text-primary">שלום, {client.name}</p>
-        <p className="mt-1.5 text-[13.5px] text-app-text-secondary">
-          {portalHeadline(openDecisions, waitingOnClient.length, inProgress.length)}
-        </p>
+      {/* 20.10.2026 (canvas, portal boards): one action at the top. When a
+          decision waits, the headline says so and one gold button leads
+          there; otherwise the headline is the whole message. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-[20px] border border-app-border bg-white p-6 sm:p-7">
+        <div>
+          <p className="text-[13.5px] text-app-text-secondary">שלום, {client.name}</p>
+          <p className="mt-1.5 text-xl font-medium text-app-text-primary">
+            {portalHeadline(openDecisions, waitingOnClient.length, inProgress.length)}
+          </p>
+        </div>
+        {openDecisions > 0 && (
+          <Link
+            href="/app/portal/decisions"
+            data-testid="portal-home-decisions"
+            className="rounded-full bg-app-accent px-5 py-3 text-sm font-medium text-app-text-primary hover:opacity-90"
+          >
+            {openDecisions === 1 ? "לצפייה בהחלטה" : `לצפייה ב-${openDecisions} החלטות`}
+          </Link>
+        )}
       </div>
 
       {nothingYet ? (
@@ -70,21 +81,6 @@ export default async function PortalHomePage() {
         </div>
       ) : (
         <>
-          {/* Portal phase 2. A link, not the cards themselves: a decision
-              needs its options and its price to be answered properly, and
-              a home screen that tries to hold them stops being a summary.
-              The count is the whole message. */}
-          {openDecisions > 0 && (
-            <Link
-              href="/app/portal/decisions"
-              className="flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-gold/45 bg-app-surface-sunken px-[18px] py-4 transition-colors hover:border-gold"
-            >
-              <span className="text-[13.5px] font-medium text-app-text-primary">
-                {openDecisions === 1 ? "החלטה אחת מחכה לך" : `${openDecisions} החלטות מחכות לך`}
-              </span>
-              <span className="text-xs text-app-text-accent">לצפייה והחלטה</span>
-            </Link>
-          )}
 
           {/* "מחכה לך", not "מחכה להחלטה שלך".
               These are promises in flight that need something from the
@@ -102,7 +98,6 @@ export default async function PortalHomePage() {
             title="בטיפול עכשיו"
             promises={inProgress}
             emptyText="אין כרגע הבטחות פתוחות."
-            showStage={false}
           />
 
           <PromiseList
@@ -118,56 +113,60 @@ export default async function PortalHomePage() {
         </>
       )}
 
-      {/* Portal phase 2: who to talk to. Last on the screen because it is
-          the answer to "and if I want a person", not the first thing a
-          client needs - but always present, because a portal without a
-          name on it is a system, and Ankora is not selling a system. */}
-      {(contact.managerName || waHref) && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
-          <span className="text-[12.5px] text-app-text-secondary">
-            {contact.managerName ? `מנהל התיק שלך: ${contact.managerName}` : "מנהל התיק שלך ב-Ankora"}
-          </span>
-          {waHref ? (
-            <a
-              href={waHref}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full border border-app-border px-3.5 py-1.5 text-xs text-app-text-primary hover:border-gold"
-            >
-              וואטסאפ
-            </a>
-          ) : (
-            <span className="text-xs text-app-text-tertiary">וואטסאפ: זמין בקרוב</span>
-          )}
-        </div>
-      )}
-
-      {cycle && (
-        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
-          <span className="text-[12.5px] text-app-text-secondary">
-            {/* A bank reads in decimal hours everywhere (3.10.2026), the same
-                figures the client sees on the hours screen one click away. */}
-            {cycle.kind === "PREPAID" ? (
-              <>
-                חבילת השעות: נוצלו{" "}
-                <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed}</bdi> מתוך{" "}
-                <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total}</bdi> שעות
-                {cycle.forecast?.status === "projected" && ` · צפויה להספיק עד ${forecastCell(cycle.forecast, client.timezone)}`}
-                {cycle.forecast?.status === "depleted" && " · החבילה נוצלה"}
-              </>
+      {/* 20.10.2026: the account manager and the hours side by side, two cards
+          in one row on a wide screen, one under the other on a phone. */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        {/* Portal phase 2: who to talk to. Last on the screen because it is
+            the answer to "and if I want a person", not the first thing a
+            client needs - but always present, because a portal without a
+            name on it is a system, and Ankora is not selling a system. */}
+        {(contact.managerName || waHref) && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
+            <span className="text-[12.5px] text-app-text-secondary">
+              {contact.managerName ? `מנהל התיק שלך: ${contact.managerName}` : "מנהל התיק שלך ב-Ankora"}
+            </span>
+            {waHref ? (
+              <a
+                href={waHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full border border-app-border-strong px-3.5 py-1.5 text-xs text-app-text-primary hover:border-app-accent"
+              >
+                וואטסאפ
+              </a>
             ) : (
-              <>
-                מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
-                <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
-              </>
+              <span className="text-xs text-app-text-tertiary">וואטסאפ: זמין בקרוב</span>
             )}
-            {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
-          </span>
-          <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
-            פירוט השעות
-          </Link>
-        </div>
-      )}
+          </div>
+        )}
+
+        {cycle && (
+          <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-[14px] border border-app-border bg-white px-[18px] py-3.5">
+            <span className="text-[12.5px] text-app-text-secondary">
+              {/* A bank reads in decimal hours everywhere (3.10.2026), the same
+                  figures the client sees on the hours screen one click away. */}
+              {cycle.kind === "PREPAID" ? (
+                <>
+                  חבילת השעות: נוצלו{" "}
+                  <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).consumed}</bdi> מתוך{" "}
+                  <bdi dir="ltr">{packageFigures(cycle.purchasedMinutes, cycle.remainingMinutes).total}</bdi> שעות
+                  {cycle.forecast?.status === "projected" && ` · צפויה להספיק עד ${forecastCell(cycle.forecast, client.timezone)}`}
+                  {cycle.forecast?.status === "depleted" && " · החבילה נוצלה"}
+                </>
+              ) : (
+                <>
+                  מחזור השעות הנוכחי: <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).consumed}</bdi> מתוך{" "}
+                  <bdi dir="ltr">{bankFigures(cycle.totalMinutes, cycle.usedMinutes).total}</bdi> שעות
+                </>
+              )}
+              {cycle.daysLeft !== null && ` · ${cycle.daysLeft} ימים לסיום`}
+            </span>
+            <Link href="/app/portal/hours" className="text-xs text-app-text-accent hover:underline">
+              פירוט השעות
+            </Link>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

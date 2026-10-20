@@ -3,7 +3,6 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalFile } from "@/lib/app-domain/client-file";
 import { DOCUMENT_KIND_LABELS, SUPPLIER_EXPERIENCE_LABELS } from "@/lib/app-domain/portal-labels";
 import { Forbidden } from "@/components/app/Forbidden";
-import { PortalTabs } from "../PortalTabs";
 import { CopyValue } from "@/components/app/CopyValue";
 import { SITE_URL } from "@/lib/site";
 
@@ -76,7 +75,6 @@ export default async function PortalFilePage() {
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="file" />
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
         <p className="text-xl font-medium text-app-text-primary">התיק של {client.name}</p>

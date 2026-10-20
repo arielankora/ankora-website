@@ -3,11 +3,14 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDashboard, getCategorySummary, getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
-import { PortalTabs } from "../PortalTabs";
 import { ViewTabs } from "@/components/app/ViewTabs";
+import { HOURS_TABS } from "./tabs";
 import { MonthlyView } from "../monthly/MonthlyView";
+import { WeeklyView } from "../weekly/WeeklyView";
 import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-format";
 import { describeForecast } from "@/lib/prepaid-format";
+import { cycleElapsedShare } from "@/lib/app-domain/hour-banks";
+import { ProgressBar } from "@/components/app/ProgressBar";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -19,7 +22,9 @@ function formatDate(date: Date) {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
 }
 
-const CATEGORY_BAR_COLORS = ["bg-gold", "bg-gold-light", "bg-gold/50"];
+// 20.10.2026: four tones of the palette that differ in lightness, not three
+// golds a client cannot tell apart.
+const CATEGORY_BAR_COLORS = ["bg-app-surface-nav", "bg-app-info", "bg-app-accent", "bg-app-border-strong"];
 
 // Spec 13's Client Portal Dashboard + Category Summary, combined on one
 // screen (both are compact "at a glance" views).
@@ -44,10 +49,11 @@ const CATEGORY_BAR_COLORS = ["bg-gold", "bg-gold-light", "bg-gold/50"];
 // page would find a banner describing them in the third person
 // nonsensical. Isolation is still structural exactly as the README
 // requires, just silent rather than announced.
-export default async function PortalHoursPage(props: { searchParams: Promise<{ view?: string; monthOffset?: string }> }) {
+export default async function PortalHoursPage(props: { searchParams: Promise<{ view?: string; monthOffset?: string; weekOffset?: string }> }) {
   // 19.10.2026: hours and the monthly report, one screen (canvas "Ankora App UI Round").
   const sp = await props.searchParams;
   if (sp.view === "monthly") return <MonthlyView searchParams={{ monthOffset: sp.monthOffset }} />;
+  if (sp.view === "weekly") return <WeeklyView searchParams={{ weekOffset: sp.weekOffset }} />;
   const user = await requireUser();
 
   let dashboard;
@@ -82,21 +88,23 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
     : null;
   const forecastText = describeForecast(forecast, client.timezone);
   const carry = snapshot?.bank.rolloverInMinutes ?? 0;
+  // Where a cycle bank is expected to be today, the same tick the team sees
+  // on its home screen. A package has no cycle to pace against: its answer
+  // is the forecast line above.
+  const pacePct =
+    snapshot && !isPrepaid
+      ? Math.round(cycleElapsedShare(snapshot.bank.cycleStart, snapshot.bank.cycleEnd, new Date()) * 100)
+      : null;
+  const usedPct = snapshot?.utilization.utilizationPct ?? 0;
+  const paceWord =
+    pacePct === null ? null : usedPct > pacePct + 5 ? "מעל הקצב" : usedPct < pacePct - 5 ? "מתחת לקצב" : "בקצב";
 
   return (
     <div className="space-y-4">
-      <PortalTabs active="hours" />
-        <ViewTabs
-          label="שעות ודוחות"
-          active="hours"
-          tabs={[
-            { key: "hours", label: "שעות", href: "/app/portal/hours" },
-            { key: "monthly", label: "דוח חודשי", href: "/app/portal/hours?view=monthly" },
-          ]}
-        />
+        <ViewTabs label="שעות ודוחות" active="hours" tabs={HOURS_TABS} />
 
       <div className="rounded-[20px] border border-gold/28 bg-app-surface-sunken p-6 sm:p-7">
-        <p className="text-xl font-medium text-app-text-primary">שלום, {client.name}</p>
+        <p className="text-base font-medium text-app-text-primary">{isPrepaid ? "חבילת השעות" : "מחזור השעות הנוכחי"}</p>
         {snapshot && isPrepaid ? (
           <div className="mt-1.5 space-y-1 text-[13.5px] text-app-text-secondary">
             <p>
@@ -116,7 +124,7 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
 
         {snapshot && figures && (
           <>
-            <div className="mt-[22px] grid grid-cols-2 gap-3.5 sm:grid-cols-4">
+            <div className="mt-[22px] grid grid-cols-3 gap-3.5">
               <div className="rounded-[14px] border border-app-border bg-white p-4">
                 <span className="text-xs text-app-text-secondary">{isPrepaid ? "גודל החבילה" : <>סה&quot;כ בבנק</>}</span>
                 <p className="mt-2 font-jbmono text-2xl text-app-text-primary">{figures.total}</p>
@@ -134,22 +142,12 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
                   <bdi dir="ltr">{figures.remaining}</bdi>
                 </p>
               </div>
-              <div className="rounded-[14px] border border-app-border bg-white p-4">
-                <span className="text-xs text-app-text-secondary">ניצול</span>
-                <p className={`mt-2 font-jbmono text-2xl ${snapshot.utilization.utilizationPct > 100 ? "text-app-error" : "text-app-text-primary"}`}>
-                  {snapshot.utilization.utilizationPct}%
-                </p>
-                <p className="mt-1 text-[11.5px] text-app-text-tertiary">
-                  {figures.consumed} שעות מתוך {figures.total}
-                </p>
-              </div>
             </div>
-            <div className="mt-[18px] h-2.5 overflow-hidden rounded-full bg-app-surface-sunken">
-              <span
-                className={`block h-full ${snapshot.utilization.utilizationPct > 100 ? "bg-app-error" : "bg-gold-gradient"}`}
-                style={{ width: `${Math.min(100, snapshot.utilization.utilizationPct)}%` }}
-              />
-            </div>
+            <ProgressBar className="mt-[18px]" percent={usedPct} dangerAt={100.01} markerAt={pacePct ?? undefined} />
+            <p className="mt-2 text-[12.5px] text-app-text-secondary">
+              <span className="font-jbmono">{usedPct}%</span> נוצל
+              {paceWord && <> · {paceWord} · הקו מסמן איפה צפוי להיות היום</>}
+            </p>
             {isPrepaid && carry !== 0 && (
               <p className="mt-3 text-[12px] text-app-text-secondary">
                 {carry < 0 ? "כולל קיזוז של " : "כולל יתרה של "}
@@ -192,14 +190,9 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
             <span className="text-[13.5px] font-medium text-app-text-primary">פעילות השבוע</span>
-            <div className="flex items-center gap-3">
-              <Link href="/app/portal/weekly" className="text-xs text-app-text-accent hover:underline">
-                לפי ימים
-              </Link>
-              <Link href="/app/portal/hours?view=monthly" className="text-xs text-app-text-accent hover:underline">
-                הורדת דוח חודשי
-              </Link>
-            </div>
+            <Link href="/app/portal/hours?view=weekly" className="text-xs text-app-text-accent hover:underline">
+              לפי ימים
+            </Link>
           </div>
           {weekly.topActivities.length === 0 ? (
             <p className="px-[18px] py-8 text-center text-sm text-app-text-tertiary">אין עדיין פעילות השבוע.</p>

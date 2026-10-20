@@ -4,7 +4,6 @@ import { getPortalHistory } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { RecipientsForm } from "../RecipientsForm";
-import { PortalTabs } from "../PortalTabs";
 import { israelMonthOffset } from "@/lib/period-offset";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
 
@@ -66,7 +65,6 @@ export default async function PortalHistoryPage() {
   return (
     <>
       <div className="space-y-8">
-        <PortalTabs active="history" />
 
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">היסטוריה</h1>
