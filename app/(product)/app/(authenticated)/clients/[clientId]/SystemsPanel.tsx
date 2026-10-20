@@ -256,7 +256,7 @@ export function SystemsPanel({
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {systems.map((s) => (
-            <li key={s.id} className="py-3">
+            <li key={s.id} id={`item-${s.id}`} className="py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">

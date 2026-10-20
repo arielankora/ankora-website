@@ -62,7 +62,7 @@ export default async function HandoverPage(props: { params: Promise<{ clientId: 
               {r.processes.map((p) => (
                 <tr key={p.id} className="border-b border-app-border align-top last:border-0">
                   <td className="px-4 py-3">
-                    <Link href={`/app/clients/${clientId}#process-${p.id}`} className="font-medium text-app-text-primary hover:underline">
+                    <Link href={`/app/clients/${clientId}?tab=file#item-${p.id}`} className="font-medium text-app-text-primary hover:underline">
                       {p.code} {p.title}
                     </Link>
                     {p.executor && <p className="mt-0.5 text-xs text-app-text-secondary">מבצע היום: {p.executor}</p>}
