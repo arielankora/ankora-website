@@ -247,12 +247,14 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
   );
 }
 
-function RejectManyForm({ ids, onDone }: { ids: string[]; onDone: () => void }) {
+function RejectManyForm({ ids }: { ids: string[] }) {
+  // The selection is not cleared here. Clearing it empties `chosen`,
+  // which unmounts this drawer in the same commit, and the drawer is the
+  // one that refreshes the screen after a write (see Drawer). Rejected
+  // proposals leave `decidable` on that refresh, so they leave `chosen`
+  // with it; any that failed stay selected for another try.
   const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(rejectProposalsAction, () => {
-    onDone();
-    close();
-  });
+  const { onSubmit, pending, error } = useActionForm(rejectProposalsAction, () => close());
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
       {ids.map((id) => (
@@ -483,7 +485,12 @@ export function ReviewBatch({
         </p>
       )}
       {decidable.length > 1 && (
-        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-app-border bg-white/95 px-3 py-2 text-xs backdrop-blur">
+        // No backdrop-blur here. A backdrop filter makes this bar the
+        // containing block of every fixed descendant, so the reject
+        // drawer below opened inside the bar's 40px instead of the
+        // viewport: clipped, with its reason field and button cut off
+        // (20.10.2026). Opaque enough without it.
+        <div className="sticky top-0 z-10 mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-app-border bg-white px-3 py-2 text-xs">
           <label className="flex items-center gap-1.5 text-app-text-primary">
             <input
               type="checkbox"
@@ -510,7 +517,7 @@ export function ReviewBatch({
                 {busy ? "מאשר..." : `אישור ${approvable.length}`}
               </button>
               <Drawer triggerLabel={`דחיית ${chosen.length}`} title="דחיית הצעות" variant="link">
-                <RejectManyForm ids={chosen.map((p) => p.id)} onDone={() => setSelected(new Set())} />
+                <RejectManyForm ids={chosen.map((p) => p.id)} />
               </Drawer>
               {approvable.length < chosen.length && (
                 <span className="text-app-text-tertiary">{chosen.length - approvable.length} מהנבחרות מאשרים אחת אחת: משנות פריט קיים, אולי כבר בתיק, או רגישות.</span>
