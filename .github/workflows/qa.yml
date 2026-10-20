@@ -140,18 +140,23 @@ jobs:
 
           echo "value=$LEVEL" >> "$GITHUB_OUTPUT"
 
-          # Only the weekly hunt is split. Level 2 is 34 minutes and is
-          # dominated by the single `integration` check, so sharding it
-          # would pay four setups to move a number that is already on the
-          # critical path. The shard names come from qa/lib/shards.mjs so
-          # that the matrix and the runner cannot disagree about what
-          # exists - a list copied into this file is a list that will drift.
-          if [ "$LEVEL" = "3" ]; then
-            SHARDS=$(node -e 'import("./qa/lib/shards.mjs").then(m => console.log(JSON.stringify(m.SHARDS)))')
-            echo "sharded=true" >> "$GITHUB_OUTPUT"
-          else
+          # How many jobs this level runs as, straight from qa/lib/shards.mjs.
+          #
+          # The plan lives there and not here so that the matrix and the
+          # runner cannot disagree about what exists: a list copied into this
+          # file is a list that will drift. `null` back means one job.
+          #
+          # Level 1 is never split: it is two minutes, and four job setups to
+          # save one would be a worse gate, not a faster one. Level 2 is, as
+          # of 20.10.2026, because it runs every night and gates most pull
+          # requests, it has grown from 11 minutes in late September to 34,
+          # and `integration` is almost all of it.
+          SHARDS=$(node -e "import('./qa/lib/shards.mjs').then(m => console.log(JSON.stringify(m.shardsFor($LEVEL))))")
+          if [ "$SHARDS" = "null" ]; then
             SHARDS='["all"]'
             echo "sharded=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "sharded=true" >> "$GITHUB_OUTPUT"
           fi
           echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
           echo "level $LEVEL, shards $SHARDS"

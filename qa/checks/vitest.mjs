@@ -11,7 +11,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../lib/discover.mjs";
-import { sh, tail } from "../lib/sh.mjs";
+import { sh, tail, timedOutFinding } from "../lib/sh.mjs";
 import { finding } from "../lib/report.mjs";
 
 const BASELINE = path.join(ROOT, "qa", "baseline.json");
@@ -31,7 +31,12 @@ async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basenam
   const r = await sh(
     "npx",
     ["vitest", "run", dir, ...extraArgs, "--reporter=json", `--outputFile=${outFile}`],
-    { env, timeoutMs: 15 * 60_000 },
+    // 20 minutes, from measurement rather than habit. Run #514 spent 22.0
+    // minutes on the whole integration suite and 18.4 on the UTC pass, both
+    // against a 15-minute budget that had never once been enforced (see
+    // lib/sh.mjs). Sharded three ways a shard is about 8; the UTC pass still
+    // runs whole and needs the room.
+    { env, timeoutMs: 20 * 60_000 },
   );
   let parsed = null;
   try {
@@ -44,6 +49,14 @@ async function runSuite(dir, env = {}, extraArgs = [], reportName = path.basenam
 
 function analyse(parsed, r, suiteName) {
   const known = baseline().knownFailures ?? [];
+
+  // A run that was stopped is not a run that reported. Before 20.10.2026 the
+  // budget never actually stopped anything, so this branch could not be
+  // reached; now that it can, a killed suite must not be read through a
+  // report file that may be stale or half written. See lib/sh.mjs.
+  const stopped = timedOutFinding(r, `${suiteName} suite`);
+  if (stopped) return [stopped];
+
   if (!parsed) {
     return r.code === 0
       ? []
@@ -151,9 +164,47 @@ function integrationEnv() {
 // It reads as 67 broken features. It is one broken assumption. The
 // suite has raced itself since it was written; running the files in
 // sequence is what makes any of its results mean anything.
-export async function integration() {
-  const { r, parsed } = await runSuite("tests/integration", integrationEnv(), ["--no-file-parallelism"]);
-  return analyse(parsed, r, "integration");
+/**
+ * @param {[number, number] | null} [split] - `[k, n]` for vitest's own
+ *   `--shard=k/n`, when this run is one of several jobs sharing the suite.
+ *
+ * Sharding across JOBS, never inside one: the suite runs
+ * `--no-file-parallelism` because its files share a database and truncate
+ * between tests. A shard with its own Postgres container has nobody to
+ * collide with; a second process against the same database would.
+ *
+ * The report file carries the shard in its name, so two shards cannot read
+ * each other's results if they ever do land on one machine.
+ */
+export async function integration(split = null) {
+  const args = ["--no-file-parallelism"];
+  if (split) args.push(`--shard=${split[0]}/${split[1]}`);
+  const name = split ? `integration-${split[0]}of${split[1]}` : "integration";
+  const { r, parsed } = await runSuite("tests/integration", integrationEnv(), args, name);
+  const out = analyse(parsed, r, split ? `integration (${split[0]}/${split[1]})` : "integration");
+
+  // How many files this shard actually ran.
+  //
+  // A shard that selects none is the failure mode of every split: it
+  // finishes in seconds, reports nothing, and is green. vitest does refuse a
+  // shard count larger than the file count, but that is its rule, not ours,
+  // and it would not catch a selection that quietly narrowed. The number is
+  // in the report so a reader can add the shards up and see the whole suite.
+  const files = parsed?.testResults?.length ?? null;
+  if (split && files === 0) {
+    out.push(
+      finding(
+        "blocker",
+        `integration shard ${split[0]}/${split[1]} ran no test files`,
+        "A shard that selects nothing finishes green having tested nothing. Check the shard count in qa/lib/shards.mjs against the number of files in tests/integration.",
+      ),
+    );
+  } else if (files !== null) {
+    out.push(
+      finding("info", split ? `shard ${split[0]}/${split[1]}: ${files} test file(s)` : `${files} test file(s)`),
+    );
+  }
+  return out;
 }
 
 /// The files whose code turns an instant into a day, a week, a month or a

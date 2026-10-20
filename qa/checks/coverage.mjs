@@ -41,7 +41,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { ROOT } from "../lib/discover.mjs";
-import { sh, tail } from "../lib/sh.mjs";
+import { sh, tail, timedOutFinding } from "../lib/sh.mjs";
 import { finding } from "../lib/report.mjs";
 
 const FLOOR_FILE = path.join(ROOT, "qa", "coverage-floor.json");
@@ -114,8 +114,14 @@ export async function coverage() {
       // they already ran. This run is only here for the numbers.
       "--reporter=dot",
     ],
-    { timeoutMs: 25 * 60_000 },
+    // 40 minutes, from measurement: run #514 spent about 26 here, against a
+    // budget of 25 that had never once been enforced (see lib/sh.mjs). The
+    // number has to be one this run can actually meet, or the first honest
+    // budget turns the weekly hunt red for being slow.
+    { timeoutMs: 40 * 60_000 },
   );
+  const stopped = timedOutFinding(r, "Coverage run");
+  if (stopped) return [stopped];
   if (!fs.existsSync(path.join(OUT_DIR, "coverage-final.json"))) {
     return [finding("major", "coverage run produced no report", tail(r.all, 25))];
   }

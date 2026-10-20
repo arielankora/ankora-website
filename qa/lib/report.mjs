@@ -39,7 +39,7 @@ export class Run {
 
   async check(id, { label, level, blocking = true, skipIf = null }, fn) {
     if (level > this.level) return;
-    if (!inShard(id, this.shard)) return;
+    if (!inShard(id, this.shard, this.level)) return;
     const started = Date.now();
     const skip = skipIf ? await skipIf() : null;
     if (skip) {

@@ -15,7 +15,7 @@
 // and a gate that cries wolf is a gate people route around.
 
 import { Run } from "./lib/report.mjs";
-import { sh } from "./lib/sh.mjs";
+import { sh, timedOutFinding } from "./lib/sh.mjs";
 import * as staticChecks from "./checks/static.mjs";
 import * as vitest from "./checks/vitest.mjs";
 import { accessibility, buildPresent } from "./checks/a11y.mjs";
@@ -24,7 +24,7 @@ import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
-import { isShard, SHARDS, ALWAYS } from "./lib/shards.mjs";
+import { isShard, ALWAYS, shardsFor, splitFor, PLAN, MAIN_SHARD } from "./lib/shards.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -47,7 +47,8 @@ function parseShard() {
   const name = arg ? arg.slice("--shard=".length) : (process.env.QA_SHARD ?? "");
   if (!name || name === "all") return null;
   if (!isShard(name)) {
-    process.stderr.write(`Unknown shard "${name}". Use one of: ${SHARDS.join(", ")}.\n`);
+    const known = [...new Set([MAIN_SHARD, ...Object.values(PLAN).filter(Boolean).flat()])].join(", ");
+    process.stderr.write(`Unknown shard "${name}". Use one of: ${known}.\n`);
     process.exit(2);
   }
   return name;
@@ -83,6 +84,8 @@ async function main() {
   // worth more than any single assertion, and it costs a second.
   await run.check("drift", { label: "Capability drift", level: 1, blocking: false }, async () => {
     const r = await sh("node", ["qa/scan.mjs", "--json"], { timeoutMs: 60_000 });
+    const stopped = timedOutFinding(r, "Capability scan");
+    if (stopped) return [stopped];
     const data = JSON.parse(r.out);
     const out = [];
     if (data.added.length)
@@ -154,7 +157,9 @@ async function main() {
   // ── Level 2 ───────────────────────────────────────────────────────────
   // Everything below needs either a database, a build, or a browser -
   // which is exactly why it is not in the fast lane.
-  await run.check("integration", { label: "Integration tests", level: 2, skipIf: needs.database }, vitest.integration);
+  await run.check("integration", { label: "Integration tests", level: 2, skipIf: needs.database }, () =>
+    vitest.integration(splitFor(shard)),
+  );
   // The same suite in UTC, like the server (see integrationUtc in
   // checks/vitest.mjs). Level 2 runs the date-sensitive files, level 3 all.
   await run.check(
@@ -164,6 +169,8 @@ async function main() {
   );
   await run.check("build", { label: "Production build", level: 2, skipIf: needs.prisma }, async () => {
     const r = await sh("npx", ["next", "build"], { timeoutMs: 20 * 60_000, env: { SKIP_ENV_VALIDATION: "1" } });
+    const stopped = timedOutFinding(r, "Production build");
+    if (stopped) return [stopped];
     if (r.code === 0) return [];
     return [finding("blocker", "next build failed", r.all.split("\n").slice(-30).join("\n"))];
   });

@@ -1,11 +1,13 @@
 // Level 1 - static analysis. Cheap, deterministic, catches the class of
 // breakage that never reaches a browser because the build dies first.
 
-import { sh, tail } from "../lib/sh.mjs";
+import { sh, tail, timedOutFinding } from "../lib/sh.mjs";
 import { finding } from "../lib/report.mjs";
 
 export async function types() {
   const r = await sh("npx", ["tsc", "--noEmit"], { timeoutMs: 6 * 60_000 });
+  const stopped = timedOutFinding(r, "TypeScript");
+  if (stopped) return [stopped];
   if (r.code === 0) return [];
   const errors = r.all.split("\n").filter((l) => /error TS\d+/.test(l));
   return [
@@ -19,6 +21,8 @@ export async function lint() {
   // "N problems (E errors, W warnings)", which is what is read here; the
   // old per-line "Warning:" / "Error:" prefixes belonged to `next lint`.
   const r = await sh("npx", ["eslint", ".", "--max-warnings", "9999"], { timeoutMs: 6 * 60_000 });
+  const stopped = timedOutFinding(r, "Lint");
+  if (stopped) return [stopped];
   const summary = r.all.match(/(\d+) errors?, (\d+) warnings?/);
   const errors = summary ? Number(summary[1]) : r.code === 0 ? 0 : 1;
   const warnings = summary ? Number(summary[2]) : 0;

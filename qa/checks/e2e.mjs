@@ -10,7 +10,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "../lib/discover.mjs";
-import { sh, tail } from "../lib/sh.mjs";
+import { sh, tail, timedOutFinding } from "../lib/sh.mjs";
 import { finding } from "../lib/report.mjs";
 
 const REPORT = path.join(ROOT, "qa", "reports", "e2e.json");
@@ -49,6 +49,8 @@ export async function e2e() {
   const r = await sh("npx", ["playwright", "test", "-c", "qa/playwright.config.ts"], {
     timeoutMs: 25 * 60_000,
   });
+  const stopped = timedOutFinding(r, "Browser suite");
+  if (stopped) return [stopped];
 
   let report = null;
   try {
