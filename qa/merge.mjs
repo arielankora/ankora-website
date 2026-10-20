@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "./lib/discover.mjs";
 import { Run, finding } from "./lib/report.mjs";
-import { SHARDS, ALWAYS, SHARD_CHECKS } from "./lib/shards.mjs";
+import { ALWAYS, checksOwnedBy, shardsFor } from "./lib/shards.mjs";
 
 function arg(name, fallback = null) {
   const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
@@ -112,7 +112,7 @@ export function missingShardChecks(expected, found, broken) {
   // still be missing the one pass it owns, which is how a quarter of the
   // hunt disappears while every job shows a tick.
   for (const [name, payload] of found) {
-    const owned = SHARD_CHECKS[name] ?? [];
+    const owned = checksOwnedBy(name);
     const present = new Set((payload.checks ?? []).map((c) => c.id));
     const absent = owned.filter((id) => !present.has(id));
     if (absent.length === 0) continue;
@@ -188,7 +188,7 @@ export function dedupe(checks) {
 function main() {
   const level = Number(arg("level", "3"));
   const dir = path.resolve(ROOT, arg("dir", path.join("qa", "reports")));
-  const expected = (arg("expect") ?? SHARDS.join(",")).split(",").map((s) => s.trim()).filter(Boolean);
+  const expected = (arg("expect") ?? (shardsFor(level) ?? []).join(",")).split(",").map((s) => s.trim()).filter(Boolean);
 
   const { found, broken } = readShards(dir);
   process.stdout.write(`\n  Merging level ${level} from ${dir}\n`);

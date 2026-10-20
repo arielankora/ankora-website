@@ -2,7 +2,14 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SHARDS, MAIN_SHARD, ALWAYS, shardOf, inShard, isShard, claimedCheckIds } from "../../qa/lib/shards.mjs";
+import { MAIN_SHARD, ALWAYS, shardOf, inShard, isShard, claimedCheckIds, shardsFor, splitFor, checksOwnedBy } from "../../qa/lib/shards.mjs";
+
+// qa/lib/shards.mjs is plain JavaScript, so everything it returns arrives as
+// `any` and a callback parameter taken from it is an implicit any. `next
+// build` type-checks this directory, so that is a failed build, not a lint
+// nit: it cost run #530 its `main` shard, its production build and its
+// browser suite, from one missing annotation.
+const shardNames = (level: number): string[] => shardsFor(level) as string[];
 import { Run } from "../../qa/lib/report.mjs";
 import { readShards, missingShardChecks, dedupe } from "../../qa/merge.mjs";
 import { shardPlan } from "../../qa/checks/static.mjs";
@@ -18,17 +25,16 @@ const payload = (shard: string, startedAt: string, durationMs: number, checks: P
 
 describe("the shard plan", () => {
   it("gives every heavy pass its own shard and sends the rest to main", () => {
-    expect(shardOf("integration")).toBe("integration");
-    expect(shardOf("integration-utc")).toBe("utc");
-    expect(shardOf("coverage")).toBe("coverage");
+    expect(shardOf("integration-utc", 3)).toBe("utc");
+    expect(shardOf("coverage", 3)).toBe("coverage");
     // Unclaimed ids fall to main rather than disappearing. A check that is
     // forgotten here must still run somewhere.
-    expect(shardOf("e2e")).toBe(MAIN_SHARD);
-    expect(shardOf("a-check-nobody-wrote-yet")).toBe(MAIN_SHARD);
+    expect(shardOf("e2e", 3)).toBe(MAIN_SHARD);
+    expect(shardOf("a-check-nobody-wrote-yet", 3)).toBe(MAIN_SHARD);
   });
 
   it("runs everything when no shard is set", () => {
-    for (const id of ["integration", "coverage", "e2e"]) expect(inShard(id, null)).toBe(true);
+    for (const id of ["integration", "coverage", "e2e"]) expect(inShard(id, null, 3)).toBe(true);
   });
 
   it("claims each check exactly once", () => {
@@ -37,9 +43,29 @@ describe("the shard plan", () => {
   });
 
   it("knows its own names and refuses anything else", () => {
-    for (const s of SHARDS) expect(isShard(s)).toBe(true);
+    for (const s of shardNames(3)) expect(isShard(s)).toBe(true);
     expect(isShard("main-ish")).toBe(false);
     expect(isShard("")).toBe(false);
+  });
+
+  // The bug this caught while being written: three shards claim one check,
+  // and a map keyed one-shard-per-id kept whichever came last. integration-1
+  // and integration-2 owned nothing and would have run no tests at all.
+  it("lets three shards share one check", () => {
+    for (const s of ["integration-1", "integration-2", "integration-3"]) {
+      expect(inShard("integration", s, 3), s).toBe(true);
+      expect(checksOwnedBy(s)).toEqual(["integration"]);
+    }
+    expect(inShard("integration", MAIN_SHARD, 3)).toBe(false);
+  });
+
+  it("hands each integration shard a different third of the suite", () => {
+    expect(splitFor("integration-1")).toEqual([1, 3]);
+    expect(splitFor("integration-2")).toEqual([2, 3]);
+    expect(splitFor("integration-3")).toEqual([3, 3]);
+    // A shard that runs its check whole has no split to pass to vitest.
+    expect(splitFor("utc")).toBeNull();
+    expect(splitFor(MAIN_SHARD)).toBeNull();
   });
 
   // The guard that matters: shards name checks by id, and nothing but this
@@ -47,6 +73,42 @@ describe("the shard plan", () => {
   // shard that matches nothing, which runs nothing and reports a pass.
   it("matches the ids qa/run.mjs actually declares", async () => {
     expect(await shardPlan()).toEqual([]);
+  });
+});
+
+describe("which shards a level runs as", () => {
+  it("never splits level 1", () => {
+    // Two minutes of checks. Four job setups to save one would be a worse
+    // gate, not a faster one.
+    expect(shardsFor(1)).toBeNull();
+  });
+
+  it("splits level 2, because that is the one that runs every night", () => {
+    expect(shardsFor(2)).toEqual(["main", "integration-1", "integration-2", "integration-3"]);
+  });
+
+  it("splits level 3 further, for the passes only it runs", () => {
+    expect(shardsFor(3)).toContain("coverage");
+    expect(shardsFor(3)).toContain("utc");
+  });
+
+  // The rule that keeps a check from falling out of the plan: level 2 has no
+  // `utc` shard, so integration-utc runs in main rather than nowhere. Its
+  // twelve date-sensitive files are about four minutes; a job setup for them
+  // would cost more than it saves.
+  it("sends a check to main when this level does not run its shard", () => {
+    expect(shardOf("integration-utc", 2)).toBe(MAIN_SHARD);
+    expect(inShard("integration-utc", MAIN_SHARD, 2)).toBe(true);
+    expect(inShard("integration-utc", MAIN_SHARD, 3)).toBe(false);
+  });
+
+  it("leaves no check without a shard at any level", () => {
+    for (const level of [2, 3]) {
+      for (const id of [...claimedCheckIds(), "e2e", "unit", "build"]) {
+        const homes = shardNames(level).filter((s) => inShard(id, s, level));
+        expect(homes.length, `${id} at level ${level}`).toBeGreaterThan(0);
+      }
+    }
   });
 });
 
@@ -194,7 +256,8 @@ describe("preflight in every shard", () => {
   // so the other three saw a machine with no database and skipped
   // everything they own. Green, instant, and nothing tested.
   it("runs in every shard, not only the one that owns it", () => {
-    for (const s of SHARDS) expect(inShard("preflight", s)).toBe(true);
+    for (const level of [2, 3])
+      for (const s of shardNames(level)) expect(inShard("preflight", s, level), `${s} at level ${level}`).toBe(true);
     expect(ALWAYS).toContain("preflight");
   });
 

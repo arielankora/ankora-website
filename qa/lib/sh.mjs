@@ -6,27 +6,92 @@
 import { spawn } from "node:child_process";
 import { ROOT } from "./discover.mjs";
 
+/**
+ * Run a command, with a budget that is actually a budget.
+ *
+ * 20.10.2026: it was not one. `child.kill()` signals the direct child only,
+ * and every expensive thing this suite runs is a wrapper around the real
+ * work: `npx vitest`, `npx next build`, `npx tsc`. Killing npx left the work
+ * running, holding the inherited pipes open, so `close` did not fire until
+ * the work finished on its own. The budget killed a wrapper and then waited
+ * for the thing it had failed to stop.
+ *
+ * Measured rather than reasoned about: a 2000ms budget on a parent whose
+ * grandchild sleeps 6s returned after 6094ms, with the grandchild's output
+ * in it. tests/unit/qa-sh-timeout.test.ts keeps that honest.
+ *
+ * What it cost, from run #514: integration ran 22.0 minutes against a
+ * 15-minute budget, integration-utc 18.4 against the same 15, and coverage
+ * about 26 against 25. Three checks over budget, three passes reported, and
+ * nothing said a word. The only wall that ever applied was the job's.
+ *
+ * `detached` puts the child in its own process group so the negative pid
+ * reaches the whole tree. `timedOut` is on the result because a killed run
+ * and a failed run are the same exit code and very different news, which is
+ * the rule this file opens with.
+ */
 export function sh(cmd, args, { cwd = ROOT, env = {}, timeoutMs = 20 * 60_000 } = {}) {
   return new Promise((resolve) => {
     const child = spawn(cmd, args, {
       cwd,
       env: { ...process.env, ...env, CI: "1", FORCE_COLOR: "0" },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: true,
     });
     let out = "";
     let err = "";
-    const timer = setTimeout(() => child.kill("SIGKILL"), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      try {
+        // Negative pid: the whole process group, which is what `detached`
+        // above bought us. Falls back to the child alone if the group is
+        // already gone.
+        process.kill(-child.pid, "SIGKILL");
+      } catch {
+        try {
+          child.kill("SIGKILL");
+        } catch {
+          /* already dead */
+        }
+      }
+    }, timeoutMs);
     child.stdout.on("data", (d) => (out += d));
     child.stderr.on("data", (d) => (err += d));
     child.on("close", (code) => {
       clearTimeout(timer);
-      resolve({ code: code ?? 1, out, err, all: out + err });
+      resolve({ code: code ?? 1, out, err, all: out + err, timedOut, timeoutMs });
     });
     child.on("error", (e) => {
       clearTimeout(timer);
-      resolve({ code: 127, out, err: String(e), all: String(e) });
+      resolve({ code: 127, out, err: String(e), all: String(e), timedOut, timeoutMs });
     });
   });
+}
+
+/**
+ * The finding for a run that was stopped rather than one that failed.
+ *
+ * Returns null when the run was not stopped, so a caller can write
+ * `const t = timedOutFinding(r, "..."); if (t) return [t];` and not think
+ * about it again.
+ */
+export function timedOutFinding(r, label) {
+  if (!r?.timedOut) return null;
+  const minutes = (r.timeoutMs / 60_000).toFixed(0);
+  return {
+    severity: "blocker",
+    title: `${label} was stopped after ${minutes} minutes`,
+    detail: [
+      "It did not fail. It was killed for running past its budget, so whatever it",
+      "would have reported is unknown and this run has no opinion about it.",
+      "",
+      "Raise the budget in the check if the suite has honestly grown, or find out",
+      "what got slower. Do not read this as a pass.",
+      "",
+      tail(r.all, 20),
+    ].join("\n"),
+  };
 }
 
 /** Last N non-empty lines - what you actually want to read from a failure. */
