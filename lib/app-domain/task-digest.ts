@@ -6,6 +6,7 @@ import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { TASK_ASSIGNED_NOTIFICATION_TYPE } from "@/lib/app-domain/notifications";
 import { describeChange, quoteComment } from "@/lib/app-domain/task-changes";
+import type { TaskBlocker } from "@prisma/client";
 
 // The morning digest.
 //
@@ -46,8 +47,20 @@ import { describeChange, quoteComment } from "@/lib/app-domain/task-changes";
 /// book's reminder ladder is what somebody does about it.
 export const STALE_WAIT_DAYS = 7;
 
-/// At most this many lines per group, and then a count.
-export const LINES_PER_GROUP = 5;
+/// At most this many lines in the ranked list, and then a count.
+///
+/// Ariel, 20.10.2026: "the idea is that I understand what I need to
+/// handle, by order of importance". One list, ranked, replaced the five
+/// groups by kind (late, today, new, updated, signature): a grouping by
+/// kind makes the reader do the ranking, and the ranking is the job.
+export const RANKED_LINES = 7;
+
+/// Long waits named in the list, at most. The rest are a count.
+export const WAITING_NAMED = 3;
+
+/// Late by at least this many days, a task stops being "do it" and
+/// becomes "decide about it": do it, move its date, or close it.
+export const DECIDE_AFTER_DAYS = 7;
 
 /// At most this many change lines under one task, and then a count.
 export const CHANGES_PER_TASK = 3;
@@ -74,6 +87,13 @@ export type DigestTask = {
   changes?: DigestChange[];
   /// How many more changes there were beyond those.
   moreChanges?: number;
+  /// "מחכה לחתימה שלך" only: whose work is stopped on the signature.
+  assigneeName?: string | null;
+  /// Since when it has been waiting: on this person's signature, or, for
+  /// a long wait, on somebody outside.
+  since?: Date | null;
+  /// Long waits only: who it is waiting on.
+  blockedOn?: TaskBlocker | null;
 };
 
 export type Digest = {
@@ -92,9 +112,13 @@ export type Digest = {
   /// Somebody else's work, stopped on this person's signature. In the
   /// digest because that is where work dies quietly.
   awaitingMySignature: DigestTask[];
-  /// Not a list. One sentence, because the action is a reminder rather
-  /// than an afternoon of work.
+  /// How many of this person's tasks have waited on somebody outside for
+  /// more than STALE_WAIT_DAYS.
   staleWaits: number;
+  /// The longest of those waits, by name, at most WAITING_NAMED. A count
+  /// alone ("4 משימות ממתינות") says there is a reminder to send and not
+  /// to whom, which is the half that gets it sent.
+  waiting?: DigestTask[];
 };
 
 export function isDigestEmpty(d: Digest): boolean {
@@ -110,32 +134,32 @@ export function isDigestEmpty(d: Digest): boolean {
 
 /// The subject line, and the most important twelve words in the email.
 ///
-/// Leads with whatever is most urgent, because on a phone this is often
-/// the whole message. "3 משימות עליך" and "3 משימות עליך, אחת באיחור"
-/// ask for two completely different mornings.
-export function digestSubject(d: Digest): string {
-  const mine = d.overdue.length + d.today.length + d.fresh.length;
-  const parts: string[] = [];
+/// It is read on a phone without opening, and for most days it is the
+/// only part read at all. Until 20.10.2026 it counted ("משימה אחת עליך,
+/// אחת באיחור"), which says how much and not what. Now it names the
+/// first thing in the ranked list, with its reason, and counts the rest.
+export function digestSubject(d: Digest, now: Date = new Date()): string {
+  const items = rankDigest(d, now);
+  if (items.length === 0) {
+    if (d.staleWaits === 1) return "משימה אחת ממתינה יותר משבוע";
+    if (d.staleWaits > 1) return `${d.staleWaits} משימות ממתינות יותר משבוע`;
+    return "הבוקר שלך";
+  }
+  const [first] = items;
+  const head = `${first.short}: ${clip(first.task.title, SUBJECT_TITLE_CHARS)}`;
+  const rest = items.length - 1 + Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
+  if (rest <= 0) return head;
+  return rest === 1 ? `${head}, ועוד אחת` : `${head}, ועוד ${rest}`;
+}
 
-  if (mine > 0) parts.push(mine === 1 ? "משימה אחת עליך" : `${mine} משימות עליך`);
-  if (d.overdue.length > 0) {
-    parts.push(d.overdue.length === 1 ? "אחת באיחור" : `${d.overdue.length} באיחור`);
-  }
-  if (mine === 0 && d.awaitingMySignature.length > 0) {
-    parts.push(
-      d.awaitingMySignature.length === 1 ? "משימה אחת מחכה לחתימה שלך" : `${d.awaitingMySignature.length} מחכות לחתימה שלך`
-    );
-  }
-  if (d.updated.length > 0) {
-    if (mine === 0 && parts.length === 0) {
-      parts.push(d.updated.length === 1 ? "משימה אחת שלך עודכנה" : `${d.updated.length} משימות שלך עודכנו`);
-    } else {
-      parts.push(d.updated.length === 1 ? "אחת עודכנה" : `${d.updated.length} עודכנו`);
-    }
-  }
-  if (parts.length === 0 && d.staleWaits > 0) parts.push("יש מה להזכיר ללקוחות");
+/// A title longer than this is cut in the subject line. Phones show
+/// about forty characters of a subject; the reason comes first so it is
+/// never the part that is cut.
+export const SUBJECT_TITLE_CHARS = 48;
 
-  return parts.join(", ") || "הבוקר שלך";
+function clip(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
 
 /// The start of today, in Israel, as an instant.
@@ -339,6 +363,31 @@ async function excerptsFor(taskIds: string[]): Promise<Map<string, string>> {
   return out;
 }
 
+/// When each task was sent for approval, from the audit log.
+///
+/// Not updatedAt: any edit moves it, and "waiting on your signature for
+/// two days" has to mean two days since it was handed over, not since
+/// somebody fixed a typo. Falls back to updatedAt where the log has no row.
+async function sentForApprovalAt(taskIds: string[]): Promise<Map<string, Date>> {
+  const out = new Map<string, Date>();
+  if (taskIds.length === 0) return out;
+  const rows = await prisma.auditEvent.findMany({
+    where: { entityType: "Task", entityId: { in: taskIds }, action: { in: ["task.update", "task.status_change"] } },
+    orderBy: { createdAt: "desc" },
+    select: { entityId: true, beforeJson: true, afterJson: true, createdAt: true },
+  });
+  // The newest row that MOVED the task into approval. A later edit that
+  // left it there writes the whole row too, and is not the handover.
+  const statusOf = (row: unknown) => (row && typeof row === "object" ? (row as Record<string, unknown>).status : undefined);
+  for (const r of rows) {
+    if (!r.entityId || out.has(r.entityId)) continue;
+    if (statusOf(r.afterJson) === "PENDING_APPROVAL" && statusOf(r.beforeJson) !== "PENDING_APPROVAL") {
+      out.set(r.entityId, r.createdAt);
+    }
+  }
+  return out;
+}
+
 export async function buildDigest(
   user: { id: string; dailyDigestAt: Date | null },
   now: Date = new Date()
@@ -359,7 +408,14 @@ export async function buildDigest(
     blockedOn: null,
   };
 
-  const [overdue, today, freshNotifications, awaiting, staleWaits] = await Promise.all([
+  const staleWhere = {
+    assignedToId: user.id,
+    deletedAt: null,
+    status: { in: OPEN_STATUSES },
+    blockedSince: { lt: staleCutoff },
+  };
+
+  const [overdue, today, freshNotifications, awaiting, staleWaits, waiting] = await Promise.all([
     prisma.task.findMany({
       where: { ...mine, dueDate: { lt: dayStart } },
       orderBy: { dueDate: "asc" },
@@ -387,15 +443,14 @@ export async function buildDigest(
         status: "PENDING_APPROVAL",
       },
       orderBy: { updatedAt: "asc" },
-      select: TASK_SELECT,
+      select: { ...TASK_SELECT, updatedAt: true, assignedTo: { select: { name: true } } },
     }),
-    prisma.task.count({
-      where: {
-        assignedToId: user.id,
-        deletedAt: null,
-        status: { in: OPEN_STATUSES },
-        blockedSince: { lt: staleCutoff },
-      },
+    prisma.task.count({ where: staleWhere }),
+    prisma.task.findMany({
+      where: staleWhere,
+      orderBy: { blockedSince: "asc" },
+      take: WAITING_NAMED,
+      select: { ...TASK_SELECT, blockedOn: true, blockedSince: true },
     }),
   ]);
 
@@ -419,9 +474,10 @@ export async function buildDigest(
   // one email is how a short email stops being short.
   const freshOnly = fresh.filter((t) => !overdueIds.has(t.id) && !todayIds.has(t.id));
 
-  const [changes, excerpts] = await Promise.all([
+  const [changes, excerpts, approvalSince] = await Promise.all([
     changesOnMyTasks(user.id, since),
     excerptsFor(freshOnly.map((t) => t.id)),
+    sentForApprovalAt(awaiting.map((t) => t.id)),
   ]);
 
   const withChanges = (t: DigestTask): DigestTask => {
@@ -460,8 +516,13 @@ export async function buildDigest(
         return { ...c, changes, excerpt };
       }),
     updated,
-    awaitingMySignature: awaiting.map(toDigestTask),
+    awaitingMySignature: awaiting.map((t) => ({
+      ...toDigestTask(t),
+      assigneeName: t.assignedTo?.name ?? null,
+      since: approvalSince.get(t.id) ?? t.updatedAt,
+    })),
     staleWaits,
+    waiting: waiting.map((t) => ({ ...toDigestTask(t), blockedOn: t.blockedOn, since: t.blockedSince })),
   };
 }
 
@@ -470,24 +531,152 @@ function formatDue(date: Date | null): string {
   return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: TIMEZONE }).format(date);
 }
 
-export type DigestGroup = { heading: string; tasks: DigestTask[]; more: number };
+/// Whole Israel calendar days from `from` to `to`. Pure.
+///
+/// By day keys, not by milliseconds over 86,400,000: a task due
+/// yesterday at 23:59 is one day late at 08:00, not zero.
+export function daysBetween(from: Date, to: Date): number {
+  const a = Date.parse(`${localDateKey(from, TIMEZONE)}T00:00:00Z`);
+  const b = Date.parse(`${localDateKey(to, TIMEZONE)}T00:00:00Z`);
+  return Math.round((b - a) / (24 * 3600_000));
+}
 
-/// The groups, in the order somebody at eight in the morning asks them.
-export function digestGroups(d: Digest): DigestGroup[] {
-  const groups: [string, DigestTask[]][] = [
-    ["באיחור", d.overdue],
-    ["להיום", d.today],
-    ["חדש אצלך", d.fresh],
-    ["עודכן אצלך", d.updated],
-    ["מחכה לחתימה שלך", d.awaitingMySignature],
-  ];
-  return groups
-    .filter(([, tasks]) => tasks.length > 0)
-    .map(([heading, tasks]) => ({
-      heading,
-      tasks: tasks.slice(0, LINES_PER_GROUP),
-      more: Math.max(0, tasks.length - LINES_PER_GROUP),
-    }));
+function days(n: number): string {
+  return n === 1 ? "יום אחד" : n === 2 ? "יומיים" : `${n} ימים`;
+}
+
+export type DigestTone = "red" | "amber" | "blue" | "gray";
+
+/// One line of the ranked list: the task, why it is here, and the one
+/// thing to do about it.
+export type DigestItem = {
+  task: DigestTask;
+  /// The reason, as shown above the title. "באיחור 17 ימים".
+  reason: string;
+  /// The same, short enough for the subject line.
+  short: string;
+  tone: DigestTone;
+  /// The button. Every line has exactly one, and it opens the task.
+  action: string;
+  /// A line under the title that is not a note from somebody: the
+  /// question a long-late task actually asks.
+  hint?: string;
+};
+
+const WAIT_LABEL: Record<TaskBlocker, string> = {
+  CLIENT: "ממתינה ללקוח",
+  SUPPLIER: "ממתינה לספק",
+  INTERNAL: "ממתינה לגורם פנימי",
+  OTHER: "ממתינה",
+};
+
+/// The whole email in one decision: what comes first. Pure.
+///
+/// The order, and why:
+///   1. Somebody else's work stopped on this person's signature. It is
+///      the one line where waiting costs two people, not one.
+///   2. Urgent work, wherever it would otherwise sit.
+///   3. Late work, the latest first. 17 days late and one day late are
+///      different mornings, and the old email printed them the same.
+///   4. Due today.
+///   5. New on this person.
+///   6. Long waits on somebody outside, by name: a reminder to send.
+///   7. Updated by somebody else, with nothing else making it urgent.
+/// Inside a rank, the order the query returned is kept.
+export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
+  const items: DigestItem[] = [];
+  const seen = new Set<string>();
+  const push = (item: DigestItem) => {
+    if (seen.has(item.task.id)) return;
+    seen.add(item.task.id);
+    items.push(item);
+  };
+
+  for (const t of d.awaitingMySignature) {
+    const waited = t.since ? daysBetween(t.since, now) : 0;
+    const who = t.assigneeName ? ` · עוצר את ${t.assigneeName}` : "";
+    push({
+      task: t,
+      reason: `מחכה לאישור שלך${waited > 0 ? ` ${days(waited)}` : ""}${who}`,
+      short: "מחכה לאישור שלך",
+      tone: "red",
+      action: "לאשר",
+    });
+  }
+
+  const lateness = (t: DigestTask) => (t.dueDate ? daysBetween(t.dueDate, now) : 0);
+  const late = [...d.overdue].sort((a, b) => lateness(b) - lateness(a));
+  const lateItem = (t: DigestTask): DigestItem => {
+    const n = Math.max(1, lateness(t));
+    const urgent = t.priority === "URGENT";
+    return {
+      task: t,
+      reason: `${urgent ? "דחופה · " : ""}באיחור ${days(n)}`,
+      short: `באיחור ${days(n)}`,
+      tone: "red",
+      action: "לפתוח",
+      hint: n >= DECIDE_AFTER_DAYS ? "לבצע, לדחות את התאריך, או לסגור?" : undefined,
+    };
+  };
+  const todayItem = (t: DigestTask): DigestItem => ({
+    task: t,
+    reason: t.priority === "URGENT" ? "דחופה · להיום" : "להיום",
+    short: t.priority === "URGENT" ? "דחופה להיום" : "להיום",
+    tone: t.priority === "URGENT" ? "red" : "amber",
+    action: "לפתוח",
+  });
+  const freshItem = (t: DigestTask): DigestItem => ({
+    task: t,
+    reason: t.priority === "URGENT" ? "דחופה · חדשה אצלך" : "חדשה אצלך",
+    short: t.priority === "URGENT" ? "דחופה חדשה" : "חדשה אצלך",
+    tone: t.priority === "URGENT" ? "red" : "blue",
+    action: "לפתוח",
+  });
+  const updatedItem = (t: DigestTask): DigestItem => ({
+    task: t,
+    reason: t.priority === "URGENT" ? "דחופה · עודכנה" : "עודכנה",
+    short: t.priority === "URGENT" ? "דחופה עודכנה" : "עודכנה",
+    tone: t.priority === "URGENT" ? "red" : "gray",
+    action: "לפתוח",
+  });
+
+  const urgent = (t: DigestTask) => t.priority === "URGENT";
+  for (const t of late.filter(urgent)) push(lateItem(t));
+  for (const t of d.today.filter(urgent)) push(todayItem(t));
+  for (const t of d.fresh.filter(urgent)) push(freshItem(t));
+  for (const t of d.updated.filter(urgent)) push(updatedItem(t));
+
+  for (const t of late) push(lateItem(t));
+  for (const t of d.today) push(todayItem(t));
+  for (const t of d.fresh) push(freshItem(t));
+
+  for (const t of d.waiting ?? []) {
+    const label = WAIT_LABEL[t.blockedOn ?? "OTHER"];
+    const waited = t.since ? daysBetween(t.since, now) : STALE_WAIT_DAYS;
+    push({ task: t, reason: `${label} ${days(waited)}`, short: label, tone: "gray", action: "להזכיר" });
+  }
+
+  for (const t of d.updated) push(updatedItem(t));
+  return items;
+}
+
+/// The sentence under the greeting. Says how much, and whether anybody
+/// is stopped on this person, which is the one fact that changes the
+/// order somebody opens things in. Pure.
+export function digestLead(d: Digest, items: DigestItem[]): string {
+  const hiddenWaits = Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
+  const needs = items.filter((i) => i.short !== "עודכנה").length + hiddenWaits;
+  const blocking = d.awaitingMySignature.length;
+  const parts: string[] = [];
+  if (needs === 0) {
+    parts.push(items.length === 1 ? "משימה אחת שלך עודכנה." : `${items.length} משימות שלך עודכנו.`);
+  } else {
+    parts.push(needs === 1 ? "דבר אחד דורש אותך היום." : `${needs} דברים דורשים אותך היום.`);
+  }
+  if (blocking > 0 && needs > 1) {
+    parts.push(blocking === 1 ? "אחד מהם עוצר מישהו אחר." : `${blocking} מהם עוצרים אחרים.`);
+  }
+  return parts.join(" ");
 }
 
 function formatTime(date: Date): string {
@@ -508,82 +697,134 @@ export function taskNotes(t: DigestTask): string[] {
   return notes;
 }
 
-export function renderDigestEmail(d: Digest, name: string): { html: string; text: string } {
+const TONE_COLOR: Record<DigestTone, string> = {
+  red: "#B42318",
+  amber: "#B54708",
+  blue: "#175CD3",
+  gray: "#5A6676",
+};
+
+const INK = "#0B1B33";
+const MUTED = "#5A6676";
+const RULE = "#E6E9EE";
+
+/// Free text, made safe for the HTML email and kept out of Gmail's
+/// link finder.
+///
+/// 20.10.2026: a task titled "לבדוק אם לרכוש את הדומיין ankora360.com"
+/// arrived with the domain turned into its own link, inside the link to
+/// the task, so a tap on the title could open the website instead of the
+/// task. A zero-width space after the dot (and after an @) is invisible
+/// and stops the match. The plain-text part is left alone: it is what
+/// gets copied.
+export function safeText(value: string): string {
+  return escapeHtml(value)
+    .replace(/([A-Za-z0-9])\.([A-Za-z])/g, "$1.&#8203;$2")
+    .replace(/@/g, "@&#8203;");
+}
+
+export function renderDigestEmail(d: Digest, name: string, now: Date = new Date()): { html: string; text: string } {
   const base = appBaseUrl();
-  const groups = digestGroups(d);
+  const all = rankDigest(d, now);
+  const items = all.slice(0, RANKED_LINES);
+  const hiddenWaits = Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
+  const more = all.length - items.length;
+  const lead = digestLead(d, all);
+  const dayHref = `${base}/app/calendar?view=day`;
 
-  const textLines: string[] = [`בוקר טוב ${name},`, ""];
-  const htmlGroups: string[] = [];
+  const textLines: string[] = [`בוקר טוב ${name},`, "", lead, `היום שלך: ${dayHref}`, ""];
+  const rows: string[] = [];
 
-  for (const group of groups) {
-    textLines.push(`${group.heading}:`);
-    const rows = group.tasks
-      .map((t) => {
-        const due = formatDue(t.dueDate);
-        const urgent = t.priority === "URGENT" ? "דחופה · " : "";
-        textLines.push(`  ${urgent}${t.title} · ${t.clientName}${due ? ` · ${due}` : ""}  ${base}/app/tasks/${t.id}`);
-        const notes = taskNotes(t);
-        for (const n of notes) textLines.push(`    ${n}`);
-        const notesHtml = notes
-          .map(
-            (n) =>
-              `<div style="margin-top:3px;padding-inline-start:10px;border-inline-start:2px solid rgba(176,141,87,.45);font-size:13px;line-height:1.55;color:rgba(27,42,61,.72);">${escapeHtml(
-                n
-              )}</div>`
-          )
-          .join("");
-        return `<tr><td style="padding:6px 0;font-size:14px;line-height:1.6;color:#1B2A3D;" dir="rtl" align="right">${
-          urgent ? `<span style="color:#9B2C2C;font-weight:600;">דחופה</span> · ` : ""
-        }<a href="${base}/app/tasks/${escapeHtml(
-          t.id
-        )}" style="color:#1B2A3D;text-decoration:none;border-bottom:1px solid rgba(27,42,61,.25);">${escapeHtml(
-          t.title
-        )}</a> <span style="color:rgba(27,42,61,.55);">· ${escapeHtml(t.clientName)}${
-          due ? ` · ${escapeHtml(due)}` : ""
-        }</span>${notesHtml}</td></tr>`;
-      })
+  items.forEach((item, i) => {
+    const t = item.task;
+    const href = `${base}/app/tasks/${t.id}`;
+    const due = formatDue(t.dueDate);
+    const meta = [t.clientName, due ? `יעד ${due}` : ""].filter(Boolean).join(" · ");
+    const notes = taskNotes(t);
+
+    textLines.push(`${i + 1}. ${item.reason}`);
+    textLines.push(`   ${t.title} · ${meta}`);
+    if (item.hint) textLines.push(`   ${item.hint}`);
+    for (const n of notes) textLines.push(`   ${n}`);
+    textLines.push(`   ${item.action}: ${href}`, "");
+
+    const notesHtml = notes
+      .map(
+        (n) =>
+          `<div style="margin-top:4px;padding-inline-start:8px;border-inline-start:2px solid ${RULE};font-size:12.5px;line-height:1.55;color:#3B4A5E;">${safeText(
+            n
+          )}</div>`
+      )
       .join("");
-    const more = group.more > 0 ? `<tr><td style="padding:4px 0;font-size:13px;color:rgba(27,42,61,.55);" dir="rtl" align="right">ועוד ${group.more}</td></tr>` : "";
-    if (group.more > 0) textLines.push(`  ועוד ${group.more}`);
-    textLines.push("");
-    htmlGroups.push(
-      `<p style="margin:22px 0 6px;font-size:13px;font-weight:600;letter-spacing:.04em;color:#B08D57;" dir="rtl" align="right">${escapeHtml(
-        group.heading
-      )}</p><table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}${more}</table>`
+    const hintHtml = item.hint
+      ? `<div style="margin-top:3px;font-size:12.5px;color:${INK};">${escapeHtml(item.hint)}</div>`
+      : "";
+
+    rows.push(`<tr>
+  <td valign="top" style="padding:14px 0 14px 10px;border-top:1px solid ${RULE};width:24px;">
+    <div style="width:22px;height:22px;line-height:22px;border-radius:11px;background:${INK};color:#FFFFFF;font-size:12px;font-weight:700;text-align:center;">${i + 1}</div>
+  </td>
+  <td valign="top" style="padding:14px 0;border-top:1px solid ${RULE};" dir="rtl" align="right">
+    <div style="font-size:12px;font-weight:700;color:${TONE_COLOR[item.tone]};">${escapeHtml(item.reason)}</div>
+    <a href="${href}" style="display:block;margin-top:2px;font-size:15px;font-weight:600;line-height:1.45;color:${INK};text-decoration:none;">${safeText(
+      t.title
+    )}</a>
+    <div style="margin-top:2px;font-size:12.5px;color:${MUTED};">${safeText(meta)}</div>
+    ${hintHtml}${notesHtml}
+  </td>
+  <td valign="top" style="padding:14px 10px 14px 0;border-top:1px solid ${RULE};width:1%;white-space:nowrap;" align="left">
+    <a href="${href}" style="display:inline-block;padding:6px 12px;border:1px solid #C7CED8;border-radius:7px;font-size:13px;font-weight:600;color:${INK};text-decoration:none;">${escapeHtml(
+      item.action
+    )}</a>
+  </td>
+</tr>`);
+  });
+
+  const tailParts: string[] = [];
+  if (more > 0) tailParts.push(more === 1 ? "ועוד משימה אחת ברשימה." : `ועוד ${more} משימות ברשימה.`);
+  if (hiddenWaits > 0) {
+    const also = items.length > 0 ? "ועוד " : "";
+    tailParts.push(
+      hiddenWaits === 1
+        ? `${also}משימה אחת ממתינה למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`
+        : `${also}${hiddenWaits} משימות ממתינות למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`
     );
   }
+  const tasksHref = `${base}/app/tasks`;
+  if (tailParts.length > 0) textLines.push(tailParts.join(" "), "");
+  textLines.push(`כל המשימות: ${tasksHref}`);
 
-  let tail = "";
-  if (d.staleWaits > 0) {
-    const sentence =
-      d.staleWaits === 1
-        ? `משימה אחת שלך ממתינה למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`
-        : `${d.staleWaits} משימות שלך ממתינות למישהו יותר משבוע. אולי הגיע הזמן להזכיר.`;
-    textLines.push(sentence, "");
-    tail = `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid rgba(27,42,61,.12);font-size:13.5px;line-height:1.7;color:rgba(27,42,61,.7);" dir="rtl" align="right">${escapeHtml(
-      sentence
-    )}</p>`;
-  }
-
-  textLines.push(`${base}/app/tasks`);
+  const tail = tailParts.length
+    ? `<p style="margin:4px 0 0;padding-top:14px;border-top:1px solid ${RULE};font-size:13px;line-height:1.7;color:${MUTED};" dir="rtl" align="right">${escapeHtml(
+        tailParts.join(" ")
+      )} <a href="${tasksHref}" style="color:${INK};font-weight:600;">לכל המשימות</a></p>`
+    : "";
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="margin:0;padding:0;background:#F8F4EC;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8F4EC;padding:28px 12px;">
+  <body style="margin:0;padding:0;background:#EEF0F3;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF0F3;padding:24px 12px;">
       <tr>
         <td align="center">
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#FFFFFF;border:1px solid rgba(27,42,61,.12);border-radius:18px;overflow:hidden;font-family:Arial,Helvetica,sans-serif;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #D9DEE5;border-radius:14px;font-family:Arial,Helvetica,sans-serif;">
             <tr>
-              <td style="background:#1B2A3D;padding:18px 24px;">
-                <span style="font-size:14px;font-weight:600;letter-spacing:.18em;color:#F3EADB;">ANKORA</span>
+              <td style="padding:22px 24px 8px;" dir="rtl" align="right">
+                <div style="font-size:11px;font-weight:600;letter-spacing:.22em;color:#8A94A3;">ANKORA</div>
+                <p style="margin:10px 0 4px;font-size:20px;font-weight:600;color:${INK};">בוקר טוב ${escapeHtml(name)}</p>
+                <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#3B4A5E;">${escapeHtml(lead)}</p>
+                <a href="${dayHref}" style="display:inline-block;background:${INK};color:#FFFFFF;text-decoration:none;padding:10px 16px;border-radius:8px;font-size:14px;font-weight:600;">פתח את היום שלי</a>
               </td>
             </tr>
             <tr>
-              <td style="padding:26px 24px 28px;" dir="rtl" align="right">
-                <p style="margin:0;font-size:19px;font-weight:500;color:#0B1B33;">בוקר טוב ${escapeHtml(name)}</p>
-                ${htmlGroups.join("")}
+              <td style="padding:14px 24px 4px;" dir="rtl" align="right">
+                <div style="font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;margin-bottom:4px;">לפי סדר חשיבות</div>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl">${rows.join("")}</table>
                 ${tail}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:14px 24px 20px;font-size:12px;color:#8A94A3;" dir="rtl" align="right">
+                <a href="${base}/app/profile" style="color:${MUTED};">הגדרות המייל</a>
               </td>
             </tr>
           </table>
@@ -637,10 +878,10 @@ export async function sendDailyTaskDigest(now: Date = new Date()): Promise<{ sen
         continue;
       }
 
-      const { html, text } = renderDigestEmail(digest, person.name);
+      const { html, text } = renderDigestEmail(digest, person.name, now);
       const result = await sendEmail({
         to: [person.email],
-        subject: digestSubject(digest),
+        subject: digestSubject(digest, now),
         text,
         html,
       });
