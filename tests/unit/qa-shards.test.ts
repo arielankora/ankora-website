@@ -3,6 +3,13 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { MAIN_SHARD, ALWAYS, shardOf, inShard, isShard, claimedCheckIds, shardsFor, splitFor, checksOwnedBy } from "../../qa/lib/shards.mjs";
+
+// qa/lib/shards.mjs is plain JavaScript, so everything it returns arrives as
+// `any` and a callback parameter taken from it is an implicit any. `next
+// build` type-checks this directory, so that is a failed build, not a lint
+// nit: it cost run #530 its `main` shard, its production build and its
+// browser suite, from one missing annotation.
+const shardNames = (level: number): string[] => shardsFor(level) as string[];
 import { Run } from "../../qa/lib/report.mjs";
 import { readShards, missingShardChecks, dedupe } from "../../qa/merge.mjs";
 import { shardPlan } from "../../qa/checks/static.mjs";
@@ -36,7 +43,7 @@ describe("the shard plan", () => {
   });
 
   it("knows its own names and refuses anything else", () => {
-    for (const s of shardsFor(3)!) expect(isShard(s)).toBe(true);
+    for (const s of shardNames(3)) expect(isShard(s)).toBe(true);
     expect(isShard("main-ish")).toBe(false);
     expect(isShard("")).toBe(false);
   });
@@ -98,7 +105,7 @@ describe("which shards a level runs as", () => {
   it("leaves no check without a shard at any level", () => {
     for (const level of [2, 3]) {
       for (const id of [...claimedCheckIds(), "e2e", "unit", "build"]) {
-        const homes = shardsFor(level)!.filter((s) => inShard(id, s, level));
+        const homes = shardNames(level).filter((s) => inShard(id, s, level));
         expect(homes.length, `${id} at level ${level}`).toBeGreaterThan(0);
       }
     }
@@ -250,7 +257,7 @@ describe("preflight in every shard", () => {
   // everything they own. Green, instant, and nothing tested.
   it("runs in every shard, not only the one that owns it", () => {
     for (const level of [2, 3])
-      for (const s of shardsFor(level)!) expect(inShard("preflight", s, level), `${s} at level ${level}`).toBe(true);
+      for (const s of shardNames(level)) expect(inShard("preflight", s, level), `${s} at level ${level}`).toBe(true);
     expect(ALWAYS).toContain("preflight");
   });
 
