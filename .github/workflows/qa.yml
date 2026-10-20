@@ -34,6 +34,45 @@ concurrency:
   group: qa-${{ github.ref }}
   cancel-in-progress: true
 
+# Why the runner is pinned, and why the actions jumped several majors.
+#
+# 19.10.2026: GitHub began moving `ubuntu-latest` to Ubuntu 26.04. It is a
+# gradual rollout, so the label can resolve to a different image from one run
+# to the next with nothing in this file changing. That image also drops tools
+# the old one had (Java 8, a global tsc, webpack); this repo uses none of them
+# from the image, but "uses none of them" is a thing to verify once rather
+# than discover on a Sunday.
+#
+# The deciding reason is narrower. This week the suite's timings were measured
+# for the first time and the shard plan in qa/lib/shards.mjs is built on those
+# numbers. An image that changes underneath invalidates the baseline while it
+# is still being used to make decisions. So: pinned, deliberately, with a date
+# on it.
+#
+# REVISIT BY 1.3.2027. A pin is a migration deferred, not avoided, and
+# ubuntu-24.04 will be retired in its turn. Moving on purpose, with the
+# timings re-measured, is the point.
+#
+# The actions are on their Node 24 majors. Every run was printing "Node.js 20
+# is deprecated ... being forced to run on Node.js 24" for all five of them.
+# The versions here were read from the GitHub API rather than guessed, and
+# each major's release notes were checked against how this file uses them:
+#
+#   checkout v7, setup-node v7   runtime only for our usage. setup-node
+#                                changed its automatic cache detection in v5
+#                                and narrowed it to npm in v6; this file asks
+#                                for `cache: npm` explicitly either way.
+#   upload-artifact v7           adds an opt-in `archive: false`; default
+#                                behaviour unchanged.
+#   download-artifact v8         the v5 break was for downloads BY ID; this
+#                                file downloads by `pattern`. v8 makes a hash
+#                                mismatch an error instead of a warning, which
+#                                is the direction this suite wants.
+#   github-script v9             `require('@actions/github')` no longer works.
+#                                The script below requires only `fs`, a Node
+#                                builtin, and uses the injected `github` and
+#                                `context`.
+
 jobs:
   # Which level, and in how many pieces.
   #
@@ -42,7 +81,7 @@ jobs:
   # begins, and the level is what decides that. It is cheap: a checkout and
   # a few lines of shell.
   level:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       value: ${{ steps.level.outputs.value }}
@@ -51,7 +90,7 @@ jobs:
     steps:
       # Full history: the level-selection step below diffs against the
       # base branch, which a shallow clone cannot see.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -163,7 +202,7 @@ jobs:
 
   qa:
     needs: level
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     # One job per shard at level 3; a single "all" job at levels 1 and 2.
     #
@@ -265,11 +304,11 @@ jobs:
       # Full history. The diff moved to the `level` job above, but nothing
       # else under qa/ has been audited against a shallow clone and ten
       # seconds is cheaper than finding out on a Sunday.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -339,7 +378,7 @@ jobs:
       # worth reading, not the scrolled-past log.
       - name: Upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-report-level-${{ needs.level.outputs.value }}-${{ matrix.shard }}
           path: qa/reports/
@@ -350,7 +389,7 @@ jobs:
       # comments once the merge has a verdict to state.
       - name: Comment on the pull request
         if: always() && github.event_name == 'pull_request' && needs.level.outputs.sharded != 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -381,19 +420,19 @@ jobs:
   report:
     needs: [level, qa]
     if: always() && needs.level.outputs.sharded == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Every shard's report, whatever the shard called its artefact.
       # `merge-multiple` is off on purpose: each artefact keeps its own
       # directory, so two runs of the same shard cannot overwrite each
       # other and qa/merge.mjs can see both and keep the later one.
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: qa-report-level-*
           path: qa/shard-artifacts
@@ -407,7 +446,7 @@ jobs:
 
       - name: Upload the merged report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qa-report-level-${{ needs.level.outputs.value }}
           path: qa/reports/
@@ -415,7 +454,7 @@ jobs:
 
       - name: Comment on the pull request
         if: always() && github.event_name == 'pull_request'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
