@@ -38,7 +38,14 @@ export const ATTENTION_TYPE = "client_file.attention";
 
 const ZERO: Attention = { pastValidity: 0, staleUncertain: 0, openQuestions: 0, staleProposedRules: 0, rulesDueReview: 0 };
 
-export async function notifyClientFileAttention(now = new Date()): Promise<{ notified: number; unowned: number }> {
+type Bucket = { all: Attention; byAssignee: Map<string, Attention>; latestExpiry: Date | null };
+
+/// What every client file is waiting on, per client: the counts for the
+/// account manager, each assignee's own, and the latest expiry. Read once
+/// here, and used by the weekly notification below and by the morning
+/// digest (lib/app-domain/task-digest.ts, 20.10.2026), so the two never
+/// disagree about what a file needs.
+async function collectClientFileAttention(now: Date): Promise<Map<string, Bucket>> {
   const staleBefore = new Date(now.getTime() - UNCERTAIN_REMINDER_DAYS * DAY_MS);
   const live = { deletedAt: null, client: { status: "ACTIVE" as const, deletedAt: null } };
 
@@ -80,7 +87,6 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
   // Per client: the counts for the account manager, each assignee's own
   // questions and expired items, and the latest expiry (to know whether
   // it is news).
-  type Bucket = { all: Attention; byAssignee: Map<string, Attention>; latestExpiry: Date | null };
   const buckets = new Map<string, Bucket>();
   const bucket = (clientId: string) => {
     let b = buckets.get(clientId);
@@ -150,6 +156,30 @@ export async function notifyClientFileAttention(now = new Date()): Promise<{ not
     }
   }
 
+  return buckets;
+}
+
+/// One person's share of every client file's attention, by client id:
+/// everything, on the clients they manage; their own items elsewhere.
+/// The same split the weekly notification makes.
+export async function clientFileAttentionFor(userId: string, now = new Date()): Promise<Map<string, Attention>> {
+  const buckets = await collectClientFileAttention(now);
+  const out = new Map<string, Attention>();
+  if (buckets.size === 0) return out;
+  const managed = new Set(
+    (
+      await prisma.client.findMany({ where: { id: { in: [...buckets.keys()] }, accountManagerId: userId }, select: { id: true } })
+    ).map((c) => c.id)
+  );
+  for (const [clientId, b] of buckets) {
+    const a = managed.has(clientId) ? b.all : b.byAssignee.get(userId);
+    if (a && hasAttention(a)) out.set(clientId, a);
+  }
+  return out;
+}
+
+export async function notifyClientFileAttention(now = new Date()): Promise<{ notified: number; unowned: number }> {
+  const buckets = await collectClientFileAttention(now);
   const clients = await prisma.client.findMany({
     where: { id: { in: [...buckets.keys()] } },
     select: { id: true, name: true, accountManagerId: true, accountManager: { select: { status: true, deletedAt: true } } },

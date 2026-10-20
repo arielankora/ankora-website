@@ -9,6 +9,12 @@ import { describeChange, quoteComment } from "@/lib/app-domain/task-changes";
 import type { TaskBlocker } from "@prisma/client";
 import { listMyRoutines } from "@/lib/app-domain/process-checks";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
+import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
+import { clientFileAttentionFor } from "@/lib/app-domain/client-file-attention";
+import { attentionSentence, hasAttention } from "@/lib/client-file-attention";
+import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
+import { STALE_BUSINESS_DAYS } from "@/lib/client-control";
+import { formatClockMinutes } from "@/lib/hours-format";
 
 // The morning digest.
 //
@@ -145,7 +151,38 @@ export type Digest = {
   dates?: DigestTask[];
   /// Procedures this person owns that are marked for review.
   reviews?: DigestTask[];
+
+  // Stage 3 (20.10.2026): two short blocks under the list.
+
+  /// "הלקוחות שלך": what the clients this person manages need from them
+  /// that is not a task. One line per client and subject.
+  clients?: DigestClientLine[];
+  /// "סדר בית": this person's own time records.
+  housekeeping?: DigestNote[];
 };
+
+export type DigestClientLine = {
+  clientName: string;
+  /// The sentence after the client's name.
+  text: string;
+  /// Where it is handled, relative to the app's base URL.
+  href: string;
+  tone: DigestTone;
+};
+
+export type DigestNote = { text: string; linkText: string; href: string };
+
+/// Bank utilisation from which a client gets a line. The home screen's
+/// "מעל 90% ניצול" card counts from the same number.
+export const BANK_ATTENTION_PCT = 90;
+
+/// At most this many client lines, then a count.
+export const CLIENT_LINES = 6;
+
+/// A day without hours is mentioned only for somebody who reported some
+/// in the weeks before. For a person who does not log time daily, the
+/// line would be every morning, and an every-morning line is noise.
+export const REPORTING_LOOKBACK_DAYS = 14;
 
 /// How far ahead an important date is worth a line in the morning.
 export const DATE_HORIZON_DAYS = 7;
@@ -165,7 +202,9 @@ export function isDigestEmpty(d: Digest): boolean {
     (d.exceptions?.length ?? 0) === 0 &&
     (d.routines?.length ?? 0) === 0 &&
     (d.dates?.length ?? 0) === 0 &&
-    (d.reviews?.length ?? 0) === 0
+    (d.reviews?.length ?? 0) === 0 &&
+    (d.clients?.length ?? 0) === 0 &&
+    (d.housekeeping?.length ?? 0) === 0
   );
 }
 
@@ -180,6 +219,11 @@ export function digestSubject(d: Digest, now: Date = new Date()): string {
   if (items.length === 0) {
     if (d.staleWaits === 1) return "משימה אחת ממתינה יותר משבוע";
     if (d.staleWaits > 1) return `${d.staleWaits} משימות ממתינות יותר משבוע`;
+    // Only the blocks under the list: name the first of them.
+    const c = d.clients?.[0];
+    if (c) return clip(`${c.clientName}: ${c.text.replace(/\.$/, "")}`, SUBJECT_TITLE_CHARS + 20);
+    const h = d.housekeeping?.[0];
+    if (h) return h.text.replace(/\.$/, "");
     return "הבוקר שלך";
   }
   const [first] = items;
@@ -431,7 +475,10 @@ async function sentForApprovalAt(taskIds: string[]): Promise<Map<string, Date>> 
 /// Each source is read on its own and a failure in one is logged and
 /// left out. The morning email is the one thing here that must arrive:
 /// a broken date table is a reason for a shorter email, not for none.
-async function beyondTasks(userId: string, now: Date): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews">> {
+async function beyondTasks(
+  userId: string,
+  now: Date
+): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews" | "clients" | "housekeeping">> {
   const actor = await prisma.user.findUnique({ where: { id: userId } });
   if (!actor) return {};
   const safe = async <T>(name: string, run: () => Promise<T[]>): Promise<T[]> => {
@@ -446,7 +493,7 @@ async function beyondTasks(userId: string, now: Date): Promise<Pick<Digest, "exc
   const clientIds = clients.map((c) => c.id);
   const clientName = new Map(clients.map((c) => [c.id, c.name]));
 
-  const [exceptions, routines, dates, reviews] = await Promise.all([
+  const [exceptions, routines, dates, reviews, clientLines, housekeeping] = await Promise.all([
     safe("exceptions", () => exceptionsToDecide(actor, clientIds, clientName)),
     safe("routines", async () =>
       (await listMyRoutines(actor, now))
@@ -490,8 +537,121 @@ async function beyondTasks(userId: string, now: Date): Promise<Pick<Digest, "exc
         })
       );
     }),
+    safe("clients", () => myClientLines(userId, clientName, now)),
+    safe("housekeeping", () => myHousekeeping(userId, now)),
   ]);
-  return { exceptions, routines, dates, reviews };
+  return { exceptions, routines, dates, reviews, clients: clientLines, housekeeping };
+}
+
+/// "הלקוחות שלך". Four questions, in the order they cost money or trust:
+///   1. A bank at BANK_ATTENTION_PCT or more (clients this person manages).
+///   2. Proposals waiting on the review screen (clients they manage, and
+///      batches they sent, so Ankora's own file still reaches someone).
+///   3. The client file's open questions, expired and uncertain items,
+///      the same split as the weekly notification.
+///   4. Extraction that stopped (clients they manage).
+async function myClientLines(userId: string, accessible: Map<string, string>, now: Date): Promise<DigestClientLine[]> {
+  const managed = await prisma.client.findMany({
+    where: { accountManagerId: userId, status: "ACTIVE", deletedAt: null },
+    select: { id: true, name: true, isInternal: true },
+  });
+  const name = new Map(accessible);
+  for (const c of managed) name.set(c.id, c.name);
+  const managedIds = managed.map((c) => c.id);
+  const lines: DigestClientLine[] = [];
+
+  const banks = await getCurrentHourBanksForClients(managedIds);
+  for (const c of managed) {
+    const b = banks.get(c.id);
+    if (!b || b.utilization.utilizationPct < BANK_ATTENTION_PCT) continue;
+    const pct = Math.round(b.utilization.utilizationPct);
+    const text =
+      b.bank.kind === "PREPAID"
+        ? `ניצלו ${pct}% מהחבילה, ${
+            b.utilization.remainingMinutes > 0 ? `נשארו ${formatClockMinutes(b.utilization.remainingMinutes)} שעות` : "ואין יתרה"
+          }.`
+        : (() => {
+            const left = Math.max(0, daysBetween(now, b.bank.cycleEnd));
+            return `ניצלו ${pct}% מבנק השעות, ${left === 0 ? "המחזור נגמר היום" : `${days(left)} לסוף המחזור`}.`;
+          })();
+    lines.push({ clientName: c.name, text, href: `/app/clients/${c.id}`, tone: pct >= 100 ? "red" : "amber" });
+  }
+
+  const pending = await prisma.knowledgeProposal.findMany({
+    where: { state: "PENDING", OR: [{ clientId: { in: managedIds } }, { batch: { createdById: userId } }] },
+    select: { clientId: true },
+  });
+  const pendingBy = new Map<string, number>();
+  for (const p of pending) if (name.has(p.clientId)) pendingBy.set(p.clientId, (pendingBy.get(p.clientId) ?? 0) + 1);
+  for (const [clientId, n] of pendingBy) {
+    lines.push({
+      clientName: name.get(clientId) ?? "",
+      text: n === 1 ? "הצעה אחת לתיק מחכה לבדיקה." : `${n} הצעות לתיק מחכות לבדיקה.`,
+      href: `/app/knowledge?clientId=${clientId}`,
+      tone: "blue",
+    });
+  }
+
+  const attention = await clientFileAttentionFor(userId, now);
+  for (const [clientId, a] of attention) {
+    if (!name.has(clientId)) continue;
+    // Waiting proposals were counted above, all of them and not only the
+    // week-old ones: one line about them, not two.
+    const rest = { ...a, staleProposals: 0 };
+    if (!hasAttention(rest)) continue;
+    lines.push({ clientName: name.get(clientId) ?? "", text: attentionSentence(rest), href: `/app/clients/${clientId}/client-file`, tone: "gray" });
+  }
+
+  for (const c of managed) {
+    if (c.isInternal) continue;
+    const since = await daysSinceLastBatch(c.id, now);
+    if (since === null || since <= STALE_BUSINESS_DAYS) continue;
+    lines.push({
+      clientName: c.name,
+      text: `לא הגיע חילוץ כבר ${since} ימי עבודה.`,
+      href: `/app/knowledge?clientId=${c.id}`,
+      tone: "gray",
+    });
+  }
+  return lines;
+}
+
+/// "סדר בית": a timer left running from before today, and a working day
+/// with no hours from somebody who usually reports them.
+async function myHousekeeping(userId: string, now: Date): Promise<DigestNote[]> {
+  const dayStart = startOfLocalDay(now);
+  const notes: DigestNote[] = [];
+
+  const running = await prisma.timeEntry.findMany({
+    where: { userId, endAt: null, deletedAt: null, startAt: { lt: dayStart } },
+    orderBy: { startAt: "asc" },
+    select: { startAt: true, client: { select: { name: true } } },
+  });
+  for (const t of running) {
+    const ago = daysBetween(t.startAt, now);
+    const when = ago === 1 ? "מאתמול" : `כבר ${days(ago)}, מ-${formatDue(t.startAt)}`;
+    notes.push({
+      text: `טיימר רץ ${when} ${formatTime(t.startAt)} על ${t.client.name}.`,
+      linkText: "לעצור ולתקן",
+      href: "/app/timer",
+    });
+  }
+
+  // The previous working day, in Israel: Sunday's previous is Thursday.
+  let prev = new Date(dayStart.getTime() - 12 * 3600_000);
+  while (!isWorkingDay(prev)) prev = new Date(prev.getTime() - 24 * 3600_000);
+  const prevStart = startOfLocalDay(prev);
+  const prevEnd = new Date(prevStart.getTime() + 24 * 3600_000);
+  const lookback = new Date(prevStart.getTime() - REPORTING_LOOKBACK_DAYS * 24 * 3600_000);
+  const [thatDay, before] = await Promise.all([
+    prisma.timeEntry.count({ where: { userId, deletedAt: null, startAt: { gte: prevStart, lt: prevEnd } } }),
+    prisma.timeEntry.count({ where: { userId, deletedAt: null, startAt: { gte: lookback, lt: prevStart } } }),
+  ]);
+  if (thatDay === 0 && before > 0) {
+    const weekday = new Intl.DateTimeFormat("he-IL", { weekday: "long", timeZone: TIMEZONE }).format(prev);
+    notes.push({ text: `לא דווחו שעות ב${weekday}, ${formatDue(prev)}.`, linkText: "לדווח", href: "/app/my-time" });
+  }
+  return notes;
 }
 
 /// Requests for an exception that this person may decide: the client's
@@ -908,7 +1068,9 @@ export function digestLead(d: Digest, items: DigestItem[]): string {
   const needs = items.filter((i) => i.short !== "עודכנה").length + hiddenWaits;
   const blocking = d.awaitingMySignature.length + (d.exceptions ?? []).filter((e) => e.assigneeName).length;
   const parts: string[] = [];
-  if (needs === 0) {
+  if (needs === 0 && items.length === 0) {
+    parts.push("אין משימות שדורשות אותך היום.");
+  } else if (needs === 0) {
     parts.push(items.length === 1 ? "משימה אחת שלך עודכנה." : `${items.length} משימות שלך עודכנו.`);
   } else {
     parts.push(needs === 1 ? "דבר אחד דורש אותך היום." : `${needs} דברים דורשים אותך היום.`);
@@ -1040,6 +1202,39 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
       )} <a href="${tasksHref}" style="color:${INK};font-weight:600;">לכל המשימות</a></p>`
     : "";
 
+  const block = (heading: string, lines: { html: string; text: string }[]) => {
+    if (lines.length === 0) return "";
+    textLines.push("", `${heading}:`, ...lines.map((l) => `  ${l.text}`));
+    return `<div style="margin-top:22px;font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;" dir="rtl" align="right">${escapeHtml(
+      heading
+    )}</div>${lines
+      .map(
+        (l) =>
+          `<div style="padding:10px 0;border-top:1px solid ${RULE};font-size:13.5px;line-height:1.7;color:#3B4A5E;" dir="rtl" align="right">${l.html}</div>`
+      )
+      .join("")}`;
+  };
+  const allClients = d.clients ?? [];
+  const shownClients = allClients.slice(0, CLIENT_LINES);
+  const clientLines = shownClients.map((c) => ({
+    html: `<a href="${base}${c.href}" style="color:${INK};font-weight:600;text-decoration:none;border-bottom:1px solid #C7CED8;">${safeText(
+      c.clientName
+    )}</a>&#8207; <span style="color:${c.tone === "red" ? TONE_COLOR.red : c.tone === "amber" ? TONE_COLOR.amber : "#3B4A5E"};">${escapeHtml(c.text)}</span>`,
+    text: `${c.clientName}: ${c.text} ${base}${c.href}`,
+  }));
+  if (allClients.length > shownClients.length) {
+    const n = allClients.length - shownClients.length;
+    clientLines.push({
+      html: `${n === 1 ? "ועוד עניין אחד" : `ועוד ${n} עניינים`}. <a href="${base}/app/clients" style="color:${INK};font-weight:600;">ללקוחות</a>`,
+      text: `${n === 1 ? "ועוד עניין אחד" : `ועוד ${n} עניינים`}: ${base}/app/clients`,
+    });
+  }
+  const houseLines = (d.housekeeping ?? []).map((h) => ({
+    html: `${escapeHtml(h.text)} <a href="${base}${h.href}" style="color:${INK};font-weight:600;">${escapeHtml(h.linkText)}</a>`,
+    text: `${h.text} ${h.linkText}: ${base}${h.href}`,
+  }));
+  const blocks = block("הלקוחות שלך", clientLines) + block("סדר בית", houseLines);
+
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
   <body style="margin:0;padding:0;background:#EEF0F3;">
@@ -1057,9 +1252,10 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
             </tr>
             <tr>
               <td style="padding:14px 24px 4px;" dir="rtl" align="right">
-                <div style="font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;margin-bottom:4px;">לפי סדר חשיבות</div>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl">${rows.join("")}</table>
+                ${rows.length ? `<div style="font-size:12px;font-weight:600;letter-spacing:.06em;color:#8A94A3;margin-bottom:4px;">לפי סדר חשיבות</div>` : ""}
+                ${rows.length ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" dir="rtl">${rows.join("")}</table>` : ""}
                 ${tail}
+                ${blocks}
               </td>
             </tr>
             <tr>
