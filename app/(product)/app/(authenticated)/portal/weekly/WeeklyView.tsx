@@ -54,20 +54,20 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">פעילות שבועית</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
-            {formatDate(activity.from)} – {formatDate(new Date(activity.to.getTime() - 86_400_000))}
+            {formatDate(activity.from)} עד {formatDate(new Date(activity.to.getTime() - 86_400_000))}
           </p>
         </div>
         <div className="flex gap-2 text-sm">
           <a
             href={`/app/portal/hours?view=weekly&weekOffset=${weekOffset - 1}`}
-            className="rounded-full border border-app-border px-4 py-2 text-app-text-secondary hover:border-gold"
+            className="rounded-full border border-app-border-strong px-4 py-2 text-app-text-primary hover:border-app-accent"
           >
             שבוע קודם
           </a>
           {weekOffset < 0 && (
             <a
               href={`/app/portal/hours?view=weekly&weekOffset=${weekOffset + 1}`}
-              className="rounded-full border border-app-border px-4 py-2 text-app-text-secondary hover:border-gold"
+              className="rounded-full border border-app-border-strong px-4 py-2 text-app-text-primary hover:border-app-accent"
             >
               שבוע הבא
             </a>

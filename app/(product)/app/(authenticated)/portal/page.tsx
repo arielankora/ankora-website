@@ -115,7 +115,7 @@ export default async function PortalHomePage() {
 
       {/* 20.10.2026: the account manager and the hours side by side, two cards
           in one row on a wide screen, one under the other on a phone. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className={`grid grid-cols-1 gap-4 ${(contact.managerName || waHref) && cycle ? "sm:grid-cols-2" : ""}`}>
         {/* Portal phase 2: who to talk to. Last on the screen because it is
             the answer to "and if I want a person", not the first thing a
             client needs - but always present, because a portal without a
