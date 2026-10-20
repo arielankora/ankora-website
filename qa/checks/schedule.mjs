@@ -74,11 +74,29 @@ const HEADROOM_RATIO = 0.8;
  * itself. The job-level key sits at four spaces; the step-level budget on
  * "Run QA" sits at eight, so the indent is what tells them apart.
  */
-export function jobWallMinutes(yaml) {
+export function jobWallMinutes(yaml, job = "qa") {
   const text = yaml ?? readWorkflow();
   if (!text) return null;
-  const m = text.match(/^ {4}timeout-minutes:\s*(\d+)\s*$/m);
+  // 20.10.2026: the workflow has more than one job now (level selection,
+  // the sharded checks, the merge), so "the first four-space
+  // timeout-minutes in the file" would return whichever job happens to be
+  // written first. The checks job is the one with a wall worth watching.
+  const scope = jobBlock(text, job) ?? text;
+  const m = scope.match(/^ {4}timeout-minutes:\s*(\d+)\s*$/m);
   return m ? Number(m[1]) : null;
+}
+
+/** The body of one job, by name, down to the next key at the same indent. */
+function jobBlock(text, job) {
+  const lines = text.split("\n");
+  const start = lines.findIndex((l) => l === `  ${job}:`);
+  if (start === -1) return null;
+  const out = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^ {2}\S/.test(lines[i])) break;
+    out.push(lines[i]);
+  }
+  return out.join("\n");
 }
 
 function readWorkflow() {

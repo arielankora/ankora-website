@@ -186,3 +186,50 @@ export async function downloadHeaders() {
     ),
   ];
 }
+
+// ──────────────────────────────────────────────────────────────────────
+// The shard plan, against the runner it describes.
+//
+// qa/lib/shards.mjs names checks by id so a level-3 run can be split across
+// parallel jobs. Nothing ties those strings to qa/run.mjs, so renaming a
+// check there leaves a shard that matches nothing - and a shard that
+// matches nothing runs nothing, finishes in seconds and reports PASS. Green
+// and empty is the one failure this suite keeps paying for, so it is a
+// blocker on the pull-request gate rather than a surprise on a Sunday.
+//
+// The reverse drift is a finding too: a check that is no longer in any
+// shard still runs (unclaimed ids fall to `main`), but silently moving a
+// twenty-minute pass onto the critical path is worth saying out loud.
+export async function shardPlan() {
+  const { claimedCheckIds } = await import("../lib/shards.mjs");
+  let src;
+  try {
+    src = await readFile("qa/run.mjs", "utf-8");
+  } catch (err) {
+    return [finding("blocker", "qa/run.mjs could not be read", String(err?.message ?? err))];
+  }
+
+  const declared = new Set([...src.matchAll(/run\.check\(\s*["'`]([^"'`]+)["'`]/g)].map((m) => m[1]));
+  // The reserved slots are declared in a loop, not in a run.check literal.
+  for (const m of src.matchAll(/\[\s*["']([a-z0-9-]+)["']\s*,\s*["'][^"']+["']\s*,\s*[123]\s*\]/g)) {
+    declared.add(m[1]);
+  }
+
+  const orphans = claimedCheckIds().filter((id) => !declared.has(id));
+  if (orphans.length === 0) return [];
+  return [
+    finding(
+      "blocker",
+      `${orphans.length} shard(s) claim a check that qa/run.mjs does not declare`,
+      [
+        `Unknown id(s): ${orphans.join(", ")}`,
+        "",
+        "A shard whose ids match nothing runs no checks, finishes in seconds and",
+        "would report a pass over an empty run. Update SHARD_CHECKS in",
+        "qa/lib/shards.mjs to match the ids in qa/run.mjs.",
+        "",
+        `Declared in qa/run.mjs: ${[...declared].sort().join(", ")}`,
+      ].join("\n"),
+    ),
+  ];
+}

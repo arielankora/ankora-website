@@ -9,6 +9,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "./discover.mjs";
+import { inShard } from "./shards.mjs";
 
 export const SEVERITY = ["blocker", "major", "minor", "info"];
 
@@ -17,14 +18,28 @@ export function finding(severity, title, detail = "", meta = {}) {
 }
 
 export class Run {
-  constructor(level) {
+  /**
+   * @param {number} level
+   * @param {{shard?: string|null}} [opts] - when set, this process runs only
+   *   the checks that belong to that shard (see lib/shards.mjs). A check
+   *   belonging elsewhere is not recorded at all, rather than recorded as
+   *   skipped: the merged report has to show each check exactly once, and a
+   *   row saying "skipped - other shard" would be noise in every report and
+   *   would make `incomplete` fire on a healthy run.
+   */
+  constructor(level, { shard = null } = {}) {
     this.level = level;
+    this.shard = shard;
     this.startedAt = new Date();
     this.checks = [];
+    /** Set only by fromShards: wall clock across parallel shards. */
+    this.durationOverrideMs = null;
+    this.shardTimings = null;
   }
 
   async check(id, { label, level, blocking = true, skipIf = null }, fn) {
     if (level > this.level) return;
+    if (!inShard(id, this.shard)) return;
     const started = Date.now();
     const skip = skipIf ? await skipIf() : null;
     if (skip) {
@@ -99,7 +114,7 @@ export class Run {
     return {
       level: this.level,
       startedAt: this.startedAt.toISOString(),
-      durationMs: Date.now() - this.startedAt.getTime(),
+      durationMs: this.durationOverrideMs ?? Date.now() - this.startedAt.getTime(),
       pass: s("pass"),
       warn: s("warn"),
       fail: s("fail"),
@@ -112,7 +127,18 @@ export class Run {
   persist() {
     const dir = path.join(ROOT, "qa", "reports");
     fs.mkdirSync(dir, { recursive: true });
-    const payload = { summary: this.summary(), checks: this.checks };
+    const payload = { summary: this.summary(), checks: this.checks, shard: this.shard ?? null };
+
+    // A shard is half a verdict. It writes its own file and nothing else:
+    // `last.json` and `last.md` are what the PR comment and the agent read,
+    // and a shard overwriting them would publish "PASS" for a quarter of a
+    // run. qa/merge.mjs writes those once every shard has reported.
+    if (this.shard) {
+      const file = path.join(dir, `shard-${this.shard}.json`);
+      fs.writeFileSync(file, JSON.stringify(payload, null, 2) + "\n");
+      return path.join("qa", "reports", `shard-${this.shard}.json`);
+    }
+
     fs.writeFileSync(path.join(dir, "last.json"), JSON.stringify(payload, null, 2) + "\n");
     const md = this.markdown();
     fs.writeFileSync(path.join(dir, "last.md"), md);
@@ -134,6 +160,45 @@ export class Run {
     return path.join("qa", "reports", "last.json");
   }
 
+  /**
+   * Rebuild one run out of the shard reports of a split level-3 run.
+   *
+   * The rendering, the verdict and the `incomplete` rule all live on this
+   * class, so the merge must produce a Run rather than a second renderer -
+   * a report written twice is a report that will disagree with itself, and
+   * this suite has paid for that lesson more than once.
+   *
+   * @param {number} level
+   * @param {Array<{summary:{startedAt:string,durationMs:number},checks:Array<object>,shard?:string|null}>} payloads
+   */
+  static fromShards(level, payloads) {
+    const run = new Run(level);
+    run.checks = payloads.flatMap((p) => p.checks ?? []);
+
+    // Wall clock, not the sum. The shards ran at the same time, so adding
+    // their durations would report the very number the split removed and
+    // would make the headroom watchdog in checks/schedule.mjs cry wolf
+    // about a wall nothing is near.
+    const spans = payloads
+      .map((p) => {
+        const start = Date.parse(p.summary?.startedAt ?? "");
+        const ms = Number(p.summary?.durationMs ?? 0);
+        return Number.isFinite(start) ? { start, end: start + ms } : null;
+      })
+      .filter(Boolean);
+    if (spans.length) {
+      const start = Math.min(...spans.map((x) => x.start));
+      run.startedAt = new Date(start);
+      run.durationOverrideMs = Math.max(...spans.map((x) => x.end)) - start;
+    }
+    run.shardTimings = payloads.map((p) => ({
+      shard: p.shard ?? "?",
+      minutes: Number(p.summary?.durationMs ?? 0) / 60_000,
+      checks: (p.checks ?? []).length,
+    }));
+    return run;
+  }
+
   markdown() {
     const s = this.summary();
     const verdict = this.verdict;
@@ -149,6 +214,11 @@ export class Run {
       ``,
       `${s.pass} passed · ${s.warn} with findings · ${s.fail} failed · ${s.skipped} skipped · ${(s.durationMs / 1000 / 60).toFixed(1)} min`,
       ``,
+      this.shardTimings
+        ? `Ran as ${this.shardTimings.length} parallel shards: ${this.shardTimings
+            .map((t) => `${t.shard} ${t.minutes.toFixed(1)} min`)
+            .join(" · ")}. The minutes above are wall clock, not their sum.\n`
+        : ``,
       `| | Check | Time | Findings |`,
       `|---|---|---|---|`,
       rows,

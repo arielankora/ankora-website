@@ -6,6 +6,9 @@
 #   - Sunday's 03:00 UTC run     -> level 3, the weekly fault hunt.
 #   - manual dispatch           -> any level, on demand.
 #
+# Level 3 runs as parallel shards; levels 1 and 2 run as one job. See
+# qa/lib/shards.mjs for the arithmetic and jobs.qa below for the wiring.
+#
 # Why CI and not only the agent: this repo's own tooling notes record that
 # ankora.co.il and binaries.prisma.sh are unreachable from the assistant's
 # sandbox and from the device bridge. GitHub's runners have neither
@@ -32,8 +35,140 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  qa:
+  # Which level, and in how many pieces.
+  #
+  # This used to be the first step of the one big job. It is its own job now
+  # because a matrix has to know how many jobs to start before any of them
+  # begins, and the level is what decides that. It is cheap: a checkout and
+  # a few lines of shell.
+  level:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      value: ${{ steps.level.outputs.value }}
+      shards: ${{ steps.level.outputs.shards }}
+      sharded: ${{ steps.level.outputs.sharded }}
+    steps:
+      # Full history: the level-selection step below diffs against the
+      # base branch, which a shallow clone cannot see.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # The level: an explicit dispatch input wins; a pull request is
+      # level 1 so the gate stays fast; Sunday's nightly run is the weekly
+      # fault hunt; anything else is the default deep regression.
+      #
+      # 26.9.2026: the weekly level 3 used to be a scheduled assistant
+      # session that dispatched this workflow by hand. That session runs
+      # in the cloud with no bridge to anyone's machine, and GitHub's API
+      # is not reachable from there - so the one run of the week that is
+      # supposed to look hardest could not start itself, and had not for
+      # at least a week. A schedule that depends on something being able
+      # to press a button is not a schedule. 03:00 UTC is already 06:00
+      # in Israel, which is the hour the weekly hunt was meant to run, so
+      # this needs no second cron - only the day.
+      #
+      # The one exception: a pull request that changes the browser suite
+      # itself runs at level 2, because level 1 does not open a browser -
+      # so without this, a change to the e2e specs would merge having
+      # never once been executed. The suite has to be able to test the
+      # thing it is made of.
+      # The same holds for qa/checks/vitest.mjs, which decides how the
+      # integration suite runs (added 29.9.2026 with the UTC run, #132).
+      - name: Choose level
+        id: level
+        run: |
+          if [ -n "${{ inputs.level }}" ]; then
+            LEVEL="${{ inputs.level }}"
+          elif [ "${{ github.event_name }}" != "pull_request" ]; then
+            # %u is 7 on Sunday. The schedule fires at 03:00 UTC, so the
+            # day is unambiguous - no run of this branch straddles
+            # midnight.
+            if [ "$(date -u +%u)" = "7" ]; then
+              echo "sunday - running the weekly fault hunt"
+              LEVEL=3
+            else
+              LEVEL=2
+            fi
+          # 7.10.2026: the diff is taken on its own line first. It used to
+          # be piped straight into grep, so when it FAILED (a stacked pull
+          # request whose base branch had been merged and deleted: there
+          # is no origin/<base> to diff against) grep saw nothing, the
+          # condition was false, and the run fell through to level 1 in
+          # silence. #155, a fix to client-facing portal code, ran that
+          # way once. A gate that cannot tell what changed now assumes the
+          # worst and runs level 2.
+          elif ! CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>&1); then
+            echo "could not diff against origin/${{ github.base_ref }} - running level 2 rather than guessing:"
+            echo "$CHANGED"
+            LEVEL=2
+          elif printf '%s\n' "$CHANGED" \
+               | grep -qE '^(qa/(e2e/|playwright\.config\.ts|checks/vitest\.mjs)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
+            # Level 1 runs types, lint and the unit suite. It does not run
+            # the integration suite, and it does not open a browser - so a
+            # pull request that changes domain logic, or adds an
+            # integration test to prove it, was being gated by checks that
+            # cannot see either. The tests went green without running.
+            #
+            # Found by a pull request that batched the hour-bank queries
+            # and shipped equivalence tests to prove the batched answer
+            # matched the per-client one. Those tests are the entire
+            # argument for the change, and level 1 would have skipped
+            # every one of them.
+            #
+            # The product screens were added on 25.9.2026, and by the same
+            # reasoning. A pull request that changed only a .tsx under
+            # /app was gated by types, lint and the unit suite - none of
+            # which opens a browser, and the browser suite is the ONLY
+            # thing in this repo that tests a screen. So a fix to the one
+            # write a CLIENT makes in this product, on the screen where
+            # they approve spending, ran a gate that could not see it.
+            #
+            # That pull request was the fix for a failure the browser
+            # suite had caught twice. It could not be verified by the
+            # suite that found it.
+            #
+            # The cost is honest: a screen change now pays ten minutes on
+            # the gate instead of four. A screen nobody watched a browser
+            # open is a screen nobody tested.
+            echo "touches domain logic, the schema or a suite level 1 cannot run - running level 2"
+            LEVEL=2
+          else
+            LEVEL=1
+          fi
+
+          echo "value=$LEVEL" >> "$GITHUB_OUTPUT"
+
+          # Only the weekly hunt is split. Level 2 is 34 minutes and is
+          # dominated by the single `integration` check, so sharding it
+          # would pay four setups to move a number that is already on the
+          # critical path. The shard names come from qa/lib/shards.mjs so
+          # that the matrix and the runner cannot disagree about what
+          # exists - a list copied into this file is a list that will drift.
+          if [ "$LEVEL" = "3" ]; then
+            SHARDS=$(node -e 'import("./qa/lib/shards.mjs").then(m => console.log(JSON.stringify(m.SHARDS)))')
+            echo "sharded=true" >> "$GITHUB_OUTPUT"
+          else
+            SHARDS='["all"]'
+            echo "sharded=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "shards=$SHARDS" >> "$GITHUB_OUTPUT"
+          echo "level $LEVEL, shards $SHARDS"
+
+  qa:
+    needs: level
+    runs-on: ubuntu-latest
+
+    # One job per shard at level 3; a single "all" job at levels 1 and 2.
+    #
+    # fail-fast is off deliberately. The weekly run exists to find things,
+    # and cancelling three healthy shards because a fourth went red would
+    # throw away three quarters of the hunt to save a few runner minutes.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.level.outputs.shards) }}
     # 18.10.2026: was 45. The weekly level-3 run cannot finish inside it,
     # and that is measured twice, not inferred: run #299 (11.10) and run
     # #406 (18.10) were both stopped by this wall with "the job has
@@ -122,8 +257,9 @@ jobs:
       VAULT_KEK: Y2ktb25seS12YXVsdC1rZXktbm90LWEtc2VjcmV0ISE=
 
     steps:
-      # Full history: the level-selection step below diffs against the
-      # base branch, which a shallow clone cannot see.
+      # Full history. The diff moved to the `level` job above, but nothing
+      # else under qa/ has been audited against a shallow clone and ten
+      # seconds is cheaper than finding out on a Sunday.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -139,96 +275,17 @@ jobs:
       - name: Apply migrations
         run: npx prisma migrate deploy
 
-      # The level: an explicit dispatch input wins; a pull request is
-      # level 1 so the gate stays fast; Sunday's nightly run is the weekly
-      # fault hunt; anything else is the default deep regression.
-      #
-      # 26.9.2026: the weekly level 3 used to be a scheduled assistant
-      # session that dispatched this workflow by hand. That session runs
-      # in the cloud with no bridge to anyone's machine, and GitHub's API
-      # is not reachable from there - so the one run of the week that is
-      # supposed to look hardest could not start itself, and had not for
-      # at least a week. A schedule that depends on something being able
-      # to press a button is not a schedule. 03:00 UTC is already 06:00
-      # in Israel, which is the hour the weekly hunt was meant to run, so
-      # this needs no second cron - only the day.
-      #
-      # The one exception: a pull request that changes the browser suite
-      # itself runs at level 2, because level 1 does not open a browser -
-      # so without this, a change to the e2e specs would merge having
-      # never once been executed. The suite has to be able to test the
-      # thing it is made of.
-      # The same holds for qa/checks/vitest.mjs, which decides how the
-      # integration suite runs (added 29.9.2026 with the UTC run, #132).
-      - name: Choose level
-        id: level
-        run: |
-          if [ -n "${{ inputs.level }}" ]; then
-            echo "value=${{ inputs.level }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" != "pull_request" ]; then
-            # %u is 7 on Sunday. The schedule fires at 03:00 UTC, so the
-            # day is unambiguous - no run of this branch straddles
-            # midnight.
-            if [ "$(date -u +%u)" = "7" ]; then
-              echo "sunday - running the weekly fault hunt"
-              echo "value=3" >> "$GITHUB_OUTPUT"
-            else
-              echo "value=2" >> "$GITHUB_OUTPUT"
-            fi
-          # 7.10.2026: the diff is taken on its own line first. It used to
-          # be piped straight into grep, so when it FAILED (a stacked pull
-          # request whose base branch had been merged and deleted: there
-          # is no origin/<base> to diff against) grep saw nothing, the
-          # condition was false, and the run fell through to level 1 in
-          # silence. #155, a fix to client-facing portal code, ran that
-          # way once. A gate that cannot tell what changed now assumes the
-          # worst and runs level 2.
-          elif ! CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>&1); then
-            echo "could not diff against origin/${{ github.base_ref }} - running level 2 rather than guessing:"
-            echo "$CHANGED"
-            echo "value=2" >> "$GITHUB_OUTPUT"
-          elif printf '%s\n' "$CHANGED" \
-               | grep -qE '^(qa/(e2e/|playwright\.config\.ts|checks/vitest\.mjs)|tests/integration/|lib/app-domain/|prisma/|app/\(product\)/app/|components/app/)'; then
-            # Level 1 runs types, lint and the unit suite. It does not run
-            # the integration suite, and it does not open a browser - so a
-            # pull request that changes domain logic, or adds an
-            # integration test to prove it, was being gated by checks that
-            # cannot see either. The tests went green without running.
-            #
-            # Found by a pull request that batched the hour-bank queries
-            # and shipped equivalence tests to prove the batched answer
-            # matched the per-client one. Those tests are the entire
-            # argument for the change, and level 1 would have skipped
-            # every one of them.
-            #
-            # The product screens were added on 25.9.2026, and by the same
-            # reasoning. A pull request that changed only a .tsx under
-            # /app was gated by types, lint and the unit suite - none of
-            # which opens a browser, and the browser suite is the ONLY
-            # thing in this repo that tests a screen. So a fix to the one
-            # write a CLIENT makes in this product, on the screen where
-            # they approve spending, ran a gate that could not see it.
-            #
-            # That pull request was the fix for a failure the browser
-            # suite had caught twice. It could not be verified by the
-            # suite that found it.
-            #
-            # The cost is honest: a screen change now pays ten minutes on
-            # the gate instead of four. A screen nobody watched a browser
-            # open is a screen nobody tested.
-            echo "touches domain logic, the schema or a suite level 1 cannot run - running level 2"
-            echo "value=2" >> "$GITHUB_OUTPUT"
-          else
-            echo "value=1" >> "$GITHUB_OUTPUT"
-          fi
-
       # From level 2, not just level 3. Two checks need a browser now -
       # the accessibility audit at level 3, and the end-to-end suite at
       # level 2 - so installing only at level 3 would leave the browser
       # suite with nothing to launch. Still not paid on the PR gate,
       # which is the point of the condition.
+      # Only the shard that owns the browser checks pays for a browser.
+      # `main` is the one with e2e and the accessibility audit in it; the
+      # integration, utc and coverage shards never open one. At levels 1
+      # and 2 the single "all" job owns everything, as before.
       - name: Install Chromium
-        if: steps.level.outputs.value != '1'
+        if: needs.level.outputs.value != '1' && (matrix.shard == 'all' || matrix.shard == 'main')
         run: npx playwright install --with-deps chromium
 
       # The demo fixtures the browser suite signs in as. Safe here and
@@ -237,8 +294,14 @@ jobs:
       # prefixed "[DEMO]" so it is unmistakable if it ever turns up
       # somewhere it should not. The e2e check re-seeds immediately before
       # it runs as well, because the integration suite truncates.
+      # Every shard, not just the one with the browser in it. The
+      # integration suite truncates and seeds for itself, so in theory only
+      # `main` needs this - but "in theory" is how a Sunday gets spent on a
+      # red run, and the seed costs seconds. The browser install above is
+      # conditional because it costs a minute and the other shards provably
+      # never launch one.
       - name: Seed demo fixtures
-        if: steps.level.outputs.value != '1'
+        if: needs.level.outputs.value != '1'
         run: npm run db:seed
 
       # The step budget sits BELOW the job wall on purpose, so that an
@@ -265,7 +328,7 @@ jobs:
           # so without this the check would go quiet exactly when the
           # runners are busy, which is when it matters.
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node qa/run.mjs ${{ steps.level.outputs.value }}
+        run: node qa/run.mjs ${{ needs.level.outputs.value }} --shard=${{ matrix.shard }}
 
       # Always upload, especially on failure - the report is the artefact
       # worth reading, not the scrolled-past log.
@@ -273,7 +336,75 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: qa-report-level-${{ steps.level.outputs.value }}
+          name: qa-report-level-${{ needs.level.outputs.value }}-${{ matrix.shard }}
+          path: qa/reports/
+          retention-days: 30
+
+      # Unsharded runs only. A shard's report is a quarter of a verdict and
+      # must never reach the pull request on its own; the `report` job below
+      # comments once the merge has a verdict to state.
+      - name: Comment on the pull request
+        if: always() && github.event_name == 'pull_request' && needs.level.outputs.sharded != 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = 'qa/reports/last.md';
+            if (!fs.existsSync(path)) return;
+            const body = fs.readFileSync(path, 'utf8');
+            const marker = '<!-- ankora-qa -->';
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const existing = (await github.rest.issues.listComments({ owner, repo, issue_number }))
+              .data.find(c => c.body.includes(marker));
+            const payload = `${marker}\n${body}`;
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body: payload });
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number, body: payload });
+            }
+
+  # One verdict out of the shards.
+  #
+  # Only a split run needs this: at levels 1 and 2 the single job already
+  # wrote last.md and commented for itself, and nothing here would have
+  # anything to merge.
+  #
+  # `if: always()` because this job matters most when a shard went red.
+  # A merge that only ran on success would go quiet in exactly the case it
+  # was written for.
+  report:
+    needs: [level, qa]
+    if: always() && needs.level.outputs.sharded == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+
+      # Every shard's report, whatever the shard called its artefact.
+      # `merge-multiple` is off on purpose: each artefact keeps its own
+      # directory, so two runs of the same shard cannot overwrite each
+      # other and qa/merge.mjs can see both and keep the later one.
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: qa-report-level-*
+          path: qa/shard-artifacts
+
+      # Exits non-zero when a check blocked OR when a shard never reported.
+      # A missing shard is a blocker by name: three green quarters and a
+      # silence is not a pass, and "the run looked fine" is how two Sundays
+      # went by unnoticed in October.
+      - name: Merge the shard reports
+        run: node qa/merge.mjs --level=${{ needs.level.outputs.value }} --dir=qa/shard-artifacts
+
+      - name: Upload the merged report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-report-level-${{ needs.level.outputs.value }}
           path: qa/reports/
           retention-days: 30
 
