@@ -326,6 +326,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
                 תיק הלקוח לקריאה
               </Link>
+              <Link href={`/app/clients/${client.id}/handover`} className="text-sm text-app-text-accent hover:underline">
+                מוכנות לחפיפה
+              </Link>
               {composer && <MessageClient clientId={client.id} {...composer} />}
             </div>
           </div>

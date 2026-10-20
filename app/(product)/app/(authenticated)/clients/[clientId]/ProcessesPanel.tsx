@@ -744,7 +744,7 @@ export function ProcessesPanel({
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {processes.map((p) => (
-            <li key={p.id} className="py-4">
+            <li key={p.id} id={`process-${p.id}`} className="py-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
