@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   RANKED_LINES,
+  CLIENT_LINES,
   type Digest,
   daysBetween,
   digestLead,
@@ -330,5 +331,55 @@ describe("stage 2: what the bell knows, in the same list", () => {
     const { html, text } = renderDigestEmail({ ...EMPTY, dates: [date("abc", "2026-10-21")] }, "אריאל", NOW);
     expect(html).toContain("/app/important-dates/abc");
     expect(text).not.toContain("/app/tasks/date:");
+  });
+});
+
+describe("stage 3: the clients, and the person's own records", () => {
+  const line = (clientName: string, text: string, href = "/app/clients/c1") => ({ clientName, text, href, tone: "amber" as const });
+
+  it("sends for a client line or a running timer alone", () => {
+    expect(isDigestEmpty({ ...EMPTY, clients: [line("RIMED", "ניצלו 92% מבנק השעות.")] })).toBe(false);
+    expect(isDigestEmpty({ ...EMPTY, housekeeping: [{ text: "טיימר רץ מאתמול.", linkText: "לעצור", href: "/app/timer" }] })).toBe(false);
+    expect(isDigestEmpty({ ...EMPTY, clients: [], housekeeping: [] })).toBe(true);
+  });
+
+  it("names the first client line in the subject when the list is empty", () => {
+    expect(digestSubject({ ...EMPTY, clients: [line("RIMED", "ניצלו 92% מבנק השעות, 11 ימים לסוף המחזור.")] }, NOW)).toBe(
+      "RIMED: ניצלו 92% מבנק השעות, 11 ימים לסוף המחזור"
+    );
+    const d = { ...EMPTY, housekeeping: [{ text: "טיימר רץ מאתמול 17:05 על RIMED.", linkText: "לעצור ולתקן", href: "/app/timer" }] };
+    expect(digestSubject(d, NOW)).toBe("טיימר רץ מאתמול 17:05 על RIMED");
+    expect(digestLead(d, rankDigest(d, NOW))).toBe("אין משימות שדורשות אותך היום.");
+  });
+
+  it("keeps the ranked list first and the blocks under it, each line with its link", () => {
+    const { html, text } = renderDigestEmail(
+      {
+        ...EMPTY,
+        today: [task("t1", "לתאם טכנאי")],
+        clients: [line("NUX", "6 הצעות לתיק מחכות לבדיקה.", "/app/knowledge?clientId=c2")],
+        housekeeping: [{ text: "לא דווחו שעות ביום חמישי, 16.10.", linkText: "לדווח", href: "/app/my-time" }],
+      },
+      "אריאל",
+      NOW
+    );
+    expect(html.indexOf("לתאם טכנאי")).toBeLessThan(html.indexOf("הלקוחות שלך"));
+    expect(html.indexOf("הלקוחות שלך")).toBeLessThan(html.indexOf("סדר בית"));
+    expect(html).toContain("/app/knowledge?clientId=c2");
+    expect(html).toContain("/app/my-time");
+    expect(text).toContain("NUX: 6 הצעות לתיק מחכות לבדיקה.");
+  });
+
+  it("does not draw an empty list heading", () => {
+    const { html } = renderDigestEmail({ ...EMPTY, clients: [line("RIMED", "x.")] }, "אריאל", NOW);
+    expect(html).not.toContain("לפי סדר חשיבות");
+  });
+
+  it("shows six client lines, then a count", () => {
+    const many = Array.from({ length: 9 }, (_, i) => line(`לקוח ${i}`, "x."));
+    const { text } = renderDigestEmail({ ...EMPTY, clients: many }, "אריאל", NOW);
+    expect(text).toContain(`לקוח ${CLIENT_LINES - 1}: x.`);
+    expect(text).not.toContain(`לקוח ${CLIENT_LINES}: x.`);
+    expect(text).toContain("ועוד 3 עניינים");
   });
 });
