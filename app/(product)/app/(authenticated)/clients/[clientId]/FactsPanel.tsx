@@ -303,7 +303,7 @@ function FactRow({
   return (
     <li id={`item-${fact.id}`} className={`py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${closed ? "opacity-60" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-[1_1_18rem]">
           <p className="text-sm text-app-text-primary">{fact.body}</p>
           {meta.length > 0 && <p className="mt-0.5 text-xs text-app-text-secondary">{meta.join(" · ")}</p>}
           {answered && (

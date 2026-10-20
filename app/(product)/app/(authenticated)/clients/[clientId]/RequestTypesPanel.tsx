@@ -165,7 +165,7 @@ export function RequestTypesPanel({
         <ul className="mt-4 divide-y divide-app-border">
           {requestTypes.map((r) => (
             <li key={r.id} id={`item-${r.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-[1_1_18rem]">
                 <p className="text-sm font-medium text-app-text-primary">{r.title}</p>
                 <p className="text-xs text-app-text-secondary">{[r.fromWho ? `מ: ${r.fromWho}` : null, r.arrivesVia ? `דרך: ${r.arrivesVia}` : null, r.entityName].filter(Boolean).join(" · ")}</p>
                 <p className="mt-1 text-xs text-app-text-primary">{r.handling}</p>

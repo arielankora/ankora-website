@@ -198,7 +198,7 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
           <ul className="mt-4 divide-y divide-app-border">
             {sources.map((s) => (
               <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
-                <div className="flex min-w-0 gap-3">
+                <div className="flex min-w-0 flex-[1_1_18rem] gap-3">
                   <span className="w-9 shrink-0 font-mono text-sm text-app-text-accent" dir="ltr">
                     {s.code}
                   </span>

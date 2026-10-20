@@ -57,13 +57,19 @@ export function SourceCodes({ sources, options }: { sources: string[]; options: 
   if (sources.length === 0) return null;
   const titles = new Map(options.map((o) => [o.code, o.title]));
   return (
-    <p className="mt-1 text-[11px] text-app-text-tertiary" dir="ltr">
-      {sources.map((s, i) => (
-        <span key={s} title={titles.get(s.split(" ")[0])}>
-          {i > 0 && ", "}
-          {s}
-        </span>
-      ))}
+    // The codes read left to right, but the line sits where every other
+    // line of the item starts. `dir` on the paragraph itself aligned it to
+    // the left edge of the item's text, which is wherever its longest
+    // line happens to end (20.10.2026).
+    <p className="mt-1 text-[11px] text-app-text-tertiary">
+      <span dir="ltr">
+        {sources.map((s, i) => (
+          <span key={s} title={titles.get(s.split(" ")[0])}>
+            {i > 0 && ", "}
+            {s}
+          </span>
+        ))}
+      </span>
     </p>
   );
 }
