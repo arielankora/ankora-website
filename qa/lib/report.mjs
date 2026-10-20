@@ -101,6 +101,17 @@ export class Run {
     return this.warned ? "PASS WITH FINDINGS" : "PASS";
   }
 
+  /**
+   * Should this run exit non-zero?
+   *
+   * One rule, named once, because it used to live in two places and
+   * disagree with itself: the verdict said INCOMPLETE and the exit code
+   * said 0. The green tick is what people read, and it was wrong.
+   */
+  get shouldFail() {
+    return this.failed || this.incomplete;
+  }
+
   get warned() {
     return this.checks.some((c) => c.status === "warn");
   }
