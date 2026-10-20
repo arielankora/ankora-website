@@ -30,7 +30,8 @@ export function BottomNav({
   const overflow = items.slice(4);
 
   function isActive(href: string) {
-    return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+    if (href === "/app" || href === "/app/portal") return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
 
   return (

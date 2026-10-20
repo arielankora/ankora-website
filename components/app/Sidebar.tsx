@@ -64,9 +64,15 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
 
+  // 20.10.2026: the two home screens are exact; every other item owns its
+  // sub-paths ("/app/portal" used to light up on every portal screen).
   function isActive(href: string) {
-    return href === "/app" ? pathname === "/app" : pathname.startsWith(href);
+    if (href === "/app" || href === "/app/portal") return pathname === href;
+    return pathname === href || pathname.startsWith(`${href}/`);
   }
+
+  // The canvas names the client's menu "פורטל", not "OPS".
+  const isPortal = items.some((i) => i.href === "/app/portal");
 
   function openCommandPalette() {
     window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT));
@@ -85,7 +91,7 @@ export function Sidebar({
           Ankora
         </Link>
         <span className="rounded-full border border-[rgba(243,234,219,0.18)] px-1.5 py-0.5 text-[11px] text-[#B4B8BC]">
-          OPS
+          {isPortal ? "פורטל" : "OPS"}
         </span>
       </div>
 
@@ -132,6 +138,7 @@ export function Sidebar({
               )}
               <Link
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 // Every screen behind this nav is dynamic, signed-in and
                 // database-backed, so Next cannot prefetch anything of a
                 // page here: it fetches the loading shell, once per link,

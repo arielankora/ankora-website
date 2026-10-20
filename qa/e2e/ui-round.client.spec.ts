@@ -43,6 +43,8 @@ test("the week by days is the third tab, and its old address keeps the week", as
   await page.goto("/app/portal/hours", { waitUntil: "domcontentloaded" });
   const tabs = page.getByRole("navigation", { name: "שעות ודוחות" });
   await expect(tabs.getByRole("link")).toHaveText(["שעות", "לפי ימים", "דוח חודשי"]);
+  // One row lit in the menu: "בית" (/app/portal) used to match every portal path.
+  await expect(page.locator(SIDEBAR).locator('a[aria-current="page"]')).toHaveText(["שעות ודוחות"]);
   await tabs.getByRole("link", { name: "לפי ימים" }).click();
   await expect(page).toHaveURL(/\/app\/portal\/hours\?view=weekly$/);
   await expect(tabs.getByRole("link", { name: "לפי ימים" })).toHaveAttribute("aria-current", "page");
