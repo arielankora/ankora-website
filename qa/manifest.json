@@ -1828,6 +1828,14 @@
       "firstSeen": "2026-10-19",
       "riskReason": "Changes items already in a client file from an approved proposal; only the fields it names change, sources add up, and a changed rule goes back to proposed"
     },
+    "domain:proposal-existing": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-20",
+      "riskReason": "Decides whether a new proposal is already in the client file, asked again when the card is read and when a person decides; a wrong match closes a proposal onto the wrong item"
+    },
     "domain:brain-metrics": {
       "kind": "domain",
       "area": "app",

@@ -8,7 +8,7 @@ import { factShapeError, isQuestion } from "@/lib/client-facts";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import { createTask } from "@/lib/app-domain/tasks";
-import type { SourceRef } from "@/lib/knowledge-sources";
+import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
 import type { User, ClientFact, FactKind, FactTopic, Prisma } from "@prisma/client";
 
 // Org brain, phase 2: the facts in a client's file
@@ -181,6 +181,32 @@ export async function confirmClientFact(actor: User, id: string, sources: Source
   await recordAudit({
     actorId: actor.id,
     action: "client_fact.confirm",
+    entityType: "ClientFact",
+    entityId: id,
+    clientId: fact.clientId,
+    before: fact,
+    after: updated,
+  });
+  return updated;
+}
+
+/// More sources for a fact that is already right: another meeting said the
+/// same (20.10.2026, "כבר בתיק" on the review screen). What we know about
+/// it does not change; a new source on a confirmed fact counts as a new
+/// confirmation, as anywhere else in the file.
+export async function addClientFactSources(actor: User, id: string, added: SourceRef[]) {
+  assertCan(actor.role, "time_entry.create_self");
+  const fact = await findLive(id);
+  await assertClientAccess(actor, fact.clientId);
+  assertCurrent(fact);
+  const sources = readSourceRefs(fact.sources);
+  for (const r of added) if (!sources.some((o) => o.code === r.code && (o.at ?? null) === (r.at ?? null))) sources.push(r);
+  if (sources.length === readSourceRefs(fact.sources).length) return fact;
+  const sourced = await sourcedFields(fact.clientId, { sources }, [fact.body], fact);
+  const updated = await prisma.clientFact.update({ where: { id }, data: sourced });
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_fact.add_sources",
     entityType: "ClientFact",
     entityId: id,
     clientId: fact.clientId,

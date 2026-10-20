@@ -40,6 +40,8 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       flags,
       link: fireflies ? firefliesLink(fireflies, at) : null,
       existing: p.existing ? { body: p.existing.body } : null,
+      alreadyIn: p.alreadyIn ? { body: p.alreadyIn.body, addsSources: p.alreadyIn.addsSources } : null,
+      attached: p.attached,
       rejectReason: p.rejectReason,
       hiddenFor: p.hiddenFor,
       task: taskFromProposal({
