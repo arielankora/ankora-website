@@ -24,6 +24,7 @@ import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
+import { isShard, SHARDS, ALWAYS } from "./lib/shards.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -31,6 +32,26 @@ const LEVELS = {
   2: "deep regression",
   3: "deep fault hunt",
 };
+
+/**
+ * `--shard=<name>`, or QA_SHARD. Null means "run everything", which is what
+ * every local run and every level-1/2 CI run does.
+ *
+ * An unknown name is fatal rather than ignored. A typo that silently ran the
+ * whole suite would look like a healthy shard and quietly triple the wall
+ * clock; a typo that silently ran nothing would report PASS over an empty
+ * run, which is the failure mode this suite's `incomplete` rule exists for.
+ */
+function parseShard() {
+  const arg = process.argv.slice(2).find((a) => a.startsWith("--shard="));
+  const name = arg ? arg.slice("--shard=".length) : (process.env.QA_SHARD ?? "");
+  if (!name || name === "all") return null;
+  if (!isShard(name)) {
+    process.stderr.write(`Unknown shard "${name}". Use one of: ${SHARDS.join(", ")}.\n`);
+    process.exit(2);
+  }
+  return name;
+}
 
 function parseLevel() {
   const arg = process.argv.slice(2).find((a) => /^--?level(=|$)|^[123]$/.test(a));
@@ -49,7 +70,9 @@ async function main() {
   process.stdout.write(`\n  ANKORA QA — level ${level}: ${LEVELS[level]}\n`);
   process.stdout.write(`  ${new Date().toISOString().replace("T", " ").slice(0, 16)}\n\n`);
 
-  const run = new Run(level);
+  const shard = parseShard();
+  if (shard) process.stdout.write(`  shard: ${shard}\n\n`);
+  const run = new Run(level, { shard });
 
   // Establish what this environment can actually do before judging the
   // product by it. See checks/preflight.mjs for why this is not optional.
@@ -92,6 +115,14 @@ async function main() {
     "download-headers",
     { label: "Download filenames", level: 1 },
     staticChecks.downloadHeaders,
+  );
+  // Blocks. The shard plan names checks by id; an id that no longer exists
+  // makes a parallel level-3 job run nothing and report a pass over an
+  // empty run - see checks/static.mjs.
+  await run.check(
+    "shard-plan",
+    { label: "Shard plan", level: 1 },
+    staticChecks.shardPlan,
   );
   await run.check("unit", { label: "Unit tests", level: 1, skipIf: needs.prisma }, vitest.unit);
   // The same suite with the process in UTC, which is what production runs
@@ -192,6 +223,38 @@ async function main() {
   run.print();
   const file = run.persist();
   process.stdout.write(`  Report: ${file}\n\n`);
+
+  // A shard that ran nothing is a shard whose check ids no longer exist -
+  // a rename in this file with lib/shards.mjs left behind. Green and empty
+  // is the one outcome worth refusing outright: the merge would see a
+  // well-formed report with no rows in it and have nothing to be alarmed
+  // by. (The static check `shard-plan` catches this on the PR gate; this
+  // is the belt to its braces, because the two can drift apart in CI.)
+  if (shard) {
+    const owned = run.checks.filter((c) => !ALWAYS.includes(c.id));
+    if (owned.length === 0) {
+      process.stderr.write(`  shard "${shard}" ran no checks at level ${level}, see qa/lib/shards.mjs\n\n`);
+      process.exit(1);
+    }
+    // Everything this shard owns skipped itself. Green and empty, in
+    // seconds - which is exactly how run #508 reported three healthy-looking
+    // shards that had tested nothing, because preflight had not run in them
+    // and so no database appeared to exist. A shard with nothing left to
+    // say is a broken shard, not a passing one.
+    if (owned.every((c) => c.status === "skipped")) {
+      process.stderr.write(
+        [
+          `  shard "${shard}" skipped every check it owns:`,
+          ...owned.map((c) => `    ${c.id}: ${c.reason ?? "no reason given"}`),
+          "",
+          "  A shard that tested nothing is not a shard that passed.",
+          "",
+        ].join("\n"),
+      );
+      process.exit(1);
+    }
+  }
+
   process.exit(run.failed ? 1 : 0);
 }
 

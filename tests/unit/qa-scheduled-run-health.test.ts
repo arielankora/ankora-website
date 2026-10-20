@@ -253,6 +253,33 @@ describe("reading the wall out of the workflow", () => {
     expect(jobWallMinutes(yaml)).toBe(90);
   });
 
+  it("reads the checks job's wall, not whichever job is written first", () => {
+    // 20.10.2026: the workflow gained a cheap "level" job above the heavy
+    // one. A regex that took the first four-space timeout-minutes in the
+    // file would report that job's wall and would have the headroom
+    // warning measuring the wrong thing forever.
+    const yaml = [
+      "jobs:",
+      "  level:",
+      "    runs-on: ubuntu-latest",
+      "    timeout-minutes: 5",
+      "  qa:",
+      "    runs-on: ubuntu-latest",
+      "    timeout-minutes: 60",
+      "  report:",
+      "    timeout-minutes: 10",
+      "",
+    ].join("\n");
+    expect(jobWallMinutes(yaml)).toBe(60);
+    expect(jobWallMinutes(yaml, "level")).toBe(5);
+    expect(jobWallMinutes(yaml, "report")).toBe(10);
+  });
+
+  it("falls back to the whole file when there is no job by that name", () => {
+    const yaml = ["jobs:", "  other:", "    timeout-minutes: 42", ""].join("\n");
+    expect(jobWallMinutes(yaml)).toBe(42);
+  });
+
   it("ignores a step budget when the job has no wall of its own", () => {
     const yaml = ["jobs:", "  qa:", "    steps:", "      - timeout-minutes: 75", ""].join("\n");
     expect(jobWallMinutes(yaml)).toBe(null);
