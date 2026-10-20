@@ -196,7 +196,7 @@ function SystemForm({
         </Field>
         <AudienceField existing={existing} />
       </div>
-      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.status === "CONFIRMED"} />
       <MissingFields target="SYSTEM" existing={existing} />
       <ItemExtras existing={existing} />
       {status !== "CONFIRMED" && (

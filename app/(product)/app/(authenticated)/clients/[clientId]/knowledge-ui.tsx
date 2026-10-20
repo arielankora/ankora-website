@@ -7,7 +7,8 @@ import { ITEM_MISSING_FIELDS, KNOWLEDGE_AUDIENCE_LABELS, KNOWLEDGE_STATUS_LABELS
 // form field, the status line with what would close it, and the sources.
 // Shared so people, organizations and systems cannot drift apart.
 
-export type SourceOption = { code: string; title: string };
+/// `secondary`: an Ankora document (R14). It records, it cannot confirm.
+export type SourceOption = { code: string; title: string; secondary?: boolean };
 export type EntityOption = { id: string; name: string };
 
 export const STATUS_TONE: Record<KnowledgeStatusLike, "green" | "amber" | "gray" | "red"> = {
@@ -31,12 +32,47 @@ export function Field({ label, children }: { label: string; children: React.Reac
 
 /// The item's sources, as typed codes, with the register right under the
 /// field so nobody has to remember what S4 was.
-export function SourcesField({ options, defaultValue, status }: { options: SourceOption[]; defaultValue?: string; status: KnowledgeStatusLike }) {
+export function SourcesField({
+  options,
+  defaultValue,
+  status,
+  confirmedBefore = false,
+}: {
+  options: SourceOption[];
+  defaultValue?: string;
+  status: KnowledgeStatusLike;
+  /// The item is confirmed already. On the same sources it stays so (a
+  /// person confirmed it by hand), and the form has nothing to warn about.
+  confirmedBefore?: boolean;
+}) {
+  const [value, setValue] = useState(defaultValue ?? "");
+  const [manual, setManual] = useState(false);
+  // R14: "מאושר" on Ankora's own documents alone is saved as "לא ודאי".
+  // The server does that quietly, so the form says it before saving, not
+  // after the person finds the old status back (20.10.2026).
+  const secondary = new Set(options.filter((o) => o.secondary).map((o) => o.code));
+  const codesOf = (v: string) => [...v.matchAll(/\bS\d+\b/gi)].map((m) => m[0].toUpperCase());
+  const codes = codesOf(value);
+  const unchanged = codes.slice().sort().join() === codesOf(defaultValue ?? "").sort().join();
+  const lowered = status === "CONFIRMED" && codes.length > 0 && codes.every((c) => secondary.has(c)) && !(confirmedBefore && unchanged);
   return (
     <div>
       <Field label={status === "MISSING" ? "מקורות" : "מקורות *"}>
-        <input name="sources" dir="ltr" defaultValue={defaultValue ?? ""} placeholder="S1 08:13, S3" className={INPUT} />
+        <input name="sources" dir="ltr" value={value} onChange={(e) => setValue(e.target.value)} placeholder="S1 08:13, S3" className={INPUT} />
       </Field>
+      {lowered && (
+        <div className="mt-1.5 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2 text-xs" data-testid="sources-secondary-only">
+          <p className={manual ? "text-app-text-secondary" : "text-app-warning"}>
+            {codes.length === 1 ? "המקור הוא מסמך של אנקורה" : "כל המקורות הם מסמכים של אנקורה"}, ולכן הפריט יישמר כ&quot;{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}&quot;. אם יש מקור מהלקוח או מספק (פגישה, מייל, הודעה), עדיף להוסיף אותו.
+          </p>
+          {/* Not every client puts things in writing (20.10.2026). The
+              person saving it stands behind it, and the audit log says who. */}
+          <label className="mt-1.5 flex items-start gap-2 text-app-text-primary">
+            <input type="checkbox" name="manualConfirm" value="1" checked={manual} onChange={(e) => setManual(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-gold" />
+            <span>אישור ידני: אין מקור מהלקוח, ואני מאשר/ת שזה נכון. יישמר כ&quot;{KNOWLEDGE_STATUS_LABELS.CONFIRMED}&quot;.</span>
+          </label>
+        </div>
+      )}
       {options.length === 0 ? (
         <p className="mt-1 text-[11px] text-app-text-tertiary">אין עדיין מקורות במרשם. מוסיפים אותם ב&quot;מרשם מקורות&quot; במסך הלקוח.</p>
       ) : (
@@ -44,7 +80,7 @@ export function SourcesField({ options, defaultValue, status }: { options: Sourc
         <p className="mt-1 text-[11px] text-app-text-tertiary">
           {options
             .slice(-8)
-            .map((o) => `${o.code} ${o.title}`)
+            .map((o) => `${o.code} ${o.title}${o.secondary ? " (מסמך של אנקורה)" : ""}`)
             .join(" · ")}
           {options.length > 8 && " · ..."}
         </p>

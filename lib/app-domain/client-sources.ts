@@ -257,14 +257,19 @@ async function loadRegister(clientId: string): Promise<RegisterEntry[]> {
 /// after R14 may have lowered it.
 export async function resolveItemSources(
   clientId: string,
-  item: { status: KnowledgeStatus; refs: SourceRef[]; toResolve: string | null; texts: (string | null | undefined)[] }
+  item: { status: KnowledgeStatus; refs: SourceRef[]; toResolve: string | null; texts: (string | null | undefined)[]; confirmedByPerson?: boolean }
 ): Promise<{ sources: SourceRef[]; knowledgeStatus: KnowledgeStatus; toResolve: string | null }> {
-  const check = checkSources(item.status, item.refs, await loadRegister(clientId), item.texts);
+  const check = checkSources(item.status, item.refs, await loadRegister(clientId), item.texts, item.confirmedByPerson);
   if (!check.ok) throw new Error(check.error);
   return {
     sources: item.refs,
     knowledgeStatus: check.status as KnowledgeStatus,
-    toResolve: check.lowered ? item.toResolve?.trim() || SECONDARY_ONLY_TO_RESOLVE : item.toResolve,
+    toResolve: check.lowered
+      ? item.toResolve?.trim() || SECONDARY_ONLY_TO_RESOLVE
+      : // Confirmed after all: "what would confirm it" no longer applies.
+        check.status === "CONFIRMED" && item.toResolve === SECONDARY_ONLY_TO_RESOLVE
+        ? null
+        : item.toResolve,
   };
 }
 

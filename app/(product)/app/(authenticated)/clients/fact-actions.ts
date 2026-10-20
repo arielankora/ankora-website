@@ -84,6 +84,8 @@ function parseFact(formData: FormData, selfId?: string): { error?: string; value
       audience: pick(formData.get("audience"), AUDIENCES),
       doNotDisclose: text(formData, "doNotDisclose"),
       sources: src.refs,
+
+      manualConfirm: formData.get("manualConfirm") === "1",
     },
   };
 }
@@ -119,7 +121,7 @@ export async function confirmClientFactAction(_prev: FormState | undefined, form
   const clientId = String(formData.get("clientId") ?? "");
   const src = sources(formData);
   if (src.error) return { error: src.error };
-  return run(clientId, () => confirmClientFact(user, String(formData.get("id") ?? ""), src.refs));
+  return run(clientId, () => confirmClientFact(user, String(formData.get("id") ?? ""), src.refs, formData.get("manualConfirm") === "1"));
 }
 
 export async function answerClientQuestionAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
@@ -128,7 +130,7 @@ export async function answerClientQuestionAction(_prev: FormState | undefined, f
   const src = sources(formData);
   if (src.error) return { error: src.error };
   return run(clientId, () =>
-    answerClientQuestion(user, String(formData.get("id") ?? ""), { answer: String(formData.get("answer") ?? ""), sources: src.refs })
+    answerClientQuestion(user, String(formData.get("id") ?? ""), { answer: String(formData.get("answer") ?? ""), sources: src.refs, manualConfirm: formData.get("manualConfirm") === "1" })
   );
 }
 

@@ -133,7 +133,12 @@ export function checkSources(
   status: KnowledgeStatusLike,
   refs: SourceRef[],
   register: RegisterEntry[],
-  texts: (string | null | undefined)[] = []
+  texts: (string | null | undefined)[] = [],
+  /// A person confirmed it on Ankora's documents alone, knowingly
+  /// (20.10.2026): not every client puts things in writing. R14 lowers
+  /// what arrives that way by itself, not what a person chose to stand
+  /// behind.
+  confirmedByPerson = false
 ): SourceCheck {
   const known = new Map(register.map((r) => [r.code, r.weight]));
   const unknown = [...new Set([...refs.map((r) => r.code), ...texts.flatMap(citedCodes)])].filter((c) => !known.has(c));
@@ -143,7 +148,7 @@ export function checkSources(
   if (refs.length === 0 && status !== "MISSING" && status !== "SUPERSEDED") {
     return { ok: false, error: 'צריך מקור: מאיפה זה ידוע? אם עוד לא ידוע, סמנו "חסר".' };
   }
-  if (status === "CONFIRMED" && refs.length > 0 && refs.every((r) => known.get(r.code) === "SECONDARY")) {
+  if (!confirmedByPerson && status === "CONFIRMED" && refs.length > 0 && refs.every((r) => known.get(r.code) === "SECONDARY")) {
     return { ok: true, status: "UNCERTAIN", lowered: true };
   }
   return { ok: true, status, lowered: false };

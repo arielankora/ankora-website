@@ -87,6 +87,8 @@ function parseProcess(f: FormData, selfId?: string): { error?: string; value?: O
       checkText: text(f, "checkText"),
       reviewEveryDays: review === null ? null : Number(review),
       sources: refs,
+
+      manualConfirm: f.get("manualConfirm") === "1",
     },
   };
 }

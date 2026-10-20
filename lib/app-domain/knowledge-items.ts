@@ -25,6 +25,9 @@ export interface KnowledgeInput {
   /// Codes in the client's source register (spec 3.2). Required unless
   /// the item is "missing".
   sources?: SourceRef[];
+  /// "מאושר" on Ankora's documents alone, chosen by the person saving it
+  /// (the form's "אישור ידני"). Without it, R14 saves it as uncertain.
+  manualConfirm?: boolean;
   /// Spec 3.1: shown to the client in the portal. Off unless a person turns
   /// it on, and never for what is sensitive, restricted or not to be told.
   clientVisible?: boolean;
@@ -56,11 +59,17 @@ export async function sourcedFields(
   texts: (string | null | undefined)[],
   before?: Before
 ) {
+  const refs = input.sources ?? readSourceRefs(before?.sources);
+  // Already confirmed on the same sources (a person confirmed it by hand,
+  // earlier): editing another field keeps it so.
+  const sameSources = (a: SourceRef[], b: SourceRef[]) => a.map((r) => r.code).sort().join() === b.map((r) => r.code).sort().join();
+  const keptConfirmed = before?.knowledgeStatus === "CONFIRMED" && sameSources(refs, readSourceRefs(before.sources));
   const resolved = await resolveItemSources(clientId, {
     status: input.knowledgeStatus ?? before?.knowledgeStatus ?? "CONFIRMED",
-    refs: input.sources ?? readSourceRefs(before?.sources),
+    refs,
     toResolve: input.toResolve !== undefined ? input.toResolve?.trim() || null : before?.toResolve ?? null,
     texts,
+    confirmedByPerson: input.manualConfirm === true || keptConfirmed,
   });
   return {
     sources: resolved.sources as Prisma.InputJsonValue,

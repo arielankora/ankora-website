@@ -53,6 +53,8 @@ function parseEntity(formData: FormData, selfId?: string): { error?: string; val
       knowledgeStatus: (STATUSES as string[]).includes(status) ? (status as KnowledgeStatus) : undefined,
       toResolve: text(formData, "toResolve"),
       sources: refs,
+
+      manualConfirm: formData.get("manualConfirm") === "1",
     },
   };
 }
