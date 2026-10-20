@@ -386,7 +386,7 @@ export function PoliciesPanel({
         <ul className="mt-4 divide-y divide-app-border">
           {live.map((p) => (
             <li key={p.id} id={`item-${p.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-[1_1_18rem]">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
                   <StatusBadge label={POLICY_STATUS_LABELS[p.status]} tone={STATUS_TONE[p.status]} />
@@ -427,6 +427,14 @@ export function PoliciesPanel({
                   </p>
                 )}
                 <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
+                {/* A rule we are not sure the client said cannot become binding
+                    (approveClientPolicy). Say how to get there, instead of
+                    offering an approval the server refuses (20.10.2026). */}
+                {canApprove && p.status === "PROPOSED" && p.knowledgeStatus !== "CONFIRMED" && (
+                  <p className="mt-1 text-[11px] text-app-text-secondary" data-testid="policy-approve-blocked">
+                    לפני שמאשרים: מוודאים מול הלקוח שזה מה שהוא אמר, ובעריכה מסמנים &quot;{KNOWLEDGE_STATUS_LABELS.CONFIRMED}&quot; עם המקור שמאשר. אחר כך אפשר לאשר את הכלל.
+                  </p>
+                )}
                 <ItemTags item={p} disclose />
                 {p.history && p.history.length > 0 && <PolicyHistory history={p.history} />}
                 <SourceCodes sources={p.sources} options={sourceOptions} />
@@ -468,7 +476,7 @@ export function PoliciesPanel({
                   ))}
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
-                {canApprove && p.status === "PROPOSED" && (
+                {canApprove && p.status === "PROPOSED" && p.knowledgeStatus === "CONFIRMED" && (
                   <button type="button" onClick={() => approve(p)} className="font-medium text-app-text-accent hover:underline">
                     אישור הכלל
                   </button>

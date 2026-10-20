@@ -351,7 +351,7 @@ export function PeoplePanel({
             {contacts.map((c) => (
               <li key={c.id} id={`item-${c.id}`} className="py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-[1_1_18rem]">
                     <p className="text-sm font-medium text-app-text-primary">
                       {c.name ?? c.role}
                       {c.isPrimary && <span className="ms-2 text-xs font-normal text-app-text-accent">ראשי</span>}
@@ -400,7 +400,7 @@ export function PeoplePanel({
           <ul className="mt-4 divide-y divide-app-border">
             {organizations.map((o) => (
               <li key={o.id} id={`item-${o.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-[1_1_18rem]">
                   <p className="text-sm font-medium text-app-text-primary">{o.name}</p>
                   <p className="text-xs text-app-text-secondary">
                     {[o.role, RELATIONSHIP_LABELS[o.relationship], o.domains.join(", ") || null].filter(Boolean).join(" · ")}

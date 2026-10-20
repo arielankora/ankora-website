@@ -258,7 +258,7 @@ export function SystemsPanel({
           {systems.map((s) => (
             <li key={s.id} id={`item-${s.id}`} className="py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-[1_1_18rem]">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium text-app-text-primary">{s.systemName}</p>
                     <StatusBadge label={SYSTEM_ACCESS_STATUS_LABELS[s.accessStatus]} tone={SYSTEM_ACCESS_STATUS_TONE[s.accessStatus]} />

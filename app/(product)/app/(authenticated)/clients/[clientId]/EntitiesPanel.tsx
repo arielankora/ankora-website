@@ -176,7 +176,7 @@ export function EntitiesPanel({ clientId, entities, sourceOptions }: { clientId:
         <ul className="mt-4 divide-y divide-app-border">
           {entities.map((e) => (
             <li key={e.id} id={`item-${e.id}`} className="flex flex-wrap items-start justify-between gap-3 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-[1_1_18rem]">
                 <p className="text-sm font-medium text-app-text-primary">
                   {e.name}
                   {e.legalName && <span className="ms-2 text-xs font-normal text-app-text-secondary">{e.legalName}</span>}
