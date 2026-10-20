@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { SHARDS, MAIN_SHARD, shardOf, inShard, isShard, claimedCheckIds } from "../../qa/lib/shards.mjs";
+import { SHARDS, MAIN_SHARD, ALWAYS, shardOf, inShard, isShard, claimedCheckIds } from "../../qa/lib/shards.mjs";
 import { Run } from "../../qa/lib/report.mjs";
-import { readShards, missingShardChecks } from "../../qa/merge.mjs";
+import { readShards, missingShardChecks, dedupe } from "../../qa/merge.mjs";
 import { shardPlan } from "../../qa/checks/static.mjs";
 
 type Finding = { severity: string; title: string; detail: string };
@@ -143,5 +143,43 @@ describe("merging the shards", () => {
     );
     const { found } = readShards(dir);
     expect(found.get("main")!.checks[0].id).toBe("fresh");
+  });
+});
+
+describe("preflight in every shard", () => {
+  // Run #508, 20.10.2026: utc, integration and coverage all reported
+  // success with "Run QA" at 0 seconds. preflight is what fills
+  // `capabilities`, every skipIf reads it, and it lived in `main` alone -
+  // so the other three saw a machine with no database and skipped
+  // everything they own. Green, instant, and nothing tested.
+  it("runs in every shard, not only the one that owns it", () => {
+    for (const s of SHARDS) expect(inShard("preflight", s)).toBe(true);
+    expect(ALWAYS).toContain("preflight");
+  });
+
+  it("appears once in the merged table, keeping the worst row", () => {
+    const row = (status: string, findings: Finding[] = []) => ({
+      id: "preflight",
+      label: "Environment preflight",
+      status,
+      blocking: false,
+      ms: 0,
+      findings,
+    });
+    const merged = dedupe([
+      row("pass"),
+      { id: "integration", label: "i", status: "pass", blocking: true, ms: 0, findings: [] },
+      row("warn", [{ severity: "major", title: "no browser available", detail: "" }]),
+      row("pass"),
+    ]);
+    expect(merged.filter((c) => c.id === "preflight")).toHaveLength(1);
+    expect(merged.find((c) => c.id === "preflight")!.status).toBe("warn");
+    // Order is preserved: preflight keeps the slot it first appeared in.
+    expect(merged.map((c) => c.id)).toEqual(["preflight", "integration"]);
+  });
+
+  it("does not collapse two different checks that share a status", () => {
+    const c = (id: string) => ({ id, label: id, status: "pass", blocking: true, ms: 0, findings: [] });
+    expect(dedupe([c("integration"), c("coverage")]).map((x) => x.id)).toEqual(["integration", "coverage"]);
   });
 });

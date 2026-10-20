@@ -136,6 +136,11 @@ export class Run {
     if (this.shard) {
       const file = path.join(dir, `shard-${this.shard}.json`);
       fs.writeFileSync(file, JSON.stringify(payload, null, 2) + "\n");
+      // The shard's own table on its job page. The artefact host is
+      // unreachable from the networks this project is operated from, so
+      // without this the only readable thing about a shard is the scrolled
+      // log - which is how run #508's three empty shards looked fine.
+      this.appendToJobSummary(`### Shard: ${this.shard}\n\n${this.markdown()}`);
       return path.join("qa", "reports", `shard-${this.shard}.json`);
     }
 
@@ -149,15 +154,18 @@ export class Run {
     // actually operated from - so the report existed and nobody could read
     // it. A dispatched run (no pull request to comment on) had no readable
     // output at all.
-    const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-    if (summaryFile) {
-      try {
-        fs.appendFileSync(summaryFile, md + "\n");
-      } catch (err) {
-        process.stdout.write(`  (could not write the job summary: ${err?.message ?? err})\n`);
-      }
-    }
+    this.appendToJobSummary(md);
     return path.join("qa", "reports", "last.json");
+  }
+
+  appendToJobSummary(md) {
+    const summaryFile = process.env.GITHUB_STEP_SUMMARY;
+    if (!summaryFile) return;
+    try {
+      fs.appendFileSync(summaryFile, md + "\n");
+    } catch (err) {
+      process.stdout.write(`  (could not write the job summary: ${err?.message ?? err})\n`);
+    }
   }
 
   /**

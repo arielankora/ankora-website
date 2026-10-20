@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "./lib/discover.mjs";
 import { Run, finding } from "./lib/report.mjs";
-import { SHARDS } from "./lib/shards.mjs";
+import { SHARDS, ALWAYS } from "./lib/shards.mjs";
 
 function arg(name, fallback = null) {
   const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
@@ -109,6 +109,42 @@ export function missingShardChecks(expected, found, broken) {
   return rows;
 }
 
+/**
+ * One row per check.
+ *
+ * The checks in ALWAYS (preflight) run in every shard by design, so the
+ * merged table would otherwise carry four of them and count each one in
+ * the summary. Keep the worst: a preflight that found no browser in one
+ * shard is the interesting one, not the three that did.
+ */
+const RANK = { fail: 4, skipped: 3, warn: 2, pass: 1 };
+
+const worseOf = (a, b) => {
+  if (!a) return b;
+  const ra = RANK[a.status] ?? 0;
+  const rb = RANK[b.status] ?? 0;
+  if (rb !== ra) return rb > ra ? b : a;
+  return b.findings.length > a.findings.length ? b : a;
+};
+
+export function dedupe(checks) {
+  const out = [];
+  const seen = new Map(); // id -> index in `out`, for ALWAYS ids only
+  for (const c of checks) {
+    if (!ALWAYS.includes(c.id)) {
+      out.push(c);
+      continue;
+    }
+    const at = seen.get(c.id);
+    if (at === undefined) {
+      seen.set(c.id, out.push(c) - 1);
+    } else {
+      out[at] = worseOf(out[at], c);
+    }
+  }
+  return out;
+}
+
 function main() {
   const level = Number(arg("level", "3"));
   const dir = path.resolve(ROOT, arg("dir", path.join("qa", "reports")));
@@ -123,12 +159,33 @@ function main() {
   // every week rather than in whatever order the artefacts downloaded.
   const payloads = expected.filter((n) => found.has(n)).map((n) => found.get(n));
   const run = Run.fromShards(level, payloads);
-  run.checks = [...run.checks, ...missingShardChecks(expected, found, broken)];
+  run.checks = dedupe([...run.checks, ...missingShardChecks(expected, found, broken)]);
 
   run.print();
   const file = run.persist();
   process.stdout.write(`  Report: ${file}\n\n`);
-  process.exit(run.failed ? 1 : 0);
+
+  // INCOMPLETE exits non-zero here, and this is the one place it does.
+  //
+  // qa/run.mjs has always exited 0 on an incomplete run: the verdict said
+  // so in words and the exit code disagreed, which is how run #508 put
+  // three green ticks on a hunt that had tested nothing. Changing that
+  // globally would turn the pull-request gate red whenever the production
+  // probe cannot reach the site, so the rule is applied where the blast
+  // radius is the weekly run and the reader is looking for exactly this.
+  if (run.incomplete) {
+    const skipped = run.checks.filter((c) => c.blocking && c.status === "skipped");
+    process.stderr.write(
+      [
+        "  INCOMPLETE: a blocking check did not run.",
+        ...skipped.map((c) => `    ${c.id}: ${c.reason ?? "no reason given"}`),
+        "",
+        "  A skipped check is not a passed check.",
+        "",
+      ].join("\n"),
+    );
+  }
+  process.exit(run.failed || run.incomplete ? 1 : 0);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();

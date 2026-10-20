@@ -24,7 +24,7 @@ import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
-import { isShard, SHARDS } from "./lib/shards.mjs";
+import { isShard, SHARDS, ALWAYS } from "./lib/shards.mjs";
 import { finding } from "./lib/report.mjs";
 
 const LEVELS = {
@@ -230,9 +230,29 @@ async function main() {
   // well-formed report with no rows in it and have nothing to be alarmed
   // by. (The static check `shard-plan` catches this on the PR gate; this
   // is the belt to its braces, because the two can drift apart in CI.)
-  if (shard && run.checks.length === 0) {
-    process.stderr.write(`  shard "${shard}" ran no checks at level ${level}, see qa/lib/shards.mjs\n\n`);
-    process.exit(1);
+  if (shard) {
+    const owned = run.checks.filter((c) => !ALWAYS.includes(c.id));
+    if (owned.length === 0) {
+      process.stderr.write(`  shard "${shard}" ran no checks at level ${level}, see qa/lib/shards.mjs\n\n`);
+      process.exit(1);
+    }
+    // Everything this shard owns skipped itself. Green and empty, in
+    // seconds - which is exactly how run #508 reported three healthy-looking
+    // shards that had tested nothing, because preflight had not run in them
+    // and so no database appeared to exist. A shard with nothing left to
+    // say is a broken shard, not a passing one.
+    if (owned.every((c) => c.status === "skipped")) {
+      process.stderr.write(
+        [
+          `  shard "${shard}" skipped every check it owns:`,
+          ...owned.map((c) => `    ${c.id}: ${c.reason ?? "no reason given"}`),
+          "",
+          "  A shard that tested nothing is not a shard that passed.",
+          "",
+        ].join("\n"),
+      );
+      process.exit(1);
+    }
   }
 
   process.exit(run.failed ? 1 : 0);

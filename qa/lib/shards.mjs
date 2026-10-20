@@ -51,6 +51,25 @@ export const MAIN_SHARD = "main";
 /** Every shard name, `main` first. The workflow's matrix reads this order. */
 export const SHARDS = [MAIN_SHARD, ...Object.keys(SHARD_CHECKS)];
 
+/**
+ * Checks every shard runs, whatever else it owns.
+ *
+ * `preflight` is not really a check. It is what fills `capabilities` in
+ * checks/preflight.mjs, and every `skipIf` in the runner consults that
+ * object. A shard that does not run it sees a machine with no database, no
+ * browser and no Prisma client, skips everything it owns, and finishes
+ * green in under a second.
+ *
+ * Measured, not feared: the first sharded run (#508, 20.10.2026) had
+ * `utc`, `integration` and `coverage` all report success with "Run QA" at
+ * 0 seconds. Three quarters of the weekly hunt did not happen and nothing
+ * was red. This is the suite's oldest failure mode and the split walked
+ * straight back into it.
+ *
+ * The merge de-duplicates the rows these produce, keeping the worst.
+ */
+export const ALWAYS = ["preflight"];
+
 const OWNER = new Map(
   Object.entries(SHARD_CHECKS).flatMap(([shard, ids]) => ids.map((id) => [id, shard])),
 );
@@ -68,6 +87,7 @@ export function shardOf(id) {
  */
 export function inShard(id, shard) {
   if (!shard) return true;
+  if (ALWAYS.includes(id)) return true;
   return shardOf(id) === shard;
 }
 
