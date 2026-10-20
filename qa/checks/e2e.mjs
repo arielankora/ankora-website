@@ -244,6 +244,9 @@ export async function e2e() {
     out.push(finding(severity, summary, aborted.join("\n")));
   }
 
+  const verdict = abortVerdict(r.all);
+  if (verdict) out.push(verdict);
+
   // The page's own answer to "who cancelled it". Printed by the probe in
   // qa/e2e/observe.ts, which wraps AbortController.abort() and window.fetch
   // inside the browser, because from the network side a fetch cancelled by
@@ -311,4 +314,63 @@ export async function e2e() {
 
   out.push(finding("info", `browser: ${passed}/${specs.length} specs passing`));
   return out;
+}
+
+/**
+ * Did any aborted write belong to a test that then failed?
+ *
+ * Separated from the check so it can be exercised without a browser: a
+ * judgement that can only be tested by having a real run go wrong is a
+ * judgement nobody can test, and this suite has been bitten by that before.
+ *
+ * 20.10.2026. The raw count has been in the report since 7.10 and has grown:
+ * 3, then 14 on run #399, then 34 on #514, most of them on the newest
+ * screen. It reads like a worsening fault. It may be nothing:
+ * claude/rsc-lost-ping-root-cause-2026-10-13.md established that
+ * ERR_ABORTED appears on successful writes too, because the browser cancels
+ * the response after the server has already committed. So the number partly
+ * tracks how many writes the suite performs, which goes up whenever anyone
+ * adds a screen.
+ *
+ * The fixture prints one `[abort-verdict]` line per test that aborted a
+ * write, carrying that test's own outcome. A test that aborted a POST and
+ * then passed its assertions saw the row; the cancellation cost nothing.
+ * One that did not is the fault this investigation was about.
+ */
+export function abortVerdict(output) {
+  const verdicts = String(output ?? "")
+    .split("\n")
+    .map((l) => l.replace(/^\[WebServer\]\s?/, "").trimEnd())
+    .filter((l) => l.includes("[abort-verdict]"));
+  if (!verdicts.length) return null;
+
+  const count = (l) => Number(/writes=(\d+)/.exec(l)?.[1] ?? 0);
+  const suspect = verdicts.filter((l) => !/outcome=as-expected/.test(l));
+  const retried = verdicts.filter((l) => /outcome=as-expected/.test(l) && !/retry=0/.test(l));
+  const total = verdicts.reduce((n, l) => n + count(l), 0);
+  const lost = suspect.reduce((n, l) => n + count(l), 0);
+
+  if (lost) {
+    return finding(
+      "major",
+      `${lost} aborted write(s) in ${suspect.length} test(s) that did not end as expected`,
+      [
+        "These are the ones worth looking at: the write was cancelled and the test could not then prove it landed.",
+        "",
+        ...suspect.slice(0, 10),
+      ].join("\n"),
+    );
+  }
+  if (retried.length) {
+    return finding(
+      "minor",
+      `every aborted write was in a test that passed, ${retried.length} of them only on a retry`,
+      ["A first attempt that failed and a second that passed is not the same as a clean run.", "", ...retried.slice(0, 10)].join("\n"),
+    );
+  }
+  return finding(
+    "info",
+    `${total} aborted write(s), none in a test that failed`,
+    "Every test that aborted a write went on to prove the write landed, first try. The cancellation is the browser dropping a response the server had already committed, which is what the root-cause note of 13.10 describes. Nothing to do.",
+  );
 }

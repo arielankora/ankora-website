@@ -52,6 +52,10 @@ type Observed = {
   /// teardown, and teardown aborts every request still in flight - which
   /// is not a fault, just a page being closed.
   sealed: boolean;
+  /// Aborts seen while the test body was still running, writes and all.
+  /// Separate from `done` because `done` also holds the teardown aborts,
+  /// and those are Playwright closing the page rather than the fault.
+  abortsWhileRunning: { method: string; path: string }[];
 };
 
 const observed = new WeakMap<Page, Observed>();
@@ -167,7 +171,7 @@ const DRIFT_PROBE = `(() => {
 })();`;
 
 export function observe(page: Page): void {
-  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [], navsInFlight: 0, sealed: false };
+  const state: Observed = { done: [], open: new Map(), logs: [], navigations: [], navsInFlight: 0, sealed: false, abortsWhileRunning: [] };
   observed.set(page, state);
 
   // Fire and forget: a probe that failed to install must never be the
@@ -234,6 +238,7 @@ export function observe(page: Page): void {
     // that noise is in the report it is worse than no report, because it
     // is indistinguishable from the real thing.
     if (state.sealed) return;
+    state.abortsWhileRunning.push({ method: started.method, path: started.path });
     console.warn(
       `[abort] ${started.method} ${started.path} ${ms}ms ${failed ?? "(no reason given)"}` +
         ` (${navigating ? "WHILE NAVIGATING" : "page still"},` +
@@ -270,6 +275,27 @@ export function observe(page: Page): void {
 /// the page said while it happened.
 /// Stop reporting aborts: the test body has returned and what follows is
 /// Playwright closing the page, which cancels whatever was in flight.
+/// The writes this test aborted while it was still running.
+///
+/// Why the count on its own was never enough. The report has carried a
+/// number since 7.10 and it has grown: 3, then 14 on run #399, then 34 on
+/// #514, most of them on the newest screen. It reads like a worsening
+/// fault, and it may be nothing at all - `claude/rsc-lost-ping-root-cause-
+/// 2026-10-13.md` established that ERR_ABORTED appears on successful
+/// writes too, because the browser cancels the response after the server
+/// has already committed. So the number tracks how many writes the suite
+/// performs, which goes up whenever anyone adds a screen.
+///
+/// What makes it a finding or not is whether the test that issued the
+/// write then went on to prove the write landed. The fixture pairs this
+/// with the test's own outcome, which is the one thing that tells a
+/// cancelled response apart from a lost one.
+export function abortedWrites(page: Page): { method: string; path: string }[] {
+  const state = observed.get(page);
+  if (!state) return [];
+  return state.abortsWhileRunning.filter((a) => a.method !== "GET");
+}
+
 export function seal(page: Page): void {
   const state = observed.get(page);
   if (state) state.sealed = true;

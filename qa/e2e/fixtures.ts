@@ -1,5 +1,5 @@
 import { test as base } from "@playwright/test";
-import { observe, pageDrift, seal, trafficSummary } from "./observe";
+import { abortedWrites, observe, pageDrift, seal, trafficSummary } from "./observe";
 
 // Every write flow, observed - because the failures move.
 //
@@ -27,7 +27,25 @@ export const test = base.extend({
     observe(page);
     await runTest(page);
     // Past this line every abort is Playwright closing the page.
+    const writes = abortedWrites(page);
     seal(page);
+
+    // One line per test that aborted a write, carrying the thing the count
+    // alone never had: whether the test went on to prove the write landed.
+    //
+    // A cancelled response and a lost write look identical in the network
+    // log. They do not look identical here: a test that aborted a POST and
+    // then passed its own assertions saw the row. The e2e check adds these
+    // up, so "34 aborted writes" becomes "34, none in a test that failed",
+    // which is a sentence somebody can act on, or stop worrying about.
+    if (writes.length) {
+      const paths = [...new Set(writes.map((w) => `${w.method} ${w.path}`))].join(" | ");
+      const outcome = testInfo.status === testInfo.expectedStatus ? "as-expected" : String(testInfo.status);
+      console.warn(
+        `[abort-verdict] writes=${writes.length} outcome=${outcome} retry=${testInfo.retry}` +
+          ` test=${JSON.stringify(testInfo.title)} on=${paths}`,
+      );
+    }
 
     if (testInfo.status === testInfo.expectedStatus) return;
 
