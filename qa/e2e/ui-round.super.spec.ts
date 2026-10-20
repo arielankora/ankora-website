@@ -57,7 +57,8 @@ test("the time-entries filter applies as a page load", async ({ page }) => {
   await expect(page.locator("select").first()).toHaveValue("demo-client-a");
 });
 
-for (const route of ["/app/clients", "/app/reports", "/app/reports?tab=schedules", "/app/time-entries", "/app/users"]) {
+// Credentials, hour banks and alerts carried gold text until 20.10.2026.
+for (const route of ["/app/clients", "/app/reports", "/app/reports?tab=schedules", "/app/time-entries", "/app/users", "/app/credentials", "/app/hour-banks", "/app/alerts"]) {
   test(`text on ${route} meets contrast`, async ({ page }) => {
     await page.goto(route, { waitUntil: "networkidle" });
     const result = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();

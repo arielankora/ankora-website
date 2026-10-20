@@ -333,7 +333,7 @@ export default async function TaskDetailPage(props: {
                 <span className="text-sm text-app-text-primary">
                   {c.systemName}
                   {c.url && (
-                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-gold hover:underline">
+                    <a href={c.url} target="_blank" rel="noopener noreferrer" className="ms-2 text-xs text-app-text-accent hover:underline">
                       פתיחה
                     </a>
                   )}

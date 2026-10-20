@@ -8,7 +8,7 @@ function SubmitButton({ saved }: { saved: boolean }) {
     <button
       type="submit"
       disabled={pending}
-      className="text-xs font-medium text-gold disabled:opacity-50"
+      className="text-xs font-medium text-app-text-accent disabled:opacity-50"
     >
       {pending ? "שומר..." : saved ? "נשמר ✓" : "שמירה"}
     </button>

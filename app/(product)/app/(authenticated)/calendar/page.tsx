@@ -139,7 +139,7 @@ export default async function CalendarPage(props: {
               data-testid="calendar-overdue-button"
               aria-pressed={state.drawer === "overdue"}
               className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                state.drawer === "overdue" ? "border-appNavy bg-app-surface-nav text-cream" : "border-app-error/35 bg-white text-app-error hover:border-app-error/60"
+                state.drawer === "overdue" ? "border-app-surface-nav bg-app-surface-nav text-cream" : "border-app-error/35 bg-white text-app-error hover:border-app-error/60"
               }`}
             >
               <Clock size={14} strokeWidth={1.8} />
@@ -151,7 +151,7 @@ export default async function CalendarPage(props: {
               data-testid="calendar-undated-button"
               aria-pressed={state.drawer === "undated"}
               className={`flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[13px] font-medium transition-colors ${
-                state.drawer === "undated" ? "border-appNavy bg-app-surface-nav text-cream" : "border-gold bg-white text-app-text-primary hover:border-gold-dim"
+                state.drawer === "undated" ? "border-app-surface-nav bg-app-surface-nav text-cream" : "border-gold bg-white text-app-text-primary hover:border-gold-dim"
               }`}
             >
               <Inbox size={14} strokeWidth={1.8} />

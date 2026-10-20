@@ -185,7 +185,7 @@ export function Drawer({
             type="button"
             aria-label="סגירה"
             onClick={dismiss}
-            className="absolute inset-0 bg-appNavy/30"
+            className="absolute inset-0 bg-app-surface-nav/30"
           />
           <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white shadow-lg sm:max-w-md">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">

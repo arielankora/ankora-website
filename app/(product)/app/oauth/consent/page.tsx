@@ -88,7 +88,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
         אתה מחובר כ־<strong className="font-medium text-app-text-primary">{user.name}</strong> ({user.email}).
       </p>
 
-      <div className="mt-6 rounded-lg border border-appNavy/10 bg-app-surface-page p-4 text-sm leading-relaxed text-app-text-primary">
+      <div className="mt-6 rounded-lg border border-app-border bg-app-surface-page p-4 text-sm leading-relaxed text-app-text-primary">
         <p className="font-medium text-app-text-primary">מה Claude יוכל לעשות</p>
         {user.role === "CLIENT_USER" ? (
           // A portal user connects the portal connector (/api/mcp/portal),
@@ -132,7 +132,7 @@ export default async function ConsentPage(props: { searchParams: Promise<Params>
           type="submit"
           name="decision"
           value="deny"
-          className="flex-1 rounded-md border border-appNavy/20 px-4 py-2.5 text-sm font-medium text-app-text-primary transition hover:bg-app-surface-sunken"
+          className="flex-1 rounded-md border border-app-border-strong px-4 py-2.5 text-sm font-medium text-app-text-primary transition hover:bg-app-surface-sunken"
         >
           ביטול
         </button>

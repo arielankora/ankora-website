@@ -34,16 +34,16 @@ export function AdminLoginForm({ redirectTo }: { redirectTo: string }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto mt-10 max-w-sm rounded-2xl border border-lineDark bg-white/60 p-8">
-      <label className="block text-sm font-medium text-appNavy/70">Admin password</label>
+    <form onSubmit={onSubmit} className="mx-auto mt-10 max-w-sm rounded-2xl border border-app-border bg-white/60 p-8">
+      <label className="block text-sm font-medium text-app-text-secondary">Admin password</label>
       <input
         type="password"
         autoFocus
         value={password}
         onChange={(e) => setPassword(e.target.value)}
-        className="mt-2 w-full rounded-lg border border-lineDark bg-white px-4 py-2.5 text-appNavy outline-none focus:border-gold"
+        className="mt-2 w-full rounded-lg border border-app-border-strong bg-white px-4 py-2.5 text-app-text-primary outline-none focus:border-gold"
       />
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && <p className="mt-3 text-sm text-app-error">{error}</p>}
       <button
         type="submit"
         disabled={loading}

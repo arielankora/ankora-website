@@ -186,7 +186,7 @@ export function TaskBoard({ cards }: { cards: BoardCard[] }) {
             }}
             data-column={column.status}
             className={`flex w-[264px] shrink-0 flex-col rounded-2xl border p-2.5 transition-colors ${
-              over === column.status ? "border-appNavy bg-app-surface-sunken" : "border-app-border bg-cream-dim/30"
+              over === column.status ? "border-app-surface-nav bg-app-surface-sunken" : "border-app-border bg-app-surface-sunken"
             }`}
           >
             <h2 className="flex items-baseline gap-2 px-1.5 pb-2 text-[13px] font-medium text-app-text-primary">

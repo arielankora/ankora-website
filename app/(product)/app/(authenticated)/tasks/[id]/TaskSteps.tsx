@@ -124,7 +124,7 @@ function StepRow({ step, parentId, listQuery }: { step: Step; parentId: string; 
         // checkboxes says what each one closes rather than "checkbox,
         // checkbox, checkbox".
         aria-label={`סימון השלב ${step.title} כהושלם`}
-        className="mt-[3px] h-4 w-4 shrink-0 cursor-pointer accent-appNavy"
+        className="mt-[3px] h-4 w-4 shrink-0 cursor-pointer accent-app-text-primary"
       />
       <div className="min-w-0 flex-1">
         <Link
@@ -168,7 +168,7 @@ function AddStep({ taskId, clientId }: { taskId: string; clientId: string }) {
         onChange={(e) => setTitle(e.target.value)}
         aria-label="שלב חדש"
         placeholder="מה צריך לקרות"
-        className="min-w-0 flex-1 border-b border-app-border-strong bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
+        className="min-w-0 flex-1 border-b border-app-border-strong bg-transparent py-1.5 text-[13.5px] text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-app-surface-nav"
       />
       <button
         type="submit"

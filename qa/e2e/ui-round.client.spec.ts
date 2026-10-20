@@ -36,7 +36,17 @@ test("hours and the monthly report are one screen, and the month stays", async (
   await expect(page).toHaveURL(/\/app\/portal\/hours\?view=monthly$/);
 });
 
-for (const route of ["/app/portal", "/app/portal/hours", "/app/portal/hours?view=monthly", "/app/portal/decisions"]) {
+test("the week by days leads back to hours and reports", async ({ page }) => {
+  await page.goto("/app/portal/hours", { waitUntil: "domcontentloaded" });
+  await page.getByRole("link", { name: "לפי ימים" }).click();
+  await expect(page).toHaveURL(/\/app\/portal\/weekly$/);
+  const back = page.getByRole("link", { name: "חזרה: שעות ודוחות" }).first();
+  await expect(back).toBeVisible();
+  await back.click();
+  await expect(page).toHaveURL(/\/app\/portal\/hours$/);
+});
+
+for (const route of ["/app/portal", "/app/portal/hours", "/app/portal/hours?view=monthly", "/app/portal/weekly", "/app/portal/decisions"]) {
   test(`text on ${route} meets contrast`, async ({ page }) => {
     await page.goto(route, { waitUntil: "networkidle" });
     const result = await new AxeBuilder({ page }).withRules(["color-contrast"]).analyze();

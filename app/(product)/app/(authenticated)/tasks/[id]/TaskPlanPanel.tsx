@@ -151,7 +151,7 @@ export function TaskPlanPanel({
               onChange={(e) => setDraftBody(e.target.value)}
               rows={14}
               dir="rtl"
-              className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy"
+              className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none focus:border-app-surface-nav"
             />
           </label>
           <label className="block">
@@ -161,7 +161,7 @@ export function TaskPlanPanel({
               onChange={(e) => setDraftSteps(e.target.value)}
               rows={6}
               dir="rtl"
-              className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-appNavy"
+              className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-app-surface-nav"
             />
           </label>
           <div className="flex gap-2">
@@ -364,7 +364,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
           rows={10}
           dir="rtl"
           placeholder={"**מטרה**\n...\n\n**שלבים**\n1. ...\n2. ..."}
-          className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-appNavy"
+          className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] leading-relaxed text-app-text-primary outline-none placeholder:text-app-text-tertiary focus:border-app-surface-nav"
         />
       </label>
       <label className="mt-3 block">
@@ -374,7 +374,7 @@ export function NewPlanEditor({ taskId }: { taskId: string }) {
           onChange={(e) => setSteps(e.target.value)}
           rows={5}
           dir="rtl"
-          className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-appNavy"
+          className="mt-1 w-full resize-y rounded-lg border border-app-border-strong p-2 text-[13.5px] text-app-text-primary outline-none focus:border-app-surface-nav"
         />
       </label>
       <div className="mt-3 flex gap-2">

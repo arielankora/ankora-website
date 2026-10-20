@@ -68,7 +68,7 @@ export function CommandPalette({ actions, clients }: { actions: NavAction[]; cli
 
   return (
     <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label="חיפוש ופעולות">
-      <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="absolute inset-0 bg-appNavy/30" />
+      <button type="button" aria-label="סגירה" onClick={() => setOpen(false)} className="absolute inset-0 bg-app-surface-nav/30" />
       <div
         className="relative mx-auto flex max-h-[70vh] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-2xl border border-app-border bg-white shadow-[0_30px_70px_rgba(11,27,51,0.3)]"
         style={{ marginTop: "14vh" }}

@@ -103,7 +103,7 @@ export function EditClientForm({
           type="checkbox"
           name="isInternal"
           defaultChecked={client.isInternal}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-appNavy"
+          className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
         />
         <span>
           <span className="block text-sm text-app-text-primary">לקוח פנימי</span>

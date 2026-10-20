@@ -37,7 +37,7 @@ export function ProgressBar({
       <span
         aria-hidden
         data-testid="progress-marker"
-        className="absolute -top-1 h-3.5 w-0.5 -translate-x-1/2 rounded-full bg-appNavy/70 rtl:translate-x-1/2"
+        className="absolute -top-1 h-3.5 w-0.5 -translate-x-1/2 rounded-full bg-app-text-secondary rtl:translate-x-1/2"
         style={{ insetInlineStart: `${marker}%` }}
       />
     </div>

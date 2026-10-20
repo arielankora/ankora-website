@@ -366,7 +366,7 @@ export default async function TasksPage(props: {
                 href={groupHref}
                 className={`rounded-full border px-4 py-2 text-[13.5px] font-medium transition-colors ${
                   grouped
-                    ? "border-appNavy bg-app-surface-nav text-cream"
+                    ? "border-app-surface-nav bg-app-surface-nav text-cream"
                     : "border-app-border bg-white text-app-text-secondary hover:text-app-text-primary"
                 }`}
               >

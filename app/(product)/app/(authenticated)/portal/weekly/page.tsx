@@ -4,6 +4,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { PortalTabs } from "../PortalTabs";
+import { PageBack } from "@/components/app/BackSlot";
 import { formatClockMinutes } from "@/lib/hours-format";
 
 export const metadata = { robots: { index: false, follow: false } };
@@ -50,6 +51,8 @@ export default async function PortalWeeklyPage(props: { searchParams: Promise<{ 
   return (
     <div className="space-y-4">
       <PortalTabs active="hours" />
+      {/* Reached from "לפי ימים" on hours; a plain link back, like every detail screen. */}
+      <PageBack href="/app/portal/hours" label="שעות ודוחות" testId="portal-weekly-back" />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>

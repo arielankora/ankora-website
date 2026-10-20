@@ -180,7 +180,7 @@ export function HoursTrendChart({ data }: { data: HoursTrendData }) {
                     <div
                       aria-hidden
                       data-partial-cap
-                      className="mb-[3px] w-full max-w-[30px] border-t-2 border-dashed border-appNavy/45"
+                      className="mb-[3px] w-full max-w-[30px] border-t-2 border-dashed border-app-border-strong"
                     />
                   )}
                   <div

@@ -226,7 +226,7 @@ export function TaskDetail({
                     setEditingTitle(false);
                   }
                 }}
-                className="w-full rounded-lg border border-app-border px-3 py-2 text-lg font-medium text-app-text-primary outline-none focus:border-appNavy/40"
+                className="w-full rounded-lg border border-app-border px-3 py-2 text-lg font-medium text-app-text-primary outline-none focus:border-app-accent"
               />
             ) : (
               <button
@@ -351,7 +351,7 @@ export function TaskDetail({
                 );
                 if (!ok) setMappingTask(!next);
               }}
-              className="h-3.5 w-3.5 accent-appNavy"
+              className="h-3.5 w-3.5 accent-app-text-primary"
             />
             משימת מיפוי: הממצאים מוצעים לתיק הלקוח לפני הסגירה
           </label>
@@ -394,7 +394,7 @@ export function TaskDetail({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="מה צריך לעשות, כתובת, מספר אסמכתא, מה כבר נוסה."
-              className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-appNavy/40"
+              className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] leading-relaxed text-app-text-primary outline-none focus:border-app-accent"
             />
             {/* The subset, said once where somebody is typing it. Naming
                 what is supported is cheaper than letting a person
@@ -588,7 +588,7 @@ function Supervision({
                 }
               )
             }
-            className="h-3.5 w-3.5 accent-appNavy"
+            className="h-3.5 w-3.5 accent-app-text-primary"
           />
           דורשת אישור לפני סגירה
         </label>
@@ -866,7 +866,7 @@ function BlockSection({
             onChange={(e) => setReason(e.target.value)}
             aria-label="סיבת ההמתנה"
             placeholder="למה עצרנו, במשפט. לא חובה, ושווה."
-            className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+            className="w-full rounded-lg border border-app-border-strong px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
           />
           {on === "CLIENT" && task.clientVisible && (
             <p className="text-[12px] text-app-text-secondary">
@@ -967,7 +967,7 @@ function ClientSection({
                 );
               }}
               placeholder={task.title}
-              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
             />
           </div>
 
@@ -988,7 +988,7 @@ function ClientSection({
                 );
               }}
               placeholder="במשפט אחד, ישירות ללקוח: מה לעשות, איפה, וכמה זמן זה לוקח."
-              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
             />
           </div>
 
@@ -1018,7 +1018,7 @@ function ClientSection({
                 );
               }}
               placeholder="במשפט אחד, בשפה של הלקוח: מה קרה בפועל."
-              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+              className="mt-1 w-full rounded-lg border border-app-border px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
             />
           </div>
         </div>
@@ -1042,7 +1042,7 @@ function ClientSection({
             aria-label="משפט התוצאה לפני סגירה"
             value={clientOutcome}
             onChange={(e) => setClientOutcome(e.target.value)}
-            className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-appNavy/40"
+            className="mt-3 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-[14px] text-app-text-primary outline-none focus:border-app-accent"
           />
           <div className="mt-3 flex gap-2">
             <button
@@ -1235,7 +1235,7 @@ function TimerButton({
       type="button"
       disabled={disabled || pending}
       onClick={ask}
-      className="flex items-center gap-2 rounded-full border border-appNavy bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
+      className="flex items-center gap-2 rounded-full border border-app-surface-nav bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary disabled:opacity-50"
     >
       <Play size={15} />
       הפעלת טיימר

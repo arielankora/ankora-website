@@ -184,7 +184,7 @@ export function CalendarGrid(props: Props) {
           <section
             data-day={props.days[0]}
             {...dropZone(props.days[0])}
-            className={`min-h-[320px] rounded-2xl border p-4 transition-colors ${over === props.days[0] ? "border-appNavy bg-app-surface-sunken" : "border-app-border bg-white"}`}
+            className={`min-h-[320px] rounded-2xl border p-4 transition-colors ${over === props.days[0] ? "border-app-surface-nav bg-app-surface-sunken" : "border-app-border bg-white"}`}
           >
             <DayItems
               tasks={byDay.get(props.days[0])?.tasks ?? []}
@@ -220,7 +220,7 @@ export function CalendarGrid(props: Props) {
                         over === day
                           ? "bg-gold/10 outline outline-1 -outline-offset-1 outline-gold"
                           : outside
-                            ? "bg-cream-dim/30"
+                            ? "bg-app-surface-sunken"
                             : day === props.today
                               ? "bg-app-surface-sunken"
                               : weekend
@@ -421,7 +421,7 @@ function Drawer({
             באיחור <span className="font-jbmono text-[11.5px]">{overdue.length}{overdueMore ? "+" : ""}</span>
           </Link>
         </div>
-        <label className="flex items-center gap-2 rounded-lg border border-app-border px-2.5 py-1.5 text-[13px] text-app-text-secondary focus-within:border-appNavy/40">
+        <label className="flex items-center gap-2 rounded-lg border border-app-border px-2.5 py-1.5 text-[13px] text-app-text-secondary focus-within:border-app-accent">
           <Search size={14} strokeWidth={1.8} />
           <span className="sr-only">חיפוש</span>
           <input
@@ -473,7 +473,7 @@ function DrawerRow({ task, from, disabled, showDue }: { task: CalendarTask; from
       }}
       data-calendar-task={task.id}
       title={`${task.title} · ${task.clientName}`}
-      className="group flex cursor-grab items-start gap-1.5 rounded-lg px-1.5 py-2 hover:bg-cream-dim/30 active:cursor-grabbing"
+      className="group flex cursor-grab items-start gap-1.5 rounded-lg px-1.5 py-2 hover:bg-app-surface-sunken active:cursor-grabbing"
     >
       {/* The grip says "this moves" before anyone tries. */}
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="mt-[3px] shrink-0 text-app-text-tertiary group-hover:text-app-text-secondary">

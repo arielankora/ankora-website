@@ -26,7 +26,7 @@ export function RetryDeliveryButton({ deliveryId }: { deliveryId: string }) {
       type="button"
       disabled={isPending}
       onClick={retry}
-      className="text-[11px] font-medium text-gold underline decoration-gold/40 underline-offset-2 disabled:opacity-50"
+      className="text-[11px] font-medium text-app-text-accent underline decoration-gold/40 underline-offset-2 disabled:opacity-50"
     >
       {isPending ? "שולח..." : "ניסיון חוזר"}
     </button>

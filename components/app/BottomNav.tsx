@@ -77,7 +77,7 @@ export function BottomNav({
             type="button"
             aria-label="סגירה"
             onClick={() => setMoreOpen(false)}
-            className="absolute inset-0 bg-appNavy/30"
+            className="absolute inset-0 bg-app-surface-nav/30"
           />
           <div className="absolute inset-x-0 bottom-0 rounded-t-2xl border-t border-app-border bg-white px-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-lg">
             <div className="mb-4 border-b border-app-border pb-4">
