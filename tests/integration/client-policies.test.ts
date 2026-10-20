@@ -63,6 +63,27 @@ describe("client policies", () => {
     await expect(approveClientPolicy(manager, p.id)).rejects.toThrow("עוד לא ודאי");
   });
 
+  // 20.10.2026: not every client puts things in writing. On Ankora's own
+  // document alone "מאושר" was saved as uncertain without a word, and the
+  // rule could never be approved.
+  it("confirmed by hand on an Ankora document, a rule stays confirmed, survives later edits, and can be approved", async () => {
+    const { client, employee, manager } = await setup();
+    await addClientSource(employee, { clientId: client.id, kind: "ANKORA_DOCUMENT", title: "סיכום של הדס", weight: "SECONDARY" });
+    const S2 = [{ code: "S2" }];
+    const p = await addClientPolicy(employee, { clientId: client.id, kind: "INFO", title: "חריגים: אישור אורן", statement: "חריג מגיע לשכר רק אחרי אישור כתוב של אורן", sources: S2 });
+    expect(p).toMatchObject({ knowledgeStatus: "UNCERTAIN" });
+    await expect(approveClientPolicy(manager, p.id)).rejects.toThrow("עוד לא ודאי");
+
+    // The same save without the box changes nothing; with it, it is confirmed.
+    expect(await updateClientPolicy(employee, p.id, { knowledgeStatus: "CONFIRMED", sources: S2 })).toMatchObject({ knowledgeStatus: "UNCERTAIN" });
+    const confirmed = await updateClientPolicy(employee, p.id, { knowledgeStatus: "CONFIRMED", sources: S2, manualConfirm: true });
+    expect(confirmed).toMatchObject({ knowledgeStatus: "CONFIRMED", toResolve: null });
+
+    // Another edit on the same sources does not lower it again.
+    expect(await updateClientPolicy(employee, p.id, { knowledgeStatus: "CONFIRMED", rationale: "לפי גיא", sources: S2 })).toMatchObject({ knowledgeStatus: "CONFIRMED" });
+    expect(await approveClientPolicy(manager, p.id)).toMatchObject({ status: "ACTIVE" });
+  });
+
   it("changing what an approved rule says is a new version, back with a manager; a source note is not", async () => {
     const { client, employee, manager } = await setup();
     const p = await addClientPolicy(employee, { clientId: client.id, kind: "SEPARATION", title: "Inc ו-LTD", statement: "לא שולחים לאיילה שום דבר של Inc", sources: S1 });

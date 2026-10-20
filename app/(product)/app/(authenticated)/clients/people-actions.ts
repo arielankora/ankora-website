@@ -83,6 +83,8 @@ function parseContactFields(formData: FormData, selfId?: string): { error?: stri
       doNotDisclose: text(formData, "doNotDisclose"),
       sensitivity: formData.get("sensitive") === "on" ? "SENSITIVE" : "NORMAL",
       sources: sources.refs,
+
+      manualConfirm: formData.get("manualConfirm") === "1",
     },
   };
 }
@@ -153,6 +155,8 @@ function parseOrganizationFields(formData: FormData, selfId: string): { error?: 
       knowledgeStatus: pick(formData.get("knowledgeStatus"), STATUSES),
       toResolve: text(formData, "toResolve"),
       sources: sources.refs,
+
+      manualConfirm: formData.get("manualConfirm") === "1",
     },
   };
 }

@@ -110,6 +110,8 @@ function parseSystem(formData: FormData, selfId?: string): {
     audience: pick(formData.get("audience"), AUDIENCES),
     doNotDisclose: text(formData, "doNotDisclose"),
     sources: refs,
+
+    manualConfirm: formData.get("manualConfirm") === "1",
     ...itemExtrasFrom(formData, selfId),
   };
   // The vault picker is shown only to people who may open the vault. A

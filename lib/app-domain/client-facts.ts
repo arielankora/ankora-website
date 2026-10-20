@@ -167,13 +167,13 @@ export async function supersedeClientFact(actor: User, id: string, input: Omit<C
 /// Confirming is not a change of the fact, only of what we know about it:
 /// it happens in place, with the source that confirms it. Ankora's own
 /// documents still cannot confirm anything (R14).
-export async function confirmClientFact(actor: User, id: string, sources: SourceRef[]) {
+export async function confirmClientFact(actor: User, id: string, sources: SourceRef[], manualConfirm = false) {
   assertCan(actor.role, "time_entry.create_self");
   const fact = await findLive(id);
   await assertClientAccess(actor, fact.clientId);
   assertCurrent(fact);
   if (isQuestion(fact.kind)) throw new Error("שאלה נסגרת בתשובה, לא באישור.");
-  const sourced = await sourcedFields(fact.clientId, { knowledgeStatus: "CONFIRMED", sources, toResolve: null }, [fact.body], fact);
+  const sourced = await sourcedFields(fact.clientId, { knowledgeStatus: "CONFIRMED", sources, toResolve: null, manualConfirm }, [fact.body], fact);
   const updated = await prisma.clientFact.update({
     where: { id },
     data: { ...sourced, toResolve: sourced.knowledgeStatus === "CONFIRMED" ? null : sourced.toResolve, verifiedAt: new Date() },
@@ -256,7 +256,7 @@ export async function recordContradiction(actor: User, id: string, input: { valu
 
 /// A question answered becomes a confirmed item with a source (spec 3.4):
 /// the answer is what we now know, and where we heard it.
-export async function answerClientQuestion(actor: User, id: string, input: { answer: string; sources: SourceRef[] }) {
+export async function answerClientQuestion(actor: User, id: string, input: { answer: string; sources: SourceRef[]; manualConfirm?: boolean }) {
   assertCan(actor.role, "time_entry.create_self");
   const fact = await findLive(id);
   await assertClientAccess(actor, fact.clientId);
@@ -265,7 +265,7 @@ export async function answerClientQuestion(actor: User, id: string, input: { ans
   if (fact.answeredAt) throw new Error("השאלה כבר נענתה.");
   const answer = input.answer.trim();
   if (!answer) throw new Error("צריך לכתוב את התשובה.");
-  const sourced = await sourcedFields(fact.clientId, { knowledgeStatus: "CONFIRMED", sources: input.sources, toResolve: null }, [answer], fact);
+  const sourced = await sourcedFields(fact.clientId, { knowledgeStatus: "CONFIRMED", sources: input.sources, toResolve: null, manualConfirm: input.manualConfirm }, [answer], fact);
   const updated = await prisma.clientFact.update({
     where: { id },
     data: {

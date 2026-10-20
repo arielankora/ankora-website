@@ -243,7 +243,7 @@ function PolicyForm({
           <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
         </select>
       </Field>
-      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} />
+      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.knowledgeStatus === "CONFIRMED"} />
       <ItemExtras existing={existing} disclose audience />
       {status !== "CONFIRMED" && (
         <Field label="מה יסגור את זה *">

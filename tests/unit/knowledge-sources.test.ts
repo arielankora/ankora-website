@@ -68,6 +68,8 @@ describe("checkSources", () => {
     expect(checkSources("CONFIRMED", [{ code: "S2" }], register)).toEqual({ ok: true, status: "UNCERTAIN", lowered: true });
     expect(checkSources("CONFIRMED", [{ code: "S2" }, { code: "S1" }], register)).toEqual({ ok: true, status: "CONFIRMED", lowered: false });
     expect(checkSources("UNCERTAIN", [{ code: "S2" }], register)).toEqual({ ok: true, status: "UNCERTAIN", lowered: false });
+    // A person confirms it by hand (20.10.2026): kept as they chose.
+    expect(checkSources("CONFIRMED", [{ code: "S2" }], register, [], true)).toEqual({ ok: true, status: "CONFIRMED", lowered: false });
   });
 });
 
