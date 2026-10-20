@@ -3326,6 +3326,9 @@ model KnowledgeProposal {
   /// Whether the person changed it before approving (decision 1 measures
   /// this: under 10% after a month opens approval in conversation).
   edited       Boolean       @default(false)
+  /// "כבר בתיק": it was already in the file, so approving it added its
+  /// sources to the item there (`resultId`) and created nothing.
+  attached     Boolean       @default(false)
   /// The item approving it created or changed.
   resultId     String?
 

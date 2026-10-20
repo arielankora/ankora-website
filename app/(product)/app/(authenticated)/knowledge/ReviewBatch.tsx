@@ -8,7 +8,7 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
+import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -28,6 +28,11 @@ export type ReviewProposal = {
   flags: { code: string; message: string; block?: boolean }[];
   link: string | null;
   existing: { body: string } | null;
+  /// A new item that is already in the file, as it stands now: what is
+  /// there, and whether "כבר בתיק" adds this proposal's sources to it.
+  alreadyIn: { body: string; addsSources: boolean } | null;
+  /// Closed by "כבר בתיק": nothing was created.
+  attached: boolean;
   rejectReason: string | null;
   /// Sensitive and this person is not an approver (R6): who decides it.
   hiddenFor: string | null;
@@ -282,10 +287,16 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
     else showToast({ tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
   }
 
+  async function attach() {
+    const r = await attachProposalAction(p.id);
+    if (r.error) showToast({ tone: "error", title: "לא נסגר", description: r.error });
+    else showToast({ tone: "info", title: p.alreadyIn?.addsSources ? "המקור נוסף לפריט שבתיק" : "נסגר: כבר בתיק", description: p.alreadyIn?.body.slice(0, 80) });
+  }
+
   if (p.state !== "PENDING") {
     return (
       <li className="py-2.5 text-xs text-app-text-tertiary">
-        {p.state === "APPROVED" ? (p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
+        {p.state === "APPROVED" ? (p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
         {p.taskId && (
@@ -331,6 +342,11 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
               {line}
             </p>
           ))}
+          {p.alreadyIn && (
+            <p className="mt-1 text-xs text-app-warning" data-testid="proposal-already-in">
+              כבר בתיק: <span className="text-app-text-secondary">{p.alreadyIn.body}</span>
+            </p>
+          )}
           {p.existing && (
             <p className="mt-1 text-xs text-app-text-secondary">
               היום בתיק: <span className={p.action === "SUPERSEDE" ? "line-through" : ""}>{p.existing.body}</span>
@@ -354,7 +370,8 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           </div>
           {p.reason && <p className="mt-1 text-xs text-app-text-secondary">למה: {p.reason}</p>}
           {p.quote && <p className="mt-1 border-s-2 border-app-border ps-2 text-xs italic text-app-text-secondary">{p.quote}</p>}
-          {p.flags.map((f, i) => (
+          {/* "Already in the file" is said once, above, with what is there. */}
+          {p.flags.filter((f) => !(p.alreadyIn && f.code === "DUPLICATE")).map((f, i) => (
             <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`}>
               {f.message}
             </p>
@@ -363,7 +380,13 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
         <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs">
           {/* A problem that blocks approval (spec 5.2) is fixed in the edit,
               where the server checks the approved text again. */}
-          {!blocked && (
+          {/* Already in the file: approving would make a second copy, or
+              be refused. The primary action closes it onto the item there. */}
+          {p.alreadyIn ? (
+            <button type="button" onClick={attach} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary">
+              {p.alreadyIn.addsSources ? "כבר בתיק: הוספת המקור" : "כבר בתיק: סגירה"}
+            </button>
+          ) : !blocked && (
             <button
               type="button"
               onClick={approve}

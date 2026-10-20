@@ -31,12 +31,13 @@ import { addClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
 import { addProcess, linkProcessDates, saveProcessVersion } from "@/lib/app-domain/processes";
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
-import { addClientFact, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
+import { addClientFact, addClientFactSources, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
+import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type ExistingItem } from "@/lib/app-domain/proposal-existing";
 import { dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
@@ -168,35 +169,11 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   if (item.target !== "TASK" && item.target !== "DATE" && sourceWeight === "SECONDARY" && (item.payload.knowledgeStatus ?? "CONFIRMED") === "CONFIRMED" && (item.alsoSources ?? []).length === 0) {
     flags.push({ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." });
   }
-  if (item.target === "FACT" && item.action === "CREATE") {
-    const body = normalizeForMatch(String(item.payload.body ?? ""));
-    const same = await prisma.clientFact.findMany({
-      where: { clientId, deletedAt: null, knowledgeStatus: { not: "SUPERSEDED" }, kind: item.payload.kind as never },
-      select: { body: true },
-    });
-    if (body && same.some((f) => normalizeForMatch(f.body) === body)) flags.push({ code: "DUPLICATE", message: "אותו פריט כבר קיים בתיק." });
-  }
-  if (item.target === "CONTACT") {
-    const emails = ((item.payload.emails as string[] | undefined) ?? []).map((e) => normalizeEmail(e)).filter((e): e is string => !!e);
-    if (emails.length > 0) {
-      const known = await prisma.clientContact.count({ where: { clientId, deletedAt: null, person: { emails: { hasSome: emails } } } });
-      if (known) flags.push({ code: "DUPLICATE", message: "איש קשר עם המייל הזה כבר בתיק." });
-    }
-  }
-  if (item.target === "ORGANIZATION") {
-    const name = String(item.payload.name ?? "").trim();
-    const known = await prisma.clientOrganization.count({
-      where: { clientId, deletedAt: null, organization: { name: { equals: name, mode: "insensitive" } } },
-    });
-    if (known) flags.push({ code: "DUPLICATE", message: "הארגון כבר בתיק." });
-  }
+  // The same match the card and the decision ask again later
+  // (proposal-existing.ts): an item can enter the file after this.
+  if (await findExisting(clientId, item.target, item.action ?? "CREATE", item.payload)) flags.push(duplicateFlag(item.target));
   if (isSensitive(item.payload)) {
     flags.push({ code: "R6", message: "מידע רגיש: רק מי שמאשר מידע רגיש אצל הלקוח רואה את הפריט ומחליט עליו." });
-  }
-  if (item.target === "ENTITY") {
-    const name = String(item.payload.name ?? "").trim();
-    const known = await prisma.clientEntity.count({ where: { clientId, deletedAt: null, name: { equals: name, mode: "insensitive" } } });
-    if (known) flags.push({ code: "DUPLICATE", message: "ישות בשם הזה כבר בתיק." });
   }
   if (item.target === "NARRATIVE") {
     const latest = await prisma.clientNarrative.findFirst({ where: { clientId, kind: item.payload.kind as never }, orderBy: { version: "desc" }, select: { body: true } });
@@ -204,31 +181,14 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
     flags.push({ code: "NARRATIVE", message: latest ? "באישור, הטקסט הזה מחליף את הגרסה שבתיק (הקודמת נשמרת בהיסטוריה)." : "באישור, זו הגרסה הראשונה של הטקסט." });
   }
   if (item.target === "PROCESS") {
-    const title = normalizeForMatch(String(item.payload.title ?? ""));
-    const known = await prisma.process.findMany({ where: { clientId, deletedAt: null, status: { not: "RETIRED" } }, select: { title: true } });
-    if (known.some((k) => normalizeForMatch(k.title) === title)) flags.push({ code: "DUPLICATE", message: "תהליך בשם הזה כבר בתיק." });
     flags.push({ code: "PROCESS", message: "באישור, התהליך נכנס כטיוטה. הנוהל רץ רק אחרי שמנהל מאשר אותו במסך התהליכים." });
   }
   if (item.target === "DATE") {
     if (typeof item.payload.responsibleName === "string" && item.payload.responsibleName.trim() && !(await ownerByName(item.payload.responsibleName))) {
       flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.responsibleName.trim()}". האחראי יהיה מי שמאשר, אלא אם מתקנים את השם.` });
     }
-    const title = normalizeForMatch(String(item.payload.title ?? ""));
-    const known = await prisma.importantDate.findMany({ where: { clientId, deletedAt: null, status: { not: "ARCHIVED" }, holidayKey: null }, select: { title: true } });
-    if (known.some((k) => normalizeForMatch(k.title) === title)) flags.push({ code: "DUPLICATE", message: "מועד בשם הזה כבר אצל הלקוח." });
-  }
-  if (item.target === "DOMAIN") {
-    const domain = normalizeDomain(String(item.payload.domain ?? ""));
-    const known = domain ? await prisma.clientDomain.count({ where: { clientId, domain, deletedAt: null } }) : 0;
-    if (known) flags.push({ code: "DUPLICATE", message: "הדומיין כבר בתיק." });
   }
   if (item.target === "POLICY") {
-    const title = normalizeForMatch(String(item.payload.title ?? ""));
-    const statement = normalizeForMatch(String(item.payload.statement ?? ""));
-    const known = await prisma.clientPolicy.findMany({ where: { clientId, deletedAt: null, status: { not: "RETIRED" } }, select: { title: true, statement: true } });
-    if (known.some((k) => normalizeForMatch(k.statement) === statement || (title && normalizeForMatch(k.title) === title))) {
-      flags.push({ code: "DUPLICATE", message: "כלל עם אותו שם או אותו נוסח כבר בתיק." });
-    }
     flags.push({ code: "POLICY", message: "באישור, הכלל נכנס לתיק כמוצע. מנהל מאשר אותו בנפרד כדי שייכנס לתוקף." });
   }
   // A change to an item is about that item: "already in the file" is the point.
@@ -430,6 +390,17 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     approverOf.set(clientId, await canApproveForClient(actor, clientId));
     approverNames.set(clientId, (await ruleApproversFor(clientId)).map((u) => u.name).join(" או "));
   }
+  // "Already in the file", as it stands now (proposal-existing.ts): an
+  // item that entered after the proposal arrived is found too, and one
+  // that left is no longer said to be there.
+  const alreadyIn = new Map<string, ExistingItem | null>();
+  for (const b of batches) {
+    for (const pr of b.proposals) {
+      if (pr.state === "PENDING" && pr.action === "CREATE") alreadyIn.set(pr.id, await findExisting(b.clientId, pr.target, pr.action, pr.payload as Record<string, unknown>));
+    }
+  }
+  const liveFlags = (pr: { id: string; target: string; flags: Prisma.JsonValue }) =>
+    alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(pr.flags) ? pr.flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : pr.flags;
   return batches.map((b) => ({
     ...b,
     source: b.sourceId ? sourceById.get(b.sourceId) ?? null : null,
@@ -443,9 +414,16 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
             reason: null,
             quote: null,
             existing: null,
+            alreadyIn: null as (ExistingItem & { addsSources: boolean }) | null,
             hiddenFor: approverNames.get(b.clientId) || "מי שמאשר מידע רגיש",
           }
-        : { ...p, existing: p.targetId ? targetById.get(p.targetId) ?? null : null, hiddenFor: null as string | null };
+        : {
+            ...p,
+            flags: liveFlags(p),
+            existing: p.targetId ? targetById.get(p.targetId) ?? null : null,
+            alreadyIn: alreadyIn.get(p.id) ? { ...alreadyIn.get(p.id)!, addsSources: keepsSources(p.target) && readSourceRefs((p.payload as Record<string, unknown>).sources).length > 0 } : null,
+            hiddenFor: null as string | null,
+          };
     }),
   }));
 }
@@ -677,6 +655,12 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
   // fix a problem, and one cannot sneak one in.
   const blocking = proposalProblems(proposal.target, payload, await registerCodes(proposal.clientId)).filter((f) => f.block);
   if (blocking.length) throw new Error(blocking[0].message);
+  // Where the file refuses a second copy, say what to do instead of only
+  // that it is there (20.10.2026).
+  if (["ORGANIZATION", "CONTACT", "SYSTEM"].includes(proposal.target)) {
+    const existing = await findExisting(proposal.clientId, proposal.target, proposal.action, payload);
+    if (existing) throw new Error(`${existing.body}: כבר בתיק. "כבר בתיק: הוספת המקור" מוסיף את המקור לפריט שבתיק.`);
+  }
   const resultId = await apply(actor, proposal, payload);
   const updated = await prisma.knowledgeProposal.update({
     where: { id },
@@ -697,6 +681,39 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     entityId: id,
     clientId: proposal.clientId,
     after: { resultId, edited: changed.length > 0, headline: proposalHeadline(proposal.target, payload), ...(options.bulk ? { bulk: true } : {}) },
+  });
+  return updated;
+}
+
+/// "כבר בתיק" (20.10.2026): what the proposal says is already in the
+/// file. Nothing new is created. The sources it brings are added to the
+/// item there, as a change proposal adds them, and the proposal closes
+/// as approved, pointing at that item. A date or a domain keeps no
+/// sources, so for them it only closes.
+export async function attachProposalToExisting(actor: User, id: string) {
+  assertCan(actor.role, "time_entry.create_self");
+  const proposal = await findPending(actor, id);
+  if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
+  const payload = proposal.payload as Record<string, unknown>;
+  const existing = await findExisting(proposal.clientId, proposal.target, proposal.action, payload);
+  if (!existing) throw new Error("הפריט כבר לא בתיק. מאשרים את ההצעה כרגיל.");
+  const sources = readSourceRefs(payload.sources);
+  if (sources.length && keepsSources(proposal.target)) {
+    if (proposal.target === "FACT") await addClientFactSources(actor, existing.id, sources);
+    else if (isUpdatable(proposal.target)) await applyUpdate(actor, { clientId: proposal.clientId, target: proposal.target, targetId: existing.id }, {}, sources);
+  }
+  const updated = await prisma.knowledgeProposal.update({
+    where: { id },
+    data: { state: "APPROVED", decidedById: actor.id, decidedAt: new Date(), edited: false, attached: true, resultId: existing.id },
+  });
+  await closeIfDone(proposal.batchId);
+  await recordAudit({
+    actorId: actor.id,
+    action: "knowledge_proposal.attach",
+    entityType: "KnowledgeProposal",
+    entityId: id,
+    clientId: proposal.clientId,
+    after: { resultId: existing.id, existing: existing.body, sources: sources.map((r) => r.code), headline: proposalHeadline(proposal.target, payload) },
   });
   return updated;
 }
@@ -804,11 +821,13 @@ export async function decideProposals(
   for (const id of unique) {
     try {
       if (decision.approve) {
-        const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { action: true, flags: true, payload: true } });
+        const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, target: true, action: true, flags: true, payload: true } });
         if (!p) throw new Error("ההצעה לא נמצאה.");
+        // The flags as they stand now, as the card showed them.
+        const existing = await findExisting(p.clientId, p.target, p.action, p.payload as Record<string, unknown>);
         const blocker = bulkApproveBlocker({
           action: p.action,
-          flags: (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[],
+          flags: withLiveDuplicate((Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[], p.target, existing) as ProposalFlag[],
           payload: p.payload as Record<string, unknown>,
         });
         if (blocker) throw new Error(`מאשרים אחת אחת: ${blocker}.`);

@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { approveProposal, decideProposals, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, attachProposalToExisting, decideProposals, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
@@ -61,6 +61,17 @@ export async function approveProposalAction(id: string): Promise<FormState> {
   const user = await requireUser();
   try {
     await approveProposal(user, id);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+/// "כבר בתיק": its sources join the item already in the file.
+export async function attachProposalAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await attachProposalToExisting(user, id);
   } catch (err) {
     return { error: friendlyError(err) };
   }

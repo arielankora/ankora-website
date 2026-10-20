@@ -4,9 +4,11 @@ import { createTestClient, createTestUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientFact, listClientFacts } from "@/lib/app-domain/client-facts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
+import { addClientOrganization } from "@/lib/app-domain/client-contacts";
 import { saveNarrative } from "@/lib/app-domain/client-narratives";
 import {
   approveProposal,
+  attachProposalToExisting,
   countPendingProposals,
   decideProposals,
   listOpenBatches,
@@ -145,6 +147,68 @@ describe("knowledge proposals", () => {
     await expect(rejectProposal(user, p.id, " ")).rejects.toThrow("למה");
     const rejected = await rejectProposal(user, p.id, "כבר בתיק");
     expect(rejected.state).toBe("REJECTED");
+  });
+
+  // 20.10.2026: IBI entered NUX's file from another meeting after S3 had
+  // proposed it. The card still offered "אישור", and approving it was
+  // refused with nothing to do next.
+  it("what entered the file after it was proposed is found when the card is read, and closes onto the item there", async () => {
+    const { client, user } = await setup();
+    await addClientSource(user, { clientId: client.id, kind: "PERSON", title: "x" });
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "ORGANIZATION", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", name: "IBI", role: "ניהול תוכנית האופציות" }, at: "34:37" },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "9 עובדים בישראל" }, at: "05:00" },
+        { target: "DOMAIN", reason: "נאמר בפגישה", payload: { domain: "nux.ai", kind: "CLIENT" } },
+      ],
+    });
+    const before = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    expect(before.map((p) => p.alreadyIn)).toEqual([null, null, null]);
+    expect(before.flatMap((p) => (p.flags as { code: string }[]).map((f) => f.code))).not.toContain("DUPLICATE");
+
+    // Meanwhile all three entered the file by another way.
+    const ibi = await addClientOrganization(user, { clientId: client.id, name: "ibi", role: "תוכנית אופציות", sources: [{ code: "S1" }] });
+    const fact = await addClientFact(user, { clientId: client.id, kind: "NOTE", body: "9 עובדים בישראל.", sources: [{ code: "S1" }] });
+    await prisma.clientDomain.create({ data: { clientId: client.id, domain: "nux.ai", kind: "CLIENT" } });
+
+    const [org, note, domain] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    expect(org.alreadyIn).toMatchObject({ id: ibi.id, addsSources: true });
+    expect(org.alreadyIn!.body).toContain("ibi");
+    expect((org.flags as { code: string }[]).map((f) => f.code)).toContain("DUPLICATE");
+    expect(note.alreadyIn).toMatchObject({ id: fact.id, addsSources: true });
+    expect(domain.alreadyIn).toMatchObject({ addsSources: false });
+
+    // Approving makes no second copy, and several at once wait for one at a time.
+    await expect(approveProposal(user, org.id)).rejects.toThrow("כבר בתיק");
+    expect((await decideProposals(user, [org.id], { approve: true })).failed).toEqual([{ id: org.id, error: expect.stringContaining("אחת אחת") }]);
+
+    const closed = await attachProposalToExisting(user, org.id);
+    expect(closed).toMatchObject({ state: "APPROVED", attached: true, edited: false, resultId: ibi.id });
+    expect((await prisma.clientOrganization.findUniqueOrThrow({ where: { id: ibi.id } })).sources).toEqual([{ code: "S1" }, { code: "S2", at: "34:37" }]);
+    expect(await prisma.clientOrganization.count({ where: { clientId: client.id, deletedAt: null } })).toBe(1);
+    expect(await prisma.auditEvent.findFirst({ where: { entityId: org.id, action: "knowledge_proposal.attach" } })).not.toBeNull();
+
+    await attachProposalToExisting(user, note.id);
+    expect((await prisma.clientFact.findUniqueOrThrow({ where: { id: fact.id } })).sources).toEqual([{ code: "S1" }, { code: "S2", at: "05:00" }]);
+
+    // A domain keeps no sources: it only closes.
+    expect(await attachProposalToExisting(user, domain.id)).toMatchObject({ state: "APPROVED", attached: true });
+    expect(await countPendingProposals(user, client.id)).toBe(0);
+    await expect(attachProposalToExisting(user, org.id)).rejects.toThrow("כבר הוחלט");
+  });
+
+  it("closing onto the file needs the item to still be there", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [{ target: "ORGANIZATION", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", name: "Justworks" } }],
+    });
+    const [p] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    await expect(attachProposalToExisting(user, p.id)).rejects.toThrow("כבר לא בתיק");
+    expect((await approveProposal(user, p.id)).state).toBe("APPROVED");
   });
 
   it("decides several at once, each as on its own; what changes the file or may be there already waits for one at a time", async () => {
