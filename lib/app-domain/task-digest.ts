@@ -7,6 +7,8 @@ import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { TASK_ASSIGNED_NOTIFICATION_TYPE } from "@/lib/app-domain/notifications";
 import { describeChange, quoteComment } from "@/lib/app-domain/task-changes";
 import type { TaskBlocker } from "@prisma/client";
+import { listMyRoutines } from "@/lib/app-domain/process-checks";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
 
 // The morning digest.
 //
@@ -94,6 +96,11 @@ export type DigestTask = {
   since?: Date | null;
   /// Long waits only: who it is waiting on.
   blockedOn?: TaskBlocker | null;
+  /// Where the line leads, when it is not a task: an exception to decide,
+  /// a routine check, a date. Relative to the app's base URL.
+  href?: string;
+  /// The grey line under the title, when it is not "client · due date".
+  meta?: string;
 };
 
 export type Digest = {
@@ -119,7 +126,33 @@ export type Digest = {
   /// alone ("4 משימות ממתינות") says there is a reminder to send and not
   /// to whom, which is the half that gets it sent.
   waiting?: DigestTask[];
+
+  // Stage 2 (20.10.2026): the things the bell already knows about that
+  // ask something of this person, read from the state they are in now
+  // rather than from the bell's rows, so a thing already dealt with is
+  // never listed. Optional, so a digest built by hand in a test, or
+  // before this, still means what it meant.
+
+  /// Requests for an exception to a client's rule, waiting on this
+  /// person's decision. Somebody is stopped on them, like a signature.
+  exceptions?: DigestTask[];
+  /// Routine checks this person owns that are due today or late.
+  /// dueDate is the day the check fell due.
+  routines?: DigestTask[];
+  /// Important dates this person is responsible for, past or within
+  /// DATE_HORIZON_DAYS, with no open task already carrying them.
+  /// dueDate is the occurrence.
+  dates?: DigestTask[];
+  /// Procedures this person owns that are marked for review.
+  reviews?: DigestTask[];
 };
+
+/// How far ahead an important date is worth a line in the morning.
+export const DATE_HORIZON_DAYS = 7;
+
+/// A date within this many days counts with today's work; further out it
+/// comes after new work.
+export const DATE_SOON_DAYS = 2;
 
 export function isDigestEmpty(d: Digest): boolean {
   return (
@@ -128,7 +161,11 @@ export function isDigestEmpty(d: Digest): boolean {
     d.fresh.length === 0 &&
     d.updated.length === 0 &&
     d.awaitingMySignature.length === 0 &&
-    d.staleWaits === 0
+    d.staleWaits === 0 &&
+    (d.exceptions?.length ?? 0) === 0 &&
+    (d.routines?.length ?? 0) === 0 &&
+    (d.dates?.length ?? 0) === 0 &&
+    (d.reviews?.length ?? 0) === 0
   );
 }
 
@@ -388,6 +425,152 @@ async function sentForApprovalAt(taskIds: string[]): Promise<Map<string, Date>> 
   return out;
 }
 
+/// Everything in the digest that is not a task: exceptions to decide,
+/// routine checks, important dates, procedures to review.
+///
+/// Each source is read on its own and a failure in one is logged and
+/// left out. The morning email is the one thing here that must arrive:
+/// a broken date table is a reason for a shorter email, not for none.
+async function beyondTasks(userId: string, now: Date): Promise<Pick<Digest, "exceptions" | "routines" | "dates" | "reviews">> {
+  const actor = await prisma.user.findUnique({ where: { id: userId } });
+  if (!actor) return {};
+  const safe = async <T>(name: string, run: () => Promise<T[]>): Promise<T[]> => {
+    try {
+      return await run();
+    } catch (err) {
+      console.error(`daily digest: ${name} failed`, err);
+      return [];
+    }
+  };
+  const clients = await safe("clients", () => listAccessibleClients(actor));
+  const clientIds = clients.map((c) => c.id);
+  const clientName = new Map(clients.map((c) => [c.id, c.name]));
+
+  const [exceptions, routines, dates, reviews] = await Promise.all([
+    safe("exceptions", () => exceptionsToDecide(actor, clientIds, clientName)),
+    safe("routines", async () =>
+      (await listMyRoutines(actor, now))
+        // The owner is the one reminded; a backup sees it in the app.
+        .filter((r) => !r.asBackup && r.dueKey && (r.state === "DUE" || r.state === "OVERDUE"))
+        .map(
+          (r): DigestTask => ({
+            id: `routine:${r.id}`,
+            title: `${r.code} ${r.title}`,
+            clientName: r.clientName,
+            dueDate: localDateTimeToUtc(r.dueKey as string, "09:00", TIMEZONE),
+            href: `/app/clients/${r.clientId}?tab=file#processes`,
+            meta: r.checkText ? `${r.clientName} · ${r.checkText}` : r.clientName,
+          })
+        )
+    ),
+    safe("dates", () => datesAhead(userId, now, clientName)),
+    safe("reviews", async () => {
+      if (clientIds.length === 0) return [];
+      const rows = await prisma.process.findMany({
+        where: {
+          deletedAt: null,
+          clientId: { in: clientIds },
+          reviewReason: { not: null },
+          status: { in: ["ACTIVE", "PAUSED"] },
+          OR: [{ ownerId: userId }, { ownerId: null, backupOwnerId: userId }],
+        },
+        orderBy: { updatedAt: "asc" },
+        select: { id: true, clientId: true, code: true, title: true, reviewReason: true },
+      });
+      return rows.map(
+        (p): DigestTask => ({
+          id: `review:${p.id}`,
+          title: `${p.code} ${p.title}`,
+          clientName: clientName.get(p.clientId) ?? "",
+          dueDate: null,
+          href: `/app/clients/${p.clientId}?tab=file#processes`,
+          meta: `${clientName.get(p.clientId) ?? ""} · ${
+            p.reviewReason === "RULES" ? "לא עומד עוד בכללי הלקוח" : "הגיע מועד הסקירה התקופתית"
+          }`,
+        })
+      );
+    }),
+  ]);
+  return { exceptions, routines, dates, reviews };
+}
+
+/// Requests for an exception that this person may decide: the client's
+/// named approvers, or, where the client named none, anyone given the
+/// permission (lib/app-domain/rule-approvals.ts, same two layers).
+async function exceptionsToDecide(
+  actor: { id: string; canApproveExceptions: boolean },
+  clientIds: string[],
+  clientName: Map<string, string>
+): Promise<DigestTask[]> {
+  if (clientIds.length === 0) return [];
+  const clients = await prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, ruleApproverIds: true } });
+  const mine = clients
+    .filter((c) => (c.ruleApproverIds.length > 0 ? c.ruleApproverIds.includes(actor.id) : actor.canApproveExceptions))
+    .map((c) => c.id);
+  if (mine.length === 0) return [];
+  const rows = await prisma.policyException.findMany({
+    where: { clientId: { in: mine }, status: "REQUESTED" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true, clientId: true, what: true, requestedById: true, createdAt: true, policy: { select: { title: true } } },
+  });
+  const people = await prisma.user.findMany({
+    where: { id: { in: [...new Set(rows.map((r) => r.requestedById))] } },
+    select: { id: true, name: true },
+  });
+  const name = new Map(people.map((p) => [p.id, p.name]));
+  return rows.map((r) => ({
+    id: `exception:${r.id}`,
+    title: `${r.policy.title}: ${r.what}`,
+    clientName: clientName.get(r.clientId) ?? "",
+    dueDate: null,
+    since: r.createdAt,
+    // The person who asked, unless it is this person: asking for one's
+    // own exception and deciding it is allowed, and "עוצר אותך" is noise.
+    assigneeName: r.requestedById === actor.id ? null : (name.get(r.requestedById) ?? null),
+    href: `/app/clients/${r.clientId}?tab=file#rules`,
+  }));
+}
+
+/// Important dates this person is responsible for that are close, or
+/// past and not yet handled, and that no open task is carrying already.
+///
+/// A date with an open task appears as that task. One that was snoozed
+/// stays quiet until its snooze ends. A sensitive date is named only as
+/// "מועד רגיש": the email leaves the app, and the date screen is where
+/// its details are shown to who may see them.
+async function datesAhead(userId: string, now: Date, clientName: Map<string, string>): Promise<DigestTask[]> {
+  const horizon = new Date(startOfLocalDay(now).getTime() + (DATE_HORIZON_DAYS + 1) * 24 * 3600_000);
+  const rows = await prisma.importantDate.findMany({
+    where: {
+      deletedAt: null,
+      responsibleUserId: userId,
+      status: { in: ["ACTIVE", "NEEDS_ATTENTION"] },
+      // A month back at most: a one-off date nobody closed is not news
+      // every morning forever.
+      nextOccurrenceAt: { gte: new Date(now.getTime() - 30 * 24 * 3600_000), lt: horizon },
+      OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
+    },
+    orderBy: { nextOccurrenceAt: "asc" },
+    select: { id: true, title: true, clientId: true, nextOccurrenceAt: true, sensitivity: true },
+  });
+  if (rows.length === 0) return [];
+  const carried = await prisma.task.findMany({
+    where: { importantDateId: { in: rows.map((r) => r.id) }, deletedAt: null, status: { in: OPEN_STATUSES } },
+    select: { importantDateId: true },
+  });
+  const withTask = new Set(carried.map((t) => t.importantDateId));
+  return rows
+    .filter((r) => !withTask.has(r.id) && clientName.has(r.clientId))
+    .map((r) => ({
+      id: `date:${r.id}`,
+      title: r.sensitivity === "SENSITIVE" ? "מועד רגיש" : r.title,
+      clientName: clientName.get(r.clientId) ?? "",
+      dueDate: r.nextOccurrenceAt,
+      href: `/app/important-dates/${r.id}`,
+      meta: `${clientName.get(r.clientId) ?? ""} · ${formatDue(r.nextOccurrenceAt)}`,
+    }));
+}
+
 export async function buildDigest(
   user: { id: string; dailyDigestAt: Date | null },
   now: Date = new Date()
@@ -443,7 +626,7 @@ export async function buildDigest(
         status: "PENDING_APPROVAL",
       },
       orderBy: { updatedAt: "asc" },
-      select: { ...TASK_SELECT, updatedAt: true, assignedTo: { select: { name: true } } },
+      select: { ...TASK_SELECT, updatedAt: true, assignedTo: { select: { name: true } }, parent: { select: { title: true } } },
     }),
     prisma.task.count({ where: staleWhere }),
     prisma.task.findMany({
@@ -474,10 +657,11 @@ export async function buildDigest(
   // one email is how a short email stops being short.
   const freshOnly = fresh.filter((t) => !overdueIds.has(t.id) && !todayIds.has(t.id));
 
-  const [changes, excerpts, approvalSince] = await Promise.all([
+  const [changes, excerpts, approvalSince, more] = await Promise.all([
     changesOnMyTasks(user.id, since),
     excerptsFor(freshOnly.map((t) => t.id)),
     sentForApprovalAt(awaiting.map((t) => t.id)),
+    beyondTasks(user.id, now),
   ]);
 
   const withChanges = (t: DigestTask): DigestTask => {
@@ -520,9 +704,13 @@ export async function buildDigest(
       ...toDigestTask(t),
       assigneeName: t.assignedTo?.name ?? null,
       since: approvalSince.get(t.id) ?? t.updatedAt,
+      // A step is sent for approval from its parent's screen, and the
+      // parent is what the approver recognises.
+      meta: t.parent ? `${t.client.name} · שלב במשימה: ${t.parent.title}` : undefined,
     })),
     staleWaits,
     waiting: waiting.map((t) => ({ ...toDigestTask(t), blockedOn: t.blockedOn, since: t.blockedSince })),
+    ...more,
   };
 }
 
@@ -573,15 +761,18 @@ const WAIT_LABEL: Record<TaskBlocker, string> = {
 /// The whole email in one decision: what comes first. Pure.
 ///
 /// The order, and why:
-///   1. Somebody else's work stopped on this person's signature. It is
-///      the one line where waiting costs two people, not one.
+///   1. Somebody else stopped on this person: a signature on their work,
+///      an exception they asked for. Waiting there costs two people.
 ///   2. Urgent work, wherever it would otherwise sit.
-///   3. Late work, the latest first. 17 days late and one day late are
-///      different mornings, and the old email printed them the same.
-///   4. Due today.
+///   3. Late: tasks, routine checks and dates that have passed, the
+///      latest first. 17 days late and one day late are different
+///      mornings, and the old email printed them the same.
+///   4. Today: tasks due, checks due, dates within DATE_SOON_DAYS.
 ///   5. New on this person.
-///   6. Long waits on somebody outside, by name: a reminder to send.
-///   7. Updated by somebody else, with nothing else making it urgent.
+///   6. Dates further out, up to DATE_HORIZON_DAYS.
+///   7. Procedures to review.
+///   8. Long waits on somebody outside, by name: a reminder to send.
+///   9. Updated by somebody else, with nothing else making it urgent.
 /// Inside a rank, the order the query returned is kept.
 export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
   const items: DigestItem[] = [];
@@ -591,6 +782,7 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
     seen.add(item.task.id);
     items.push(item);
   };
+  const lateness = (t: DigestTask) => (t.dueDate ? daysBetween(t.dueDate, now) : 0);
 
   for (const t of d.awaitingMySignature) {
     const waited = t.since ? daysBetween(t.since, now) : 0;
@@ -603,9 +795,18 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
       action: "לאשר",
     });
   }
+  for (const t of d.exceptions ?? []) {
+    const waited = t.since ? daysBetween(t.since, now) : 0;
+    const who = t.assigneeName ? ` · ביקש/ה ${t.assigneeName}` : "";
+    push({
+      task: t,
+      reason: `בקשת חריגה מחכה להחלטה שלך${waited > 0 ? ` ${days(waited)}` : ""}${who}`,
+      short: "בקשת חריגה מחכה לך",
+      tone: "red",
+      action: "להחליט",
+    });
+  }
 
-  const lateness = (t: DigestTask) => (t.dueDate ? daysBetween(t.dueDate, now) : 0);
-  const late = [...d.overdue].sort((a, b) => lateness(b) - lateness(a));
   const lateItem = (t: DigestTask): DigestItem => {
     const n = Math.max(1, lateness(t));
     const urgent = t.priority === "URGENT";
@@ -616,6 +817,26 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
       tone: "red",
       action: "לפתוח",
       hint: n >= DECIDE_AFTER_DAYS ? "לבצע, לדחות את התאריך, או לסגור?" : undefined,
+    };
+  };
+  const routineItem = (t: DigestTask): DigestItem => {
+    const n = lateness(t);
+    return n > 0
+      ? { task: t, reason: `בדיקה שגרתית באיחור ${days(n)}`, short: "בדיקה שגרתית באיחור", tone: "red", action: "לבדוק" }
+      : { task: t, reason: "בדיקה שגרתית להיום", short: "בדיקה שגרתית להיום", tone: "amber", action: "לבדוק" };
+  };
+  const dateItem = (t: DigestTask): DigestItem => {
+    const n = lateness(t);
+    if (n > 0) return { task: t, reason: `מועד שעבר לפני ${days(n)} ולא טופל`, short: "מועד שעבר", tone: "red", action: "לטפל" };
+    if (n === 0) return { task: t, reason: "מועד היום", short: "מועד היום", tone: "amber", action: "לטפל" };
+    const ahead = -n;
+    return {
+      task: t,
+      reason: ahead === 1 ? "מועד מחר" : `מועד בעוד ${days(ahead)}`,
+      short: ahead === 1 ? "מועד מחר" : `מועד בעוד ${days(ahead)}`,
+      tone: ahead <= DATE_SOON_DAYS ? "amber" : "blue",
+      action: "לטפל",
+      hint: "אין עדיין משימה פתוחה למועד הזה.",
     };
   };
   const todayItem = (t: DigestTask): DigestItem => ({
@@ -641,14 +862,33 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
   });
 
   const urgent = (t: DigestTask) => t.priority === "URGENT";
-  for (const t of late.filter(urgent)) push(lateItem(t));
+  const lateTasks = [...d.overdue].sort((a, b) => lateness(b) - lateness(a));
+  for (const t of lateTasks.filter(urgent)) push(lateItem(t));
   for (const t of d.today.filter(urgent)) push(todayItem(t));
   for (const t of d.fresh.filter(urgent)) push(freshItem(t));
   for (const t of d.updated.filter(urgent)) push(updatedItem(t));
 
-  for (const t of late) push(lateItem(t));
+  // Late, from every source, the latest first. A stable sort keeps tasks
+  // ahead of checks and dates that are exactly as late.
+  const routines = d.routines ?? [];
+  const dates = d.dates ?? [];
+  const late = [
+    ...lateTasks.map((t) => ({ t, item: lateItem(t) })),
+    ...routines.filter((t) => lateness(t) > 0).map((t) => ({ t, item: routineItem(t) })),
+    ...dates.filter((t) => lateness(t) > 0).map((t) => ({ t, item: dateItem(t) })),
+  ].sort((a, b) => lateness(b.t) - lateness(a.t));
+  for (const { item } of late) push(item);
+
   for (const t of d.today) push(todayItem(t));
+  for (const t of routines.filter((r) => lateness(r) <= 0)) push(routineItem(t));
+  for (const t of dates.filter((x) => lateness(x) <= 0 && -lateness(x) <= DATE_SOON_DAYS)) push(dateItem(t));
+
   for (const t of d.fresh) push(freshItem(t));
+  for (const t of dates) push(dateItem(t));
+
+  for (const t of d.reviews ?? []) {
+    push({ task: t, reason: "נוהל לבדיקה", short: "נוהל לבדיקה", tone: "blue", action: "לבדוק" });
+  }
 
   for (const t of d.waiting ?? []) {
     const label = WAIT_LABEL[t.blockedOn ?? "OTHER"];
@@ -666,7 +906,7 @@ export function rankDigest(d: Digest, now: Date = new Date()): DigestItem[] {
 export function digestLead(d: Digest, items: DigestItem[]): string {
   const hiddenWaits = Math.max(0, d.staleWaits - (d.waiting?.length ?? 0));
   const needs = items.filter((i) => i.short !== "עודכנה").length + hiddenWaits;
-  const blocking = d.awaitingMySignature.length;
+  const blocking = d.awaitingMySignature.length + (d.exceptions ?? []).filter((e) => e.assigneeName).length;
   const parts: string[] = [];
   if (needs === 0) {
     parts.push(items.length === 1 ? "משימה אחת שלך עודכנה." : `${items.length} משימות שלך עודכנו.`);
@@ -737,9 +977,9 @@ export function renderDigestEmail(d: Digest, name: string, now: Date = new Date(
 
   items.forEach((item, i) => {
     const t = item.task;
-    const href = `${base}/app/tasks/${t.id}`;
+    const href = `${base}${t.href ?? `/app/tasks/${t.id}`}`;
     const due = formatDue(t.dueDate);
-    const meta = [t.clientName, due ? `יעד ${due}` : ""].filter(Boolean).join(" · ");
+    const meta = t.meta ?? [t.clientName, due ? `יעד ${due}` : ""].filter(Boolean).join(" · ");
     const notes = taskNotes(t);
 
     textLines.push(`${i + 1}. ${item.reason}`);
