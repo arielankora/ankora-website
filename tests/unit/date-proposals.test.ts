@@ -35,3 +35,20 @@ describe("a proposed date", () => {
     expect(proposalProblems("DATE", { title: "x", recurrence: "MONTHLY" }, []).some((f) => f.code === "SHAPE" && f.block)).toBe(true);
   });
 });
+
+describe("a proposed date as a key, against the dates in the file", () => {
+  it("monthly by its day, once by its date, annual by day and month", async () => {
+    const { dateProposalKey } = await import("@/lib/date-proposals");
+    expect(dateProposalKey({ title: "x", recurrence: "MONTHLY", dayOfMonth: 25 })).toMatchObject({ recurrence: "MONTHLY", day: 25 });
+    expect(dateProposalKey({ title: "x", recurrence: "ONCE", date: "2026-11-02" })).toMatchObject({ recurrence: "ONCE", once: "2026-11-02" });
+    expect(dateProposalKey({ title: "x", recurrence: "ANNUAL", date: "1991-10-26" })).toMatchObject({ recurrence: "ANNUAL", month: 10, day: 26 });
+    expect(dateProposalKey({ title: "x", recurrence: "WEEKLY", weekday: 2 })).toMatchObject({ recurrence: "WEEKLY", weekday: 2 });
+    expect(dateProposalKey({ recurrence: "MONTHLY" })).toEqual({ recurrence: "MONTHLY" });
+  });
+  it("finds the same birthday stored by a person", async () => {
+    const { dateProposalKey } = await import("@/lib/date-proposals");
+    const { findDateMatches, dateKeyFromRow } = await import("@/lib/name-match");
+    const stored = [{ id: "d1", name: "יום הולדת של אורן מירון (לידה 26.10.1991)", key: dateKeyFromRow({ recurrence: "ANNUAL", month: 10, day: 26, nextOccurrenceAt: new Date("2026-10-26T00:00:00Z") }) }];
+    expect(findDateMatches({ name: "יום הולדת של אורן מירון", key: dateProposalKey({ title: "x", recurrence: "ANNUAL", date: "1991-10-26" }) }, stored).map((m) => m.id)).toEqual(["d1"]);
+  });
+});

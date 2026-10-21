@@ -25,6 +25,7 @@ import {
 import {
   addProcessAction,
   approveProcessVersionAction,
+  closeCoveredTaskAction,
   linkProcessDatesAction,
   markProcessReviewedAction,
   removeProcessAction,
@@ -37,6 +38,7 @@ import {
 import Link from "next/link";
 import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
+import { SCHEDULED_NO_DATE_NOTE } from "@/lib/client-control";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
@@ -55,6 +57,8 @@ import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-cal
 type Option = { id: string; name: string };
 
 export type PanelProcess = {
+  /// 21.10.2026: open tasks of the client this approved process covers.
+  covered?: { taskId: string; title: string; assignee: string | null }[];
   /// When a person last confirmed it, as ISO.
   verifiedAt?: string | null;
   /// When a run was last closed, as ISO.
@@ -787,6 +791,35 @@ export function ProcessesPanel({
                       .filter(Boolean)
                       .join(" · ")}
                   </p>
+                  {p.status === "ACTIVE" && p.triggerKinds.includes("SCHEDULED") && !p.nextDate && (
+                    <p className="mt-1.5 text-xs font-medium text-app-error" data-testid="process-no-next-date">
+                      {SCHEDULED_NO_DATE_NOTE}. מקשרים לתהליך את המועדים שלו, או מוסיפים מועד חדש.
+                    </p>
+                  )}
+                  {(p.covered ?? []).length > 0 && (
+                    <div className="mt-1.5 rounded-lg bg-app-warning-soft px-3 py-2" data-testid="process-covered-tasks">
+                      <p className="text-xs text-app-text-primary">משימות פתוחות שהתהליך כנראה מכסה. כל ריצה שלו פותחת משימה משלה, ולכן הישנה נשארת כפולה:</p>
+                      <ul className="mt-1 space-y-0.5">
+                        {p.covered!.map((t) => (
+                          <li key={t.taskId} className="text-xs text-app-text-secondary">
+                            <Link href={`/app/tasks/${t.taskId}`} className="text-app-text-accent hover:underline">
+                              {t.title}
+                            </Link>
+                            {t.assignee && <span className="text-app-text-tertiary"> · {t.assignee}</span>}
+                            {canApprove && (
+                              <button
+                                type="button"
+                                onClick={() => act(() => closeCoveredTaskAction(t.taskId, p.id, clientId), "המשימה נסגרה")}
+                                className="ms-2 font-medium text-app-text-accent hover:underline"
+                              >
+                                לסגור, התהליך מכסה את זה
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   {p.gaps.length > 0 && (
                     <ul className="mt-1.5 space-y-0.5">
                       {p.gaps.map((g) => (

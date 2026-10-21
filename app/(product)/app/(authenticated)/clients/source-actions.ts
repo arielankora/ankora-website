@@ -8,6 +8,7 @@ import {
   addClientDomain,
   removeClientDomain,
 } from "@/lib/app-domain/client-sources";
+import { confirmSourceWithClient } from "@/lib/app-domain/source-confirmation";
 import type { ClientDomainKind, SourceKind, SourceRestriction, SourceWeight } from "@prisma/client";
 
 // Org brain, phase 2: the source register and the domains on the client
@@ -108,4 +109,19 @@ export async function removeClientDomainAction(id: string, clientId: string): Pr
   }
   revalidatePath(`/app/clients/${clientId}`);
   return { ok: true };
+}
+
+/// "אושר מול הלקוח": every item uncertain only because this source is
+/// Ankora's, confirmed in one step (21.10.2026).
+export async function confirmSourceWithClientAction(_prev: (FormState & { confirmed?: number }) | undefined, formData: FormData): Promise<FormState & { confirmed?: number }> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") ?? "");
+  try {
+    const r = await confirmSourceWithClient(user, clientId, String(formData.get("code") ?? ""), String(formData.get("note") ?? ""));
+    revalidatePath(`/app/clients/${clientId}`);
+    revalidatePath("/app/approvals");
+    return { ok: true, confirmed: r.confirmed };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }

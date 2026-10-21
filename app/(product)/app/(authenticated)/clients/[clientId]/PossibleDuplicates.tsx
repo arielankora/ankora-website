@@ -1,7 +1,8 @@
 import type { DuplicatePair } from "@/lib/name-match";
 
 // Items that may be in the file twice under two spellings ("איילה" and
-// "איילה מנצור"): each name opens the item, where it is completed and the
+// "איילה מנצור"), and dates that fall on the same day under almost the
+// same title: each name opens the item, where it is completed and the
 // extra one removed. Nothing is merged on its own: a person decides.
 
 const KIND: Record<string, string> = {
@@ -9,7 +10,11 @@ const KIND: Record<string, string> = {
   ORGANIZATION: "ארגונים",
   SYSTEM: "מערכות",
   ENTITY: "ישויות",
+  DATE: "מועדים",
 };
+
+/// A date lives on its own page; everything else in the file, by anchor.
+const hrefOf = (kind: string, id: string) => (kind === "DATE" ? `/app/important-dates/${id}` : `#item-${id}`);
 
 export function PossibleDuplicates({ pairs }: { pairs: DuplicatePair[] }) {
   if (pairs.length === 0) return null;
@@ -21,11 +26,11 @@ export function PossibleDuplicates({ pairs }: { pairs: DuplicatePair[] }) {
         {pairs.map((p) => (
           <li key={`${p.a.id}-${p.b.id}`} className="text-app-text-secondary">
             <span className="text-xs text-app-text-tertiary">{KIND[p.kind] ?? p.kind}: </span>
-            <a href={`#item-${p.a.id}`} className="text-app-text-accent hover:underline">
+            <a href={hrefOf(p.kind, p.a.id)} className="text-app-text-accent hover:underline">
               {p.a.name}
             </a>
             {" ו"}
-            <a href={`#item-${p.b.id}`} className="text-app-text-accent hover:underline">
+            <a href={hrefOf(p.kind, p.b.id)} className="text-app-text-accent hover:underline">
               {p.b.name}
             </a>
             {p.match === "SAME" && <span className="ms-1.5 text-xs text-app-warning">אותו שם</span>}

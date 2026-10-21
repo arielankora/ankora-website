@@ -138,3 +138,96 @@ export function duplicatePairs<K extends string>(kind: K, items: NameCandidate[]
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Dates (21.10.2026). Two rows for one birthday: "יום הולדת של אורן מירון
+// (ברכה בקבוצה ו-BuyMe 100 ₪)" and "יום הולדת של אורן מירון (לידה
+// 26.10.1991)", from two meetings. The titles differ only in what is in
+// brackets, and both fall on the same day. A date is one date only when
+// both hold: "תשלום ספקים (ה-10)" and "תשלום ספקים (ה-25)" share a title
+// and are two dates.
+// ---------------------------------------------------------------------------
+
+/// When a date occurs, as far as two dates can be compared. `next` is the
+/// next occurrence (YYYY-MM-DD) when it is known: the surest key, whatever
+/// the calendar.
+export type DateKey = {
+  recurrence: string;
+  calendarType?: string | null;
+  month?: number | null;
+  day?: number | null;
+  weekday?: number | null;
+  /// ONCE: the day itself, YYYY-MM-DD.
+  once?: string | null;
+  next?: string | null;
+};
+
+export type DateCandidate = { id: string; name: string; key: DateKey };
+
+/// The title without what is in brackets: what the date is, not the notes
+/// a meeting added to it.
+export function dateCore(title: string): string {
+  const core = title.replace(/\([^)]*\)/g, " ").replace(/\[[^\]]*\]/g, " ");
+  return normalizeName(core) ? core : title;
+}
+
+/// Both fall on the same day, by the same rule.
+export function sameSchedule(a: DateKey, b: DateKey): boolean {
+  if (a.next && b.next) return a.next === b.next;
+  const greg = (k: DateKey) => !k.calendarType || k.calendarType === "GREGORIAN";
+  if (!greg(a) || !greg(b)) return false;
+  if (a.recurrence !== b.recurrence) return false;
+  switch (a.recurrence) {
+    case "ONCE":
+      return !!a.once && a.once === b.once;
+    case "ANNUAL":
+      return a.month != null && a.month === b.month && a.day != null && a.day === b.day;
+    case "MONTHLY":
+      return a.day != null && a.day === b.day;
+    case "WEEKLY":
+      return a.weekday != null && a.weekday === b.weekday;
+    default:
+      return false;
+  }
+}
+
+/// SAME or PARTIAL when the two may be one date; null otherwise.
+export function datesMatch(a: { name: string; key: DateKey }, b: { name: string; key: DateKey }): NameMatchKind | null {
+  if (!sameSchedule(a.key, b.key)) return null;
+  return namesMatch(dateCore(a.name), dateCore(b.name));
+}
+
+export function findDateMatches(date: { name: string; key: DateKey }, candidates: DateCandidate[], limit = 3): NameMatch[] {
+  const out: NameMatch[] = [];
+  for (const c of candidates) {
+    const kind = datesMatch(date, c);
+    if (kind) out.push({ id: c.id, name: c.name, kind });
+  }
+  return out.sort((x, y) => (x.kind === y.kind ? 0 : x.kind === "SAME" ? -1 : 1)).slice(0, limit);
+}
+
+export function dateDuplicatePairs<K extends string>(kind: K, items: DateCandidate[]): DuplicatePair<K>[] {
+  const out: DuplicatePair<K>[] = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const match = datesMatch(items[i], items[j]);
+      if (match) out.push({ kind, a: { id: items[i].id, name: items[i].name }, b: { id: items[j].id, name: items[j].name }, match });
+    }
+  }
+  return out;
+}
+
+const ymdOf = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
+
+/// A stored date (ImportantDate) as a key.
+export function dateKeyFromRow(r: { recurrence: string; calendarType?: string | null; month: number; day: number; weekday?: number | null; onceDate?: Date | null; nextOccurrenceAt?: Date | null }): DateKey {
+  return {
+    recurrence: r.recurrence,
+    calendarType: r.calendarType ?? "GREGORIAN",
+    month: r.month,
+    day: r.day,
+    weekday: r.weekday ?? null,
+    once: ymdOf(r.onceDate),
+    next: ymdOf(r.nextOccurrenceAt),
+  };
+}

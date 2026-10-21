@@ -105,6 +105,19 @@ test.describe("knowledge/actions", () => {
     await expect(row.getByRole("button", { name: "למשימה" })).toBeVisible();
   });
 
+  test("turning a proposal into a task asks what to do and fills in by when", async ({ page }) => {
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const section = page.getByTestId("client-pending-proposals");
+    await expect(section).toBeVisible({ timeout: 30_000 });
+    const row = section.locator("li", { hasText: "[DEMO] הצעה" }).first();
+    await row.getByRole("button", { name: "למשימה" }).click();
+    const form = page.getByTestId("proposal-task-form");
+    await expect(form).toBeVisible();
+    await expect(form.getByText("מה עושים? כותרת המשימה")).toBeVisible();
+    await expect(form.locator('input[name="dueDate"]')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
+    await expect(form.getByText("הקטגוריה נבחרת לפי הכותרת")).toBeVisible();
+  });
+
   test("a manager reads the measures of every client's file", async ({ page }) => {
     await page.goto("/app/brain-metrics");
     await expect(page.getByRole("heading", { level: 1, name: "מדדי התיק" })).toBeVisible({ timeout: 30_000 });

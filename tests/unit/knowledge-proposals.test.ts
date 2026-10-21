@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf, taskBlocker, taskFromProposal, TaskPayload, missingRequired, proposalDetails } from "@/lib/knowledge-proposals";
+import { actionTitle, defaultTaskDue, isQuestionTitle, looksLikeAction, taskTitleProblem, FactPayload, firefliesLink, normalizeForMatch, payloadText, proposalHeadline, secondsOf, taskBlocker, taskFromProposal, TaskPayload, missingRequired, proposalDetails } from "@/lib/knowledge-proposals";
 
 describe("knowledge proposals, pure parts", () => {
   it("opens a recording at the minute", () => {
@@ -101,7 +101,7 @@ describe("a proposal that is a task", () => {
   });
 
   it("cuts a long line for the title and keeps the whole of it in the description", () => {
-    const body = "א".repeat(260);
+    const body = `לשלוח ${"א".repeat(260)}`;
     const t = taskFromProposal({ target: "FACT", payload: { body }, reason: null, quote: null, source: null, link: null });
     expect(t.title).toHaveLength(200);
     expect(t.title.endsWith("...")).toBe(true);
@@ -149,5 +149,41 @@ describe("what a proposal names in the file", () => {
       linkDetails({ entityName: "NUX Inc", routeToNames: ["איילה"], processName: "P1", systemNames: ["Doka"], approverName: "הדס", billingCycle: "ANNUAL", billingCostMinor: 120000, billingCurrency: "USD", cardLast4: "4242", invoiceTo: "billing-us@nux.ai" })
     ).toEqual(["ישות: NUX Inc", "מפנים אל: איילה", "מפעיל את: P1", "מערכות: Doka", "מאשר: הדס", "חיוב: שנתי, 1,200 USD, כרטיס 4242", "חשבונית אל: billing-us@nux.ai"]);
     expect(linkDetails({ title: "x" })).toEqual([]);
+  });
+});
+
+describe("a task's title says what to do (21.10.2026)", () => {
+  it("a question becomes something to find out", () => {
+    expect(isQuestionTitle("הדס ואריאל צריכים לחתום ב-Settle. בוצע?")).toBe(true);
+    expect(actionTitle("הדס ואריאל צריכים לחתום ב-Settle. בוצע?")).toBe("לברר: הדס ואריאל צריכים לחתום ב-Settle. בוצע");
+    expect(actionTitle("לברר מה עוד פתוח?")).toBe("לברר מה עוד פתוח");
+    expect(actionTitle("לשלוח חוזה")).toBe("לשלוח חוזה");
+  });
+  it("knows an action from a fact", () => {
+    expect(looksLikeAction("לשלוח לדנה את החוזה")).toBe(true);
+    expect(looksLikeAction("הזמנת סוואג ממותג לעובדים")).toBe(true);
+    expect(looksLikeAction("Send Dana the contract")).toBe(true);
+    expect(looksLikeAction("בנק לאומי, חשבון הבנק של החברה הישראלית: שכר ותשלומי ספקים.")).toBe(false);
+    expect(looksLikeAction("מה עוד פתוח?")).toBe(false);
+  });
+  it("a fact turned into a task gets no title of its own until someone writes one", () => {
+    const fact = "בנק לאומי, חשבון הבנק של החברה הישראלית: שכר ותשלומי ספקים.";
+    const t = taskFromProposal({ target: "SYSTEM", payload: { systemName: fact }, reason: null, quote: null, source: null, link: null });
+    expect(t.title).toBe("");
+    expect(t.needsTitle).toBe(true);
+    expect(t.description.startsWith(`מה שנאמר: ${t.said}`)).toBe(true);
+    expect(taskTitleProblem("", { target: "SYSTEM", headline: t.said })).toContain("מה עושים");
+    expect(taskTitleProblem(t.said, { target: "SYSTEM", headline: t.said })).toContain("לא לחזור");
+    expect(taskTitleProblem("לבקש מגיא את הרשאות הבנק", { target: "SYSTEM", headline: t.said })).toBeNull();
+    expect(taskTitleProblem("לשלוח חוזה", { target: "TASK", headline: "לשלוח חוזה" })).toBeNull();
+  });
+  it("a task of Claude's that is a question opens as one to find out", () => {
+    const t = taskFromProposal({ target: "TASK", payload: { title: "Onboarding אהוד: מה עוד פתוח?" }, reason: null, quote: null, source: null, link: null });
+    expect(t.title).toBe("לברר: Onboarding אהוד: מה עוד פתוח");
+    expect(t.needsTitle).toBe(false);
+  });
+  it("is due in three business days when nobody said", () => {
+    // Wednesday 21.10.2026: Thursday, then Sunday and Monday.
+    expect(defaultTaskDue("2026-10-21")).toBe("2026-10-26");
   });
 });

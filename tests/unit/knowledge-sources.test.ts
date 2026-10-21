@@ -85,3 +85,21 @@ describe("defaultWeight and public domains", () => {
     expect(isPublicEmailDomain("nux.ai")).toBe(false);
   });
 });
+
+describe("a summary of a conversation with the client (21.10.2026)", () => {
+  it("is an Ankora document with the primary weight", async () => {
+    const { isClientConversation } = await import("@/lib/knowledge-sources");
+    expect(isClientConversation({ kind: "ANKORA_DOCUMENT", weight: "PRIMARY" })).toBe(true);
+    expect(isClientConversation({ kind: "ANKORA_DOCUMENT", weight: "SECONDARY" })).toBe(false);
+    expect(isClientConversation({ kind: "TRANSCRIPT", weight: "PRIMARY" })).toBe(false);
+  });
+  it("confirms only what R14 lowered, from that source", async () => {
+    const { uncertainOnlyForAnkora, SECONDARY_ONLY_TO_RESOLVE: R14 } = await import("@/lib/knowledge-sources");
+    const item = (over: Record<string, unknown>) => ({ knowledgeStatus: "UNCERTAIN", toResolve: R14, sources: [{ code: "S2" }], ...over }) as { knowledgeStatus: string; toResolve: string | null; sources: unknown };
+    expect(uncertainOnlyForAnkora(item({}), "S2")).toBe(true);
+    expect(uncertainOnlyForAnkora(item({ sources: [{ code: "S2", at: "08:13" }, { code: "S3" }] }), "S3")).toBe(true);
+    expect(uncertainOnlyForAnkora(item({}), "S3")).toBe(false);
+    expect(uncertainOnlyForAnkora(item({ toResolve: "לוודא מול דקלה" }), "S2")).toBe(false);
+    expect(uncertainOnlyForAnkora(item({ knowledgeStatus: "CONFIRMED" }), "S2")).toBe(false);
+  });
+});

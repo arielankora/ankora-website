@@ -1,5 +1,6 @@
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { firefliesLink, proposalHeadline, reviewConfidence, reviewRank, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { defaultTaskDue, firefliesLink, proposalHeadline, reviewConfidence, reviewRank, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { localDateKey } from "@/lib/timezone";
 import type { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
 import type { ReviewProposal } from "./ReviewBatch";
 
@@ -44,14 +45,18 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       attached: p.attached,
       rejectReason: p.rejectReason,
       hiddenFor: p.hiddenFor,
-      task: taskFromProposal({
-        target: p.target as ProposalTargetLike,
-        payload,
-        reason: p.reason,
-        quote: p.quote,
-        source: b.source ? { code: b.source.code, title: b.source.title } : null,
-        link: fireflies ? firefliesLink(fireflies, at) : null,
-      }),
+      task: {
+        ...taskFromProposal({
+          target: p.target as ProposalTargetLike,
+          payload,
+          reason: p.reason,
+          quote: p.quote,
+          source: b.source ? { code: b.source.code, title: b.source.title } : null,
+          link: fireflies ? firefliesLink(fireflies, at) : null,
+        }),
+        // By when, already filled in: three business days unless changed.
+        due: defaultTaskDue(localDateKey(new Date(), "Asia/Jerusalem")),
+      },
       taskBlocked: taskBlocker({ target: p.target as ProposalTargetLike, payload }),
       taskId: p.state === "TASK" || (p.state === "APPROVED" && p.target === "TASK") ? p.resultId : null,
     };

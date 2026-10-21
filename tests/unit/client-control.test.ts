@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONTROL_DETAIL_LIMIT, businessDaysBetween, controlDetails, controlFrom, controlLine, controlParts, type ControlData } from "@/lib/client-control";
+import { CONTROL_DETAIL_LIMIT, SCHEDULED_NO_DATE_NOTE, businessDaysBetween, controlDetails, controlFrom, controlLine, controlParts, scheduledWithoutDate, type ControlData } from "@/lib/client-control";
 
 // The control line at the top of a client's file (spec 7.6).
 
@@ -9,6 +9,7 @@ const base: ControlData = {
   inHandover: 0,
   avgCompleteness: null,
   needsReview: 0,
+  scheduledNoDate: 0,
   noBackup: 0,
   exceptionsInForce: 0,
   exceptionsRequested: 0,
@@ -169,5 +170,25 @@ describe("control details lead to the item", () => {
     expect(d.noOwner).toEqual([{ text: "מגבלת Justworks", id: "f1" }]);
     expect(d.exceptionsInForce).toEqual([{ text: "סף: בלי אישור עד 1.11", id: "pol1" }]);
     expect(d.systemsWithoutAccess).toEqual([{ text: "Mercury", id: "s1", note: "אין גישה" }]);
+  });
+});
+
+describe("a process that runs by a date, with no date ahead (21.10.2026)", () => {
+  const proc = (over: Record<string, unknown>) => ({ code: "P2", title: "תשלומי ספקים", transitionStatus: "IN_HANDOVER", completeness: { score: 4 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE", triggerKinds: ["SCHEDULED"], nextDate: null, ...over });
+  it("only an approved one that runs by a date and has none", () => {
+    expect(scheduledWithoutDate(proc({}))).toBe(true);
+    expect(scheduledWithoutDate(proc({ nextDate: new Date("2026-10-25") }))).toBe(false);
+    expect(scheduledWithoutDate(proc({ status: "DRAFT" }))).toBe(false);
+    expect(scheduledWithoutDate(proc({ triggerKinds: ["EVENT"] }))).toBe(false);
+    expect(scheduledWithoutDate(proc({ triggerKinds: undefined }))).toBe(false);
+  });
+  it("is a warning on the line, and names the process with why", () => {
+    const d = controlFrom({ processes: [proc({}), proc({ code: "P1", nextDate: new Date("2026-10-22") })], exceptions: [], facts: [], otherItems: [], systems: [], daysSinceBatch: 0 });
+    expect(d.scheduledNoDate).toBe(1);
+    const part = controlParts(d).find((p) => p.key === "scheduledNoDate");
+    expect(part).toEqual({ text: "תהליך אחד לפי מועד בלי מועד הבא", warn: true, key: "scheduledNoDate" });
+    expect(controlParts({ ...base, processes: 3, scheduledNoDate: 2 }).map((p) => p.text)).toContain("2 תהליכים לפי מועד בלי מועד הבא");
+    const details = controlDetails({ processes: [{ ...proc({}), id: "p2" }], exceptions: [], facts: [], otherItems: [], systems: [] });
+    expect(details.scheduledNoDate).toEqual([{ text: "P2 תשלומי ספקים", id: "p2", note: SCHEDULED_NO_DATE_NOTE }]);
   });
 });
