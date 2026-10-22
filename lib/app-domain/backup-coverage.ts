@@ -284,6 +284,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "important_dates.holidayKey": "A public holiday identifier.",
   "reminder_occurrences.idempotencyKey": "A de-duplication key. Losing it re-sends reminders; it grants nothing.",
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
+  "clients.sourceKeywords": "Words that name the client in a meeting or mail title ('nux'), for finding its material. Not a key of any kind.",
   "system_access.credentialId": "The id of a vault row, a pointer. The secret stays encrypted in client_credentials.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.

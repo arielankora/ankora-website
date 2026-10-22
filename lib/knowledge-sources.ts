@@ -16,7 +16,7 @@
 
 import type { KnowledgeStatusLike } from "@/lib/knowledge";
 
-export type SourceKindLike = "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT";
+export type SourceKindLike = "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL";
 export type SourceWeightLike = "PRIMARY" | "SECONDARY";
 export type SourceRestrictionLike = "NONE" | "TOPICS_ONLY";
 
@@ -26,6 +26,7 @@ export const SOURCE_KIND_LABELS: Record<SourceKindLike, string> = {
   TASK: "משימה",
   PERSON: "נמסר בעל פה",
   ANKORA_DOCUMENT: "מסמך של אנקורה",
+  EMAIL: "מייל",
 };
 
 export const SOURCE_WEIGHT_LABELS: Record<SourceWeightLike, string> = {
@@ -170,4 +171,14 @@ export function isClientConversation(s: { kind: SourceKindLike; weight: SourceWe
 /// "what would close it" and is left alone.
 export function uncertainOnlyForAnkora(item: { knowledgeStatus: string; toResolve: string | null; sources: unknown }, code: string): boolean {
   return item.knowledgeStatus === "UNCERTAIN" && item.toResolve === SECONDARY_ONLY_TO_RESOLVE && readSourceRefs(item.sources).some((r) => r.code === code);
+}
+
+/// A Drive id from what a person pastes: the id itself, or a folder or
+/// document link. Null when nothing that looks like an id is there.
+export function driveIdFrom(raw: string | null | undefined): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  const fromUrl = v.match(/\/(?:folders|d)\/([A-Za-z0-9_-]{10,})/) ?? v.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
+  const id = fromUrl ? fromUrl[1] : v;
+  return /^[A-Za-z0-9_-]{10,}$/.test(id) ? id : null;
 }

@@ -7,7 +7,7 @@ import type { TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
-import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel } from "@/lib/advance-prompt";
+import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, SOURCES_LOOKBACK_DAYS, type AdvancePromptSources } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
 // into the prompt. One extra read, the decisions filed against the task;
@@ -76,6 +76,34 @@ export async function advancePromptFor(
   // A run of a process: the lessons prompt also asks about its procedure.
   const process = mode === "lessons" && task.processId && !task.parentId ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } }) : null;
 
+  // Mail, Drive and recordings (22.10.2026): the client's anchors, only
+  // for planning. Domains of firms, never a person's address.
+  let sources: AdvancePromptSources | null = null;
+  if (mode === "plan") {
+    const [anchors, domains] = await Promise.all([
+      prisma.client.findUnique({
+        where: { id: task.clientId },
+        select: { sourceKeywords: true, driveFolderId: true, conversationsDocId: true },
+      }),
+      prisma.clientDomain.findMany({
+        where: { clientId: task.clientId, deletedAt: null },
+        select: { domain: true, kind: true },
+        orderBy: { domain: "asc" },
+      }),
+    ]);
+    const from = new Date(task.createdAt.getTime() - SOURCES_LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+    const iso = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(from);
+    sources = {
+      clientDomains: domains.filter((d) => d.kind === "CLIENT").map((d) => d.domain),
+      partnerDomains: domains.filter((d) => d.kind === "PARTNER").map((d) => d.domain),
+      keywords: anchors?.sourceKeywords ?? [],
+      driveFolderId: anchors?.driveFolderId ?? null,
+      conversationsDocId: anchors?.conversationsDocId ?? null,
+      fromLabel: day.format(from),
+      fromIso: iso,
+    };
+  }
+
   const build = mode === "lessons" ? buildLessonsPrompt : buildAdvancePrompt;
   return build({
     taskId: task.id,
@@ -130,6 +158,7 @@ export async function advancePromptFor(
       : null,
     // The task's own flag, the same one the closing check reads.
     mapping: task.mappingTask && !task.parentId,
+    sources,
     requestedBy: actor.name,
     todayLabel: day.format(new Date()),
   });

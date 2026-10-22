@@ -19,6 +19,7 @@ import {
   addClientDomainAction,
   removeClientDomainAction,
   confirmSourceWithClientAction,
+  setClientSourceAnchorsAction,
 } from "../source-actions";
 
 // Org brain, phase 2: the source register ("מקרא מקורות" in Hadas's file)
@@ -39,6 +40,13 @@ export type PanelSource = {
   participants: string[];
   topicsOnly: boolean;
   notes: string | null;
+};
+
+/// Where the client's material lives outside Ankora, beside the domains.
+export type PanelAnchors = {
+  keywords: string[];
+  driveFolderId: string | null;
+  conversationsDocId: string | null;
 };
 
 export type PanelDomain = {
@@ -170,6 +178,30 @@ function DomainForm({ clientId }: { clientId: string }) {
   );
 }
 
+function AnchorsForm({ clientId, anchors }: { clientId: string; anchors: PanelAnchors }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(setClientSourceAnchorsAction, close);
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="source-anchors-form">
+      <input type="hidden" name="clientId" value={clientId} />
+      <Field label="מילות מפתח בכותרת פגישה או מייל">
+        <input name="keywords" defaultValue={anchors.keywords.join(", ")} placeholder="nux, נוקס" className={INPUT} />
+      </Field>
+      <Field label="תיקיית השיחות בדרייב (קישור או מזהה)">
+        <input name="driveFolder" dir="ltr" defaultValue={anchors.driveFolderId ?? ""} className={INPUT} />
+      </Field>
+      <Field label="המסמך המצטבר של השיחות (קישור או מזהה)">
+        <input name="conversationsDoc" dir="ltr" defaultValue={anchors.conversationsDocId ?? ""} className={INPUT} />
+      </Field>
+      <p className="-mt-1 text-[11px] text-app-text-tertiary">אלה אומרים לקלוד איפה לחפש, לא מה מותר לו. מה שכל עובד יכול לקרוא נקבע לפי החיבורים שלו.</p>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+        {pending ? "שומר..." : "שמירה"}
+      </button>
+    </form>
+  );
+}
+
 /// "אושר מול הלקוח" on one source (21.10.2026): the items lowered only
 /// because the source is Ankora's, confirmed in one step.
 function ConfirmForm({ clientId, source, count }: { clientId: string; source: PanelSource; count: number }) {
@@ -213,12 +245,14 @@ export function SourcesPanel({
   clientId,
   sources,
   domains,
+  anchors,
   lowered = {},
   canConfirm = false,
 }: {
   clientId: string;
   sources: PanelSource[];
   domains: PanelDomain[];
+  anchors: PanelAnchors;
   lowered?: Record<string, number>;
   canConfirm?: boolean;
 }) {
@@ -318,6 +352,46 @@ export function SourcesPanel({
             ))}
           </ul>
         )}
+      </div>
+
+      <div className="rounded-2xl border border-app-border bg-white p-6" data-testid="source-anchors">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <h2 className="text-sm font-medium text-app-text-primary">איפה עוד מחפשים</h2>
+          <Drawer triggerLabel="עריכה" title="עוגנים למקורות" variant="link">
+            <AnchorsForm clientId={clientId} anchors={anchors} />
+          </Drawer>
+        </div>
+        <p className="mt-1 text-xs text-app-text-tertiary">יחד עם הדומיינים, כך &quot;קדם עם קלוד&quot; מוצא מיילים, קבצים והקלטות של הלקוח.</p>
+        <dl className="mt-3 space-y-1.5 text-sm">
+          <div className="flex gap-2">
+            <dt className="text-app-text-secondary">מילות מפתח:</dt>
+            <dd className="text-app-text-primary">{anchors.keywords.length > 0 ? anchors.keywords.join(", ") : "אין"}</dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-app-text-secondary">תיקיית שיחות:</dt>
+            <dd className="text-app-text-primary">
+              {anchors.driveFolderId ? (
+                <a href={`https://drive.google.com/drive/folders/${anchors.driveFolderId}`} target="_blank" rel="noreferrer" className="text-app-text-accent hover:underline">
+                  פתיחה בדרייב
+                </a>
+              ) : (
+                "אין"
+              )}
+            </dd>
+          </div>
+          <div className="flex gap-2">
+            <dt className="text-app-text-secondary">מסמך מצטבר:</dt>
+            <dd className="text-app-text-primary">
+              {anchors.conversationsDocId ? (
+                <a href={`https://docs.google.com/document/d/${anchors.conversationsDocId}/edit`} target="_blank" rel="noreferrer" className="text-app-text-accent hover:underline">
+                  פתיחה בדרייב
+                </a>
+              ) : (
+                "אין"
+              )}
+            </dd>
+          </div>
+        </dl>
       </div>
     </div>
   );

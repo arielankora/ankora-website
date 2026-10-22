@@ -503,6 +503,16 @@ model Client {
   /// approval"). Empty: anyone with User.canApproveExceptions.
   ruleApproverIds String[] @default([])
 
+  /// Where this client's material lives outside Ankora (advance with
+  /// Claude, 22.10.2026). The domains are in ClientDomain; these are the
+  /// rest of the anchors the recording agent kept in its own sheet:
+  /// words that name the client in a meeting title, the Drive folder its
+  /// conversations are saved to, and the running conversations document.
+  /// Not access: each employee's connectors decide what can be read.
+  sourceKeywords     String[] @default([])
+  driveFolderId      String?
+  conversationsDocId String?
+
   /// The dedicated WhatsApp line this client already talks to Ankora on.
   /// Stored per client (not per employee) because that is how it works
   /// today: the thread exists before the portal does, and the portal's
@@ -2879,6 +2889,8 @@ enum SourceKind {
   PERSON
   /// A document Ankora wrote (Hadas's KI, HMP, TE).
   ANKORA_DOCUMENT
+  /// An email thread, found again by its Gmail thread id (22.10.2026).
+  EMAIL
 }
 
 enum SourceWeight {

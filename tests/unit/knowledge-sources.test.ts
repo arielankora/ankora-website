@@ -6,6 +6,8 @@ import {
   formatSourceRef,
   parseSourceRefs,
   readSourceRefs,
+  driveIdFrom,
+  SOURCE_KIND_LABELS,
 } from "@/lib/knowledge-sources";
 import { isPublicEmailDomain } from "@/lib/contact-normalize";
 
@@ -101,5 +103,24 @@ describe("a summary of a conversation with the client (21.10.2026)", () => {
     expect(uncertainOnlyForAnkora(item({}), "S3")).toBe(false);
     expect(uncertainOnlyForAnkora(item({ toResolve: "לוודא מול דקלה" }), "S2")).toBe(false);
     expect(uncertainOnlyForAnkora(item({ knowledgeStatus: "CONFIRMED" }), "S2")).toBe(false);
+  });
+});
+
+describe("source anchors (22.10.2026)", () => {
+  it("reads a Drive id from a folder link, a document link or the id itself", () => {
+    expect(driveIdFrom("https://drive.google.com/drive/folders/1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv?usp=sharing")).toBe("1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv");
+    expect(driveIdFrom("https://docs.google.com/document/d/1hqxKEycC9O2xz_az0dppFpaVLJbAIt2CiyiKLTTcPF0/edit")).toBe("1hqxKEycC9O2xz_az0dppFpaVLJbAIt2CiyiKLTTcPF0");
+    expect(driveIdFrom(" 1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv ")).toBe("1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv");
+  });
+
+  it("refuses what is not an id", () => {
+    expect(driveIdFrom("")).toBeNull();
+    expect(driveIdFrom(null)).toBeNull();
+    expect(driveIdFrom("התיקייה של נוקס")).toBeNull();
+    expect(driveIdFrom("https://example.com/x")).toBeNull();
+  });
+
+  it("names an email thread as a source", () => {
+    expect(SOURCE_KIND_LABELS.EMAIL).toBe("מייל");
   });
 });

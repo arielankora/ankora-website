@@ -6,6 +6,7 @@ import {
   fileTypeLabel,
   isEmptyBrief,
   MAX_COMMENT_CHARS,
+  sourcesRules,
   timerRules,
   type AdvancePromptInput,
 } from "@/lib/advance-prompt";
@@ -378,5 +379,75 @@ describe("a new procedure reaches the client file (19.10.2026)", () => {
     expect(none).toContain("בקטגוריה שתיבחר אוטומטית");
     expect(none).not.toContain('בקטגוריה "');
     expect(none).toContain("הקטגוריה שהטיימר רץ בה (מהתשובה של start_timer) נכנסת לשאלה של הכרטיס הבא");
+  });
+});
+
+describe("mail, Drive and recordings (22.10.2026)", () => {
+  const sources = {
+    clientDomains: ["nux.ai"],
+    partnerDomains: ["nextage.co.il"],
+    keywords: ["nux", "נוקס"],
+    driveFolderId: "1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv",
+    conversationsDocId: "1hqxKEycC9O2xz_az0dppFpaVLJbAIt2CiyiKLTTcPF0",
+    fromLabel: "03.07.2026",
+    fromIso: "2026-07-03",
+  };
+
+  it("leaves the section out when the caller passes no anchors", () => {
+    const text = buildAdvancePrompt(base);
+    expect(text).not.toContain("## מקורות נוספים");
+    expect(text).toContain("- **מה ידוע**: התמצית מהנתונים");
+  });
+
+  it("checks what is connected, never assumes it, and uses whatever is", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("## מקורות נוספים: מייל, דרייב והקלטות");
+    expect(text).toContain("אל תניח שמקור מחובר, ואל תוותר על מקור שמחובר");
+    expect(text).toContain("כשהמקור מחובר, זה חובה ולא רשות");
+    expect(text).toContain("שורה אחת שהוא לא היה זמין, וממשיכים");
+    expect(text).toContain("שורה ראשונה \"מקורות:\"");
+  });
+
+  it("carries the anchors, the window and the forwarded-mail case", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("- דומיינים של הלקוח: nux.ai");
+    expect(text).toContain("- דומיינים של ספקים ושותפים: nextage.co.il");
+    expect(text).toContain("דומיין כזה לבד לא הופך מייל או פגישה לשל הלקוח הזה");
+    expect(text).toContain("- מילות מפתח בכותרת: nux, נוקס");
+    expect(text).toContain("1i7d2fcUnvBWmWDWAyFT4i6g3NoP4Hpwv");
+    expect(text).toContain("after:2026/07/03");
+    expect(text).toContain("from:2026-07-03");
+    expect(text).toContain("בהעברה או בהעתק");
+  });
+
+  it("states the seven privacy rules, secrets included", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    for (const n of [1, 2, 3, 4, 5, 6, 7]) expect(text).toMatch(new RegExp(`^${n}\\. `, "m"));
+    expect(text).toContain("לא מעתיקים סיסמאות, קודים או פרטי גישה");
+    expect(text).toContain("כללי \"לא לספר\" בתיק הלקוח חלים גם על מה שנמצא במקורות");
+    expect(text).toContain("מייל אישי של העובד");
+  });
+
+  it("proposes knowledge from meetings and mail threads, each by its own id", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("newSource מסוג TRANSCRIPT עם firefliesId");
+    expect(text).toContain("newSource מסוג EMAIL עם gmailThreadId");
+  });
+
+  it("falls back to the client's name, marked uncertain, when the file has no anchors", () => {
+    const text = buildAdvancePrompt({
+      ...base,
+      sources: { ...sources, clientDomains: [], partnerDomains: [], keywords: [], driveFolderId: null, conversationsDocId: null },
+    });
+    expect(text).toContain("בתיק הלקוח עוד אין דומיינים או מילות מפתח");
+    expect(text).not.toContain("- דומיינים של הלקוח:");
+  });
+
+  it("never reaches the lessons prompt", () => {
+    expect(buildLessonsPrompt({ ...base, sources })).not.toContain("## מקורות נוספים");
+  });
+
+  it("keeps the em dash out of the new section", () => {
+    expect(buildAdvancePrompt({ ...base, sources })).not.toMatch(/[–—]/);
   });
 });

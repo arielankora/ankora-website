@@ -805,6 +805,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 kind: d.kind,
                 organizationName: d.organization?.name ?? null,
               }))}
+              anchors={{ keywords: client.sourceKeywords, driveFolderId: client.driveFolderId, conversationsDocId: client.conversationsDocId }}
               lowered={Object.fromEntries(lowered.map((l) => [l.code, l.count]))}
               canConfirm={canManageClients(user.role)}
             />

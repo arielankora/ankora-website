@@ -100,6 +100,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_source.remove": "הסרת מקור ממרשם המקורות",
   "client_domain.add": "הוספת דומיין ללקוח",
   "client_domain.remove": "הסרת דומיין מהלקוח",
+  "client_source_anchors.set": "עדכון עוגני מקורות של לקוח",
   "system_access.add": "הוספת מערכת למפת המערכות",
   "system_access.update": "עדכון מערכת במפת המערכות",
   "system_access.remove": "הסרת מערכת ממפת המערכות",
