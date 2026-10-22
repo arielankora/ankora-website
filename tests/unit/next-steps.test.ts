@@ -103,22 +103,65 @@ describe("next steps", () => {
 describe("recommendBackup", () => {
   const s = (over: Partial<StaffSignal>): StaffSignal => ({ id: "x", name: "X", accountManager: false, openTasks: 0, processes: [], ...over });
 
-  it("prefers the account manager, never the owner", () => {
+  it("prefers who works on the client most, never the owner", () => {
     const pick = recommendBackup("hadas", [s({ id: "hadas", name: "Hadas", accountManager: true, openTasks: 9 }), s({ id: "anna", name: "Anna", openTasks: 1 }), s({ id: "ariel", name: "Ariel", accountManager: false, processes: ["P2"] })]);
     expect(pick?.id).toBe("ariel");
     expect(pick?.why).toContain("P2");
     const am = recommendBackup("hadas", [s({ id: "anna", name: "Anna", accountManager: true }), s({ id: "ariel", name: "Ariel", openTasks: 2 })]);
     expect(am).toMatchObject({ id: "anna", name: "Anna" });
-    expect(am?.why).toContain("מנהל התיק");
+    expect(am?.why).toContain("ניהול התיק");
   });
 
-  it("recommends nobody when only the owner works on the client", () => {
+  it("recommends nobody when only the owner works on the client and there is no one else", () => {
     expect(recommendBackup("hadas", [s({ id: "hadas", accountManager: true })])).toBeNull();
     expect(recommendBackup("hadas", [s({ id: "anna" })])).toBeNull();
   });
 
   it("breaks a tie by name, the same every time", () => {
     expect(recommendBackup(null, [s({ id: "b", name: "בני", openTasks: 1 }), s({ id: "a", name: "אנה", openTasks: 1 })])?.id).toBe("a");
+  });
+
+  // 22.10.2026: Ariel was suggested as the backup everywhere, because he
+  // has the most open tasks. He manages; he does not run the processes.
+  it("never suggests a manager who runs nothing while an operator exists", () => {
+    const nux = [s({ id: "hadas", name: "Hadas Vinogura", processes: ["P1", "P2"], openTasks: 20 }), s({ id: "ariel", name: "Ariel", openTasks: 13, operator: false })];
+    const pick = recommendBackup("hadas", nux, [
+      { id: "hadas", name: "Hadas Vinogura" },
+      { id: "anna", name: "Anna Kozlov" },
+    ]);
+    expect(pick?.id).toBe("anna");
+    expect(pick?.why).toContain("אין עוד מישהו מצוות התפעול על הלקוח");
+  });
+
+  it("prefers someone already the backup of the client's other processes", () => {
+    const pick = recommendBackup("hadas", [s({ id: "anna", name: "Anna", processes: ["P3"], backs: ["P3"] }), s({ id: "noa", name: "Noa", openTasks: 3, accountManager: true })]);
+    expect(pick?.id).toBe("anna");
+    expect(pick?.why).toContain("גיבוי של P3");
+  });
+
+  it("suggests the other operator on the client: Grantor, owned by Anna, gets Hadas", () => {
+    const grantor = [s({ id: "anna", name: "Anna Kozlov", accountManager: true, processes: ["P1"] }), s({ id: "hadas", name: "Hadas Vinogura", openTasks: 2 }), s({ id: "ariel", name: "Ariel", openTasks: 5, operator: false })];
+    expect(recommendBackup("anna", grantor)?.id).toBe("hadas");
+  });
+
+  it("falls back to a manager who works on the client only when no operator exists", () => {
+    const pick = recommendBackup("hadas", [s({ id: "ariel", name: "Ariel", openTasks: 4, operator: false })], [{ id: "hadas", name: "Hadas" }]);
+    expect(pick?.id).toBe("ariel");
+    expect(pick?.why).toContain("אין מישהו נוסף מצוות התפעול");
+  });
+
+  it("says why without he or she", () => {
+    const rows = [
+      recommendBackup("o", [s({ id: "a", name: "A", openTasks: 13 })]),
+      recommendBackup("o", [s({ id: "a", name: "A", openTasks: 1, accountManager: true, processes: ["P1"] })]),
+      recommendBackup("o", [s({ id: "a", name: "A", processes: ["P2"], backs: ["P2"] })]),
+      recommendBackup("o", [], [{ id: "b", name: "B" }]),
+    ];
+    for (const r of rows) {
+      expect(r?.why).toBeTruthy();
+      expect(r?.why).not.toMatch(/יש לו|יש לה|\bמכיר\b|מכירה|אחראי|אחראית/);
+    }
+    expect(rows[0]?.why).toContain("13 משימות פתוחות");
   });
 });
 

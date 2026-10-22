@@ -4,7 +4,9 @@ import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { requestException } from "@/lib/app-domain/policy-exceptions";
-import { collectApprovals, countApprovals, countApprovalsForClient } from "@/lib/app-domain/approvals";
+import { collectApprovals, countApprovals, countApprovalsForClient, countMyPendingProposals } from "@/lib/app-domain/approvals";
+import { INTERNAL_NOTE, approveInternalRule, approveRuleDecision, confirmInternalSource } from "@/lib/app-domain/internal-client";
+import { SECONDARY_ONLY_TO_RESOLVE } from "@/lib/knowledge-sources";
 import { collectQuestionCards, createQuestionsTask, markQuestionsAsked } from "@/lib/app-domain/client-questions";
 import { approveRulesTogether, runStep } from "@/lib/app-domain/process-next-steps";
 import { addClientFact } from "@/lib/app-domain/client-facts";
@@ -64,20 +66,18 @@ describe("approvals", () => {
     // A manager: rules, the procedure and the summary. Not the task (not
     // the supervisor) and not the exception (the client named Hadas).
     const forAriel = (await mine(ariel, client.id)).filter((i) => i.kind !== "process");
-    expect(forAriel.map((i) => i.kind).sort()).toEqual(["procedure", "rule", "rule", "summary"]);
+    // The rule not yet confirmed is a question to the client, not a decision (22.10.2026).
+    expect(forAriel.map((i) => i.kind).sort()).toEqual(["procedure", "rule", "summary"]);
     // Every row says what to do.
     expect(forAriel.every((i) => !!i.recommend?.text)).toBe(true);
     const rules = forAriel.filter((i) => i.kind === "rule");
     expect(rules.find((r) => r.id === proposed.id)?.actions.approve).toBe("אישור הכלל");
-    // Not confirmed: no approve button, and what would confirm it.
-    const blocked = rules.find((r) => r.id === unsure.id);
-    expect(blocked?.actions.approve).toBeNull();
-    expect(blocked?.blocked).toContain("לשאול את אורן");
+    expect(rules.some((r) => r.id === unsure.id)).toBe(false);
     expect(forAriel.find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, version: 1, href: `/app/clients/${client.id}?tab=file#item-${process.id}` });
 
     // And P1's missing backup, as a decision of its own.
     expect((await mine(ariel, client.id)).filter((i) => i.kind === "process").map((i) => i.id)).toEqual([`${process.id}:backup`]);
-    expect(await countApprovalsForClient(ariel, client.id)).toBe(5);
+    expect(await countApprovalsForClient(ariel, client.id)).toBe(4);
     expect(await countApprovals(hadas)).toBeGreaterThanOrEqual(2);
   });
 
@@ -197,5 +197,71 @@ describe("approvals", () => {
     expect(bad?.actions.approve).toBeNull();
     expect(bad?.blocked).toContain("לא עובר את הבדיקות");
     expect(bad?.preview?.problems.length).toBeGreaterThan(0);
+  });
+});
+
+// 22.10.2026: Ankora's own file. Ankora is the client there, so what is
+// uncertain only because Ankora wrote it is a manager's decision.
+describe("approvals of the internal file", () => {
+  async function internalSetup() {
+    const client = await createTestClient({ name: "Ankora פנימי" });
+    await prisma.client.update({ where: { id: client.id }, data: { isInternal: true } });
+    const { user: ariel } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const { user: hadas } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: client.id } });
+    const src = await addClientSource(ariel, { clientId: client.id, kind: "ANKORA_DOCUMENT", title: "נוהל קליטה ועזיבה" });
+    await prisma.clientSource.update({ where: { id: src.id }, data: { weight: "SECONDARY" } });
+    const code = src.code;
+    const rule = await addClientPolicy(ariel, { clientId: client.id, kind: "FORBIDDEN", title: "הסוכן לא שולח", statement: "הוא מנסח, אדם שולח", sources: [{ code }] });
+    await prisma.clientPolicy.update({ where: { id: rule.id }, data: { knowledgeStatus: "UNCERTAIN", toResolve: SECONDARY_ONLY_TO_RESOLVE, ownerId: hadas.id } });
+    const fact = await addClientFact(ariel, { clientId: client.id, kind: "NOTE", body: "מסמכים חתומים נשמרים 7 שנים", sources: [{ code }] });
+    await prisma.clientFact.update({ where: { id: fact.id }, data: { knowledgeStatus: "UNCERTAIN", toResolve: SECONDARY_ONLY_TO_RESOLVE, ownerId: hadas.id } });
+    return { client, ariel, hadas, rule, fact, code };
+  }
+
+  it("offers the rule as a decision, confirms and approves it in one click", async () => {
+    const { client, ariel, rule } = await internalSetup();
+    const row = (await mine(ariel, client.id)).find((i) => i.kind === "rule" && i.id === rule.id);
+    expect(row?.actions.approve).toBe("אישור הכלל");
+    expect(row?.recommend?.why).toContain("אנקורה היא הלקוח");
+    await approveRuleDecision(ariel, rule.id);
+    const after = await prisma.clientPolicy.findUniqueOrThrow({ where: { id: rule.id } });
+    expect(after).toMatchObject({ status: "ACTIVE", knowledgeStatus: "CONFIRMED", toResolve: null });
+    const audit = await prisma.auditEvent.findFirst({ where: { action: "client_policy.internal_confirm", entityId: rule.id } });
+    expect((audit?.afterJson as { note?: string }).note).toBe(INTERNAL_NOTE);
+  });
+
+  it("puts the other items on one row per source, and never on a card of questions to a client", async () => {
+    const { client, ariel, hadas, fact, code } = await internalSetup();
+    const row = (await mine(ariel, client.id)).find((i) => i.kind === "internal");
+    expect(row).toMatchObject({ id: code, weight: 1, actions: { approve: "לאשר את כולם" } });
+    expect((await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id)).toEqual([]);
+    await confirmInternalSource(ariel, client.id, code);
+    expect((await prisma.clientFact.findUniqueOrThrow({ where: { id: fact.id } })).knowledgeStatus).toBe("CONFIRMED");
+    // Not a manager: no such row.
+    expect((await mine(hadas, client.id)).some((i) => i.kind === "internal")).toBe(false);
+  });
+
+  it("refuses the shortcut on a client's file", async () => {
+    const { ariel, unsure } = await setup();
+    await expect(approveRuleDecision(ariel, unsure.id)).rejects.toThrow();
+    await expect(approveInternalRule(ariel, unsure.id)).rejects.toThrow("רק בתיק הפנימי");
+  });
+});
+
+// 22.10.2026: Grantor's proposals Hadas sent filled Ariel's count.
+describe("whose meetings count", () => {
+  it("counts a meeting for its sender and the account manager, not for every manager", async () => {
+    const { client, hadas, anna, ariel } = await setup();
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: anna.id } });
+    const batch = await prisma.knowledgeBatch.create({ data: { clientId: client.id, createdById: hadas.id } });
+    for (const n of [1, 2, 3]) await prisma.knowledgeProposal.create({ data: { batchId: batch.id, clientId: client.id, target: "FACT", payload: { kind: "NOTE", body: `פריט ${n}` }, reason: "בדיקה" } });
+    expect(await countMyPendingProposals(hadas, { clientId: client.id })).toBe(3);
+    expect(await countMyPendingProposals(anna, { clientId: client.id })).toBe(3);
+    expect(await countMyPendingProposals(ariel, { clientId: client.id })).toBe(0);
+    expect(await countMyPendingProposals(ariel, { clientId: client.id, everyone: true })).toBe(3);
+    const row = (await collectApprovals(ariel)).find((i) => i.kind === "knowledge" && i.clientId === client.id);
+    expect(row?.mine).toBe(false);
+    expect((await collectApprovals(hadas)).find((i) => i.kind === "knowledge" && i.clientId === client.id)?.mine).toBe(true);
   });
 });

@@ -8,6 +8,8 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { loweredBySource, type LoweredSource } from "@/lib/app-domain/source-confirmation";
 import { createTask } from "@/lib/app-domain/tasks";
 import { cardOwner, cardTitle, sendTaskTitle, type QuestionItem } from "@/lib/client-questions";
+import { internalClientIds } from "@/lib/app-domain/internal-client";
+import { SECONDARY_ONLY_TO_RESOLVE } from "@/lib/knowledge-sources";
 
 // "שאלות ללקוח" (lib/client-questions.ts says why): per client, what is
 // not yet confirmed and the open questions, on the card of whoever owns
@@ -84,7 +86,12 @@ export async function collectQuestionCards(user: User, options: { scope?: "mine"
 
   type Entry = { owner: string | null; item: QuestionItem; updatedAt: Date };
   const byClient = new Map<string, Entry[]>();
+  // 22.10.2026: in Ankora's own file there is no client to ask. What is
+  // uncertain there only because Ankora wrote it is a manager's decision,
+  // on "אישורים" (lib/app-domain/internal-client.ts).
+  const internal = await internalClientIds(clients);
   const add = (r: Row & { assigneeId?: string | null }, what: string, title: string, isQuestion: boolean) => {
+    if (internal.has(r.clientId) && r.toResolve === SECONDARY_ONLY_TO_RESOLVE) return;
     const owner = cardOwner(r, am.get(r.clientId) ?? null);
     const list = byClient.get(r.clientId) ?? [];
     list.push({
@@ -139,7 +146,7 @@ export async function collectQuestionCards(user: User, options: { scope?: "mine"
         ownerName: owner ? (names.get(owner) ?? null) : null,
         title: cardTitle(open || entries.length, contactName),
         items: entries.map((e) => e.item),
-        lowered: lowered.filter((l) => l.clientId === c.id && (all || owner === user.id)),
+        lowered: internal.has(c.id) ? [] : lowered.filter((l) => l.clientId === c.id && (all || owner === user.id)),
       });
     }
   }

@@ -7,9 +7,9 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { closeTaskCoveredByProcess, coveredTasksForClients, type CoveredTask } from "@/lib/app-domain/process-overlap";
 import { approveProcessVersion, linkProcessDates } from "@/lib/app-domain/processes";
 import { markProcessReviewed } from "@/lib/app-domain/process-review";
-import { approveClientPolicy } from "@/lib/app-domain/client-policies";
+import { approveRuleDecision } from "@/lib/app-domain/internal-client";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
-import { matchDateToProcess, recommendBackup, type BackupCandidate, type DateCandidate, type ProcessFacts, type StaffSignal, type StepOp } from "@/lib/next-steps";
+import { matchDateToProcess, recommendBackup, type BackupCandidate, type DateCandidate, type PoolMember, type ProcessFacts, type StaffSignal, type StepOp } from "@/lib/next-steps";
 
 // The data behind a process's next steps (lib/next-steps.ts), read once
 // for a set of clients, and the one door that carries a step out. The
@@ -18,11 +18,26 @@ import { matchDateToProcess, recommendBackup, type BackupCandidate, type DateCan
 
 const OPEN = ["OPEN", "IN_PROGRESS"] as const;
 
+/// Who runs work, as opposed to only managing it (22.10.2026): anyone on
+/// the team who is not a manager, and a manager who owns or backs up a
+/// process somewhere. Ariel manages every client and owns none of the
+/// processes, so he is never suggested as someone's backup.
+async function operatorIds(): Promise<{ operators: Set<string>; pool: PoolMember[] }> {
+  const [users, holders] = await Promise.all([
+    prisma.user.findMany({ where: { deletedAt: null, status: "ACTIVE", role: { not: "CLIENT_USER" } }, select: { id: true, name: true, role: true } }),
+    prisma.process.findMany({ where: { deletedAt: null, status: { not: "RETIRED" } }, select: { ownerId: true, backupOwnerId: true } }),
+  ]);
+  const holds = new Set<string>();
+  for (const p of holders) for (const id of [p.ownerId, p.backupOwnerId]) if (id) holds.add(id);
+  const operators = new Set(users.filter((u) => !canManageClients(u.role) || holds.has(u.id)).map((u) => u.id));
+  return { operators, pool: users.filter((u) => operators.has(u.id)).map((u) => ({ id: u.id, name: u.name })) };
+}
+
 /// Who already works on each client, for the backup to recommend.
 export async function staffSignals(clientIds: string[]): Promise<Map<string, StaffSignal[]>> {
   const out = new Map<string, StaffSignal[]>();
   if (clientIds.length === 0) return out;
-  const [clients, tasks, processes] = await Promise.all([
+  const [clients, tasks, processes, { operators }] = await Promise.all([
     prisma.client.findMany({ where: { id: { in: clientIds } }, select: { id: true, accountManagerId: true } }),
     prisma.task.groupBy({
       by: ["clientId", "assignedToId"],
@@ -33,6 +48,7 @@ export async function staffSignals(clientIds: string[]): Promise<Map<string, Sta
       where: { clientId: { in: clientIds }, deletedAt: null, status: { not: "RETIRED" } },
       select: { clientId: true, code: true, ownerId: true, backupOwnerId: true },
     }),
+    operatorIds(),
   ]);
   const ids = new Set<string>();
   for (const c of clients) if (c.accountManagerId) ids.add(c.accountManagerId);
@@ -48,7 +64,7 @@ export async function staffSignals(clientIds: string[]): Promise<Map<string, Sta
     const of = (id: string) => {
       let s = byUser.get(id);
       if (!s) {
-        s = { id, name: name.get(id)!, accountManager: false, openTasks: 0, processes: [] };
+        s = { id, name: name.get(id)!, accountManager: false, openTasks: 0, processes: [], backs: [], operator: operators.has(id) };
         byUser.set(id, s);
       }
       return s;
@@ -58,6 +74,7 @@ export async function staffSignals(clientIds: string[]): Promise<Map<string, Sta
     for (const p of processes) {
       if (p.clientId !== c.id) continue;
       for (const id of [p.ownerId, p.backupOwnerId]) if (id && name.has(id) && !of(id).processes.includes(p.code)) of(id).processes.push(p.code);
+      if (p.backupOwnerId && name.has(p.backupOwnerId)) of(p.backupOwnerId).backs!.push(p.code);
     }
     out.set(c.id, [...byUser.values()]);
   }
@@ -72,19 +89,20 @@ export async function stepCandidates(
 ): Promise<Map<string, { backup: BackupCandidate | null; date: DateCandidate | null }>> {
   const out = new Map<string, { backup: BackupCandidate | null; date: DateCandidate | null }>();
   if (processes.length === 0) return out;
-  const [signals, dates] = await Promise.all([
+  const [signals, dates, { pool }] = await Promise.all([
     staffSignals(clientIds),
     prisma.importantDate.findMany({
       where: { clientId: { in: clientIds }, processId: null, deletedAt: null, status: { not: "ARCHIVED" } },
       select: { id: true, clientId: true, title: true },
       orderBy: { title: "asc" },
     }),
+    operatorIds(),
   ]);
   for (const p of processes) {
     // Each process its own backup, without the owner of this one.
-    const staff = (signals.get(p.clientId) ?? []).map((s) => ({ ...s, processes: s.processes.filter((c) => c !== p.code) }));
+    const staff = (signals.get(p.clientId) ?? []).map((s) => ({ ...s, processes: s.processes.filter((c) => c !== p.code), backs: (s.backs ?? []).filter((c) => c !== p.code) }));
     out.set(p.id, {
-      backup: p.backupOwnerId ? null : recommendBackup(p.ownerId, staff),
+      backup: p.backupOwnerId ? null : recommendBackup(p.ownerId, staff, pool),
       date: p.triggerKinds.includes("SCHEDULED")
         ? matchDateToProcess(
             p,
@@ -211,7 +229,7 @@ export async function approveRulesTogether(actor: User, clientId: string, ids: s
   const failed: string[] = [];
   for (const r of rules) {
     try {
-      await approveClientPolicy(actor, r.id);
+      await approveRuleDecision(actor, r.id);
       approved++;
     } catch (e) {
       failed.push(`${r.title}: ${e instanceof Error ? e.message : "שגיאה"}`);
