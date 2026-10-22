@@ -1,6 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Prisma, User, SourceKind, SourceRestriction, TaskPriority } from "@prisma/client";
+import type { Prisma, User, SourceKind, SourceRestriction, SourceWeight, TaskPriority } from "@prisma/client";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -25,7 +25,12 @@ import {
   taskBlocker,
   taskFromProposal,
   TASK_TITLE_MAX,
+  actionTitle,
+  defaultTaskDue,
+  isQuestionTitle,
+  taskTitleProblem,
 } from "@/lib/knowledge-proposals";
+import { localDateKey } from "@/lib/timezone";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
@@ -38,12 +43,12 @@ import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { createTask } from "@/lib/app-domain/tasks";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
 import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type ExistingItem } from "@/lib/app-domain/proposal-existing";
-import { dateSchedule } from "@/lib/date-proposals";
+import { dateProposalKey, dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
-import { isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
-import { findNameMatches, nameTokens } from "@/lib/name-match";
+import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
+import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -93,6 +98,9 @@ export type BatchSourceInput =
       participants?: string[];
       externalIds?: string[];
       restriction?: SourceRestriction;
+      /// An Ankora document that writes down what the client said
+      /// (21.10.2026): registered with the primary weight.
+      weight?: SourceWeight;
     };
 
 export type ProposeInput = {
@@ -147,6 +155,7 @@ async function resolveSource(actor: User, clientId: string, source: BatchSourceI
     participants: source.participants,
     externalIds: ids,
     restriction: source.restriction,
+    weight: source.weight,
   });
 }
 
@@ -192,6 +201,19 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
       });
     }
   }
+  // The same date under another title, on the same day: two rows for one
+  // birthday (21.10.2026). Not merged: a date is opened and fixed by hand.
+  if (item.action === "CREATE" && item.target === "DATE") {
+    const title = String(item.payload.title ?? "").trim();
+    for (const m of title ? findDateMatches({ name: title, key: dateProposalKey(item.payload) }, await datesInFile(clientId)) : []) {
+      if (m.id === exact?.id) continue;
+      flags.push({
+        code: "SIMILAR",
+        match: { id: m.id, name: m.name },
+        message: `ייתכן שזה "${m.name}" הקיים: אותו יום, כמעט אותו שם. אם כן, דוחים את ההצעה ומשלימים את המועד הקיים.`,
+      });
+    }
+  }
   if (isSensitive(item.payload)) {
     flags.push({ code: "R6", message: "מידע רגיש: רק מי שמאשר מידע רגיש אצל הלקוח רואה את הפריט ומחליט עליו." });
   }
@@ -207,6 +229,9 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
     if (typeof item.payload.responsibleName === "string" && item.payload.responsibleName.trim() && !(await ownerByName(item.payload.responsibleName))) {
       flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.responsibleName.trim()}". האחראי יהיה מי שמאשר, אלא אם מתקנים את השם.` });
     }
+  }
+  if (item.target === "TASK" && typeof item.payload.title === "string" && isQuestionTitle(item.payload.title)) {
+    flags.push({ code: "TASK_TITLE", message: `הכותרת היא שאלה. באישור המשימה תיפתח כ"${actionTitle(item.payload.title)}". אפשר לנסח אחרת בעריכה.` });
   }
   if (item.target === "POLICY") {
     flags.push({ code: "POLICY", message: "באישור, הכלל נכנס לתיק כמוצע. מנהל מאשר אותו בנפרד כדי שייכנס לתוקף." });
@@ -299,6 +324,7 @@ export async function proposeKnowledge(
     const flags = await flagsFor(input.clientId, { ...item, payload }, source.weight, codes);
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
+    else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
     accepted.push({ item, payload, flags });
   }
 
@@ -653,7 +679,9 @@ async function apply(
       title: draft.title,
       description: draft.description,
       assignedToId: assignee ?? actor.id,
-      dueDate: date(t.dueDate),
+      // 21.10.2026: by when, and under what, even when nobody said.
+      dueDate: date(t.dueDate) ?? defaultDueDate(),
+      categoryId: await autoCategory(actor, p.clientId, draft.title),
       ...(t.priority ? { priority: t.priority } : {}),
     });
     return task.id;
@@ -810,6 +838,24 @@ export async function rejectProposal(actor: User, id: string, reason: string, op
   return updated;
 }
 
+/// A task from a proposal is due in three business days when nobody said
+/// by when (21.10.2026), so it does not sit in the list without a date.
+function defaultDueDate(): Date {
+  return new Date(`${defaultTaskDue(localDateKey(new Date(), "Asia/Jerusalem"))}T00:00:00Z`);
+}
+
+/// The category the task's words point to (lib/mcp/category-pick.ts), the
+/// same pick create_task makes. Dynamic, as in employee-lifecycle.ts: the
+/// lookup module imports back into the app domain.
+async function autoCategory(actor: User, clientId: string, text: string): Promise<string | null> {
+  try {
+    const { autoPickCategory } = await import("@/lib/mcp/lookup");
+    return (await autoPickCategory(actor, clientId, text))?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function draftFor(proposal: { batchId: string; target: string; payload: Prisma.JsonValue; reason: string | null; quote: string | null }) {
   const batch = await prisma.knowledgeBatch.findUnique({ where: { id: proposal.batchId }, select: { sourceId: true } });
   const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { code: true, title: true, externalRefs: true } }) : null;
@@ -834,14 +880,16 @@ async function draftFor(proposal: { batchId: string; target: string; payload: Pr
 export async function proposalToTask(
   actor: User,
   id: string,
-  input: { title?: string | null; description?: string | null; assignedToId?: string | null; dueDate?: Date | null; priority?: TaskPriority | null } = {}
+  input: { title?: string | null; description?: string | null; assignedToId?: string | null; dueDate?: Date | null; priority?: TaskPriority | null; categoryId?: string | null } = {}
 ) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
   const blocker = taskBlocker({ target: proposal.target as ProposalTargetLike, payload: (proposal.payload ?? {}) as Record<string, unknown> });
   if (blocker) throw new Error(blocker);
   const draft = await draftFor(proposal);
-  const title = (input.title?.trim() || draft.title).slice(0, TASK_TITLE_MAX);
+  const title = actionTitle(input.title?.trim() || draft.title).slice(0, TASK_TITLE_MAX);
+  const problem = taskTitleProblem(title, { target: proposal.target as ProposalTargetLike, headline: draft.said });
+  if (problem) throw new Error(problem);
   const description = input.description?.trim() || draft.description;
   // The same check as on the way in: what the person typed is not saved
   // if it holds a password, a key or a card number.
@@ -851,7 +899,8 @@ export async function proposalToTask(
     title,
     description,
     assignedToId: input.assignedToId || actor.id,
-    dueDate: input.dueDate ?? null,
+    dueDate: input.dueDate ?? defaultDueDate(),
+    categoryId: input.categoryId || (await autoCategory(actor, proposal.clientId, title)),
     ...(input.priority ? { priority: input.priority } : {}),
   });
   const updated = await prisma.knowledgeProposal.update({

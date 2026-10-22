@@ -11,6 +11,7 @@ import { blockingChecks, readSteps } from "@/lib/process-rules";
 import { clientVisibleBlocker } from "@/lib/knowledge";
 import { DatePayload, dateShapeError, dateWhen } from "@/lib/date-proposals";
 import { parseExternalRefs, readExternalRefs, refLabel } from "@/lib/external-refs";
+import { addBusinessDays } from "@/lib/business-calendar";
 
 const knowledge = {
   knowledgeStatus: z.enum(["CONFIRMED", "UNCERTAIN", "MISSING"]).optional(),
@@ -576,6 +577,53 @@ export function taskBlocker(p: { target?: ProposalTargetLike; payload: Record<st
 
 export const TASK_TITLE_MAX = 200;
 
+// A task's title says what to do (21.10.2026). Tasks opened from proposals
+// came out titled as a fact ("בנק לאומי, חשבון הבנק של החברה הישראלית:
+// שכר ותשלומי ספקים...") or a question ("...בוצע?"), with no date and no
+// category: nobody could tell from the list what to do, or by when.
+
+/// "...בוצע?" is a question, not something to do.
+export function isQuestionTitle(title: string): boolean {
+  return /[?؟]\s*$/.test(title.trim());
+}
+
+/// The title as an action: a question becomes "לברר: ...".
+export function actionTitle(title: string): string {
+  const t = title.trim();
+  if (!isQuestionTitle(t)) return t;
+  const body = t.replace(/[?؟]+\s*$/, "").trim();
+  return body.startsWith("לברר") ? body : `לברר: ${body}`;
+}
+
+/// A title that already says what to do: a Hebrew infinitive ("לשלוח",
+/// "לברר") or a noun of action ("הזמנת", "תיאום"). A fact or a question is
+/// not one.
+const ACTION_START = /^(ל[א-ת]{2,}|הזמנת|בדיקת|שליחת|תיאום|הגשת|השלמת|מיפוי|הכנת|הפקת|תשלום|סגירת|פתיחת|עדכון|איסוף|חידוש|ביטול|העברת|קבלת|מעקב|ניהול|טיפול|הוספת|הסרת|חתימה|חתימת)(\s|:|$)/;
+
+export function looksLikeAction(title: string): boolean {
+  const t = title.trim();
+  return !isQuestionTitle(t) && (ACTION_START.test(t) || /^(send|call|check|ask|book|pay|sign|update|review|prepare|schedule)\b/i.test(t));
+}
+
+/// Why a task's title will not do, or null. A proposal that was something
+/// to know (a fact, a system) and turned out to be something to do needs
+/// a title of its own: repeating what was said is not a task.
+export function taskTitleProblem(title: string, from: { target: ProposalTargetLike; headline: string }): string | null {
+  const t = title.trim();
+  if (!t) return "צריך לכתוב בכותרת מה עושים.";
+  if (from.target !== "TASK" && !looksLikeAction(t) && normalizeForMatch(t) === normalizeForMatch(from.headline)) {
+    return 'כותרת המשימה צריכה לומר מה עושים, לא לחזור על מה שנאמר. למשל: "לברר עם דקלה מתי השכר משולם".';
+  }
+  return null;
+}
+
+/// Business days a task from a proposal gets when nobody said by when.
+export const TASK_DEFAULT_BUSINESS_DAYS = 3;
+
+export function defaultTaskDue(todayKey: string): string {
+  return addBusinessDays(todayKey, TASK_DEFAULT_BUSINESS_DAYS, "IL");
+}
+
 /// The task a proposal would open, before the person edits it: its line
 /// as the title, and in the description why, the quote, where it is from
 /// and the moment in the recording, so the task can be done without
@@ -587,12 +635,17 @@ export function taskFromProposal(p: {
   quote: string | null;
   source: { code: string; title: string } | null;
   link: string | null;
-}): { title: string; description: string } {
+}): { title: string; description: string; needsTitle: boolean; said: string } {
   const headline = proposalHeadline(p.target, p.payload).trim() || "משימה מהצעה";
-  const title = headline.length > TASK_TITLE_MAX ? `${headline.slice(0, TASK_TITLE_MAX - 3)}...` : headline;
+  // Something to do keeps its line, as an action. Something that was to
+  // know, and does not already read as an action, gets no title of its
+  // own: the person writes what to do.
+  const action = actionTitle(headline);
+  const needsTitle = p.target !== "TASK" && !looksLikeAction(action);
+  const title = needsTitle ? "" : action.length > TASK_TITLE_MAX ? `${action.slice(0, TASK_TITLE_MAX - 3)}...` : action;
   const s = (k: string) => (typeof p.payload[k] === "string" ? (p.payload[k] as string).trim() : "");
   const lines = [
-    headline.length > TASK_TITLE_MAX ? headline : null,
+    needsTitle ? `מה שנאמר: ${headline}` : headline.length > TASK_TITLE_MAX ? headline : null,
     p.target === "TASK" && s("description") ? s("description") : null,
     p.reason?.trim() ? `למה: ${p.reason.trim()}` : null,
     p.quote?.trim() ? `"${p.quote.trim()}"` : null,
@@ -601,5 +654,5 @@ export function taskFromProposal(p: {
     p.link ? `ברגע בשיחה: ${p.link}` : null,
     "נפתחה מהצעה של Claude בממתין לאישור.",
   ];
-  return { title, description: lines.filter(Boolean).join("\n\n") };
+  return { title, description: lines.filter(Boolean).join("\n\n"), needsTitle, said: headline };
 }

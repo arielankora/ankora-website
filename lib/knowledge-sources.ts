@@ -153,3 +153,21 @@ export function checkSources(
   }
   return { ok: true, status, lowered: false };
 }
+
+/// An Ankora document that writes down what the client said: the summary
+/// of an intake meeting, a file Hadas typed while Nadav talked (21.10.2026).
+/// It is registered as an Ankora document with the primary weight, so what
+/// comes from it is not lowered to "uncertain" by R14.
+export const CLIENT_CONVERSATION_LABEL = "סיכום שיחה עם הלקוח";
+
+export function isClientConversation(s: { kind: SourceKindLike; weight: SourceWeightLike }): boolean {
+  return s.kind === "ANKORA_DOCUMENT" && s.weight === "PRIMARY";
+}
+
+/// An item that is uncertain only because R14 lowered it (every source is
+/// an Ankora document) and that cites `code`: what "אושר מול הלקוח" on that
+/// source confirms. An item uncertain for any other reason keeps its own
+/// "what would close it" and is left alone.
+export function uncertainOnlyForAnkora(item: { knowledgeStatus: string; toResolve: string | null; sources: unknown }, code: string): boolean {
+  return item.knowledgeStatus === "UNCERTAIN" && item.toResolve === SECONDARY_ONLY_TO_RESOLVE && readSourceRefs(item.sources).some((r) => r.code === code);
+}

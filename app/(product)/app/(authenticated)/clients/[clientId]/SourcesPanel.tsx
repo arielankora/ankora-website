@@ -5,9 +5,11 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import {
+  CLIENT_CONVERSATION_LABEL,
   SOURCE_KIND_LABELS,
   SOURCE_WEIGHT_LABELS,
   defaultWeight,
+  isClientConversation,
   type SourceKindLike,
   type SourceWeightLike,
 } from "@/lib/knowledge-sources";
@@ -16,6 +18,7 @@ import {
   removeClientSourceAction,
   addClientDomainAction,
   removeClientDomainAction,
+  confirmSourceWithClientAction,
 } from "../source-actions";
 
 // Org brain, phase 2: the source register ("מקרא מקורות" in Hadas's file)
@@ -108,12 +111,17 @@ function SourceForm({ clientId }: { clientId: string }) {
       )}
       <Field label="משקל">
         <select name="weight" value={weight} onChange={(e) => setWeight(e.target.value as SourceWeightLike)} className={INPUT}>
-          <option value="PRIMARY">{SOURCE_WEIGHT_LABELS.PRIMARY}: הלקוח או ספק שלו</option>
+          <option value="PRIMARY">
+            {SOURCE_WEIGHT_LABELS.PRIMARY}: {kind === "ANKORA_DOCUMENT" ? `${CLIENT_CONVERSATION_LABEL}, מה שהלקוח אמר בכתב של אנקורה` : "הלקוח או ספק שלו"}
+          </option>
           <option value="SECONDARY">{SOURCE_WEIGHT_LABELS.SECONDARY}: מסמך שאנקורה כתבה</option>
         </select>
       </Field>
       {weight === "SECONDARY" && (
         <p className="-mt-2 text-[11px] text-app-text-tertiary">פריט שכל המקורות שלו משניים נשמר כ&quot;לא ודאי&quot;, עד שהלקוח מאשר.</p>
+      )}
+      {weight === "PRIMARY" && kind === "ANKORA_DOCUMENT" && (
+        <p className="-mt-2 text-[11px] text-app-text-tertiary">למסמך שאנקורה כתבה מתוך שיחה עם הלקוח, כמו סיכום פגישת היכרות. מה שנכנס ממנו לא יסומן &quot;לא ודאי&quot; רק בגלל שהוא בכתב של אנקורה.</p>
       )}
       <label className="flex items-center gap-2 text-sm text-app-text-primary">
         <input type="checkbox" name="topicsOnly" className="h-4 w-4 accent-gold" />
@@ -162,13 +170,58 @@ function DomainForm({ clientId }: { clientId: string }) {
   );
 }
 
+/// "אושר מול הלקוח" on one source (21.10.2026): the items lowered only
+/// because the source is Ankora's, confirmed in one step.
+function ConfirmForm({ clientId, source, count }: { clientId: string; source: PanelSource; count: number }) {
+  const close = useDrawerClose();
+  const { showToast } = useToast();
+  const { onSubmit, pending, error } = useActionForm(confirmSourceWithClientAction, (r) => {
+    showToast({ tone: "info", title: "אושר מול הלקוח", description: `${r.confirmed ?? 0} פריטים מ-${source.code}` });
+    close();
+  });
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="source-confirm-form">
+      <input type="hidden" name="clientId" value={clientId} />
+      <input type="hidden" name="code" value={source.code} />
+      <p className="text-sm text-app-text-primary">
+        {count === 1 ? "פריט אחד מסומן" : `${count} פריטים מסומנים`} &quot;לא ודאי&quot; רק כי המקור שלהם, {source.code}, הוא מסמך של אנקורה.
+      </p>
+      <p className="text-xs text-app-text-secondary">
+        באישור הם יסומנו כמאושרים, ו-{source.code} יסומן &quot;{CLIENT_CONVERSATION_LABEL}&quot;, כך שמה שייכנס ממנו בהמשך לא יסומן שוב. פריט שלא ודאי מסיבה אחרת לא משתנה.
+      </p>
+      <Field label="איך זה אושר מול הלקוח, בשורה אחת *">
+        <input name="note" required placeholder="נדב עבר על הרשימה בוואטסאפ ב-21.10 ואישר" className={INPUT} />
+      </Field>
+      {error && <p className="text-sm text-app-error">{error}</p>}
+      <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+        {pending ? "שומר..." : "אושר מול הלקוח"}
+      </button>
+    </form>
+  );
+}
+
 function formatDate(iso: string | null): string | null {
   if (!iso) return null;
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${Number(d)}.${Number(m)}.${y}`;
 }
 
-export function SourcesPanel({ clientId, sources, domains }: { clientId: string; sources: PanelSource[]; domains: PanelDomain[] }) {
+/// `lowered`: per source code, the items uncertain only because the source
+/// is Ankora's. `canConfirm`: a manager, who may confirm them with the
+/// client in one step.
+export function SourcesPanel({
+  clientId,
+  sources,
+  domains,
+  lowered = {},
+  canConfirm = false,
+}: {
+  clientId: string;
+  sources: PanelSource[];
+  domains: PanelDomain[];
+  lowered?: Record<string, number>;
+  canConfirm?: boolean;
+}) {
   const { showToast } = useToast();
 
   async function removeSource(s: PanelSource) {
@@ -197,7 +250,7 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
         ) : (
           <ul className="mt-4 divide-y divide-app-border">
             {sources.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+              <li key={s.id} id={`source-${s.code}`} className="flex scroll-mt-24 flex-wrap items-start justify-between gap-3 rounded-lg py-3 target:bg-app-accent-soft">
                 <div className="flex min-w-0 flex-[1_1_18rem] gap-3">
                   <span className="w-9 shrink-0 font-mono text-sm text-app-text-accent" dir="ltr">
                     {s.code}
@@ -208,10 +261,23 @@ export function SourcesPanel({ clientId, sources, domains }: { clientId: string;
                       {[SOURCE_KIND_LABELS[s.kind], formatDate(s.occurredAt), s.participants.join(", ") || null].filter(Boolean).join(" · ")}
                     </p>
                     {s.notes && <p className="mt-1 text-xs text-app-text-secondary">{s.notes}</p>}
-                    {(s.weight === "SECONDARY" || s.topicsOnly) && (
+                    {(s.weight === "SECONDARY" || s.topicsOnly || isClientConversation(s)) && (
                       <div className="mt-1.5 flex flex-wrap gap-2">
                         {s.weight === "SECONDARY" && <StatusBadge label="משני" tone="gray" />}
+                        {isClientConversation(s) && <StatusBadge label={CLIENT_CONVERSATION_LABEL} tone="green" />}
                         {s.topicsOnly && <StatusBadge label="נושאים בלבד" tone="amber" />}
+                      </div>
+                    )}
+                    {(lowered[s.code] ?? 0) > 0 && (
+                      <div className="mt-1.5 text-xs text-app-warning" data-testid="source-lowered">
+                        {lowered[s.code] === 1 ? "פריט אחד לא ודאי" : `${lowered[s.code]} פריטים לא ודאיים`} רק כי זה מסמך של אנקורה.
+                        {canConfirm && (
+                          <span className="ms-2 inline-block">
+                            <Drawer triggerLabel="אושר מול הלקוח" title={`אישור מול הלקוח: ${s.code}`} variant="link">
+                              <ConfirmForm clientId={clientId} source={s} count={lowered[s.code]!} />
+                            </Drawer>
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>

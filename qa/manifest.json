@@ -1915,6 +1915,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-20",
       "riskReason": "מסך שמרכז את כל האישורים. חייב לסנן לפי הרשאה ולפי לקוח, והלשונית של ידע מהחילוץ היא מסך האישור של התיק."
+    },
+    "domain:process-overlap": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-21",
+      "riskReason": "סוגר משימות של לקוח לארכיון. רק מנהל, אחת אחת, עם תגובה ורישום ביומן."
+    },
+    "domain:source-confirmation": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-21",
+      "riskReason": "משנה בבת אחת את הוודאות של פריטים בתיק ואת משקל המקור. רק מנהל, עם שורת הסבר ורישום ביומן."
     }
   },
   "waivers": {},

@@ -9,6 +9,9 @@ import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { approvalsHref, tabCounts, type ApprovalItem, type ReviewItem } from "@/lib/approvals";
+import { SCHEDULED_NO_DATE_NOTE } from "@/lib/client-control";
+import { loweredBySource } from "@/lib/app-domain/source-confirmation";
+import { coveredTasksForClients } from "@/lib/app-domain/process-overlap";
 
 // What is waiting on one person's approval, read from the state each thing
 // is in now (lib/approvals.ts says why this screen exists). Each kind is
@@ -333,7 +336,7 @@ export async function collectReview(user: User): Promise<ReviewItem[]> {
       return [] as T[];
     });
 
-  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies, flagged, lessons, awaiting, signatures] = await Promise.all([
+  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies, flagged, lessons, awaiting, signatures, scheduled, lowered, covered] = await Promise.all([
     read("facts", prisma.clientFact.findMany({ where: { ...unsure, kind: { not: "QUESTION" } }, select: { ...base, body: true } })),
     read("contacts", prisma.clientContact.findMany({ where: unsure, select: { ...base, role: true, person: { select: { name: true } } } })),
     read("orgs", prisma.clientOrganization.findMany({ where: unsure, select: { ...base, organization: { select: { name: true } } } })),
@@ -367,6 +370,19 @@ export async function collectReview(user: User): Promise<ReviewItem[]> {
           })
         )
       : Promise.resolve([]),
+    // 21.10.2026: an approved process that runs by a date, with none ahead.
+    read(
+      "scheduled without a date",
+      prisma.process.findMany({
+        where: { deletedAt: null, clientId: { in: ids }, status: "ACTIVE", triggerKinds: { has: "SCHEDULED" } },
+        select: { id: true, clientId: true, ownerId: true, code: true, title: true, updatedAt: true, dates: { where: { deletedAt: null, status: { not: "ARCHIVED" }, nextOccurrenceAt: { not: null } }, select: { id: true } } },
+      })
+    ),
+    // Sources whose items are uncertain only because Ankora wrote them, for
+    // the managers who may confirm them with the client in one step.
+    s.manager ? read("lowered by source", loweredBySource(ids)) : Promise.resolve([]),
+    // Open tasks an approved process covers.
+    read("covered tasks", coveredTasksForClients(s.manager ? ids : [...managed])),
   ]);
 
   const out: ReviewItem[] = [];
@@ -415,6 +431,43 @@ export async function collectReview(user: User): Promise<ReviewItem[]> {
       detail: l.body ? clip(l.body) : "הערה מריצה של התהליך",
       since: l.createdAt,
       href: itemHref(l.clientId, l.processId),
+    });
+  }
+  for (const p of theirs(scheduled)) {
+    if (p.dates.length > 0) continue;
+    out.push({
+      kind: "no_next_date",
+      id: p.id,
+      clientId: p.clientId,
+      clientName: name.get(p.clientId) ?? null,
+      title: `${p.code} ${p.title}`,
+      detail: `${SCHEDULED_NO_DATE_NOTE}. מקשרים לתהליך את המועדים שלו.`,
+      since: p.updatedAt,
+      href: itemHref(p.clientId, p.id),
+    });
+  }
+  for (const l of lowered) {
+    out.push({
+      kind: "source_confirm",
+      id: `${l.clientId}:${l.code}`,
+      clientId: l.clientId,
+      clientName: name.get(l.clientId) ?? null,
+      title: `${l.code} ${l.title}`,
+      detail: `${l.count === 1 ? "פריט אחד לא ודאי" : `${l.count} פריטים לא ודאיים`} רק כי המקור הוא מסמך של אנקורה. אם הלקוח אישר, "אושר מול הלקוח" במרשם המקורות מאשר את כולם יחד.`,
+      since: new Date(),
+      href: `/app/clients/${l.clientId}?tab=file#source-${l.code}`,
+    });
+  }
+  for (const c of covered) {
+    out.push({
+      kind: "covered_task",
+      id: c.task.id,
+      clientId: c.clientId,
+      clientName: name.get(c.clientId) ?? null,
+      title: c.task.title,
+      detail: `${c.process.code} ${c.process.title} כבר מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. סוגרים אותה בתהליך.`,
+      since: c.task.createdAt,
+      href: itemHref(c.clientId, c.process.id),
     });
   }
   for (const a of awaiting) {

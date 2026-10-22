@@ -5,6 +5,7 @@
 // what the dates engine gets once it is approved.
 
 import { z } from "zod";
+import type { DateKey } from "@/lib/name-match";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD");
 
@@ -90,4 +91,21 @@ export function dateWhen(p: Record<string, unknown>): string {
     return `${every} ב-${alts ?? p.dayOfMonth ?? ""}`;
   }
   return "";
+}
+
+/// When a proposed date falls, in the terms two dates are compared by
+/// (lib/name-match.ts, sameSchedule): a second date for the same day
+/// under a slightly different title is flagged before it is approved.
+export function dateProposalKey(p: Record<string, unknown>): DateKey {
+  const parsed = DatePayload.safeParse(p);
+  if (!parsed.success) return { recurrence: String(p.recurrence ?? "") };
+  const s = dateSchedule(parsed.data);
+  return {
+    recurrence: s.recurrence,
+    calendarType: "GREGORIAN",
+    month: s.month,
+    day: s.day,
+    weekday: s.weekday,
+    once: s.recurrence === "ONCE" && parsed.data.date ? parsed.data.date : null,
+  };
 }

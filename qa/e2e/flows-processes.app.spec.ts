@@ -98,6 +98,39 @@ test.describe("clients/process-actions", () => {
     await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
   });
 
+  test("an approved process that runs by a date, with none ahead, says no run will open", async ({ page }) => {
+    const title = tag("[E2E] תשלומי ספקים");
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const code = await addSource(page);
+    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('input[name="triggerKinds"][value="SCHEDULED"]').check();
+    await dialog.locator('input[name="triggerText"]').fill("ב-10 וב-25 לחודש");
+    await dialog.locator('input[name="sources"]').fill(code);
+    await submit(page, "הוספה לתיק");
+
+    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    // A draft does not run anyway: nothing to say yet.
+    await expect(card().getByTestId("process-no-next-date")).toHaveCount(0);
+
+    await card().getByRole("button", { name: "כתיבת נוהל" }).click();
+    const editor = page.getByRole("dialog");
+    await expect(editor).toBeVisible();
+    await editor.getByLabel("שלב 1: מה עושים").fill("מכינים את קובץ התשלומים");
+    await submit(page, "שמירת טיוטה");
+    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await card().getByRole("button", { name: "אישור הנוהל" }).click();
+    await approved;
+    await page.reload();
+
+    await expect(card().getByTestId("process-no-next-date")).toContainText("לא תיפתח ריצה", { timeout: 15_000 });
+    await expect(page.getByText(/לפי מועד בלי מועד הבא/).first()).toBeVisible();
+  });
+
   test("an ongoing process is in its owner's routine; a check that finds an issue opens a task", async ({ page }) => {
     const title = tag("[E2E] שוטף");
 

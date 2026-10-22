@@ -18,6 +18,7 @@ import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { resolveLesson } from "@/lib/app-domain/process-lessons";
+import { closeTaskCoveredByProcess } from "@/lib/app-domain/process-overlap";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 import { itemExtrasFrom } from "./item-extras";
 
@@ -127,6 +128,18 @@ export async function updateProcessAction(_prev: FormState | undefined, f: FormD
 export async function markProcessReviewedAction(processId: string, clientId: string): Promise<FormState> {
   const user = await requireUser();
   return run(clientId, () => markProcessReviewed(user, processId));
+}
+
+/// "לסגור, התהליך מכסה את זה" (21.10.2026): an open task the approved
+/// process already covers goes to the archive, with a comment.
+export async function closeCoveredTaskAction(taskId: string, processId: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  const r = await run(clientId, () => closeTaskCoveredByProcess(user, taskId, processId));
+  if (r.ok) {
+    revalidatePath("/app/tasks");
+    revalidatePath("/app/approvals");
+  }
+  return r;
 }
 
 /// Learning from runs (spec 5.4): a remark on the procedure went into it,

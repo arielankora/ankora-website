@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
-import { duplicatePairs, type DuplicatePair, type NameCandidate } from "@/lib/name-match";
+import { dateDuplicatePairs, dateKeyFromRow, duplicatePairs, type DateCandidate, type DuplicatePair, type NameCandidate } from "@/lib/name-match";
 
 // Items with a name that may be in the file twice under two spellings
 // (lib/name-match.ts): people, organizations, systems and legal entities.
@@ -47,11 +47,24 @@ export async function namesInFile(clientId: string, target: NamedTarget): Promis
   return rows.map((r) => ({ id: r.id, name: r.name }));
 }
 
+/// The client's own dates (not the holidays every client gets), with when
+/// each falls: two rows for one birthday are the same date only when they
+/// also fall on the same day (lib/name-match.ts, datesMatch).
+export async function datesInFile(clientId: string): Promise<DateCandidate[]> {
+  const rows = await prisma.importantDate.findMany({
+    where: { clientId, deletedAt: null, holidayKey: null, status: { not: "ARCHIVED" } },
+    select: { id: true, title: true, recurrence: true, calendarType: true, month: true, day: true, weekday: true, onceDate: true, nextOccurrenceAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+  return rows.map((r) => ({ id: r.id, name: r.title, key: dateKeyFromRow(r) }));
+}
+
 /// What may already be twice in the file: the cleanup list.
-export async function possibleDuplicates(actor: User, clientId: string): Promise<DuplicatePair<NamedTarget>[]> {
+export async function possibleDuplicates(actor: User, clientId: string): Promise<DuplicatePair<NamedTarget | "DATE">[]> {
   await assertClientAccess(actor, clientId);
-  const out: DuplicatePair<NamedTarget>[] = [];
+  const out: DuplicatePair<NamedTarget | "DATE">[] = [];
   for (const t of NAMED_TARGETS) out.push(...duplicatePairs(t, await namesInFile(clientId, t)));
+  out.push(...dateDuplicatePairs("DATE" as const, await datesInFile(clientId)));
   return out;
 }
 

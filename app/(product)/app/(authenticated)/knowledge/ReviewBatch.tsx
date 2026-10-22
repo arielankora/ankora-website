@@ -41,7 +41,9 @@ export type ReviewProposal = {
   rank: number;
   /// Something to do, not to know: the task it would open, why it cannot
   /// (taskBlocker), and the task it opened once it did.
-  task: { title: string; description: string };
+  /// `needsTitle`: it was something to know, so the person writes what to
+  /// do; `said` is what was said; `due` the date already filled in.
+  task: { title: string; description: string; needsTitle?: boolean; said?: string; due?: string };
   taskBlocked: string | null;
   taskId: string | null;
 };
@@ -212,9 +214,22 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
       <input type="hidden" name="id" value={p.id} />
       <p className="text-xs text-app-text-secondary">ההצעה לא תיכנס לתיק. במקומה תיפתח משימה על הלקוח, וההצעה תסומן &quot;הפכה למשימה&quot;.</p>
       <label className="block">
-        <span className="block text-xs font-medium text-app-text-secondary">כותרת המשימה *</span>
-        <input name="title" required maxLength={200} defaultValue={p.task.title} className={INPUT} />
+        <span className="block text-xs font-medium text-app-text-secondary">מה עושים? כותרת המשימה *</span>
+        <input
+          name="title"
+          required
+          maxLength={200}
+          defaultValue={p.task.title}
+          placeholder={p.task.needsTitle ? "לברר עם... / לשלוח ל... / להזמין..." : undefined}
+          className={INPUT}
+          data-testid="proposal-task-title"
+        />
       </label>
+      {p.task.needsTitle && p.task.said && (
+        <p className="-mt-2 text-[11px] text-app-text-tertiary">
+          מה שנאמר: {p.task.said}. בכותרת כותבים מה צריך לעשות, לא את מה שנאמר.
+        </p>
+      )}
       <label className="block">
         <span className="block text-xs font-medium text-app-text-secondary">תיאור</span>
         <textarea name="description" rows={6} defaultValue={p.task.description} className={INPUT} />
@@ -232,9 +247,10 @@ function TaskForm({ p, staff, meId }: { p: ReviewProposal; staff: ReviewStaff; m
         </label>
         <label className="block">
           <span className="block text-xs font-medium text-app-text-secondary">תאריך יעד</span>
-          <input type="date" name="dueDate" className={INPUT} />
+          <input type="date" name="dueDate" defaultValue={p.task.due} className={INPUT} />
         </label>
       </div>
+      <p className="-mt-1.5 text-[11px] text-app-text-tertiary">הקטגוריה נבחרת לפי הכותרת, ואפשר לשנות אותה במשימה.</p>
       <label className="block">
         <span className="block text-xs font-medium text-app-text-secondary">עדיפות</span>
         <select name="priority" defaultValue="NORMAL" className={INPUT}>
@@ -383,7 +399,13 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`}>
               {f.message}
               {/* The same item under another spelling: added to it, not a second one. */}
-              {f.match && !blocked && (
+              {/* A date is not merged: the existing one is opened and completed. */}
+              {f.match && p.target === "DATE" && (
+                <a href={`/app/important-dates/${f.match.id}`} className="ms-2 font-medium text-app-text-accent hover:underline" data-testid="proposal-date-match">
+                  לפתוח את {f.match.name}
+                </a>
+              )}
+              {f.match && !blocked && p.target !== "DATE" && (
                 <button type="button" onClick={() => merge(f.match!)} className="ms-2 font-medium text-app-text-accent hover:underline" data-testid="proposal-merge">
                   להוסיף אל {f.match.name}
                 </button>

@@ -3,7 +3,7 @@ import { PageBack } from "@/components/app/BackSlot";
 import { CLIENTS_LIST_KEYS, clientsBackTitle, listBackHref } from "@/lib/list-back";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
-import { can } from "@/lib/app-auth/permissions";
+import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { getClient, listStaffForAssignment } from "@/lib/app-domain/clients";
 import { ItemStaffProvider } from "./knowledge-ui";
 import { listDecisionsForClient } from "@/lib/app-domain/decisions";
@@ -28,6 +28,8 @@ import { PeoplePanel } from "./PeoplePanel";
 import { listClientPeople, listOrganizationNames } from "@/lib/app-domain/client-contacts";
 import { effectiveStatus, missingLine, parseFieldStatus, type MissingFieldsTarget } from "@/lib/knowledge";
 import { SourcesPanel } from "./SourcesPanel";
+import { loweredBySource } from "@/lib/app-domain/source-confirmation";
+import { coveredTasksForClient } from "@/lib/app-domain/process-overlap";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { SystemsPanel } from "./SystemsPanel";
@@ -42,7 +44,7 @@ import { paramsInForce, paramsSummary, readParams } from "@/lib/policy-params";
 import { readReviewReason, reviewDueAt, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { ControlLine } from "./ControlLine";
 import { PossibleDuplicates } from "./PossibleDuplicates";
-import { duplicatePairs } from "@/lib/name-match";
+import { dateDuplicatePairs, dateKeyFromRow, duplicatePairs } from "@/lib/name-match";
 import { controlDetails, controlFrom, controlParts } from "@/lib/client-control";
 import { daysSinceLastBatch } from "@/lib/app-domain/client-control";
 import { DisclosureBanner, PoliciesPanel } from "./PoliciesPanel";
@@ -235,6 +237,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // tab, with the same card and actions as on "ממתין לאישור".
   // Everything on this client waiting on this person, on "אישורים".
   const approvalsHere = await countApprovalsForClient(user, client.id).catch(() => 0);
+  // 21.10.2026: per source, the items uncertain only because it is
+  // Ankora's own document; and the open tasks an approved process covers.
+  const [lowered, covered] = tab === "file" ? await Promise.all([loweredBySource([client.id]).catch(() => []), coveredTasksForClient(user, client.id).catch(() => [])]) : [[], []];
   const openBatches = tab === "file" && pendingProposals > 0 ? (await listOpenBatches(user, { clientId: client.id })).filter((b) => b.proposals.some((p) => p.state === "PENDING")) : [];
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
@@ -420,6 +425,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               ...duplicatePairs("ORGANIZATION", people.organizations.map((o) => ({ id: o.id, name: o.organization.name }))),
               ...duplicatePairs("SYSTEM", systems.map((x) => ({ id: x.id, name: x.systemName }))),
               ...duplicatePairs("ENTITY", entities.map((e) => ({ id: e.id, name: e.name }))),
+              ...dateDuplicatePairs(
+                "DATE",
+                clientDates.filter((d) => !d.holidayKey && d.status !== "ARCHIVED").map((d) => ({ id: d.id, name: d.title, key: dateKeyFromRow(d) }))
+              ),
             ]}
           />
         )}
@@ -589,6 +598,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 gaps: p.gaps,
                 nextDate: p.nextDate ? p.nextDate.toISOString() : null,
                 dateIds: p.dates.map((d) => d.id),
+                covered: covered.filter((c) => c.process.id === p.id).map((c) => ({ taskId: c.task.id, title: c.task.title, assignee: c.task.assignee })),
                 latestVersion: p.latestVersion,
                 current: p.current
                   ? {
@@ -783,6 +793,8 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 kind: d.kind,
                 organizationName: d.organization?.name ?? null,
               }))}
+              lowered={Object.fromEntries(lowered.map((l) => [l.code, l.count]))}
+              canConfirm={canManageClients(user.role)}
             />
 
           </ItemStaffProvider>

@@ -14,7 +14,7 @@ export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "knowle
 
 /// Not approvals: things to check, with no approve button. A tab of their
 /// own, so the approval tabs stay a list of decisions.
-export type ReviewKind = "uncertain" | "process_review" | "lesson" | "assignment" | "signature";
+export type ReviewKind = "uncertain" | "process_review" | "lesson" | "assignment" | "signature" | "no_next_date" | "source_confirm" | "covered_task";
 
 export type ApprovalTab = "all" | ApprovalKind | "review";
 
@@ -51,6 +51,9 @@ export const REVIEW_LABELS: Record<ReviewKind, string> = {
   lesson: "לקח מריצה",
   assignment: "שיחה לשיוך",
   signature: "חתימה לבדיקה",
+  no_next_date: "תהליך בלי מועד הבא",
+  source_confirm: "לאשר מול הלקוח",
+  covered_task: "משימה שתהליך מכסה",
 };
 
 export type KindTone = "error" | "warning" | "accent" | "info" | "success" | "neutral";
