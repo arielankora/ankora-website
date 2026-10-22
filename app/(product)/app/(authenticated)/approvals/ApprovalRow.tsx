@@ -2,6 +2,7 @@
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { ApprovalKind, KindTone, RowActions } from "@/lib/approvals";
+import type { ApprovalPreview } from "@/lib/approvals-preview";
 import { decideApprovalAction } from "./actions";
 
 // One row of "אישורים": what it is, for whom, how long it has waited,
@@ -35,6 +36,7 @@ export type RowView = {
   href: string;
   actions: RowActions;
   blocked?: string | null;
+  preview?: ApprovalPreview | null;
   label: string;
   tone: KindTone;
   showLabel: boolean;
@@ -46,6 +48,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
   const [rejecting, setRejecting] = useState(false);
   const [note, setNote] = useState("");
   const [done, setDone] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   const decide = (decision: "approve" | "reject") =>
     start(async () => {
@@ -71,7 +74,31 @@ export function ApprovalRow({ row }: { row: RowView }) {
           </a>
         </div>
         {row.detail && <p className="mt-1 text-[12.5px] leading-relaxed text-app-text-secondary">{row.detail}</p>}
-        {row.blocked && <p className="mt-1 text-[12.5px] text-app-warning">{row.blocked}</p>}
+        {row.blocked && (
+          <p className="mt-1 text-[12.5px] text-app-warning">
+            {row.blocked}
+            {row.kind === "procedure" && (
+              <>
+                {" "}
+                <a href={row.href} className="font-medium text-app-text-accent hover:underline">
+                  לתהליך
+                </a>
+              </>
+            )}
+          </p>
+        )}
+        {row.preview && (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            aria-expanded={open}
+            className="mt-1.5 text-[12.5px] font-medium text-app-text-accent hover:underline"
+            data-testid="approval-preview-toggle"
+          >
+            {open ? "הסתרה" : row.preview.toggle}
+          </button>
+        )}
+        {row.preview && open && <PreviewBody preview={row.preview} />}
         <p className="mt-1 text-[11.5px] text-app-text-tertiary">
           {[row.clientName, row.by ? `מ${row.by}` : null, row.waited].filter(Boolean).join(" · ")}
         </p>
@@ -131,5 +158,33 @@ export function ApprovalRow({ row }: { row: RowView }) {
         )}
       </div>
     </li>
+  );
+}
+
+/// The item in full, under its row: read before deciding.
+function PreviewBody({ preview }: { preview: ApprovalPreview }) {
+  return (
+    <div className="mt-2 space-y-2.5 rounded-lg border border-app-border bg-app-surface-sunken px-3 py-2.5" data-testid="approval-preview">
+      {preview.problems.length > 0 && (
+        <div>
+          <p className="text-[12px] font-medium text-app-error">מה מעכב את האישור</p>
+          {preview.problems.map((line, i) => (
+            <p key={i} className="mt-0.5 text-[12.5px] leading-relaxed text-app-error">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
+      {preview.sections.map((sec, i) => (
+        <div key={i}>
+          {sec.heading && <p className="text-[12px] font-medium text-app-text-secondary">{sec.heading}</p>}
+          {sec.lines.map((line, j) => (
+            <p key={j} className="mt-0.5 whitespace-pre-line text-[12.5px] leading-relaxed text-app-text-primary">
+              {line}
+            </p>
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }

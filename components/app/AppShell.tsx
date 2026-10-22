@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
@@ -6,6 +6,7 @@ import { BottomNav } from "./BottomNav";
 import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BackSlotProvider } from "./BackSlot";
+import { HashScroll } from "./HashScroll";
 import { CommandPalette } from "./CommandPalette";
 import { ActiveTimerProvider, MobileTimerStrip } from "./ActiveTimerProvider";
 import { OfflineBanner } from "./states/Offline";
@@ -176,6 +177,9 @@ export function AppShell({
             several screens that ran out of room because of it. */}
         <main className="mx-auto max-w-appContent space-y-4 px-4 py-5 pb-24 md:px-7 md:py-7 md:pb-7">
           <OfflineBanner />
+          <Suspense fallback={null}>
+            <HashScroll />
+          </Suspense>
           {children}
         </main>
       </div>

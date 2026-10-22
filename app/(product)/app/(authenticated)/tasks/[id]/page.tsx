@@ -1,6 +1,7 @@
 import { ChevronLeft } from "lucide-react";
 import { PageBack } from "@/components/app/BackSlot";
 import { backLabel, backTitle, carriedListQuery, tasksListHref } from "../list-query";
+import { approvalsBack } from "@/lib/approvals";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
@@ -66,16 +67,19 @@ export const metadata = { robots: { index: false, follow: false } };
 // act on its client, and getTaskDetail answers that by returning null.
 export default async function TaskDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string | string[] }>;
+  searchParams: Promise<{ from?: string | string[]; fromApprovals?: string | string[] }>;
 }) {
   const { id } = await props.params;
   // The list this task was opened from: its client, search, pills and
   // view. See list-query.ts. Without it, "back" is the list's defaults.
-  const rawFrom = (await props.searchParams).from;
+  const sp = await props.searchParams;
+  const rawFrom = sp.from;
   const from = typeof rawFrom === "string" ? rawFrom : undefined;
-  const backHref = tasksListHref(from);
+  // Opened from "אישורים": back there, to the same tab (22.10.2026).
+  const viaApprovals = approvalsBack(sp.fromApprovals);
+  const backHref = viaApprovals?.href ?? tasksListHref(from);
   const listQuery = carriedListQuery(from);
-  const backText = backLabel(from);
+  const backText = viaApprovals?.label ?? backLabel(from);
   const user = await requireUser();
 
   if (!can(user.role, "time_entry.create_self")) return <Forbidden />;
@@ -114,7 +118,7 @@ export default async function TaskDetailPage(props: {
       backNames.category = category.name;
     }
   }
-  const backTitleText = backTitle(from, backNames);
+  const backTitleText = viaApprovals?.label ?? backTitle(from, backNames);
 
   // Opening the task is reading what the bell said about it.
   await markTaskNotificationsRead(user.id, task.id);

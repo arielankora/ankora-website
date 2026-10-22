@@ -15,6 +15,45 @@ test.describe.configure({ timeout: 90_000 });
 
 const CLIENT = "demo-client-b";
 
+function tag(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+async function submit(page: import("@playwright/test").Page, button: string) {
+  const written = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+  await page.getByRole("dialog").getByRole("button", { name: button }).click();
+  await written;
+  await page.reload();
+}
+
+/// A process with a draft procedure on the demo client, written on the
+/// client's page the way flows-processes does. Its title.
+async function draftProcedure(page: import("@playwright/test").Page, step: string): Promise<string> {
+  const title = tag("[E2E] נוהל לאישור");
+  await page.goto(`/app/clients/${CLIENT}?tab=file`);
+  await page.getByRole("button", { name: "+ מקור", exact: true }).click();
+  const source = page.getByRole("dialog");
+  const sourceTitle = tag("[E2E] מקור");
+  await source.locator('input[name="title"]').fill(sourceTitle);
+  await submit(page, "הוספה למרשם");
+  const code = (await page.locator("li", { hasText: sourceTitle }).first().locator("span.font-mono").innerText()).trim();
+
+  await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
+  const dialog = page.getByRole("dialog");
+  await dialog.locator('input[name="title"]').fill(title);
+  await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
+  await dialog.locator('input[name="triggerText"]').fill("בקשת עובד");
+  await dialog.locator('input[name="sources"]').fill(code);
+  await submit(page, "הוספה לתיק");
+  const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+  await expect(card, "the process was not added").toBeVisible({ timeout: 15_000 });
+  await card.getByRole("button", { name: "כתיבת נוהל" }).click();
+  await page.getByRole("dialog").getByLabel("שלב 1: מה עושים").fill(step);
+  await submit(page, "שמירת טיוטה");
+  await expect(card).toContainText("טיוטה, גרסה 1", { timeout: 15_000 });
+  return title;
+}
+
 test.describe("approvals", () => {
   test("the menu leads to one screen, with all first and a tab for what waits", async ({ page }) => {
     await page.goto("/app");
@@ -56,5 +95,44 @@ test.describe("approvals", () => {
     const link = page.getByTestId("client-approvals-link");
     await expect(link).toBeVisible({ timeout: 30_000 });
     await expect(link).toHaveAttribute("href", `/app/approvals?clientId=${CLIENT}`);
+  });
+
+  // 22.10.2026, Ariel from a phone: the procedure opened the client's page
+  // at the top, its way back was "לקוחות", and there was nothing to read
+  // on the row itself.
+  test("on a phone, a procedure is read on its row, its link lands on it, the way back returns, and approving stays", async ({ page }) => {
+    const step = tag("מכינים קובץ");
+    const title = await draftProcedure(page, step);
+    await page.setViewportSize({ width: 375, height: 812 });
+
+    await page.goto(`/app/approvals?tab=procedure&clientId=${CLIENT}`);
+    const row = page.locator('[data-testid="approval-row"][data-kind="procedure"]', { hasText: title });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+
+    // Read before deciding.
+    await row.getByTestId("approval-preview-toggle").click();
+    await expect(row.getByTestId("approval-preview")).toContainText(step);
+
+    // The link lands on the process, scrolled to it.
+    await row.getByRole("link", { name: title }).click();
+    await expect(page).toHaveURL(/fromApprovals=.*#item-/, { timeout: 30_000 });
+    const target = page.locator(`[id^="item-"]`, { hasText: title }).first();
+    await expect(target).toBeInViewport({ timeout: 20_000 });
+
+    // And back to the same tab.
+    const back = page.getByRole("link", { name: "אישורים · נהלים" }).first();
+    await expect(back).toBeVisible();
+    await back.click();
+    await expect(page).toHaveURL(new RegExp(`/app/approvals\\?tab=procedure&clientId=${CLIENT}$`), { timeout: 30_000 });
+
+    // Approving keeps the person on the screen.
+    const again = page.locator('[data-testid="approval-row"][data-kind="procedure"]', { hasText: title });
+    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await again.getByRole("button", { name: "אישור הנוהל" }).click();
+    await approved;
+    // "אושר" in place, and once the list refreshes the row is gone: no
+    // button to press twice either way.
+    await expect(again.getByRole("button", { name: "אישור הנוהל" })).toHaveCount(0, { timeout: 15_000 });
+    await expect(page).toHaveURL(/\/app\/approvals\?tab=procedure/);
   });
 });

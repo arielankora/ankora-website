@@ -10,6 +10,8 @@
 // all read one definition of what a tab is, what it holds and in what
 // order. The rows are read in lib/app-domain/approvals.ts.
 
+import type { ApprovalPreview } from "@/lib/approvals-preview";
+
 export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "knowledge" | "plan" | "summary" | "guide";
 
 /// Not approvals: things to check, with no approve button. A tab of their
@@ -100,6 +102,9 @@ export type ApprovalItem = {
   blocked?: string | null;
   /// How many it stands for: a knowledge batch counts its proposals.
   weight?: number;
+  /// What it says in full, to read before deciding: a procedure's steps
+  /// and checks, a rule's whole text, a plan.
+  preview?: ApprovalPreview | null;
 };
 
 export type ReviewItem = {
@@ -178,4 +183,64 @@ export function waitedLabel(since: Date, now: Date): string {
 export function approvalsLine(count: number): string | null {
   if (count <= 0) return null;
   return count === 1 ? "דבר אחד מחכה לאישור שלך." : `${count} דברים מחכים לאישור שלך.`;
+}
+
+// ---------------------------------------------------------------------------
+// The way back to "אישורים" (Ariel, 22.10.2026)
+// ---------------------------------------------------------------------------
+//
+// A row leads to where its item lives: a client's page, a task. Until
+// then the way back there was the list that page belongs to ("לקוחות"),
+// and the person lost their place in the approvals. The link now carries
+// the approvals screen as it was, tab and client, in its own parameter:
+// `from` already means the list a client or a task was opened from.
+
+export const APPROVALS_BACK_PARAM = "fromApprovals";
+const BACK_KEYS = ["tab", "clientId"] as const;
+const MAX_VALUE = 200;
+
+/// The approvals screen's state, as the parameter carries it. "all" for
+/// the default view, so the parameter is never empty.
+function backValue(tab: ApprovalTab, clientId: string | null): string {
+  const q = new URLSearchParams();
+  if (tab !== "all") q.set("tab", tab);
+  if (clientId) q.set("clientId", clientId);
+  return q.toString() || "all";
+}
+
+/// `href` with the way back to this approvals view. The hash stays last.
+export function withApprovalsBack(href: string, tab: ApprovalTab, clientId: string | null): string {
+  if (!href.startsWith("/app/") || href.startsWith("/app/approvals")) return href;
+  const hashAt = href.indexOf("#");
+  const base = hashAt >= 0 ? href.slice(0, hashAt) : href;
+  const hash = hashAt >= 0 ? href.slice(hashAt) : "";
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}${APPROVALS_BACK_PARAM}=${encodeURIComponent(backValue(tab, clientId))}${hash}`;
+}
+
+/// The way back, from the parameter: the screen's address and its name,
+/// "אישורים · כללים". Null when the page was not opened from there. The
+/// value is input: only the screen's own keys survive, and the address is
+/// always /app/approvals.
+export function approvalsBack(value: string | string[] | null | undefined): { href: string; label: string; param: string } | null {
+  const raw = Array.isArray(value) ? value[0] : value;
+  if (typeof raw !== "string" || !raw || raw.length > MAX_VALUE * 2) return null;
+  const input = raw === "all" ? new URLSearchParams() : new URLSearchParams(raw);
+  const params: Record<string, string> = {};
+  for (const key of BACK_KEYS) {
+    const v = input.get(key);
+    if (v && v.length <= MAX_VALUE) params[key] = v;
+  }
+  const { tab, clientId } = parseApprovalsParams(params);
+  const name = APPROVAL_TABS.find((t) => t.key === tab)?.label;
+  return {
+    href: approvalsHref(tab, clientId),
+    label: tab === "all" || !name ? "אישורים" : `אישורים · ${name}`,
+    param: `${APPROVALS_BACK_PARAM}=${encodeURIComponent(backValue(tab, clientId))}`,
+  };
+}
+
+/// The parameter to keep on a link inside the page (a tab change), or "".
+export function approvalsBackParam(value: string | string[] | null | undefined): string {
+  return approvalsBack(value)?.param ?? "";
 }
