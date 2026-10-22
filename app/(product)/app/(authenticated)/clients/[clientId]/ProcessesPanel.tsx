@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -24,12 +24,10 @@ import {
 } from "@/lib/process-rules";
 import {
   addProcessAction,
-  approveProcessVersionAction,
-  closeCoveredTaskAction,
   linkProcessDatesAction,
-  markProcessReviewedAction,
   removeProcessAction,
   resolveLessonAction,
+  runProcessStepAction,
   saveProcessVersionAction,
   setProcessStatusAction,
   startProcessRunAction,
@@ -38,7 +36,7 @@ import {
 import Link from "next/link";
 import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
-import { SCHEDULED_NO_DATE_NOTE } from "@/lib/client-control";
+import { nextSteps, type BackupCandidate, type DateCandidate, type NextStep, type ProcessFacts } from "@/lib/next-steps";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
@@ -59,6 +57,12 @@ type Option = { id: string; name: string };
 export type PanelProcess = {
   /// 21.10.2026: open tasks of the client this approved process covers.
   covered?: { taskId: string; title: string; assignee: string | null }[];
+  /// 22.10.2026: what "הצעד הבא" reads. The fields still missing (their
+  /// labels), the systems without access, and the two recommendations.
+  missing?: string[];
+  noAccess?: { id: string; name: string }[];
+  backupCandidate?: BackupCandidate | null;
+  dateCandidate?: DateCandidate | null;
   /// When a person last confirmed it, as ISO.
   verifiedAt?: string | null;
   /// When a run was last closed, as ISO.
@@ -748,233 +752,349 @@ export function ProcessesPanel({
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {processes.map((p) => (
-            <li key={p.id} id={`item-${p.id}`} className="py-4 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-xs text-app-text-tertiary">{p.code}</span>
-                    <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
-                    <StatusBadge label={TRANSITION_LABELS[p.transitionStatus]} tone={TONE[p.transitionStatus]} />
-                    {p.status !== "ACTIVE" && (
-                      <StatusBadge label={p.status === "DRAFT" ? "אין נוהל מאושר" : p.status === "PAUSED" ? "מושהה" : "בוטל"} tone="gray" />
-                    )}
-                    <span className={`text-xs ${p.score >= 8 ? "text-app-success" : "text-app-warning"}`}>{p.score} מתוך 9</span>
-                    {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
-                  </div>
-                  {p.reviewReason && (
-                    <p className="mt-1 text-xs text-app-error">
-                      {REVIEW_REASON_LABELS[p.reviewReason]}
-                      {p.reviewReason === "PERIODIC" && p.reviewEveryDays && ` (כל ${p.reviewEveryDays} ימים)`}.
-                      {canApprove && p.reviewReason === "PERIODIC" && (
-                        <button
-                          type="button"
-                          onClick={() => act(() => markProcessReviewedAction(p.id, clientId), "סומן כנסקר")}
-                          className="ms-2 font-medium text-app-text-accent hover:underline"
-                        >
-                          סימון שנסקר
-                        </button>
-                      )}
-                    </p>
-                  )}
-                  {!p.reviewReason && p.reviewDueAt && <p className="mt-1 text-[11px] text-app-text-tertiary">סקירה הבאה: {day(p.reviewDueAt)}</p>}
-                  <p className="mt-1 text-xs text-app-text-secondary">
-                    {[
-                      p.triggerKinds.map((t) => TRIGGER_LABELS[t]).join(", ") || null,
-                      p.triggerText,
-                      p.ownerId ? `בעלים: ${staffName.get(p.ownerId) ?? ""}` : null,
-                      p.backupOwnerId ? `מחליף: ${staffName.get(p.backupOwnerId) ?? ""}` : null,
-                      p.executorName || p.executorText ? `מבצע היום: ${p.executorName ?? p.executorText}` : null,
-                      p.systemsLine ? `מערכות: ${p.systemsLine}` : null,
-                      p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
-                      p.lastRunAt ? `ריצה אחרונה: ${day(p.lastRunAt)}` : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  {p.status === "ACTIVE" && p.triggerKinds.includes("SCHEDULED") && !p.nextDate && (
-                    <p className="mt-1.5 text-xs font-medium text-app-error" data-testid="process-no-next-date">
-                      {SCHEDULED_NO_DATE_NOTE}. מקשרים לתהליך את המועדים שלו, או מוסיפים מועד חדש.
-                    </p>
-                  )}
-                  {(p.covered ?? []).length > 0 && (
-                    <div className="mt-1.5 rounded-lg bg-app-warning-soft px-3 py-2" data-testid="process-covered-tasks">
-                      <p className="text-xs text-app-text-primary">משימות פתוחות שהתהליך כנראה מכסה. כל ריצה שלו פותחת משימה משלה, ולכן הישנה נשארת כפולה:</p>
-                      <ul className="mt-1 space-y-0.5">
-                        {p.covered!.map((t) => (
-                          <li key={t.taskId} className="text-xs text-app-text-secondary">
-                            <Link href={`/app/tasks/${t.taskId}`} className="text-app-text-accent hover:underline">
-                              {t.title}
-                            </Link>
-                            {t.assignee && <span className="text-app-text-tertiary"> · {t.assignee}</span>}
-                            {canApprove && (
-                              <button
-                                type="button"
-                                onClick={() => act(() => closeCoveredTaskAction(t.taskId, p.id, clientId), "המשימה נסגרה")}
-                                className="ms-2 font-medium text-app-text-accent hover:underline"
-                              >
-                                לסגור, התהליך מכסה את זה
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {p.gaps.length > 0 && (
-                    <ul className="mt-1.5 space-y-0.5">
-                      {p.gaps.map((g) => (
-                        <li key={g} className="text-xs text-app-warning">
-                          {g}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
-                  <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, refs: p.refs, verifiedAt: p.verifiedAt }} disclose />
-                  <SourceCodes sources={p.sources} options={sourceOptions} />
-
-                  {p.current ? (
-                    <div className="mt-2">
-                      <p className="text-xs font-medium text-app-text-secondary">
-                        נוהל, גרסה {p.current.version}
-                        {p.current.approvedByName && `, אושר על ידי ${p.current.approvedByName}`}
-                        {p.current.approvedAt && ` ב-${day(p.current.approvedAt)}`}
-                      </p>
-                      {p.current.atApproval && (
-                        <div className="mt-0.5" data-testid="approval-checks">
-                          <p className="text-[11px] text-app-text-tertiary">
-                            {p.current.atApproval.length === 0
-                              ? "באישור: עמד בכל הכללים של הלקוח."
-                              : `באישור: ${p.current.atApproval.length === 1 ? "חריגה אחת מאושרת" : `${p.current.atApproval.length} חריגות מאושרות`}.`}
-                          </p>
-                          {p.current.atApproval.length > 0 && <CheckLines checks={p.current.atApproval} />}
-                        </div>
-                      )}
-                      <StepList steps={p.current.steps} systemName={systemName} />
-                      {p.current.highlights && <p className="mt-1 text-xs text-app-text-secondary">דגשים: {p.current.highlights}</p>}
-                      {p.current.checks.some((c) => !c.excepted) && (
-                        <div className="mt-1.5 rounded-lg border border-app-error/30 bg-app-error-soft px-3 py-2">
-                          <p className="text-xs font-medium text-app-error">הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.</p>
-                          <CheckLines checks={p.current.checks.filter((c) => !c.excepted)} />
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    !p.draft && <p className="mt-2 text-xs text-app-text-tertiary">עוד אין נוהל.</p>
-                  )}
-
-                  {p.runs.length > 0 && (
-                    <p className="mt-1.5 text-xs text-app-text-secondary">
-                      ריצות:{" "}
-                      {p.runs.map((r, i) => (
-                        <span key={r.id}>
-                          {i > 0 && " · "}
-                          <Link href={`/app/tasks/${r.id}`} className="text-app-text-accent hover:underline">
-                            {r.dueDate ? day(r.dueDate) : r.title}
-                          </Link>
-                          {r.status === "DONE" && " (בוצע)"}
-                        </span>
-                      ))}
-                    </p>
-                  )}
-
-                  <Lessons clientId={clientId} lessons={p.lessons} canResolve={canApprove || (!!userId && p.ownerId === userId)} />
-
-                  {p.checkEvery && (
-                    <p className="mt-1.5 text-xs text-app-text-secondary">
-                      בדיקה {p.checkEvery}
-                      {p.checkText && `: ${p.checkText}`}
-                      {p.checkDue && (
-                        <span className={p.checkDue.state === "LATER" ? "text-app-text-tertiary" : "text-app-warning"}>
-                          {" · "}
-                          {p.checkDue.state === "LATER" ? `הבאה ב-${day(p.checkDue.key)}` : `${CHECK_STATE_LABELS[p.checkDue.state]}${p.checkDue.state === "OVERDUE" ? `, מ-${day(p.checkDue.key)}` : ""}`}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {p.checks.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {p.checks.map((c) => (
-                        <li key={c.id} className={`text-xs ${c.outcome === "ISSUE" ? "text-app-warning" : "text-app-text-secondary"}`}>
-                          {day(c.createdAt)}
-                          {c.checkedByName && `, ${c.checkedByName}`}: {c.outcome === "OK" ? "תקין" : "נמצאה בעיה"}
-                          {c.note && `. ${c.note}`}
-                          {c.taskId && (
-                            <>
-                              {" · "}
-                              <Link href={`/app/tasks/${c.taskId}`} className="text-app-text-accent hover:underline">
-                                המשימה
-                              </Link>
-                            </>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-
-                  {p.draft && (
-                    <div className="mt-2 rounded-lg border border-app-warning/30 bg-app-warning-soft px-3 py-2">
-                      <p className="text-xs font-medium text-app-warning">
-                        טיוטה, גרסה {p.draft.version}
-                        {p.draft.changeNote && `: ${p.draft.changeNote}`}
-                      </p>
-                      <StepList steps={p.draft.steps} systemName={systemName} />
-                      <CheckLines checks={p.draft.checks} />
-                      {canApprove && p.draft.checks.every((c) => c.excepted) && (
-                        <button
-                          type="button"
-                          onClick={() => act(() => approveProcessVersionAction(p.id, p.draft!.version, clientId), "הנוהל אושר")}
-                          className="mt-1.5 text-xs font-medium text-app-text-accent hover:underline"
-                        >
-                          אישור הנוהל
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <div className="flex shrink-0 flex-col items-end gap-2 text-xs">
-                  <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
-                    <ProcessForm clientId={clientId} existing={p} {...form} />
-                  </Drawer>
-                  <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
-                    <ProcedureEditor clientId={clientId} process={p} systems={systems} />
-                  </Drawer>
-                  {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
-                    <Drawer triggerLabel="פתיחת ריצה" title={`ריצה: ${p.code} ${p.title}`} variant="link">
-                      <StartRunForm clientId={clientId} process={p} />
-                    </Drawer>
-                  )}
-                  {p.routine && (
-                    <Drawer triggerLabel="רישום בדיקה" title={`בדיקה: ${p.code} ${p.title}`} variant="link">
-                      <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={p.current?.steps.map((st) => st.title) ?? []} />
-                    </Drawer>
-                  )}
-                  {p.triggerKinds.includes("SCHEDULED") && (
-                    <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
-                      <DatesForm clientId={clientId} process={p} dates={dates} />
-                    </Drawer>
-                  )}
-                  {canApprove && p.status === "ACTIVE" && (
-                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-app-text-tertiary hover:text-app-text-primary">
-                      השהיה
-                    </button>
-                  )}
-                  {canApprove && p.status === "PAUSED" && (
-                    <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-app-text-tertiary hover:text-app-text-primary">
-                      חידוש
-                    </button>
-                  )}
-                  {p.status === "DRAFT" && (
-                    <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-app-text-tertiary hover:text-app-error">
-                      הסרה
-                    </button>
-                  )}
-                </div>
-              </div>
-            </li>
+            <ProcessCard key={p.id} p={p} clientId={clientId} userId={userId} canApprove={canApprove} staffName={staffName} systemName={systemName} systems={systems} dates={dates} form={form} act={act} />
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+type FormOptions = { staff: Option[]; contacts: Option[]; systems: Option[]; rules: Option[]; entities: EntityOption[]; sourceOptions: SourceOption[] };
+
+/// The facts next steps read, from what the card already has.
+function factsOf(p: PanelProcess): ProcessFacts {
+  return {
+    id: p.id,
+    code: p.code,
+    title: p.title,
+    purpose: p.purpose,
+    status: p.status,
+    triggerKinds: p.triggerKinds,
+    ownerId: p.ownerId,
+    backupOwnerId: p.backupOwnerId,
+    hasNextDate: !!p.nextDate,
+    draft: p.draft ? { version: p.draft.version, blocked: !p.draft.checks.every((c) => c.excepted) } : null,
+    covered: (p.covered ?? []).map((t) => ({ taskId: t.taskId, title: t.title })),
+    missing: p.missing ?? [],
+    noAccess: (p.noAccess ?? []).map((x) => x.name),
+    review: p.reviewReason ? { label: REVIEW_REASON_LABELS[p.reviewReason], periodic: p.reviewReason === "PERIODIC" } : null,
+    openLessons: p.lessons.filter((l) => l.status === "OPEN").length,
+    knowledge: { uncertain: p.knowledgeStatus === "UNCERTAIN" || p.knowledgeStatus === "MISSING", toResolve: p.toResolve },
+    backupCandidate: p.backupCandidate ?? null,
+    dateCandidate: p.dateCandidate ?? null,
+  };
+}
+
+/// One process (22.10.2026): what it is in a line, the step it waits on
+/// with what is recommended and a button, the rest of its gaps as a list
+/// to tick off, and everything else under "פרטים", closed unless a draft
+/// waits or the link led here.
+function ProcessCard({
+  p,
+  clientId,
+  userId,
+  canApprove,
+  staffName,
+  systemName,
+  systems,
+  dates,
+  form,
+  act,
+}: {
+  p: PanelProcess;
+  clientId: string;
+  userId?: string;
+  canApprove: boolean;
+  staffName: Map<string, string>;
+  systemName: Map<string, string>;
+  systems: Option[];
+  dates: Option[];
+  form: FormOptions;
+  act: (fn: () => Promise<{ error?: string }>, ok: string) => Promise<void>;
+}) {
+  const [open, setOpen] = useState(!!p.draft);
+  useEffect(() => {
+    // Arriving on this process by its link opens it.
+    const check = () => {
+      if (window.location.hash === `#item-${p.id}`) setOpen(true);
+    };
+    check();
+    window.addEventListener("hashchange", check);
+    return () => window.removeEventListener("hashchange", check);
+  }, [p.id]);
+  const steps = nextSteps(factsOf(p), canApprove);
+  const [first, ...rest] = steps;
+
+  const fixButton = (step: NextStep, primary: boolean) => {
+    const cls = primary ? "rounded-full bg-app-surface-nav px-3 py-1 text-[12px] font-medium text-cream" : "text-[12px] font-medium text-app-text-accent hover:underline";
+    const f = step.fix;
+    if (f.kind === "op") {
+      return (
+        <button type="button" onClick={() => act(() => runProcessStepAction(f.op, clientId), "בוצע")} className={cls} data-testid="step-op">
+          {f.label}
+        </button>
+      );
+    }
+    if (f.kind === "edit") {
+      return (
+        <Drawer triggerLabel={f.label} title={`עריכה: ${p.code} ${p.title}`} variant="link">
+          <ProcessForm clientId={clientId} existing={p} {...form} />
+        </Drawer>
+      );
+    }
+    if (f.kind === "procedure") {
+      return (
+        <Drawer triggerLabel={f.label} title={`נוהל: ${p.code} ${p.title}`} variant="link">
+          <ProcedureEditor clientId={clientId} process={p} systems={systems} />
+        </Drawer>
+      );
+    }
+    if (f.kind === "dates") {
+      return (
+        <Drawer triggerLabel={f.label} title={`מועדים: ${p.code} ${p.title}`} variant="link">
+          <DatesForm clientId={clientId} process={p} dates={dates} />
+        </Drawer>
+      );
+    }
+    return (
+      <button type="button" onClick={() => setOpen(true)} className={cls}>
+        {f.label}
+      </button>
+    );
+  };
+
+  return (
+    <li id={`item-${p.id}`} className="py-4 scroll-mt-24 rounded-lg target:bg-app-accent-soft" data-testid="process-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-xs text-app-text-tertiary">{p.code}</span>
+            <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
+            <StatusBadge label={TRANSITION_LABELS[p.transitionStatus]} tone={TONE[p.transitionStatus]} />
+            {p.status !== "ACTIVE" && <StatusBadge label={p.status === "DRAFT" ? "אין נוהל מאושר" : p.status === "PAUSED" ? "מושהה" : "בוטל"} tone="gray" />}
+            <span className={`text-xs ${p.score >= 8 ? "text-app-success" : "text-app-warning"}`}>{p.score} מתוך 9</span>
+            {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
+          </div>
+          <p className="mt-1 text-xs text-app-text-secondary">
+            {[
+              p.triggerKinds.map((t) => TRIGGER_LABELS[t]).join(", ") || null,
+              p.ownerId ? `בעלים: ${staffName.get(p.ownerId) ?? ""}` : null,
+              p.backupOwnerId ? `מחליף: ${staffName.get(p.backupOwnerId) ?? ""}` : null,
+              p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
+              p.lastRunAt ? `ריצה אחרונה: ${day(p.lastRunAt)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </p>
+
+          {first ? (
+            <div className={`mt-2 rounded-lg px-3 py-2 ${first.blocking ? "bg-app-error-soft" : "bg-app-warning-soft"}`} data-testid="process-next-step" data-step={first.kind}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="min-w-0 flex-1 text-xs text-app-text-primary">
+                  <span className="font-medium">הצעד הבא: </span>
+                  {first.title}
+                </p>
+                {fixButton(first, true)}
+              </div>
+              {first.recommend && (
+                <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
+                  מומלץ: {first.recommend}.{first.why && ` ${first.why}`}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="mt-2 text-xs font-medium text-app-success" data-testid="process-next-step" data-step="none">
+              תקין: אין כרגע מה לסגור בתהליך.
+            </p>
+          )}
+
+          {rest.length > 0 && (
+            <ul className="mt-2 space-y-1" data-testid="process-checklist">
+              {rest.map((st) => (
+                <li key={st.kind} className="flex flex-wrap items-start justify-between gap-2 text-xs">
+                  <span className="min-w-0 flex-1 text-app-text-primary">
+                    <span aria-hidden className="me-1.5 inline-block h-3 w-3 rounded-sm border border-app-border-strong align-middle" />
+                    {st.title}
+                    {st.recommend && <span className="text-app-text-tertiary"> · מומלץ: {st.recommend}</span>}
+                  </span>
+                  {fixButton(st, false)}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <details className="mt-2" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} data-testid="process-details">
+            <summary className="cursor-pointer text-xs font-medium text-app-text-secondary hover:text-app-text-primary">פרטים</summary>
+            <div className="mt-1.5">
+              <p className="text-xs text-app-text-secondary">
+                {[
+                  p.triggerText,
+                  p.executorName || p.executorText ? `מבצע היום: ${p.executorName ?? p.executorText}` : null,
+                  p.systemsLine ? `מערכות: ${p.systemsLine}` : null,
+                  p.reviewReason ? `${REVIEW_REASON_LABELS[p.reviewReason]}${p.reviewReason === "PERIODIC" && p.reviewEveryDays ? ` (כל ${p.reviewEveryDays} ימים)` : ""}` : null,
+                  !p.reviewReason && p.reviewDueAt ? `סקירה הבאה: ${day(p.reviewDueAt)}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+              <StatusLine status={p.knowledgeStatus} toResolve={p.toResolve} />
+              <ItemTags item={{ clientVisible: p.clientVisible, doNotDisclose: p.doNotDisclose, refs: p.refs, verifiedAt: p.verifiedAt }} disclose />
+              <SourceCodes sources={p.sources} options={form.sourceOptions} />
+              <Body p={p} clientId={clientId} userId={userId} canApprove={canApprove} systemName={systemName} />
+            </div>
+          </details>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-2 text-xs">
+          <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
+            <ProcessForm clientId={clientId} existing={p} {...form} />
+          </Drawer>
+          <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
+            <ProcedureEditor clientId={clientId} process={p} systems={systems} />
+          </Drawer>
+          {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
+            <Drawer triggerLabel="פתיחת ריצה" title={`ריצה: ${p.code} ${p.title}`} variant="link">
+              <StartRunForm clientId={clientId} process={p} />
+            </Drawer>
+          )}
+          {p.routine && (
+            <Drawer triggerLabel="רישום בדיקה" title={`בדיקה: ${p.code} ${p.title}`} variant="link">
+              <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={p.current?.steps.map((st) => st.title) ?? []} />
+            </Drawer>
+          )}
+          {p.triggerKinds.includes("SCHEDULED") && (
+            <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
+              <DatesForm clientId={clientId} process={p} dates={dates} />
+            </Drawer>
+          )}
+          {canApprove && p.status === "ACTIVE" && (
+            <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-app-text-tertiary hover:text-app-text-primary">
+              השהיה
+            </button>
+          )}
+          {canApprove && p.status === "PAUSED" && (
+            <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-app-text-tertiary hover:text-app-text-primary">
+              חידוש
+            </button>
+          )}
+          {p.status === "DRAFT" && (
+            <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-app-text-tertiary hover:text-app-error">
+              הסרה
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
+  );
+}
+
+/// Under "פרטים": the procedure in force, its runs, the remarks from runs,
+/// the checks of an ongoing process, and a draft waiting for approval.
+function Body({
+  p,
+  clientId,
+  userId,
+  canApprove,
+  systemName,
+}: {
+  p: PanelProcess;
+  clientId: string;
+  userId?: string;
+  canApprove: boolean;
+  systemName: Map<string, string>;
+}) {
+  return (
+    <>
+      {p.current ? (
+        <div className="mt-2">
+          <p className="text-xs font-medium text-app-text-secondary">
+            נוהל, גרסה {p.current.version}
+            {p.current.approvedByName && `, אושר על ידי ${p.current.approvedByName}`}
+            {p.current.approvedAt && ` ב-${day(p.current.approvedAt)}`}
+          </p>
+          {p.current.atApproval && (
+            <div className="mt-0.5" data-testid="approval-checks">
+              <p className="text-[11px] text-app-text-tertiary">
+                {p.current.atApproval.length === 0
+                  ? "באישור: עמד בכל הכללים של הלקוח."
+                  : `באישור: ${p.current.atApproval.length === 1 ? "חריגה אחת מאושרת" : `${p.current.atApproval.length} חריגות מאושרות`}.`}
+              </p>
+              {p.current.atApproval.length > 0 && <CheckLines checks={p.current.atApproval} />}
+            </div>
+          )}
+          <StepList steps={p.current.steps} systemName={systemName} />
+          {p.current.highlights && <p className="mt-1 text-xs text-app-text-secondary">דגשים: {p.current.highlights}</p>}
+          {p.current.checks.some((c) => !c.excepted) && (
+            <div className="mt-1.5 rounded-lg border border-app-error/30 bg-app-error-soft px-3 py-2">
+              <p className="text-xs font-medium text-app-error">הנוהל שבתוקף לא עומד היום בכללים של הלקוח. כותבים גרסה חדשה, או מבקשים חריגה.</p>
+              <CheckLines checks={p.current.checks.filter((c) => !c.excepted)} />
+            </div>
+          )}
+        </div>
+      ) : (
+        !p.draft && <p className="mt-2 text-xs text-app-text-tertiary">עוד אין נוהל.</p>
+      )}
+
+      {p.runs.length > 0 && (
+        <p className="mt-1.5 text-xs text-app-text-secondary">
+          ריצות:{" "}
+          {p.runs.map((r, i) => (
+            <span key={r.id}>
+              {i > 0 && " · "}
+              <Link href={`/app/tasks/${r.id}`} className="text-app-text-accent hover:underline">
+                {r.dueDate ? day(r.dueDate) : r.title}
+              </Link>
+              {r.status === "DONE" && " (בוצע)"}
+            </span>
+          ))}
+        </p>
+      )}
+
+      <Lessons clientId={clientId} lessons={p.lessons} canResolve={canApprove || (!!userId && p.ownerId === userId)} />
+
+      {p.checkEvery && (
+        <p className="mt-1.5 text-xs text-app-text-secondary">
+          בדיקה {p.checkEvery}
+          {p.checkText && `: ${p.checkText}`}
+          {p.checkDue && (
+            <span className={p.checkDue.state === "LATER" ? "text-app-text-tertiary" : "text-app-warning"}>
+              {" · "}
+              {p.checkDue.state === "LATER" ? `הבאה ב-${day(p.checkDue.key)}` : `${CHECK_STATE_LABELS[p.checkDue.state]}${p.checkDue.state === "OVERDUE" ? `, מ-${day(p.checkDue.key)}` : ""}`}
+            </span>
+          )}
+        </p>
+      )}
+      {p.checks.length > 0 && (
+        <ul className="mt-1 space-y-0.5">
+          {p.checks.map((c) => (
+            <li key={c.id} className={`text-xs ${c.outcome === "ISSUE" ? "text-app-warning" : "text-app-text-secondary"}`}>
+              {day(c.createdAt)}
+              {c.checkedByName && `, ${c.checkedByName}`}: {c.outcome === "OK" ? "תקין" : "נמצאה בעיה"}
+              {c.note && `. ${c.note}`}
+              {c.taskId && (
+                <>
+                  {" · "}
+                  <Link href={`/app/tasks/${c.taskId}`} className="text-app-text-accent hover:underline">
+                    המשימה
+                  </Link>
+                </>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {p.draft && (
+        <div className="mt-2 rounded-lg border border-app-warning/30 bg-app-warning-soft px-3 py-2">
+          <p className="text-xs font-medium text-app-warning">
+            טיוטה, גרסה {p.draft.version}
+            {p.draft.changeNote && `: ${p.draft.changeNote}`}
+          </p>
+          <StepList steps={p.draft.steps} systemName={systemName} />
+          <CheckLines checks={p.draft.checks} />
+          {/* Approved from "הצעד הבא" above, one button for one decision. */}
+        </div>
+      )}
+    </>
   );
 }

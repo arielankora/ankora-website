@@ -65,7 +65,7 @@ export function ControlLine({
           <span className="flex items-center gap-x-2">
             <span className="text-app-text-tertiary">·</span>
             <a href={approvalsHref} className="text-app-text-accent hover:underline" data-testid="control-approvals">
-              לאישורים ולבדיקה
+              לאישורים ולשאלות ללקוח
             </a>
           </span>
         )}

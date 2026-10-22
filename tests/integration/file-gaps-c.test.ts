@@ -5,7 +5,9 @@ import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addClientFact } from "@/lib/app-domain/client-facts";
 import { addProcess } from "@/lib/app-domain/processes";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
-import { collectReview } from "@/lib/app-domain/approvals";
+import { collectApprovals } from "@/lib/app-domain/approvals";
+import { collectQuestionCards } from "@/lib/app-domain/client-questions";
+import { runStep } from "@/lib/app-domain/process-next-steps";
 import { confirmSourceWithClient, loweredBySource } from "@/lib/app-domain/source-confirmation";
 import { closeTaskCoveredByProcess, coveredTasksForClient } from "@/lib/app-domain/process-overlap";
 import { possibleDuplicates } from "@/lib/app-domain/name-duplicates";
@@ -29,7 +31,8 @@ async function setup() {
 
 const codes = (flags: unknown) => ((Array.isArray(flags) ? flags : []) as { code: string }[]).map((f) => f.code);
 
-const reviewOf = async (user: Parameters<typeof collectReview>[0], clientId: string) => (await collectReview(user)).filter((r) => r.clientId === clientId);
+// 22.10.2026: these are decisions on "אישורים" now, as process rows.
+const processRows = async (user: Parameters<typeof collectApprovals>[0], clientId: string) => (await collectApprovals(user)).filter((r) => r.clientId === clientId && r.kind === "process");
 
 describe("a process that runs by a date, with no date ahead", () => {
   it("is listed to check until a date is linked", async () => {
@@ -38,17 +41,22 @@ describe("a process that runs by a date, with no date ahead", () => {
     await prisma.process.update({ where: { id: p.id }, data: { status: "ACTIVE" } });
     const draft = await addProcess(anna, { clientId: client.id, title: "גבייה", triggerKinds: ["SCHEDULED"], sources: [{ code: "S1" }], ownerId: anna.id });
 
-    const rows = (await reviewOf(ariel, client.id)).filter((r) => r.kind === "no_next_date");
-    expect(rows.map((r) => r.id)).toEqual([p.id]);
-    expect(rows[0].href).toBe(`/app/clients/${client.id}?tab=file#item-${p.id}`);
-    expect(rows.map((r) => r.id)).not.toContain(draft.id);
+    const rows = (await processRows(ariel, client.id)).filter((r) => r.id.endsWith(":no_next_date"));
+    expect(rows.map((r) => r.id)).toEqual([`${p.id}:no_next_date`]);
+    expect(rows[0]).toMatchObject({ href: `/app/clients/${client.id}?tab=file#item-${p.id}`, blocking: true });
+    expect(rows.map((r) => r.id)).not.toContain(`${draft.id}:no_next_date`);
     // The owner sees it too.
-    expect((await reviewOf(anna, client.id)).some((r) => r.kind === "no_next_date")).toBe(true);
+    expect((await processRows(anna, client.id)).some((r) => r.id.endsWith(":no_next_date"))).toBe(true);
 
     await createImportantDate(ariel, { clientId: client.id, title: "תשלום ספקים ה-25", type: "CLIENT", category: "BUSINESS_FINANCE", recurrence: "MONTHLY", month: 1, day: 25, responsibleUserId: anna.id });
     const date = await prisma.importantDate.findFirstOrThrow({ where: { clientId: client.id, title: "תשלום ספקים ה-25" } });
-    await prisma.importantDate.update({ where: { id: date.id }, data: { processId: p.id } });
-    expect((await reviewOf(ariel, client.id)).some((r) => r.kind === "no_next_date")).toBe(false);
+    // 22.10.2026: the date is in the file, unlinked, and its name is the
+    // process's work: the row recommends linking it, and links it.
+    const row = (await processRows(ariel, client.id)).find((r) => r.id === `${p.id}:no_next_date`);
+    expect(row?.op).toEqual({ type: "link_date", processId: p.id, dateId: date.id });
+    expect(await runStep(ariel, row!.op!)).toContain("קושר");
+    expect((await prisma.importantDate.findUniqueOrThrow({ where: { id: date.id } })).processId).toBe(p.id);
+    expect((await processRows(ariel, client.id)).some((r) => r.id.endsWith(":no_next_date"))).toBe(false);
   });
 });
 
@@ -62,10 +70,11 @@ describe("items uncertain only because Ankora wrote them", () => {
     const fromMeeting = await addClientFact(anna, { clientId: client.id, kind: "NOTE", body: "וואטסאפ", knowledgeStatus: "CONFIRMED", sources: [{ code: "S1" }] });
 
     expect(await loweredBySource([client.id])).toEqual([{ clientId: client.id, code: "S2", title: "תיק לקוח נדב (Word)", count: 1 }]);
-    const row = (await reviewOf(ariel, client.id)).find((r) => r.kind === "source_confirm");
-    expect(row).toMatchObject({ id: `${client.id}:S2`, href: `/app/clients/${client.id}?tab=file#source-S2` });
-    // Not a manager: neither the row nor the action.
-    expect((await reviewOf(anna, client.id)).some((r) => r.kind === "source_confirm")).toBe(false);
+    // On the client's card of questions, for a manager.
+    const cards = (await collectQuestionCards(ariel, { scope: "all" })).filter((c) => c.clientId === client.id);
+    expect(cards.flatMap((c) => c.lowered)).toEqual([{ clientId: client.id, code: "S2", title: "תיק לקוח נדב (Word)", count: 1 }]);
+    // Not a manager: neither the button nor the action.
+    expect((await collectQuestionCards(anna)).filter((c) => c.clientId === client.id).flatMap((c) => c.lowered)).toEqual([]);
     await expect(confirmSourceWithClient(anna, client.id, "S2", "נדב אישר")).rejects.toThrow("רק מנהל");
     await expect(confirmSourceWithClient(ariel, client.id, "S2", "  ")).rejects.toThrow("בשורה אחת");
 
@@ -134,7 +143,8 @@ describe("open tasks an approved process covers", () => {
 
     const covered = await coveredTasksForClient(anna, client.id);
     expect(covered.map((c) => [c.process.id, c.task.id])).toEqual([[p.id, old.id]]);
-    expect((await reviewOf(ariel, client.id)).filter((r) => r.kind === "covered_task").map((r) => r.id)).toEqual([old.id]);
+    const row = (await processRows(ariel, client.id)).find((r) => r.id === `${p.id}:covered_tasks`);
+    expect(row?.op).toEqual({ type: "close_covered", processId: p.id, taskIds: [old.id] });
 
     await expect(closeTaskCoveredByProcess(anna, old.id, p.id)).rejects.toThrow("רק מנהל");
     await closeTaskCoveredByProcess(ariel, old.id, p.id);

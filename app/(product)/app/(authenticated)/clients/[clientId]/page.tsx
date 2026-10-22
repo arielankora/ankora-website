@@ -31,6 +31,8 @@ import { effectiveStatus, missingLine, parseFieldStatus, type MissingFieldsTarge
 import { SourcesPanel } from "./SourcesPanel";
 import { loweredBySource } from "@/lib/app-domain/source-confirmation";
 import { coveredTasksForClient } from "@/lib/app-domain/process-overlap";
+import { stepCandidates } from "@/lib/app-domain/process-next-steps";
+import { FIELD_LABELS } from "@/lib/process-rules";
 import { listClientSources, listClientDomains } from "@/lib/app-domain/client-sources";
 import { formatSourceRef, readSourceRefs } from "@/lib/knowledge-sources";
 import { SystemsPanel } from "./SystemsPanel";
@@ -244,6 +246,9 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // 21.10.2026: per source, the items uncertain only because it is
   // Ankora's own document; and the open tasks an approved process covers.
   const [lowered, covered] = tab === "file" ? await Promise.all([loweredBySource([client.id]).catch(() => []), coveredTasksForClient(user, client.id).catch(() => [])]) : [[], []];
+  // 22.10.2026: who could back each process up, and a date that looks like
+  // its own, for the step "הצעד הבא" recommends.
+  const candidates = tab === "file" ? await stepCandidates([client.id], processes).catch(() => new Map()) : new Map();
   const openBatches = tab === "file" && pendingProposals > 0 ? (await listOpenBatches(user, { clientId: client.id })).filter((b) => b.proposals.some((p) => p.state === "PENDING")) : [];
   // The last runs of each process, for its card.
   const runsByProcess = new Map(await Promise.all(processes.map(async (p) => [p.id, await listProcessRuns(user, p.id)] as const)));
@@ -603,6 +608,10 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 nextDate: p.nextDate ? p.nextDate.toISOString() : null,
                 dateIds: p.dates.map((d) => d.id),
                 covered: covered.filter((c) => c.process.id === p.id).map((c) => ({ taskId: c.task.id, title: c.task.title, assignee: c.task.assignee })),
+                missing: p.completeness.missing.filter((k) => k !== "permissions" && k !== "next").map((k) => FIELD_LABELS[k]),
+                noAccess: p.noAccess,
+                backupCandidate: candidates.get(p.id)?.backup ?? null,
+                dateCandidate: candidates.get(p.id)?.date ?? null,
                 latestVersion: p.latestVersion,
                 current: p.current
                   ? {

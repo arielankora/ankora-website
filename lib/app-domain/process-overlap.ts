@@ -8,7 +8,7 @@ import { addTaskComment, updateTask } from "@/lib/app-domain/tasks";
 import { coveredTasks, type Overlap } from "@/lib/process-task-overlap";
 
 // Open tasks an approved process already covers (lib/process-task-overlap.ts).
-// Shown on the process and in "לבדיקה"; closed only by a manager, one at a
+// Shown on the process and in "אישורים"; closed only by a manager, one at a
 // time, with a comment on the task that says which process took it over.
 
 export type CoveredTask = {
@@ -57,7 +57,7 @@ export async function coveredTasksForClient(actor: User, clientId: string): Prom
   return readFor([clientId]);
 }
 
-/// The same, across clients, for "לבדיקה". The caller has already scoped
+/// The same, across clients, for "אישורים". The caller has already scoped
 /// the clients to the person.
 export async function coveredTasksForClients(clientIds: string[]): Promise<CoveredTask[]> {
   return readFor(clientIds);

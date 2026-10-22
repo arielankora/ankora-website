@@ -19,6 +19,8 @@ import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import { closeTaskCoveredByProcess } from "@/lib/app-domain/process-overlap";
+import { runStep } from "@/lib/app-domain/process-next-steps";
+import type { StepOp } from "@/lib/next-steps";
 import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
 import { itemExtrasFrom } from "./item-extras";
 
@@ -140,6 +142,21 @@ export async function closeCoveredTaskAction(taskId: string, processId: string, 
     revalidatePath("/app/approvals");
   }
   return r;
+}
+
+/// "הצעד הבא" on a process card (22.10.2026): the step it recommends,
+/// carried out through the same door as on "אישורים".
+export async function runProcessStepAction(op: StepOp, clientId: string): Promise<FormState & { done?: string }> {
+  const user = await requireUser();
+  let done = "";
+  const r = await run(clientId, async () => {
+    done = await runStep(user, op);
+  });
+  if (r.ok) {
+    revalidatePath("/app/tasks");
+    revalidatePath("/app", "layout");
+  }
+  return r.ok ? { ...r, done } : r;
 }
 
 /// Learning from runs (spec 5.4): a remark on the procedure went into it,
