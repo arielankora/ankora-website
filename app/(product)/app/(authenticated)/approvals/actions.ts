@@ -4,7 +4,8 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { updateTask } from "@/lib/app-domain/tasks";
 import { approveException, rejectException } from "@/lib/app-domain/policy-exceptions";
-import { approveClientPolicy, removeClientPolicy } from "@/lib/app-domain/client-policies";
+import { removeClientPolicy } from "@/lib/app-domain/client-policies";
+import { approveRuleDecision, confirmInternalSource } from "@/lib/app-domain/internal-client";
 import { approveProcessVersion } from "@/lib/app-domain/processes";
 import { approveTaskPlan } from "@/lib/app-domain/task-plans";
 import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/portal-summary";
@@ -51,7 +52,7 @@ export async function decideApprovalAction(input: DecideInput): Promise<{ error?
         else await rejectException(user, input.id, note);
         break;
       case "rule":
-        if (approve) await approveClientPolicy(user, input.id);
+        if (approve) await approveRuleDecision(user, input.id);
         else await removeClientPolicy(user, input.id);
         break;
       case "procedure":
@@ -73,6 +74,10 @@ export async function decideApprovalAction(input: DecideInput): Promise<{ error?
       case "process":
         if (!approve || !input.op) throw new Error("אין כאן פעולה לבצע. פותחים את התהליך.");
         await runStep(user, input.op);
+        break;
+      case "internal":
+        if (!approve || !input.clientId) throw new Error("את הפריטים של התיק הפנימי מאשרים כאן, או פותחים את התיק.");
+        await confirmInternalSource(user, input.clientId, input.id);
         break;
       case "check":
         throw new Error("את החתימה בודקים עם Claude, בדף של איש הצוות.");

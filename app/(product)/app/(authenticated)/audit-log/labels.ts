@@ -132,6 +132,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_policy.update": "עדכון כלל בתיק הלקוח",
   "client_policy.reopen": "שינוי בכלל שבתוקף, שחזר לאישור",
   "client_policy.approve": "אישור כלל של לקוח",
+  "client_policy.internal_confirm": "אימות כלל בתיק הפנימי של אנקורה",
   "client_policy.approve_together": "אישור כמה כללים של לקוח יחד",
   "client_policy.retire": "ביטול כלל של לקוח",
   "client_policy.remove": "הסרת כלל מוצע מתיק הלקוח",

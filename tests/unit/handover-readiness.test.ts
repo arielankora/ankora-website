@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readinessLine, readinessOf, type ReadinessProcessInput } from "@/lib/handover-readiness";
 
-// Spec 3.9 and 11: the five things true of a process before the person who
+// Spec 3.9 and 11: the four things (22.10.2026: a backup is not one) true of a process before the person who
 // does it today can leave, and what is still missing.
 
 const base: ReadinessProcessInput = {
@@ -11,7 +11,6 @@ const base: ReadinessProcessInput = {
   status: "ACTIVE",
   transitionStatus: "WITH_ANKORA",
   ownerId: "h",
-  backupOwnerId: "a",
   executor: null,
   hasApprovedProcedure: true,
   completeness: 9,
@@ -19,7 +18,7 @@ const base: ReadinessProcessInput = {
 };
 
 describe("handover readiness", () => {
-  it("a process with all five is ready", () => {
+  it("a process with all four is ready", () => {
     const r = readinessOf([base]);
     expect(r).toMatchObject({ ready: 1, total: 1, systemsWithoutAccess: [] });
     expect(readinessLine(r)).toBe("התהליך מוכן: אפשר להעביר אותו אלינו.");
@@ -29,7 +28,7 @@ describe("handover readiness", () => {
     const mercury = { id: "s2", name: "Mercury", accessStatus: "NO_ACCESS", permission: "אישור תשלומים" };
     const r = readinessOf([
       base,
-      { ...base, id: "q", code: "P2", title: "ספקים", transitionStatus: "IN_HANDOVER", backupOwnerId: null, executor: "גיא", hasApprovedProcedure: false, completeness: 5, systems: [mercury] },
+      { ...base, id: "q", code: "P2", title: "ספקים", transitionStatus: "IN_HANDOVER", executor: "גיא", hasApprovedProcedure: false, completeness: 5, systems: [mercury] },
       { ...base, id: "r", code: "P3", title: "קבלנים", systems: [mercury] },
       { ...base, id: "x", code: "P4", title: "IT", transitionStatus: "NOT_PLANNED" },
       { ...base, id: "y", code: "P5", title: "ישן", status: "RETIRED", transitionStatus: "IN_HANDOVER" },
@@ -39,7 +38,6 @@ describe("handover readiness", () => {
     expect(r.processes[0].code).toBe("P2");
     expect(r.processes[0].missing).toEqual([
       "אין נוהל מאושר: מנהל מאשר את הטיוטה במסך התהליכים.",
-      "אין מחליף: הידע אצל אדם אחד.",
       "אין לנו גישה ל: Mercury (אישור תשלומים).",
       "עוד לא אצלנו: היום מבצע גיא.",
       "התיעוד 5 מתוך 9.",
@@ -51,5 +49,11 @@ describe("handover readiness", () => {
 
   it("nothing planned yet", () => {
     expect(readinessLine(readinessOf([]))).toBe("אין עדיין תהליכים שמתוכננים לעבור אלינו.");
+  });
+});
+
+describe("no backup", () => {
+  it("a process without a backup is ready when the four are true", () => {
+    expect(readinessOf([base]).processes[0].missing).toEqual([]);
   });
 });

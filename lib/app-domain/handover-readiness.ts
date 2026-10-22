@@ -27,7 +27,6 @@ export async function handoverReadiness(actor: User, clientId: string): Promise<
         status: p.status,
         transitionStatus: p.transitionStatus,
         ownerId: p.ownerId,
-        backupOwnerId: p.backupOwnerId,
         executor: (p.executorUserId && users.get(p.executorUserId)) || (p.executorContactId && contactName.get(p.executorContactId)) || p.executorText,
         hasApprovedProcedure: !!p.current,
         completeness: p.completeness.score,

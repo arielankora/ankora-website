@@ -78,7 +78,8 @@ describe("processes", () => {
     const [p] = await listProcesses(hadas, client.id);
     expect(p.completeness.score).toBe(5);
     expect(p.completeness.missing).toEqual(["permissions", "approvals", "exceptions", "next"]);
-    expect(p.gaps).toEqual(expect.arrayContaining(["חסר: נוהל חריגים", "חסר: מועד הבא", "אין לנו גישה ל: בנק LTD", "אין מחליף: הידע אצל אדם אחד"]));
+    expect(p.gaps).toEqual(expect.arrayContaining(["חסר: נוהל חריגים", "חסר: מועד הבא", "אין לנו גישה ל: בנק LTD"]));
+    expect(p.gaps.some((g) => g.includes("מחליף"))).toBe(false);
   });
 });
 

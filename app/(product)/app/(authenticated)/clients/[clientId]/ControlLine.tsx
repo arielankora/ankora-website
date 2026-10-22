@@ -14,7 +14,6 @@ const SECTION: Partial<Record<ControlKey, string>> = {
   completeness: "processes",
   needsReview: "processes",
   scheduledNoDate: "processes",
-  noBackup: "processes",
   exceptionsInForce: "rules",
   exceptionsRequested: "rules",
 };

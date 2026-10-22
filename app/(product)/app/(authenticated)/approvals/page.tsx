@@ -1,9 +1,8 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
-import { collectApprovals } from "@/lib/app-domain/approvals";
+import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
 import { collectQuestionCards } from "@/lib/app-domain/client-questions";
-import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
   APPROVAL_TABS,
@@ -12,6 +11,7 @@ import {
   approvalsHref,
   bulkRuleGroups,
   forClient,
+  onlyMine,
   parseApprovalsParams,
   tabCounts,
   visibleTabs,
@@ -43,17 +43,21 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   if (!can(user.role, "time_entry.create_self")) redirect("/app");
   const { tab, clientId } = parseApprovalsParams(params);
   const manager = canManageClients(user.role);
-  const everyone = manager && params.scope === "all";
+  // "של כולם" (22.10.2026): everyone's questions for a manager, and on
+  // the decisions, the meetings other people sent too. A chosen client
+  // shows that client's meetings whoever sent them.
+  const everyone = params.scope === "all" && (manager || tab !== "questions");
   const now = new Date();
-  // Everyone's questions stay everyone's while the client changes.
-  const withScope = (href: string) => (everyone && tab === "questions" ? `${href}${href.includes("?") ? "&" : "?"}scope=all` : href);
+  // "של כולם" stays while the tab or the client changes.
+  const withScope = (href: string) => (everyone ? `${href}${href.includes("?") ? "&" : "?"}scope=all` : href);
 
-  const [allItems, myCards, knowledgeAll, knowledgeClient] = await Promise.all([
+  const [everything, myCards, knowledgeAll, knowledgeClient] = await Promise.all([
     collectApprovals(user),
     collectQuestionCards(user),
-    countPendingProposals(user),
-    clientId ? countPendingProposals(user, clientId) : Promise.resolve(null),
+    countMyPendingProposals(user, { everyone }),
+    clientId ? countMyPendingProposals(user, { clientId, everyone: true }) : Promise.resolve(null),
   ]);
+  const allItems = everyone ? everything : onlyMine(everything);
   const cards = tab === "questions" && everyone ? await collectQuestionCards(user, { scope: "all" }) : myCards;
 
   // The client chips count the decisions, the tabs count the chosen client.
@@ -66,7 +70,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   }
   for (const c of cards) if (!clients.has(c.clientId)) clients.set(c.clientId, { name: c.clientName, count: 0 });
 
-  const items = forClient(allItems, clientId);
+  const items = clientId ? forClient(everything, clientId) : allItems;
   const shownCards = clientId ? cards.filter((c) => c.clientId === clientId) : cards;
   const myQuestions = (clientId ? myCards.filter((c) => c.clientId === clientId) : myCards).reduce((n, c) => n + c.items.filter((i) => !i.askedAt).length, 0);
   const counts = tabCounts(items, myQuestions, clientId ? (knowledgeClient ?? 0) : knowledgeAll);
@@ -134,11 +138,20 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       <ViewTabs
         label="סוגי אישורים"
         active={tab}
-        tabs={tabs.map((t) => ({ key: t.key, label: t.count > 0 ? `${t.label} (${t.count})` : t.label, href: approvalsHref(t.key, clientId) }))}
+        tabs={tabs.map((t) => ({ key: t.key, label: t.count > 0 ? `${t.label} (${t.count})` : t.label, href: withScope(approvalsHref(t.key, clientId)) }))}
       />
 
+      {tab !== "questions" && !clientId && (
+        <ScopeToggle
+          everyone={everyone}
+          mineHref={approvalsHref(tab, clientId)}
+          allHref={`${approvalsHref(tab, clientId)}${approvalsHref(tab, clientId).includes("?") ? "&" : "?"}scope=all`}
+          hidden={everything.length - allItems.length}
+        />
+      )}
+
       {tab === "knowledge" ? (
-        <KnowledgeReview searchParams={clientId ? { ...params, clientId } : params} />
+        <KnowledgeReview searchParams={clientId ? { ...params, clientId } : params} mineOnly={!everyone && !clientId} />
       ) : tab === "questions" ? (
         <Questions cards={shownCards} manager={manager} everyone={everyone} clientId={clientId} senderName={user.name} tab={tab} />
       ) : ofTab.length === 0 ? (
@@ -241,6 +254,23 @@ function Questions({
           />
         ))
       )}
+    </div>
+  );
+}
+
+/// "שלי" or "של כולם", on the decisions (22.10.2026): the meetings other
+/// people sent wait on them, and are here only on asking.
+function ScopeToggle({ everyone, mineHref, allHref, hidden }: { everyone: boolean; mineHref: string; allHref: string; hidden: number }) {
+  if (!everyone && hidden === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[12.5px]" data-testid="approvals-scope">
+      <a href={mineHref} aria-current={!everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${!everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
+        שלי
+      </a>
+      <a href={allHref} aria-current={everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
+        של כולם
+      </a>
+      {!everyone && hidden > 0 && <span className="text-app-text-tertiary">{hidden === 1 ? "פגישה אחת של מישהו אחר" : `${hidden} פגישות של אחרים`} מחכות להם, לא לך.</span>}
     </div>
   );
 }

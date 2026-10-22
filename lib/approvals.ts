@@ -13,12 +13,16 @@
 import type { ApprovalPreview } from "@/lib/approvals-preview";
 import type { StepOp } from "@/lib/next-steps";
 
-/// 22.10.2026: "process" holds a process's decisions (a date to link, a
-/// backup to set, duplicate tasks to close, a review), and "check" what an
+/// 22.10.2026: "process" holds a process's decisions (a date to link,
+/// duplicate tasks to close, a review), and "check" what an
 /// admin checks (a signed PDF). What used to be "לבדיקה", items not yet
 /// confirmed, is no longer a decision of the manager's: it is the file
 /// owner's "שאלות ללקוח" (lib/client-questions.ts).
-export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "knowledge" | "plan" | "summary" | "guide" | "check";
+///
+/// "internal" (22.10.2026): items of Ankora's own file, uncertain only
+/// because Ankora wrote them. There Ankora is the client, so they are a
+/// manager's decision, not a question to a client.
+export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "internal" | "knowledge" | "plan" | "summary" | "guide" | "check";
 
 export type ApprovalTab = "all" | ApprovalKind | "questions";
 
@@ -32,6 +36,7 @@ export const APPROVAL_TABS: { key: ApprovalTab; label: string }[] = [
   { key: "rule", label: "כללים" },
   { key: "procedure", label: "נהלים" },
   { key: "process", label: "תהליכים" },
+  { key: "internal", label: "תיק פנימי" },
   { key: "knowledge", label: "ידע מהחילוץ" },
   { key: "plan", label: "תוכניות משימה" },
   { key: "summary", label: "סיכומים ללקוח" },
@@ -47,6 +52,7 @@ export const KIND_LABELS: Record<ApprovalKind, string> = {
   rule: "כלל",
   procedure: "נוהל",
   process: "תהליך",
+  internal: "תיק פנימי",
   knowledge: "ידע",
   plan: "תוכנית",
   summary: "סיכום",
@@ -62,6 +68,7 @@ export const KIND_TONES: Record<ApprovalKind, KindTone> = {
   rule: "accent",
   procedure: "info",
   process: "warning",
+  internal: "neutral",
   knowledge: "success",
   plan: "info",
   summary: "success",
@@ -114,7 +121,16 @@ export type ApprovalItem = {
   blocking?: boolean;
   /// A date it is tied to: the task's due date, the process's next run.
   deadline?: Date | null;
+  /// A knowledge batch: false when it waits on someone else (whoever sent
+  /// it, the account manager). Out of the count and "היום", on screen
+  /// under "של כולם" and with a client chosen (22.10.2026).
+  mine?: boolean;
 };
+
+/// What waits on the person: everything but other people's meetings.
+export function onlyMine<T extends { mine?: boolean }>(items: T[]): T[] {
+  return items.filter((i) => i.mine !== false);
+}
 
 /// Oldest first: what has waited longest is what to do first.
 export function sortByWaiting<T extends { since: Date; title: string }>(rows: T[]): T[] {
@@ -259,4 +275,15 @@ export function bulkRuleGroups(items: ApprovalItem[]): { clientId: string; clien
     by.set(i.clientId, g);
   }
   return [...by.values()].filter((g) => g.ids.length >= 2).sort((a, b) => b.ids.length - a.ids.length || a.clientName.localeCompare(b.clientName, "he"));
+}
+
+/// 22.10.2026: whose a meeting's proposals are. They wait on whoever sent
+/// them for extraction and on the client's account manager, not on every
+/// manager: Grantor's 59 proposals Hadas sent filled Ariel's count. A
+/// batch nobody sent, of a client with no account manager, waits on the
+/// managers. Anyone on the client may still approve; this decides only
+/// whose count and "היום" they are in.
+export function knowledgeBatchIsMine(batch: { createdById: string | null; accountManagerId: string | null }, userId: string, manager: boolean): boolean {
+  if (batch.createdById === userId || batch.accountManagerId === userId) return true;
+  return manager && !batch.createdById && !batch.accountManagerId;
 }

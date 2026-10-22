@@ -1,8 +1,10 @@
 // Is a client ready to be run by Ankora? (spec 3.9 and section 11: "every
 // process planned to move to us, with us"). Pure. For each process that is
-// planned to move, the five things that have to be true before the person
+// planned to move, the four things that have to be true before the person
 // who does it today can leave, and what is still missing. The client's
 // screen, a meeting with the client and Claude read the same answer.
+// 22.10.2026: a backup is no longer one of them (Ariel): what lets someone
+// step in is the approved procedure and the access, both checked here.
 
 export type ReadinessSystem = { id: string; name: string; accessStatus: string; permission: string | null };
 
@@ -13,18 +15,16 @@ export type ReadinessProcessInput = {
   status: string;
   transitionStatus: string;
   ownerId: string | null;
-  backupOwnerId: string | null;
   executor: string | null;
   hasApprovedProcedure: boolean;
   completeness: number;
   systems: ReadinessSystem[];
 };
 
-export type ReadinessCheckKey = "procedure" | "backup" | "access" | "withUs" | "complete";
+export type ReadinessCheckKey = "procedure" | "access" | "withUs" | "complete";
 
 export const READINESS_CHECKS: { key: ReadinessCheckKey; label: string }[] = [
   { key: "procedure", label: "נוהל מאושר" },
-  { key: "backup", label: "מחליף" },
   { key: "access", label: "גישה לכל המערכות" },
   { key: "withUs", label: "אצלנו" },
   { key: "complete", label: "תיעוד מלא (8 מתוך 9)" },
@@ -56,14 +56,12 @@ export function readinessOf(input: ReadinessProcessInput[]): Readiness {
     const noAccess = p.systems.filter((s) => !HAS_ACCESS(s));
     const checks: Record<ReadinessCheckKey, boolean> = {
       procedure: p.hasApprovedProcedure,
-      backup: !!p.backupOwnerId,
       access: noAccess.length === 0,
       withUs: p.transitionStatus === "WITH_ANKORA",
       complete: p.completeness >= 8,
     };
     const missing = [
       !checks.procedure && "אין נוהל מאושר: מנהל מאשר את הטיוטה במסך התהליכים.",
-      !checks.backup && "אין מחליף: הידע אצל אדם אחד.",
       !checks.access && `אין לנו גישה ל: ${noAccess.map((s) => (s.permission ? `${s.name} (${s.permission})` : s.name)).join(", ")}.`,
       !checks.withUs && `עוד לא אצלנו${p.executor ? `: היום מבצע ${p.executor}` : ""}.`,
       !checks.complete && `התיעוד ${p.completeness} מתוך 9.`,

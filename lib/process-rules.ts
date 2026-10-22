@@ -240,11 +240,12 @@ export function completeness(p: CompletenessInput): { score: number; of: 9; miss
 }
 
 /// The gaps a reader sees on the process (R11, R12, R13), in words.
-export function processGaps(p: CompletenessInput & { backupOwnerId: string | null }, systemName: (id: string) => string): string[] {
+/// 22.10.2026: no backup is no longer a gap (Ariel: what lets someone step
+/// in is an approved procedure and access, not a name on the process).
+export function processGaps(p: CompletenessInput & { backupOwnerId?: string | null }, systemName: (id: string) => string): string[] {
   const gaps: string[] = [];
   const { missing } = completeness(p);
   for (const k of missing) if (k !== "permissions") gaps.push(`חסר: ${FIELD_LABELS[k]}`);
   if (p.systemsWithoutAccess.length) gaps.push(`אין לנו גישה ל: ${p.systemsWithoutAccess.map(systemName).join(", ")}`);
-  if (!p.backupOwnerId) gaps.push("אין מחליף: הידע אצל אדם אחד");
   return gaps;
 }

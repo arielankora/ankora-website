@@ -405,7 +405,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     where: { clientId: { in: clientIds }, closedAt: null, awaitingAssignment: false },
     orderBy: { createdAt: "desc" },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, accountManagerId: true } },
       proposals: { orderBy: { createdAt: "asc" } },
     },
   });

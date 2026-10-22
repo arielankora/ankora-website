@@ -58,7 +58,7 @@ export async function brainMetrics(actor: User, now = new Date()) {
     inputs.push({
       clientId: c.id,
       clientName: c.name,
-      processes: processes.map((p) => ({ status: p.status, transitionStatus: p.transitionStatus, backupOwnerId: p.backupOwnerId, completeness: p.completeness.score })),
+      processes: processes.map((p) => ({ status: p.status, transitionStatus: p.transitionStatus, completeness: p.completeness.score })),
       uncertainSince: uncertainRows.filter((r) => r.clientId === c.id).map((r) => r.updatedAt),
       systems: systems.filter((s) => s.clientId === c.id),
       autoTasks: autoTasks.filter((t) => t.clientId === c.id),

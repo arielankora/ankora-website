@@ -36,7 +36,7 @@ import {
 import Link from "next/link";
 import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
-import { nextSteps, type BackupCandidate, type DateCandidate, type NextStep, type ProcessFacts } from "@/lib/next-steps";
+import { nextSteps, type DateCandidate, type NextStep, type ProcessFacts } from "@/lib/next-steps";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
@@ -58,10 +58,9 @@ export type PanelProcess = {
   /// 21.10.2026: open tasks of the client this approved process covers.
   covered?: { taskId: string; title: string; assignee: string | null }[];
   /// 22.10.2026: what "הצעד הבא" reads. The fields still missing (their
-  /// labels), the systems without access, and the two recommendations.
+  /// labels), the systems without access, and the date recommended.
   missing?: string[];
   noAccess?: { id: string; name: string }[];
-  backupCandidate?: BackupCandidate | null;
   dateCandidate?: DateCandidate | null;
   /// When a person last confirmed it, as ISO.
   verifiedAt?: string | null;
@@ -343,7 +342,7 @@ function ProcessForm({
             ))}
           </select>
         </Field>
-        <Field label="מחליף">
+        <Field label="מחליף (לא חובה)">
           <select name="backupOwnerId" defaultValue={existing?.backupOwnerId ?? ""} className={INPUT}>
             <option value="">אין</option>
             {staff.map((u) => (
@@ -772,7 +771,6 @@ function factsOf(p: PanelProcess): ProcessFacts {
     status: p.status,
     triggerKinds: p.triggerKinds,
     ownerId: p.ownerId,
-    backupOwnerId: p.backupOwnerId,
     hasNextDate: !!p.nextDate,
     draft: p.draft ? { version: p.draft.version, blocked: !p.draft.checks.every((c) => c.excepted) } : null,
     covered: (p.covered ?? []).map((t) => ({ taskId: t.taskId, title: t.title })),
@@ -781,7 +779,6 @@ function factsOf(p: PanelProcess): ProcessFacts {
     review: p.reviewReason ? { label: REVIEW_REASON_LABELS[p.reviewReason], periodic: p.reviewReason === "PERIODIC" } : null,
     openLessons: p.lessons.filter((l) => l.status === "OPEN").length,
     knowledge: { uncertain: p.knowledgeStatus === "UNCERTAIN" || p.knowledgeStatus === "MISSING", toResolve: p.toResolve },
-    backupCandidate: p.backupCandidate ?? null,
     dateCandidate: p.dateCandidate ?? null,
   };
 }

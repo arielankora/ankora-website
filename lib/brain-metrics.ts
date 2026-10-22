@@ -18,7 +18,7 @@ const DAY = 86_400_000;
 export type ClientMetricsInput = {
   clientId: string;
   clientName: string;
-  processes: { status: string; transitionStatus: string; backupOwnerId: string | null; completeness: number }[];
+  processes: { status: string; transitionStatus: string; backupOwnerId?: string | null; completeness: number }[];
   /// When each item of the file now "uncertain" last changed.
   uncertainSince: Date[];
   systems: { accessStatus: string }[];
@@ -62,7 +62,6 @@ export function measures(input: Omit<ClientMetricsInput, "clientId" | "clientNam
   const live = input.processes.filter((p) => p.status !== "RETIRED");
   const planned = live.filter((p) => p.transitionStatus !== "NOT_PLANNED");
   const avg = live.length ? Math.round((live.reduce((a, p) => a + p.completeness, 0) / live.length) * 10) / 10 : null;
-  const noBackup = live.filter((p) => !p.backupOwnerId).length;
   const stale = input.uncertainSince.filter((d) => now.getTime() - d.getTime() > UNCERTAIN_STALE_DAYS * DAY).length;
   const noAccess = input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").length;
   const fromProcess = input.autoTasks.filter((t) => t.processId).length;
@@ -86,7 +85,6 @@ export function measures(input: Omit<ClientMetricsInput, "clientId" | "clientNam
   return [
     m("completeness", "שלמות תהליכים", "ממוצע תשעת השדות של כל תהליך פעיל.", "8 מתוך 9", avg, `${avg} מתוך 9`, (v) => v >= 8),
     m("coverage", "משימות שנפתחו מתהליך", `מהמשימות שהמערכת פתחה לבד ב-${COVERAGE_WINDOW_DAYS} הימים האחרונים, כמה היו ריצה של תהליך ולא מועד בלבד.`, "60%", coverage, `${coverage}%`, (v) => v >= 60),
-    m("noBackup", "תהליכים בלי מחליף", "תהליכים פעילים שהידע עליהם אצל אדם אחד.", "0", live.length ? noBackup : null, String(noBackup), (v) => v === 0),
     m("staleUncertain", `לא ודאי מעל ${UNCERTAIN_STALE_DAYS} יום`, `פריטים בתיק שמסומנים לא ודאיים ולא השתנו ${UNCERTAIN_STALE_DAYS} יום.`, "יורד מחודש לחודש", stale, String(stale), (v) => v === 0),
     m("noAccess", "מערכות בלי גישה", "מערכות במפה שאין לנו אליהן גישה, או שהיא ממתינה. מדד ההתקדמות של החפיפה.", "יורד", input.systems.length ? noAccess : null, String(noAccess), (v) => v === 0),
     m("withAnkora", "תהליכים אצלנו", "מהתהליכים שמתוכננים לעבור אלינו, כמה כבר אצלנו.", "100% עד 31.12.2026", withAnkora, `${withAnkora}%`, (v) => v >= 100),

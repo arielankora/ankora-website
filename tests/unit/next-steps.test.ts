@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchDateToProcess, nextSteps, rankApprovals, recommendBackup, urgency, type ProcessFacts, type StaffSignal } from "@/lib/next-steps";
+import { matchDateToProcess, nextSteps, rankApprovals, urgency, type ProcessFacts } from "@/lib/next-steps";
 
 // "הצעד הבא" (22.10.2026): every gap of a process as a step with what to
 // do, why, and the action; the order of the approvals screen.
@@ -13,7 +13,6 @@ function facts(over: Partial<ProcessFacts> = {}): ProcessFacts {
     status: "ACTIVE",
     triggerKinds: ["SCHEDULED"],
     ownerId: "hadas",
-    backupOwnerId: "anna",
     hasNextDate: true,
     draft: null,
     covered: [],
@@ -22,7 +21,6 @@ function facts(over: Partial<ProcessFacts> = {}): ProcessFacts {
     review: null,
     openLessons: 0,
     knowledge: { uncertain: false, toResolve: null },
-    backupCandidate: null,
     dateCandidate: null,
     ...over,
   };
@@ -34,8 +32,8 @@ describe("next steps", () => {
   });
 
   it("puts a scheduled process without a date first, and links the date that looks like its own", () => {
-    const steps = nextSteps(facts({ hasNextDate: false, backupOwnerId: null, dateCandidate: { id: "d1", title: "שליחת טבלת השכר לדקלה (P5)" } }), true);
-    expect(steps.map((s) => s.kind)).toEqual(["no_next_date", "backup"]);
+    const steps = nextSteps(facts({ hasNextDate: false, dateCandidate: { id: "d1", title: "שליחת טבלת השכר לדקלה (P5)" } }), true);
+    expect(steps.map((s) => s.kind)).toEqual(["no_next_date"]);
     expect(steps[0]).toMatchObject({ blocking: true, fix: { kind: "op", op: { type: "link_date", processId: "p5", dateId: "d1" }, label: "לקשר" } });
     expect(steps[0].recommend).toContain("שליחת טבלת השכר");
   });
@@ -62,10 +60,8 @@ describe("next steps", () => {
     expect(forOwner.fix.kind).toBe("open");
   });
 
-  it("recommends a backup with a reason, or asks to choose one", () => {
-    const withOne = nextSteps(facts({ backupOwnerId: null, backupCandidate: { id: "ariel", name: "Ariel", why: "כבר אחראי על P2." } }), false)[0];
-    expect(withOne).toMatchObject({ kind: "backup", recommend: "לקבוע את Ariel", fix: { kind: "op", op: { type: "set_backup", userId: "ariel" }, label: "לקבוע" } });
-    expect(nextSteps(facts({ backupOwnerId: null }), true)[0].fix.kind).toBe("edit");
+  it("never asks for a backup (22.10.2026)", () => {
+    expect(nextSteps(facts({ status: "DRAFT", triggerKinds: ["EVENT"] }), true)).toEqual([]);
   });
 
   it("approves a draft that passes in one click for a manager, and sends one that fails to be fixed", () => {
@@ -83,7 +79,6 @@ describe("next steps", () => {
     const steps = nextSteps(
       facts({
         hasNextDate: false,
-        backupOwnerId: null,
         draft: { version: 3, blocked: false },
         covered: [{ taskId: "t1", title: "x" }],
         missing: ["SLA"],
@@ -94,31 +89,9 @@ describe("next steps", () => {
       }),
       true
     );
-    expect(steps.map((s) => s.kind)).toEqual(["no_next_date", "procedure_draft", "review", "covered_tasks", "backup", "lessons", "uncertain", "missing_fields", "no_access"]);
+    expect(steps.map((s) => s.kind)).toEqual(["no_next_date", "procedure_draft", "review", "covered_tasks", "lessons", "uncertain", "missing_fields", "no_access"]);
     expect(steps.find((s) => s.kind === "missing_fields")?.title).toBe("חסר: SLA");
     expect(steps.find((s) => s.kind === "lessons")?.title).toBe("2 הערות מריצות, לגרסה הבאה");
-  });
-});
-
-describe("recommendBackup", () => {
-  const s = (over: Partial<StaffSignal>): StaffSignal => ({ id: "x", name: "X", accountManager: false, openTasks: 0, processes: [], ...over });
-
-  it("prefers the account manager, never the owner", () => {
-    const pick = recommendBackup("hadas", [s({ id: "hadas", name: "Hadas", accountManager: true, openTasks: 9 }), s({ id: "anna", name: "Anna", openTasks: 1 }), s({ id: "ariel", name: "Ariel", accountManager: false, processes: ["P2"] })]);
-    expect(pick?.id).toBe("ariel");
-    expect(pick?.why).toContain("P2");
-    const am = recommendBackup("hadas", [s({ id: "anna", name: "Anna", accountManager: true }), s({ id: "ariel", name: "Ariel", openTasks: 2 })]);
-    expect(am).toMatchObject({ id: "anna", name: "Anna" });
-    expect(am?.why).toContain("מנהל התיק");
-  });
-
-  it("recommends nobody when only the owner works on the client", () => {
-    expect(recommendBackup("hadas", [s({ id: "hadas", accountManager: true })])).toBeNull();
-    expect(recommendBackup("hadas", [s({ id: "anna" })])).toBeNull();
-  });
-
-  it("breaks a tie by name, the same every time", () => {
-    expect(recommendBackup(null, [s({ id: "b", name: "בני", openTasks: 1 }), s({ id: "a", name: "אנה", openTasks: 1 })])?.id).toBe("a");
   });
 });
 

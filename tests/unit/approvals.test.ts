@@ -5,6 +5,8 @@ import {
   approvalsLine,
   bulkRuleGroups,
   forClient,
+  knowledgeBatchIsMine,
+  onlyMine,
   parseApprovalsParams,
   sortByWaiting,
   tabCounts,
@@ -34,7 +36,7 @@ function item(over: Partial<ApprovalItem>): ApprovalItem {
 
 describe("approvals", () => {
   it("keeps the tabs in the agreed order, most urgent first, the questions last", () => {
-    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "knowledge", "plan", "summary", "guide", "check", "questions"]);
+    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "internal", "knowledge", "plan", "summary", "guide", "check", "questions"]);
   });
 
   it("lists what waited longest first", () => {
@@ -109,5 +111,32 @@ describe("approvals", () => {
       item({ id: "e", kind: "task", clientId: "c2" }),
     ];
     expect(bulkRuleGroups(rows)).toEqual([{ clientId: "c1", clientName: "NUX", ids: ["a", "b"] }]);
+  });
+});
+
+// 22.10.2026: other people's meetings wait on them, not on every manager.
+describe("knowledgeBatchIsMine and onlyMine", () => {
+  it("is the sender's and the account manager's", () => {
+    expect(knowledgeBatchIsMine({ createdById: "hadas", accountManagerId: "anna" }, "hadas", false)).toBe(true);
+    expect(knowledgeBatchIsMine({ createdById: "hadas", accountManagerId: "anna" }, "anna", false)).toBe(true);
+    expect(knowledgeBatchIsMine({ createdById: "hadas", accountManagerId: "anna" }, "ariel", true)).toBe(false);
+  });
+
+  it("waits on the managers only when nobody sent it and nobody manages the client", () => {
+    expect(knowledgeBatchIsMine({ createdById: null, accountManagerId: null }, "ariel", true)).toBe(true);
+    expect(knowledgeBatchIsMine({ createdById: null, accountManagerId: null }, "noa", false)).toBe(false);
+    expect(knowledgeBatchIsMine({ createdById: null, accountManagerId: "anna" }, "ariel", true)).toBe(false);
+  });
+
+  it("keeps everything that is not someone else's meeting", () => {
+    const rows = [{ id: "a" }, { id: "b", mine: true }, { id: "c", mine: false }];
+    expect(onlyMine(rows).map((r) => r.id)).toEqual(["a", "b"]);
+  });
+
+  it("counts the internal file's items as decisions, under their own tab", () => {
+    const counts = tabCounts([{ kind: "internal", weight: 4 } as never, { kind: "rule" } as never], 0);
+    expect(counts.internal).toBe(4);
+    expect(counts.all).toBe(5);
+    expect(APPROVAL_TABS.some((t) => t.key === "internal")).toBe(true);
   });
 });

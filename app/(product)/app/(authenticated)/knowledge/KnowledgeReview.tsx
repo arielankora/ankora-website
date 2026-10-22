@@ -1,3 +1,4 @@
+import { knowledgeBatchIsMine } from "@/lib/approvals";
 import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { listOpenBatches, proposalQuality } from "@/lib/app-domain/knowledge-proposals";
@@ -44,13 +45,17 @@ function options(labels: Map<string, string>, counts: Map<string, number>, chose
 
 /// The review screen as a tab of "אישורים" (20.10.2026). Its own address,
 /// /app/knowledge, redirects there with its filters.
-export async function KnowledgeReview({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export async function KnowledgeReview({ searchParams, mineOnly = false }: { searchParams: Record<string, string | string[] | undefined>; mineOnly?: boolean }) {
   const filters = parseReviewFilters(searchParams);
   const user = await requireUser();
   // The whole queue this person can see, filtered here: the counts beside
   // each option come from the queue, not from what is left after filtering,
   // so a person sees what exists without clearing anything.
-  const [all, awaiting, staff] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user), listStaffForAssignment()]);
+  const [queue, awaiting, staff] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user), listStaffForAssignment()]);
+  // 22.10.2026: by default the meetings waiting on this person, whoever
+  // sent them or the client's account manager; "של כולם" shows the rest.
+  const manager = canManageClients(user.role);
+  const all = mineOnly ? queue.filter((b) => knowledgeBatchIsMine({ createdById: b.createdById, accountManagerId: b.client.accountManagerId ?? null }, user.id, manager)) : queue;
   const now = new Date();
   // Decision 1's measure, for whoever makes that decision.
   const quality = canManageClients(user.role) ? qualityLine(await proposalQuality(user, new Date(now.getTime() - DECISION_1_DAYS * 86_400_000)), now) : null;
