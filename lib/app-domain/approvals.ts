@@ -4,14 +4,11 @@ import { prisma } from "@/lib/prisma";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
-import { listAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
-import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
-import { approvalsHref, tabCounts, type ApprovalItem, type ReviewItem } from "@/lib/approvals";
-import { SCHEDULED_NO_DATE_NOTE } from "@/lib/client-control";
-import { loweredBySource } from "@/lib/app-domain/source-confirmation";
-import { coveredTasksForClients } from "@/lib/app-domain/process-overlap";
+import { approvalsHref, tabCounts, type ApprovalItem } from "@/lib/approvals";
+import { processDecisions } from "@/lib/app-domain/process-next-steps";
+import { nextSteps, type NextStepKind } from "@/lib/next-steps";
 import { processChecks, ruleContext } from "@/lib/app-domain/processes";
 import { readSteps } from "@/lib/process-rules";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
@@ -67,6 +64,7 @@ async function tasks(s: Scope): Promise<ApprovalItem[]> {
       title: true,
       parentId: true,
       updatedAt: true,
+      dueDate: true,
       client: { select: { id: true, name: true } },
       parent: { select: { title: true } },
       assignedTo: { select: { name: true } },
@@ -84,6 +82,8 @@ async function tasks(s: Scope): Promise<ApprovalItem[]> {
     by: t.assignedTo?.name ?? null,
     href: `/app/tasks/${t.parentId ?? t.id}`,
     actions: { approve: "אישור וסגירה", reject: { label: "החזרה לביצוע", note: false } },
+    recommend: { text: "לבדוק את התוצאה, לאשר ולסגור", why: `${t.assignedTo?.name ?? "מי שביצע"} סיים ושלח לחתימה שלך, והמשימה לא נסגרת עד שתאשר.` },
+    deadline: t.dueDate,
   }));
 }
 
@@ -107,6 +107,8 @@ async function exceptions(s: Scope): Promise<ApprovalItem[]> {
     by: names.get(e.requestedById) ?? null,
     href: itemHref(e.clientId, e.policy.id),
     actions: { approve: "אישור החריגה", reject: { label: "דחייה", note: true } },
+    recommend: { text: "לאשר אם הסיבה מספיקה", why: `החריגה מוגבלת עד ${day(e.validUntil)}, ואחר כך חוזרים לכלל.` },
+    deadline: e.validUntil,
   }));
 }
 
@@ -135,6 +137,9 @@ async function rules(s: Scope): Promise<ApprovalItem[]> {
       // the row says what would confirm it instead of offering a button.
       blocked: confirmed ? null : `צריך אימות מול הלקוח${p.toResolve ? `: ${p.toResolve}` : "."}`,
       actions: { approve: confirmed ? "אישור הכלל" : null, reject: { label: "הסרה", note: false } },
+      recommend: confirmed
+        ? { text: "לאשר", why: p.interimStatement ? "הלקוח אמר את זה במפורש. עד האישור חל כלל הביניים, ואחריו הכלל עצמו נבדק מול כל נוהל ומשימה." : "הלקוח אמר את זה במפורש. מאושר, הוא נבדק מול כל נוהל ומשימה." }
+        : { text: "לשאול את הלקוח, ואז לאשר", why: "כלל שלא אומת לא מאושר." },
     };
   });
 }
@@ -191,6 +196,9 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       preview,
       blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : null,
       actions: { approve: held ? null : "אישור הנוהל", reject: null },
+      recommend: held ? { text: "לתקן בתהליך, ואז לאשר", why: "נוהל שלא עומד בכללים של הלקוח לא מאושר." } : { text: "לקרוא ולאשר", why: "עובר את כל הבדיקות מול הכללים של הלקוח. בלי נוהל מאושר התהליך לא פותח ריצות." },
+      // Waiting on this is waiting with the work: no run opens without it.
+      blocking: !held,
     };
   });
 }
@@ -233,6 +241,8 @@ async function knowledge(s: Scope): Promise<ApprovalItem[]> {
       // review screen itself: the row leads there.
       actions: { approve: null, reject: null },
       weight: n,
+      recommend: { text: "לעבור על ההצעות", why: "כל הצעה נכנסת לתיק רק אחרי אישור, עם המקור שלה." },
+      go: { label: "לעבור", href: approvalsHref("knowledge", b.clientId) },
     };
   });
 }
@@ -250,7 +260,7 @@ async function plans(s: Scope): Promise<ApprovalItem[]> {
         OR: [{ assignedToId: s.user.id }, { supervisorId: s.user.id }],
       },
     },
-    include: { task: { select: { id: true, title: true, clientId: true, client: { select: { name: true } } } }, createdBy: { select: { name: true } } },
+    include: { task: { select: { id: true, title: true, clientId: true, dueDate: true, client: { select: { name: true } } } }, createdBy: { select: { name: true } } },
   });
   if (drafts.length === 0) return [];
   const latest = await prisma.taskPlan.groupBy({ by: ["taskId"], where: { taskId: { in: [...new Set(drafts.map((d) => d.taskId))] } }, _max: { version: true } });
@@ -270,6 +280,8 @@ async function plans(s: Scope): Promise<ApprovalItem[]> {
       by: d.createdBy?.name ?? (d.origin === "APP" ? null : "Claude"),
       href: `/app/tasks/${d.taskId}`,
       actions: { approve: "אישור התוכנית", reject: null },
+      recommend: { text: "לקרוא ולאשר", why: "מי שמבצע את המשימה מחכה לתוכנית מאושרת כדי להתחיל." },
+      deadline: d.task.dueDate,
     }));
 }
 
@@ -288,6 +300,7 @@ async function summaries(s: Scope): Promise<ApprovalItem[]> {
     by: null,
     href: `/app/clients/${x.clientId}#portal-summary`,
     actions: { approve: "אישור לפורטל", reject: { label: "ביטול הטיוטה", note: false } },
+    recommend: { text: "לקרוא ולאשר לפורטל", why: "הלקוח יראה את הסיכום בפורטל רק אחרי האישור." },
   }));
 }
 
@@ -308,6 +321,76 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
     by: names.get(g.createdById ?? "") ?? null,
     href: "/app/extraction-guide",
     actions: { approve: "אישור הגרסה", reject: { label: "דחייה", note: true } },
+    recommend: { text: "לקרוא את השינוי ולאשר", why: "ההנחיות קובעות מה Claude מחלץ מכל פגישה, מעכשיו." },
+  }));
+}
+
+/// The steps of a process that are decisions, on the approvals screen. The
+/// rest (a draft, fields to fill, access, an item not yet confirmed) are
+/// on the process itself and in "שאלות ללקוח".
+const DECISION_STEPS: NextStepKind[] = ["no_next_date", "review", "covered_tasks", "backup", "lessons"];
+
+/// A process's decisions: for a manager, every process of their clients;
+/// for anyone else, the processes they own (22.10.2026).
+async function processes(s: Scope): Promise<ApprovalItem[]> {
+  if (s.clients.length === 0) return [];
+  const name = new Map(s.clients.map((c) => [c.id, c.name]));
+  const rows = await processDecisions(
+    s.clients.map((c) => c.id),
+    (p) => s.manager || p.ownerId === s.user.id
+  );
+  const out: ApprovalItem[] = [];
+  for (const r of rows) {
+    const href = itemHref(r.clientId, r.facts.id);
+    for (const step of nextSteps(r.facts, s.manager)) {
+      if (!DECISION_STEPS.includes(step.kind)) continue;
+      // A process not yet approved, without dates, stops nothing yet: its
+      // dates are part of writing it, on the process.
+      if (step.kind === "no_next_date" && !step.blocking) continue;
+      out.push({
+        kind: "process",
+        id: `${r.facts.id}:${step.kind}`,
+        clientId: r.clientId,
+        clientName: name.get(r.clientId) ?? null,
+        title: `${r.facts.code} ${r.facts.title}`,
+        detail: step.title,
+        since: r.updatedAt,
+        by: null,
+        href,
+        actions: { approve: step.fix.kind === "op" ? step.fix.label : null, reject: null },
+        recommend: step.recommend ? { text: step.recommend, why: step.why } : null,
+        op: step.fix.kind === "op" ? step.fix.op : null,
+        go: step.fix.kind === "op" ? null : { label: step.fix.label, href },
+        blocking: step.blocking,
+        deadline: r.deadline,
+      });
+    }
+  }
+  return out;
+}
+
+const AGREEMENT_LABELS: Record<string, string> = { CONFIDENTIALITY: "התחייבות לסודיות", DELETION_DECLARATION: "הצהרת מחיקה" };
+
+/// Signed PDFs waiting to be checked, for an admin (assertAgreementAdmin).
+async function checks(s: Scope): Promise<ApprovalItem[]> {
+  if (s.user.role !== "SUPER_ADMIN" && s.user.role !== "ANKORA_ADMIN") return [];
+  const rows = await prisma.agreementSignLink.findMany({
+    where: { purpose: "PDF_UPLOAD", documentId: { not: null }, reviewedAt: null },
+    select: { id: true, userId: true, kind: true, usedAt: true, createdAt: true, user: { select: { name: true } } },
+  });
+  return rows.map((x) => ({
+    kind: "check",
+    id: x.id,
+    clientId: null,
+    clientName: null,
+    title: `${AGREEMENT_LABELS[x.kind] ?? "מסמך"} של ${x.user.name}`,
+    detail: "PDF חתום שהועלה ומחכה לבדיקה.",
+    since: x.usedAt ?? x.createdAt,
+    by: x.user.name,
+    href: `/app/users/${x.userId}`,
+    actions: { approve: null, reject: null },
+    recommend: { text: "לבדוק עם Claude", why: "Claude קורא את הקובץ, ורושם את החתימה או מחזיר אותו עם סיבה." },
+    go: { label: "לבדיקה", href: `/app/users/${x.userId}` },
   }));
 }
 
@@ -316,7 +399,7 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
 export async function collectApprovals(user: User): Promise<ApprovalItem[]> {
   const s = await scopeOf(user);
   const parts = await Promise.all(
-    [tasks, exceptions, rules, procedures, knowledge, plans, summaries, guides].map((read) =>
+    [tasks, exceptions, rules, procedures, processes, knowledge, plans, summaries, guides, checks].map((read) =>
       read(s).catch((e: unknown) => {
         console.error(`approvals: ${read.name} failed`, e);
         return [] as ApprovalItem[];
@@ -332,199 +415,11 @@ export async function collectApprovals(user: User): Promise<ApprovalItem[]> {
 export async function countApprovals(user: User): Promise<number> {
   if (!can(user.role, "time_entry.create_self")) return 0;
   const [items, proposals] = await Promise.all([collectApprovals(user), countPendingProposals(user)]);
-  return tabCounts(items, [], proposals).all;
+  return tabCounts(items, 0, proposals).all;
 }
 
 /// Per client, for the link on the client's page.
 export async function countApprovalsForClient(user: User, clientId: string): Promise<number> {
   const items = (await collectApprovals(user)).filter((i) => i.clientId === clientId);
   return items.reduce((n, i) => n + (i.weight ?? 1), 0);
-}
-
-// ---------------------------------------------------------------------------
-// "לבדיקה": things to check, not to approve.
-// ---------------------------------------------------------------------------
-
-const AGREEMENT_LABELS: Record<string, string> = { CONFIDENTIALITY: "התחייבות לסודיות", DELETION_DECLARATION: "הצהרת מחיקה" };
-
-/// What is not yet confirmed with the client, the procedures marked for
-/// review, the lessons from runs, the meetings waiting for their client
-/// and the signed PDFs waiting to be checked. A manager sees every client;
-/// anyone else, what they own and the clients they manage.
-export async function collectReview(user: User): Promise<ReviewItem[]> {
-  const s = await scopeOf(user);
-  if (s.clients.length === 0) return [];
-  const ids = s.clients.map((c) => c.id);
-  const managed = new Set(s.clients.filter((c) => c.accountManagerId === user.id).map((c) => c.id));
-  const name = new Map(s.clients.map((c) => [c.id, c.name]));
-  const theirs = <T extends { clientId: string; ownerId: string | null }>(rows: T[]) => (s.manager ? rows : rows.filter((r) => r.ownerId === user.id || managed.has(r.clientId)));
-
-  const unsure = { deletedAt: null, clientId: { in: ids }, knowledgeStatus: { in: ["UNCERTAIN" as const, "MISSING" as const] } };
-  const base = { id: true, clientId: true, ownerId: true, toResolve: true, updatedAt: true, knowledgeStatus: true } as const;
-
-  const read = async <T>(label: string, p: Promise<T[]>): Promise<T[]> =>
-    p.catch((e: unknown) => {
-      console.error(`approvals review: ${label} failed`, e);
-      return [] as T[];
-    });
-
-  const [facts, contacts, orgs, systems, entities, requestTypes, processes, policies, flagged, lessons, awaiting, signatures, scheduled, lowered, covered] = await Promise.all([
-    read("facts", prisma.clientFact.findMany({ where: { ...unsure, kind: { not: "QUESTION" } }, select: { ...base, body: true } })),
-    read("contacts", prisma.clientContact.findMany({ where: unsure, select: { ...base, role: true, person: { select: { name: true } } } })),
-    read("orgs", prisma.clientOrganization.findMany({ where: unsure, select: { ...base, organization: { select: { name: true } } } })),
-    read("systems", prisma.systemAccess.findMany({ where: unsure, select: { ...base, systemName: true } })),
-    read("entities", prisma.clientEntity.findMany({ where: unsure, select: { ...base, name: true } })),
-    read("requestTypes", prisma.requestType.findMany({ where: unsure, select: { ...base, title: true } })),
-    read("processes", prisma.process.findMany({ where: { ...unsure, status: { not: "RETIRED" } }, select: { ...base, code: true, title: true } })),
-    read("policies", prisma.clientPolicy.findMany({ where: { ...unsure, status: { not: "RETIRED" } }, select: { ...base, title: true } })),
-    read(
-      "process review",
-      prisma.process.findMany({
-        where: { deletedAt: null, clientId: { in: ids }, needsReview: true, status: { not: "RETIRED" } },
-        select: { id: true, clientId: true, ownerId: true, code: true, title: true, reviewReason: true, updatedAt: true },
-      })
-    ),
-    read(
-      "lessons",
-      prisma.processLesson.findMany({
-        where: { status: "OPEN", clientId: { in: ids } },
-        select: { id: true, clientId: true, body: true, createdAt: true, processId: true, process: { select: { code: true, title: true, ownerId: true } } },
-      })
-    ),
-    read("awaiting assignment", listAwaitingAssignment(user)),
-    // Agreement uploads are reviewed by an admin (assertAgreementAdmin).
-    user.role === "SUPER_ADMIN" || user.role === "ANKORA_ADMIN"
-      ? read(
-          "signatures",
-          prisma.agreementSignLink.findMany({
-            where: { purpose: "PDF_UPLOAD", documentId: { not: null }, reviewedAt: null },
-            select: { id: true, userId: true, kind: true, usedAt: true, createdAt: true, user: { select: { name: true } } },
-          })
-        )
-      : Promise.resolve([]),
-    // 21.10.2026: an approved process that runs by a date, with none ahead.
-    read(
-      "scheduled without a date",
-      prisma.process.findMany({
-        where: { deletedAt: null, clientId: { in: ids }, status: "ACTIVE", triggerKinds: { has: "SCHEDULED" } },
-        select: { id: true, clientId: true, ownerId: true, code: true, title: true, updatedAt: true, dates: { where: { deletedAt: null, status: { not: "ARCHIVED" }, nextOccurrenceAt: { not: null } }, select: { id: true } } },
-      })
-    ),
-    // Sources whose items are uncertain only because Ankora wrote them, for
-    // the managers who may confirm them with the client in one step.
-    s.manager ? read("lowered by source", loweredBySource(ids)) : Promise.resolve([]),
-    // Open tasks an approved process covers.
-    read("covered tasks", coveredTasksForClients(s.manager ? ids : [...managed])),
-  ]);
-
-  const out: ReviewItem[] = [];
-  const unsureRow = (r: { id: string; clientId: string; toResolve: string | null; updatedAt: Date; knowledgeStatus: string }, title: string, what: string) => {
-    out.push({
-      kind: "uncertain",
-      id: r.id,
-      clientId: r.clientId,
-      clientName: name.get(r.clientId) ?? null,
-      title: clip(title, 140),
-      detail: [what, r.knowledgeStatus === "MISSING" ? "חסר" : "לא ודאי", r.toResolve ? `מה יסגור: ${r.toResolve}` : null].filter(Boolean).join(" · "),
-      since: r.updatedAt,
-      href: itemHref(r.clientId, r.id),
-    });
-  };
-  for (const r of theirs(facts)) unsureRow(r, r.body, "פריט");
-  for (const r of theirs(contacts)) unsureRow(r, r.person.name ?? r.role ?? "איש קשר", "איש קשר");
-  for (const r of theirs(orgs)) unsureRow(r, r.organization.name, "ארגון");
-  for (const r of theirs(systems)) unsureRow(r, r.systemName, "מערכת");
-  for (const r of theirs(entities)) unsureRow(r, r.name, "ישות");
-  for (const r of theirs(requestTypes)) unsureRow(r, r.title, "סוג פנייה");
-  for (const r of theirs(processes)) unsureRow(r, `${r.code} ${r.title}`, "תהליך");
-  for (const r of theirs(policies)) unsureRow(r, r.title, "כלל");
-
-  for (const p of theirs(flagged)) {
-    const reason = readReviewReason(p.reviewReason);
-    out.push({
-      kind: "process_review",
-      id: p.id,
-      clientId: p.clientId,
-      clientName: name.get(p.clientId) ?? null,
-      title: `${p.code} ${p.title}`,
-      detail: reason ? REVIEW_REASON_LABELS[reason] : "סומן לסקירה",
-      since: p.updatedAt,
-      href: itemHref(p.clientId, p.id),
-    });
-  }
-  for (const l of lessons) {
-    if (!s.manager && l.process.ownerId !== user.id) continue;
-    out.push({
-      kind: "lesson",
-      id: l.id,
-      clientId: l.clientId,
-      clientName: name.get(l.clientId) ?? null,
-      title: `${l.process.code} ${l.process.title}`,
-      detail: l.body ? clip(l.body) : "הערה מריצה של התהליך",
-      since: l.createdAt,
-      href: itemHref(l.clientId, l.processId),
-    });
-  }
-  for (const p of theirs(scheduled)) {
-    if (p.dates.length > 0) continue;
-    out.push({
-      kind: "no_next_date",
-      id: p.id,
-      clientId: p.clientId,
-      clientName: name.get(p.clientId) ?? null,
-      title: `${p.code} ${p.title}`,
-      detail: `${SCHEDULED_NO_DATE_NOTE}. מקשרים לתהליך את המועדים שלו.`,
-      since: p.updatedAt,
-      href: itemHref(p.clientId, p.id),
-    });
-  }
-  for (const l of lowered) {
-    out.push({
-      kind: "source_confirm",
-      id: `${l.clientId}:${l.code}`,
-      clientId: l.clientId,
-      clientName: name.get(l.clientId) ?? null,
-      title: `${l.code} ${l.title}`,
-      detail: `${l.count === 1 ? "פריט אחד לא ודאי" : `${l.count} פריטים לא ודאיים`} רק כי המקור הוא מסמך של אנקורה. אם הלקוח אישר, "אושר מול הלקוח" במרשם המקורות מאשר את כולם יחד.`,
-      since: new Date(),
-      href: `/app/clients/${l.clientId}?tab=file#source-${l.code}`,
-    });
-  }
-  for (const c of covered) {
-    out.push({
-      kind: "covered_task",
-      id: c.task.id,
-      clientId: c.clientId,
-      clientName: name.get(c.clientId) ?? null,
-      title: c.task.title,
-      detail: `${c.process.code} ${c.process.title} כבר מכסה את העבודה הזו, וכל ריצה שלו פותחת משימה משלה. סוגרים אותה בתהליך.`,
-      since: c.task.createdAt,
-      href: itemHref(c.clientId, c.process.id),
-    });
-  }
-  for (const a of awaiting) {
-    out.push({
-      kind: "assignment",
-      id: a.id,
-      clientId: null,
-      clientName: null,
-      title: a.source.title,
-      detail: "שיחה שמחכה שיגידו של איזה לקוח היא. עד אז שום דבר ממנה לא נכנס לתיק.",
-      since: a.createdAt,
-      href: approvalsHref("knowledge", null),
-    });
-  }
-  for (const x of signatures) {
-    out.push({
-      kind: "signature",
-      id: x.id,
-      clientId: null,
-      clientName: null,
-      title: `${AGREEMENT_LABELS[x.kind] ?? "מסמך"} של ${x.user.name}`,
-      detail: "PDF חתום שהועלה ומחכה לבדיקה. בודקים אותו עם Claude, שרושם את החתימה או מחזיר את הקובץ.",
-      since: x.usedAt ?? x.createdAt,
-      href: `/app/users/${x.userId}`,
-    });
-  }
-  return out;
 }

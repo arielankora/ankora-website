@@ -11,28 +11,33 @@
 // order. The rows are read in lib/app-domain/approvals.ts.
 
 import type { ApprovalPreview } from "@/lib/approvals-preview";
+import type { StepOp } from "@/lib/next-steps";
 
-export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "knowledge" | "plan" | "summary" | "guide";
+/// 22.10.2026: "process" holds a process's decisions (a date to link, a
+/// backup to set, duplicate tasks to close, a review), and "check" what an
+/// admin checks (a signed PDF). What used to be "לבדיקה", items not yet
+/// confirmed, is no longer a decision of the manager's: it is the file
+/// owner's "שאלות ללקוח" (lib/client-questions.ts).
+export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "knowledge" | "plan" | "summary" | "guide" | "check";
 
-/// Not approvals: things to check, with no approve button. A tab of their
-/// own, so the approval tabs stay a list of decisions.
-export type ReviewKind = "uncertain" | "process_review" | "lesson" | "assignment" | "signature" | "no_next_date" | "source_confirm" | "covered_task";
-
-export type ApprovalTab = "all" | ApprovalKind | "review";
+export type ApprovalTab = "all" | ApprovalKind | "questions";
 
 /// The order of the tabs, most urgent first: somebody is stopped on a
-/// signature, then an exception has a date, then the file itself.
+/// signature, then an exception has a date, then the file itself. The
+/// questions last: they are work, not decisions, and not in the count.
 export const APPROVAL_TABS: { key: ApprovalTab; label: string }[] = [
   { key: "all", label: "הכול" },
   { key: "task", label: "משימות לחתימה" },
   { key: "exception", label: "חריגות" },
   { key: "rule", label: "כללים" },
   { key: "procedure", label: "נהלים" },
+  { key: "process", label: "תהליכים" },
   { key: "knowledge", label: "ידע מהחילוץ" },
   { key: "plan", label: "תוכניות משימה" },
   { key: "summary", label: "סיכומים ללקוח" },
   { key: "guide", label: "מדריך חילוץ" },
-  { key: "review", label: "לבדיקה" },
+  { key: "check", label: "לבדיקה" },
+  { key: "questions", label: "שאלות ללקוח" },
 ];
 
 /// The label beside each row in "הכול", and its colour.
@@ -41,35 +46,27 @@ export const KIND_LABELS: Record<ApprovalKind, string> = {
   exception: "חריגה",
   rule: "כלל",
   procedure: "נוהל",
+  process: "תהליך",
   knowledge: "ידע",
   plan: "תוכנית",
   summary: "סיכום",
   guide: "מדריך",
-};
-
-export const REVIEW_LABELS: Record<ReviewKind, string> = {
-  uncertain: "לא ודאי",
-  process_review: "תהליך לסקירה",
-  lesson: "לקח מריצה",
-  assignment: "שיחה לשיוך",
-  signature: "חתימה לבדיקה",
-  no_next_date: "תהליך בלי מועד הבא",
-  source_confirm: "לאשר מול הלקוח",
-  covered_task: "משימה שתהליך מכסה",
+  check: "לבדיקה",
 };
 
 export type KindTone = "error" | "warning" | "accent" | "info" | "success" | "neutral";
 
-export const KIND_TONES: Record<ApprovalKind | "review", KindTone> = {
+export const KIND_TONES: Record<ApprovalKind, KindTone> = {
   task: "error",
   exception: "warning",
   rule: "accent",
   procedure: "info",
+  process: "warning",
   knowledge: "success",
   plan: "info",
   summary: "success",
   guide: "neutral",
-  review: "neutral",
+  check: "neutral",
 };
 
 /// What a row lets the person do in place. `note` means the reject needs a
@@ -82,7 +79,8 @@ export type RowActions = {
 export type ApprovalItem = {
   kind: ApprovalKind;
   /// The id the decision acts on: a task, an exception, a rule, a process,
-  /// a summary, a guide version. A knowledge row is a batch.
+  /// a summary, a guide version. A knowledge row is a batch. A process
+  /// decision is "<processId>:<step>".
   id: string;
   /// A procedure and a plan are decided by version.
   version?: number;
@@ -105,17 +103,17 @@ export type ApprovalItem = {
   /// What it says in full, to read before deciding: a procedure's steps
   /// and checks, a rule's whole text, a plan.
   preview?: ApprovalPreview | null;
-};
-
-export type ReviewItem = {
-  kind: ReviewKind;
-  id: string;
-  clientId: string | null;
-  clientName: string | null;
-  title: string;
-  detail?: string | null;
-  since: Date;
-  href: string;
+  /// 22.10.2026: what to do, and why, on every row.
+  recommend?: { text: string; why: string | null } | null;
+  /// A process decision carried out in one click (lib/next-steps.ts).
+  op?: StepOp | null;
+  /// A decision whose fix is somewhere else: the button leads there.
+  go?: { label: string; href: string } | null;
+  /// Stops work until decided: a procedure waiting, a scheduled process
+  /// without a date. First in "היום".
+  blocking?: boolean;
+  /// A date it is tied to: the task's due date, the process's next run.
+  deadline?: Date | null;
 };
 
 /// Oldest first: what has waited longest is what to do first.
@@ -127,23 +125,25 @@ export function forClient<T extends { clientId: string | null }>(rows: T[], clie
   return clientId ? rows.filter((r) => r.clientId === clientId) : rows;
 }
 
-/// How many each tab holds. "הכול" is every approval, not the things to
-/// check: those are not waiting on a decision. A knowledge batch counts
-/// as its proposals, the way the review screen always counted.
-export function tabCounts(items: ApprovalItem[], review: ReviewItem[], knowledgeTotal?: number): Record<ApprovalTab, number> {
+/// How many each tab holds. "הכול" is every decision, not the questions
+/// for the client: those are work, and are not waiting on a decision. A
+/// knowledge batch counts as its proposals, the way the review screen
+/// always counted.
+export function tabCounts(items: ApprovalItem[], questions: number, knowledgeTotal?: number): Record<ApprovalTab, number> {
   const out = Object.fromEntries(APPROVAL_TABS.map((t) => [t.key, 0])) as Record<ApprovalTab, number>;
   for (const i of items) out[i.kind] += i.weight ?? 1;
   if (knowledgeTotal !== undefined) out.knowledge = knowledgeTotal;
   out.all = (Object.keys(KIND_LABELS) as ApprovalKind[]).reduce((n, k) => n + out[k], 0);
-  out.review = review.length;
+  out.questions = questions;
   return out;
 }
 
 /// The tabs a person sees: "הכול" always, the rest only while they hold
-/// something, plus the one asked for. A person who approves no rules never
+/// something, plus the one asked for. "שאלות ללקוח" always, since a
+/// manager reaches everyone's questions from there. A person who approves no rules never
 /// sees a "כללים" tab with a zero in it.
 export function visibleTabs(counts: Record<ApprovalTab, number>, active: ApprovalTab): { key: ApprovalTab; label: string; count: number }[] {
-  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === active || counts[t.key] > 0).map((t) => ({ ...t, count: counts[t.key] }));
+  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === "questions" || t.key === active || counts[t.key] > 0).map((t) => ({ ...t, count: counts[t.key] }));
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -156,7 +156,9 @@ function one(v: string | string[] | undefined): string | null {
 /// `clientId`, the name the review screen always used, and `client` as an
 /// alias, so a hand-typed link works too.
 export function parseApprovalsParams(params: Params): { tab: ApprovalTab; clientId: string | null } {
-  const tab = one(params.tab);
+  // "review" was the tab of the items not yet confirmed, until 22.10.2026.
+  const asked = one(params.tab);
+  const tab = asked === "review" ? "questions" : asked;
   return {
     tab: APPROVAL_TABS.some((t) => t.key === tab) ? (tab as ApprovalTab) : "all",
     clientId: one(params.clientId) ?? one(params.client),
@@ -243,4 +245,18 @@ export function approvalsBack(value: string | string[] | null | undefined): { hr
 /// The parameter to keep on a link inside the page (a tab change), or "".
 export function approvalsBackParam(value: string | string[] | null | undefined): string {
   return approvalsBack(value)?.param ?? "";
+}
+
+/// 22.10.2026: the rules of one client that can be approved together, two
+/// or more of them, each one confirmed with the client. A rule still to
+/// confirm is never in it.
+export function bulkRuleGroups(items: ApprovalItem[]): { clientId: string; clientName: string; ids: string[] }[] {
+  const by = new Map<string, { clientId: string; clientName: string; ids: string[] }>();
+  for (const i of items) {
+    if (i.kind !== "rule" || !i.actions.approve || !i.clientId) continue;
+    const g = by.get(i.clientId) ?? { clientId: i.clientId, clientName: i.clientName ?? "", ids: [] };
+    g.ids.push(i.id);
+    by.set(i.clientId, g);
+  }
+  return [...by.values()].filter((g) => g.ids.length >= 2).sort((a, b) => b.ids.length - a.ids.length || a.clientName.localeCompare(b.clientName, "he"));
 }

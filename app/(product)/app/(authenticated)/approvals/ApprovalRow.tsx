@@ -3,6 +3,7 @@ import { useState, useTransition } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { ApprovalKind, KindTone, RowActions } from "@/lib/approvals";
 import type { ApprovalPreview } from "@/lib/approvals-preview";
+import type { StepOp } from "@/lib/next-steps";
 import { decideApprovalAction } from "./actions";
 
 // One row of "אישורים": what it is, for whom, how long it has waited,
@@ -40,6 +41,9 @@ export type RowView = {
   label: string;
   tone: KindTone;
   showLabel: boolean;
+  recommend?: { text: string; why: string | null } | null;
+  op?: StepOp | null;
+  go?: { label: string; href: string } | null;
 };
 
 export function ApprovalRow({ row }: { row: RowView }) {
@@ -52,14 +56,15 @@ export function ApprovalRow({ row }: { row: RowView }) {
 
   const decide = (decision: "approve" | "reject") =>
     start(async () => {
-      const r = await decideApprovalAction({ kind: row.kind, id: row.id, version: row.version, decision, note, clientId: row.clientId });
+      const r = await decideApprovalAction({ kind: row.kind, id: row.kind === "process" ? row.id.split(":")[0] : row.id, version: row.version, decision, note, clientId: row.clientId, op: row.op ?? null });
       if (r.error) {
         showToast({ tone: "error", title: decision === "approve" ? "האישור נכשל" : "הפעולה נכשלה", description: r.error });
         return;
       }
       setRejecting(false);
-      setDone(decision === "approve" ? "אושר" : row.actions.reject?.label ?? "נדחה");
-      showToast({ tone: decision === "approve" ? "success" : "info", title: decision === "approve" ? "אושר" : "בוצע", description: row.title.slice(0, 80) });
+      const did = row.kind === "process" ? "בוצע" : "אושר";
+      setDone(decision === "approve" ? did : row.actions.reject?.label ?? "נדחה");
+      showToast({ tone: decision === "approve" ? "success" : "info", title: decision === "approve" ? did : "בוצע", description: row.title.slice(0, 80) });
     });
 
   const reject = row.actions.reject;
@@ -74,6 +79,12 @@ export function ApprovalRow({ row }: { row: RowView }) {
           </a>
         </div>
         {row.detail && <p className="mt-1 text-[12.5px] leading-relaxed text-app-text-secondary">{row.detail}</p>}
+        {row.recommend && (
+          <p className="mt-1 text-[12.5px] leading-relaxed text-app-text-primary" data-testid="approval-recommend">
+            <span className="font-medium">מומלץ: {row.recommend.text}.</span>
+            {row.recommend.why && <span className="text-app-text-secondary"> {row.recommend.why}</span>}
+          </p>
+        )}
         {row.blocked && (
           <p className="mt-1 text-[12.5px] text-app-warning">
             {row.blocked}
@@ -149,9 +160,19 @@ export function ApprovalRow({ row }: { row: RowView }) {
                 {reject.label}
               </button>
             )}
-            {!row.actions.approve && !reject && (
+            {!row.actions.approve && row.go && (
+              <a href={row.go.href} className="rounded-full bg-app-surface-nav px-3.5 py-1.5 font-medium text-cream" data-testid="approval-go">
+                {row.go.label}
+              </a>
+            )}
+            {!row.actions.approve && !row.go && !reject && (
               <a href={row.href} className="font-medium text-app-text-accent hover:underline">
-                לבדיקה
+                לפתוח
+              </a>
+            )}
+            {!reject && (row.actions.approve || row.go) && (
+              <a href={row.href} className="text-app-text-secondary hover:text-app-text-primary hover:underline">
+                אחרת
               </a>
             )}
           </>

@@ -521,6 +521,9 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         nextDate,
         completeness: completeness(input),
         gaps: processGaps(input, (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה"),
+        /// 22.10.2026: the systems it needs and cannot use, by id and name,
+        /// for the step that asks for access.
+        noAccess: input.systemsWithoutAccess.map((id) => ({ id, name: systemById.get(id)?.systemName ?? "מערכת שהוסרה" })),
       };
     });
 }

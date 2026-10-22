@@ -4,7 +4,10 @@ import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { requestException } from "@/lib/app-domain/policy-exceptions";
-import { collectApprovals, collectReview, countApprovals, countApprovalsForClient } from "@/lib/app-domain/approvals";
+import { collectApprovals, countApprovals, countApprovalsForClient } from "@/lib/app-domain/approvals";
+import { collectQuestionCards, createQuestionsTask, markQuestionsAsked } from "@/lib/app-domain/client-questions";
+import { approveRulesTogether, runStep } from "@/lib/app-domain/process-next-steps";
+import { addClientFact } from "@/lib/app-domain/client-facts";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { updateTask } from "@/lib/app-domain/tasks";
 import type { User } from "@prisma/client";
@@ -60,8 +63,10 @@ describe("approvals", () => {
 
     // A manager: rules, the procedure and the summary. Not the task (not
     // the supervisor) and not the exception (the client named Hadas).
-    const forAriel = await mine(ariel, client.id);
+    const forAriel = (await mine(ariel, client.id)).filter((i) => i.kind !== "process");
     expect(forAriel.map((i) => i.kind).sort()).toEqual(["procedure", "rule", "rule", "summary"]);
+    // Every row says what to do.
+    expect(forAriel.every((i) => !!i.recommend?.text)).toBe(true);
     const rules = forAriel.filter((i) => i.kind === "rule");
     expect(rules.find((r) => r.id === proposed.id)?.actions.approve).toBe("אישור הכלל");
     // Not confirmed: no approve button, and what would confirm it.
@@ -70,7 +75,9 @@ describe("approvals", () => {
     expect(blocked?.blocked).toContain("לשאול את אורן");
     expect(forAriel.find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, version: 1, href: `/app/clients/${client.id}?tab=file#item-${process.id}` });
 
-    expect(await countApprovalsForClient(ariel, client.id)).toBe(4);
+    // And P1's missing backup, as a decision of its own.
+    expect((await mine(ariel, client.id)).filter((i) => i.kind === "process").map((i) => i.id)).toEqual([`${process.id}:backup`]);
+    expect(await countApprovalsForClient(ariel, client.id)).toBe(5);
     expect(await countApprovals(hadas)).toBeGreaterThanOrEqual(2);
   });
 
@@ -82,16 +89,72 @@ describe("approvals", () => {
     expect((await mine(hadas, client.id)).some((i) => i.kind === "exception")).toBe(false);
   });
 
-  it("lists what is not yet confirmed: all of it for a manager, their own for anyone else", async () => {
+  it("puts what is not yet confirmed on its owner's card, as questions to the client", async () => {
     const { client, ariel, anna, hadas, unsure } = await setup();
-    const forAriel = (await collectReview(ariel)).filter((r) => r.clientId === client.id);
-    expect(forAriel.find((r) => r.id === unsure.id)).toMatchObject({ kind: "uncertain", href: `/app/clients/${client.id}?tab=file#item-${unsure.id}` });
-    expect(forAriel.find((r) => r.id === unsure.id)?.detail).toContain("לשאול את אורן");
+    // No owner and no account manager: on nobody's own card, only in everyone's.
+    expect((await collectQuestionCards(ariel)).filter((c) => c.clientId === client.id)).toEqual([]);
+    const all = (await collectQuestionCards(ariel, { scope: "all" })).filter((c) => c.clientId === client.id);
+    expect(all.flatMap((c) => c.items.map((i) => i.id))).toContain(unsure.id);
+    // Not a manager: never everyone's.
+    expect((await collectQuestionCards(hadas, { scope: "all" })).filter((c) => c.clientId === client.id)).toEqual([]);
 
-    expect((await collectReview(hadas)).filter((r) => r.clientId === client.id)).toEqual([]);
     await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
-    expect((await collectReview(hadas)).map((r) => r.id)).toContain(unsure.id);
-    expect((await collectReview(anna)).map((r) => r.id)).not.toContain(unsure.id);
+    const [card] = (await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id);
+    expect(card).toMatchObject({ ownerId: hadas.id, clientName: "NUX" });
+    expect(card.items.find((i) => i.id === unsure.id)).toMatchObject({ what: "כלל", toResolve: "לשאול את אורן", href: `/app/clients/${client.id}?tab=file#item-${unsure.id}`, askedAt: null });
+    expect((await collectQuestionCards(anna)).filter((c) => c.clientId === client.id)).toEqual([]);
+
+    // An open question goes on the card of whoever chases it.
+    const q = await addClientFact(anna, { clientId: client.id, kind: "QUESTION", body: "מי מורשה החתימה בבנק", assigneeId: hadas.id, sources: [{ code: "S1" }] });
+    const again = (await collectQuestionCards(hadas)).find((c) => c.clientId === client.id)!;
+    expect(again.items.map((i) => i.id)).toEqual(expect.arrayContaining([unsure.id, q.id]));
+    expect(again.items.find((i) => i.id === q.id)?.isQuestion).toBe(true);
+  });
+
+  it("marks questions asked, by a copy or by a task to send them, and refuses items of another client", async () => {
+    const { client, hadas, unsure } = await setup();
+    await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
+    const other = await createTestClient({ name: "RIMED" });
+    await expect(markQuestionsAsked(hadas, other.id, [unsure.id])).rejects.toThrow();
+
+    expect(await markQuestionsAsked(hadas, client.id, [unsure.id])).toBe(1);
+    const card = (await collectQuestionCards(hadas)).find((c) => c.clientId === client.id)!;
+    expect(card.items.find((i) => i.id === unsure.id)?.askedAt).toBeInstanceOf(Date);
+
+    const { taskId } = await createQuestionsTask(hadas, client.id, [unsure.id], "היי אורן,\n1. מתנות?", "Oren Rubin");
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(task).toMatchObject({ clientId: client.id, assignedToId: hadas.id, title: "לשלוח ל-Oren שאלה אחת לתיק" });
+    expect(task.description).toContain("1. מתנות?");
+    const events = await prisma.auditEvent.findMany({ where: { action: "client_file.questions_asked", clientId: client.id } });
+    expect(events).toHaveLength(2);
+    expect(events.some((e) => (e.afterJson as { taskId?: string }).taskId === taskId)).toBe(true);
+  });
+
+  it("recommends a backup who already works on the client, and sets it in one click", async () => {
+    const { client, hadas, anna, ariel, process } = await setup();
+    await prisma.process.update({ where: { id: process.id }, data: { ownerId: anna.id } });
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: hadas.id } });
+    const row = (await mine(ariel, client.id)).find((i) => i.id === `${process.id}:backup`);
+    expect(row?.recommend?.text).toBe(`לקבוע את ${hadas.name}`);
+    expect(row?.op).toEqual({ type: "set_backup", processId: process.id, userId: hadas.id });
+    // The owner sees the decision too, and may carry it out.
+    expect((await mine(anna, client.id)).some((i) => i.id === `${process.id}:backup`)).toBe(true);
+    expect(await runStep(anna, row!.op!)).toContain("נקבע כמחליף");
+    expect((await prisma.process.findUniqueOrThrow({ where: { id: process.id } })).backupOwnerId).toBe(hadas.id);
+    expect((await mine(ariel, client.id)).some((i) => i.id === `${process.id}:backup`)).toBe(false);
+  });
+
+  it("approves the confirmed rules of a client together, each one checked on its own", async () => {
+    const { client, anna, ariel, unsure, proposed } = await setup();
+    const second = await addClientPolicy(anna, { clientId: client.id, kind: "SEPARATION", title: "חשבונית", statement: "על שם החברה הנכונה", sources: [{ code: "S1" }] });
+    await expect(approveRulesTogether(anna, client.id, [proposed.id, second.id])).rejects.toThrow("רק מנהל");
+    const r = await approveRulesTogether(ariel, client.id, [proposed.id, second.id, unsure.id]);
+    expect(r.approved).toBe(2);
+    // The unconfirmed one is refused on its own, and stops nothing else.
+    expect(r.failed).toHaveLength(1);
+    expect((await prisma.clientPolicy.findUniqueOrThrow({ where: { id: proposed.id } })).status).toBe("ACTIVE");
+    expect((await prisma.clientPolicy.findUniqueOrThrow({ where: { id: unsure.id } })).status).toBe("PROPOSED");
+    expect(await prisma.auditEvent.count({ where: { action: "client_policy.approve_together", clientId: client.id } })).toBe(1);
   });
 
   it("dates a signature from the moment the task was handed over, not from its last edit", async () => {
@@ -110,7 +173,7 @@ describe("approvals", () => {
     const { client } = await setup();
     const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
     expect(await mine(stranger, client.id)).toEqual([]);
-    expect((await collectReview(stranger)).filter((r) => r.clientId === client.id)).toEqual([]);
+    expect((await collectQuestionCards(stranger)).filter((c) => c.clientId === client.id)).toEqual([]);
   });
 
   // 22.10.2026: a procedure is read on its row, and the row says what

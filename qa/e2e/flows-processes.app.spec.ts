@@ -92,7 +92,9 @@ test.describe("clients/process-actions", () => {
     await start.locator('input[name="day"]').fill(today);
     await submit(page, "פתיחת הריצה");
     await expect(card()).toContainText("ריצות:", { timeout: 15_000 });
-    await card().getByRole("link").first().click();
+    // 22.10.2026: the runs are under "פרטים", closed once nothing waits.
+    await card().getByTestId("process-details").locator("summary").click();
+    await card().getByTestId("process-details").getByRole("link").first().click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText(title).first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText("מעבירים תשלום לספק").first()).toBeVisible();
@@ -114,8 +116,9 @@ test.describe("clients/process-actions", () => {
 
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
-    // A draft does not run anyway: nothing to say yet.
-    await expect(card().getByTestId("process-no-next-date")).toHaveCount(0);
+    // A draft does not run anyway: its dates are asked for, but no run is
+    // said to be stopped yet.
+    await expect(card().getByTestId("process-next-step")).not.toContainText("לא תיפתח ריצה");
 
     await card().getByRole("button", { name: "כתיבת נוהל" }).click();
     const editor = page.getByRole("dialog");
@@ -127,7 +130,9 @@ test.describe("clients/process-actions", () => {
     await approved;
     await page.reload();
 
-    await expect(card().getByTestId("process-no-next-date")).toContainText("לא תיפתח ריצה", { timeout: 15_000 });
+    // 22.10.2026: it is the step that stops work, so it is "הצעד הבא".
+    await expect(card().getByTestId("process-next-step")).toHaveAttribute("data-step", "no_next_date", { timeout: 15_000 });
+    await expect(card().getByTestId("process-next-step")).toContainText("לא תיפתח ריצה");
     await expect(page.getByText(/לפי מועד בלי מועד הבא/).first()).toBeVisible();
   });
 
@@ -171,7 +176,8 @@ test.describe("clients/process-actions", () => {
 
     await page.goto(`/app/clients/${CLIENT}?tab=file`);
     await expect(card()).toContainText("נמצאה בעיה. חשבונית של Notion לא הגיעה", { timeout: 15_000 });
-    await card().getByRole("link", { name: "המשימה" }).click();
+    await card().getByTestId("process-details").locator("summary").click();
+    await card().getByTestId("process-details").getByRole("link", { name: "המשימה" }).click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText("חשבונית של Notion לא הגיעה").first()).toBeVisible({ timeout: 15_000 });
   });

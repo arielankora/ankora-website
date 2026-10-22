@@ -9,7 +9,10 @@ import { approveProcessVersion } from "@/lib/app-domain/processes";
 import { approveTaskPlan } from "@/lib/app-domain/task-plans";
 import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/portal-summary";
 import { approveGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
+import { approveRulesTogether, runStep } from "@/lib/app-domain/process-next-steps";
+import { createQuestionsTask, markQuestionsAsked } from "@/lib/app-domain/client-questions";
 import type { ApprovalKind } from "@/lib/approvals";
+import type { StepOp } from "@/lib/next-steps";
 
 // The buttons on "אישורים" (lib/approvals.ts). Nothing here decides on
 // its own: every decision goes through the same domain function the
@@ -24,6 +27,8 @@ export type DecideInput = {
   decision: "approve" | "reject";
   note?: string;
   clientId?: string | null;
+  /// A process decision: the step to carry out (lib/next-steps.ts).
+  op?: StepOp | null;
 };
 
 function friendlyError(err: unknown): string {
@@ -65,6 +70,12 @@ export async function decideApprovalAction(input: DecideInput): Promise<{ error?
         if (approve) await approveGuide(user, input.id);
         else await rejectGuide(user, input.id, note);
         break;
+      case "process":
+        if (!approve || !input.op) throw new Error("אין כאן פעולה לבצע. פותחים את התהליך.");
+        await runStep(user, input.op);
+        break;
+      case "check":
+        throw new Error("את החתימה בודקים עם Claude, בדף של איש הצוות.");
       case "knowledge":
         throw new Error("הצעות לתיק מאשרים אחת אחת, בלשונית ידע מהחילוץ.");
     }
@@ -75,4 +86,42 @@ export async function decideApprovalAction(input: DecideInput): Promise<{ error?
   revalidatePath("/app", "layout");
   if (input.clientId) revalidatePath(`/app/clients/${input.clientId}`);
   return { ok: true };
+}
+
+/// "לאשר את כל הכללים של NUX": each one through approveClientPolicy.
+export async function approveRulesTogetherAction(clientId: string, ids: string[]): Promise<{ error?: string; approved?: number; failed?: string[] }> {
+  const user = await requireUser();
+  try {
+    const r = await approveRulesTogether(user, clientId, ids);
+    revalidatePath("/app", "layout");
+    revalidatePath(`/app/clients/${clientId}`);
+    return r;
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+}
+
+/// The questions went to the client, by a message the person sent.
+export async function markQuestionsAskedAction(clientId: string, itemIds: string[]): Promise<{ error?: string; ok?: boolean }> {
+  const user = await requireUser();
+  try {
+    await markQuestionsAsked(user, clientId, itemIds);
+    revalidatePath("/app/approvals");
+    return { ok: true };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+}
+
+/// A task to send the message, with the message in it.
+export async function createQuestionsTaskAction(clientId: string, itemIds: string[], draft: string, contactName: string | null): Promise<{ error?: string; taskId?: string }> {
+  const user = await requireUser();
+  try {
+    const r = await createQuestionsTask(user, clientId, itemIds, draft, contactName);
+    revalidatePath("/app/approvals");
+    revalidatePath("/app/tasks");
+    return r;
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }

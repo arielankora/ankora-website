@@ -1931,6 +1931,22 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-21",
       "riskReason": "משנה בבת אחת את הוודאות של פריטים בתיק ואת משקל המקור. רק מנהל, עם שורת הסבר ורישום ביומן."
+    },
+    "domain:client-questions": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-22",
+      "riskReason": "מנסח הודעה ללקוח מפריטים בתיק ופותח משימה. לא שולח כלום בעצמו, ומשאיר בחוץ פריטים רגישים ופריטים עם \"לא לספר\"."
+    },
+    "domain:process-next-steps": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-22",
+      "riskReason": "פעולה בלחיצה אחת על תהליך: קביעת מחליף, קישור מועד שפותח ריצות, סגירת משימות ואישור כמה כללים יחד. כל פעולה עוברת דרך הפונקציה של המסך המקורי, עם אותן הרשאות ורישום ביומן."
     }
   },
   "waivers": {},

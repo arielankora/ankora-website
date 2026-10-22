@@ -53,7 +53,7 @@ async function lowered(clientIds: string[]): Promise<{ table: Table; row: Row }[
 export type LoweredSource = { clientId: string; code: string; title: string; count: number };
 
 /// Per client and source: how many items are uncertain only because the
-/// source is Ankora's. For the sources panel and "לבדיקה".
+/// source is Ankora's. For the sources panel and "שאלות ללקוח".
 export async function loweredBySource(clientIds: string[]): Promise<LoweredSource[]> {
   const rows = await lowered(clientIds);
   const counts = new Map<string, number>();

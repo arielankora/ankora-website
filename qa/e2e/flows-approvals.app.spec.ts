@@ -82,12 +82,75 @@ test.describe("approvals", () => {
     await expect(page.locator("li", { hasText: "[DEMO] הצעה" }).first()).toBeVisible();
   });
 
-  test("the things to check have a tab of their own, without approve buttons", async ({ page }) => {
+  // 22.10.2026: decisions only, each with a recommendation; what is not
+  // yet confirmed is questions for the client, on its owner's card.
+  test("all opens on today's few, each row with what is recommended and a button", async ({ page }) => {
+    await page.goto("/app/approvals");
+    const today = page.getByTestId("approvals-today");
+    await expect(today).toBeVisible({ timeout: 30_000 });
+    const rows = today.getByTestId("approval-row");
+    expect(await rows.count()).toBeLessThanOrEqual(5);
+    await expect(rows.first().getByTestId("approval-recommend")).toContainText("מומלץ:");
+    // Every row has one thing to press: the decision, or where it is made.
+    const first = rows.first();
+    await expect(first.getByRole("button").or(first.getByTestId("approval-go")).first()).toBeVisible();
+  });
+
+  test("the old address of the things to check opens the questions for the client", async ({ page }) => {
     await page.goto("/app/approvals?tab=review");
-    await expect(page.getByRole("navigation", { name: "סוגי אישורים" }).getByRole("link", { name: /^לבדיקה/ })).toHaveAttribute("aria-current", "page");
-    const list = page.getByTestId("review-list");
-    if ((await list.count()) > 0) await expect(list.getByRole("button")).toHaveCount(0);
-    else await expect(page.getByText("אין כרגע פריטים לבדיקה.")).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "סוגי אישורים" }).getByRole("link", { name: /^שאלות ללקוח/ })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByTestId("questions")).toBeVisible();
+    // A manager may look at everyone's cards.
+    await expect(page.getByTestId("questions-scope")).toBeVisible();
+  });
+
+  test("an item not yet confirmed becomes a question on the client's card, with a message drafted", async ({ page }) => {
+    const title = tag("[E2E] סוג פנייה לשאלה");
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    await page.getByRole("button", { name: "+ סוג פנייה", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('textarea[name="handling"]').fill("עונים במייל");
+    await dialog.locator('select[name="knowledgeStatus"]').selectOption("MISSING");
+    await dialog.locator('input[name="toResolve"]').fill("לברר עם המנכ״ל מי עונה");
+    await submit(page, "הוספה לתיק");
+
+    await page.goto(`/app/approvals?tab=questions&clientId=${CLIENT}&scope=all`);
+    const card = page.getByTestId("question-card").filter({ hasText: title }).first();
+    await expect(card, "the item is not on a card").toBeVisible({ timeout: 30_000 });
+    await expect(card.getByTestId("question-item").filter({ hasText: title })).toContainText("לברר עם המנכ״ל מי עונה");
+    await card.getByTestId("question-draft-toggle").click();
+    const draft = card.getByTestId("question-draft").locator("textarea");
+    await expect(draft).toBeVisible();
+    await expect(draft).toHaveValue(/^היי/);
+    await expect(draft).toHaveValue(new RegExp("לברר עם המנכ״ל מי עונה"));
+
+    // Clean up: the request type goes, and its question with it.
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const row = page.locator("li", { hasText: title }).first();
+    const removed = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await row.getByRole("button", { name: "הסרה" }).click();
+    await removed;
+  });
+
+  test("a process card says its next step, with the details closed once nothing waits on its draft", async ({ page }) => {
+    const step = tag("אוספים טופס");
+    const title = await draftProcedure(page, step);
+    const card = page.locator('[data-testid="process-card"]', { hasText: title }).first();
+    // A draft waits: approving it is the next step, and the details are open.
+    await expect(card.getByTestId("process-next-step")).toHaveAttribute("data-step", "procedure_draft");
+    await expect(card.getByTestId("process-details")).toHaveAttribute("open", "");
+    const approved = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await card.getByTestId("process-next-step").getByRole("button", { name: "אישור הנוהל" }).click();
+    await approved;
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const after = page.locator('[data-testid="process-card"]', { hasText: title }).first();
+    await expect(after.getByTestId("process-next-step")).not.toHaveAttribute("data-step", "procedure_draft", { timeout: 15_000 });
+    await expect(after.getByTestId("process-details")).not.toHaveAttribute("open", "");
+    // The procedure is under "פרטים".
+    await after.getByTestId("process-details").locator("summary").click();
+    await expect(after.getByTestId("process-details")).toContainText(step);
   });
 
   test("the client's page leads to its approvals", async ({ page }) => {
