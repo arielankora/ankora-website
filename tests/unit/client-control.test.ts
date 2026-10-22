@@ -10,7 +10,6 @@ const base: ControlData = {
   avgCompleteness: null,
   needsReview: 0,
   scheduledNoDate: 0,
-  noBackup: 0,
   exceptionsInForce: 0,
   exceptionsRequested: 0,
   uncertain: 0,
@@ -43,7 +42,6 @@ describe("controlParts", () => {
       inHandover: 9,
       avgCompleteness: 6,
       needsReview: 3,
-      noBackup: 4,
       exceptionsInForce: 2,
       exceptionsRequested: 1,
       uncertain: 9,
@@ -52,12 +50,11 @@ describe("controlParts", () => {
       daysSinceBatch: 0,
     });
     expect(parts.map((p) => p.text).join(" · ")).toBe(
-      "18 תהליכים, 5 אצלנו ו-9 בחפיפה · שלמות ממוצעת 6 מתוך 9 · 3 תהליכים דורשים סקירה · 4 תהליכים בלי מחליף · 2 חריגות בתוקף · בקשת חריגה אחת ממתינה · 9 פריטים לא ודאיים · 18 שאלות פתוחות · 6 מערכות בלי גישה · אצווה אחרונה: היום"
+      "18 תהליכים, 5 אצלנו ו-9 בחפיפה · שלמות ממוצעת 6 מתוך 9 · 3 תהליכים דורשים סקירה · 2 חריגות בתוקף · בקשת חריגה אחת ממתינה · 9 פריטים לא ודאיים · 18 שאלות פתוחות · 6 מערכות בלי גישה · אצווה אחרונה: היום"
     );
     expect(parts.filter((p) => p.warn).map((p) => p.text)).toEqual([
       "שלמות ממוצעת 6 מתוך 9",
       "3 תהליכים דורשים סקירה",
-      "4 תהליכים בלי מחליף",
       "בקשת חריגה אחת ממתינה",
       "6 מערכות בלי גישה",
     ]);
@@ -87,7 +84,7 @@ describe("controlFrom", () => {
       systems: [{ accessStatus: "HAS_ACCESS" }, { accessStatus: "PENDING" }, { accessStatus: "NOT_NEEDED" }],
       daysSinceBatch: 1,
     });
-    expect(d).toMatchObject({ processes: 2, withAnkora: 1, inHandover: 1, avgCompleteness: 7.5, needsReview: 1, noBackup: 1, exceptionsInForce: 1, exceptionsRequested: 1, uncertain: 2, openQuestions: 1, systemsWithoutAccess: 1 });
+    expect(d).toMatchObject({ processes: 2, withAnkora: 1, inHandover: 1, avgCompleteness: 7.5, needsReview: 1, exceptionsInForce: 1, exceptionsRequested: 1, uncertain: 2, openQuestions: 1, systemsWithoutAccess: 1 });
   });
 });
 
@@ -140,7 +137,7 @@ describe("what is behind each count (spec 7.6)", () => {
     expect(d.processes).toEqual(["P1 תשלומי ספקים", "P2 דוח רבעוני"]);
     expect(d.completeness).toEqual(["P2 דוח רבעוני"]);
     expect(d.needsReview).toEqual(["P2 דוח רבעוני"]);
-    expect(d.noBackup).toEqual(["P2 דוח רבעוני"]);
+    expect(d.noBackup).toBeUndefined();
     expect(d.exceptionsRequested).toEqual(["סף: תשלום בלי אישור"]);
     expect(d.uncertain).toEqual(["מגבלת Justworks"]);
     expect(d.openQuestions).toEqual(["מי מורשה החתימה?"]);

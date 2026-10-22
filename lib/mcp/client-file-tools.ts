@@ -320,7 +320,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "List a client's processes",
       description:
-        "The client's processes (P1, P2...), one line each: what it is for, its triggers, owner and backup, where it stands in the handover, how complete its documentation is (out of the 9 fields), whether it needs review and why, the approved procedure's version, the next date and the last run. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
+        "The client's processes (P1, P2...), one line each: what it is for, its triggers, owner (and backup, only when one is set), where it stands in the handover, how complete its documentation is (out of the 9 fields), whether it needs review and why, the approved procedure's version, the next date and the last run. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
       inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
       annotations: TOOL_ANNOTATIONS.list_processes,
     },

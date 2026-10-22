@@ -10,7 +10,10 @@
 // Here every gap becomes a step: one line that says what waits, a
 // recommendation with a short why, and the action that carries it out.
 // The order is what stops work first: a scheduled process with no date
-// opens no run, so it comes before a missing backup. Pure: the rules and
+// opens no run, so it comes first. 22.10.2026: the backup is no longer a
+// step (Ariel: with two operators it said the same thing on every card;
+// what lets someone else step in is an approved procedure and access).
+// Pure: the rules and
 // the order are read here; lib/app-domain/process-next-steps.ts reads the
 // data, and the screens only show.
 
@@ -18,7 +21,6 @@ import { taskCoveredBy, contentWords, sameForm } from "@/lib/process-task-overla
 
 /// An action the server carries out in one click.
 export type StepOp =
-  | { type: "set_backup"; processId: string; userId: string }
   | { type: "link_date"; processId: string; dateId: string }
   | { type: "close_covered"; processId: string; taskIds: string[] }
   | { type: "approve_procedure"; processId: string; version: number }
@@ -28,7 +30,7 @@ export type StepOp =
 /// on its card, or the item on the client's page.
 export type StepFix = { kind: "op"; op: StepOp; label: string } | { kind: "edit" | "procedure" | "dates" | "open"; label: string };
 
-export type NextStepKind = "no_next_date" | "procedure_draft" | "review" | "covered_tasks" | "backup" | "lessons" | "missing_fields" | "no_access" | "uncertain";
+export type NextStepKind = "no_next_date" | "procedure_draft" | "review" | "covered_tasks" | "lessons" | "missing_fields" | "no_access" | "uncertain";
 
 export type NextStep = {
   kind: NextStepKind;
@@ -42,7 +44,6 @@ export type NextStep = {
   blocking: boolean;
 };
 
-export type BackupCandidate = { id: string; name: string; why: string };
 export type DateCandidate = { id: string; title: string };
 
 export type ProcessFacts = {
@@ -53,7 +54,6 @@ export type ProcessFacts = {
   status: "DRAFT" | "ACTIVE" | "PAUSED" | "RETIRED";
   triggerKinds: string[];
   ownerId: string | null;
-  backupOwnerId: string | null;
   hasNextDate: boolean;
   /// The newest version, when it is a draft: whether it passes its checks.
   draft: { version: number; blocked: boolean } | null;
@@ -67,11 +67,10 @@ export type ProcessFacts = {
   review: { label: string; periodic: boolean } | null;
   openLessons: number;
   knowledge: { uncertain: boolean; toResolve: string | null };
-  backupCandidate: BackupCandidate | null;
   dateCandidate: DateCandidate | null;
 };
 
-const ORDER: NextStepKind[] = ["no_next_date", "procedure_draft", "review", "covered_tasks", "backup", "lessons", "uncertain", "missing_fields", "no_access"];
+const ORDER: NextStepKind[] = ["no_next_date", "procedure_draft", "review", "covered_tasks", "lessons", "uncertain", "missing_fields", "no_access"];
 
 function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many.replace("{n}", String(n));
@@ -142,17 +141,6 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
     });
   }
 
-  if (!p.backupOwnerId && p.status !== "RETIRED") {
-    out.push({
-      kind: "backup",
-      title: "אין מחליף: הידע אצל אדם אחד",
-      recommend: p.backupCandidate ? `לקבוע את ${p.backupCandidate.name}` : "לבחור מחליף",
-      why: p.backupCandidate ? p.backupCandidate.why : "אין עוד מישהו מהצוות שעובד על הלקוח.",
-      fix: p.backupCandidate ? { kind: "op", op: { type: "set_backup", processId: p.id, userId: p.backupCandidate.id }, label: "לקבוע" } : { kind: "edit", label: "לבחור" },
-      blocking: false,
-    });
-  }
-
   if (p.openLessons > 0) {
     out.push({
       kind: "lessons",
@@ -180,7 +168,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
       kind: "missing_fields",
       title: `חסר: ${p.missing.join(", ")}`,
       recommend: "להשלים בתהליך",
-      why: "כך מי שמחליף יודע לעשות את זה בלי לשאול.",
+      why: "כך כל מי שנכנס לתהליך יודע לעשות אותו בלי לשאול.",
       fix: { kind: "edit", label: "להשלים" },
       blocking: false,
     });
@@ -204,74 +192,6 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
 // ---------------------------------------------------------------------------
 // The recommendations
 // ---------------------------------------------------------------------------
-
-/// What tells us a person already works on the client.
-export type StaffSignal = {
-  id: string;
-  name: string;
-  accountManager: boolean;
-  /// Open tasks on the client assigned to them.
-  openTasks: number;
-  /// Processes of the client they own or back up.
-  processes: string[];
-  /// Processes of the client they back up, a subset of `processes`.
-  backs?: string[];
-  /// Runs work, rather than only managing it: not a manager, or a manager
-  /// who owns or backs up a process somewhere (22.10.2026). Missing reads
-  /// as an operator, as before.
-  operator?: boolean;
-};
-
-/// Someone on the team who could take a process with no one else on the
-/// client: an operator, by name.
-export type PoolMember = { id: string; name: string };
-
-/// What a person has to do with the client, as nouns, so the line reads
-/// the same for anyone (22.10.2026: no "יש לו").
-function footprint(s: StaffSignal): string[] {
-  const out: string[] = [];
-  if (s.accountManager) out.push("ניהול התיק");
-  const owns = s.processes.filter((c) => !(s.backs ?? []).includes(c));
-  if (owns.length) out.push(`בעלות על ${owns.slice(0, 3).join(", ")}`);
-  if ((s.backs ?? []).length) out.push(`גיבוי של ${(s.backs ?? []).slice(0, 3).join(", ")}`);
-  if (s.openTasks) out.push(s.openTasks === 1 ? "משימה פתוחה אחת" : `${s.openTasks} משימות פתוחות`);
-  return out;
-}
-
-const score = (s: StaffSignal) => (s.accountManager ? 3 : 0) + Math.min(s.processes.length, 3) * 2 + Math.min(s.openTasks, 3);
-
-/// The backup to recommend (22.10.2026, after Ariel saw himself suggested
-/// everywhere): someone who runs the work, never only the manager.
-///   1. Already the backup of other processes of the same client.
-///   2. An operator who works on the client: account manager, processes,
-///      open tasks.
-///   3. Any other operator on the team, when nobody else is on the client.
-///   4. A manager who works on the client, only when there is no operator.
-/// The owner is never their own backup. Null when there is nobody at all.
-export function recommendBackup(ownerId: string | null, staff: StaffSignal[], pool: PoolMember[] = []): BackupCandidate | null {
-  const others = staff.filter((s) => s.id !== ownerId);
-  const operators = others.filter((s) => s.operator !== false);
-  const byScore = (rows: StaffSignal[]) =>
-    rows
-      .map((s) => ({ s, score: score(s) }))
-      .filter((x) => x.score > 0)
-      .sort((a, b) => b.score - a.score || a.s.name.localeCompare(b.s.name, "he"))
-      .map((x) => x.s);
-
-  const backing = operators.filter((s) => (s.backs ?? []).length > 0).sort((a, b) => (b.backs ?? []).length - (a.backs ?? []).length || a.name.localeCompare(b.name, "he"));
-  if (backing[0]) {
-    const s = backing[0];
-    return { id: s.id, name: s.name, why: `${footprint(s).join(", ")} אצל אותו לקוח, ולכן הלקוח כבר מוכר.` };
-  }
-  const working = byScore(operators)[0];
-  if (working) return { id: working.id, name: working.name, why: `${footprint(working).join(", ")} אצל הלקוח, ולכן הלקוח כבר מוכר.` };
-  const onClient = new Set(staff.map((s) => s.id));
-  const free = pool.filter((m) => m.id !== ownerId && !onClient.has(m.id)).sort((a, b) => a.name.localeCompare(b.name, "he"))[0];
-  if (free) return { id: free.id, name: free.name, why: "אין עוד מישהו מצוות התפעול על הלקוח. בעלות על תהליכים אצל לקוחות אחרים." };
-  const manager = byScore(others)[0];
-  if (manager) return { id: manager.id, name: manager.name, why: `אין מישהו נוסף מצוות התפעול. ${footprint(manager).join(", ")} אצל הלקוח.` };
-  return null;
-}
 
 /// A date of the client not linked to any process, whose title says it is
 /// this process's: the process's code in it ("(P5)"), or most of its words

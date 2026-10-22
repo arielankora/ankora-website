@@ -35,7 +35,7 @@ describe("brain metrics", () => {
     const row = r.clients.find((c) => c.clientId === client.id)!;
     const m = Object.fromEntries(row.measures.map((x) => [x.key, x]));
     expect(m.noAccess.value).toBe(1);
-    expect(m.noBackup.value).toBe(1);
+    expect(m.noBackup).toBeUndefined();
     expect(m.withAnkora.value).toBe(0);
     expect(m.oldestProposal.value).toBe(0);
   });

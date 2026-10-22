@@ -41,7 +41,7 @@ describe("the measures of spec section 11", () => {
       )
     );
     expect(m.completeness).toMatchObject({ value: 8, state: "ok" });
-    expect(m.noBackup).toMatchObject({ value: 1, state: "off" });
+    expect(m.noBackup).toBeUndefined();
     expect(m.staleUncertain).toMatchObject({ value: 1, state: "off" });
     expect(m.noAccess).toMatchObject({ value: 1, state: "off" });
     expect(m.coverage).toMatchObject({ value: 67, state: "ok" });

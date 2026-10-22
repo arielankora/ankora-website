@@ -13,8 +13,8 @@
 import type { ApprovalPreview } from "@/lib/approvals-preview";
 import type { StepOp } from "@/lib/next-steps";
 
-/// 22.10.2026: "process" holds a process's decisions (a date to link, a
-/// backup to set, duplicate tasks to close, a review), and "check" what an
+/// 22.10.2026: "process" holds a process's decisions (a date to link,
+/// duplicate tasks to close, a review), and "check" what an
 /// admin checks (a signed PDF). What used to be "לבדיקה", items not yet
 /// confirmed, is no longer a decision of the manager's: it is the file
 /// owner's "שאלות ללקוח" (lib/client-questions.ts).

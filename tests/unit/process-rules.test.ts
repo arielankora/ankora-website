@@ -110,11 +110,11 @@ describe("completeness", () => {
     expect(completeness({ ...full, systemsWithoutAccess: ["s"] }).missing).toEqual(["permissions"]);
   });
 
-  it("names the gaps: missing fields, systems without access, nobody to back up", () => {
+  it("names the gaps: missing fields and systems without access, never a backup", () => {
     const gaps = processGaps({ ...empty, ownerId: "u", requiredSystemIds: ["s"], systemsWithoutAccess: ["s"] }, () => "Mercury");
     expect(gaps).toContain("חסר: טריגר");
     expect(gaps).toContain("אין לנו גישה ל: Mercury");
-    expect(gaps).toContain("אין מחליף: הידע אצל אדם אחד");
+    expect(gaps.some((g) => g.includes("מחליף"))).toBe(false);
     expect(gaps.some((g) => g.includes("הרשאות"))).toBe(false);
   });
 });

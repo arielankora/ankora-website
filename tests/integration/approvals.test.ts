@@ -75,9 +75,9 @@ describe("approvals", () => {
     expect(rules.some((r) => r.id === unsure.id)).toBe(false);
     expect(forAriel.find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, version: 1, href: `/app/clients/${client.id}?tab=file#item-${process.id}` });
 
-    // And P1's missing backup, as a decision of its own.
-    expect((await mine(ariel, client.id)).filter((i) => i.kind === "process").map((i) => i.id)).toEqual([`${process.id}:backup`]);
-    expect(await countApprovalsForClient(ariel, client.id)).toBe(4);
+    // 22.10.2026: a missing backup is no longer a decision.
+    expect((await mine(ariel, client.id)).filter((i) => i.kind === "process")).toEqual([]);
+    expect(await countApprovalsForClient(ariel, client.id)).toBe(3);
     expect(await countApprovals(hadas)).toBeGreaterThanOrEqual(2);
   });
 
@@ -128,20 +128,6 @@ describe("approvals", () => {
     const events = await prisma.auditEvent.findMany({ where: { action: "client_file.questions_asked", clientId: client.id } });
     expect(events).toHaveLength(2);
     expect(events.some((e) => (e.afterJson as { taskId?: string }).taskId === taskId)).toBe(true);
-  });
-
-  it("recommends a backup who already works on the client, and sets it in one click", async () => {
-    const { client, hadas, anna, ariel, process } = await setup();
-    await prisma.process.update({ where: { id: process.id }, data: { ownerId: anna.id } });
-    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: hadas.id } });
-    const row = (await mine(ariel, client.id)).find((i) => i.id === `${process.id}:backup`);
-    expect(row?.recommend?.text).toBe(`לקבוע את ${hadas.name}`);
-    expect(row?.op).toEqual({ type: "set_backup", processId: process.id, userId: hadas.id });
-    // The owner sees the decision too, and may carry it out.
-    expect((await mine(anna, client.id)).some((i) => i.id === `${process.id}:backup`)).toBe(true);
-    expect(await runStep(anna, row!.op!)).toContain("נקבע כמחליף");
-    expect((await prisma.process.findUniqueOrThrow({ where: { id: process.id } })).backupOwnerId).toBe(hadas.id);
-    expect((await mine(ariel, client.id)).some((i) => i.id === `${process.id}:backup`)).toBe(false);
   });
 
   it("approves the confirmed rules of a client together, each one checked on its own", async () => {
