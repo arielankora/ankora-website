@@ -42,6 +42,10 @@ export async function notifyStaleExtraction(now = new Date()): Promise<{ notifie
         body: "ההצעה האחרונה לתיק הלקוח הגיעה לפני יותר משלושה ימי עבודה. כדאי לבדוק שהחילוץ היומי רץ, ושהפגישות של הלקוח משויכות אליו לפי הדומיינים.",
         entityType: "Knowledge",
         entityId: c.id,
+        // The run's own clock, so "once per silence" compares like with
+        // like: the integration test runs on fixed dates, and with the
+        // wall clock it failed on the day its second batch is dated.
+        createdAt: now,
       },
     });
     notified++;
