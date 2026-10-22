@@ -12,6 +12,10 @@ import { approvalsHref, tabCounts, type ApprovalItem, type ReviewItem } from "@/
 import { SCHEDULED_NO_DATE_NOTE } from "@/lib/client-control";
 import { loweredBySource } from "@/lib/app-domain/source-confirmation";
 import { coveredTasksForClients } from "@/lib/app-domain/process-overlap";
+import { processChecks, ruleContext } from "@/lib/app-domain/processes";
+import { readSteps } from "@/lib/process-rules";
+import { canSeeKnowledgeItem } from "@/lib/knowledge";
+import { planPreview, procedurePreview, rulePreview } from "@/lib/approvals-preview";
 
 // What is waiting on one person's approval, read from the state each thing
 // is in now (lib/approvals.ts says why this screen exists). Each kind is
@@ -122,6 +126,8 @@ async function rules(s: Scope): Promise<ApprovalItem[]> {
       clientName: p.client.name,
       title: p.title,
       detail: clip(p.statement, 220),
+      // The whole rule, when the line above cuts it or there is more.
+      preview: p.statement.replace(/\s+/g, " ").trim().length > 220 || p.interimStatement || p.rationale ? rulePreview(p) : null,
       since: p.createdAt,
       by: names.get(p.createdById ?? "") ?? null,
       href: itemHref(p.clientId, p.id),
@@ -137,7 +143,9 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
   if (!s.manager || s.clients.length === 0) return [];
   const drafts = await prisma.processVersion.findMany({
     where: { status: "DRAFT", process: { deletedAt: null, status: { not: "RETIRED" }, clientId: { in: s.clients.map((c) => c.id) } } },
-    include: { process: { select: { id: true, code: true, title: true, clientId: true, client: { select: { name: true } } } } },
+    include: {
+      process: { select: { id: true, code: true, title: true, clientId: true, entityId: true, externalPartyContactIds: true, client: { select: { name: true } } } },
+    },
   });
   if (drafts.length === 0) return [];
   // Only the newest version is approved (approveProcessVersion).
@@ -149,19 +157,42 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
   const newest = new Map(latest.map((l) => [l.processId, l._max.version]));
   const current = drafts.filter((d) => newest.get(d.processId) === d.version);
   const names = await namesOf(current.map((d) => d.createdById));
-  return current.map((d) => ({
-    kind: "procedure",
-    id: d.processId,
-    version: d.version,
-    clientId: d.process.clientId,
-    clientName: d.process.client.name,
-    title: `${d.process.code} ${d.process.title}`,
-    detail: d.changeNote ? `גרסה ${d.version}: ${clip(d.changeNote)}` : `גרסה ${d.version} של הנוהל`,
-    since: d.createdAt,
-    by: names.get(d.createdById ?? "") ?? null,
-    href: itemHref(d.process.clientId, d.processId),
-    actions: { approve: "אישור הנוהל", reject: null },
-  }));
+  // The same checks approveProcessVersion runs, read once per client, so
+  // the row says what holds it back instead of a button that fails.
+  const clientIds = [...new Set(current.map((d) => d.process.clientId))];
+  const viewer = { id: s.user.id, isManager: s.manager };
+  const [contexts, systems] = await Promise.all([
+    Promise.all(
+      clientIds.map(async (id) => {
+        const am = s.clients.find((c) => c.id === id)?.accountManagerId ?? null;
+        return [id, await ruleContext(id, { canSee: (r) => canSeeKnowledgeItem(r, viewer, am) })] as const;
+      })
+    ).then((rows) => new Map(rows)),
+    prisma.systemAccess
+      .findMany({ where: { clientId: { in: clientIds }, deletedAt: null }, select: { id: true, systemName: true } })
+      .then((rows) => Object.fromEntries(rows.map((r) => [r.id, r.systemName]))),
+  ]);
+  return current.map((d) => {
+    const steps = readSteps(d.steps);
+    const checks = processChecks({ steps, highlights: d.highlights, outputs: d.outputs }, d.process, contexts.get(d.process.clientId)!);
+    const preview = procedurePreview({ steps, highlights: d.highlights, outputs: d.outputs }, systems, checks);
+    const held = preview.problems.length > 0;
+    return {
+      kind: "procedure",
+      id: d.processId,
+      version: d.version,
+      clientId: d.process.clientId,
+      clientName: d.process.client.name,
+      title: `${d.process.code} ${d.process.title}`,
+      detail: `${d.changeNote ? `גרסה ${d.version}: ${clip(d.changeNote)}` : `גרסה ${d.version} של הנוהל`} · ${steps.length === 1 ? "שלב אחד" : `${steps.length} שלבים`}`,
+      since: d.createdAt,
+      by: names.get(d.createdById ?? "") ?? null,
+      href: itemHref(d.process.clientId, d.processId),
+      preview,
+      blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : null,
+      actions: { approve: held ? null : "אישור הנוהל", reject: null },
+    };
+  });
 }
 
 async function knowledge(s: Scope): Promise<ApprovalItem[]> {
@@ -234,6 +265,7 @@ async function plans(s: Scope): Promise<ApprovalItem[]> {
       clientName: d.task.client.name,
       title: d.task.title,
       detail: `תוכנית, גרסה ${d.version}: ${clip(d.body)}`,
+      preview: planPreview({ body: d.body, steps: d.steps }),
       since: d.createdAt,
       by: d.createdBy?.name ?? (d.origin === "APP" ? null : "Claude"),
       href: `/app/tasks/${d.taskId}`,

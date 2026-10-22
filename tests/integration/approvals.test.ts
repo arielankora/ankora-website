@@ -112,4 +112,27 @@ describe("approvals", () => {
     expect(await mine(stranger, client.id)).toEqual([]);
     expect((await collectReview(stranger)).filter((r) => r.clientId === client.id)).toEqual([]);
   });
+
+  // 22.10.2026: a procedure is read on its row, and the row says what
+  // holds it back instead of a button that would fail.
+  it("shows a procedure's steps, and holds back one that does not pass its checks", async () => {
+    const { client, ariel } = await setup();
+    const step = (over: Record<string, unknown>) => ({ title: "שלב", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false, amountMaxMinor: null, currency: null, channel: null, ...over });
+    const ok = await prisma.process.create({ data: { clientId: client.id, seq: 2, code: "P2", title: "קליטת עובד" } });
+    await prisma.processVersion.create({ data: { processId: ok.id, version: 1, status: "DRAFT", steps: [step({ title: "אוספים טופס 101" })], highlights: "בלי רטרו" } });
+    const held = await prisma.process.create({ data: { clientId: client.id, seq: 3, code: "P3", title: "העברה לספק" } });
+    await prisma.processVersion.create({ data: { processId: held.id, version: 1, status: "DRAFT", steps: [step({ title: "מעבירים תשלום", mode: "AUTOMATED", actionTags: ["PAYMENT"] })] } });
+
+    const rows = await mine(ariel, client.id);
+    const good = rows.find((r) => r.id === ok.id);
+    expect(good?.actions.approve).toBe("אישור הנוהל");
+    expect(good?.preview?.sections[0].lines[0]).toContain("אוספים טופס 101");
+    expect(good?.preview?.sections.map((x) => x.heading)).toContain("דגשים");
+    expect(good?.preview?.problems).toEqual([]);
+
+    const bad = rows.find((r) => r.id === held.id);
+    expect(bad?.actions.approve).toBeNull();
+    expect(bad?.blocked).toContain("לא עובר את הבדיקות");
+    expect(bad?.preview?.problems.length).toBeGreaterThan(0);
+  });
 });

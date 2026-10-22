@@ -16,6 +16,7 @@ import {
   tabCounts,
   visibleTabs,
   waitedLabel,
+  withApprovalsBack,
   type ApprovalItem,
   type ReviewItem,
 } from "@/lib/approvals";
@@ -75,9 +76,11 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       detail: i.detail,
       waited: waitedLabel(i.since, now),
       by: i.by,
-      href: i.href,
+      // The way back from the item to this view, tab and client.
+      href: withApprovalsBack(i.href, tab, clientId),
       actions: i.actions,
       blocked: i.blocked,
+      preview: i.preview ?? null,
       label: KIND_LABELS[i.kind],
       tone: KIND_TONES[i.kind],
       showLabel,
@@ -128,7 +131,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
       {tab === "knowledge" ? (
         <KnowledgeReview searchParams={clientId ? { ...params, clientId } : params} />
       ) : tab === "review" ? (
-        <ReviewList rows={sortByWaiting(review)} now={now} />
+        <ReviewList rows={sortByWaiting(review).map((r) => ({ ...r, href: withApprovalsBack(r.href, tab, clientId) }))} now={now} />
       ) : shown.length === 0 ? (
         <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary" data-testid="approvals-empty">
           {EMPTY[tab] ?? `אין כרגע ${APPROVAL_TABS.find((t) => t.key === tab)?.label ?? ""} שמחכים לך.`}

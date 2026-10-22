@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageBack } from "@/components/app/BackSlot";
 import { CLIENTS_LIST_KEYS, clientsBackTitle, listBackHref } from "@/lib/list-back";
+import { approvalsBack } from "@/lib/approvals";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
@@ -119,7 +120,7 @@ function serverNow(): number {
   return Date.now();
 }
 
-export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; from?: string | string[] }> }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; from?: string | string[]; fromApprovals?: string | string[] }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
   // file. The file has a dozen sections, and on one long page they would
@@ -127,8 +128,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const sp = await props.searchParams;
   const tab = sp?.tab === "file" ? "file" : "work";
   // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
-  const backHref = listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
-  const fromParam = typeof sp?.from === "string" && sp.from ? `from=${encodeURIComponent(sp.from)}` : "";
+  // Opened from "אישורים": back there, to the same tab (22.10.2026).
+  const viaApprovals = approvalsBack(sp?.fromApprovals);
+  const backHref = viaApprovals?.href ?? listBackHref("/app/clients", CLIENTS_LIST_KEYS, sp?.from);
+  const backLabel = viaApprovals?.label ?? clientsBackTitle(sp?.from);
+  const fromParam = [typeof sp?.from === "string" && sp.from ? `from=${encodeURIComponent(sp.from)}` : "", viaApprovals?.param ?? ""].filter(Boolean).join("&");
   const user = await requireUser();
 
   if (!can(user.role, "client.manage")) {
@@ -154,7 +158,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     return (
       <div className="space-y-6">
         <div>
-          <PageBack href={backHref} label={clientsBackTitle(sp?.from)} />
+          <PageBack href={backHref} label={backLabel} testId="client-back" />
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             <StatusBadge label={paused ? "מושהה" : "בארכיון"} tone={paused ? "amber" : "gray"} />
@@ -319,7 +323,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     <>
       <div className="space-y-6">
         <div>
-          <PageBack href={backHref} label={clientsBackTitle(sp?.from)} />
+          <PageBack href={backHref} label={backLabel} testId="client-back" />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-xl font-medium text-app-text-primary">{client.name}</h1>
             {/* The same button as on a task, on the screen somebody
