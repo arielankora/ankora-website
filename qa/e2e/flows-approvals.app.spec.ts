@@ -111,6 +111,7 @@ test.describe("approvals", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('textarea[name="handling"]').fill("עונים במייל");
     await dialog.locator('select[name="knowledgeStatus"]').selectOption("MISSING");
     await dialog.locator('input[name="toResolve"]').fill("לברר עם המנכ״ל מי עונה");
     await submit(page, "הוספה לתיק");
