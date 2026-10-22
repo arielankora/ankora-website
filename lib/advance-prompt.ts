@@ -72,6 +72,28 @@ export type AdvancePromptPlan = {
   steps: string[];
 };
 
+/// Where the client's material lives outside Ankora (22.10.2026): the
+/// anchors from the client file. Domains are firms' domains, not people's
+/// addresses, so they may travel in a pasted prompt; a person's address
+/// stays one lookup_contact away.
+export type AdvancePromptSources = {
+  clientDomains: string[];
+  /// Suppliers' and partners' domains (nextage.co.il). A partner may work
+  /// for several clients, so its domain alone never makes a message this
+  /// client's.
+  partnerDomains: string[];
+  keywords: string[];
+  driveFolderId: string | null;
+  conversationsDocId: string | null;
+  /// 90 days before the task opened: the oldest material worth reading.
+  fromLabel: string;
+  /// The same day as YYYY-MM-DD, for search filters (after:, from:).
+  fromIso: string;
+};
+
+/// How far back the search goes, from the day the task opened.
+export const SOURCES_LOOKBACK_DAYS = 90;
+
 export type AdvancePromptInput = {
   taskId: string;
   /// A run of a process (spec 5.4): its code and title. The lessons
@@ -110,6 +132,9 @@ export type AdvancePromptInput = {
   /// (isMappingTask). What it learns goes to the client file before it
   /// closes, even when no document came out of it.
   mapping?: boolean;
+  /// The client's anchors for mail, Drive and recordings. Null on the
+  /// lessons prompt, which reads only what is in Ankora.
+  sources?: AdvancePromptSources | null;
   requestedBy: string;
   todayLabel: string;
 };
@@ -210,6 +235,62 @@ export function timerRules(
   ];
 }
 
+/// Mail, Drive and recordings (Ariel, 22.10.2026).
+///
+/// What a person can reach differs by client and by person: at NUX Hadas
+/// has the client's Drive and mailbox connected and Ariel has neither,
+/// though NUX mail reaches him forwarded; Ariel sees every recording in
+/// Fireflies and others may see only their own. So nothing here assumes a
+/// connector is there. Claude looks at what this conversation actually
+/// has, uses all of it, and says in one line what the plan rests on. When
+/// a source is connected, using it is not optional: the thread with the
+/// supplier is usually where the task really stands.
+///
+/// The anchors say where to look, never what may be read: each person's
+/// own connectors decide that. The seven rules are the privacy decision
+/// of the same day, word for word in substance.
+export function sourcesRules(input: Pick<AdvancePromptInput, "clientName" | "taskId">, src: AdvancePromptSources): string[] {
+  const anchors: string[] = [];
+  if (src.clientDomains.length > 0) anchors.push(`- דומיינים של הלקוח: ${src.clientDomains.join(", ")}`);
+  if (src.partnerDomains.length > 0)
+    anchors.push(`- דומיינים של ספקים ושותפים: ${src.partnerDomains.join(", ")}. שותף יכול לעבוד עם כמה לקוחות, ולכן דומיין כזה לבד לא הופך מייל או פגישה לשל הלקוח הזה: צריך גם משתתף מהלקוח, מילת מפתח, או נושא המשימה.`);
+  if (src.keywords.length > 0) anchors.push(`- מילות מפתח בכותרת: ${src.keywords.join(", ")}`);
+  if (src.driveFolderId) anchors.push(`- תיקיית השיחות בדרייב: ${src.driveFolderId} (חיפוש עם parentId)`);
+  if (src.conversationsDocId) anchors.push(`- המסמך המצטבר של השיחות: ${src.conversationsDocId}`);
+  anchors.push("- מילים מכותרת המשימה ומהתיאור שלה.");
+  const noAnchors = src.clientDomains.length === 0 && src.keywords.length === 0 && !src.driveFolderId;
+
+  return [
+    "## מקורות נוספים: מייל, דרייב והקלטות",
+    "מה מחובר שונה מעובד לעובד ומלקוח ללקוח. לכן אל תניח שמקור מחובר, ואל תוותר על מקור שמחובר.",
+    "- **לפני שאתה מתכנן:** תבדוק אילו כלים יש לך בשיחה הזו: מייל (Gmail), דרייב (Google Drive) והקלטות (Fireflies). בכל מקור מחובר תריץ חיפוש קצר לפי העוגנים שלמטה, ותקרא את מה שרלוונטי למשימה. כשהמקור מחובר, זה חובה ולא רשות.",
+    "- מייל של הלקוח יכול להגיע גם בהעברה או בהעתק לתיבה של אנקורה, ולכן מחפשים לפי הדומיינים גם בשולח, גם בנמענים וגם בגוף ההודעה.",
+    `- טווח: מ-${src.fromLabel} (${SOURCES_LOOKBACK_DAYS} יום לפני פתיחת המשימה) ועד היום. במייל: after:${src.fromIso.replace(/-/g, "/")}. ב-Fireflies: from:${src.fromIso}.`,
+    "- מקור שלא מחובר: שורה אחת שהוא לא היה זמין, וממשיכים. לא עוצרים בגללו.",
+    "- **בתוכנית:** בחלק \"מה ידוע\", שורה ראשונה שמתחילה ב\"מקורות:\". מה נבדק, מה נמצא (מספר שרשורים, קבצים ופגישות), ומה לא היה זמין.",
+    "",
+    "### העוגנים של הלקוח",
+    ...anchors,
+    ...(noAnchors
+      ? [`- בתיק הלקוח עוד אין דומיינים או מילות מפתח. תחפש לפי שם הלקוח (${input.clientName}) ונושא המשימה, תסמן כל ממצא כ\"לא ודאי שהוא של הלקוח\", ותציע לי להוסיף עוגנים לתיק (לשונית מקורות).`]
+      : []),
+    "",
+    "### כללי פרטיות",
+    "1. מחפשים רק לפי העוגנים של הלקוח. מה שלא מתאים להם לא נכנס, וזה כולל מייל אישי של העובד.",
+    "2. מייל או פגישה שעוסקים גם בלקוח אחר: לוקחים רק את החלק של הלקוח הזה. פרטים של לקוח אחר לא נכנסים לתוכנית, להערות או לתיק.",
+    "3. כללי \"לא לספר\" בתיק הלקוח חלים גם על מה שנמצא במקורות.",
+    "4. לא מעתיקים סיסמאות, קודים או פרטי גישה לתוכנית, להערות או לתיק, גם כשהם מופיעים במייל או בסיכום אוטומטי של פגישה. כותבים רק שהפרט קיים, ואיפה.",
+    "5. לכל פרט מהמקורות מצורף המקור: מי כתב או אמר, מתי, וקישור (מייל, קובץ, פגישה עם הדקה).",
+    "6. מידע שיש רק לעובד אחד גישה אליו: מותר בתוכנית ובהערות הפנימיות. לתיק הלקוח הוא נכנס רק דרך הצעת ידע שממתינה לאישור.",
+    "7. שום דבר מהמקורות לא נכנס לשדה שהלקוח רואה בלי אישור שלי.",
+    "",
+    "### ידע שעוד לא בתיק",
+    `- פגישה או שרשור מייל של הלקוח שיש בהם ידע קבוע (כלל, תהליך, איש קשר, מערכת, תאריך) שעוד לא בתיק: להציע אותו עם propose_knowledge, client "${input.clientName}". מקור: פגישה כ-newSource מסוג TRANSCRIPT עם firefliesId. שרשור מייל כ-newSource מסוג EMAIL עם gmailThreadId. מקור שכבר במרשם (get_client_file מציג אותו): sourceCode.`,
+    "- ההצעות ממתינות לאישור מנהל במסך הבדיקה, ולכן מותר לשלוח אותן בלי לשאול. אחר כך להזכיר לי לאשר. דברים שקשורים רק למשימה עצמה נשארים בתוכנית ולא נכנסים לתיק.",
+    "",
+  ];
+}
+
 /// No description and no comment: nothing a person wrote down.
 export function isEmptyBrief(input: Pick<AdvancePromptInput, "description" | "comments">): boolean {
   return !input.description?.trim() && input.comments.length === 0;
@@ -267,6 +348,7 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
 
   out.push(...timerRules(input, "advance"));
   out.push(...HOW_TO_ASK);
+  if (input.sources) out.push(...sourcesRules(input, input.sources));
 
   // ---- What may be done without asking -----------------------------------
   out.push(
@@ -294,7 +376,9 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
     "## מבנה התוכנית",
     "בלי כותרות עם #. כותרת כל חלק מודגשת (**כך**), והתוכן ברשימות. העברית פשוטה, המשפטים קצרים, ובלי קו מפריד ארוך.",
     "- **מטרה**: משפט אחד. איך נראית המשימה כשהיא סגורה.",
-    "- **מה ידוע**: התמצית מהנתונים, בלי לחזור על כולם.",
+    input.sources
+      ? "- **מה ידוע**: שורה ראשונה \"מקורות:\" (על מה התוכנית מבוססת, ומה לא היה זמין), ואז התמצית מהנתונים, בלי לחזור על כולם."
+      : "- **מה ידוע**: התמצית מהנתונים, בלי לחזור על כולם.",
     "- **מה חסר**: שאלות פתוחות שצריך לענות עליהן. אם אין, לכתוב \"אין\".",
     "- **שלבים**: רשימה ממוספרת. לכל שלב: מה עושים, מי מבצע (קלוד, שם מנהל התפעול, הלקוח או ספק), במה הוא תלוי, וזמן משוער.",
     `  אם תוצאת המשימה היא נוהל, השלב שלפני הסגירה הוא תמיד: "${PROPOSE_STEP_TITLE}". מבצע: קלוד. אישור: מנהל במסך הבדיקה.`,

@@ -8,6 +8,7 @@ import { emailDomain, isPublicEmailDomain, normalizeDomain } from "@/lib/contact
 import {
   checkSources,
   defaultWeight,
+  driveIdFrom,
   readSourceRefs,
   sourceCode,
   SECONDARY_ONLY_TO_RESOLVE,
@@ -42,7 +43,7 @@ export async function assertClientAccess(actor: User, clientId: string) {
 // Sources
 // ---------------------------------------------------------------------------
 
-export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "OTHER"; id: string };
+export type ExternalRef = { system: "FIREFLIES" | "DOCUMENT" | "TASK" | "GMAIL" | "OTHER"; id: string };
 
 /// What an external id on a source of this kind points at.
 export function externalSystemFor(kind: SourceKind): ExternalRef["system"] {
@@ -54,6 +55,8 @@ export function externalSystemFor(kind: SourceKind): ExternalRef["system"] {
       return "DOCUMENT";
     case "TASK":
       return "TASK";
+    case "EMAIL":
+      return "GMAIL";
     default:
       return "OTHER";
   }
@@ -356,6 +359,49 @@ export async function removeClientDomain(actor: User, id: string) {
     before: row,
   });
   return removed;
+}
+
+// ---------------------------------------------------------------------------
+// Source anchors (advance with Claude, 22.10.2026)
+// ---------------------------------------------------------------------------
+
+export interface SourceAnchorsInput {
+  clientId: string;
+  keywords: string[];
+  driveFolder: string | null;
+  conversationsDoc: string | null;
+}
+
+/// The anchors beside the domains: words that name the client in a
+/// meeting title, its conversations folder and document in Drive. They say
+/// where to look, never who may: that stays with each person's connectors.
+export async function setClientSourceAnchors(actor: User, input: SourceAnchorsInput) {
+  assertCan(actor.role, "time_entry.create_self");
+  await assertClientAccess(actor, input.clientId);
+  const keywords = [...new Set(input.keywords.map((k) => k.trim()).filter(Boolean))].slice(0, 20);
+  const driveFolderId = driveIdFrom(input.driveFolder);
+  if (input.driveFolder?.trim() && !driveFolderId) throw new Error("תיקיית הדרייב לא מזוהה. מדביקים קישור לתיקייה או את המזהה שלה.");
+  const conversationsDocId = driveIdFrom(input.conversationsDoc);
+  if (input.conversationsDoc?.trim() && !conversationsDocId) throw new Error("המסמך המצטבר לא מזוהה. מדביקים קישור למסמך או את המזהה שלו.");
+  const before = await prisma.client.findUniqueOrThrow({
+    where: { id: input.clientId },
+    select: { sourceKeywords: true, driveFolderId: true, conversationsDocId: true },
+  });
+  const after = await prisma.client.update({
+    where: { id: input.clientId },
+    data: { sourceKeywords: keywords, driveFolderId, conversationsDocId },
+    select: { sourceKeywords: true, driveFolderId: true, conversationsDocId: true },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "client_source_anchors.set",
+    entityType: "Client",
+    entityId: input.clientId,
+    clientId: input.clientId,
+    before,
+    after,
+  });
+  return after;
 }
 
 export async function listClientDomains(actor: User, clientId: string) {

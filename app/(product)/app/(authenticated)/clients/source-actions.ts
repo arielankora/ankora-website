@@ -7,6 +7,7 @@ import {
   removeClientSource,
   addClientDomain,
   removeClientDomain,
+  setClientSourceAnchors,
 } from "@/lib/app-domain/client-sources";
 import { confirmSourceWithClient } from "@/lib/app-domain/source-confirmation";
 import type { ClientDomainKind, SourceKind, SourceRestriction, SourceWeight } from "@prisma/client";
@@ -16,7 +17,7 @@ import type { ClientDomainKind, SourceKind, SourceRestriction, SourceWeight } fr
 
 type FormState = { error?: string; ok?: boolean };
 
-const KINDS: SourceKind[] = ["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT"];
+const KINDS: SourceKind[] = ["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT", "EMAIL"];
 const WEIGHTS: SourceWeight[] = ["PRIMARY", "SECONDARY"];
 const RESTRICTIONS: SourceRestriction[] = ["NONE", "TOPICS_ONLY"];
 const DOMAIN_KINDS: ClientDomainKind[] = ["CLIENT", "PARTNER"];
@@ -104,6 +105,24 @@ export async function removeClientDomainAction(id: string, clientId: string): Pr
   const user = await requireUser();
   try {
     await removeClientDomain(user, id);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/clients/${clientId}`);
+  return { ok: true };
+}
+
+/// The source anchors beside the domains (22.10.2026).
+export async function setClientSourceAnchorsAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(formData.get("clientId") ?? "");
+  try {
+    await setClientSourceAnchors(user, {
+      clientId,
+      keywords: list(formData.get("keywords")),
+      driveFolder: String(formData.get("driveFolder") ?? "").trim() || null,
+      conversationsDoc: String(formData.get("conversationsDoc") ?? "").trim() || null,
+    });
   } catch (err) {
     return { error: friendlyError(err) };
   }

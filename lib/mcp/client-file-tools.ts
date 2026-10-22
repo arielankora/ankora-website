@@ -134,7 +134,7 @@ export function registerClientFileTools(server: McpServer): void {
       title: "Propose knowledge for a client file",
       description: [
         "Sends a batch of proposed items for a client's file, from ONE source (a meeting or a document). Nothing enters the file until a person approves each item on Ankora's review screen; there is no tool that approves.",
-        "Source: pass `sourceCode` (\"S3\") if the source is already in the client's register (get_client_file lists it), or `newSource` to register it. A recording is found again by its `firefliesId`, so sending the same meeting twice does not create a second source.",
+        "Source: pass `sourceCode` (\"S3\") if the source is already in the client's register (get_client_file lists it), or `newSource` to register it. A recording is found again by its `firefliesId`, and an email thread (kind EMAIL) by its `gmailThreadId`, so sending the same meeting or thread twice does not create a second source. An email thread is a source only when it is this client's, by its domains or people; quote only what the client or their supplier wrote, never a password, code or access detail.",
         "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM | REQUEST_TYPE | POLICY | ENTITY | NARRATIVE | PROCESS | DOMAIN | TASK | DATE, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence: why it is true and where it was said; required), `confidence` (HIGH, MEDIUM or LOW: how sure you are; the review screen orders by it, lowest first), and optionally `quote` (short; never from a topics-only source).",
         "FACT payload: kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE), body, and as relevant topic, referTo, validUntil or validUntilEvent (TEMPORARY needs one), decidedAt (ONE_OFF_DECISION needs it), decidedBy, and for a PREFERENCE subjectName: whose preference it is (a contact or a firm in the file, by name).",
         "CONTACT payload: name and/or role, relationship (CLIENT_STAFF, PROVIDER, ADVISOR, INVESTOR, SUPPLIER), emails, phones, organizationName, context, channelOrder, isPrimary, isDecisionMaker, entityName (the client's legal entity they work with).",
@@ -155,11 +155,12 @@ export function registerClientFileTools(server: McpServer): void {
         sourceCode: z.string().optional().describe("An existing source code in the client's register, e.g. S3."),
         newSource: z
           .object({
-            kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT"]),
+            kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT", "EMAIL"]),
             title: z.string(),
             date: z.string().optional().describe("YYYY-MM-DD"),
             participants: z.array(z.string()).optional(),
             firefliesId: z.string().optional(),
+            gmailThreadId: z.string().optional().describe("For kind EMAIL: the Gmail thread id, so the same thread is one source."),
             documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
             taskId: z.string().optional().describe("For kind TASK: the task the knowledge came out of, such as a mapping task."),
             topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
@@ -201,7 +202,7 @@ export function registerClientFileTools(server: McpServer): void {
       args: {
         client: string;
         sourceCode?: string;
-        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT"; title: string; date?: string; participants?: string[]; firefliesId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean };
+        newSource?: { kind: "TRANSCRIPT" | "CLIENT_DOCUMENT" | "TASK" | "PERSON" | "ANKORA_DOCUMENT" | "EMAIL"; title: string; date?: string; participants?: string[]; firefliesId?: string; gmailThreadId?: string; documentId?: string; taskId?: string; topicsOnly?: boolean; clientConversation?: boolean };
         note?: string;
         uncertain?: { candidates: string[]; reason: string };
         items: (ProposalItemInput & { client?: string })[];
@@ -215,13 +216,14 @@ export function registerClientFileTools(server: McpServer): void {
         if (!args.sourceCode && !args.newSource) return toolText("Say where this comes from: pass `sourceCode` for a source already in the register, or `newSource`.");
         const ns = args.newSource;
         if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
+        if (ns?.kind === "EMAIL" && !ns.gmailThreadId) return toolText("newSource of kind EMAIL needs `gmailThreadId`, so the same thread is never registered twice.");
         const newSource = ns
           ? {
               kind: ns.kind,
               title: ns.title,
               occurredAt: ns.date ? new Date(`${ns.date}T00:00:00Z`) : null,
               participants: ns.participants,
-              externalIds: [ns.firefliesId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
+              externalIds: [ns.firefliesId, ns.gmailThreadId, ns.documentId, ns.taskId].filter((v): v is string => !!v),
               restriction: ns.topicsOnly ? ("TOPICS_ONLY" as const) : ("NONE" as const),
               ...(ns.kind === "ANKORA_DOCUMENT" && ns.clientConversation ? { weight: "PRIMARY" as const } : {}),
             }
