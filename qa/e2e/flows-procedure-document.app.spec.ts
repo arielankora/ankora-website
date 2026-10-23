@@ -95,7 +95,8 @@ test("an approved procedure reads as a document and downloads as PDF and Word", 
   const en = await page.request.get((await page.getByTestId("export-pdf").getAttribute("href", { timeout: 15_000 }))!.replace("lang=he", "lang=en"));
   expect(en.status()).toBe(404);
 
-  await page.goto(`/app/clients/${CLIENT}`);
+  // The processes panel is on the client file's tab.
+  await page.goto(`/app/clients/${CLIENT}?tab=file`);
   await page.getByTestId("procedures-index-link").click({ timeout: 15_000 });
   await expect(page.getByTestId("procedure-row").filter({ hasText: title })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId("procedures-pack")).toBeVisible();
