@@ -6,6 +6,7 @@ import { procedureFileName } from "@/lib/procedure-document";
 import { renderProcedurePdf } from "@/lib/procedure-pdf";
 import { renderProcedureDocx } from "@/lib/procedure-docx";
 import { attachmentDisposition } from "@/lib/http-headers";
+import { parsePageNumber } from "@/lib/url-numbers";
 
 // One procedure as a document (23.10.2026): `?format=pdf|docx`,
 // `&lang=he|en`, `&version=N` (default: the approved one). English only
@@ -20,10 +21,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ clie
   const url = new URL(request.url);
   const format = url.searchParams.get("format") === "docx" ? "docx" : "pdf";
   const lang = url.searchParams.get("lang") === "en" ? "en" : "he";
-  const v = Number(url.searchParams.get("version"));
+  const raw = url.searchParams.get("version");
+  const version = raw ? parsePageNumber(raw, 100_000) : undefined;
   let view;
   try {
-    view = await procedureDocument(user, processId, { lang, version: Number.isInteger(v) && v > 0 ? v : undefined, omitEmpty: true });
+    view = await procedureDocument(user, processId, { lang, version, omitEmpty: true });
   } catch (err) {
     if (err instanceof ForbiddenError) return new NextResponse("Not found", { status: 404 });
     if (err instanceof Error) return new NextResponse(err.message, { status: 404, headers: { "Content-Type": "text/plain; charset=utf-8" } });

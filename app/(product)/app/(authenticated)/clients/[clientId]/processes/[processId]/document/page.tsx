@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { canManageClients, ForbiddenError } from "@/lib/app-auth/permissions";
 import { procedureDocument, type ProcedureDocumentView } from "@/lib/app-domain/procedure-documents";
 import { dateText, type DocBlock, type ProcedureDoc } from "@/lib/procedure-document";
+import { parsePageNumber } from "@/lib/url-numbers";
 import { ApproveTranslation, TranslateWithClaude } from "./TranslationActions";
 
 // A procedure as a document (23.10.2026): the read view of what the PDF
@@ -128,8 +129,9 @@ export default async function ProcedureDocumentPage(props: {
   const user = await requireUser();
   const isManager = canManageClients(user.role);
   const lang = sp.lang === "en" ? "en" : "he";
-  const v = Number(sp.version);
-  const version = Number.isInteger(v) && v > 0 ? v : undefined;
+  // A version number from the URL, through the one helper that cannot
+  // hand Prisma a NaN (lib/url-numbers.ts).
+  const version = sp.version ? parsePageNumber(sp.version, 100_000) : undefined;
 
   let view: ProcedureDocumentView;
   let heView: ProcedureDocumentView;
