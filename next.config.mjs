@@ -93,6 +93,10 @@ const nextConfig = {
       './content/agreements/*.md',
       './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',
     ],
+    // Procedure documents (23.10.2026): one procedure, and all of a
+    // client's, as PDF. The Word file needs no font.
+    '/api/clients/[clientId]/processes/[processId]/document': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
+    '/api/clients/[clientId]/procedures': ['./node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff'],
     '/agreements/sign/[token]': [
       './content/agreements/*.md',
       './node_modules/@fontsource/heebo/files/heebo-{hebrew,latin}-400-normal.woff',

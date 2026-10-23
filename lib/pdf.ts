@@ -224,7 +224,13 @@ const MIRROR: Record<string, string> = { "(": ")", ")": "(", "[": "]", "]": "[",
 
 /// Left-to-right drawing segments for one line of an RTL paragraph.
 /// Exported for its unit test; drawBidiLine() is the only caller.
-export function visualSegments(text: string): { font: string; text: string }[] {
+///
+/// `dir: "ltr"` (23.10.2026, the English procedure document) runs the same
+/// pass for a left-to-right paragraph: the edges and an undecided neutral
+/// count as LTR, and the sequence of runs keeps its order. A Hebrew name
+/// inside English prose still reads right to left.
+export function visualSegments(text: string, dir: "rtl" | "ltr" = "rtl"): { font: string; text: string }[] {
+  const base: "R" | "L" = dir === "ltr" ? "L" : "R";
   const chars = Array.from(text);
   const cls = chars.map(bidiClass);
   const isDigit = (i: number) => i >= 0 && i < chars.length && /\p{N}/u.test(chars[i]);
@@ -247,29 +253,40 @@ export function visualSegments(text: string): { font: string; text: string }[] {
   for (const [o, c] of pairs) {
     const inside = cls.slice(o + 1, c);
     let d: "R" | "L" | null = null;
-    if (inside.includes("R")) d = "R";
-    else if (inside.includes("L")) {
-      let before: BidiClass = "R";
-      for (let k = o - 1; k >= 0; k--) if (cls[k] !== "N") { before = cls[k]; break; }
-      d = before === "L" ? "L" : "R";
+    if (base === "R") {
+      if (inside.includes("R")) d = "R";
+      else if (inside.includes("L")) {
+        let before: BidiClass = "R";
+        for (let k = o - 1; k >= 0; k--) if (cls[k] !== "N") { before = cls[k]; break; }
+        d = before === "L" ? "L" : "R";
+      }
+    } else {
+      // The mirror image: LTR unless the brackets hold only Hebrew and
+      // Hebrew comes before them.
+      if (inside.includes("L")) d = "L";
+      else if (inside.includes("R")) {
+        let before: BidiClass = "L";
+        for (let k = o - 1; k >= 0; k--) if (cls[k] !== "N") { before = cls[k]; break; }
+        d = before === "R" ? "R" : "L";
+      }
     }
     if (d) cls[o] = cls[c] = d;
   }
 
   // Resolve neutrals.
-  const dir: ("R" | "L")[] = new Array(chars.length);
+  const dirs: ("R" | "L")[] = new Array(chars.length);
   for (let i = 0; i < chars.length; ) {
     if (cls[i] !== "N") {
-      dir[i] = cls[i] as "R" | "L";
+      dirs[i] = cls[i] as "R" | "L";
       i++;
       continue;
     }
     let j = i;
     while (j < chars.length && cls[j] === "N") j++;
-    const before = i > 0 ? dir[i - 1] : "R";
-    const after = j < chars.length ? (cls[j] as "R" | "L") : "R";
-    const resolved = before === after ? before : "R";
-    for (let k = i; k < j; k++) dir[k] = resolved;
+    const before = i > 0 ? dirs[i - 1] : base;
+    const after = j < chars.length ? (cls[j] as "R" | "L") : base;
+    const resolved = before === after ? before : base;
+    for (let k = i; k < j; k++) dirs[k] = resolved;
     i = j;
   }
 
@@ -277,11 +294,11 @@ export function visualSegments(text: string): { font: string; text: string }[] {
   const runs: { dir: "R" | "L"; chars: string[] }[] = [];
   chars.forEach((ch, i) => {
     const last = runs[runs.length - 1];
-    if (last && last.dir === dir[i]) last.chars.push(ch);
-    else runs.push({ dir: dir[i], chars: [ch] });
+    if (last && last.dir === dirs[i]) last.chars.push(ch);
+    else runs.push({ dir: dirs[i], chars: [ch] });
   });
   const visual: string[] = [];
-  for (const run of runs.reverse()) {
+  for (const run of base === "R" ? runs.reverse() : runs) {
     if (run.dir === "L") visual.push(...run.chars);
     else visual.push(...run.chars.reverse().map((ch) => MIRROR[ch] ?? ch));
   }
@@ -301,16 +318,17 @@ export function visualSegments(text: string): { font: string; text: string }[] {
   );
 }
 
-/// One line of an RTL paragraph, right-aligned within [x, x+width].
-export function drawBidiLine(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, size: number) {
+/// One line of an RTL paragraph, right-aligned within [x, x+width]; with
+/// `dir: "ltr"`, a left-to-right line, left-aligned.
+export function drawBidiLine(doc: PDFKit.PDFDocument, text: string, x: number, y: number, width: number, size: number, dir: "rtl" | "ltr" = "rtl") {
   doc.fontSize(size);
-  const segments = visualSegments(text);
+  const segments = visualSegments(text, dir);
   let total = 0;
   for (const seg of segments) {
     doc.font(seg.font);
     total += doc.widthOfString(seg.text);
   }
-  let cursorX = x + width - total;
+  let cursorX = dir === "ltr" ? x : x + width - total;
   for (const seg of segments) {
     doc.font(seg.font);
     doc.text(seg.text, cursorX, y, { lineBreak: false });

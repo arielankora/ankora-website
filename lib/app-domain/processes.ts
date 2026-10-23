@@ -1,6 +1,6 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
-import type { KnowledgeAudience, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
+import type { KnowledgeAudience, ProcedureClassification, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -24,6 +24,8 @@ import { assertEntityBelongs } from "@/lib/app-domain/client-entities";
 import { assertResolvable, knowledgeData, sourcedFields, type KnowledgeInput } from "@/lib/app-domain/knowledge-items";
 import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
+import { readControlRefs } from "@/lib/procedure-document";
+import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -75,6 +77,12 @@ export interface ProcessInput extends KnowledgeInput {
   checkText?: string | null;
   /// Review the procedure every N days (spec 5.4).
   reviewEveryDays?: number | null;
+  // The procedure as a document (23.10.2026).
+  scope?: string | null;
+  definitions?: string | null;
+  controlRefs?: string[];
+  classification?: ProcedureClassification;
+  relatedDocs?: string | null;
 }
 
 export class ProcessVersionConflictError extends Error {
@@ -164,6 +172,11 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     checkEveryDays: input.checkEveryDays !== undefined ? input.checkEveryDays : undefined,
     checkText: input.checkText !== undefined ? clean(input.checkText) : undefined,
     reviewEveryDays: input.reviewEveryDays !== undefined ? input.reviewEveryDays : undefined,
+    scope: input.scope !== undefined ? clean(input.scope) : undefined,
+    definitions: input.definitions !== undefined ? clean(input.definitions) : undefined,
+    controlRefs: input.controlRefs !== undefined ? readControlRefs(input.controlRefs) : undefined,
+    classification: input.classification ?? undefined,
+    relatedDocs: input.relatedDocs !== undefined ? clean(input.relatedDocs) : undefined,
   };
 }
 
@@ -176,7 +189,7 @@ function assertCheck(triggerKinds: ProcessTrigger[], checkEveryDays: number | nu
 }
 
 function assertNoSecrets(input: Partial<ProcessInput>) {
-  const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText]
+  const text = [input.title, input.purpose, input.triggerText, input.slaText, input.externalPartyText, input.approverText, input.approvalText, input.exceptionPlaybook, input.executorText, input.checkText, input.scope, input.definitions, input.relatedDocs]
     .filter(Boolean)
     .join("\n");
   if (findSecrets(text).length) throw new Error("יש כאן סיסמה, מפתח או מספר כרטיס. סודות נשמרים בכספת, לא בתיק.");
@@ -445,9 +458,15 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   const blocking = holdsApproval(checks);
   if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
   const now = new Date();
+  // 23.10.2026: the document as approved, names and all, so version N
+  // reads the same next year (lib/app-domain/procedure-documents.ts).
+  const document = await buildSnapshot(processId, "approval", prisma, now);
   await prisma.$transaction([
     prisma.processVersion.updateMany({ where: { processId, status: "APPROVED" }, data: { status: "SUPERSEDED" } }),
-    prisma.processVersion.update({ where: { id: latest.id }, data: { status: "APPROVED", approvedById: actor.id, approvedAt: now, approvalChecks: checks as unknown as Prisma.InputJsonValue } }),
+    prisma.processVersion.update({
+      where: { id: latest.id },
+      data: { status: "APPROVED", approvedById: actor.id, approvedAt: now, approvalChecks: checks as unknown as Prisma.InputJsonValue, document: document as unknown as Prisma.InputJsonValue },
+    }),
     prisma.process.update({
       where: { id: processId },
       data: { status: process.status === "DRAFT" ? "ACTIVE" : undefined, lastReviewedAt: now, needsReview: false, reviewReason: null },

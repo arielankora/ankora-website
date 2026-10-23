@@ -20,6 +20,7 @@ import { prisma } from "@/lib/prisma";
 import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-live";
 import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
+import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
 
 /// A process of one client, by its code ("P3") or its title, the way the
 /// user says it. One match or a sentence saying why not.
@@ -364,6 +365,100 @@ export function registerClientFileTools(server: McpServer): void {
         return toolJson(detail);
       } catch (err) {
         console.error("[mcp] get_process failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // The procedure as a document (23.10.2026): Claude translates the
+  // approved version to English, a manager approves it on the screen, and
+  // only then can it be exported in English.
+  const TRANSLATION_GUIDE =
+    "Translate into clear, formal business English as used in SOC 2 policies: short declarative sentences, present tense, no marketing tone. Keep product, system and company names as they are (Google Workspace, Slack, Nextage). Write people's names in Latin letters as they would sign them, and give each Hebrew name in `names` its English form. Translate every field that has Hebrew; leave a field out only when the Hebrew is empty. Keep the steps in the same order and number. Do not add, drop or soften anything: the English must say exactly what the approved Hebrew says.";
+
+  server.registerTool(
+    "get_procedure_for_translation",
+    {
+      title: "Get a procedure to translate",
+      description:
+        "The approved version of a client's procedure, in Hebrew, in exactly the shape save_procedure_translation takes back, with the style guide. Use it when the user asks to translate a procedure (or prepare it in English for a client or an auditor). Draft the English, show it to the user, then save it.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_procedure_for_translation,
+    },
+    async (args: { client: string; process: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const source = await translationSource(actor, process.id);
+        return toolJson({ client: client.value.name, ...source, guide: TRANSLATION_GUIDE });
+      } catch (err) {
+        console.error("[mcp] get_procedure_for_translation failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  const nullableText = z.string().nullable().optional();
+  server.registerTool(
+    "save_procedure_translation",
+    {
+      title: "Save a procedure's English translation",
+      description:
+        "Saves the English translation of a procedure's approved version as a draft; a manager approves it on the procedure's document page, and only an approved translation is exported. Pass the fields get_procedure_for_translation returned under `hebrew`, in English. Saving again replaces the draft. The answer lists what is still missing or still in Hebrew (`gaps`): fill those and save again until it is empty, then tell the user a manager needs to approve it and give the link.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P3") or its title.'),
+        version: z.number().int().describe("The approved version number get_procedure_for_translation returned."),
+        translation: z
+          .object({
+            title: z.string(),
+            purpose: nullableText,
+            scope: nullableText,
+            definitions: nullableText,
+            triggerText: nullableText,
+            slaText: nullableText,
+            owner: nullableText,
+            backupOwner: nullableText,
+            executor: nullableText,
+            approver: nullableText,
+            approvalText: nullableText,
+            externalParty: nullableText,
+            systems: z.array(z.object({ name: z.string(), permission: nullableText })).optional(),
+            exceptionPlaybook: nullableText,
+            relatedDocs: nullableText,
+            steps: z.array(z.object({ title: z.string(), output: nullableText, verification: nullableText })),
+            highlights: nullableText,
+            outputs: nullableText,
+            changeNotes: z.record(z.string(), z.string()).optional().describe("Version number to its change note, in English."),
+            names: z.record(z.string(), z.string()).optional().describe("Each Hebrew name to its English form."),
+          })
+          .describe("The English, field for field."),
+      }),
+      annotations: TOOL_ANNOTATIONS.save_procedure_translation,
+    },
+    async (args: { client: string; process: string; version: number; translation: unknown }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const saved = await saveProcedureTranslation(actor, process.id, args.version, args.translation);
+        return toolJson({
+          saved: true,
+          version: saved.version,
+          gaps: saved.gaps,
+          next: saved.gaps.length ? "Fill the gaps and save again." : "Complete. A manager approves it on the document page.",
+          link: `${appBaseUrl()}/app/clients/${client.value.id}/processes/${process.id}/document?lang=en`,
+        });
+      } catch (err) {
+        console.error("[mcp] save_procedure_translation failed", err);
         return toolFailure(err);
       }
     }

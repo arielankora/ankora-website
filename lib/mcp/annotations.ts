@@ -114,6 +114,11 @@ export const TOOL_ANNOTATIONS = {
   list_processes: READ_ONLY,
   get_process: READ_ONLY,
   list_policies: READ_ONLY,
+  // The procedure as a document (23.10.2026): the Hebrew to translate, and
+  // the English saved as a draft a manager approves on the screen. Saving
+  // again replaces the draft, so a retry does no harm.
+  get_procedure_for_translation: READ_ONLY,
+  save_procedure_translation: { ...WRITES, idempotentHint: true },
   // The answer about a run's procedure (spec 5.4). One per run: a second
   // call is refused, not applied twice.
   record_run_lesson: WRITES,
@@ -170,6 +175,7 @@ export const WRITE_TOOLS = [
   "propose_knowledge",
   "start_process",
   "record_process_check",
+  "save_procedure_translation",
   "record_run_lesson",
   "record_pdf_signature",
   "issue_agreement_upload_code",

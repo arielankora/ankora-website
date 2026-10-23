@@ -1955,8 +1955,48 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-22",
       "riskReason": "מאמת ומאשר בלחיצה אחת כללים ופריטים בתיק הפנימי של אנקורה. בודק שהלקוח פנימי ושהפריט לא ודאי רק בגלל מקור של אנקורה, למנהל בלבד, ונרשם ביומן."
+    },
+    "api:/api/clients/[clientId]/procedures": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-23",
+      "riskReason": "מוציא את כל הנהלים של לקוח מהמערכת בקובץ אחד, למבקר. הרשאה לפי שיוך ללקוח ולקהל של כל תהליך, ונרשם ביומן."
+    },
+    "api:/api/clients/[clientId]/processes/[processId]/document": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-23",
+      "riskReason": "מוציא נוהל כ-PDF או Word. מי שלא משויך ללקוח מקבל 404, אנגלית רק מתרגום מאושר, וכל הורדה נרשמת ביומן."
+    },
+    "domain:procedure-documents": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-23",
+      "riskReason": "נועל את המסמך באישור גרסה, שולח תרגום לקלוד רק לתהליך שמותר לשלוח, ומאשר תרגום רק למנהל ורק כשהוא שלם. טעות כאן היא מסמך שגוי אצל מבקר SOC 2."
+    },
+    "screen:/app/clients/[clientId]/procedures": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-23",
+      "riskReason": "קריאה בלבד: רשימת הנהלים וקישורי ייצוא. ההרשאה נאכפת ב-listProcesses ובראוטים."
+    },
+    "screen:/app/clients/[clientId]/processes/[processId]/document": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-23",
+      "riskReason": "תצוגת המסמך ואישור תרגום. האישור עצמו נאכף בשרת למנהל בלבד."
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-20"
+  "lastScan": "2026-10-23"
 }

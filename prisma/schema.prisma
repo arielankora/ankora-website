@@ -3656,6 +3656,13 @@ enum ProcessStepMode {
   AUTOMATED
 }
 
+/// How a procedure document is marked when it leaves the product.
+enum ProcedureClassification {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+}
+
 enum ProcessVersionStatus {
   DRAFT
   APPROVED
@@ -3748,6 +3755,21 @@ model Process {
   checkEveryDays Int?
   checkText      String?
   lastCheckedAt  DateTime?
+
+  // The procedure as a document (23.10.2026): what a SOC 2 style policy
+  // has and the operating fields above do not. Written once per process,
+  // frozen into each approved version (ProcessVersion.document).
+  /// Who and what it applies to, and what it does not. Markdown.
+  scope          String?
+  /// One term per line: "term: meaning".
+  definitions    String?
+  /// The controls it evidences, as the client's framework names them
+  /// ("CC6.2", "CC6.3"). Free text codes, not a fixed list: a client on
+  /// ISO 27001 writes "A.5.18".
+  controlRefs    String[]                @default([])
+  classification ProcedureClassification @default(CONFIDENTIAL)
+  /// Related policies and documents, one per line.
+  relatedDocs    String?
 
   // Knowledge fields (spec 3.1).
   knowledgeStatus KnowledgeStatus      @default(CONFIRMED)
@@ -3874,6 +3896,21 @@ model ProcessVersion {
   /// excepted? }]. The live checks may say otherwise later; this says what
   /// the approver saw.
   approvalChecks Json?
+
+  /// The procedure document as it was approved (lib/procedure-document.ts,
+  /// ProcedureSnapshot): the process's fields, names resolved, frozen at
+  /// approval. An auditor asking for version 2 gets version 2, not version
+  /// 2's steps under today's owner. Null for versions approved before
+  /// 23.10.2026, which are drawn from the live process and say so.
+  document Json?
+  /// The same document in English, for an auditor or a client who reads
+  /// English (ProcedureTranslation). Claude drafts it through MCP; a
+  /// manager approves it. Only an approved translation is exported.
+  translationEn           Json?
+  translationEnById       String?
+  translationEnAt         DateTime?
+  translationEnApprovedById String?
+  translationEnApprovedAt   DateTime?
 
   process Process @relation(fields: [processId], references: [id], onDelete: Cascade)
 
