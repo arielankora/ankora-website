@@ -420,6 +420,25 @@ describe("mail, Drive and recordings (22.10.2026)", () => {
     expect(text).toContain("בהעברה או בהעתק");
   });
 
+  it("treats a mailbox on the client's own domain as the client's, filtered by the task's words (23.10.2026)", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("תיבה בדומיין של הלקוח");
+    expect(text).toContain("הדומיין לא מסנן בה כלום");
+  });
+
+  it("searches Drive by the task's words too, and reports an anchor it cannot open", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("וגם בכל הדרייב לפי מילים מהמשימה");
+    expect(text).toContain("לא משותף עם החשבון המחובר");
+  });
+
+  it("never searches recordings by date alone, and looks by the client's participants", () => {
+    const text = buildAdvancePrompt({ ...base, sources });
+    expect(text).toContain("אף פעם לא מחפשים לפי תאריך בלבד");
+    expect(text).toContain("מחפשים לפי משתתפים מהלקוח");
+    expect(text).toContain("פגישה של לקוח אחר שעלתה בחיפוש: לא פותחים אותה");
+  });
+
   it("states the seven privacy rules, secrets included", () => {
     const text = buildAdvancePrompt({ ...base, sources });
     for (const n of [1, 2, 3, 4, 5, 6, 7]) expect(text).toMatch(new RegExp(`^${n}\\. `, "m"));
