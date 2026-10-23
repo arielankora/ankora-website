@@ -121,6 +121,12 @@ export type PanelProcess = {
   reviewReason: ReviewReason | null;
   reviewEveryDays: number | null;
   reviewDueAt: string | null;
+  // The procedure as a document (23.10.2026).
+  scope?: string | null;
+  definitions?: string | null;
+  controlRefs?: string[];
+  classification?: "PUBLIC" | "INTERNAL" | "CONFIDENTIAL";
+  relatedDocs?: string | null;
   checkEvery: string | null;
   checkText: string | null;
   checkDue: { key: string; state: CheckState } | null;
@@ -412,6 +418,33 @@ function ProcessForm({
       <Field label="נוהל חריגים">
         <textarea name="exceptionPlaybook" rows={3} defaultValue={existing?.exceptionPlaybook ?? ""} placeholder="מה עושים כשמשהו חורג" className={INPUT} />
       </Field>
+      <details className="rounded-lg border border-app-border px-3 py-2" open={!!(existing?.scope || existing?.definitions || existing?.controlRefs?.length || existing?.relatedDocs)}>
+        <summary className="cursor-pointer text-xs font-medium text-app-text-secondary">למסמך הנוהל (תחולה, הגדרות, בקרות)</summary>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">מה שנוהל SOC 2 צריך ואין בשדות למעלה. נכנס למסמך שמייצאים ללקוח או למבקר, וננעל עם כל גרסה מאושרת.</p>
+        <div className="mt-2 space-y-3">
+          <Field label="תחולה">
+            <textarea name="scope" rows={2} defaultValue={existing?.scope ?? ""} placeholder="על מי ועל מה הנוהל חל, ועל מה לא" className={INPUT} />
+          </Field>
+          <Field label="הגדרות (מונח: הסבר, שורה לכל מונח)">
+            <textarea name="definitions" rows={2} defaultValue={existing?.definitions ?? ""} placeholder="Offboarding: עזיבת עובד" className={INPUT} />
+          </Field>
+          <div className="grid grid-cols-[1fr_9rem] gap-3">
+            <Field label="בקרות (מופרדות בפסיק)">
+              <input name="controlRefs" dir="ltr" defaultValue={existing?.controlRefs?.join(", ") ?? ""} placeholder="CC6.2, CC6.3" className={INPUT} />
+            </Field>
+            <Field label="סיווג">
+              <select name="classification" defaultValue={existing?.classification ?? "CONFIDENTIAL"} className={INPUT}>
+                <option value="CONFIDENTIAL">סודי</option>
+                <option value="INTERNAL">פנימי</option>
+                <option value="PUBLIC">ציבורי</option>
+              </select>
+            </Field>
+          </div>
+          <Field label="מסמכים קשורים">
+            <textarea name="relatedDocs" rows={2} defaultValue={existing?.relatedDocs ?? ""} placeholder="מדיניות בקרת גישה, נוהל קליטת עובד" className={INPUT} />
+          </Field>
+        </div>
+      </details>
       <EntitySelect entities={entities} defaultValue={existing?.entityId} />
       <Field label="לוח ימי עבודה">
         <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? ""} aria-label="לוח ימי עבודה" className={INPUT}>
@@ -737,9 +770,16 @@ export function ProcessesPanel({
     <div id="processes" className="rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
         <h2 className="text-sm font-medium text-app-text-primary">תהליכים ({processes.length})</h2>
-        <Drawer triggerLabel="+ תהליך" title="תהליך" variant="link">
-          <ProcessForm clientId={clientId} {...form} />
-        </Drawer>
+        <div className="flex items-center gap-4">
+          {processes.some((p) => p.current) && (
+            <Link href={`/app/clients/${clientId}/procedures`} className="text-xs font-medium text-app-text-accent hover:underline" data-testid="procedures-index-link">
+              הנהלים כמסמכים
+            </Link>
+          )}
+          <Drawer triggerLabel="+ תהליך" title="תהליך" variant="link">
+            <ProcessForm clientId={clientId} {...form} />
+          </Drawer>
+        </div>
       </div>
       {processes.length > 0 && (
         <p className="mt-1 text-[11px] text-app-text-tertiary">
@@ -943,6 +983,11 @@ function ProcessCard({
           </details>
         </div>
         <div className="flex shrink-0 flex-col items-end gap-2 text-xs">
+          {p.latestVersion > 0 && (
+            <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-document-link">
+              מסמך הנוהל
+            </Link>
+          )}
           <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
             <ProcessForm clientId={clientId} existing={p} {...form} />
           </Drawer>

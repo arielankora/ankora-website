@@ -46,7 +46,8 @@ export function wrap(doc: PDFKit.PDFDocument, text: string, width: number, size:
 /// One document being written: the pdfkit doc, a cursor, and the few
 /// drawing moves every flowing PDF makes. Pages are buffered so the
 /// footer can be stamped on every page once the total is known.
-export function startDocument() {
+export function startDocument(options: { dir?: "rtl" | "ltr" } = {}) {
+  const dir = options.dir ?? "rtl";
   const doc = createHebrewPdfDocument();
   const chunks: Buffer[] = [];
   const done = new Promise<Buffer>((resolve, reject) => {
@@ -67,12 +68,14 @@ export function startDocument() {
     }
   }
 
-  function paragraph(text: string, size: number, x = left, w = width) {
+  function paragraph(text: string, size: number, x = left, w = width, color?: string) {
+    if (color) doc.fillColor(color);
     for (const line of wrap(doc, text, w, size)) {
       ensure(size + LINE_GAP);
-      drawBidiLine(doc, line, x, state.y, w, size);
+      drawBidiLine(doc, line, x, state.y, w, size, dir);
       state.y += size + LINE_GAP;
     }
+    if (color) doc.fillColor("#000000");
   }
 
   function blocks(list: Block[]) {
@@ -91,12 +94,16 @@ export function startDocument() {
     }
   }
 
-  /// A bordered table, first column on the right. Empty rows keep a
-  /// height a hand can write in.
-  function table(rows: string[][]) {
+  /// A bordered table, first column on the right (on the left in an LTR
+  /// document). Empty rows keep a height a hand can write in. `weights`
+  /// sizes the columns; `header` shades the first row.
+  function table(rows: string[][], opts: { weights?: number[]; header?: boolean } = {}) {
+    if (rows.length === 0) return;
     const columns = Math.max(...rows.map((r) => r.length));
-    const widths = Array.from({ length: columns }, () => width / columns);
-    const xs = layoutRtlColumns(widths, left);
+    const weights = opts.weights && opts.weights.length === columns ? opts.weights : Array.from({ length: columns }, () => 1);
+    const sum = weights.reduce((a, b) => a + b, 0);
+    const widths = weights.map((w) => (w / sum) * width);
+    const xs = dir === "ltr" ? layoutLtrColumns(widths, left) : layoutRtlColumns(widths, left);
     state.y += 4;
     const laid = rows.map((row) => {
       const cellLines = widths.map((w, i) => (row[i] ? wrap(doc, row[i], w - 8, BODY_SIZE) : []));
@@ -107,14 +114,15 @@ export function startDocument() {
     // page together.
     const total = laid.reduce((sum, r) => sum + r.height, 0);
     if (total < doc.page.height - doc.page.margins.top - doc.page.margins.bottom) ensure(total);
-    for (const { cellLines, height } of laid) {
+    laid.forEach(({ cellLines, height }, r) => {
       ensure(height);
       widths.forEach((w, i) => {
+        if (opts.header && r === 0) doc.rect(xs[i], state.y, w, height).fillColor("#EEF0F3").fill().fillColor("#000000");
         doc.rect(xs[i], state.y, w, height).strokeColor("#999999").stroke();
-        cellLines[i].forEach((line, n) => drawBidiLine(doc, line, xs[i] + 4, state.y + 6 + n * (BODY_SIZE + LINE_GAP), w - 8, BODY_SIZE));
+        cellLines[i].forEach((line, n) => drawBidiLine(doc, line, xs[i] + 4, state.y + 6 + n * (BODY_SIZE + LINE_GAP), w - 8, BODY_SIZE, dir));
       });
       state.y += height;
-    }
+    });
     state.y += 10;
   }
 
@@ -130,14 +138,25 @@ export function startDocument() {
       doc.page.margins.bottom = 0;
       const text = `${code} · page ${i + 1}/${range.count}`;
       const w = measureMixed(doc, text, FOOTER_SIZE);
-      drawBidiLine(doc, text, left + (width - w) / 2, doc.page.height - 26, w, FOOTER_SIZE);
+      drawBidiLine(doc, text, left + (width - w) / 2, doc.page.height - 26, w, FOOTER_SIZE, dir);
       doc.page.margins.bottom = margin;
     }
     doc.end();
     return done;
   }
 
-  return { doc, left, width, state, ensure, paragraph, blocks, finish };
+  return { doc, dir, left, width, state, ensure, paragraph, table, blocks, finish };
+}
+
+/// x positions for LTR columns: column 0 is the leftmost.
+export function layoutLtrColumns(widths: number[], left: number): number[] {
+  const xs: number[] = [];
+  let acc = left;
+  for (const w of widths) {
+    xs.push(acc);
+    acc += w;
+  }
+  return xs;
 }
 
 export type Block = { kind: "heading" | "para"; text: string } | { kind: "table"; rows: string[][] };

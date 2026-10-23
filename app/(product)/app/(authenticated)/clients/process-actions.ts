@@ -21,7 +21,9 @@ import { resolveLesson } from "@/lib/app-domain/process-lessons";
 import { closeTaskCoveredByProcess } from "@/lib/app-domain/process-overlap";
 import { runStep } from "@/lib/app-domain/process-next-steps";
 import type { StepOp } from "@/lib/next-steps";
-import type { KnowledgeStatus, ProcessTransition, ProcessTrigger } from "@prisma/client";
+import type { KnowledgeStatus, ProcedureClassification, ProcessTransition, ProcessTrigger } from "@prisma/client";
+import { readControlRefs } from "@/lib/procedure-document";
+import { approveProcedureTranslation } from "@/lib/app-domain/procedure-documents";
 import { itemExtrasFrom } from "./item-extras";
 
 // Org brain, phase 1: processes and their procedures on the client screen
@@ -32,6 +34,7 @@ type FormState = { error?: string; ok?: boolean };
 const STATUSES: KnowledgeStatus[] = ["CONFIRMED", "UNCERTAIN", "MISSING"];
 const TRIGGERS: ProcessTrigger[] = ["SCHEDULED", "EVENT", "ON_DEMAND", "CONTINUOUS"];
 const TRANSITIONS: ProcessTransition[] = ["WITH_CLIENT", "IN_HANDOVER", "WITH_ANKORA", "NOT_PLANNED"];
+const CLASSIFICATIONS: ProcedureClassification[] = ["PUBLIC", "INTERNAL", "CONFIDENTIAL"];
 
 function friendlyError(err: unknown): string {
   if (err instanceof ForbiddenError) return "אין לך הרשאה לפעולה זו - הלקוח אינו משויך אליך.";
@@ -89,6 +92,12 @@ function parseProcess(f: FormData, selfId?: string): { error?: string; value?: O
       checkEveryDays: every === null ? null : Number(every),
       checkText: text(f, "checkText"),
       reviewEveryDays: review === null ? null : Number(review),
+      // The procedure as a document (23.10.2026).
+      scope: text(f, "scope"),
+      definitions: text(f, "definitions"),
+      controlRefs: readControlRefs(String(f.get("controlRefs") ?? "")),
+      classification: (CLASSIFICATIONS as string[]).includes(String(f.get("classification") ?? "")) ? (String(f.get("classification")) as ProcedureClassification) : undefined,
+      relatedDocs: text(f, "relatedDocs"),
       sources: refs,
 
       manualConfirm: f.get("manualConfirm") === "1",
@@ -231,5 +240,19 @@ export async function recordProcessCheckAction(_prev: FormState | undefined, f: 
   revalidatePath(`/app/clients/${clientId}`);
   // From the home screen's routine, the home screen is what changed.
   if (from === "home") revalidatePath("/app");
+  return { ok: true };
+}
+
+/// A manager approves the English translation of a procedure version
+/// (23.10.2026). Only an approved translation is exported.
+export async function approveProcedureTranslationAction(processId: string, version: number, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await approveProcedureTranslation(user, processId, version);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  revalidatePath(`/app/clients/${clientId}/processes/${processId}/document`);
+  revalidatePath(`/app/clients/${clientId}/procedures`);
   return { ok: true };
 }
