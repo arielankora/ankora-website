@@ -39,8 +39,10 @@ internal dashboards/reports/CSV export (5), client portal + scheduled
 reports (6), integrations (8), tasks/profile/notifications (9), and
 important dates (10). Everything after that stopped being numbered: the
 credentials vault, two-factor sign-in with passkeys, the client file
-("המוח הארגוני") with its processes, rules and knowledge extraction, and
-internal-supplier onboarding. See the ADR's phased plan for the numbered
+("המוח הארגוני") with its processes, rules and knowledge extraction,
+internal-supplier onboarding, a calendar screen, one approvals screen
+gathering every manual approval, procedure documents (PDF/Word, with an
+approved English version) and handover readiness. See the ADR's phased plan for the numbered
 part and `docs/erd.md` for what the schema looks like today.
 
 ### Stack
@@ -235,8 +237,10 @@ was true before timer/billing/alerts/reports/portal/integrations/tasks
 existed.
 
 - **No real external integration is connected yet.** `/app/integrations`
-  (Phase 8) shows ClickUp as a deliberate placeholder - every mutating
-  method on its provider adapter rejects by design (spec 17.3: no OAuth
+  (Phase 8) carried a ClickUp placeholder card until 26.9.2026, when the
+  card was removed; the screen now shows only the Claude connection and
+  advance-with-Claude usage. Every mutating method on the ClickUp
+  provider adapter still rejects by design (spec 17.3: no OAuth
   scope requested until the integration is actually built). The generic
   `IntegrationConnection`/`ExternalMapping` tables and provider interface
   exist so a real integration can be added later without a schema change.
@@ -252,22 +256,23 @@ existed.
   either way), and a real-device Safari pass (verified via Chrome device
   emulation across every phase's QA, but that is not the same as a real
   iPhone).
-- **Audit log has no export/retention policy UI.** Unchanged since Phase
-  1 - it's an append-only table with a read-only filtered viewer;
-  retention/export was never a stated acceptance criterion for any phase.
+- **Audit log has no retention policy.** It's an append-only table that
+  nothing prunes; retention was never a stated acceptance criterion for
+  any phase. The viewer does have an "ייצוא" button, which exports the
+  rows matching the current filter.
 
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 44 tools, by family:
+the Model Context Protocol. 49 tools, by family:
 
 | | |
 | --- | --- |
-| Time (`lib/mcp/tools.ts`, 14) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `update_timer_note`, `create_time_entry`, `list_tasks`, `get_task`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
+| Time (`lib/mcp/tools.ts`, 14) | `list_my_clients`, `list_categories`, `get_active_timer`, `list_my_time_entries`, `start_timer`, `stop_timer`, `update_timer_note`, `create_time_entry`, `list_tasks`, `create_task`, `update_task`, `list_assignable_people`, and the two team reads below |
 | Read (team) | `list_team_members`, `list_team_time_entries` — needs `time_entry.edit_others`, the same permission the admin screen and the CSV export already use |
-| Tasks (`task-extra-tools.ts`, 10) | task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `create_decision`, `list_my_routines`, `record_process_check` |
-| Client file (`client-file-tools.ts`, 11) | `get_client_file`, `list_processes`, `get_process`, `start_process`, `record_run_lesson`, `list_policies`, `propose_knowledge`, `get_extraction_brief`, `lookup_contact` and related reads |
-| Documents (`document-tools.ts`, 4) | `list_documents`, `read_document`, `start_document_upload`, `upload_document` |
+| Tasks (`task-extra-tools.ts`, 10) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `create_decision`, `list_decisions` |
+| Client file (`client-file-tools.ts`, 15) | `get_client_file`, `get_client_brief`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `list_my_routines`, `record_process_check`, `get_extraction_brief` |
+| Documents (`document-tools.ts`, 5) | `list_documents`, `read_document`, `set_document_kind`, `start_document_upload`, `upload_document` |
 | Internal suppliers (`employee-tools.ts`, 5) | `get_employee_status`, `get_blank_agreement_pdf`, `issue_agreement_upload_code`, `record_pdf_signature`, `dismiss_pdf_upload` |
 
 A second, separate server at `/api/mcp/portal` (`portal-tools.ts`) serves

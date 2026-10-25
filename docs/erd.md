@@ -92,6 +92,9 @@ erDiagram
         ClientStatus status
         string timezone
         bool portalShowEmployeeNames
+        string sourceKeywords "(list) words that name the client in a meeting title"
+        string driveFolderId "nullable, the Drive folder its conversations are saved to"
+        string conversationsDocId "nullable, the running conversations document"
         datetime deletedAt
     }
 
@@ -134,9 +137,10 @@ erDiagram
         string clientId FK
         string categoryId FK "nullable"
         string title
-        TaskStatus status "Phase 9: OPEN / IN_PROGRESS / DONE / ARCHIVED"
+        TaskStatus status "OPEN / IN_PROGRESS / PENDING_APPROVAL / DONE / ARCHIVED"
         string source "local or external provider name"
         string externalRef "nullable"
+        bool mappingTask "a handover mapping stage: what it learns goes to the client file before it closes"
         datetime deletedAt
     }
 
@@ -296,6 +300,8 @@ erDiagram
         string autoTaskCategoryId FK "nullable"
         datetime nextOccurrenceAt "nullable"
         datetime snoozedUntil "nullable"
+        boolean expectsReceipt "something is due to reach us from outside on this date"
+        string expectedFrom "nullable, who sends it, in words"
         ImportantDateSource source "MANUAL, HOLIDAY or TEMPLATE"
         string holidayKey "nullable, unique per client"
         datetime deletedAt "nullable"
@@ -935,6 +941,10 @@ erDiagram
     }
 
     KnowledgeBatch {
+        boolean awaitingAssignment "a conversation no participant decides the client of"
+        string candidateClientIds "(list)"
+        string assignmentReason "nullable, which client Claude thinks it is, and why"
+        json pendingInput "nullable"
         string id PK
         string clientId FK
         string sourceId "nullable"
@@ -962,6 +972,8 @@ erDiagram
         datetime decidedAt "nullable"
         string rejectReason "nullable"
         boolean edited
+        string confidence "nullable, HIGH / MEDIUM / LOW, as Claude reported it"
+        boolean attached "it was already in the file, so approving only added its sources"
         string resultId "nullable"
         datetime createdAt
     }
@@ -1048,6 +1060,8 @@ erDiagram
         string approvedById "nullable"
         datetime approvedAt "nullable"
         datetime retiredAt "nullable"
+        datetime effectiveFrom "nullable, the day the rule starts to bind"
+        datetime reviewBy "nullable, the day someone looks at it again"
         string retiredById "nullable"
         string knowledgeStatus "enum KnowledgeStatus"
         json fieldStatus
@@ -1108,6 +1122,16 @@ erDiagram
         string approvalPolicyIds "(list)"
         string approvalText "nullable"
         string exceptionPlaybook "nullable"
+        json requiredSystemPermissions
+        string approverUserId "nullable"
+        string executorUserId "nullable"
+        string executorContactId "nullable"
+        string businessCalendar "nullable, which country's working days the steps are counted by"
+        string scope "nullable, procedure document: tchula"
+        string definitions "nullable, procedure document: hagdarot"
+        string controlRefs "(list), procedure document: referenced controls"
+        string classification "enum ProcedureClassification"
+        string relatedDocs "nullable, procedure document: related documents"
         string entityId "nullable"
         string executorText "nullable"
         string transitionStatus "enum ProcessTransition"
@@ -1151,6 +1175,13 @@ erDiagram
         string highlights "nullable"
         string outputs "nullable"
         string changeNote "nullable"
+        json approvalChecks "nullable, what the checks said when the version was approved"
+        json document "nullable, the version as a SOC 2 style procedure document"
+        json translationEn "nullable, the approved English version"
+        string translationEnById "nullable"
+        datetime translationEnAt "nullable"
+        string translationEnApprovedById "nullable"
+        datetime translationEnApprovedAt "nullable"
         string createdById "nullable"
         datetime createdAt
         string approvedById "nullable"
@@ -1229,7 +1260,7 @@ erDiagram
 | `AgreementKind` | `CONFIDENTIALITY`, `DELETION_DECLARATION` |
 | `AgreementLinkPurpose` | `APP_SIGN`, `PDF_UPLOAD` |
 | `BillingCycle` | `MONTHLY`, `ANNUAL`, `OTHER` |
-| `ClientDocumentKind` | `POLICY`, `CERTIFICATE`, `CONTRACT`, `INVOICE`, `OTHER` |
+| `ClientDocumentKind` | `POLICY`, `PROCEDURE`, `CERTIFICATE`, `CONTRACT`, `INVOICE`, `OTHER` |
 | `ClientDomainKind` | `CLIENT`, `PARTNER` |
 | `ClientKind` | `BUSINESS`, `PRIVATE` |
 | `ContactRelationship` | `CLIENT_STAFF`, `PROVIDER`, `ADVISOR`, `INVESTOR`, `SUPPLIER`, `ANKORA` |
@@ -1261,10 +1292,11 @@ erDiagram
 | `ProcessTrigger` | `SCHEDULED`, `EVENT`, `ON_DEMAND`, `CONTINUOUS` |
 | `ProcessVersionStatus` | `DRAFT`, `APPROVED`, `SUPERSEDED` |
 | `ProposalAction` | `CREATE`, `SUPERSEDE`, `CONTRADICT` |
-| `ProposalState` | `PENDING`, `APPROVED`, `REJECTED` |
-| `ProposalTarget` | `FACT`, `CONTACT`, `ORGANIZATION`, `SYSTEM`, `REQUEST_TYPE`, `POLICY`, `ENTITY`, `NARRATIVE`, `PROCESS`, `DOMAIN` |
+| `ProcedureClassification` | `PUBLIC`, `INTERNAL`, `CONFIDENTIAL` |
+| `ProposalState` | `PENDING`, `APPROVED`, `REJECTED`, `TASK` |
+| `ProposalTarget` | `FACT`, `CONTACT`, `ORGANIZATION`, `SYSTEM`, `REQUEST_TYPE`, `POLICY`, `ENTITY`, `NARRATIVE`, `PROCESS`, `DOMAIN`, `TASK`, `DATE` |
 | `RollConvention` | `NONE`, `PREVIOUS_BUSINESS_DAY`, `NEXT_BUSINESS_DAY` |
-| `SourceKind` | `TRANSCRIPT`, `CLIENT_DOCUMENT`, `TASK`, `PERSON`, `ANKORA_DOCUMENT` |
+| `SourceKind` | `TRANSCRIPT`, `CLIENT_DOCUMENT`, `TASK`, `PERSON`, `ANKORA_DOCUMENT`, `EMAIL` |
 | `SourceRestriction` | `NONE`, `TOPICS_ONLY` |
 | `SourceWeight` | `PRIMARY`, `SECONDARY` |
 | `SupplierExperience` | `GOOD`, `OK`, `AVOID` |
