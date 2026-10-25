@@ -13,6 +13,7 @@ import {
   retryFailedEmailDeliveries,
   retryEmailDelivery,
   reconcileAllClientAlerts,
+  countEnabledRulesByClient,
 } from "@/lib/app-domain/alerts";
 import { sendVaultAlert } from "@/lib/vault/alerts";
 import {
@@ -21,6 +22,7 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   notifyLongRunningTimers,
+  markTaskNotificationsRead,
   LONG_TIMER_NOTIFICATION_TYPE,
 } from "@/lib/app-domain/notifications";
 import type { User } from "@prisma/client";
@@ -459,5 +461,80 @@ describe("notifyLongRunningTimers() - the timer's owner is told once, by email o
     await notifyLongRunningTimers();
     expect(await unreadNotificationCount(user.id)).toBe(1);
     expect(sendEmail).not.toHaveBeenCalled();
+  });
+});
+
+// Two more the coverage check named on 25.10.2026 as never executed.
+
+describe("markTaskNotificationsRead() - opening a task clears its bell", () => {
+  async function bell(userId: string, taskId: string, title: string) {
+    return prisma.notification.create({
+      data: { userId, type: "task_assigned", title, body: title, entityType: "Task", entityId: taskId },
+    });
+  }
+
+  it("clears this user's unread ones for this task, and nothing else", async () => {
+    const { user: me } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: someoneElse } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    const mineOnThis = await bell(me.id, "task-1", "שלי על המשימה הזו");
+    const mineOnAnother = await bell(me.id, "task-2", "שלי על משימה אחרת");
+    const theirsOnThis = await bell(someoneElse.id, "task-1", "של מישהו אחר");
+
+    await markTaskNotificationsRead(me.id, "task-1");
+
+    const read = async (id: string) =>
+      (await prisma.notification.findUniqueOrThrow({ where: { id }, select: { readAt: true } })).readAt;
+
+    expect(await read(mineOnThis.id)).not.toBeNull();
+    expect(await read(mineOnAnother.id), "a bell about another task was cleared").toBeNull();
+    expect(await read(theirsOnThis.id), "somebody else's bell was cleared").toBeNull();
+  });
+
+  it("leaves an already-read one where it was", async () => {
+    // Otherwise re-opening a task keeps moving the timestamp, and "when
+    // did they see it" stops meaning anything.
+    const { user: me } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const old = new Date("2026-10-01T08:00:00Z");
+    const row = await bell(me.id, "task-1", "כבר נקראה");
+    await prisma.notification.update({ where: { id: row.id }, data: { readAt: old } });
+
+    await markTaskNotificationsRead(me.id, "task-1");
+
+    const after = await prisma.notification.findUniqueOrThrow({ where: { id: row.id } });
+    expect(after.readAt).toEqual(old);
+  });
+
+  it("does nothing, and throws nothing, when there is no bell to clear", async () => {
+    // It is called on every task open, so it has to be quiet about the
+    // ordinary case. It swallows its own errors by design; that only
+    // helps if the ordinary case is not an error.
+    const { user: me } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(markTaskNotificationsRead(me.id, "task-nobody-was-told-about")).resolves.toBeUndefined();
+  });
+});
+
+describe("countEnabledRulesByClient() - the number on the clients list", () => {
+  it("counts the enabled rules of each client, and leaves disabled ones out", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const a = await createTestClient();
+    const b = await createTestClient();
+    const quiet = await createTestClient();
+
+    const rule = (clientId: string, thresholdValue: number) =>
+      createAlertRule(superAdmin, clientId, { type: "UTILIZATION_PCT", thresholdValue, recipientsAnkora: [], recipientsClient: [] });
+
+    await rule(a.id, 70);
+    await rule(a.id, 90);
+    const off = await rule(b.id, 80);
+    await prisma.alertRule.update({ where: { id: off.id }, data: { enabled: false } });
+
+    const counts = await countEnabledRulesByClient();
+
+    expect(counts.get(a.id)).toBe(2);
+    // Not zero: a client with only disabled rules is absent, which is
+    // what lets the screen render nothing rather than a "0".
+    expect(counts.get(b.id)).toBeUndefined();
+    expect(counts.get(quiet.id)).toBeUndefined();
   });
 });

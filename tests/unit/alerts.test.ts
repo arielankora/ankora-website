@@ -3,6 +3,7 @@ import {
   currentValueForThreshold,
   isThresholdBreached,
   decideAlertAction,
+  describeThreshold,
 } from "@/lib/app-domain/alerts";
 
 // Phase 4 - spec 9.1's four threshold types and the ADR 11.3 dedupe/
@@ -76,5 +77,30 @@ describe("decideAlertAction() - ADR 11.3 dedupe/retrigger", () => {
   it("does nothing when not breached and there is no open event", () => {
     expect(decideAlertAction(false, false, false, false)).toBe("none");
     expect(decideAlertAction(false, true, true, false)).toBe("none");
+  });
+});
+
+// The sentence a person reads on the alerts screen, which is the only
+// place the direction of a threshold is ever spelled out.
+//
+// Never executed by a test until 25.10.2026, when the coverage check
+// named it. Small, and the one thing it has to get right is that one of
+// the four types counts down while the others count up: "דקות שנותרו:
+// 60 או יותר" would describe the opposite of the rule it belongs to.
+describe("describeThreshold()", () => {
+  it("counts down for the one type that counts down", () => {
+    expect(describeThreshold("REMAINING_MINUTES", 60)).toBe("דקות שנותרו: 60 או פחות");
+  });
+
+  it("counts up for the others", () => {
+    expect(describeThreshold("UTILIZATION_PCT", 80)).toBe("אחוז ניצול: 80 או יותר");
+    expect(describeThreshold("CONSUMED_MINUTES", 900)).toBe("דקות שנוצלו: 900 או יותר");
+    expect(describeThreshold("OVERAGE", 0)).toBe("חריגה: 0 או יותר");
+  });
+
+  it("prints a type it does not know rather than an empty label", () => {
+    // A fifth threshold type would otherwise render as ": 5 או יותר",
+    // which reads like a bug in the screen rather than a gap here.
+    expect(describeThreshold("SOMETHING_NEW", 5)).toBe("SOMETHING_NEW: 5 או יותר");
   });
 });

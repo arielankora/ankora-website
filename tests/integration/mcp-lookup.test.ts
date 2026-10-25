@@ -25,9 +25,11 @@ import {
   canSeeOthersTime,
   lookupCategory,
   lookupClient,
+  lookupStaffMember,
   lookupTeamMember,
   teamMembers,
   usableCategories,
+  usableCategoryById,
 } from "@/lib/mcp/lookup";
 
 type Handler = (args: unknown, ctx: unknown) => Promise<{ content: { text: string }[]; isError?: boolean }>;
@@ -343,5 +345,103 @@ describe("list_team_members / list_team_time_entries - managers only", () => {
     expect(res.json.entries.map((e: { id: string }) => e.id)).toEqual([h1.id, h2.id]);
     expect(res.text).not.toContain("Secret Holdings");
     expect(res.text).not.toContain('"employee"');
+  });
+});
+
+// The two lookups the coverage check named on 25.10.2026 as never having
+// been executed by a test.
+//
+// lookupStaffMember is not a near-duplicate of lookupTeamMember, and the
+// difference is the whole reason it exists: the employee-lifecycle tools
+// ask about somebody who is being onboarded (still INVITED) or leaving
+// (already SUSPENDED), and lookupTeamMember, which is ACTIVE only
+// because it is about who can be booked hours against, would refuse
+// both. A test that only covered the happy path would not notice if the
+// two were quietly merged.
+describe("lookupStaffMember() - the one that finds somebody on their way in or out", () => {
+  async function staff(status: "ACTIVE" | "INVITED" | "SUSPENDED" | "ARCHIVED", email: string) {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE", status, email });
+    return user;
+  }
+
+  it("finds the joiner and the leaver, where the hours lookup refuses them", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const joining = await staff("INVITED", "joining@test.ankora.local");
+    const leaving = await staff("SUSPENDED", "leaving@test.ankora.local");
+
+    expect((await lookupStaffMember(admin, "joining@test.ankora.local")).ok).toBe(true);
+    expect((await lookupStaffMember(admin, "leaving@test.ankora.local")).ok).toBe(true);
+
+    // The difference, asserted rather than described: the roster lookup
+    // for hours is ACTIVE only and cannot answer about either of them.
+    expect((await lookupTeamMember(admin, "joining@test.ankora.local")).ok).toBe(false);
+    expect((await lookupTeamMember(admin, "leaving@test.ankora.local")).ok).toBe(false);
+    void joining;
+    void leaving;
+  });
+
+  it("never answers with a client's portal user", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    const { user: portal } = await createTestClientUser({ clientId: client.id, email: "portal@test.ankora.local" });
+
+    const found = await lookupStaffMember(admin, "portal@test.ankora.local");
+    expect(found.ok, "a client's portal user answered a staff lookup").toBe(false);
+    void portal;
+  });
+
+  it("leaves out somebody already archived", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    await staff("ARCHIVED", "gone@test.ankora.local");
+    expect((await lookupStaffMember(admin, "gone@test.ankora.local")).ok).toBe(false);
+  });
+
+  it("prefers an exact address over a name that could be two people", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const exact = await staff("ACTIVE", "noa@test.ankora.local");
+    await prisma.user.update({ where: { id: exact.id }, data: { name: "נועה" } });
+    const other = await staff("ACTIVE", "noa2@test.ankora.local");
+    await prisma.user.update({ where: { id: other.id }, data: { name: "נועה" } });
+
+    const byEmail = await lookupStaffMember(admin, "noa@test.ankora.local");
+    expect(byEmail.ok && byEmail.value.id).toBe(exact.id);
+
+    // And by the shared name it refuses rather than picking one, which
+    // is the behaviour that keeps a lifecycle tool from onboarding the
+    // wrong person.
+    const byName = await lookupStaffMember(admin, "נועה");
+    expect(byName.ok).toBe(false);
+  });
+
+  it("is refused to somebody who may not read the roster", async () => {
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await staff("ACTIVE", "someone@test.ankora.local");
+    await expect(lookupStaffMember(employee, "someone@test.ankora.local")).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe("usableCategoryById() - the same rule as the picker, asked by id", () => {
+  it("answers for a global category and for this client's own", async () => {
+    const client = await createTestClient();
+    const global = await createTestCategory();
+    const own = await createTestCategory({ clientId: client.id });
+
+    expect((await usableCategoryById(client.id, global.id))?.id).toBe(global.id);
+    expect((await usableCategoryById(client.id, own.id))?.id).toBe(own.id);
+  });
+
+  it("refuses another client's category, and a retired one", async () => {
+    // The id comes from a Claude conversation rather than from a list
+    // the product rendered, so it is exactly the value that has to be
+    // checked rather than trusted.
+    const client = await createTestClient();
+    const other = await createTestClient();
+    const theirs = await createTestCategory({ clientId: other.id });
+    const retired = await createTestCategory();
+    await prisma.category.update({ where: { id: retired.id }, data: { active: false } });
+
+    expect(await usableCategoryById(client.id, theirs.id)).toBeNull();
+    expect(await usableCategoryById(client.id, retired.id)).toBeNull();
+    expect(await usableCategoryById(client.id, "clxxxxxxxxxxxxxxxxxxxxxxxx")).toBeNull();
   });
 });
