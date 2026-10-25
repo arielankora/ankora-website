@@ -177,7 +177,7 @@ async function main() {
   await run.check(
     "integration-utc",
     { label: "Integration tests (UTC, like the server)", level: 2, skipIf: needs.database },
-    () => vitest.integrationUtc(level),
+    () => vitest.integrationUtc(level, splitFor(shard)),
   );
   await run.check("build", { label: "Production build", level: 2, skipIf: needs.prisma }, async () => {
     const r = await sh("npx", ["next", "build"], { timeoutMs: 20 * 60_000, env: { SKIP_ENV_VALIDATION: "1" } });
