@@ -22,6 +22,24 @@ import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
 
+/// Ceilings on the list-shaped inputs of this file's tools (security
+/// review, 25.10.2026).
+///
+/// GHSA-mrhx-c7xc-m3w5: zod's array parser collected one issue per failing
+/// element, with no cap and no early exit, so an array with no length
+/// constraint turned a single authenticated request into an out-of-memory
+/// crash. zod 4.6.6 fixes the accumulation; a bound on the schema is what
+/// makes the question moot, and it is the right shape for these inputs
+/// anyway. lib/mcp/limits.ts holds the matching cap at the SDK layer,
+/// which is also what bounds the `z.record` inputs below.
+///
+/// Each number is well above the widest real call: a meeting has a dozen
+/// participants, not fifty, and a procedure has a handful of systems.
+const MAX_PARTICIPANTS = 50;
+const MAX_ALSO_SOURCES = 20;
+const MAX_PROCEDURE_SYSTEMS = 50;
+const MAX_PROCEDURE_STEPS = 200;
+
 /// A process of one client, by its code ("P3") or its title, the way the
 /// user says it. One match or a sentence saying why not.
 async function resolveProcess(client: { id: string; name: string }, query: string): Promise<{ ok: true; id: string } | { ok: false; message: string }> {
@@ -159,7 +177,7 @@ export function registerClientFileTools(server: McpServer): void {
             kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT", "EMAIL"]),
             title: z.string(),
             date: z.string().optional().describe("YYYY-MM-DD"),
-            participants: z.array(z.string()).optional(),
+            participants: z.array(z.string()).max(MAX_PARTICIPANTS).optional(),
             firefliesId: z.string().optional(),
             gmailThreadId: z.string().optional().describe("For kind EMAIL: the Gmail thread id, so the same thread is one source."),
             documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
@@ -187,7 +205,7 @@ export function registerClientFileTools(server: McpServer): void {
               targetId: z.string().optional(),
               payload: z.record(z.string(), z.unknown()),
               at: z.string().optional(),
-              alsoSources: z.array(z.string()).optional(),
+              alsoSources: z.array(z.string()).max(MAX_ALSO_SOURCES).optional(),
               reason: z.string().optional(),
               quote: z.string().optional(),
               confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
@@ -429,10 +447,10 @@ export function registerClientFileTools(server: McpServer): void {
             approver: nullableText,
             approvalText: nullableText,
             externalParty: nullableText,
-            systems: z.array(z.object({ name: z.string(), permission: nullableText })).optional(),
+            systems: z.array(z.object({ name: z.string(), permission: nullableText })).max(MAX_PROCEDURE_SYSTEMS).optional(),
             exceptionPlaybook: nullableText,
             relatedDocs: nullableText,
-            steps: z.array(z.object({ title: z.string(), output: nullableText, verification: nullableText })),
+            steps: z.array(z.object({ title: z.string(), output: nullableText, verification: nullableText })).max(MAX_PROCEDURE_STEPS),
             highlights: nullableText,
             outputs: nullableText,
             changeNotes: z.record(z.string(), z.string()).optional().describe("Version number to its change note, in English."),

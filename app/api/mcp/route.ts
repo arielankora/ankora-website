@@ -4,6 +4,7 @@ import { verifyMcpBearerToken } from "@/lib/mcp/auth";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
 import { isProductionBuild } from "@/lib/env";
+import { TOOL_INPUT_LIMIT } from "@/lib/mcp/limits";
 
 // Phase 13 (MCP server, docs/adr/0005). The Model Context Protocol
 // endpoint that lets an Ankora employee reach the Time Tracking app from
@@ -38,6 +39,11 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const handler = createMcpHandler(registerAnkoraTools, {
+  // Caps the number of array elements and object members one tools/call
+  // may ask the SDK to validate. See lib/mcp/limits.ts: without it, the
+  // 2.3.0 upgrade that closed GHSA-46jr-4wx8-v453 does nothing, because
+  // the option ships off by default.
+  ...TOOL_INPUT_LIMIT,
   serverInfo: {
     name: "ankora-time-tracking",
     version: "0.1.0",

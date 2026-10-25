@@ -79,6 +79,87 @@ a worse failure mode than a build-time DoS we cannot trigger.
 
 Revisit when Prisma ships a release depending on deepmerge-ts >= 8.
 
+## Fixed, not accepted: the MCP input-size pair (25.10.2026)
+
+Two advisories a week apart, both reachable, both closed by a patch bump
+plus one line of configuration. Written down because the configuration is
+the part that is easy to lose.
+
+- **`@modelcontextprotocol/server` 2.0.0 → 2.4.0.** GHSA-46jr-4wx8-v453 /
+  CVE-2026-111768: the SDK put no ceiling on how many array elements and
+  object members it would validate inside one `tools/call`, so a single
+  request under the body-size limit could end the function in "JavaScript
+  heap out of memory". Fixed in 2.3.0.
+- **`zod` 4.6.5 → 4.6.7.** GHSA-mrhx-c7xc-m3w5: `$ZodArray` collected one
+  issue per failing element, with no cap and no early exit, on any array
+  schema without a length constraint. Fixed in 4.6.6.
+- **`mcp-handler` 2.2.0 → 2.3.0**, which is the release that refuses a
+  shared server instance. We were never exposed to the advisory that
+  change is for (see below), but staying on a version whose peer is a
+  withdrawn SDK line is not worth the saving.
+
+Reachable, and the reasoning matters because the first reading says
+otherwise. Both endpoints authenticate before the SDK sees the body
+(`withMcpAuth(..., { required: true })`), so this was never anonymous. It
+was still worth fixing at once: `/api/mcp/portal` is reachable by a
+client's portal user and not only by staff, the per-token rate limit of
+120 a minute is irrelevant to an attack that needs one request, and
+`propose_knowledge` took `participants`, `alsoSources` and a `z.record`
+payload with no bound at all.
+
+**The upgrade alone fixes nothing.** `maxToolInputElements` ships off by
+default. `lib/mcp/limits.ts` turns it on for both handlers, and has to
+pass it through a cast: mcp-handler 2.3.0 types its options as the SDK's
+`ServerOptions`, which does not declare the field, while at runtime it
+collects unrecognised options with a rest spread and hands them to
+`new McpServer`. `tests/unit/mcp/input-limit.test.ts` asserts the running
+server refuses an oversized payload, because a cast cannot be trusted to
+keep working and a rename upstream would otherwise be silent. Remove the
+cast when mcp-handler widens the type.
+
+The schemas were bounded as well, in `lib/mcp/client-file-tools.ts`. A
+dependency fix that a future version can regress is not the place to
+leave the only defence, and the bounds are right on their own terms: a
+meeting has a dozen participants, not fifty.
+
+`maxRequestBodySize`, which the advisory also recommends, is **not**
+reachable from here: mcp-handler forwards only `legacy`, `onerror` and
+`maxSubscriptions` to the SDK's own handler options. Vercel's 4.5MB
+function body limit is what caps the request itself today.
+
+## Checked and not applicable: the other two MCP SDK advisories
+
+Recorded so the weekly check does not re-derive them.
+
+- **GHSA-jm63-cq47-j5jp** (one client's responses delivered to another).
+  Requires a `McpServer` or transport built once and shared across
+  requests. mcp-handler passes `createMcpHandler` a factory that builds a
+  new `McpServer` per call, which the advisory names explicitly as the
+  unaffected pattern.
+- **GHSA-rvq5-wwqv-78pq** (bearer tokens issued for another service
+  accepted). Concerns the SDK's own bearer verification. `withMcpAuth`
+  calls `verifyMcpBearerToken` in `lib/mcp/auth.ts`, which resolves a
+  token by prefix and hash against our own tables and trusts no external
+  issuer.
+
+## Accepted: @vercel/oidc → @vercel/cli-config → zod 4.1.11 (high)
+
+Survives the zod bump above, because this is a second, nested copy. npm's
+suggested remediation is `@vercel/oidc` 3.5.0, a major downgrade, which is
+the pattern the standing rule below forbids.
+
+Not reachable here. `@vercel/cli-config` reads the Vercel CLI's own local
+configuration files, never network input, and `@vercel/oidc` is used only
+by `getVercelOidcToken` in `lib/google-drive.ts` and
+`lib/vault/gcp-token.ts`. Nothing an attacker controls is parsed by that
+copy of zod.
+
+## Accepted: vite, vitest and @vitest/mocker (high and moderate)
+
+All three are `dev: true` in the lockfile and run only under
+`npm test`. They never enter a deployed bundle, and the inputs they parse
+are this repository's own test files.
+
 ## Standing rule
 
 Do not run `npm audit fix --force` on this project. Every remaining
