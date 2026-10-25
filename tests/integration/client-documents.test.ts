@@ -171,7 +171,10 @@ describe("addClientDocumentForLink() - the upload that arrives with a token, not
   const base = (clientId: string) => ({
     clientId,
     title: "התחייבות לסודיות",
-    kind: "AGREEMENT" as const,
+    // CONTRACT, not an invented "AGREEMENT": the signed confidentiality
+    // undertaking is a contract, and ClientDocumentKind has six values,
+    // none of them that one.
+    kind: "CONTRACT" as const,
     fileName: "signed.pdf",
     mimeType: "application/pdf",
   });

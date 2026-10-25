@@ -447,9 +447,11 @@ describe("setUserPersonalEmail() - the address outside the company", () => {
     });
     expect(audit, "no audit row for a change of where we mail somebody").not.toBeNull();
     // Both sides, because the question is "where did we send it", and an
-    // audit row that records only the new value cannot answer it.
-    expect(JSON.stringify(audit?.before)).toContain("null");
-    expect(JSON.stringify(audit?.after)).toContain("noa.private@gmail.com");
+    // audit row that records only the new value cannot answer it. The
+    // columns are beforeJson/afterJson; `before`/`after` are what
+    // recordAudit takes, not what the row carries.
+    expect(JSON.stringify(audit?.beforeJson)).toContain("null");
+    expect(JSON.stringify(audit?.afterJson)).toContain("noa.private@gmail.com");
   });
 
   it("clears it when the field is emptied", async () => {
