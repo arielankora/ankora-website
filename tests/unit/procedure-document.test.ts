@@ -48,6 +48,8 @@ const snapshot: ProcedureSnapshot = {
   classification: "CONFIDENTIAL",
   relatedDocs: null,
   reviewEveryDays: 365,
+  // A v1 snapshot froze no contact ids. See SnapshotPeople.
+  people: null,
 };
 
 const steps = [
@@ -104,7 +106,9 @@ describe("readControlRefs", () => {
 describe("readSnapshot", () => {
   it("round-trips and rejects what is not a snapshot", () => {
     expect(readSnapshot(JSON.parse(JSON.stringify(snapshot)))).toEqual(snapshot);
-    expect(readSnapshot({ v: 2, title: "x", code: "P1" })).toBeNull();
+    // 25.10.2026: v2 is a real version now (contact ids, see
+    // SnapshotPeople), so the "not a snapshot" case moved up.
+    expect(readSnapshot({ v: 9, title: "x", code: "P1" })).toBeNull();
     expect(readSnapshot(null)).toBeNull();
   });
 });
@@ -296,5 +300,100 @@ describe("files", () => {
     const zip = await JSZip.loadAsync(await renderProcedurePackDocx({ clientName: "NUX", lang: "he", generatedAt: new Date(), docs: [{ doc: he, fingerprint: hash }, { doc: he, fingerprint: hash }], skipped: [] }));
     const body = await zip.file("word/document.xml")!.async("string");
     expect(body.match(/<w:pageBreakBefore\/>/g)?.length).toBe(2);
+  });
+});
+
+// A contact marked sensitive after the version was approved (25.10.2026).
+//
+// The filter that keeps a sensitive contact out of a document used to run
+// in one place: the query inside buildSnapshot, at the moment of
+// approval. A procedure approved in March and a contact marked sensitive
+// in April therefore never met, and that procedure is the one that goes
+// to a client, to an auditor, and to Claude for the translation.
+//
+// These cover the document half. The database half, where the mark is
+// actually read, is in tests/integration/procedure-documents.test.ts.
+describe("a contact who may no longer be named", () => {
+  const v2: ProcedureSnapshot = {
+    ...snapshot,
+    v: 2,
+    executor: "טל (IT). רינת כהן (מנהלת משרד)",
+    people: {
+      executorUser: "טל (IT)",
+      executorContactId: "contact_rinat",
+      executorText: null,
+      approverUser: null,
+      approverContactId: null,
+      approverText: "אין אישור נפרד.",
+      externalPartyContactIds: [],
+      externalPartyText: null,
+    },
+  };
+
+  it("reads a v2 snapshot's parts back, and a v1 snapshot as having none", () => {
+    const back = readSnapshot(JSON.parse(JSON.stringify(v2)));
+    expect(back?.v).toBe(2);
+    expect(back?.people?.executorContactId).toBe("contact_rinat");
+    expect(back?.people?.externalPartyContactIds).toEqual([]);
+
+    const old = readSnapshot(JSON.parse(JSON.stringify(snapshot)));
+    expect(old?.v).toBe(1);
+    expect(old?.people).toBeNull();
+    // And the frozen line is still readable, which is what a v1 version
+    // keeps being read through.
+    expect(old?.executor).toBe("טל (IT)");
+  });
+
+  it("refuses a snapshot whose version it does not know", () => {
+    expect(readSnapshot({ ...snapshot, v: 3 })).toBeNull();
+  });
+
+  it("says so in the document instead of printing one name fewer", () => {
+    const doc = buildProcedureDoc({
+      lang: "he",
+      snapshot: { ...v2, executor: "טל (IT)" },
+      version,
+      history: [],
+      live: false,
+      omitEmpty: true,
+      withheldPeople: ["executor"],
+    });
+    const roles = doc.blocks.map((b) => JSON.stringify(b)).join("\n");
+    expect(roles).toContain("הושמט");
+    // The name itself is gone.
+    expect(roles).not.toContain("רינת");
+  });
+
+  it("prints nothing about it on an ordinary document", () => {
+    const doc = buildProcedureDoc({ lang: "he", snapshot, version, history: [], live: false, omitEmpty: true });
+    expect(doc.blocks.map((b) => JSON.stringify(b)).join("\n")).not.toContain("הושמט");
+  });
+
+  it("does not let the English keep a name the Hebrew dropped", () => {
+    // The translation was approved before the contact was marked, so it
+    // still carries the name. Withholding in one language only publishes
+    // it in the other.
+    const stale = { ...translation, executor: "Tal (IT). Rinat Cohen (office manager)" };
+    const doc = buildProcedureDoc({
+      lang: "en",
+      snapshot: { ...v2, executor: "טל (IT)" },
+      version,
+      history: [],
+      translation: stale,
+      live: false,
+      omitEmpty: true,
+      withheldPeople: ["executor"],
+    });
+    const text = doc.blocks.map((b) => JSON.stringify(b)).join("\n");
+    expect(text).not.toContain("Rinat");
+    expect(text).toContain("withheld");
+  });
+
+  it("leaves the English alone when nothing was withheld", () => {
+    const fresh = { ...translation, executor: "Tal (IT)" };
+    const doc = buildProcedureDoc({ lang: "en", snapshot: v2, version, history: [], translation: fresh, live: false, omitEmpty: true });
+    const text = doc.blocks.map((b) => JSON.stringify(b)).join("\n");
+    expect(text).toContain("Tal (IT)");
+    expect(text).not.toContain("withheld");
   });
 });

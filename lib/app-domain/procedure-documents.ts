@@ -12,14 +12,17 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import {
   buildProcedureDoc,
   fingerprintSource,
+  joinParts,
   readSnapshot,
   readTranslation,
   translationGaps,
   type HistoryRow,
+  type PeopleField,
   type ProcedureDoc,
   type ProcedureLang,
   type ProcedureSnapshot,
   type ProcedureTranslation,
+  type SnapshotPeople,
 } from "@/lib/procedure-document";
 
 // A client's procedures as documents (23.10.2026): the snapshot frozen
@@ -33,7 +36,18 @@ type Db = Prisma.TransactionClient | typeof prisma;
 const contactLabel = (c: { role: string | null; person: { name: string | null } }) =>
   c.person.name ? (c.role ? `${c.person.name} (${c.role})` : c.person.name) : c.role ?? null;
 
-const join = (parts: (string | null | undefined)[]) => parts.filter((p): p is string => !!p && !!p.trim()).join(". ") || null;
+const join = joinParts;
+
+/// Who may be named in a document, asked of the database rather than
+/// remembered. The one place this condition is written.
+///
+/// It used to live only in buildSnapshot's query, which runs once, at
+/// approval. Marking a contact sensitive afterwards therefore did nothing
+/// to a procedure already approved, and that procedure is the one that
+/// goes to a client, to an auditor and to Claude for translation. The
+/// condition is a function now because it is asked twice: once when the
+/// version is frozen, and once on every read.
+const NAMEABLE = { deletedAt: null, sensitivity: "NORMAL", audience: "ALL_STAFF" } as const;
 
 /// The process as it stands now, names resolved: what an approval
 /// freezes. `db` lets the approval take it inside its transaction.
@@ -49,7 +63,7 @@ export async function buildSnapshot(processId: string, frozenBy: ProcedureSnapsh
     // a few people is not named in it.
     contactIds.length
       ? db.clientContact.findMany({
-          where: { id: { in: contactIds }, deletedAt: null, sensitivity: "NORMAL", audience: "ALL_STAFF" },
+          where: { id: { in: contactIds }, ...NAMEABLE },
           select: { id: true, role: true, person: { select: { name: true } } },
         })
       : [],
@@ -63,7 +77,7 @@ export async function buildSnapshot(processId: string, frozenBy: ProcedureSnapsh
   const systemName = new Map(systems.map((s) => [s.id, s.systemName]));
   const permissions = (p.requiredSystemPermissions ?? {}) as Record<string, unknown>;
   return {
-    v: 1,
+    v: 2,
     frozenAt: now.toISOString(),
     frozenBy,
     clientName: p.client.name,
@@ -90,6 +104,94 @@ export async function buildSnapshot(processId: string, frozenBy: ProcedureSnapsh
     classification: p.classification,
     relatedDocs: p.relatedDocs,
     reviewEveryDays: p.reviewEveryDays,
+    // v2: the parts, so a read can ask about the contacts again. The
+    // joined strings above stay as the approval wrote them, and are what
+    // a v1 reader (or a v1 snapshot) still uses.
+    people: {
+      executorUser: user(p.executorUserId),
+      executorContactId: p.executorContactId,
+      executorText: p.executorText,
+      approverUser: user(p.approverUserId),
+      approverContactId: p.approverContactId,
+      approverText: p.approverText,
+      externalPartyContactIds: [...p.externalPartyContactIds],
+      externalPartyText: p.externalPartyText,
+    },
+  };
+}
+
+/// The role lines as they read now, with any contact who may no longer be
+/// named left out.
+///
+/// `live` is the process as it stands, and it is the fallback for a v1
+/// snapshot, which froze no ids. A v1 version therefore names whoever the
+/// process points at today, filtered; that is less faithful to the moment
+/// of approval than v2 and strictly safer than printing a frozen name
+/// nobody can check.
+///
+/// Returns the fields a contact was removed from, so the document can say
+/// so, in both languages.
+export async function resolveSnapshotPeople(
+  snapshot: ProcedureSnapshot,
+  live: { executorContactId: string | null; approverContactId: string | null; externalPartyContactIds: string[] },
+  db: Db = prisma
+): Promise<{ snapshot: ProcedureSnapshot; withheld: PeopleField[] }> {
+  const people: SnapshotPeople = snapshot.people ?? {
+    executorUser: null,
+    executorContactId: live.executorContactId,
+    executorText: null,
+    approverUser: null,
+    approverContactId: live.approverContactId,
+    approverText: null,
+    externalPartyContactIds: [...live.externalPartyContactIds],
+    externalPartyText: null,
+  };
+  const wanted = [people.executorContactId, people.approverContactId, ...people.externalPartyContactIds].filter(
+    (x): x is string => !!x
+  );
+  if (wanted.length === 0) return { snapshot, withheld: [] };
+
+  const rows = await db.clientContact.findMany({
+    where: { id: { in: [...new Set(wanted)] }, ...NAMEABLE },
+    select: { id: true, role: true, person: { select: { name: true } } },
+  });
+  const byId = new Map(rows.map((c) => [c.id, c]));
+  const withheld: PeopleField[] = [];
+  // Asked of the rows that came back, not of a reason we guessed: a
+  // contact that is sensitive, restricted or deleted simply is not in
+  // them, and so is not named.
+  const label = (id: string | null, field: PeopleField): string | null => {
+    if (!id) return null;
+    const c = byId.get(id);
+    if (!c) {
+      if (!withheld.includes(field)) withheld.push(field);
+      return null;
+    }
+    return contactLabel(c);
+  };
+
+  // A v1 snapshot has no parts to rebuild from, so its frozen line is
+  // kept unless a contact it may name is withheld, in which case the line
+  // goes entirely. Half a line built by guessing which words are a name
+  // would be worse than either.
+  const rebuild = (field: PeopleField, parts: (string | null)[], frozen: string | null): string | null => {
+    const had = withheld.includes(field);
+    if (snapshot.people) return joinParts(parts);
+    return had ? null : frozen;
+  };
+
+  const executorContact = label(people.executorContactId, "executor");
+  const approverContact = label(people.approverContactId, "approver");
+  const externalContacts = people.externalPartyContactIds.map((id) => label(id, "externalParty"));
+
+  return {
+    snapshot: {
+      ...snapshot,
+      executor: rebuild("executor", [people.executorUser, executorContact, people.executorText], snapshot.executor),
+      approver: rebuild("approver", [people.approverUser, approverContact, people.approverText], snapshot.approver),
+      externalParty: rebuild("externalParty", [...externalContacts, people.externalPartyText], snapshot.externalParty),
+    },
+    withheld,
   };
 }
 
@@ -146,7 +248,9 @@ export async function procedureDocument(
   if (!v) throw new Error("הגרסה לא נמצאה.");
 
   const frozen = readSnapshot(v.document);
-  const snapshot = frozen ?? (await buildSnapshot(p.id, "approval"));
+  const base = frozen ?? (await buildSnapshot(p.id, "approval"));
+  // Every read, not only the approval: see resolveSnapshotPeople.
+  const { snapshot, withheld } = await resolveSnapshotPeople(base, p);
   const userIds = [...new Set([...p.versions.map((x) => x.approvedById), v.translationEnById, v.translationEnApprovedById].filter((x): x is string => !!x))];
   const users = new Map((await prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   const name = (id: string | null) => (id ? users.get(id) ?? null : null);
@@ -181,6 +285,7 @@ export async function procedureDocument(
     translation,
     live: !frozen,
     omitEmpty: options.omitEmpty ?? false,
+    withheldPeople: withheld,
   });
   const steps = readSteps(v.steps);
   const parsed = readTranslation(v.translationEn);
@@ -196,7 +301,9 @@ export async function procedureDocument(
         ? null
         : {
             state,
-            gaps: parsed ? translationGaps(snapshot, { steps, highlights: v.highlights, outputs: v.outputs }, parsed) : ["invalid"],
+            // Against the resolved snapshot, so a role the document no longer
+        // names is not reported as a translation that went missing.
+        gaps: parsed ? translationGaps(snapshot, { steps, highlights: v.highlights, outputs: v.outputs }, parsed) : ["invalid"],
             by: name(v.translationEnById),
             at: v.translationEnAt,
             approvedBy: name(v.translationEnApprovedById),
@@ -213,7 +320,10 @@ export async function translationSource(actor: User, processId: string) {
   if (!canSendToAi(p, actor.id)) throw new Error("This process is sensitive or restricted, so it is not sent to Claude. Translate it by hand.");
   const v = p.versions.find((x) => x.status === "APPROVED");
   if (!v) throw new Error("רק נוהל מאושר מתורגם. לתהליך הזה אין עדיין גרסה מאושרת.");
-  const snapshot = readSnapshot(v.document) ?? (await buildSnapshot(p.id, "translation"));
+  // Resolved before anything is handed over. canSendToAi above answers
+  // for the process; it says nothing about the people named inside it,
+  // and a Claude conversation is a copy outside the product.
+  const { snapshot } = await resolveSnapshotPeople(readSnapshot(v.document) ?? (await buildSnapshot(p.id, "translation")), p);
   const steps = readSteps(v.steps);
   const approvers = await prisma.user.findMany({ where: { id: { in: p.versions.map((x) => x.approvedById).filter((x): x is string => !!x) } }, select: { name: true } });
   return {
@@ -258,7 +368,7 @@ export async function saveProcedureTranslation(actor: User, processId: string, v
   const tr = readTranslation(value);
   if (!tr) throw new Error("התרגום צריך לפחות כותרת ורשימת שלבים.");
   if (findSecrets(JSON.stringify(tr)).length) throw new Error("יש בתרגום סיסמה, מפתח או מספר כרטיס.");
-  const snapshot = readSnapshot(v.document) ?? (await buildSnapshot(p.id, "translation"));
+  const { snapshot } = await resolveSnapshotPeople(readSnapshot(v.document) ?? (await buildSnapshot(p.id, "translation")), p);
   const gaps = translationGaps(snapshot, { steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, tr);
   await prisma.processVersion.update({
     where: { id: v.id },
@@ -281,9 +391,10 @@ export async function approveProcedureTranslation(actor: User, processId: string
   const v = p.versions.find((x) => x.version === version);
   if (!v || !v.translationEn) throw new Error("אין תרגום לאשר.");
   if (v.translationEnApprovedAt) return;
-  const snapshot = readSnapshot(v.document);
+  const stored = readSnapshot(v.document);
   const tr = readTranslation(v.translationEn);
-  if (!snapshot || !tr) throw new Error("התרגום השמור לא תקין. צריך לתרגם מחדש.");
+  if (!stored || !tr) throw new Error("התרגום השמור לא תקין. צריך לתרגם מחדש.");
+  const { snapshot } = await resolveSnapshotPeople(stored, p);
   const gaps = translationGaps(snapshot, { steps: readSteps(v.steps), highlights: v.highlights, outputs: v.outputs }, tr);
   if (gaps.length) throw new Error(`התרגום לא שלם: ${gaps.slice(0, 5).join(", ")}${gaps.length > 5 ? "..." : ""}`);
   await prisma.processVersion.update({ where: { id: v.id }, data: { translationEnApprovedById: actor.id, translationEnApprovedAt: new Date() } });
