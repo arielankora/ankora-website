@@ -198,3 +198,106 @@ export const CREDENTIAL_PATTERNS: { pattern: RegExp; what: string }[] = [
 // So the rule for adding to this list: match a shape that cannot occur by
 // accident in HTML, or a database column name that no UI should ever
 // render. Fuzzier detection belongs in secret-scan.ts.
+
+/**
+ * Product screens whose route carries a dynamic segment.
+ *
+ * APP_SCREENS above drops every one of these, with a reason that is
+ * sound on its own terms: a blind sweep cannot invent an id. What the
+ * reason does not say is that the credential sweep built in #84 - the
+ * one structural guard against a database row being serialised into a
+ * page's HTML - therefore runs on 41 screens and skips 11.
+ *
+ * That is the wrong 11. A list screen renders names and counts; a
+ * detail screen renders a record, and a record is where the columns
+ * are. Two of the three leaks that sweep exists for were on screens in
+ * this list: /app/users/[userId] handed over a whole User row, and
+ * /app/important-dates/[id] handed over the whole user list. Only the
+ * first of those two is checked today, by a hand-written test in
+ * credentials.super.spec.ts, and a hand-written test covers the screen
+ * somebody remembered.
+ *
+ * Derived from the manifest for the same reason the list above is: the
+ * five newest screens here all landed in the last five weeks, and not
+ * one of them was added to any sweep.
+ */
+export const DYNAMIC_SCREENS: string[] = ids
+  .filter(([id, c]) => c.kind === "screen" && id.includes("["))
+  .map(([id]) => id.slice("screen:".length))
+  .sort();
+
+/**
+ * The dynamic screens the browser sweep reaches, and how it gets there.
+ *
+ * No id is typed out. Each route is resolved from a page the product
+ * itself rendered: the list screen above it, or - for a screen two
+ * levels down - a link harvested from a screen already resolved. An id
+ * written into a spec is a fixture dependency in disguise.
+ *
+ * `optional` means the sweep cannot insist on finding an instance,
+ * because whether one exists depends on what the database holds rather
+ * than on the product being correct. Those print a line naming what was
+ * not swept; everything else is a failure, because a screen that
+ * silently resolves to nothing is a check that silently stopped.
+ */
+export const DYNAMIC_SWEEP: { route: string; optional?: string }[] = [
+  { route: "/app/clients/[clientId]" },
+  { route: "/app/clients/[clientId]/client-file" },
+  { route: "/app/clients/[clientId]/handover" },
+  { route: "/app/clients/[clientId]/procedures" },
+  {
+    route: "/app/clients/[clientId]/processes/[processId]/document",
+    optional: "needs a process with an approved version on the first client; the approval flow creates one, and spec order is not guaranteed",
+  },
+  { route: "/app/categories/[categoryId]" },
+  { route: "/app/tasks/[id]" },
+  { route: "/app/users/[userId]" },
+  {
+    route: "/app/important-dates/[id]",
+    optional: "the demo seed creates no important dates; inventing one here would make this a creation test wearing a sweep's name",
+  },
+];
+
+/**
+ * Dynamic screens the sweep deliberately leaves alone, each with the
+ * reason. Not a backlog: anything not listed here has to be swept.
+ */
+export const DYNAMIC_NOT_SWEPT: Record<string, string> = {
+  "/agreements/sign/[token]":
+    "public, reached only with a signing token the product mails out. flows-agreements.super.spec.ts opens it with a real token and is the right place for it.",
+  "/agreements/upload/[token]":
+    "same token, same spec. Neither screen is behind the session this sweep signs in with.",
+};
+
+/** `/app/clients/[clientId]/procedures` as a matcher for a real address. */
+export function routePattern(route: string): RegExp {
+  return new RegExp(`^${route.replace(/[.*+?^${}()|\\]/g, "\\$&").replace(/\[[^\]]+\]/g, "[^/]+")}$`);
+}
+
+/** The part of a route before its first dynamic segment: its list screen. */
+export function parentListRoute(route: string): string {
+  return route.slice(0, route.indexOf("/["));
+}
+
+/**
+ * `route` with the ids of a screen already resolved above it.
+ *
+ * `/app/clients/[clientId]/handover` is the client whose screen was just
+ * swept, not a second lookup: the suffix comes from the manifest route
+ * itself, so the address is the product's own rather than a guess. A
+ * segment nothing has resolved yet is left in brackets, which is how the
+ * caller knows it still has to find one.
+ */
+export function substituteKnownIds(route: string, resolved: Map<string, string>): string {
+  const seg = route.split("/");
+  const out = [...seg];
+  for (const [pattern, url] of resolved) {
+    const ps = pattern.split("/");
+    if (ps.length > seg.length) continue;
+    const prefixes = ps.every((s, i) => s === seg[i] || (s.startsWith("[") && (seg[i] ?? "").startsWith("[")));
+    if (!prefixes) continue;
+    const us = url.split("/");
+    for (let i = 0; i < ps.length; i += 1) if (seg[i].startsWith("[")) out[i] = us[i];
+  }
+  return out.join("/");
+}
