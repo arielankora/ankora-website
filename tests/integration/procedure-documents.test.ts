@@ -3,6 +3,7 @@ import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { addProcess, approveProcessVersion, saveProcessVersion, updateProcess } from "@/lib/app-domain/processes";
+import { addClientContact, updateClientContact } from "@/lib/app-domain/client-contacts";
 import {
   approveProcedureTranslation,
   clientProcedurePack,
@@ -102,6 +103,101 @@ describe("procedure documents", () => {
     await saveProcessVersion(hadas, secret.id, { steps: [{ title: "שלב" }], baseVersion: 0 });
     await approveProcessVersion(ariel, secret.id, 1);
     await expect(translationSource(hadas, secret.id)).rejects.toThrow(/not sent to Claude/);
+  });
+
+  // A contact marked sensitive after the version was approved
+  // (25.10.2026). The rule that keeps such a contact out of a document
+  // used to be enforced once, in the query inside buildSnapshot, at the
+  // moment of approval. Everything below is what that left open.
+  describe("a contact marked sensitive after the version was approved", () => {
+    async function withContact() {
+      const { hadas, ariel, client } = await setup();
+      const contact = await addClientContact(hadas, {
+        clientId: client.id,
+        name: "רינת כהן",
+        role: "מנהלת משרד",
+        sources: S1,
+      });
+      const p = await addProcess(hadas, {
+        clientId: client.id,
+        title: "קליטת עובד",
+        purpose: "פתיחת גישות",
+        ownerId: hadas.id,
+        triggerKinds: ["EVENT"],
+        executorContactId: contact.id,
+        sources: S1,
+      });
+      await saveProcessVersion(hadas, p.id, { steps: [{ title: "שלב" }], baseVersion: 0 });
+      await approveProcessVersion(ariel, p.id, 1);
+      return { hadas, ariel, client, contact, p };
+    }
+
+    it("names the contact while the mark is not there", async () => {
+      const { hadas, p } = await withContact();
+      const view = await procedureDocument(hadas, p.id);
+      expect(JSON.stringify(view.doc)).toContain("רינת כהן");
+    });
+
+    it("takes the name out of a version approved before the mark, and says so", async () => {
+      const { hadas, contact, p } = await withContact();
+      const before = await procedureDocument(hadas, p.id);
+
+      await updateClientContact(hadas, contact.id, { sensitivity: "SENSITIVE" });
+
+      const after = await procedureDocument(hadas, p.id);
+      const text = JSON.stringify(after.doc);
+      expect(text).not.toContain("רינת כהן");
+      expect(text).toContain("הושמט");
+      // The bytes really changed, so the fingerprint an auditor checks
+      // against the system changes with them.
+      expect(after.fingerprint).not.toBe(before.fingerprint);
+    });
+
+    it("does the same for a contact kept to a few people, and for one deleted", async () => {
+      const restricted = await withContact();
+      await updateClientContact(restricted.hadas, restricted.contact.id, { audience: "RESTRICTED", audienceUserIds: [] });
+      expect(JSON.stringify((await procedureDocument(restricted.hadas, restricted.p.id)).doc)).not.toContain("רינת כהן");
+
+      const removed = await withContact();
+      await prisma.clientContact.update({ where: { id: removed.contact.id }, data: { deletedAt: new Date() } });
+      expect(JSON.stringify((await procedureDocument(removed.hadas, removed.p.id)).doc)).not.toContain("רינת כהן");
+    });
+
+    it("does not hand the name to Claude either", async () => {
+      const { hadas, contact, p } = await withContact();
+      expect(JSON.stringify(await translationSource(hadas, p.id))).toContain("רינת כהן");
+
+      await updateClientContact(hadas, contact.id, { sensitivity: "SENSITIVE" });
+      // canSendToAi answers for the process. It says nothing about the
+      // people named inside it, and a Claude conversation is a copy
+      // outside the product.
+      expect(JSON.stringify(await translationSource(hadas, p.id))).not.toContain("רינת כהן");
+    });
+
+    it("keeps the name out of the auditor's single file too", async () => {
+      const { hadas, contact, client, p } = await withContact();
+      expect(JSON.stringify(await clientProcedurePack(hadas, client.id, "he"))).toContain("רינת כהן");
+
+      await updateClientContact(hadas, contact.id, { sensitivity: "SENSITIVE" });
+      const pack = await clientProcedurePack(hadas, client.id, "he");
+      expect(JSON.stringify(pack)).not.toContain("רינת כהן");
+      // And the procedure is still in the file, rather than dropping out
+      // of the auditor's pack because one line changed.
+      expect(pack.docs.length).toBeGreaterThan(0);
+      void p;
+    });
+
+    it("leaves the rest of the frozen version exactly as it was", async () => {
+      const { hadas, contact, p } = await withContact();
+      const before = await procedureDocument(hadas, p.id);
+      await updateClientContact(hadas, contact.id, { sensitivity: "SENSITIVE" });
+      const after = await procedureDocument(hadas, p.id);
+      // The content of version 1 is what the approval froze. Only who may
+      // be named in it is answered now instead of then.
+      expect(after.doc.version).toBe(before.doc.version);
+      expect(after.doc.title).toBe(before.doc.title);
+      expect(JSON.stringify(after.doc)).toContain("פתיחת גישות");
+    });
   });
 
   it("records every export", async () => {

@@ -27,7 +27,7 @@ export type ClassificationLike = "PUBLIC" | "INTERNAL" | "CONFIDENTIAL";
 // ---------------------------------------------------------------------------
 
 export type ProcedureSnapshot = {
-  v: 1;
+  v: 1 | 2;
   frozenAt: string;
   /// What froze it: the approval, or a translation saved for a version
   /// approved before snapshots existed.
@@ -56,14 +56,75 @@ export type ProcedureSnapshot = {
   classification: ClassificationLike;
   relatedDocs: string | null;
   reviewEveryDays: number | null;
+  /// The three role fields as their parts, so the contacts in them can be
+  /// looked at again every time the document is read (v2, 25.10.2026).
+  /// Null on a v1 snapshot, which froze only the joined text.
+  people: SnapshotPeople | null;
 };
 
+/**
+ * Who a role names, kept apart rather than pre-joined.
+ *
+ * The joined strings above are what the document prints. They are built
+ * from these, and the contact parts are rebuilt on every read.
+ *
+ * Why the ids and not just the names. A contact's sensitivity is not a
+ * property of the version, it is a property of the person: somebody marks
+ * a contact sensitive precisely to stop their name leaving the product,
+ * and that decision has to reach documents approved before they made it.
+ * A frozen name cannot be re-checked against anything. An id can.
+ *
+ * The content of a version stays frozen; only who may be named in it is
+ * answered now instead of then.
+ */
+export type SnapshotPeople = {
+  executorUser: string | null;
+  executorContactId: string | null;
+  executorText: string | null;
+  approverUser: string | null;
+  approverContactId: string | null;
+  approverText: string | null;
+  externalPartyContactIds: string[];
+  externalPartyText: string | null;
+};
+
+/// The three role fields built from contacts, and so re-checked on read.
+export const PEOPLE_FIELDS = ["executor", "approver", "externalParty"] as const;
+export type PeopleField = (typeof PEOPLE_FIELDS)[number];
+
 const str = (v: unknown, max = 5000): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, max) : null);
+
+/// How a role line is assembled from its parts, in one place, so that a
+/// read rebuilds it exactly the way the approval wrote it.
+export function joinParts(parts: (string | null | undefined)[]): string | null {
+  return parts.filter((p): p is string => !!p && !!p.trim()).join(". ") || null;
+}
+
+function readPeople(value: unknown): SnapshotPeople | null {
+  if (!value || typeof value !== "object") return null;
+  const v = value as Record<string, unknown>;
+  const ids = Array.isArray(v.externalPartyContactIds)
+    ? (v.externalPartyContactIds as unknown[]).filter((x): x is string => typeof x === "string" && !!x).slice(0, 50)
+    : [];
+  return {
+    executorUser: str(v.executorUser, 200),
+    executorContactId: str(v.executorContactId, 60),
+    executorText: str(v.executorText, 500),
+    approverUser: str(v.approverUser, 200),
+    approverContactId: str(v.approverContactId, 60),
+    approverText: str(v.approverText, 500),
+    externalPartyContactIds: ids,
+    externalPartyText: str(v.externalPartyText, 500),
+  };
+}
 
 export function readSnapshot(value: unknown): ProcedureSnapshot | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
-  if (v.v !== 1 || !str(v.title) || !str(v.code)) return null;
+  // v1 and v2 both read. v2 adds `people` (see SnapshotPeople); a v1
+  // snapshot has no contact ids of its own, and the caller falls back to
+  // the ones the process carries now.
+  if ((v.v !== 1 && v.v !== 2) || !str(v.title) || !str(v.code)) return null;
   const triggers = Array.isArray(v.triggerKinds) ? (v.triggerKinds as unknown[]).filter((t): t is TriggerLike => typeof t === "string" && t in TRIGGER_LABELS) : [];
   const systems = Array.isArray(v.systems)
     ? (v.systems as unknown[])
@@ -76,7 +137,7 @@ export function readSnapshot(value: unknown): ProcedureSnapshot | null {
     for (const [k, n] of Object.entries(v.systemNames as Record<string, unknown>)) if (typeof n === "string") names[k] = n;
   }
   return {
-    v: 1,
+    v: v.v === 2 ? 2 : 1,
     frozenAt: str(v.frozenAt) ?? new Date(0).toISOString(),
     frozenBy: v.frozenBy === "translation" ? "translation" : "approval",
     clientName: str(v.clientName, 200) ?? "",
@@ -101,6 +162,7 @@ export function readSnapshot(value: unknown): ProcedureSnapshot | null {
     classification: v.classification === "PUBLIC" || v.classification === "INTERNAL" ? v.classification : "CONFIDENTIAL",
     relatedDocs: str(v.relatedDocs),
     reviewEveryDays: typeof v.reviewEveryDays === "number" && v.reviewEveryDays > 0 ? Math.round(v.reviewEveryDays) : null,
+    people: readPeople(v.people),
   };
 }
 
@@ -309,6 +371,7 @@ const L = {
     roleExecutor: "מבצע",
     roleApprover: "מאשר",
     roleExternal: "גורם חיצוני",
+    peopleWithheld: "שם של איש קשר הושמט מהמסמך לפי סימון הרגישות שלו בתיק הלקוח.",
     trigger: "הפעלה וזמני תגובה",
     triggerWhen: "מתי",
     triggerKinds: "סוג הפעלה",
@@ -371,6 +434,7 @@ const L = {
     roleExecutor: "Executor",
     roleApprover: "Approver",
     roleExternal: "External party",
+    peopleWithheld: "A contact's name is withheld from this document, per their sensitivity marking in the client file.",
     trigger: "Trigger and service level",
     triggerWhen: "When",
     triggerKinds: "Trigger type",
@@ -474,13 +538,30 @@ export type BuildInput = {
   /// Leave sections with nothing in them out (the files); the read view
   /// keeps them, marked, so a gap is seen.
   omitEmpty: boolean;
+  /// Role fields a contact was taken out of, because that contact is
+  /// marked sensitive or kept to a few people today. Empty is the normal
+  /// case. The document says so rather than quietly printing one name
+  /// fewer: a reader who cannot tell the difference between "nobody" and
+  /// "withheld" is a reader the document has misled, and an auditor is
+  /// exactly that reader.
+  withheldPeople?: readonly PeopleField[];
 };
 
 export function buildProcedureDoc(input: BuildInput): ProcedureDoc {
   const { lang, version, history, live, omitEmpty } = input;
   const t = labels(lang);
-  const tr = lang === "en" ? input.translation ?? null : null;
+  const withheld = input.withheldPeople ?? [];
+  let tr = lang === "en" ? input.translation ?? null : null;
   if (lang === "en" && !tr) throw new Error("An English document needs an approved translation.");
+  // The English text was translated from the Hebrew as it read before the
+  // contact was marked. Taking the name out of one language only would
+  // publish it in the other, which is not a smaller leak, it is the same
+  // leak in a document that claims to be the translation of a document
+  // without it.
+  if (tr && withheld.length) {
+    tr = { ...tr };
+    for (const k of withheld) tr[k] = null;
+  }
   const snap = input.snapshot;
   const steps = readSteps(version.steps);
   // A field in the document's language: the translation's when English.
@@ -528,7 +609,9 @@ export function buildProcedureDoc(input: BuildInput): ProcedureDoc {
   if (f("executor")) roles.push([t.roleExecutor, f("executor")!]);
   if (f("approver")) roles.push([t.roleApprover, f("approver")!]);
   if (f("externalParty")) roles.push([t.roleExternal, f("externalParty")!]);
-  add("roles", t.roles, roles.length ? [{ kind: "table", header: t.rolesHeader, rows: roles, weights: [1, 2] }] : []);
+  const rolesBody: DocBlock[] = roles.length ? [{ kind: "table", header: t.rolesHeader, rows: roles, weights: [1, 2] }] : [];
+  if (withheld.length) rolesBody.push({ kind: "para", text: t.peopleWithheld, muted: true });
+  add("roles", t.roles, rolesBody);
 
   const trig: string[][] = [];
   if (snap.triggerKinds.length) trig.push([t.triggerKinds, snap.triggerKinds.map((k) => t.triggers[k]).join(", ")]);
