@@ -43,6 +43,10 @@ async function draftProcedure(page: import("@playwright/test").Page, step: strin
   await dialog.locator('input[name="title"]').fill(title);
   await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
   await dialog.locator('input[name="triggerText"]').fill("בקשת עובד");
+  // 25.10.2026: with an owner, the only thing between it and running is
+  // the procedure waiting for approval.
+  const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
+  await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
   await dialog.locator('input[name="sources"]').fill(code);
   await submit(page, "הוספה לתיק");
   const card = page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
