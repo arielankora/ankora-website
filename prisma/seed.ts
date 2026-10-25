@@ -122,6 +122,35 @@ async function main() {
     },
   });
 
+  // Ankora's own file (25.10.2026).
+  //
+  // Every CI run has printed "[employee-lifecycle] onboarding_task
+  // failed ... Internal client not found" since the employee lifecycle
+  // landed, and the reason is this: no seed ever created the client it
+  // looks for. The line reads like noise. It is not.
+  //
+  // openOnboardingTask catches its own failure and returns null, so the
+  // browser suite invites employees, gets no checklist, and goes green.
+  // Onboarding, offboarding and the employee-agreement routes all hang
+  // off this one row, and not one of them has ever run end to end in a
+  // browser.
+  //
+  // No `[DEMO]` prefix, on purpose. Its name is the third way
+  // resolveInternalClient finds it (lib/app-domain/employee-lifecycle.ts),
+  // and a seed that prefixed the name would exercise a client the
+  // fallback cannot find, which is the opposite of the point. The flag
+  // is set too, which is the way the product should find it.
+  const internalClient = await prisma.client.upsert({
+    where: { id: "ankora-internal" },
+    update: { isInternal: true },
+    create: {
+      id: "ankora-internal",
+      name: "Ankora פנימי",
+      status: "ACTIVE",
+      isInternal: true,
+    },
+  });
+
   await prisma.category.upsert({
     where: { id: "demo-category-meetings" },
     update: {},
@@ -175,6 +204,14 @@ async function main() {
     where: { userId_clientId: { userId: ankoraAdmin.id, clientId: clientA.id } },
     update: {},
     create: { userId: ankoraAdmin.id, clientId: clientA.id },
+  });
+
+  // The lifecycle's tasks land on the internal client, so the person who
+  // owns them has to be able to reach it (resolveOwner).
+  await prisma.userClientAccess.upsert({
+    where: { userId_clientId: { userId: ankoraAdmin.id, clientId: internalClient.id } },
+    update: {},
+    create: { userId: ankoraAdmin.id, clientId: internalClient.id },
   });
 
   // Phase 9 gap-fix (docs/adr/0001 section 17.2): demo Tasks across every

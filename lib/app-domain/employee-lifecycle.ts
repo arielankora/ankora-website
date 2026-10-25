@@ -67,22 +67,58 @@ export function shouldOpenOffboarding(existing: { status: TaskStatus }[]): boole
   return !existing.some((t) => !CLOSED_STATUSES.includes(t.status));
 }
 
-/// The internal client: by id from INTERNAL_CLIENT_ID when set, else by
-/// its exact name. Either way it must be live and active, because a task
-/// on an archived client is invisible to everyone it is meant for.
+/**
+ * The internal client, in the order the answers are trustworthy.
+ *
+ * 1. `INTERNAL_CLIENT_ID`, when set. Somebody named it on purpose.
+ * 2. `Client.isInternal`, the column that exists to answer this.
+ * 3. The exact name, for a database where nobody ever set the flag.
+ *
+ * The flag was added on 9.10.2026 with its own migration and a checkbox
+ * on the client screen, and this function did not look at it. So the
+ * question "which client is Ankora's own" had two answers that could
+ * disagree: `lib/app-domain/internal-client.ts` already merged the flag
+ * with this lookup "in case the flag was never set on it", while the two
+ * callers that most depend on being right did not.
+ *
+ * What that cost, had anyone renamed the client in the UI:
+ *
+ * - `openOnboardingTask` and `openOffboardingTask` catch, return null
+ *   and write a console line. **Every new employee would stop getting a
+ *   checklist, silently.**
+ * - The employee-agreement routes throw, so signing and issuing a
+ *   download link break.
+ *
+ * Found on 25.10.2026 while reading why `[employee-lifecycle]
+ * onboarding_task failed` appears in every CI run. A rule that holds in
+ * one of two ways is not a rule.
+ *
+ * Whichever way it is found, the client must be live and active: a task
+ * on an archived client is invisible to everyone it is meant for.
+ *
+ * Oldest first when more than one row carries the flag, so the answer is
+ * the same on every call rather than whatever the database returns
+ * today. Two internal clients is a misconfiguration, and an answer that
+ * moves is worse than one that is arguably the wrong half of a pair.
+ */
 export async function resolveInternalClient(): Promise<{ id: string; name: string } | null> {
+  const live = { deletedAt: null, status: "ACTIVE" } as const;
+  const select = { id: true, name: true } as const;
+
   const id = process.env.INTERNAL_CLIENT_ID?.trim();
   if (id) {
-    const byId = await prisma.client.findFirst({
-      where: { id, deletedAt: null, status: "ACTIVE" },
-      select: { id: true, name: true },
-    });
+    const byId = await prisma.client.findFirst({ where: { id, ...live }, select });
     if (byId) return byId;
   }
-  return prisma.client.findFirst({
-    where: { name: INTERNAL_CLIENT_NAME, deletedAt: null, status: "ACTIVE" },
-    select: { id: true, name: true },
+
+  const byFlag = await prisma.client.findFirst({
+    where: { isInternal: true, ...live },
+    orderBy: { createdAt: "asc" },
+    select,
   });
+  if (byFlag) return byFlag;
+
+  return prisma.client.findFirst({ where: { name: INTERNAL_CLIENT_NAME, ...live }, select });
 }
 
 /// The person who owns the task: from the env (with Ariel's defaults),
