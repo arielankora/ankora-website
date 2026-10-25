@@ -7,9 +7,9 @@ const base: ControlData = {
   processes: 0,
   withAnkora: 0,
   inHandover: 0,
-  avgCompleteness: null,
+  avgDocumentation: null,
   needsReview: 0,
-  scheduledNoDate: 0,
+  notRunning: 0,
   exceptionsInForce: 0,
   exceptionsRequested: 0,
   uncertain: 0,
@@ -40,7 +40,8 @@ describe("controlParts", () => {
       processes: 18,
       withAnkora: 5,
       inHandover: 9,
-      avgCompleteness: 6,
+      notRunning: 2,
+      avgDocumentation: 67,
       needsReview: 3,
       exceptionsInForce: 2,
       exceptionsRequested: 1,
@@ -50,10 +51,10 @@ describe("controlParts", () => {
       daysSinceBatch: 0,
     });
     expect(parts.map((p) => p.text).join(" · ")).toBe(
-      "18 תהליכים, 5 אצלנו ו-9 בחפיפה · שלמות ממוצעת 6 מתוך 9 · 3 תהליכים דורשים סקירה · 2 חריגות בתוקף · בקשת חריגה אחת ממתינה · 9 פריטים לא ודאיים · 18 שאלות פתוחות · 6 מערכות בלי גישה · אצווה אחרונה: היום"
+      "18 תהליכים, 5 אצלנו ו-9 בחפיפה · 2 תהליכים לא ירוצו · תיעוד 67% · 3 תהליכים דורשים סקירה · 2 חריגות בתוקף · בקשת חריגה אחת ממתינה · 9 פריטים לא ודאיים · 18 שאלות פתוחות · 6 מערכות בלי גישה · אצווה אחרונה: היום"
     );
     expect(parts.filter((p) => p.warn).map((p) => p.text)).toEqual([
-      "שלמות ממוצעת 6 מתוך 9",
+      "2 תהליכים לא ירוצו",
       "3 תהליכים דורשים סקירה",
       "בקשת חריגה אחת ממתינה",
       "6 מערכות בלי גישה",
@@ -70,8 +71,8 @@ describe("controlFrom", () => {
   it("counts from the rows the screen shows: weakest field, questions apart, closed facts out", () => {
     const d = controlFrom({
       processes: [
-        { transitionStatus: "WITH_ANKORA", completeness: { score: 9 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
-        { transitionStatus: "IN_HANDOVER", completeness: { score: 6 }, needsReview: true, backupOwnerId: null, status: "ACTIVE" },
+        { transitionStatus: "WITH_ANKORA", readiness: { ready: true, blocker: null }, documentation: { score: 6, of: 6 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
+        { transitionStatus: "IN_HANDOVER", readiness: { ready: false, blocker: "לא ירוץ: אין נוהל מאושר" }, documentation: { score: 3, of: 6 }, needsReview: true, backupOwnerId: null, status: "ACTIVE" },
       ],
       exceptions: [{ status: "APPROVED" }, { status: "REQUESTED" }],
       facts: [
@@ -84,14 +85,14 @@ describe("controlFrom", () => {
       systems: [{ accessStatus: "HAS_ACCESS" }, { accessStatus: "PENDING" }, { accessStatus: "NOT_NEEDED" }],
       daysSinceBatch: 1,
     });
-    expect(d).toMatchObject({ processes: 2, withAnkora: 1, inHandover: 1, avgCompleteness: 7.5, needsReview: 1, exceptionsInForce: 1, exceptionsRequested: 1, uncertain: 2, openQuestions: 1, systemsWithoutAccess: 1 });
+    expect(d).toMatchObject({ processes: 2, withAnkora: 1, inHandover: 1, avgDocumentation: 75, notRunning: 1, needsReview: 1, exceptionsInForce: 1, exceptionsRequested: 1, uncertain: 2, openQuestions: 1, systemsWithoutAccess: 1 });
   });
 });
 
 describe("visible to the client and owner (spec 3.1)", () => {
   it("counts what the client may see, and what nobody keeps, without warning", () => {
     const d = controlFrom({
-      processes: [{ transitionStatus: "WITH_CLIENT", completeness: { score: 5 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE", clientVisible: true }],
+      processes: [{ transitionStatus: "WITH_CLIENT", readiness: { ready: true, blocker: null }, documentation: { score: 5, of: 6 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE", clientVisible: true }],
       exceptions: [],
       facts: [
         { kind: "NOTE", answeredAt: null, closedAt: null, knowledgeStatus: "CONFIRMED", fieldStatus: {}, clientVisible: true, ownerId: "u" },
@@ -111,16 +112,16 @@ describe("visible to the client and owner (spec 3.1)", () => {
 
 describe("what is behind each count (spec 7.6)", () => {
   it("each count that has names says which key it opens", () => {
-    const keys = controlParts({ ...base, processes: 2, avgCompleteness: 7, needsReview: 1, uncertain: 3, daysSinceBatch: 0 }).map((p) => p.key);
-    expect(keys).toEqual(["processes", "completeness", "needsReview", "uncertain", undefined]);
+    const keys = controlParts({ ...base, processes: 2, notRunning: 1, avgDocumentation: 70, needsReview: 1, uncertain: 3, daysSinceBatch: 0 }).map((p) => p.key);
+    expect(keys).toEqual(["processes", "notRunning", "completeness", "needsReview", "uncertain", undefined]);
   });
 
   it("names the same rows the counts come from", () => {
     const full = controlDetails({
       processes: [
-        { code: "P1", title: "תשלומי ספקים", transitionStatus: "WITH_ANKORA", completeness: { score: 9 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
-        { code: "P2", title: "דוח רבעוני", transitionStatus: "IN_HANDOVER", completeness: { score: 6 }, needsReview: true, reviewLabel: "כלל השתנה", backupOwnerId: null, status: "ACTIVE", clientVisible: true },
-        { code: "P3", title: "ישן", transitionStatus: "WITH_CLIENT", completeness: { score: 1 }, needsReview: true, backupOwnerId: null, status: "RETIRED" },
+        { code: "P1", title: "תשלומי ספקים", transitionStatus: "WITH_ANKORA", readiness: { ready: true, blocker: null }, documentation: { score: 6, of: 6 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE" },
+        { code: "P2", title: "דוח רבעוני", transitionStatus: "IN_HANDOVER", readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" }, documentation: { score: 4, of: 5 }, needsReview: true, reviewLabel: "כלל השתנה", backupOwnerId: null, status: "ACTIVE", clientVisible: true },
+        { code: "P3", title: "ישן", transitionStatus: "WITH_CLIENT", documentation: { score: 1, of: 6 }, needsReview: true, backupOwnerId: null, status: "RETIRED" },
       ],
       exceptions: [{ status: "REQUESTED", what: "תשלום בלי אישור", ruleTitle: "סף" }],
       facts: [
@@ -131,7 +132,8 @@ describe("what is behind each count (spec 7.6)", () => {
       systems: [{ systemName: "Doka", accessStatus: "PENDING" }],
     });
     const d = Object.fromEntries(Object.entries(full).map(([k, v]) => [k, v!.map((x) => x.text)])) as Record<string, string[]>;
-    expect(full.completeness![0].note).toBe("6 מתוך 9");
+    expect(full.completeness![0].note).toBe("תיעוד 4 מתוך 5");
+    expect(full.notRunning).toEqual([{ text: "P2 דוח רבעוני", note: "לא ירוץ: אין אחראי" }]);
     expect(full.needsReview![0].note).toBe("כלל השתנה");
     expect(full.systemsWithoutAccess![0].note).toBe("הגישה ממתינה");
     expect(d.processes).toEqual(["P1 תשלומי ספקים", "P2 דוח רבעוני"]);
@@ -171,7 +173,7 @@ describe("control details lead to the item", () => {
 });
 
 describe("a process that runs by a date, with no date ahead (21.10.2026)", () => {
-  const proc = (over: Record<string, unknown>) => ({ code: "P2", title: "תשלומי ספקים", transitionStatus: "IN_HANDOVER", completeness: { score: 4 }, needsReview: false, backupOwnerId: "b", status: "ACTIVE", triggerKinds: ["SCHEDULED"], nextDate: null, ...over });
+  const proc = (over: Record<string, unknown>) => ({ code: "P2", title: "תשלומי ספקים", transitionStatus: "IN_HANDOVER", needsReview: false, backupOwnerId: "b", status: "ACTIVE", ownerId: "h", triggerText: "ב-10 וב-25", triggerKinds: ["SCHEDULED"], nextDate: null, ...over });
   it("only an approved one that runs by a date and has none", () => {
     expect(scheduledWithoutDate(proc({}))).toBe(true);
     expect(scheduledWithoutDate(proc({ nextDate: new Date("2026-10-25") }))).toBe(false);
@@ -179,13 +181,12 @@ describe("a process that runs by a date, with no date ahead (21.10.2026)", () =>
     expect(scheduledWithoutDate(proc({ triggerKinds: ["EVENT"] }))).toBe(false);
     expect(scheduledWithoutDate(proc({ triggerKinds: undefined }))).toBe(false);
   });
-  it("is a warning on the line, and names the process with why", () => {
+  it("25.10.2026: counts as a process that will not run, and says why (read without readiness from the rows)", () => {
     const d = controlFrom({ processes: [proc({}), proc({ code: "P1", nextDate: new Date("2026-10-22") })], exceptions: [], facts: [], otherItems: [], systems: [], daysSinceBatch: 0 });
-    expect(d.scheduledNoDate).toBe(1);
-    const part = controlParts(d).find((p) => p.key === "scheduledNoDate");
-    expect(part).toEqual({ text: "תהליך אחד לפי מועד בלי מועד הבא", warn: true, key: "scheduledNoDate" });
-    expect(controlParts({ ...base, processes: 3, scheduledNoDate: 2 }).map((p) => p.text)).toContain("2 תהליכים לפי מועד בלי מועד הבא");
+    expect(d.notRunning).toBe(1);
+    expect(controlParts(d).find((p) => p.key === "notRunning")).toEqual({ text: "תהליך אחד לא ירוץ", warn: true, key: "notRunning" });
+    expect(controlParts({ ...base, processes: 3, notRunning: 2 }).map((p) => p.text)).toContain("2 תהליכים לא ירוצו");
     const details = controlDetails({ processes: [{ ...proc({}), id: "p2" }], exceptions: [], facts: [], otherItems: [], systems: [] });
-    expect(details.scheduledNoDate).toEqual([{ text: "P2 תשלומי ספקים", id: "p2", note: SCHEDULED_NO_DATE_NOTE }]);
+    expect(details.notRunning).toEqual([{ text: "P2 תשלומי ספקים", id: "p2", note: SCHEDULED_NO_DATE_NOTE }]);
   });
 });

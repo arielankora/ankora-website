@@ -1,11 +1,12 @@
 import "server-only";
+import { readinessLabel } from "@/lib/process-readiness";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { canSendToAi } from "@/lib/knowledge";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
-import { ACTION_TAG_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, type ProcessStep } from "@/lib/process-rules";
+import { ACTION_TAG_LABELS, FIELD_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, type ProcessStep } from "@/lib/process-rules";
 import { POLICY_KIND_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
@@ -48,7 +49,10 @@ function summary(p: Processes[number], user: Map<string, string>) {
     owner: p.ownerId ? (user.get(p.ownerId) ?? null) : null,
     backup: p.backupOwnerId ? (user.get(p.backupOwnerId) ?? null) : null,
     handover: TRANSITION_LABELS[p.transitionStatus],
-    completeness: `${p.completeness.score}/9`,
+    // 25.10.2026: whether it runs, and how well it is written down.
+    runs: readinessLabel(p.readiness),
+    documentation: `${p.documentation.score}/${p.documentation.of}`,
+    notApplicable: p.notApplicable.length ? p.notApplicable.map((k) => FIELD_LABELS[k]) : null,
     needsReview: reason ? REVIEW_REASON_LABELS[reason] : null,
     approvedVersion: p.current?.version ?? null,
     nextDate: day(p.nextDate),

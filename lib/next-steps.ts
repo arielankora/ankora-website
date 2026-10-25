@@ -18,19 +18,36 @@
 // data, and the screens only show.
 
 import { taskCoveredBy, contentWords, sameForm } from "@/lib/process-task-overlap";
+import { SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
 
 /// An action the server carries out in one click.
 export type StepOp =
   | { type: "link_date"; processId: string; dateId: string }
   | { type: "close_covered"; processId: string; taskIds: string[] }
   | { type: "approve_procedure"; processId: string; version: number }
-  | { type: "mark_reviewed"; processId: string };
+  | { type: "mark_reviewed"; processId: string }
+  // 25.10.2026: a documentation field not relevant to this process, and a
+  // system or a contact its own words name, linked in one click.
+  | { type: "mark_not_applicable"; processId: string; field: string }
+  | { type: "link_system"; processId: string; systemId: string }
+  | { type: "link_contact"; processId: string; contactId: string };
 
 /// Where the fix is, when it is not one click: the process's own forms,
 /// on its card, or the item on the client's page.
 export type StepFix = { kind: "op"; op: StepOp; label: string } | { kind: "edit" | "procedure" | "dates" | "open"; label: string };
 
-export type NextStepKind = "no_next_date" | "procedure_draft" | "review" | "covered_tasks" | "lessons" | "missing_fields" | "no_access" | "uncertain";
+export type NextStepKind =
+  | "not_ready"
+  | "no_next_date"
+  | "procedure_draft"
+  | "review"
+  | "covered_tasks"
+  | "lessons"
+  | "link_mention"
+  | "missing_fields"
+  | "doc_field"
+  | "no_access"
+  | "uncertain";
 
 export type NextStep = {
   kind: NextStepKind;
@@ -40,8 +57,12 @@ export type NextStep = {
   recommend: string | null;
   why: string | null;
   fix: StepFix;
+  /// A second way out, quieter: "לא רלוונטי" on a documentation field.
+  alt?: StepFix;
   /// Stops work today: no run opens until it is done.
   blocking: boolean;
+  /// Its own key, when a kind repeats on one process (one row per field).
+  key?: string;
 };
 
 export type DateCandidate = { id: string; title: string };
@@ -68,9 +89,20 @@ export type ProcessFacts = {
   openLessons: number;
   knowledge: { uncertain: boolean; toResolve: string | null };
   dateCandidate: DateCandidate | null;
+  /// 25.10.2026: why it will not run, when it will not
+  /// (lib/process-readiness.ts).
+  readiness?: { ready: boolean; blocker: string | null };
+  /// The documentation fields still missing, each its own quiet row with
+  /// "לא רלוונטי" beside it. When given, it replaces `missing`.
+  doc?: { field: string; label: string }[];
+  /// Systems and contacts its own words name and it does not link yet.
+  suggestions?: { systems: { id: string; name: string }[]; contacts: { id: string; name: string }[] };
+  /// Whether this person may mark a field not relevant (a manager or the
+  /// process's owner).
+  canMarkNotApplicable?: boolean;
 };
 
-const ORDER: NextStepKind[] = ["no_next_date", "procedure_draft", "review", "covered_tasks", "lessons", "uncertain", "missing_fields", "no_access"];
+const ORDER: NextStepKind[] = ["not_ready", "no_next_date", "procedure_draft", "review", "covered_tasks", "lessons", "uncertain", "link_mention", "missing_fields", "doc_field", "no_access"];
 
 function plural(n: number, one: string, many: string): string {
   return n === 1 ? one : many.replace("{n}", String(n));
@@ -84,11 +116,28 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
   const out: NextStep[] = [];
   const scheduled = p.triggerKinds.includes("SCHEDULED");
 
+  // Why it will not run, when the steps below do not already say it: no
+  // owner, nothing that sets it off, or no procedure written yet.
+  const blocker = p.readiness && !p.readiness.ready ? p.readiness.blocker : null;
+  const saidBelow = (scheduled && !p.hasNextDate) || !!p.draft;
+  if (blocker && !saidBelow) {
+    const noOwnerOrTrigger = /אחראי|מפעיל/.test(blocker);
+    const noProcedure = /נוהל/.test(blocker);
+    out.push({
+      kind: "not_ready",
+      title: blocker,
+      recommend: noOwnerOrTrigger ? (/אחראי/.test(blocker) ? "לקבוע מי אחראי" : "לכתוב מה מפעיל את התהליך") : noProcedure ? "לכתוב את הנוהל ולשלוח לאישור" : "להחליט אם לחדש אותו",
+      why: "עד אז התהליך לא פותח ריצות לבד.",
+      fix: noOwnerOrTrigger ? { kind: "edit", label: "להשלים" } : noProcedure ? { kind: "procedure", label: "לכתוב נוהל" } : { kind: "open", label: "לתהליך" },
+      blocking: true,
+    });
+  }
+
   if (scheduled && !p.hasNextDate && p.status !== "RETIRED") {
     const active = p.status === "ACTIVE";
     out.push({
       kind: "no_next_date",
-      title: active ? "תהליך לפי מועד בלי מועד הבא: לא תיפתח ריצה" : "תהליך לפי מועד בלי מועדים",
+      title: active ? SCHEDULED_NO_DATE_BLOCKER : "תהליך לפי מועד בלי מועדים",
       recommend: p.dateCandidate ? `לקשר את המועד "${p.dateCandidate.title}"` : "להוסיף לתהליך את המועדים שלו",
       why: p.dateCandidate ? "המועד כבר בתיק, ושמו מתאר את העבודה של התהליך. מקושר, הוא פותח את הריצה." : "בלי מועד מקושר אף ריצה לא נפתחת לבד.",
       fix: p.dateCandidate ? { kind: "op", op: { type: "link_date", processId: p.id, dateId: p.dateCandidate.id }, label: "לקשר" } : { kind: "dates", label: "להוסיף מועד" },
@@ -163,7 +212,44 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
     });
   }
 
-  if (p.missing.length > 0) {
+  for (const x of p.suggestions?.systems ?? []) {
+    out.push({
+      kind: "link_mention",
+      key: `system:${x.id}`,
+      title: `${x.name} מוזכרת בתהליך ולא מקושרת`,
+      recommend: "לקשר את המערכת",
+      why: "כך התהליך יודע לאיזו מערכת צריך גישה.",
+      fix: { kind: "op", op: { type: "link_system", processId: p.id, systemId: x.id }, label: "לקשר" },
+      blocking: false,
+    });
+  }
+  for (const x of p.suggestions?.contacts ?? []) {
+    out.push({
+      kind: "link_mention",
+      key: `contact:${x.id}`,
+      title: `${x.name} מוזכר/ת בתהליך ולא מקושר/ת כגורם חיצוני`,
+      recommend: "לקשר כגורם חיצוני",
+      why: "כך ברור מי בחוץ שותף לתהליך.",
+      fix: { kind: "op", op: { type: "link_contact", processId: p.id, contactId: x.id }, label: "לקשר" },
+      blocking: false,
+    });
+  }
+
+  if (p.doc) {
+    // Quiet: how well it is written down, never what stops it.
+    for (const f of p.doc) {
+      out.push({
+        kind: "doc_field",
+        key: f.field,
+        title: `תיעוד: חסר ${f.label}`,
+        recommend: null,
+        why: null,
+        fix: { kind: "edit", label: "להשלים" },
+        ...(p.canMarkNotApplicable && f.field !== "permissions" ? { alt: { kind: "op" as const, op: { type: "mark_not_applicable" as const, processId: p.id, field: f.field }, label: "לא רלוונטי" } } : {}),
+        blocking: false,
+      });
+    }
+  } else if (p.missing.length > 0) {
     out.push({
       kind: "missing_fields",
       title: `חסר: ${p.missing.join(", ")}`,

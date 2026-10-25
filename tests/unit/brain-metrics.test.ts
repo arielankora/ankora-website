@@ -19,10 +19,10 @@ describe("the measures of spec section 11", () => {
       measures(
         {
           processes: [
-            { status: "ACTIVE", transitionStatus: "WITH_ANKORA", backupOwnerId: "b", completeness: 9 },
-            { status: "ACTIVE", transitionStatus: "IN_HANDOVER", backupOwnerId: null, completeness: 6 },
-            { status: "ACTIVE", transitionStatus: "NOT_PLANNED", backupOwnerId: "b", completeness: 9 },
-            { status: "RETIRED", transitionStatus: "WITH_ANKORA", backupOwnerId: null, completeness: 1 },
+            { status: "ACTIVE", transitionStatus: "WITH_ANKORA", backupOwnerId: "b", ready: true, documentation: 1 },
+            { status: "ACTIVE", transitionStatus: "IN_HANDOVER", backupOwnerId: null, ready: false, documentation: 0.5 },
+            { status: "ACTIVE", transitionStatus: "NOT_PLANNED", backupOwnerId: "b", ready: true, documentation: 0.9 },
+            { status: "RETIRED", transitionStatus: "WITH_ANKORA", backupOwnerId: null, ready: false, documentation: 0 },
           ],
           uncertainSince: [daysAgo(20), daysAgo(3)],
           systems: [{ accessStatus: "HAS_ACCESS" }, { accessStatus: "PENDING" }, { accessStatus: "NOT_NEEDED" }],
@@ -40,7 +40,9 @@ describe("the measures of spec section 11", () => {
         now
       )
     );
-    expect(m.completeness).toMatchObject({ value: 8, state: "ok" });
+    // 25.10.2026: documentation in percent, and the processes that run.
+    expect(m.completeness).toMatchObject({ value: 80, display: "80%", state: "ok" });
+    expect(m.running).toMatchObject({ value: 67, state: "off" });
     expect(m.noBackup).toBeUndefined();
     expect(m.staleUncertain).toMatchObject({ value: 1, state: "off" });
     expect(m.noAccess).toMatchObject({ value: 1, state: "off" });

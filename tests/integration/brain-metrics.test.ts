@@ -49,7 +49,8 @@ describe("brain metrics", () => {
     const mine = sent.filter((m) => m.to.includes(admin.email));
     expect(mine).toHaveLength(1);
     expect(mine[0].subject).toContain("מדדי התיק, שבוע 25.10.2026");
-    expect(mine[0].text).toContain("שלמות תהליכים");
+    expect(mine[0].text).toContain("תיעוד תהליכים");
+    expect(mine[0].text).toContain("תהליכים שרצים");
     // A second run the same day sends nothing new.
     sent.length = 0;
     await sendWeeklyBrainMetrics(sunday);

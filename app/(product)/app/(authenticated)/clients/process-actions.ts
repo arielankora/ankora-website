@@ -13,6 +13,7 @@ import {
   updateProcess,
   ProcessVersionConflictError,
   type ProcessInput,
+  setProcessFieldNotApplicable,
 } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
@@ -166,6 +167,12 @@ export async function runProcessStepAction(op: StepOp, clientId: string): Promis
     revalidatePath("/app", "layout");
   }
   return r.ok ? { ...r, done } : r;
+}
+
+/// 25.10.2026: takes the "לא רלוונטי" mark off a documentation field.
+export async function restoreProcessFieldAction(processId: string, field: string, clientId: string): Promise<FormState> {
+  const user = await requireUser();
+  return run(clientId, () => setProcessFieldNotApplicable(user, processId, field, false));
 }
 
 /// Learning from runs (spec 5.4): a remark on the procedure went into it,

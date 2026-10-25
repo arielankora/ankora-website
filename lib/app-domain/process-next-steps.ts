@@ -5,10 +5,11 @@ import { canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
 import { closeTaskCoveredByProcess, coveredTasksForClients, type CoveredTask } from "@/lib/app-domain/process-overlap";
-import { approveProcessVersion, linkProcessDates } from "@/lib/app-domain/processes";
+import { approveProcessVersion, linkProcessDates, linkProcessMention, setProcessFieldNotApplicable } from "@/lib/app-domain/processes";
 import { markProcessReviewed } from "@/lib/app-domain/process-review";
 import { approveRuleDecision } from "@/lib/app-domain/internal-client";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
+import { runReadiness } from "@/lib/process-readiness";
 import { matchDateToProcess, type DateCandidate, type ProcessFacts, type StepOp } from "@/lib/next-steps";
 
 // The data behind a process's next steps (lib/next-steps.ts), read once
@@ -67,6 +68,7 @@ export async function processDecisions(clientIds: string[], filter: (p: { client
       purpose: true,
       status: true,
       triggerKinds: true,
+      triggerText: true,
       ownerId: true,
       needsReview: true,
       reviewReason: true,
@@ -102,6 +104,7 @@ export async function processDecisions(clientIds: string[], filter: (p: { client
       openLessons: p._count.lessons,
       knowledge: { uncertain: false, toResolve: null },
       dateCandidate: c?.date ?? null,
+      readiness: runReadiness({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: next }),
     };
     return { clientId: p.clientId, facts, deadline: next, updatedAt: p.updatedAt };
   });
@@ -130,6 +133,15 @@ export async function runStep(actor: User, op: StepOp): Promise<string> {
     case "mark_reviewed":
       await markProcessReviewed(actor, op.processId);
       return "סומן כנסקר";
+    case "mark_not_applicable":
+      await setProcessFieldNotApplicable(actor, op.processId, op.field, true);
+      return "סומן כלא רלוונטי";
+    case "link_system":
+      await linkProcessMention(actor, op.processId, "system", op.systemId);
+      return `המערכת קושרה ל-${process.code}`;
+    case "link_contact":
+      await linkProcessMention(actor, op.processId, "contact", op.contactId);
+      return `קושר כגורם חיצוני ב-${process.code}`;
   }
 }
 

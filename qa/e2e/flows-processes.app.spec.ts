@@ -49,14 +49,18 @@ test.describe("clients/process-actions", () => {
     await dialog.locator('input[name="title"]').fill(title);
     await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
     await dialog.locator('input[name="triggerText"]').fill("בקשת עובד");
+    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
+    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
     await dialog.locator('input[name="sources"]').fill(code);
     await submit(page, "הוספה לתיק");
 
     // The process's card in the panel, not a line elsewhere with the same name.
     const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
-    await expect(card()).toContainText("אין נוהל מאושר");
-    await expect(card()).toContainText("מתוך 9");
+    // 25.10.2026: whether it runs, and why not, apart from the documentation.
+    await expect(card().getByTestId("process-readiness")).toHaveText("לא ירוץ: אין נוהל מאושר");
+    await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "false");
+    await expect(card().getByTestId("process-documentation")).toContainText("תיעוד");
 
     await card().getByRole("button", { name: "כתיבת נוהל" }).click();
     const editor = page.getByRole("dialog");
@@ -83,6 +87,8 @@ test.describe("clients/process-actions", () => {
     await page.reload();
     await expect(card()).toContainText("נוהל, גרסה 2", { timeout: 15_000 });
     await expect(card()).not.toContainText("אין נוהל מאושר");
+    await expect(card().getByTestId("process-readiness")).toHaveText("רץ");
+    await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "true");
 
     // An event happened: a run opens as a task, and the card links to it.
     await card().getByRole("button", { name: "פתיחת ריצה" }).click();
@@ -118,7 +124,7 @@ test.describe("clients/process-actions", () => {
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
     // A draft does not run anyway: its dates are asked for, but no run is
     // said to be stopped yet.
-    await expect(card().getByTestId("process-next-step")).not.toContainText("לא תיפתח ריצה");
+    await expect(card().getByTestId("process-next-step")).not.toContainText("בלי מועד");
 
     await card().getByRole("button", { name: "כתיבת נוהל" }).click();
     const editor = page.getByRole("dialog");
@@ -132,8 +138,9 @@ test.describe("clients/process-actions", () => {
 
     // 22.10.2026: it is the step that stops work, so it is "הצעד הבא".
     await expect(card().getByTestId("process-next-step")).toHaveAttribute("data-step", "no_next_date", { timeout: 15_000 });
-    await expect(card().getByTestId("process-next-step")).toContainText("לא תיפתח ריצה");
-    await expect(page.getByText(/לפי מועד בלי מועד הבא/).first()).toBeVisible();
+    await expect(card().getByTestId("process-next-step")).toContainText("לא ירוץ: תהליך לפי מועד בלי מועד");
+    // The control line counts it among the processes that will not run.
+    await expect(page.getByText(/לא ירוצ?ו?/).first()).toBeVisible();
   });
 
   test("an ongoing process is in its owner's routine; a check that finds an issue opens a task", async ({ page }) => {
@@ -180,5 +187,39 @@ test.describe("clients/process-actions", () => {
     await card().getByTestId("process-details").getByRole("link", { name: "המשימה" }).click();
     await expect(page).toHaveURL(/\/app\/tasks\//, { timeout: 15_000 });
     await expect(page.getByText("חשבונית של Notion לא הגיעה").first()).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("a documentation field marked not relevant leaves the count, and the mark can be taken off", async ({ page }) => {
+    const title = tag("[E2E] לא רלוונטי");
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    const code = await addSource(page);
+    await page.getByRole("button", { name: "+ תהליך", exact: true }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await dialog.locator('input[name="title"]').fill(title);
+    await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
+    await dialog.locator('input[name="triggerText"]').fill("עובד חדש");
+    await dialog.locator('input[name="sources"]').fill(code);
+    await submit(page, "הוספה לתיק");
+
+    const card = () => page.locator("li", { hasText: title }).filter({ has: page.getByRole("button", { name: "עריכה" }) }).first();
+    await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
+    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 6");
+
+    const external = card().getByTestId("process-checklist").locator('li[data-step="doc_field"]', { hasText: "גורם חיצוני" });
+    const marked = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await external.getByTestId("mark-not-applicable").click();
+    await marked;
+    await page.reload();
+    await expect(card().getByTestId("process-not-applicable")).toContainText("גורם חיצוני", { timeout: 15_000 });
+    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 5");
+    await expect(card().getByTestId("process-checklist")).not.toContainText("תיעוד: חסר גורם חיצוני");
+
+    const restored = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await card().getByTestId("process-not-applicable").getByRole("button", { name: "(ביטול)" }).click();
+    await restored;
+    await page.reload();
+    await expect(card().getByTestId("process-documentation")).toHaveText("תיעוד 0 מתוך 6", { timeout: 15_000 });
   });
 });

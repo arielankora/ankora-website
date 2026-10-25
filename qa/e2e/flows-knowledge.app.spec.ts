@@ -121,7 +121,7 @@ test.describe("knowledge/actions", () => {
   test("a manager reads the measures of every client's file", async ({ page }) => {
     await page.goto("/app/brain-metrics");
     await expect(page.getByRole("heading", { level: 1, name: "מדדי התיק" })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByTestId("metrics-all").getByText("שלמות תהליכים")).toBeVisible();
+    await expect(page.getByTestId("metrics-all").getByText("תיעוד תהליכים")).toBeVisible();
     await expect(page.getByTestId("metrics-clients")).toBeVisible();
   });
 });

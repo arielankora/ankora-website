@@ -344,7 +344,7 @@ async function guides(s: Scope): Promise<ApprovalItem[]> {
 /// The steps of a process that are decisions, on the approvals screen. The
 /// rest (a draft, fields to fill, access, an item not yet confirmed) are
 /// on the process itself and in "שאלות ללקוח".
-const DECISION_STEPS: NextStepKind[] = ["no_next_date", "review", "covered_tasks", "lessons"];
+const DECISION_STEPS: NextStepKind[] = ["not_ready", "no_next_date", "review", "covered_tasks", "lessons"];
 
 /// A process's decisions: for a manager, every process of their clients;
 /// for anyone else, the processes they own (22.10.2026).
@@ -363,6 +363,10 @@ async function processes(s: Scope): Promise<ApprovalItem[]> {
       // A process not yet approved, without dates, stops nothing yet: its
       // dates are part of writing it, on the process.
       if (step.kind === "no_next_date" && !step.blocking) continue;
+      // 25.10.2026: a process in force that will not run (no owner, nothing
+      // that sets it off, paused) is a decision; a draft not yet written is
+      // work on the process itself.
+      if (step.kind === "not_ready" && r.facts.status === "DRAFT") continue;
       out.push({
         kind: "process",
         id: `${r.facts.id}:${step.kind}`,

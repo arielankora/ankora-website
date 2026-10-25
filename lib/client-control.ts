@@ -3,6 +3,8 @@
 // numbers. Pure, so the client screen, the file, the Markdown and the tests
 // say the same thing.
 
+import { scheduledWithoutDate, runReadiness } from "@/lib/process-readiness";
+import { documentationLine } from "@/lib/process-rules";
 import { addDaysToKey, isBusinessDay, type BusinessCalendarKey } from "@/lib/business-calendar";
 import { effectiveStatus, parseFieldStatus, type KnowledgeStatusLike } from "@/lib/knowledge";
 
@@ -15,12 +17,15 @@ export type ControlData = {
   processes: number;
   withAnkora: number;
   inHandover: number;
-  /// Mean of the nine-field scores, one decimal; null with no processes.
-  avgCompleteness: number | null;
+  /// 25.10.2026: how well the processes are written down, the mean share
+  /// of their documentation fields, in percent; null with no processes.
+  /// Quiet: it stops nothing.
+  avgDocumentation: number | null;
   needsReview: number;
-  /// Approved, runs by a date, and no date ahead: no run will open
-  /// (21.10.2026, NUX P2 with nothing on the 25th).
-  scheduledNoDate: number;
+  /// Processes that will not run (lib/process-readiness.ts): no owner, no
+  /// trigger, no approved procedure, or a date missing (21.10.2026, NUX P2
+  /// with nothing on the 25th).
+  notRunning: number;
   exceptionsInForce: number;
   exceptionsRequested: number;
   uncertain: number;
@@ -38,16 +43,38 @@ export type ControlData = {
 /// `key` names what is behind the count (controlDetails), when something is.
 export type ControlPart = { text: string; warn: boolean; key?: ControlKey };
 
-export type ControlKey = "processes" | "completeness" | "needsReview" | "scheduledNoDate" | "exceptionsInForce" | "exceptionsRequested" | "uncertain" | "openQuestions" | "clientVisible" | "noOwner" | "systemsWithoutAccess";
+export type ControlKey = "processes" | "completeness" | "needsReview" | "notRunning" | "exceptionsInForce" | "exceptionsRequested" | "uncertain" | "openQuestions" | "clientVisible" | "noOwner" | "systemsWithoutAccess";
 
-/// A process that runs by a date (SCHEDULED) and is in force, with no
-/// date ahead of it: nothing will open its next run. A draft does not run
-/// anyway; it is the approval that makes the missing date matter.
-export function scheduledWithoutDate(p: { status: string; triggerKinds?: readonly string[] | null; nextDate?: Date | null }): boolean {
-  return p.status === "ACTIVE" && (p.triggerKinds ?? []).includes("SCHEDULED") && !p.nextDate;
+/// 25.10.2026: read by lib/process-readiness.ts, one rule for every screen.
+export { scheduledWithoutDate };
+
+/// A process as the line reads it. `readiness` and `documentation` come
+/// from listProcesses; without them the readiness is worked out here and
+/// the documentation counts as full.
+export type ControlProcess = {
+  transitionStatus: string;
+  needsReview: boolean;
+  status: string;
+  clientVisible?: boolean;
+  backupOwnerId?: string | null;
+  ownerId?: string | null;
+  triggerKinds?: readonly string[] | null;
+  triggerText?: string | null;
+  nextDate?: Date | null;
+  readiness?: { ready: boolean; blocker: string | null };
+  documentation?: { score: number; of: number };
+};
+
+function blockerOf(p: ControlProcess): string | null {
+  if (p.readiness) return p.readiness.blocker;
+  return runReadiness({ status: p.status, ownerId: p.ownerId ?? null, triggerKinds: p.triggerKinds ?? [], triggerText: p.triggerText ?? null, nextDate: p.nextDate ?? null }).blocker;
 }
 
-export const SCHEDULED_NO_DATE_NOTE = "תהליך לפי מועד בלי מועד הבא: לא תיפתח ריצה";
+function docShare(p: ControlProcess): number {
+  return p.documentation && p.documentation.of > 0 ? p.documentation.score / p.documentation.of : 1;
+}
+
+export { SCHEDULED_NO_DATE_BLOCKER as SCHEDULED_NO_DATE_NOTE } from "@/lib/process-readiness";
 
 /// Business days after `fromKey` up to and including `toKey`. Same day: 0.
 export function businessDaysBetween(fromKey: string, toKey: string, calendar: BusinessCalendarKey = "IL"): number {
@@ -72,10 +99,10 @@ export function controlParts(d: ControlData): ControlPart[] {
   } else {
     const where = [d.withAnkora ? `${d.withAnkora} אצלנו` : null, d.inHandover ? `${d.inHandover} בחפיפה` : null].filter(Boolean).join(" ו-");
     parts.push({ text: `${plural(d.processes, "תהליך אחד", "תהליכים")}${where ? `, ${where}` : ""}`, warn: false, key: "processes" });
-    if (d.avgCompleteness !== null) parts.push({ text: `שלמות ממוצעת ${d.avgCompleteness} מתוך 9`, warn: d.avgCompleteness < 8, key: "completeness" });
+    if (d.notRunning) parts.push({ text: d.notRunning === 1 ? "תהליך אחד לא ירוץ" : `${d.notRunning} תהליכים לא ירוצו`, warn: true, key: "notRunning" });
+    if (d.avgDocumentation !== null) parts.push({ text: `תיעוד ${d.avgDocumentation}%`, warn: false, key: "completeness" });
   }
   if (d.needsReview) parts.push({ text: d.needsReview === 1 ? "תהליך אחד דורש סקירה" : `${d.needsReview} תהליכים דורשים סקירה`, warn: true, key: "needsReview" });
-  if (d.scheduledNoDate) parts.push({ text: d.scheduledNoDate === 1 ? "תהליך אחד לפי מועד בלי מועד הבא" : `${d.scheduledNoDate} תהליכים לפי מועד בלי מועד הבא`, warn: true, key: "scheduledNoDate" });
   if (d.exceptionsInForce) parts.push({ text: `${plural(d.exceptionsInForce, "חריגה אחת", "חריגות")} בתוקף`, warn: false, key: "exceptionsInForce" });
   if (d.exceptionsRequested) parts.push({ text: d.exceptionsRequested === 1 ? "בקשת חריגה אחת ממתינה" : `${d.exceptionsRequested} בקשות חריגה ממתינות`, warn: true, key: "exceptionsRequested" });
   if (d.uncertain) parts.push({ text: d.uncertain === 1 ? "פריט אחד לא ודאי" : `${d.uncertain} פריטים לא ודאיים`, warn: false, key: "uncertain" });
@@ -113,7 +140,7 @@ export function countUncertain(items: Item[]): number {
 /// The numbers from what the screens already load: the same rows, so the
 /// line never counts what this person cannot see.
 export function controlFrom(input: {
-  processes: { transitionStatus: string; completeness: { score: number }; needsReview: boolean; backupOwnerId?: string | null; status: string; clientVisible?: boolean; triggerKinds?: readonly string[] | null; nextDate?: Date | null }[];
+  processes: ControlProcess[];
   exceptions: { status: string }[];
   facts: (Item & { kind: string; answeredAt: Date | null; closedAt: Date | null })[];
   otherItems: Item[];
@@ -127,9 +154,9 @@ export function controlFrom(input: {
     processes: live.length,
     withAnkora: live.filter((p) => p.transitionStatus === "WITH_ANKORA").length,
     inHandover: live.filter((p) => p.transitionStatus === "IN_HANDOVER").length,
-    avgCompleteness: live.length ? Math.round((live.reduce((a, p) => a + p.completeness.score, 0) / live.length) * 10) / 10 : null,
+    avgDocumentation: live.length ? Math.round((live.reduce((a, p) => a + docShare(p), 0) / live.length) * 100) : null,
     needsReview: live.filter((p) => p.needsReview).length,
-    scheduledNoDate: live.filter(scheduledWithoutDate).length,
+    notRunning: live.filter((p) => blockerOf(p) !== null).length,
     exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").length,
     exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").length,
     // A question is its own count; an answered or closed fact is history.
@@ -152,7 +179,7 @@ export function controlFrom(input: {
 export const CONTROL_DETAIL_LIMIT = 30;
 
 export type DetailInput = {
-  processes: { id?: string; code: string; title: string; transitionStatus: string; completeness: { score: number }; needsReview: boolean; reviewLabel?: string | null; backupOwnerId?: string | null; status: string; clientVisible?: boolean; triggerKinds?: readonly string[] | null; nextDate?: Date | null }[];
+  processes: (ControlProcess & { id?: string; code: string; title: string; reviewLabel?: string | null })[];
   exceptions: { status: string; what: string; ruleTitle?: string | null; policyId?: string | null }[];
   facts: (Item & { id?: string; kind: string; body: string; answeredAt: Date | null; closedAt: Date | null; toResolve?: string | null })[];
   otherItems: (Item & { id?: string; label: string; toResolve?: string | null })[];
@@ -182,9 +209,9 @@ export function controlDetails(input: DetailInput): Partial<Record<ControlKey, C
   const exception = (e: DetailInput["exceptions"][number]): ControlDetail => ({ text: e.ruleTitle ? `${e.ruleTitle}: ${e.what}` : e.what, id: e.policyId ?? undefined });
   const out: Partial<Record<ControlKey, ControlDetail[]>> = {
     processes: live.map((p) => proc(p)),
-    completeness: live.filter((p) => p.completeness.score < 9).sort((a, b) => a.completeness.score - b.completeness.score).map((p) => proc(p, `${p.completeness.score} מתוך 9`)),
+    completeness: live.filter((p) => docShare(p) < 1).sort((a, b) => docShare(a) - docShare(b)).map((p) => proc(p, p.documentation ? documentationLine(p.documentation) : undefined)),
     needsReview: live.filter((p) => p.needsReview).map((p) => proc(p, p.reviewLabel ?? undefined)),
-    scheduledNoDate: live.filter(scheduledWithoutDate).map((p) => proc(p, SCHEDULED_NO_DATE_NOTE)),
+    notRunning: live.filter((p) => blockerOf(p) !== null).map((p) => proc(p, blockerOf(p)!)),
     exceptionsInForce: input.exceptions.filter((e) => e.status === "APPROVED").map(exception),
     exceptionsRequested: input.exceptions.filter((e) => e.status === "REQUESTED").map(exception),
     uncertain: items.filter(uncertain).map((i) => item(i, i.toResolve)),

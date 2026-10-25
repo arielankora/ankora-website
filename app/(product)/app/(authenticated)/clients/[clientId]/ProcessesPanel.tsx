@@ -28,6 +28,7 @@ import {
   removeProcessAction,
   resolveLessonAction,
   runProcessStepAction,
+  restoreProcessFieldAction,
   saveProcessVersionAction,
   setProcessStatusAction,
   startProcessRunAction,
@@ -36,7 +37,9 @@ import {
 import Link from "next/link";
 import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
-import { nextSteps, type DateCandidate, type NextStep, type ProcessFacts } from "@/lib/next-steps";
+import { nextSteps, type DateCandidate, type NextStep, type ProcessFacts, type StepOp } from "@/lib/next-steps";
+import { RUNS_LABEL } from "@/lib/process-readiness";
+import { documentationLine } from "@/lib/process-rules";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
@@ -108,6 +111,14 @@ export type PanelProcess = {
   toResolve: string | null;
   sources: string[];
   score: number;
+  /// 25.10.2026: will it run, and why not (lib/process-readiness.ts).
+  readiness?: { ready: boolean; blocker: string | null };
+  /// How well it is written down, less the fields not relevant.
+  doc?: { score: number; of: number };
+  docMissing?: { field: string; label: string }[];
+  notApplicable?: { field: string; label: string }[];
+  /// Named in its own words, not linked yet.
+  suggestions?: { systems: { id: string; name: string }[]; contacts: { id: string; name: string }[] };
   gaps: string[];
   nextDate: string | null;
   dateIds: string[];
@@ -757,7 +768,8 @@ export function ProcessesPanel({
   const systemName = new Map(systems.map((s) => [s.id, s.name]));
   const withUs = processes.filter((p) => p.transitionStatus === "WITH_ANKORA").length;
   const handover = processes.filter((p) => p.transitionStatus === "IN_HANDOVER").length;
-  const avg = processes.length ? Math.round((processes.reduce((a, p) => a + p.score, 0) / processes.length) * 10) / 10 : 0;
+  const running = processes.filter((p) => p.readiness?.ready).length;
+  const docAvg = processes.length ? Math.round((processes.reduce((a, p) => a + (p.doc && p.doc.of ? p.doc.score / p.doc.of : 1), 0) / processes.length) * 100) : 0;
 
   async function act(fn: () => Promise<{ error?: string }>, ok: string) {
     const r = await fn();
@@ -783,7 +795,7 @@ export function ProcessesPanel({
       </div>
       {processes.length > 0 && (
         <p className="mt-1 text-[11px] text-app-text-tertiary">
-          {withUs} אצלנו · {handover} בחפיפה · שלמות ממוצעת {avg} מתוך 9
+          {running === processes.length ? "כולם רצים" : `${running} מתוך ${processes.length} רצים`} · {withUs} אצלנו · {handover} בחפיפה · תיעוד {docAvg}%
         </p>
       )}
       {processes.length === 0 ? (
@@ -802,7 +814,7 @@ export function ProcessesPanel({
 type FormOptions = { staff: Option[]; contacts: Option[]; systems: Option[]; rules: Option[]; entities: EntityOption[]; sourceOptions: SourceOption[] };
 
 /// The facts next steps read, from what the card already has.
-function factsOf(p: PanelProcess): ProcessFacts {
+function factsOf(p: PanelProcess, canMark = false): ProcessFacts {
   return {
     id: p.id,
     code: p.code,
@@ -820,6 +832,10 @@ function factsOf(p: PanelProcess): ProcessFacts {
     openLessons: p.lessons.filter((l) => l.status === "OPEN").length,
     knowledge: { uncertain: p.knowledgeStatus === "UNCERTAIN" || p.knowledgeStatus === "MISSING", toResolve: p.toResolve },
     dateCandidate: p.dateCandidate ?? null,
+    readiness: p.readiness,
+    doc: p.docMissing,
+    suggestions: p.suggestions,
+    canMarkNotApplicable: canMark,
   };
 }
 
@@ -860,8 +876,12 @@ function ProcessCard({
     window.addEventListener("hashchange", check);
     return () => window.removeEventListener("hashchange", check);
   }, [p.id]);
-  const steps = nextSteps(factsOf(p), canApprove);
-  const [first, ...rest] = steps;
+  const canMark = canApprove || (!!userId && p.ownerId === userId);
+  const steps = nextSteps(factsOf(p, canMark), canApprove);
+  // 25.10.2026: documentation is never "the next step"; it is listed last,
+  // quietly, under what actually needs doing.
+  const [first, ...others] = steps.filter((st) => st.kind !== "doc_field");
+  const rest = [...others, ...steps.filter((st) => st.kind === "doc_field")];
 
   const fixButton = (step: NextStep, primary: boolean) => {
     const cls = primary ? "rounded-full bg-app-surface-nav px-3 py-1 text-[12px] font-medium text-cream" : "text-[12px] font-medium text-app-text-accent hover:underline";
@@ -909,8 +929,21 @@ function ProcessCard({
             <span className="font-mono text-xs text-app-text-tertiary">{p.code}</span>
             <p className="text-sm font-medium text-app-text-primary">{p.title}</p>
             <StatusBadge label={TRANSITION_LABELS[p.transitionStatus]} tone={TONE[p.transitionStatus]} />
-            {p.status !== "ACTIVE" && <StatusBadge label={p.status === "DRAFT" ? "אין נוהל מאושר" : p.status === "PAUSED" ? "מושהה" : "בוטל"} tone="gray" />}
-            <span className={`text-xs ${p.score >= 8 ? "text-app-success" : "text-app-warning"}`}>{p.score} מתוך 9</span>
+            {p.readiness &&
+              (p.readiness.ready ? (
+                <span className="text-xs font-medium text-app-success" data-testid="process-readiness" data-ready="true">
+                  {RUNS_LABEL}
+                </span>
+              ) : (
+                <span className="text-xs font-medium text-app-error" data-testid="process-readiness" data-ready="false">
+                  {p.readiness.blocker}
+                </span>
+              ))}
+            {p.doc && (
+              <span className="text-[11px] text-app-text-tertiary" data-testid="process-documentation">
+                {documentationLine(p.doc)}
+              </span>
+            )}
             {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
           </div>
           <p className="mt-1 text-xs text-app-text-secondary">
@@ -949,16 +982,45 @@ function ProcessCard({
           {rest.length > 0 && (
             <ul className="mt-2 space-y-1" data-testid="process-checklist">
               {rest.map((st) => (
-                <li key={st.kind} className="flex flex-wrap items-start justify-between gap-2 text-xs">
-                  <span className="min-w-0 flex-1 text-app-text-primary">
+                <li key={st.key ? `${st.kind}:${st.key}` : st.kind} className="flex flex-wrap items-start justify-between gap-2 text-xs" data-step={st.kind}>
+                  <span className={`min-w-0 flex-1 ${st.kind === "doc_field" ? "text-app-text-tertiary" : "text-app-text-primary"}`}>
                     <span aria-hidden className="me-1.5 inline-block h-3 w-3 rounded-sm border border-app-border-strong align-middle" />
                     {st.title}
                     {st.recommend && <span className="text-app-text-tertiary"> · מומלץ: {st.recommend}</span>}
                   </span>
-                  {fixButton(st, false)}
+                  <span className="flex items-center gap-3">
+                    {fixButton(st, false)}
+                    {st.alt?.kind === "op" && (
+                      <button
+                        type="button"
+                        onClick={() => act(() => runProcessStepAction((st.alt as { kind: "op"; op: StepOp }).op, clientId), "סומן כלא רלוונטי")}
+                        className="text-[12px] text-app-text-tertiary hover:text-app-text-primary hover:underline"
+                        data-testid="mark-not-applicable"
+                      >
+                        {st.alt.label}
+                      </button>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>
+          )}
+
+          {(p.notApplicable ?? []).length > 0 && (
+            <p className="mt-1.5 text-[11px] text-app-text-tertiary" data-testid="process-not-applicable">
+              לא רלוונטי:{" "}
+              {p.notApplicable!.map((f, i) => (
+                <span key={f.field}>
+                  {i > 0 && ", "}
+                  {f.label}
+                  {canMark && (
+                    <button type="button" onClick={() => act(() => restoreProcessFieldAction(p.id, f.field, clientId), "הסימון הוסר")} className="ms-1 hover:text-app-text-primary hover:underline">
+                      (ביטול)
+                    </button>
+                  )}
+                </span>
+              ))}
+            </p>
           )}
 
           <details className="mt-2" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} data-testid="process-details">

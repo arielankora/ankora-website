@@ -17,18 +17,30 @@ export type ReadinessProcessInput = {
   ownerId: string | null;
   executor: string | null;
   hasApprovedProcedure: boolean;
-  completeness: number;
+  /// 25.10.2026: why it will not run, null when it runs
+  /// (lib/process-readiness.ts). Without it, an approved procedure is
+  /// taken as running.
+  runBlocker?: string | null;
+  /// How well it is written down, less the fields not relevant. Shown,
+  /// never what makes it not ready.
+  documentation: { score: number; of: number };
   systems: ReadinessSystem[];
 };
 
-export type ReadinessCheckKey = "procedure" | "access" | "withUs" | "complete";
+export type ReadinessCheckKey = "runs" | "access" | "withUs" | "complete";
 
+/// 25.10.2026: "רץ" replaces "נוהל מאושר" (owner, trigger, an approved
+/// procedure and a date when it runs by one), and the documentation is
+/// shown but no longer decides whether a process is ready.
 export const READINESS_CHECKS: { key: ReadinessCheckKey; label: string }[] = [
-  { key: "procedure", label: "נוהל מאושר" },
+  { key: "runs", label: "רץ" },
   { key: "access", label: "גישה לכל המערכות" },
   { key: "withUs", label: "אצלנו" },
-  { key: "complete", label: "תיעוד מלא (8 מתוך 9)" },
+  { key: "complete", label: "תיעוד מלא" },
 ];
+
+/// The checks that decide whether a process is ready.
+const DECIDING: ReadinessCheckKey[] = ["runs", "access", "withUs"];
 
 export type ReadinessProcess = ReadinessProcessInput & {
   checks: Record<ReadinessCheckKey, boolean>;
@@ -54,19 +66,19 @@ export function readinessOf(input: ReadinessProcessInput[]): Readiness {
   const planned = live.filter((p) => p.transitionStatus !== "NOT_PLANNED");
   const processes = planned.map((p): ReadinessProcess => {
     const noAccess = p.systems.filter((s) => !HAS_ACCESS(s));
+    const blocker = p.runBlocker !== undefined ? p.runBlocker : p.hasApprovedProcedure ? null : "לא ירוץ: אין נוהל מאושר";
     const checks: Record<ReadinessCheckKey, boolean> = {
-      procedure: p.hasApprovedProcedure,
+      runs: blocker === null,
       access: noAccess.length === 0,
       withUs: p.transitionStatus === "WITH_ANKORA",
-      complete: p.completeness >= 8,
+      complete: p.documentation.score >= p.documentation.of,
     };
     const missing = [
-      !checks.procedure && "אין נוהל מאושר: מנהל מאשר את הטיוטה במסך התהליכים.",
+      blocker && `${blocker}.`,
       !checks.access && `אין לנו גישה ל: ${noAccess.map((s) => (s.permission ? `${s.name} (${s.permission})` : s.name)).join(", ")}.`,
       !checks.withUs && `עוד לא אצלנו${p.executor ? `: היום מבצע ${p.executor}` : ""}.`,
-      !checks.complete && `התיעוד ${p.completeness} מתוך 9.`,
     ].filter((x): x is string => !!x);
-    return { ...p, checks, ready: missing.length === 0, missing };
+    return { ...p, checks, ready: DECIDING.every((k) => checks[k]), missing };
   });
   const seen = new Set<string>();
   const systemsWithoutAccess: ReadinessSystem[] = [];

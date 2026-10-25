@@ -3720,6 +3720,10 @@ model Process {
   /// What to do when something deviates. Markdown.
   exceptionPlaybook String?
 
+  /// 25.10.2026: documentation fields a person marked "לא רלוונטי" (sla,
+  /// systems, approvals, external, exceptions). Not counted, never a gap.
+  notApplicableFields String[] @default([])
+
   entityId String?
   /// Org-brain decision 6: the business calendar its runs and its dates
   /// use ("IL", "US"). Null: its entity's country decides, and with no

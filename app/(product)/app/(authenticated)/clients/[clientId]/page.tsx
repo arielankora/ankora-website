@@ -609,6 +609,12 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 externalRefs: refsText(p.externalRefs), refs: teamRefs(p.externalRefs).map(refLabel), audience: p.audience, audienceUserIds: p.audienceUserIds, verifiedAt: p.verifiedAt ? p.verifiedAt.toISOString() : null, lastRunAt: p.lastRunAt ? p.lastRunAt.toISOString() : null,
                 sources: readSourceRefs(p.sources).map(formatSourceRef),
                 score: p.completeness.score,
+                readiness: p.readiness,
+                doc: { score: p.documentation.score, of: p.documentation.of },
+                // Access has a row of its own (no_access).
+                docMissing: p.documentation.missing.filter((k) => k !== "permissions").map((k) => ({ field: k, label: FIELD_LABELS[k] })),
+                notApplicable: p.notApplicable.map((k) => ({ field: k, label: FIELD_LABELS[k] })),
+                suggestions: p.suggestions,
                 gaps: p.gaps,
                 nextDate: p.nextDate ? p.nextDate.toISOString() : null,
                 dateIds: p.dates.map((d) => d.id),

@@ -204,6 +204,10 @@ export type CompletenessInput = {
   exceptionPlaybook: string | null;
   /// For a scheduled process: the next occurrence of its dates, if any.
   nextDate: Date | null;
+  /// Fields marked "לא רלוונטי" (NOT_APPLICABLE_FIELDS).
+  notApplicableFields?: unknown;
+  /// A step or a text of the process names a contact or a firm of the file.
+  mentionedExternal?: boolean;
 };
 
 export const NINE_FIELDS = ["owner", "trigger", "sla", "systems", "permissions", "approvals", "external", "exceptions", "next"] as const;
@@ -221,22 +225,70 @@ export const FIELD_LABELS: Record<FieldKey, string> = {
   next: "מועד הבא",
 };
 
-export function completeness(p: CompletenessInput): { score: number; of: 9; missing: FieldKey[] } {
-  const has: Record<FieldKey, boolean> = {
+/// 25.10.2026 (Ariel: "there is always something missing"): what a
+/// process needs to run (owner, trigger, a date when it runs by one) is
+/// read by lib/process-readiness.ts. The rest is how well it is written
+/// down, shown quietly, and any of it can be marked not relevant.
+export const DOC_FIELDS = ["sla", "systems", "permissions", "approvals", "external", "exceptions"] as const;
+export type DocField = (typeof DOC_FIELDS)[number];
+
+/// The fields a person may mark "לא רלוונטי". Permissions follow systems:
+/// no systems, nothing to have access to.
+export const NOT_APPLICABLE_FIELDS = ["sla", "systems", "approvals", "external", "exceptions"] as const;
+export type NotApplicableField = (typeof NOT_APPLICABLE_FIELDS)[number];
+
+export function readNotApplicable(v: unknown): NotApplicableField[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is NotApplicableField => typeof x === "string" && (NOT_APPLICABLE_FIELDS as readonly string[]).includes(x)))];
+}
+
+function notApplicableSet(p: CompletenessInput): Set<FieldKey> {
+  const na = new Set<FieldKey>(readNotApplicable(p.notApplicableFields));
+  if (na.has("systems")) na.add("permissions");
+  return na;
+}
+
+function fieldsPresent(p: CompletenessInput): Record<FieldKey, boolean> {
+  return {
     owner: !!p.ownerId,
     trigger: p.triggerKinds.length > 0 && !!p.triggerText?.trim(),
     sla: !!p.slaText?.trim() || p.slaBusinessDays !== null,
     systems: p.requiredSystemIds.length > 0,
     // No systems, nothing to have access to: the "systems" gap says it.
     permissions: p.requiredSystemIds.length > 0 && p.systemsWithoutAccess.length === 0,
-    approvals: (!!p.approverText?.trim() || !!p.approverContactId || !!p.approverUserId) && (p.approvalPolicyIds.length > 0 || !!p.approvalText?.trim()),
-    external: p.externalPartyContactIds.length > 0 || !!p.externalPartyText?.trim(),
+    // 25.10.2026: a named approver is enough. A linked approval rule or
+    // the thresholds in words add to it, but are not required.
+    approvals: !!p.approverText?.trim() || !!p.approverContactId || !!p.approverUserId,
+    // A step or a text that names a contact or a firm of the file counts.
+    external: p.externalPartyContactIds.length > 0 || !!p.externalPartyText?.trim() || !!p.mentionedExternal,
     exceptions: !!p.exceptionPlaybook?.trim(),
     // Only a scheduled process has a next date to know.
     next: !p.triggerKinds.includes("SCHEDULED") || p.nextDate !== null,
   };
-  const missing = NINE_FIELDS.filter((k) => !has[k]);
-  return { score: 9 - missing.length, of: 9, missing };
+}
+
+/// All nine, less the ones marked not relevant: `of` is what is left.
+export function completeness(p: CompletenessInput): { score: number; of: number; missing: FieldKey[] } {
+  const has = fieldsPresent(p);
+  const na = notApplicableSet(p);
+  const counted = NINE_FIELDS.filter((k) => !na.has(k));
+  const missing = counted.filter((k) => !has[k]);
+  return { score: counted.length - missing.length, of: counted.length, missing };
+}
+
+/// How well it is written down: the documentation fields only, less the
+/// ones not relevant. Quiet: nothing here stops a run.
+export function documentation(p: CompletenessInput): { score: number; of: number; missing: DocField[]; notApplicable: NotApplicableField[] } {
+  const has = fieldsPresent(p);
+  const na = notApplicableSet(p);
+  const counted = DOC_FIELDS.filter((k) => !na.has(k));
+  const missing = counted.filter((k) => !has[k]);
+  return { score: counted.length - missing.length, of: counted.length, missing, notApplicable: readNotApplicable(p.notApplicableFields) };
+}
+
+/// "תיעוד 4 מתוך 6", or "תיעוד מלא".
+export function documentationLine(d: { score: number; of: number }): string {
+  return d.score >= d.of ? "תיעוד מלא" : `תיעוד ${d.score} מתוך ${d.of}`;
 }
 
 /// The gaps a reader sees on the process (R11, R12, R13), in words.
@@ -246,6 +298,6 @@ export function processGaps(p: CompletenessInput & { backupOwnerId?: string | nu
   const gaps: string[] = [];
   const { missing } = completeness(p);
   for (const k of missing) if (k !== "permissions") gaps.push(`חסר: ${FIELD_LABELS[k]}`);
-  if (p.systemsWithoutAccess.length) gaps.push(`אין לנו גישה ל: ${p.systemsWithoutAccess.map(systemName).join(", ")}`);
+  if (p.systemsWithoutAccess.length && !notApplicableSet(p).has("systems")) gaps.push(`אין לנו גישה ל: ${p.systemsWithoutAccess.map(systemName).join(", ")}`);
   return gaps;
 }
