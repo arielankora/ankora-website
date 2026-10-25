@@ -32,10 +32,38 @@ export async function listAccessibleClients(actor: User) {
   return access.map((a) => a.client).filter((c) => !c.deletedAt && c.status === "ACTIVE");
 }
 
+/**
+ * One client, with who is assigned to it.
+ *
+ * The columns of the assigned people are named, and that is the whole
+ * point of this comment. `include: { user: true }` returned the User row
+ * entire, `passwordHash` included, and `/app/clients/[clientId]` hands
+ * this object to `<EditClientForm client={client} />`, which is a client
+ * component. Next serialises a client component's props into the RSC
+ * payload inside the page HTML, so every assigned employee's bcrypt hash
+ * was sitting in the source of that screen, readable by anyone who may
+ * open the client.
+ *
+ * TypeScript had nothing to say about it: the prop is declared `Client`,
+ * and a variable, unlike an object literal, may carry properties its
+ * declared type never mentions. That is word for word the mechanism of
+ * #84, where three screens leaked the same column.
+ *
+ * Found on 25.10.2026 by the sweep merged in #326 that morning, on its
+ * first level-3 run. The sweep had covered 41 screens and skipped every
+ * route with an id in it, which is where records are rendered. This was
+ * the first screen it looked at.
+ *
+ * Only `name` and `email` are rendered (the assigned-people list on the
+ * client screen), so only those are asked for.
+ */
 export async function getClient(id: string) {
   return prisma.client.findFirst({
     where: { id, deletedAt: null },
-    include: { employeeAccess: { include: { user: true } }, categories: true },
+    include: {
+      employeeAccess: { include: { user: { select: { id: true, name: true, email: true } } } },
+      categories: true,
+    },
   });
 }
 
