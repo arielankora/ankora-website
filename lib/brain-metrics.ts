@@ -18,7 +18,9 @@ const DAY = 86_400_000;
 export type ClientMetricsInput = {
   clientId: string;
   clientName: string;
-  processes: { status: string; transitionStatus: string; backupOwnerId?: string | null; completeness: number }[];
+  /// 25.10.2026: whether each runs, and the share of its documentation
+  /// fields that are filled (0 to 1, the ones not relevant left out).
+  processes: { status: string; transitionStatus: string; backupOwnerId?: string | null; ready: boolean; documentation: number }[];
   /// When each item of the file now "uncertain" last changed.
   uncertainSince: Date[];
   systems: { accessStatus: string }[];
@@ -61,7 +63,8 @@ function endOfDueDay(d: Date): number {
 export function measures(input: Omit<ClientMetricsInput, "clientId" | "clientName">, now: Date): Measure[] {
   const live = input.processes.filter((p) => p.status !== "RETIRED");
   const planned = live.filter((p) => p.transitionStatus !== "NOT_PLANNED");
-  const avg = live.length ? Math.round((live.reduce((a, p) => a + p.completeness, 0) / live.length) * 10) / 10 : null;
+  const running = pct(live.filter((p) => p.ready).length, live.length);
+  const docAvg = live.length ? Math.round((live.reduce((a, p) => a + p.documentation, 0) / live.length) * 100) : null;
   const stale = input.uncertainSince.filter((d) => now.getTime() - d.getTime() > UNCERTAIN_STALE_DAYS * DAY).length;
   const noAccess = input.systems.filter((s) => s.accessStatus === "NO_ACCESS" || s.accessStatus === "PENDING").length;
   const fromProcess = input.autoTasks.filter((t) => t.processId).length;
@@ -83,7 +86,8 @@ export function measures(input: Omit<ClientMetricsInput, "clientId" | "clientNam
     state: value === null ? "none" : ok(value) ? "ok" : "off",
   });
   return [
-    m("completeness", "שלמות תהליכים", "ממוצע תשעת השדות של כל תהליך פעיל.", "8 מתוך 9", avg, `${avg} מתוך 9`, (v) => v >= 8),
+    m("running", "תהליכים שרצים", "מהתהליכים הפעילים, כמה ירוצו לבד: יש אחראי, טריגר, נוהל מאושר, ומועד כשהם לפי מועד.", "100%", running, `${running}%`, (v) => v >= 100),
+    m("completeness", "תיעוד תהליכים", "ממוצע שדות התיעוד של כל תהליך פעיל, בלי השדות שסומנו לא רלוונטיים.", "80%", docAvg, `${docAvg}%`, (v) => v >= 80),
     m("coverage", "משימות שנפתחו מתהליך", `מהמשימות שהמערכת פתחה לבד ב-${COVERAGE_WINDOW_DAYS} הימים האחרונים, כמה היו ריצה של תהליך ולא מועד בלבד.`, "60%", coverage, `${coverage}%`, (v) => v >= 60),
     m("staleUncertain", `לא ודאי מעל ${UNCERTAIN_STALE_DAYS} יום`, `פריטים בתיק שמסומנים לא ודאיים ולא השתנו ${UNCERTAIN_STALE_DAYS} יום.`, "יורד מחודש לחודש", stale, String(stale), (v) => v === 0),
     m("noAccess", "מערכות בלי גישה", "מערכות במפה שאין לנו אליהן גישה, או שהיא ממתינה. מדד ההתקדמות של החפיפה.", "יורד", input.systems.length ? noAccess : null, String(noAccess), (v) => v === 0),

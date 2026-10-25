@@ -189,6 +189,8 @@ export const ProcessPayload = z.object({
   systemNames: z.array(z.string().max(200)).max(20).optional(),
   approverName: z.string().max(200).nullish(),
   approvalPolicyTitles: z.array(z.string().max(200)).max(10).optional(),
+  /// 25.10.2026: documentation fields that do not apply to this process.
+  notApplicableFields: z.array(z.enum(["sla", "systems", "approvals", "external", "exceptions"])).max(5).optional(),
   ...knowledge,
 });
 

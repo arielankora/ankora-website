@@ -133,3 +133,39 @@ describe("rankApprovals", () => {
     expect(urgency(r("x", "2026-10-01", { deadline: new Date("2026-12-01T00:00:00Z") }), now)).toBe(2);
   });
 });
+
+describe("runs, documentation and what its words name (25.10.2026)", () => {
+  it("says why it will not run first, when nothing below says it", () => {
+    const [step] = nextSteps(facts({ status: "DRAFT", triggerKinds: ["EVENT"], readiness: { ready: false, blocker: "לא ירוץ: אין נוהל מאושר" } }), true);
+    expect(step).toMatchObject({ kind: "not_ready", title: "לא ירוץ: אין נוהל מאושר", blocking: true, fix: { kind: "procedure" } });
+    expect(nextSteps(facts({ ownerId: null, readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" } }), true)[0]).toMatchObject({ kind: "not_ready", fix: { kind: "edit" } });
+    // A missing date or a draft already says it.
+    expect(nextSteps(facts({ hasNextDate: false, readiness: { ready: false, blocker: "לא ירוץ: תהליך לפי מועד בלי מועד" } }), true).map((s) => s.kind)).toEqual(["no_next_date"]);
+    expect(nextSteps(facts({ status: "DRAFT", draft: { version: 1, blocked: false }, readiness: { ready: false, blocker: "לא ירוץ: אין נוהל מאושר" } }), true).map((s) => s.kind)).toEqual(["procedure_draft"]);
+    // Another reason first: it is said, and the draft after it.
+    expect(nextSteps(facts({ status: "DRAFT", ownerId: null, draft: { version: 1, blocked: false }, readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" } }), true).map((s) => s.kind)).toEqual(["not_ready", "procedure_draft"]);
+  });
+
+  it("lists each documentation field quietly, with \"לא רלוונטי\" for who may mark it", () => {
+    const doc = [
+      { field: "sla", label: "SLA" },
+      { field: "external", label: "גורם חיצוני" },
+    ];
+    const steps = nextSteps(facts({ doc, canMarkNotApplicable: true }), true);
+    expect(steps.map((s) => [s.kind, s.key, s.blocking])).toEqual([
+      ["doc_field", "sla", false],
+      ["doc_field", "external", false],
+    ]);
+    expect(steps[0]).toMatchObject({ title: "תיעוד: חסר SLA", alt: { kind: "op", label: "לא רלוונטי", op: { type: "mark_not_applicable", processId: "p5", field: "sla" } } });
+    expect(nextSteps(facts({ doc }), false)[0].alt).toBeUndefined();
+    // `doc` replaces the old one line of missing fields.
+    expect(nextSteps(facts({ doc: [], missing: ["SLA"] }), true)).toEqual([]);
+  });
+
+  it("offers to link a system or a contact the process names", () => {
+    const steps = nextSteps(facts({ suggestions: { systems: [{ id: "s1", name: "בנק לאומי" }], contacts: [{ id: "c1", name: "דקלה כרמי" }] } }), true);
+    expect(steps.map((s) => s.kind)).toEqual(["link_mention", "link_mention"]);
+    expect(steps[0]).toMatchObject({ title: "בנק לאומי מוזכרת בתהליך ולא מקושרת", fix: { kind: "op", label: "לקשר", op: { type: "link_system", systemId: "s1" } } });
+    expect(steps[1].fix).toMatchObject({ kind: "op", op: { type: "link_contact", contactId: "c1" } });
+  });
+});

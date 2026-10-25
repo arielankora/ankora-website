@@ -14,8 +14,13 @@ import {
   MAX_PROCESS_STEPS,
   blockingChecks,
   completeness,
+  documentation,
   processGaps,
+  readNotApplicable,
   readSteps,
+  FIELD_LABELS,
+  NOT_APPLICABLE_FIELDS,
+  type NotApplicableField,
   type CheckResult,
   type ProcessStep,
 } from "@/lib/process-rules";
@@ -26,6 +31,8 @@ import { syncDateCalendars } from "@/lib/app-domain/date-calendars";
 import { isBusinessCalendarKey } from "@/lib/business-calendar";
 import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
+import { runReadiness } from "@/lib/process-readiness";
+import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -83,6 +90,8 @@ export interface ProcessInput extends KnowledgeInput {
   controlRefs?: string[];
   classification?: ProcedureClassification;
   relatedDocs?: string | null;
+  /// 25.10.2026: documentation fields not relevant to this process.
+  notApplicableFields?: string[];
 }
 
 export class ProcessVersionConflictError extends Error {
@@ -177,6 +186,7 @@ function fields(input: Partial<ProcessInput>, ids: { contacts?: string[]; system
     controlRefs: input.controlRefs !== undefined ? readControlRefs(input.controlRefs) : undefined,
     classification: input.classification ?? undefined,
     relatedDocs: input.relatedDocs !== undefined ? clean(input.relatedDocs) : undefined,
+    notApplicableFields: input.notApplicableFields !== undefined ? readNotApplicable(input.notApplicableFields) : undefined,
   };
 }
 
@@ -488,6 +498,53 @@ export async function systemNamesFor(actor: User, clientId: string): Promise<Rec
   return Object.fromEntries(rows.map((r) => [r.id, r.systemName]));
 }
 
+/// The contacts and firms of the client, by name, for finding the ones a
+/// process names (lib/process-mentions.ts).
+async function partiesOf(clientId: string): Promise<(Named & { kind: "contact" | "organization" })[]> {
+  const [contacts, orgs] = await Promise.all([
+    prisma.clientContact.findMany({ where: { clientId, deletedAt: null }, select: { id: true, person: { select: { name: true } } } }),
+    prisma.clientOrganization.findMany({ where: { clientId, deletedAt: null }, select: { id: true, organization: { select: { name: true } } } }),
+  ]);
+  return [
+    ...contacts.filter((c) => c.person.name?.trim()).map((c) => ({ id: c.id, name: c.person.name!, kind: "contact" as const })),
+    ...orgs.filter((o) => o.organization.name?.trim()).map((o) => ({ id: o.id, name: o.organization.name, kind: "organization" as const })),
+  ];
+}
+
+/// Marks a documentation field "לא רלוונטי", or takes the mark off
+/// (25.10.2026). A manager or the process's owner. It stops counting, and
+/// is never shown as a gap.
+export async function setProcessFieldNotApplicable(actor: User, id: string, field: string, notApplicable: boolean) {
+  const before = await findProcess(actor, id);
+  if (!canManageClients(actor.role) && before.ownerId !== actor.id) throw new Error("רק מנהל או הבעלים של התהליך מסמנים שדה כלא רלוונטי.");
+  if (!(NOT_APPLICABLE_FIELDS as readonly string[]).includes(field)) throw new Error("את השדה הזה אי אפשר לסמן כלא רלוונטי.");
+  const now = readNotApplicable(before.notApplicableFields);
+  const next = notApplicable ? [...new Set([...now, field as NotApplicableField])] : now.filter((f) => f !== field);
+  const updated = await prisma.process.update({ where: { id }, data: { notApplicableFields: next } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "process.field_not_applicable",
+    entityType: "Process",
+    entityId: id,
+    clientId: before.clientId,
+    before: { notApplicableFields: now },
+    after: { notApplicableFields: next, field: FIELD_LABELS[field as NotApplicableField], notApplicable },
+  });
+  return updated;
+}
+
+/// Links a system the process names to its required systems, or a contact
+/// it names to its outside parties: the one-click suggestions on the card.
+export async function linkProcessMention(actor: User, id: string, kind: "system" | "contact", itemId: string) {
+  const before = await findProcess(actor, id);
+  if (kind === "system") {
+    if (before.requiredSystemIds.includes(itemId)) return before;
+    return updateProcess(actor, id, { requiredSystemIds: [...before.requiredSystemIds, itemId] });
+  }
+  if (before.externalPartyContactIds.includes(itemId)) return before;
+  return updateProcess(actor, id, { externalPartyContactIds: [...before.externalPartyContactIds, itemId] });
+}
+
 /// Every process of the client this person may see, with its current and
 /// draft procedure, its dates, its completeness and its gaps.
 export async function listProcesses(actor: User, clientId: string, options: { includeRetired?: boolean } = {}) {
@@ -508,6 +565,7 @@ export async function listProcesses(actor: User, clientId: string, options: { in
     ruleContext(clientId, { canSee: (r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null) }),
   ]);
   const systemById = new Map(systems.map((s) => [s.id, s]));
+  const parties = await partiesOf(clientId);
   return rows
     .filter((r) => canSeeKnowledgeItem(r, viewer, client?.accountManagerId ?? null))
     .map((r) => {
@@ -521,6 +579,15 @@ export async function listProcesses(actor: User, clientId: string, options: { in
           .sort((a, b) => a.getTime() - b.getTime())[0] ?? null;
       const stepSystems = [...new Set((current ? readSteps(current.steps) : []).flatMap((s) => s.systemIds))];
       const needed = [...new Set([...r.requiredSystemIds, ...stepSystems])];
+      const steps = (v: typeof current): ProcessStep[] => (v ? readSteps(v.steps) : []);
+      // 25.10.2026: what its own words already name, offered to link.
+      const texts = processTexts({ ...r, steps: [...steps(current), ...steps(draft)] });
+      const systemSuggestions = mentionedIn(
+        texts,
+        systems.filter((s) => !needed.includes(s.id)).map((s) => ({ id: s.id, name: s.systemName }))
+      );
+      const partyMentions = mentionedIn(texts, parties);
+      const contactSuggestions = partyMentions.filter((x) => x.kind === "contact" && !r.externalPartyContactIds.includes(x.id));
       const input = {
         ...r,
         systemsWithoutAccess: needed.filter((id) => {
@@ -528,8 +595,8 @@ export async function listProcesses(actor: User, clientId: string, options: { in
           return !s || (s.accessStatus !== "HAS_ACCESS" && s.accessStatus !== "NOT_NEEDED");
         }),
         nextDate,
+        mentionedExternal: partyMentions.length > 0,
       };
-      const steps = (v: typeof current): ProcessStep[] => (v ? readSteps(v.steps) : []);
       return {
         ...r,
         // The approved procedure against today's rules: a rule added or
@@ -539,6 +606,14 @@ export async function listProcesses(actor: User, clientId: string, options: { in
         latestVersion: latest?.version ?? 0,
         nextDate,
         completeness: completeness(input),
+        documentation: documentation(input),
+        readiness: runReadiness({ ...r, nextDate }),
+        notApplicable: readNotApplicable(r.notApplicableFields),
+        /// Named in its own words, not linked yet: one click links each.
+        suggestions: {
+          systems: systemSuggestions.map((x) => ({ id: x.id, name: x.name })),
+          contacts: contactSuggestions.map((x) => ({ id: x.id, name: x.name })),
+        },
         gaps: processGaps(input, (id) => systemById.get(id)?.systemName ?? "מערכת שהוסרה"),
         /// 22.10.2026: the systems it needs and cannot use, by id and name,
         /// for the step that asks for access.

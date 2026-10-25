@@ -29,7 +29,8 @@ export async function handoverReadiness(actor: User, clientId: string): Promise<
         ownerId: p.ownerId,
         executor: (p.executorUserId && users.get(p.executorUserId)) || (p.executorContactId && contactName.get(p.executorContactId)) || p.executorText,
         hasApprovedProcedure: !!p.current,
-        completeness: p.completeness.score,
+        runBlocker: p.readiness.blocker,
+        documentation: { score: p.documentation.score, of: p.documentation.of },
         systems: ids
           .map((id) => systemById.get(id))
           .filter((s): s is NonNullable<typeof s> => !!s)

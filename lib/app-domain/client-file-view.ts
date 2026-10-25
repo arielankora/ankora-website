@@ -1,4 +1,5 @@
 import "server-only";
+import { readinessLabel } from "@/lib/process-readiness";
 import { prisma } from "@/lib/prisma";
 import { RECEIPT_LABEL } from "@/lib/date-receipt";
 import { assertCan } from "@/lib/app-auth/permissions";
@@ -24,7 +25,7 @@ import { controlFrom, controlParts } from "@/lib/client-control";
 import { batchItem, CHANGES_GROUP, oneOffSuppliers, ruleSection } from "@/lib/client-file-sections";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
-import { STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
+import { documentationLine, FIELD_LABELS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS } from "@/lib/process-rules";
 import { checkEveryText } from "@/lib/process-checks";
 import { POLICY_KIND_LABELS, POLICY_STATUS_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { ACTION_LABEL } from "@/app/(product)/app/(authenticated)/audit-log/labels";
@@ -337,7 +338,9 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
           p.nextDate ? `הבא: ${day(p.nextDate)}` : null,
           p.checkEveryDays ? `בדיקה ${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}${p.lastCheckedAt ? `, נבדק לאחרונה ${day(p.lastCheckedAt)}` : ", עוד לא נבדק"}` : null,
           readReviewReason(p.reviewReason) ? `דורש סקירה: ${REVIEW_REASON_LABELS[readReviewReason(p.reviewReason)!]}` : null,
-          `שלמות ${p.completeness.score} מתוך 9`,
+          readinessLabel(p.readiness),
+          documentationLine(p.documentation),
+          p.notApplicable.length ? `לא רלוונטי: ${p.notApplicable.map((k) => FIELD_LABELS[k]).join(", ")}` : null,
           (() => {
             const n = openLessons.find((l) => l.processId === p.id)?._count ?? 0;
             return n ? (n === 1 ? "הערה אחת מריצות ממתינה לגרסה הבאה" : `${n} הערות מריצות ממתינות לגרסה הבאה`) : null;

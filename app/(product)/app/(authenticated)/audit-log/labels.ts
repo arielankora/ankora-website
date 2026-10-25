@@ -143,6 +143,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "policy_exception.withdraw": "משיכת בקשה לחריגה מכלל של לקוח",
   "process.add": "הוספת תהליך לתיק הלקוח",
   "process.update": "עדכון תהליך בתיק הלקוח",
+  "process.field_not_applicable": "סימון שדה בתהליך כלא רלוונטי",
   "process.status": "השהיה, חידוש או ביטול של תהליך",
   "process.remove": "הסרת תהליך מתיק הלקוח",
   "process.dates": "קישור מועדים לתהליך",

@@ -13,7 +13,7 @@ const SECTION: Partial<Record<ControlKey, string>> = {
   processes: "processes",
   completeness: "processes",
   needsReview: "processes",
-  scheduledNoDate: "processes",
+  notRunning: "processes",
   exceptionsInForce: "rules",
   exceptionsRequested: "rules",
 };
