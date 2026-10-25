@@ -95,6 +95,7 @@ test("every detail screen ships no credential material", async ({ page }) => {
   const missing: string[] = [];
   const counts: string[] = [];
   let swept = 0;
+  let widest = 0;
 
   for (const { route, optional } of DYNAMIC_SWEEP) {
     await test.step(route, async () => {
@@ -138,7 +139,10 @@ test("every detail screen ships no credential material", async ({ page }) => {
       }
 
       if (here === 0) missing.push(optional ? `${route} (not swept: ${optional})` : route);
-      else counts.push(`${route}: ${here} of ${targets.length} instance(s)`);
+      else {
+        counts.push(`${route}: ${here} of ${targets.length} instance(s)`);
+        widest = Math.max(widest, here);
+      }
     });
   }
 
@@ -146,6 +150,30 @@ test("every detail screen ships no credential material", async ({ page }) => {
   // #510 is the precedent: three of four shards reported success with a
   // "Run QA" of zero seconds.
   expect(swept, "no detail screen was reached at all - the sweep checked nothing").toBeGreaterThan(0);
+
+  // And that it opened more than one of something.
+  //
+  // Raising PER_SCREEN changes nothing a green run can show: if the pool
+  // only ever holds one address per screen, the sweep does exactly what
+  // it did before and passes either way. That is how the gap this file
+  // was changed for looked from the outside - a sweep that was green
+  // because it was narrow.
+  //
+  // The seed creates two clients and the clients list links both, so on
+  // any database this suite runs against there are at least two
+  // instances of one screen to open. Not a fixture dependency: it names
+  // no id and no client, only that more than one record exists, which is
+  // the minimum under which a sweep means anything at all.
+  expect(
+    widest,
+    [
+      "The sweep opened exactly one instance of every screen.",
+      "A record with nothing on it satisfies every credential pattern while proving nothing,",
+      "and which record comes first is decided by whatever the suite created before this spec ran.",
+      "See PER_SCREEN: either the lists stopped linking to more than one record, or the",
+      "breadth this file exists for has quietly gone away.",
+    ].join("\n"),
+  ).toBeGreaterThan(1);
 
   const required = missing.filter((m) => !m.includes("(not swept:"));
   expect(
