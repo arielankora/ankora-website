@@ -117,6 +117,8 @@ test.describe("clients/process-actions", () => {
     await dialog.locator('input[name="title"]').fill(title);
     await dialog.locator('input[name="triggerKinds"][value="SCHEDULED"]').check();
     await dialog.locator('input[name="triggerText"]').fill("ב-10 וב-25 לחודש");
+    const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
+    await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
     await dialog.locator('input[name="sources"]').fill(code);
     await submit(page, "הוספה לתיק");
 
@@ -124,7 +126,7 @@ test.describe("clients/process-actions", () => {
     await expect(card(), "the process was not added").toBeVisible({ timeout: 15_000 });
     // A draft does not run anyway: its dates are asked for, but no run is
     // said to be stopped yet.
-    await expect(card().getByTestId("process-next-step")).not.toContainText("בלי מועד");
+    await expect(card().getByTestId("process-next-step")).not.toContainText("לא ירוץ: תהליך לפי מועד");
 
     await card().getByRole("button", { name: "כתיבת נוהל" }).click();
     const editor = page.getByRole("dialog");

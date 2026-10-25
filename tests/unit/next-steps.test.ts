@@ -141,6 +141,9 @@ describe("runs, documentation and what its words name (25.10.2026)", () => {
     expect(nextSteps(facts({ ownerId: null, readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" } }), true)[0]).toMatchObject({ kind: "not_ready", fix: { kind: "edit" } });
     // A missing date or a draft already says it.
     expect(nextSteps(facts({ hasNextDate: false, readiness: { ready: false, blocker: "לא ירוץ: תהליך לפי מועד בלי מועד" } }), true).map((s) => s.kind)).toEqual(["no_next_date"]);
+    expect(nextSteps(facts({ status: "DRAFT", draft: { version: 1, blocked: false }, readiness: { ready: false, blocker: "לא ירוץ: אין נוהל מאושר" } }), true).map((s) => s.kind)).toEqual(["procedure_draft"]);
+    // Another reason first: it is said, and the draft after it.
+    expect(nextSteps(facts({ status: "DRAFT", ownerId: null, draft: { version: 1, blocked: false }, readiness: { ready: false, blocker: "לא ירוץ: אין אחראי" } }), true).map((s) => s.kind)).toEqual(["not_ready", "procedure_draft"]);
   });
 
   it("lists each documentation field quietly, with \"לא רלוונטי\" for who may mark it", () => {

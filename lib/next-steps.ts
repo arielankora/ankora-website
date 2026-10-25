@@ -119,7 +119,7 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
   // Why it will not run, when the steps below do not already say it: no
   // owner, nothing that sets it off, or no procedure written yet.
   const blocker = p.readiness && !p.readiness.ready ? p.readiness.blocker : null;
-  const saidBelow = (scheduled && !p.hasNextDate) || !!p.draft;
+  const saidBelow = blocker === SCHEDULED_NO_DATE_BLOCKER || (!!p.draft && !!blocker && /נוהל/.test(blocker));
   if (blocker && !saidBelow) {
     const noOwnerOrTrigger = /אחראי|מפעיל/.test(blocker);
     const noProcedure = /נוהל/.test(blocker);
