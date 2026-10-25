@@ -4,6 +4,7 @@ import { verifyMcpBearerToken } from "@/lib/mcp/auth";
 import { checkRateLimit, clientIpFrom } from "@/lib/rate-limit";
 import { hashMcpToken, looksLikeMcpToken, parseBearerToken } from "@/lib/mcp/token";
 import { isProductionBuild } from "@/lib/env";
+import { TOOL_INPUT_LIMIT } from "@/lib/mcp/limits";
 
 // The client portal as an MCP server (NUX handover, 3.10.2026).
 //
@@ -26,6 +27,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const handler = createMcpHandler(registerPortalTools, {
+  // See app/api/mcp/route.ts and lib/mcp/limits.ts. It matters more here
+  // than there: this endpoint is reachable by a client's portal user, not
+  // only by Ankora staff.
+  ...TOOL_INPUT_LIMIT,
   serverInfo: {
     name: "ankora-client-portal",
     version: "0.1.0",
