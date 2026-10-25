@@ -176,34 +176,41 @@ function integrationEnv() {
  * The report file carries the shard in its name, so two shards cannot read
  * each other's results if they ever do land on one machine.
  */
+/**
+ * How many files this shard actually ran, as a finding.
+ *
+ * A shard that selects none is the failure mode of every split: it
+ * finishes in seconds, reports nothing, and is green. vitest does refuse a
+ * shard count larger than the file count, but that is its rule, not ours,
+ * and it would not catch a selection that quietly narrowed. The number is
+ * in the report so a reader can add the shards up and see the whole suite.
+ *
+ * Shared by both passes rather than written twice. 25.10.2026: the UTC
+ * pass is sharded too, and a guard that exists on one of two identical
+ * paths is the shape this repo has paid for five times.
+ */
+function shardFileCount(parsed, split, suiteName) {
+  const files = parsed?.testResults?.length ?? null;
+  if (split && files === 0) {
+    return [
+      finding(
+        "blocker",
+        `${suiteName} shard ${split[0]}/${split[1]} ran no test files`,
+        "A shard that selects nothing finishes green having tested nothing. Check the shard count in qa/lib/shards.mjs against the number of files in tests/integration.",
+      ),
+    ];
+  }
+  if (files === null) return [];
+  return [finding("info", split ? `shard ${split[0]}/${split[1]}: ${files} test file(s)` : `${files} test file(s)`)];
+}
+
 export async function integration(split = null) {
   const args = ["--no-file-parallelism"];
   if (split) args.push(`--shard=${split[0]}/${split[1]}`);
   const name = split ? `integration-${split[0]}of${split[1]}` : "integration";
   const { r, parsed } = await runSuite("tests/integration", integrationEnv(), args, name);
   const out = analyse(parsed, r, split ? `integration (${split[0]}/${split[1]})` : "integration");
-
-  // How many files this shard actually ran.
-  //
-  // A shard that selects none is the failure mode of every split: it
-  // finishes in seconds, reports nothing, and is green. vitest does refuse a
-  // shard count larger than the file count, but that is its rule, not ours,
-  // and it would not catch a selection that quietly narrowed. The number is
-  // in the report so a reader can add the shards up and see the whole suite.
-  const files = parsed?.testResults?.length ?? null;
-  if (split && files === 0) {
-    out.push(
-      finding(
-        "blocker",
-        `integration shard ${split[0]}/${split[1]} ran no test files`,
-        "A shard that selects nothing finishes green having tested nothing. Check the shard count in qa/lib/shards.mjs against the number of files in tests/integration.",
-      ),
-    );
-  } else if (files !== null) {
-    out.push(
-      finding("info", split ? `shard ${split[0]}/${split[1]}: ${files} test file(s)` : `${files} test file(s)`),
-    );
-  }
+  out.push(...shardFileCount(parsed, split, "integration"));
   return out;
 }
 
@@ -239,7 +246,18 @@ export const DATE_SENSITIVE_INTEGRATION = [
 /// runs the date-sensitive files and level 3 runs all of them. Files run
 /// in sequence for the same reason as the Israel run: they share one
 /// database and truncate it.
-export async function integrationUtc(level) {
+///
+/// 25.10.2026: sharded at level 3, like the Israel pass. Run #574 spent
+/// 1188.1s here, which is 19.8 minutes against a 20-minute budget set in
+/// October from a measurement of 18.4. The margin was twelve seconds, and
+/// the suite has grown every week since the budget was written, so the
+/// next run would have been a red blocker rather than a slow check. This
+/// was the last heavy pass still running whole.
+///
+/// `split` is null at level 2, where the twelve date-sensitive files take
+/// about four minutes and a job setup per shard would cost more than it
+/// saves.
+export async function integrationUtc(level, split = null) {
   const files = level >= 3 ? ["tests/integration"] : DATE_SENSITIVE_INTEGRATION;
   const missing = files.filter((f) => !fs.existsSync(path.join(ROOT, f)));
   if (missing.length) {
@@ -247,11 +265,13 @@ export async function integrationUtc(level) {
     return [finding("blocker", "UTC integration list names a file that does not exist", missing.join("\n"))];
   }
   const [first, ...rest] = files;
-  const { r, parsed } = await runSuite(
-    first,
-    { ...integrationEnv(), TZ: "UTC" },
-    [...rest, "--no-file-parallelism"],
-    "integration-utc",
-  );
-  return analyse(parsed, r, "integration (UTC)");
+  const args = [...rest, "--no-file-parallelism"];
+  if (split) args.push(`--shard=${split[0]}/${split[1]}`);
+  // The report file carries the shard, so two shards cannot read each
+  // other's results if they ever do land on one machine.
+  const name = split ? `integration-utc-${split[0]}of${split[1]}` : "integration-utc";
+  const { r, parsed } = await runSuite(first, { ...integrationEnv(), TZ: "UTC" }, args, name);
+  const out = analyse(parsed, r, split ? `integration (UTC, ${split[0]}/${split[1]})` : "integration (UTC)");
+  out.push(...shardFileCount(parsed, split, "integration (UTC)"));
+  return out;
 }

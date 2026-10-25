@@ -34,6 +34,27 @@
 //
 // Level 1 is never split. It is two minutes, and four job setups to save one
 // would be a worse gate, not a faster one.
+//
+// 25.10.2026, third pass: `integration-utc` is split three ways too, and the
+// reason is a budget rather than a clock.
+//
+//   Run #574 spent 1188.1s (19.8 min) on the UTC pass, against the 20-minute
+//   budget in checks/vitest.mjs. That budget was written in October from a
+//   measurement of 18.4 min, and the suite has grown every week since. The
+//   margin was twelve seconds.
+//
+//   Since 20.10 a check that overruns its budget is killed and reported as a
+//   blocker, on purpose, so the next weekly hunt would have come back red
+//   with no verdict - the exact outcome that cost two Sundays in October,
+//   arriving through a different door.
+//
+//   Raising the budget buys weeks. Splitting buys the same headroom the other
+//   heavy passes already have, and this was the last one still running whole.
+//   Three ways, not two, for one reason beyond symmetry: at the suite's
+//   current rate of growth two shards would be back at the budget by winter.
+//
+// Level 3's critical path is still `coverage` at ~29 minutes, so this does not
+// move the clock. It is not meant to.
 
 /**
  * Shards that own specific checks, and how a check is divided inside one.
@@ -45,7 +66,9 @@ export const SHARD_CHECKS = {
   "integration-1": { checks: ["integration"], split: [1, 3] },
   "integration-2": { checks: ["integration"], split: [2, 3] },
   "integration-3": { checks: ["integration"], split: [3, 3] },
-  utc: { checks: ["integration-utc"] },
+  "utc-1": { checks: ["integration-utc"], split: [1, 3] },
+  "utc-2": { checks: ["integration-utc"], split: [2, 3] },
+  "utc-3": { checks: ["integration-utc"], split: [3, 3] },
   coverage: { checks: ["coverage"] },
 };
 
@@ -61,7 +84,7 @@ export const MAIN_SHARD = "main";
 export const PLAN = {
   1: null,
   2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3"],
-  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "utc", "coverage"],
+  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "utc-1", "utc-2", "utc-3", "coverage"],
 };
 
 /** The shard names for a level, or null when that level runs as one job. */

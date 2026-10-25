@@ -25,7 +25,7 @@ const payload = (shard: string, startedAt: string, durationMs: number, checks: P
 
 describe("the shard plan", () => {
   it("gives every heavy pass its own shard and sends the rest to main", () => {
-    expect(shardOf("integration-utc", 3)).toBe("utc");
+    expect(shardOf("integration-utc", 3)).toBe("utc-1");
     expect(shardOf("coverage", 3)).toBe("coverage");
     // Unclaimed ids fall to main rather than disappearing. A check that is
     // forgotten here must still run somewhere.
@@ -59,12 +59,54 @@ describe("the shard plan", () => {
     expect(inShard("integration", MAIN_SHARD, 3)).toBe(false);
   });
 
+  // Every split check is covered exactly once, with no gap and no overlap.
+  //
+  // Written on 25.10.2026 with the UTC split, and general on purpose rather
+  // than named after `utc`: the previous test proves three shards can share
+  // a check, and this proves the shares add up. A typo that gave two shards
+  // `[1, 3]` would leave a third of the suite unrun and a third run twice,
+  // and both halves of that are silent - the run is green either way, and
+  // "91 files" never appears anywhere to be compared against.
+  //
+  // The arithmetic is the whole guard: k from 1 to n, each exactly once,
+  // all shards of one check agreeing on n.
+  it("gives a split check every k of n, once", () => {
+    const splitsByCheck = new Map<string, [number, number][]>();
+    for (const shard of shardNames(3)) {
+      const split = splitFor(shard) as [number, number] | null;
+      if (!split) continue;
+      for (const id of checksOwnedBy(shard) as string[]) {
+        if (!splitsByCheck.has(id)) splitsByCheck.set(id, []);
+        splitsByCheck.get(id)!.push(split);
+      }
+    }
+
+    // Non-vacuous: if the plan stops splitting anything, say so here rather
+    // than passing an empty loop.
+    expect([...splitsByCheck.keys()].sort()).toEqual(["integration", "integration-utc"]);
+
+    for (const [id, splits] of splitsByCheck) {
+      const totals = new Set(splits.map(([, n]) => n));
+      expect(totals.size, `${id}: its shards disagree about how many pieces there are`).toBe(1);
+      const n = [...totals][0];
+      expect(splits.length, `${id}: ${splits.length} shard(s) for a ${n}-way split`).toBe(n);
+      const ks = splits.map(([k]) => k).sort((a, b) => a - b);
+      expect(ks, `${id}: the pieces do not add up`).toEqual(Array.from({ length: n }, (_, i) => i + 1));
+    }
+  });
+
   it("hands each integration shard a different third of the suite", () => {
     expect(splitFor("integration-1")).toEqual([1, 3]);
     expect(splitFor("integration-2")).toEqual([2, 3]);
     expect(splitFor("integration-3")).toEqual([3, 3]);
+    // 25.10.2026: the UTC pass is sharded on the same three-way split, and
+    // for the same reason one level down - it reached 19.8 minutes against a
+    // 20-minute budget, and a budget overrun is a blocker by design.
+    expect(splitFor("utc-1")).toEqual([1, 3]);
+    expect(splitFor("utc-2")).toEqual([2, 3]);
+    expect(splitFor("utc-3")).toEqual([3, 3]);
     // A shard that runs its check whole has no split to pass to vitest.
-    expect(splitFor("utc")).toBeNull();
+    expect(splitFor("coverage")).toBeNull();
     expect(splitFor(MAIN_SHARD)).toBeNull();
   });
 
@@ -89,11 +131,13 @@ describe("which shards a level runs as", () => {
 
   it("splits level 3 further, for the passes only it runs", () => {
     expect(shardsFor(3)).toContain("coverage");
-    expect(shardsFor(3)).toContain("utc");
+    expect(shardsFor(3)).toContain("utc-1");
+    expect(shardsFor(3)).toContain("utc-2");
+    expect(shardsFor(3)).toContain("utc-3");
   });
 
   // The rule that keeps a check from falling out of the plan: level 2 has no
-  // `utc` shard, so integration-utc runs in main rather than nowhere. Its
+  // `utc-*` shard, so integration-utc runs in main rather than nowhere. Its
   // twelve date-sensitive files are about four minutes; a job setup for them
   // would cost more than it saves.
   it("sends a check to main when this level does not run its shard", () => {
@@ -206,8 +250,8 @@ describe("merging the shards", () => {
   });
 
   it("fails a shard that reported without the check it owns", () => {
-    const found = new Map([["utc", payload("utc", "2026-10-25T03:00:00.000Z", 1000, [{ id: "preflight" }])]]);
-    const rows = missingShardChecks(["utc"], found, []);
+    const found = new Map([["utc-1", payload("utc-1", "2026-10-25T03:00:00.000Z", 1000, [{ id: "preflight" }])]]);
+    const rows = missingShardChecks(["utc-1"], found, []);
     expect(rows).toHaveLength(1);
     expect(rows[0].findings[0].title).toContain("integration-utc");
     expect(rows[0].blocking).toBe(true);
