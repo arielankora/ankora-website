@@ -27,6 +27,7 @@ const {
   logoutAllSessions,
   listUsers,
   setUserClientAccess,
+  setUserPersonalEmail,
 } = await import("@/lib/app-domain/users");
 
 const sendEmailMock = vi.mocked(sendEmail);
@@ -422,5 +423,92 @@ describe("inviteUser() - who can create whom", () => {
     const access = await prisma.userClientAccess.findMany({ where: { userId: invited.id } });
     expect(access.map((r) => r.clientId).sort()).toEqual([a.id, b.id].sort());
     expect(await prisma.clientUser.count({ where: { userId: invited.id } })).toBe(0);
+  });
+});
+
+// The private address the deletion declaration goes to after the work
+// account is suspended.
+//
+// Never executed by a test until 25.10.2026, when the coverage check
+// named it. It is worth more than its size: it is the one field in this
+// module whose value is an address outside the company, written by an
+// admin about somebody who is on their way out, and "where did we send
+// it" is a question somebody will ask afterwards.
+describe("setUserPersonalEmail() - the address outside the company", () => {
+  it("saves it normalized, and writes both values to the audit trail", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: staff } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    const saved = await setUserPersonalEmail(superAdmin, staff.id, "  Noa.Private@Gmail.COM ");
+    expect(saved.personalEmail).toBe("noa.private@gmail.com");
+
+    const audit = await prisma.auditEvent.findFirst({
+      where: { action: "user.personal_email_change", entityId: staff.id },
+    });
+    expect(audit, "no audit row for a change of where we mail somebody").not.toBeNull();
+    // Both sides, because the question is "where did we send it", and an
+    // audit row that records only the new value cannot answer it. The
+    // columns are beforeJson/afterJson; `before`/`after` are what
+    // recordAudit takes, not what the row carries.
+    expect(JSON.stringify(audit?.beforeJson)).toContain("null");
+    expect(JSON.stringify(audit?.afterJson)).toContain("noa.private@gmail.com");
+  });
+
+  it("clears it when the field is emptied", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: staff } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await setUserPersonalEmail(superAdmin, staff.id, "noa@gmail.com");
+    const cleared = await setUserPersonalEmail(superAdmin, staff.id, "   ");
+    expect(cleared.personalEmail).toBeNull();
+  });
+
+  it("writes nothing when the address did not change", async () => {
+    // Otherwise every save of the user form leaves an audit row saying
+    // the address changed from itself to itself, and the trail stops
+    // being readable.
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: staff } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await setUserPersonalEmail(superAdmin, staff.id, "noa@gmail.com");
+    await setUserPersonalEmail(superAdmin, staff.id, "NOA@gmail.com");
+
+    const rows = await prisma.auditEvent.findMany({
+      where: { action: "user.personal_email_change", entityId: staff.id },
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("refuses an address that is not one, instead of saving the typing", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: staff } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await expect(setUserPersonalEmail(superAdmin, staff.id, "not-an-address")).rejects.toThrow(/תקינה/);
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: staff.id } });
+    expect(after.personalEmail).toBeNull();
+  });
+
+  it("refuses to keep one for a client user", async () => {
+    // A private address is an Ankora-staff field. A client's portal user
+    // is not somebody this company offboards.
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    const { user: portal } = await createTestUser({ role: "CLIENT_USER" });
+
+    await expect(setUserPersonalEmail(superAdmin, portal.id, "x@gmail.com")).rejects.toThrow(/אנקורה/);
+  });
+
+  it("is refused to everyone who is not a SUPER_ADMIN", async () => {
+    const { user: staff } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    for (const role of NON_SUPER_ADMIN_ROLES) {
+      const { user: actor } = await createTestUser({ role });
+      await expect(setUserPersonalEmail(actor, staff.id, "x@gmail.com"), role).rejects.toBeInstanceOf(ForbiddenError);
+    }
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: staff.id } });
+    expect(after.personalEmail).toBeNull();
+  });
+
+  it("says so when the user is not there", async () => {
+    const { user: superAdmin } = await createTestUser({ role: "SUPER_ADMIN" });
+    await expect(setUserPersonalEmail(superAdmin, "clxxxxxxxxxxxxxxxxxxxxxxxx", "x@gmail.com")).rejects.toThrow(/לא נמצא/);
   });
 });

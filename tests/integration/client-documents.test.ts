@@ -5,6 +5,7 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import {
   DriveNotConfiguredError,
   addClientDocument,
+  addClientDocumentForLink,
   listClientDocuments,
   removeClientDocument,
   setClientDocumentKind,
@@ -153,5 +154,52 @@ describe("visibility and removal", () => {
 
     await expect(setClientDocumentVisibility(employee, doc.id, false)).rejects.toBeInstanceOf(ForbiddenError);
     await expect(removeClientDocument(employee, doc.id)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+// The same store, entered from the agreement link instead of a screen.
+//
+// Named by the coverage check on 25.10.2026 as never executed. It is a
+// one-line wrapper, and the line that matters is the one it does NOT
+// have: addClientDocument asserts the actor may reach the client, and
+// this one takes an uploaded-by id and asserts nothing, because the
+// caller is a token-bearing upload route where there is no actor to ask
+// about. So what is worth holding is that it still refuses everything
+// the store refuses, and that the difference in permissions is on
+// purpose rather than by omission.
+describe("addClientDocumentForLink() - the upload that arrives with a token, not a session", () => {
+  const base = (clientId: string) => ({
+    clientId,
+    title: "התחייבות לסודיות",
+    // CONTRACT, not an invented "AGREEMENT": the signed confidentiality
+    // undertaking is a contract, and ClientDocumentKind has six values,
+    // none of them that one.
+    kind: "CONTRACT" as const,
+    fileName: "signed.pdf",
+    mimeType: "application/pdf",
+  });
+
+  it("says the storage is not connected rather than failing on upload", async () => {
+    delete process.env.GCP_DRIVE_FOLDER_CLIENT_DOCS;
+    const client = await createTestClient({ name: "Link No Drive" });
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await expect(
+      addClientDocumentForLink({ ...base(client.id), content: Buffer.from("hello") }, user.id)
+    ).rejects.toBeInstanceOf(DriveNotConfiguredError);
+  });
+
+  it("refuses an empty file, a nameless one and one past the size the platform allows", async () => {
+    process.env.GCP_DRIVE_FOLDER_CLIENT_DOCS = "folder-for-test";
+    const client = await createTestClient({ name: "Link Sizes" });
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await expect(addClientDocumentForLink({ ...base(client.id), content: Buffer.alloc(0) }, user.id)).rejects.toThrow("ריק");
+    await expect(
+      addClientDocumentForLink({ ...base(client.id), title: "   ", content: Buffer.from("x") }, user.id)
+    ).rejects.toThrow("שם");
+    await expect(
+      addClientDocumentForLink({ ...base(client.id), content: Buffer.alloc(4 * 1024 * 1024 + 1) }, user.id)
+    ).rejects.toThrow("4MB");
   });
 });
