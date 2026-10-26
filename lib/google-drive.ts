@@ -474,7 +474,8 @@ export interface DriveRemoveResult {
 /// In a Shared drive only a Manager may delete outright; a Content manager
 /// may only move to trash. The service account is a Content manager today
 /// (see the header of this file), so the permanent delete is attempted
-/// first and a 403 falls back to trash. Either way the file stops being a
+/// first and a refusal (403, or the 404 Drive actually returns) falls back
+/// to trash. Either way the file stops being a
 /// live copy of client data, and the result says which happened so the
 /// audit log does not overstate it.
 export async function removeDriveFile(fileId: string): Promise<DriveRemoveResult> {
@@ -486,7 +487,11 @@ export async function removeDriveFile(fileId: string): Promise<DriveRemoveResult
   try {
     const del = await fetch(url, { method: "DELETE", headers });
     if (del.ok) return { ok: true, how: "deleted" };
-    if (del.status !== 403) {
+    // A Content manager is refused with 403, or, in practice, with 404
+    // "File not found" for a file it can list perfectly well: that is how
+    // Drive answered the first real sweep on 26.10.2026. Both go to trash;
+    // a file that is truly gone fails the trash call too, and is reported.
+    if (del.status !== 403 && del.status !== 404) {
       return { ok: false, error: `Drive delete failed ${del.status}: ${await del.text()}` };
     }
     const trash = await fetch(url, {

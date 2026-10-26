@@ -298,8 +298,25 @@ describe("google-drive retention helpers", () => {
     expect(JSON.parse(calls[1].init.body)).toEqual({ trashed: true });
   });
 
-  it("does not try trash after a failure that is not a permission refusal", async () => {
+  it("falls back to trash on the 404 Drive gives a Content manager for a file it can list", async () => {
+    const calls = fakeGoogle((_url, init) =>
+      init.method === "DELETE" ? new Response("File not found", { status: 404 }) : new Response("{}", { status: 200 }),
+    );
+    const result = await removeDriveFile("file-1");
+    expect(result).toEqual({ ok: true, how: "trashed" });
+    expect(calls.map((c) => c.init.method)).toEqual(["DELETE", "PATCH"]);
+  });
+
+  it("reports a file that is truly gone: the trash call fails too", async () => {
     const calls = fakeGoogle(() => new Response("gone", { status: 404 }));
+    const result = await removeDriveFile("file-1");
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/Drive trash failed 404/);
+    expect(calls).toHaveLength(2);
+  });
+
+  it("does not try trash after a failure that is not a refusal", async () => {
+    const calls = fakeGoogle(() => new Response("boom", { status: 500 }));
     const result = await removeDriveFile("file-1");
     expect(result.ok).toBe(false);
     expect(calls).toHaveLength(1);
