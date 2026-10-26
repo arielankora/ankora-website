@@ -94,7 +94,7 @@ const security: SecurityPageContent = {
       },
       {
         title: "You decide.",
-        body: "Ask, and a task or a document never passes through an AI system at all. It is marked that way and handled by people only.",
+        body: "Ask, and a task or a document stays away from AI systems. Your operations manager handles it personally.",
         gate: "noAi",
       },
     ],
@@ -204,6 +204,7 @@ const security: SecurityPageContent = {
     updated: "Page last updated: October 2026",
     changelogTitle: "Changelog",
     changelog: [
+      { date: "October 2026", change: "Personal confidentiality undertaking, signed by the whole team" },
       { date: "October 2026", change: "Two-step sign-in, required for all staff and available to clients" },
       { date: "October 2026", change: "On-device verification before every password view" },
       { date: "October 2026", change: "Encrypted credentials vault, with every view logged" },

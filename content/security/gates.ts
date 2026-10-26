@@ -12,12 +12,17 @@ export const SECURITY_GATES = {
   /** Claude and OpenAI on paid plans, with training on our data switched
    *  off on every account. Confirmed by Ariel, 16.10.2026. */
   openaiTier: true,
-  /** Fireflies terms on our plan checked: no training, business retention. */
-  firefliesTier: false,
-  /** A client can mark a task or material as "no AI" (development task). */
-  noAi: false,
-  /** Every team member has signed the personal confidentiality undertaking. */
-  confidentiality: false,
+  /** Fireflies terms on our plan checked: no training, business retention.
+   *  Checked 17.10.2026: no training, not kept by its model vendors. */
+  firefliesTier: true,
+  /** A client can ask that a task or material stay away from AI. Today the
+   *  operations manager handles it by hand (Ariel, 22.10.2026); the copy
+   *  says so and does not promise a marking in the system. */
+  noAi: true,
+  /** Every team member has signed the personal confidentiality undertaking.
+   *  All active staff signed in the app by 18.10.2026; signing is required
+   *  before any client data is shown (app layout). */
+  confidentiality: true,
   /** A written DPA with every vendor: Vercel Pro and the Google Workspace CDPA. */
   vendorDpas: true,
   /** A completed security questionnaire ready to send on request. */
