@@ -11,7 +11,8 @@ import { MAIN_SHARD, ALWAYS, shardOf, inShard, isShard, claimedCheckIds, shardsF
 // browser suite, from one missing annotation.
 const shardNames = (level: number): string[] => shardsFor(level) as string[];
 import { Run } from "../../qa/lib/report.mjs";
-import { readShards, missingShardChecks, dedupe } from "../../qa/merge.mjs";
+import { readShards, missingShardChecks, dedupe, coverageRows } from "../../qa/merge.mjs";
+import { mergeFinals, modulesOf, suiteFiles, partFiles } from "../../qa/checks/coverage.mjs";
 import { shardPlan } from "../../qa/checks/static.mjs";
 
 type Finding = { severity: string; title: string; detail: string };
@@ -26,7 +27,7 @@ const payload = (shard: string, startedAt: string, durationMs: number, checks: P
 describe("the shard plan", () => {
   it("gives every heavy pass its own shard and sends the rest to main", () => {
     expect(shardOf("integration-utc", 3)).toBe("utc-1");
-    expect(shardOf("coverage", 3)).toBe("coverage");
+    expect(shardOf("coverage", 3)).toBe("coverage-1");
     // Unclaimed ids fall to main rather than disappearing. A check that is
     // forgotten here must still run somewhere.
     expect(shardOf("e2e", 3)).toBe(MAIN_SHARD);
@@ -83,7 +84,7 @@ describe("the shard plan", () => {
 
     // Non-vacuous: if the plan stops splitting anything, say so here rather
     // than passing an empty loop.
-    expect([...splitsByCheck.keys()].sort()).toEqual(["integration", "integration-utc"]);
+    expect([...splitsByCheck.keys()].sort()).toEqual(["coverage", "integration", "integration-utc"]);
 
     for (const [id, splits] of splitsByCheck) {
       const totals = new Set(splits.map(([, n]) => n));
@@ -105,8 +106,12 @@ describe("the shard plan", () => {
     expect(splitFor("utc-1")).toEqual([1, 3]);
     expect(splitFor("utc-2")).toEqual([2, 3]);
     expect(splitFor("utc-3")).toEqual([3, 3]);
-    // A shard that runs its check whole has no split to pass to vitest.
-    expect(splitFor("coverage")).toBeNull();
+    // 27.10.2026: coverage too, at 38.9 minutes of a 40-minute budget on
+    // run #602. Its parts are judged together in qa/merge.mjs.
+    expect(splitFor("coverage-1")).toEqual([1, 3]);
+    expect(splitFor("coverage-2")).toEqual([2, 3]);
+    expect(splitFor("coverage-3")).toEqual([3, 3]);
+    // A shard that runs its checks whole has no split to pass to vitest.
     expect(splitFor(MAIN_SHARD)).toBeNull();
   });
 
@@ -130,7 +135,12 @@ describe("which shards a level runs as", () => {
   });
 
   it("splits level 3 further, for the passes only it runs", () => {
-    expect(shardsFor(3)).toContain("coverage");
+    expect(shardsFor(3)).toContain("coverage-1");
+    expect(shardsFor(3)).toContain("coverage-2");
+    expect(shardsFor(3)).toContain("coverage-3");
+    // The old single shard is gone, not left beside its parts: it would run
+    // the whole suite a fourth time and judge it on its own.
+    expect(shardsFor(3)).not.toContain("coverage");
     expect(shardsFor(3)).toContain("utc-1");
     expect(shardsFor(3)).toContain("utc-2");
     expect(shardsFor(3)).toContain("utc-3");
@@ -158,7 +168,7 @@ describe("which shards a level runs as", () => {
 
 describe("Run, sharded", () => {
   it("does not record a check that belongs to another shard", async () => {
-    const run = new Run(3, { shard: "coverage" });
+    const run = new Run(3, { shard: "coverage-1" });
     await run.check("integration", { label: "Integration tests", level: 2 }, async () => []);
     await run.check("coverage", { label: "Executed coverage", level: 3 }, async () => []);
     // Not "skipped": a row per foreign check would appear in every merged
@@ -167,7 +177,7 @@ describe("Run, sharded", () => {
   });
 
   it("still applies the level cut inside a shard", async () => {
-    const run = new Run(2, { shard: "coverage" });
+    const run = new Run(2, { shard: "coverage-1" });
     await run.check("coverage", { label: "Executed coverage", level: 3 }, async () => []);
     expect(run.checks).toEqual([]);
   });
@@ -329,5 +339,137 @@ describe("preflight in every shard", () => {
   it("does not collapse two different checks that share a status", () => {
     const c = (id: string) => ({ id, label: id, status: "pass", blocking: true, ms: 0, findings: [] });
     expect(dedupe([c("integration"), c("coverage")]).map((x) => x.id)).toEqual(["integration", "coverage"]);
+  });
+});
+
+describe("coverage, split and merged", () => {
+  // Typed views of plain-JS returns, for the same reason as shardNames above.
+  type ModuleCov = { functions: number; covered: number; pct: number; missed: string[] };
+  type FileCov = { fnMap: Record<string, unknown>; s: Record<string, number>; b: Record<string, number[]> };
+  const modules = (f: unknown) => modulesOf(f) as Record<string, ModuleCov>;
+  const merge = (finals: unknown[]) => mergeFinals(finals) as Record<string, FileCov>;
+
+  // One measured module, two functions, in the shape V8 coverage writes.
+  const root = process.cwd();
+  const loc = (line: number) => ({ start: { line, column: 0 }, end: { line: line + 2, column: 1 } });
+  const fileCov = (counts: [number, number], order: "ab" | "ba" = "ab") => {
+    const fns = { a: { name: "alpha", decl: loc(1), loc: loc(1) }, b: { name: "beta", decl: loc(5), loc: loc(5) } };
+    const ids = order === "ab" ? (["a", "b"] as const) : (["b", "a"] as const);
+    const byName = { a: counts[0], b: counts[1] };
+    return {
+      path: path.join(root, "lib/app-domain/fake.ts"),
+      fnMap: Object.fromEntries(ids.map((k, i) => [String(i), fns[k]])),
+      f: Object.fromEntries(ids.map((k, i) => [String(i), byName[k]])),
+      statementMap: { "0": loc(2), "1": loc(6) },
+      s: { "0": counts[0], "1": counts[1] },
+      branchMap: { "0": { type: "if", loc: loc(2), locations: [loc(2), loc(3)] } },
+      b: { "0": [counts[0], 0] },
+    };
+  };
+  const final = (counts: [number, number], order: "ab" | "ba" = "ab") => ({
+    [path.join(root, "lib/app-domain/fake.ts")]: fileCov(counts, order),
+  });
+
+  // The reason the parts cannot judge themselves: each one sees half.
+  it("counts a function run by any part as run", () => {
+    const one = modules(final([3, 0]))["lib/app-domain/fake.ts"];
+    const two = modules(final([0, 2]))["lib/app-domain/fake.ts"];
+    expect(one.covered).toBe(1);
+    expect(two.covered).toBe(1);
+    const merged = merge([final([3, 0]), final([0, 2])]);
+    const m = modules(merged)["lib/app-domain/fake.ts"];
+    expect(m).toMatchObject({ functions: 2, covered: 2, pct: 100, missed: [] });
+    const data = merged[path.join(root, "lib/app-domain/fake.ts")];
+    expect(data.s).toEqual({ "0": 3, "1": 2 });
+    expect(data.b["0"]).toEqual([3, 0]);
+  });
+
+  // Ids are the converter's numbering; a location is the function itself.
+  it("matches functions by where they are, not by their id", () => {
+    const merged = merge([final([1, 0], "ab"), final([0, 1], "ba")]);
+    const data = merged[path.join(root, "lib/app-domain/fake.ts")];
+    expect(Object.keys(data.fnMap)).toHaveLength(2);
+    expect(modules(merged)["lib/app-domain/fake.ts"].covered).toBe(2);
+  });
+
+  it("does not change the inputs it adds up", () => {
+    const a = final([1, 0]);
+    const before = JSON.stringify(a);
+    merge([a, final([0, 1])]);
+    expect(JSON.stringify(a)).toBe(before);
+  });
+
+  /** Three parts on disk, laid out the way the artefact download lays them out. */
+  const lay = (lists: string[][], skip: number[] = []) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-cov-"));
+    const found = new Map();
+    const files = new Map();
+    lists.forEach((list, i) => {
+      const name = `coverage-${i + 1}`;
+      const at = path.join(dir, `qa-report-level-3-${name}`);
+      fs.mkdirSync(at, { recursive: true });
+      const p = payload(name, "2026-11-01T02:07:00.000Z", 1000, [{ id: "coverage", blocking: false }]);
+      const shardFile = path.join(at, `shard-${name}.json`);
+      fs.writeFileSync(shardFile, JSON.stringify(p));
+      found.set(name, p);
+      files.set(name, shardFile);
+      if (skip.includes(i + 1)) return;
+      const part = partFiles([i + 1, 3]);
+      fs.mkdirSync(path.join(at, part.dir));
+      fs.writeFileSync(path.join(at, part.dir, "coverage-final.json"), JSON.stringify(final(i === 0 ? [1, 0] : [0, 1])));
+      fs.writeFileSync(
+        path.join(at, part.files),
+        JSON.stringify({ testResults: list.map((f) => ({ name: path.join("/home/runner/work/x/x", f) })) }),
+      );
+    });
+    return { found, files, out: path.join(dir, "merged") };
+  };
+  const thirds = (all: string[]) => [0, 1, 2].map((k) => all.filter((_, i) => i % 3 === k));
+  const expected = ["main", "coverage-1", "coverage-2", "coverage-3"];
+
+  it("judges the sum once, after proving every test file ran in exactly one part", () => {
+    const { found, files, out } = lay(thirds(suiteFiles()));
+    const rows = coverageRows(expected, found, files, out);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("coverage-merged");
+    expect(rows[0].blocking).toBe(false);
+    const titles = rows[0].findings.map((f: Finding) => f.title);
+    expect(titles[0]).toMatch(/each in exactly one of 3 parts/);
+    expect(titles.some((t: string) => /functions executed/.test(t))).toBe(true);
+    expect(fs.existsSync(path.join(out, "coverage-final.json"))).toBe(true);
+  });
+
+  it("says so when a file ran in no part, or in two", () => {
+    const [a, b, c] = thirds(suiteFiles());
+    const lost = c[0];
+    const { found, files, out } = lay([a, [...b, a[0]], c.slice(1)]);
+    const f = coverageRows(expected, found, files, out)[0].findings[0];
+    expect(f.severity).toBe("major");
+    expect(f.title).toContain("1 file(s) in no part, 1 in more than one");
+    expect(f.detail).toContain(`in no part: ${lost}`);
+    expect(f.detail).toContain(`more than once: ${a[0]} (coverage-1, coverage-2)`);
+  });
+
+  // Two thirds of the suite would report most modules as fallen. Better
+  // to say the floor was not judged than to judge it on a part.
+  it("does not judge the floor when a part brought no data", () => {
+    const { found, files, out } = lay(thirds(suiteFiles()), [2]);
+    const rows = coverageRows(expected, found, files, out);
+    expect(rows[0].findings).toHaveLength(1);
+    expect(rows[0].findings[0].title).toBe("coverage was not judged: no data from coverage-2");
+    expect(fs.existsSync(out)).toBe(false);
+  });
+
+  it("reports a part it cannot read, rather than losing the merged verdict", () => {
+    const { found, files, out } = lay(thirds(suiteFiles()));
+    const at = path.dirname(files.get("coverage-3")!);
+    fs.writeFileSync(path.join(at, partFiles([3, 3]).dir, "coverage-final.json"), "{ not json");
+    const rows = coverageRows(expected, found, files, out);
+    expect(rows[0].findings[0].title).toBe("the coverage parts could not be merged");
+    expect(rows[0].blocking).toBe(false);
+  });
+
+  it("adds nothing at a level whose coverage is not split", () => {
+    expect(coverageRows(["main", "integration-1"], new Map(), new Map())).toEqual([]);
   });
 });

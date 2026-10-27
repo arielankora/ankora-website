@@ -55,6 +55,24 @@
 //
 // Level 3's critical path is still `coverage` at ~29 minutes, so this does not
 // move the clock. It is not meant to.
+//
+// 27.10.2026, fourth pass: `coverage` is split three ways, and it is the same
+// budget story one week on.
+//
+//   Run #602 spent 2331.1s (38.9 min) on the coverage pass, against the
+//   40-minute budget in checks/coverage.mjs. Two days earlier, on #583, it was
+//   29.7. The time is spread thin: the heaviest test file is 5% of it and the
+//   ten heaviest are a third, so there is no one file to move out. It has to
+//   be divided by files, like the other two passes.
+//
+//   This split has a catch the others do not. A coverage floor is a statement
+//   about the whole suite: a function that only the second third of the files
+//   calls is "never run" as far as the first third can tell. So the shards do
+//   not judge. Each one keeps its raw coverage-final.json in its artefact, and
+//   qa/merge.mjs adds the three up and compares the sum with the floor, once.
+//
+//   Measured shares of #602's files under vitest's own `--shard`: about 12.4,
+//   14.4 and 12.0 minutes. Level 3's critical path becomes `main` again.
 
 /**
  * Shards that own specific checks, and how a check is divided inside one.
@@ -69,7 +87,9 @@ export const SHARD_CHECKS = {
   "utc-1": { checks: ["integration-utc"], split: [1, 3] },
   "utc-2": { checks: ["integration-utc"], split: [2, 3] },
   "utc-3": { checks: ["integration-utc"], split: [3, 3] },
-  coverage: { checks: ["coverage"] },
+  "coverage-1": { checks: ["coverage"], split: [1, 3] },
+  "coverage-2": { checks: ["coverage"], split: [2, 3] },
+  "coverage-3": { checks: ["coverage"], split: [3, 3] },
 };
 
 export const MAIN_SHARD = "main";
@@ -84,7 +104,7 @@ export const MAIN_SHARD = "main";
 export const PLAN = {
   1: null,
   2: [MAIN_SHARD, "integration-1", "integration-2", "integration-3"],
-  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "utc-1", "utc-2", "utc-3", "coverage"],
+  3: [MAIN_SHARD, "integration-1", "integration-2", "integration-3", "utc-1", "utc-2", "utc-3", "coverage-1", "coverage-2", "coverage-3"],
 };
 
 /** The shard names for a level, or null when that level runs as one job. */
