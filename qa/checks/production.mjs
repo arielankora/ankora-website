@@ -61,7 +61,9 @@ const ROUTES = [
   { path: "/he/contact", expect: [200] },
   { path: "/he/blog", expect: [200] },
   { path: "/app/login", expect: [200] },
-  { path: "/api/health", expect: [200], json: true },
+  // ?db=1: the daily probe is the one caller cheap enough to wake the
+  // database on purpose. See app/api/health/route.ts.
+  { path: "/api/health?db=1", expect: [200], json: true },
   { path: "/sitemap.xml", expect: [200] },
   { path: "/robots.txt", expect: [200] },
   // The product must not be reachable without a session, and must not be
