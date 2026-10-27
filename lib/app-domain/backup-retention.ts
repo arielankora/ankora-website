@@ -99,6 +99,7 @@ export async function sweepBackupFolder(params: {
     if (!removed.ok) {
       result.failed += 1;
       result.ok = false;
+      result.error = `${result.failed} of ${expired.length} expired file(s) could not be removed`;
       console.error(`Backup retention: could not remove ${file.name}:`, removed.error);
     } else if (removed.how === "trashed") {
       result.trashed += 1;
