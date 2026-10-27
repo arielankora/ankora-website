@@ -6,7 +6,7 @@ import { Hero } from "@/components/sections/Hero";
 import { Stats } from "@/components/sections/Stats";
 import { EditorialSection } from "@/components/sections/EditorialSection";
 import { HowItWorks } from "@/components/sections/HowItWorks";
-import { Intelligence } from "@/components/sections/Intelligence";
+import { OperationalBrain } from "@/components/sections/OperationalBrain";
 import { Capabilities } from "@/components/sections/Capabilities";
 import { HumanAI } from "@/components/sections/HumanAI";
 import { Industries } from "@/components/sections/Industries";
@@ -80,7 +80,7 @@ export default async function Home(props: { params: Promise<{ locale: string }> 
       <EditorialSection label={dict.insight.label} title={dict.insight.title} body={dict.insight.body} />
       <EditorialSection label={dict.category.label} title={dict.category.title} body={dict.category.body} />
       <HowItWorks dict={dict} />
-      <Intelligence dict={dict} />
+      <OperationalBrain dict={dict} locale={locale} variant="compact" />
       <Capabilities dict={dict} locale={locale} />
       <HumanAI dict={dict} />
       <CustomerProof locale={locale} stories={featuredStories} />

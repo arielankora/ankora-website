@@ -108,17 +108,28 @@ const en: Dictionary = {
     noteWith:
       "You explain it once. An experienced Operations Manager carries the task to the end, clears the obstacles directly, and closes it before you think to ask where it stands.",
   },
-  intelligence: {
-    label: "Technology",
-    titleLine1: "AI that remembers.",
-    titleLine2: "People who decide.",
-    body: "Our system remembers your preferences, schedules work, tracks progress, and flags what needs attention. Our Operations Managers bring judgment, empathy, and accountability: the parts AI shouldn't replace.",
-    pillars: [
-      { key: "MEMORY", title: "Memory", body: "Every preference, every decision, always available, without repeating yourself." },
-      { key: "ORCHESTRATION", title: "Orchestration", body: "Many tasks, many parties, one transparent coordination layer." },
-      { key: "MONITORING", title: "Monitoring", body: "Continuous tracking of every open thread, so you don't have to check." },
-      { key: "PREDICTION", title: "Prediction", body: "Flagging what needs attention before it becomes a problem." },
+  brain: {
+    label: "The Ankora brain",
+    title: "One brain for all your operations.",
+    sub: "Everything that comes in passes through four layers and leaves as action. What is learned along the way flows back to the start.",
+    sourcesLabel: "Comes in",
+    sources: ["Calls", "Emails", "Documents", "Messages"],
+    learning: "Learning: every run improves the next.",
+    columns: { input: "Takes in", does: "Does", output: "Puts out" },
+    layers: [
+      { name: "Intake", verb: "Listens", short: "Calls, emails and documents become knowledge with a source.", input: "Calls, emails, documents and messages.", does: "Identifies what needs to happen, when and by whom. Every item has a source, and your Operations Manager approves it.", output: "One clear picture of your operations." },
+      { name: "Rules", verb: "Keeps the rules", short: "Every process is checked against your rules and ours.", input: "Your rules and ours: who approves, up to what amount, through which channel.", does: "Checks every process against the rules before anything happens.", output: "A process you can rely on." },
+      { name: "Triggers", verb: "Never forgets", short: "Every date opens a task on time.", input: "Deadlines, renewals, payments and recurring events.", does: "Opens a task early enough, with the person responsible.", output: "Nothing is forgotten." },
+      { name: "Execution", verb: "Executes", short: "Automatically, with an Operations Manager, or by a person.", input: "A task, ready to go.", does: "Automatically when possible. With an Operations Manager when it needs review. By a person when it takes relationships and trust.", output: "A documented result you can see in your portal." },
     ],
+    modesTitle: "Every task gets the way that fits it.",
+    modes: [
+      { title: "Automated", body: "Repeatable and verifiable. The system executes and verifies the result." },
+      { title: "AI with an Operations Manager", body: "Anything that needs review. AI prepares, your Operations Manager checks and approves." },
+      { title: "Human", body: "Judgment, relationships and trust. A person, without AI." },
+    ],
+    principle: "AI proposes. A person approves. The system remembers.",
+    moreLabel: "How the brain works",
   },
   capabilities: {
     label: "Capabilities",
@@ -295,15 +306,6 @@ const en: Dictionary = {
       eyebrow: "Technology",
       title: "The layer that remembers you, so you don't have to explain again.",
       sub: "Our system isn't a chatbot executing commands. It's an orchestration layer connecting your request, your Operations Manager, and the execution network, with persistent memory that stays with you.",
-      orchestrationLabel: "ORCHESTRATION LAYER",
-      sideYou: "YOU",
-      sideAnkora: "ANKORA",
-      layers: [
-        { tag: "01 · REQUEST", side: "you", title: "What needs to happen", body: "You get in touch however suits you: a call, a message or an email" },
-        { tag: "02 · OPERATIONS MANAGER", side: "ankora", title: "Human judgment", body: "Decides what is right, what is urgent, and what genuinely needs you." },
-        { tag: "03 · AI ORCHESTRATION", side: "ankora", title: "Memory, monitoring, prediction", body: "Holds the context and flags delays before they land." },
-        { tag: "04 · EXECUTION NETWORK", side: "ankora", title: "Vendors and service providers", body: "Coordinated, supervised and quality-checked end to end." },
-      ],
       faq: {
         label: "FAQ",
         title: "What the AI does, and what it does not",
@@ -314,7 +316,6 @@ const en: Dictionary = {
           { q: "What does the system remember about me?", a: "Preferences, past decisions, vendors you have worked with and recurring dates, so you never have to explain twice. Access credentials to your systems are never passed to the AI." },
         ],
       },
-      persistenceNote: "The memory persists across all four stages, which is why the next request is shorter than the last.",
       ctaTitle: "Want to see how this would work for you?",
       blocks: [
         { title: "Persistent memory", body: "Every preference you've shared, every decision you've made, is stored and used the next time, without repeating yourself." },

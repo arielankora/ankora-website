@@ -100,14 +100,22 @@ export interface Dictionary {
     noteWithout: string;
     noteWith: string;
   };
-  intelligence: {
+  // The four-layer "brain" (intake, rules, triggers, execution), shared by the home
+  // section and the technology page. The layer names carry no 01..04 index: the
+  // arrows between them already say the order.
+  brain: {
     label: string;
-    // Two lines; line 2 is gold. Same reasoning as hero.titleLine1/2.
-    titleLine1: string;
-    titleLine2: string;
-    body: string;
-    // `key` is the Latin mono key above the title (MEMORY, ORCHESTRATION, ...).
-    pillars: { key: string; title: string; body: string }[];
+    title: string;
+    sub: string;
+    sourcesLabel: string;
+    sources: string[];
+    learning: string;
+    columns: { input: string; does: string; output: string };
+    layers: { name: string; verb: string; short: string; input: string; does: string; output: string }[];
+    modesTitle: string;
+    modes: { title: string; body: string }[];
+    principle: string;
+    moreLabel: string;
   };
   capabilities: {
     label: string;
@@ -287,15 +295,6 @@ export interface PagesContent {
     faq: PageFaqBlock;
   };
   technology: SimplePageContent & {
-    // The four-layer diagram above the technology cards. `side` is the one thing
-    // colour encodes on this page — who does the work — so it is data rather than a
-    // class name chosen at the call site: the first layer is the client's, the other
-    // three are Ankora's.
-    orchestrationLabel: string;
-    sideYou: string;
-    sideAnkora: string;
-    layers: { tag: string; side: "you" | "ankora"; title: string; body: string }[];
-    persistenceNote: string;
     // Only this page overrides the shared closing CTA heading.
     ctaTitle: string;
     faq: PageFaqBlock;
