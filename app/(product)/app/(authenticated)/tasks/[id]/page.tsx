@@ -32,6 +32,7 @@ import { RunLessonCard } from "./RunLessonCard";
 import { runLesson } from "@/lib/app-domain/process-lessons";
 import { asksForLesson } from "@/lib/process-lessons";
 import { prisma } from "@/lib/prisma";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 
 function planView(p: TaskPlanRow): PlanView {
   return {
@@ -232,6 +233,10 @@ export default async function TaskDetailPage(props: {
           clientOutcome: task.clientOutcome,
           // 20.10.2026: only a task carries the toggle; a step is a line.
           mappingTask: task.parentId === null ? task.mappingTask : null,
+          // 28.10.2026: "בלי AI". The toggle is the task's own mark; the
+          // source says where an inherited one comes from.
+          aiExcluded: task.parentId === null ? task.aiExcluded : null,
+          aiExclusionSource: taskAiExclusion(task),
           blockedOn: task.blockedOn,
           blockedReason: task.blockedReason,
           blockedSince: task.blockedSince?.toISOString() ?? null,
@@ -248,6 +253,9 @@ export default async function TaskDetailPage(props: {
         // domain refuses the write regardless, so a wrong answer here is
         // a confusing screen rather than a hole.
         canApprove={user.id === task.supervisorId || can(user.role, "time_entry.edit_others")}
+        // 28.10.2026: clearing "בלי AI" is a manager's call. The domain
+        // refuses it otherwise; this only keeps the toggle honest.
+        canClearAiExclusion={can(user.role, "client.manage")}
         leadComment={leadComment}
         viewerId={user.id}
         // Only this person's own timers, and only enough of each to

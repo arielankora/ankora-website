@@ -850,11 +850,14 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
             <DocumentsPanel
               clientId={client.id}
               storageReady={clientDocumentsFolder() !== null}
+              canClearAiExclusion={can(user.role, "client.manage")}
               documents={documents.map((d) => ({
                 id: d.id,
                 title: d.title,
                 kind: d.kind,
                 clientVisible: d.clientVisible,
+                aiExcluded: d.aiExcluded,
+                aiExcludedByTask: !!d.task && (d.task.aiExcluded || !!d.task.parent?.aiExcluded),
                 sizeBytes: d.sizeBytes,
                 createdAt: d.createdAt.toISOString(),
                 uploadedByName: d.uploadedBy?.name ?? null,
