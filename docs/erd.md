@@ -1122,6 +1122,7 @@ erDiagram
         string approvalPolicyIds "(list)"
         string approvalText "nullable"
         string exceptionPlaybook "nullable"
+        string notApplicableFields "(list), documentation fields marked not relevant: sla, systems, approvals, external, exceptions"
         json requiredSystemPermissions
         string approverUserId "nullable"
         string executorUserId "nullable"
