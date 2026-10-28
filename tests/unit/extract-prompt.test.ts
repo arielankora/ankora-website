@@ -59,3 +59,13 @@ describe("the client's data-handling rules (spec 3.11)", () => {
     expect(p).toContain("target POLICY");
   });
 });
+
+// 28.10.2026: a recorded meeting where a "בלי AI" subject came up is marked
+// in its title, and the extraction leaves it unopened. Same rule as
+// NO_AI_MEETING_RULE in lib/ai-exclusion.ts.
+describe("a meeting marked בלי AI", () => {
+  it("is not opened, quoted or extracted from", () => {
+    const p = buildExtractPrompt(BASE);
+    expect(p).toContain('פגישה שבכותרת שלה מופיע "[בלי AI]": לא פותחים אותה');
+  });
+});

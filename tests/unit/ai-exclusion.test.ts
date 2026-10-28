@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { documentAiExclusion, taskAiExclusion } from "@/lib/ai-exclusion";
+import { NO_AI_MEETING_MARKER, NO_AI_MEETING_RULE, documentAiExclusion, taskAiExclusion } from "@/lib/ai-exclusion";
+import { sourcesRules } from "@/lib/advance-prompt";
 
 /**
  * "בלי AI" is set on one level and inherited by everything under it. The
@@ -45,5 +46,19 @@ describe("documentAiExclusion", () => {
 
   it("inherits from its client", () => {
     expect(documentAiExclusion({ aiExcluded: false, task: { aiExcluded: false, parent: null }, client: on })).toBe("CLIENT");
+  });
+});
+
+// Calls are still recorded (Ariel, 28.10.2026); a meeting where a marked
+// subject came up carries "[בלי AI]" in its title, and every prompt that
+// may search Fireflies says not to open it.
+describe("a meeting marked בלי AI", () => {
+  it("the advance prompt's sources section says to leave it unopened", () => {
+    const text = sourcesRules(
+      { clientName: "NUX", taskId: "t1" },
+      { clientDomains: [], partnerDomains: [], keywords: [], driveFolderId: null, conversationsDocId: null, fromLabel: "13.07.2026", fromIso: "2026-07-13" }
+    ).join("\n");
+    expect(text).toContain(NO_AI_MEETING_RULE);
+    expect(text).toContain(NO_AI_MEETING_MARKER);
   });
 });

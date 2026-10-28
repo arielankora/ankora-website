@@ -1,4 +1,5 @@
 import "server-only";
+import { NO_AI_MEETING_MARKER } from "@/lib/ai-exclusion";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 import { assertCan } from "@/lib/app-auth/permissions";
@@ -80,6 +81,12 @@ export async function extractionBrief(actor: User, now = new Date()) {
           .map(ruleLine)
           .filter((l): l is string => !!l),
       }),
+    // 28.10.2026: a meeting where a "בלי AI" subject came up is marked in
+    // its title by whoever ran it, and a run leaves it unopened.
+    noAiMeetings: {
+      titleMarker: NO_AI_MEETING_MARKER,
+      instruction: `Skip any meeting whose title contains "${NO_AI_MEETING_MARKER}": a subject marked "בלי AI" came up in it. Do not open its transcript or summary, and propose nothing from it.`,
+    },
     processedRecordings: processed,
     processedWindowDays: PROCESSED_WINDOW_DAYS,
   };

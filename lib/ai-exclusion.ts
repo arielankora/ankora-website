@@ -29,6 +29,16 @@ export const AI_EXCLUDED_MESSAGE = "הפריט מסומן \"בלי AI\" ומטו
 export const AI_EXCLUDED_TOOL_MESSAGE =
   'This is marked "בלי AI" (no AI) at the client\'s request: a person handles it, and it is not available through this connection. Do not work on it here. Tell the user to handle it in the Ankora app.';
 
+/// Calls are still recorded and transcribed (Ariel, 28.10.2026): "בלי AI"
+/// means the material is not worked on with AI, not that it is never
+/// recorded. A meeting where a marked subject came up carries this in its
+/// Fireflies title, added by whoever ran it, and every prompt that may
+/// search Fireflies says not to open such a meeting.
+export const NO_AI_MEETING_MARKER = "[בלי AI]";
+
+/// The rule as the prompts state it, in their language.
+export const NO_AI_MEETING_RULE = `- **פגישה שבכותרת שלה מופיע "${NO_AI_MEETING_MARKER}":** לא פותחים אותה, לא מצטטים ממנה ולא מציעים ממנה ידע. עלה בה נושא שסומן "בלי AI", והוא מטופל בידי אדם.`;
+
 /// Thrown by a domain function asked for something marked "בלי AI" on
 /// behalf of an AI-facing reader. Named so lib/mcp/errors.ts can turn it
 /// into AI_EXCLUDED_TOOL_MESSAGE rather than a generic server error.
