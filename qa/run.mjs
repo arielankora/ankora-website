@@ -220,16 +220,18 @@ async function main() {
 
   // Executed coverage against a floor. The capability scan proves a test
   // touches a capability; this proves its functions actually run. Never
-  // blocks - see checks/coverage.mjs for why both exist.
+  // blocks - see checks/coverage.mjs for why both exist. Split three ways at
+  // level 3; the parts are judged together in qa/merge.mjs.
+  const coverageSplit = splitFor(shard);
   await run.check(
     "coverage",
     {
-      label: "Executed coverage (floor)",
+      label: coverageSplit ? `Executed coverage (part ${coverageSplit[0]}/${coverageSplit[1]})` : "Executed coverage (floor)",
       level: 3,
       blocking: false,
       skipIf: async () => coverageProviderMissing() ?? (await needs.database()),
     },
-    coverage,
+    () => coverage(coverageSplit),
   );
 
   // The reserved a11y slot, filled. It needs a browser AND a server: the check reads
