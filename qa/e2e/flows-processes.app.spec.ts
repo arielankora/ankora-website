@@ -77,7 +77,12 @@ test.describe("clients/process-actions", () => {
     await card().getByRole("button", { name: "עריכת הטיוטה" }).click();
     const fix = page.getByRole("dialog");
     await expect(fix).toBeVisible();
+    // 28.10.2026: the editor says what holds the approval, and where.
+    await expect(fix.getByTestId("procedure-issues")).toContainText("לא נעשה אוטומטית");
+    await expect(fix.getByTestId("procedure-issues")).toContainText("איך אדם מוודא שזה קרה");
+    await expect(fix.getByLabel("אימות של שלב 1")).toHaveAttribute("aria-invalid", "true");
     await fix.getByLabel("שלב 1: איך").selectOption("MANUAL");
+    await expect(fix.getByTestId("procedure-issues")).toHaveCount(0);
     await submit(page, "שמירת טיוטה");
     await expect(card()).toContainText("טיוטה, גרסה 2", { timeout: 15_000 });
 

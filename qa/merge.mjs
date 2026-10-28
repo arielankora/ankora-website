@@ -20,7 +20,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { ROOT } from "./lib/discover.mjs";
 import { Run, finding } from "./lib/report.mjs";
-import { ALWAYS, checksOwnedBy, shardsFor } from "./lib/shards.mjs";
+import { ALWAYS, checksOwnedBy, shardsFor, splitFor } from "./lib/shards.mjs";
+import { filesRun, judge, mergeFinals, modulesOf, partFiles, suiteFiles } from "./checks/coverage.mjs";
 
 function arg(name, fallback = null) {
   const hit = process.argv.slice(2).find((a) => a.startsWith(`--${name}=`));
@@ -49,6 +50,9 @@ function findShardFiles(dir) {
 
 export function readShards(dir) {
   const found = new Map();
+  // name -> the file the winning report came from. A coverage part keeps its
+  // raw data next to its report, so this is where the merge looks for it.
+  const files = new Map();
   const broken = [];
   for (const file of findShardFiles(dir)) {
     try {
@@ -69,12 +73,13 @@ export function readShards(dir) {
       const prev = found.get(name);
       if (!prev || Date.parse(payload.summary?.startedAt ?? 0) > Date.parse(prev.summary?.startedAt ?? 0)) {
         found.set(name, payload);
+        files.set(name, file);
       }
     } catch (err) {
       broken.push(`${file}: ${err?.message ?? err}`);
     }
   }
-  return { found, broken };
+  return { found, files, broken };
 }
 
 /**
@@ -149,6 +154,113 @@ export function missingShardChecks(expected, found, broken) {
   return rows;
 }
 
+/** A row's status from its findings, the way Run.check decides it. */
+function statusOf(findings) {
+  if (findings.some((f) => f.severity === "blocker")) return "fail";
+  return findings.length ? "warn" : "pass";
+}
+
+/**
+ * The coverage verdict, out of the parts. Empty when coverage is not split.
+ *
+ * Each part ran a third of the files and judged nothing (see
+ * checks/coverage.mjs). Here the three coverage-final.json files are added
+ * up and the sum is held against the floor once, which is the only way the
+ * floor means what it says.
+ *
+ * Two things are checked before any number is believed:
+ *
+ *  - every part is here. A missing part already blocks the run by name (see
+ *    missingShardChecks); this row says the floor was not judged, rather
+ *    than judging two thirds of the suite and reporting most of the code as
+ *    untested.
+ *  - the parts ran every test file once. vitest's `--shard` promises that,
+ *    and this holds it to the promise against the files in the checkout: a
+ *    file in no part is coverage nobody measured, a file in two is a split
+ *    that is not one.
+ *
+ * Never blocking, like the check itself: coverage is a work list.
+ */
+export function coverageRows(expected, found, files, outDir = path.join(ROOT, "qa", "reports", partFiles(null).dir)) {
+  const parts = expected.filter((n) => splitFor(n) && checksOwnedBy(n).includes("coverage"));
+  if (parts.length === 0) return [];
+  const started = Date.now();
+  const row = (findings) => ({
+    id: "coverage-merged",
+    label: `Executed coverage (floor, ${parts.length} parts merged)`,
+    status: statusOf(findings),
+    blocking: false,
+    ms: Date.now() - started,
+    findings,
+  });
+
+  // A part whose files are there but unreadable is still a coverage
+  // problem, not a reason to lose the whole verdict: a throw here would stop
+  // the merge before it printed anything.
+  try {
+    return judgeParts(parts, files, outDir, row);
+  } catch (err) {
+    return [row([finding("major", "the coverage parts could not be merged", String(err?.stack ?? err))])];
+  }
+}
+
+function judgeParts(parts, files, outDir, row) {
+  const finals = [];
+  const ranBy = new Map(); // test file -> the parts that ran it
+  const absent = [];
+  for (const name of parts) {
+    const at = files.get(name);
+    const { dir, files: listFile } = partFiles(splitFor(name));
+    const finalFile = at && path.join(path.dirname(at), dir, "coverage-final.json");
+    const list = at && path.join(path.dirname(at), listFile);
+    if (!at || !fs.existsSync(finalFile) || !fs.existsSync(list)) {
+      absent.push(name);
+      continue;
+    }
+    finals.push(JSON.parse(fs.readFileSync(finalFile, "utf8")));
+    for (const f of filesRun(JSON.parse(fs.readFileSync(list, "utf8")))) {
+      if (!ranBy.has(f)) ranBy.set(f, []);
+      ranBy.get(f).push(name);
+    }
+  }
+  if (absent.length) {
+    return [
+      row([
+        finding(
+          "major",
+          `coverage was not judged: no data from ${absent.join(", ")}`,
+          [
+            "The floor is about the whole suite, and the parts that did report hold only some of it.",
+            "Judging them alone would report most modules as having fallen. Open the job for the part named above.",
+          ].join("\n"),
+        ),
+      ]),
+    ];
+  }
+
+  const out = [];
+  const suite = suiteFiles();
+  const missing = suite.filter((f) => !ranBy.has(f));
+  const twice = [...ranBy].filter(([, by]) => by.length > 1).map(([f, by]) => `${f} (${by.join(", ")})`);
+  if (missing.length || twice.length)
+    out.push(
+      finding(
+        "major",
+        `the coverage parts do not add up to the suite: ${missing.length} file(s) in no part, ${twice.length} in more than one`,
+        [...missing.map((f) => `in no part: ${f}`), ...twice.map((f) => `more than once: ${f}`)].join("\n"),
+      ),
+    );
+  else out.push(finding("info", `${suite.length} test files, each in exactly one of ${parts.length} parts`));
+
+  // Kept in the merged artefact, so the summed numbers can be read again
+  // without re-running anything.
+  const merged = mergeFinals(finals);
+  fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(path.join(outDir, "coverage-final.json"), JSON.stringify(merged));
+  out.push(...judge(modulesOf(merged)));
+  return [row(out)];
+}
+
 /**
  * One row per check.
  *
@@ -190,7 +302,7 @@ function main() {
   const dir = path.resolve(ROOT, arg("dir", path.join("qa", "reports")));
   const expected = (arg("expect") ?? (shardsFor(level) ?? []).join(",")).split(",").map((s) => s.trim()).filter(Boolean);
 
-  const { found, broken } = readShards(dir);
+  const { found, files, broken } = readShards(dir);
   process.stdout.write(`\n  Merging level ${level} from ${dir}\n`);
   process.stdout.write(`  expected: ${expected.join(", ")}\n`);
   process.stdout.write(`  found:    ${[...found.keys()].join(", ") || "(none)"}\n\n`);
@@ -199,7 +311,7 @@ function main() {
   // every week rather than in whatever order the artefacts downloaded.
   const payloads = expected.filter((n) => found.has(n)).map((n) => found.get(n));
   const run = Run.fromShards(level, payloads);
-  run.checks = dedupe([...run.checks, ...missingShardChecks(expected, found, broken)]);
+  run.checks = dedupe([...run.checks, ...coverageRows(expected, found, files), ...missingShardChecks(expected, found, broken)]);
 
   run.print();
   const file = run.persist();
