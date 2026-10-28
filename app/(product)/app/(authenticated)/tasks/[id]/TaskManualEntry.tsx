@@ -28,11 +28,12 @@ export function TaskManualEntry({
   const formRef = useRef<HTMLFormElement>(null);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
   const [date, setDate] = useState(todayKey());
-  const [warningDismissed, setWarningDismissed] = useState(false);
+  /// The warning the person dismissed. Every answer is a new object, so
+  /// the next overlap shows again without an effect resetting a flag.
+  const [dismissedWarning, setDismissedWarning] = useState<object | null>(null);
   const isBackdated = date !== todayKey();
 
   useEffect(() => {
-    if (result?.overlapWarning) setWarningDismissed(false);
     // Sticky across submits, like the same flag in ManualEntryForm.
     if (confirmOverlapRef.current && (result?.ok || result?.error)) confirmOverlapRef.current.value = "false";
     if (!result?.ok) return;
@@ -99,8 +100,12 @@ export function TaskManualEntry({
       </div>
 
       {isBackdated && <BackdateReasonField />}
-      {result?.overlapWarning && !warningDismissed && (
-        <OverlapNotice warning={result.overlapWarning} onSaveAnyway={saveAnyway} onDismiss={() => setWarningDismissed(true)} />
+      {result?.overlapWarning && result.overlapWarning !== dismissedWarning && (
+        <OverlapNotice
+          warning={result.overlapWarning}
+          onSaveAnyway={saveAnyway}
+          onDismiss={() => setDismissedWarning(result.overlapWarning ?? null)}
+        />
       )}
       {result?.error && (
         <p className="mt-3 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-[12.5px] text-app-error">
