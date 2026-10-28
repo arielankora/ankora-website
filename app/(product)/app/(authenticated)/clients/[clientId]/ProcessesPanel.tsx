@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -15,6 +15,7 @@ import {
   STEP_MODE_LABELS,
   TRANSITION_LABELS,
   TRIGGER_LABELS,
+  blockingChecks,
   type ActionTag,
   type Channel,
   type ProcessStep,
@@ -238,7 +239,7 @@ function Lessons({ clientId, lessons, canResolve }: { clientId: string; lessons:
 
 /// A check a procedure faces (R1 to R4, and the client's rules). BLOCK
 /// never passes; EXCEPTION passes while the rule has an approved exception.
-export type PanelCheck = { code: string; message: string; severity: "BLOCK" | "EXCEPTION"; excepted?: boolean };
+export type PanelCheck = { code: string; message: string; severity: "BLOCK" | "EXCEPTION"; excepted?: boolean; step?: number };
 
 function CheckLines({ checks }: { checks: PanelCheck[] }) {
   return (
@@ -528,6 +529,21 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
   const start = process.draft ?? process.current;
   const [steps, setSteps] = useState<ProcessStep[]>(start?.steps.length ? start.steps : [{ ...EMPTY_STEP }]);
   const set = (i: number, patch: Partial<ProcessStep>) => setSteps((all) => all.map((s, j) => (j === i ? { ...s, ...patch } : s)));
+  // 28.10.2026 (Ariel, P4 of NUX: "I have no idea what to fix and
+  // where"): the checks that hold the approval, as the steps stand now,
+  // at the top and on the step they are about. The steps' own checks run
+  // here as you type; the client's rules are the saved version's, as the
+  // server read them.
+  const live = blockingChecks({ steps }, []);
+  const ruled = (start?.checks ?? []).filter((c) => !c.excepted && !["R1", "R3", "R4"].includes(c.code));
+  const issues = [...live, ...ruled];
+  const atStep = (n: number) => issues.filter((c) => c.step === n);
+  const first = useRef<HTMLLIElement>(null);
+  const firstStep = issues.find((c) => c.step)?.step;
+  useEffect(() => {
+    first.current?.scrollIntoView({ block: "center" });
+    // Only on opening: a step that fails while typing is not jumped to.
+  }, []);
   const move = (i: number, d: -1 | 1) =>
     setSteps((all) => {
       const next = [...all];
@@ -545,9 +561,21 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
       <p className="text-xs text-app-text-secondary">
         נשמר כגרסה {process.latestVersion + 1}, טיוטה. מנהל מאשר, והבדיקות רצות לפני האישור.
       </p>
+      {issues.length > 0 && (
+        <div className="rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5" data-testid="procedure-issues">
+          <p className="text-xs font-medium text-app-error">מה חוסם את האישור ({issues.length})</p>
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {issues.map((c, i) => (
+              <li key={i} className="text-xs text-app-error">
+                {c.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <ol className="flex flex-col gap-3">
         {steps.map((st, i) => (
-          <li key={i} className="rounded-lg border border-app-border p-3">
+          <li key={i} ref={i + 1 === firstStep ? first : undefined} className={`rounded-lg border p-3 ${atStep(i + 1).length ? "border-app-error" : "border-app-border"}`}>
             <div className="flex items-center justify-between gap-2">
               <span className="text-xs font-medium text-app-text-secondary">שלב {i + 1}</span>
               <span className="flex gap-2 text-xs text-app-text-tertiary">
@@ -562,6 +590,11 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
                 </button>
               </span>
             </div>
+            {atStep(i + 1).map((c, k) => (
+              <p key={k} className="mb-1.5 text-xs text-app-error">
+                {c.message}
+              </p>
+            ))}
             <input aria-label={`שלב ${i + 1}: מה עושים`} value={st.title} onChange={(e) => set(i, { title: e.target.value })} placeholder="מה עושים" className={INPUT} />
             <div className="mt-2 grid grid-cols-[1fr_7rem] gap-2">
               <select aria-label={`שלב ${i + 1}: איך`} value={st.mode} onChange={(e) => set(i, { mode: e.target.value as StepModeLike })} className={INPUT}>
@@ -643,7 +676,14 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
               </select>
             )}
             {st.mode === "AUTOMATED" && (
-              <input value={st.verification ?? ""} onChange={(e) => set(i, { verification: e.target.value || null })} placeholder="איך אדם מוודא שזה קרה *" className={INPUT} />
+              <input
+                aria-label={`אימות של שלב ${i + 1}`}
+                aria-invalid={!st.verification}
+                value={st.verification ?? ""}
+                onChange={(e) => set(i, { verification: e.target.value || null })}
+                placeholder="איך אדם מוודא שזה קרה *"
+                className={`${INPUT} ${st.verification ? "" : "!border-app-error"}`}
+              />
             )}
             <label className="mt-2 flex items-center gap-1.5 text-xs text-app-text-primary">
               <input type="checkbox" checked={st.requiresApproval} onChange={(e) => set(i, { requiresApproval: e.target.checked })} className="h-4 w-4 accent-gold" />
