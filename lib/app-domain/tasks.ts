@@ -1563,6 +1563,10 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.plan_approved": "תוכנית העבודה אושרה",
   "task.plan_steps_applied": "תוכנית העבודה הפכה לשלבים",
   "task.advance_prompt_copied": "הועתק פרומט לקלוד",
+  // 28.10.2026: "בלי AI". Its own line, with who and when: the question a
+  // client asks about it is exactly "מי סימן ומתי, ומי הסיר".
+  "task.ai_excluded": "המשימה סומנה בלי AI",
+  "task.ai_included": "הסימון בלי AI הוסר",
 };
 
 /// Audit actions the thread deliberately drops, because the thing they
@@ -1644,6 +1648,7 @@ const FIELD_LABELS: Record<string, string> = {
   clientOutcome: "משפט התוצאה",
   supplierName: "ספק",
   supplierExperience: "חוויה מהספק",
+  aiExcluded: "בלי AI",
 };
 
 /// Server-owned columns. They move on their own as a consequence of

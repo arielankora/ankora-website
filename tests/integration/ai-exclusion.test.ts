@@ -43,6 +43,11 @@ describe("בלי AI", () => {
     expect((await prisma.task.findUniqueOrThrow({ where: { id: task.id } })).aiExcluded).toBe(false);
 
     expect(await actions(task.id)).toEqual(["task.ai_excluded", "task.ai_included"]);
+
+    // Step 4: both are lines in the task's own history, in Hebrew, with who.
+    const events = (await getTaskDetail(ariel, task.id))!.thread.filter((e) => e.kind === "event");
+    expect(events.map((e) => ("label" in e ? e.label : null))).toEqual(["הסימון בלי AI הוסר", "המשימה סומנה בלי AI"]);
+    expect(events.map((e) => e.actorName)).toEqual([ariel.name, hadas.name]);
   });
 
   it("a step is not marked on its own", async () => {
