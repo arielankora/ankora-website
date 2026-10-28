@@ -183,6 +183,19 @@ export default async function TaskDetailPage(props: {
     getActiveTimers(user.id),
   ]);
 
+  // "שיתוף" (28.10.2026): the WhatsApp number each of these people put on
+  // their profile. Read here rather than added to assignableUsers(), which
+  // also answers the Claude tools, and a phone number has no business in
+  // a list of who can hold a task.
+  const whatsappById = new Map(
+    (
+      await prisma.user.findMany({
+        where: { id: { in: people.map((p) => p.id) } },
+        select: { id: true, whatsappNumber: true },
+      })
+    ).map((u) => [u.id, u.whatsappNumber])
+  );
+
   // The same filter the create form uses: global categories, plus the
   // client-specific ones belonging to THIS client. An inactive category
   // stays in the list only when it is the one already on the task, so
@@ -241,6 +254,8 @@ export default async function TaskDetailPage(props: {
           reportedSeconds: time.totalSeconds,
         }}
         people={people}
+        shareWith={people.map((p) => ({ ...p, whatsappNumber: whatsappById.get(p.id) ?? null }))}
+        taskUrl={`${appBaseUrl()}/app/tasks/${task.id}`}
         categories={categories}
         // Whether THIS person may sign. Computed on the server beside the
         // rule it mirrors (assertApprovable), not guessed in the browser:

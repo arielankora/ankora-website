@@ -148,6 +148,11 @@ model User {
   /// is exactly the one that cannot be used for it.
   personalEmail String?
 
+  /// 28.10.2026: the number a colleague's "שיתוף" on a task opens a
+  /// WhatsApp chat with. Self-service on the profile screen, stored as
+  /// typed; lib/whatsapp.ts normalizes it when a link is built.
+  whatsappNumber String?
+
   /// App redesign, Profile screen (screen 18, docs/adr/0001 section 23):
   /// the one real per-user notification preference backing that screen's
   /// "התראות אישיות" toggle. Gates only the *email* half of

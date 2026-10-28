@@ -5,7 +5,10 @@ import { addTaskComment, applyTaskTemplate, createTask, deleteTaskComment, setSt
 import { procedureReminderForScreen } from "@/lib/app-domain/procedure-to-file";
 import { addClientDocument, MAX_DOCUMENT_BYTES } from "@/lib/app-domain/client-documents";
 import {
+  combineWallClockTime,
+  createManualEntry,
   getActiveTimers,
+  OverlapError,
   startTimer,
   stopTimer,
   SameClientTimerError,
@@ -18,6 +21,11 @@ import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPla
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { recordRunLesson } from "@/lib/app-domain/process-lessons";
+import {
+  friendlyError as entryError,
+  overlapWarningFrom,
+  type ManualEntryFormState,
+} from "../../my-time/entry-errors";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 
 // Tasks phase 1, the writes behind /app/tasks/[id].
@@ -214,6 +222,60 @@ export async function startTimerForTaskAction(input: {
     return { ok: true as const, timeEntryId: entry.id, startAt: entry.startAt.toISOString() };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// A manual entry on this task (28.10.2026), for time the timer missed.
+///
+/// The "הזמן שלי" form with the client and the category taken from the
+/// task, the way the timer button takes them: a task with no category
+/// cannot be reported on here either. Every rule (overlap, backdating,
+/// the future, access to the client) is createManualEntry's, unchanged.
+/// The note defaults to the task's title on the screen, as the timer's
+/// does, and the person may change it.
+export async function createTaskManualEntryAction(
+  _prev: ManualEntryFormState | undefined,
+  formData: FormData
+): Promise<ManualEntryFormState> {
+  const user = await requireUser();
+  const taskId = String(formData.get("taskId") || "");
+  const date = String(formData.get("date") || "");
+  const startTime = String(formData.get("startTime") || "");
+  const endTime = String(formData.get("endTime") || "");
+  if (!taskId || !date || !startTime || !endTime) {
+    return { error: "יש למלא תאריך ושעות." };
+  }
+
+  try {
+    const task = await prisma.task.findFirst({
+      where: { id: taskId, deletedAt: null },
+      select: { id: true, clientId: true, categoryId: true },
+    });
+    if (!task) return { error: "המשימה לא נמצאה." };
+    if (!task.categoryId) {
+      return { error: "למשימה אין קטגוריה, ודיווח זמן חייב קטגוריה. בחרו קטגוריה ונסו שוב." };
+    }
+
+    await createManualEntry(user, user.id, {
+      clientId: task.clientId,
+      categoryId: task.categoryId,
+      taskId: task.id,
+      startAt: combineWallClockTime(date, startTime),
+      endAt: combineWallClockTime(date, endTime),
+      note: String(formData.get("note") || ""),
+      backdateReason: String(formData.get("backdateReason") || ""),
+      allowOverlapOverride: formData.get("confirmOverlap") === "true",
+    });
+
+    revalidatePath(`/app/tasks/${task.id}`);
+    revalidatePath("/app/my-time");
+    revalidatePath("/app/timer");
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof OverlapError && !err.sameClient) {
+      return { overlapWarning: overlapWarningFrom(err) };
+    }
+    return { error: entryError(err) };
   }
 }
 

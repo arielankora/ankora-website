@@ -6,6 +6,7 @@ import {
   changeOwnPassword,
   updateOwnTimezone,
   updateOwnName,
+  updateOwnWhatsappNumber,
   updateLongRunningTimerEmailPreference,
   updateDailyDigestPreference,
 } from "@/lib/app-domain/profile";
@@ -52,6 +53,20 @@ export async function updateNameAction(_prev: FormState | undefined, formData: F
 
   try {
     await updateOwnName(user, name);
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
+  }
+
+  revalidatePath("/app/profile");
+  return { ok: true };
+}
+
+export async function updateWhatsappNumberAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const whatsappNumber = String(formData.get("whatsappNumber") || "");
+
+  try {
+    await updateOwnWhatsappNumber(user, whatsappNumber);
   } catch (err) {
     return { error: err instanceof Error ? err.message : "אירעה שגיאה. נסו שוב." };
   }

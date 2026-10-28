@@ -3,6 +3,7 @@ import { getLastPasswordChangeAt } from "@/lib/app-domain/profile";
 import { ChangePasswordForm } from "./ChangePasswordForm";
 import { TimezoneForm } from "./TimezoneForm";
 import { NameForm } from "./NameForm";
+import { WhatsappForm } from "./WhatsappForm";
 import { DailyDigestPreferenceForm, NotificationPreferenceForm } from "./NotificationPreferenceForm";
 import { getMyClaudeConnection } from "@/lib/app-domain/mcp-connections";
 import { ClaudeConnectionCard } from "@/components/app/ClaudeConnectionCard";
@@ -89,6 +90,9 @@ export default async function ProfilePage() {
             <div className="mt-5 space-y-5 border-t border-app-border pt-5">
               <NameForm name={user.name} />
               <TimezoneForm timezone={user.timezone} />
+              {/* Staff only: it is what a colleague's "שיתוף" on a task
+                  reaches. A client's number lives on the client. */}
+              {user.role !== "CLIENT_USER" && <WhatsappForm whatsappNumber={user.whatsappNumber} />}
             </div>
           </div>
         </div>

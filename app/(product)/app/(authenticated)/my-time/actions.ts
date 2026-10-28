@@ -7,29 +7,10 @@ import {
   deleteTimeEntry,
   combineWallClockTime,
   OverlapError,
-  EditWindowExpiredError,
-  BackdateReasonRequiredError,
-  FutureEntryError,
-  ConflictError,
 } from "@/lib/app-domain/time-entries";
-import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { describeOverlapConflict } from "@/lib/time-entry-format";
+import { friendlyError, overlapWarningFrom, type ManualEntryFormState } from "./entry-errors";
 
-/// Spec "אישור דיווח שעות חופף בין לקוחות שונים" (Phase 12): a cross-client
-/// overlap (OverlapError.sameClient === false) is surfaced as a non-fatal,
-/// confirmable warning instead of the hard `error` every other validation
-/// failure returns - the employee can resubmit the SAME form data with
-/// confirmOverlap set to push it through ("שמירה בכל זאת"). A same-client
-/// conflict is never offered that choice; it still comes back as `error`,
-/// exactly as before this feature.
-type OverlapWarning = {
-  clientName: string;
-  categoryName: string;
-  startAt: string;
-  endAt: string | null;
-};
-
-type FormState = { error?: string; ok?: boolean; overlapWarning?: OverlapWarning };
+type FormState = ManualEntryFormState;
 
 /// What an accepted edit wrote, as the row shows it.
 ///
@@ -51,28 +32,6 @@ export type SavedEntry = {
 };
 
 type UpdateState = FormState & { entry?: SavedEntry };
-
-function friendlyError(err: unknown): string {
-  if (err instanceof OverlapError)
-    return `טווח הזמן חופף לדיווח קיים אצל אותו לקוח: ${describeOverlapConflict(err.conflicting)}.`;
-  if (err instanceof ConflictError)
-    return "הרשומה הזו עודכנה בינתיים על ידי מישהו אחר. יש לרענן את הדף ולנסות שוב.";
-  if (err instanceof EditWindowExpiredError) return "חלון העריכה העצמית הסתיים; נדרשת הרשאת מנהל.";
-  if (err instanceof BackdateReasonRequiredError) return "יש לציין סיבה לדיווח עבור יום קודם.";
-  if (err instanceof FutureEntryError) return "לא ניתן לדווח על זמן בעתיד.";
-  if (err instanceof ForbiddenError) return "אין לך הרשאה לבצע פעולה זו.";
-  if (err instanceof Error) return err.message;
-  return "אירעה שגיאה. נסו שוב.";
-}
-
-function overlapWarningFrom(err: OverlapError): OverlapWarning {
-  return {
-    clientName: err.conflicting.client.name,
-    categoryName: err.conflicting.category.name,
-    startAt: err.conflicting.startAt.toISOString(),
-    endAt: err.conflicting.endAt ? err.conflicting.endAt.toISOString() : null,
-  };
-}
 
 // Spec 6.3: manual entry - date + start/end, self-only from this screen
 // (an admin entering time on behalf of someone else does so from the

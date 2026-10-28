@@ -7,6 +7,7 @@ import {
   updateLongRunningTimerEmailPreference,
   updateOwnName,
   updateOwnTimezone,
+  updateOwnWhatsappNumber,
 } from "@/lib/app-domain/profile";
 import { authenticateWithPassword } from "@/lib/app-auth/authenticate";
 
@@ -167,5 +168,39 @@ describe("updateLongRunningTimerEmailPreference()", () => {
     // has not quietly gained one.
     const otherAfter = await prisma.user.findUniqueOrThrow({ where: { id: other.id } });
     expect(otherAfter.notifyLongRunningTimerByEmail).toBe(otherBefore.notifyLongRunningTimerByEmail);
+  });
+});
+
+// 28.10.2026: the number a colleague's "שיתוף" on a task opens WhatsApp
+// with. Kept as typed; the link normalizes it.
+describe("updateOwnWhatsappNumber()", () => {
+  it("saves the number as typed, and clears it when emptied", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+
+    await updateOwnWhatsappNumber(user, "  052-123-4567 ");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).whatsappNumber).toBe("052-123-4567");
+
+    await updateOwnWhatsappNumber(user, "   ");
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).whatsappNumber).toBeNull();
+  });
+
+  it("refuses something that is not a phone number, and keeps the old one", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await updateOwnWhatsappNumber(user, "+972 52 123 4567");
+    const saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+
+    await expect(updateOwnWhatsappNumber(saved, "call me")).rejects.toThrow();
+    await expect(updateOwnWhatsappNumber(saved, "123")).rejects.toThrow();
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).whatsappNumber).toBe("+972 52 123 4567");
+  });
+
+  it("records the old and new number", async () => {
+    const { user } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await updateOwnWhatsappNumber(user, "0521234567");
+
+    const event = await prisma.auditEvent.findFirst({
+      where: { actorId: user.id, action: "profile.whatsapp_update" },
+    });
+    expect(JSON.stringify(event?.afterJson)).toContain("0521234567");
   });
 });

@@ -265,6 +265,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.close_covered_by_process": "סגירת משימה שתהליך מכסה",
   "task.auto_create_from_important_date": "יצירת משימה אוטומטית ממועד חשוב",
   "profile.name_update": "עדכון שם תצוגה",
+  "profile.whatsapp_update": "עדכון מספר וואטסאפ",
   "profile.notification_preference_update": "עדכון העדפת התראות",
   // Phase 10 (מועדים חשובים) and its reminder rules - audited since they
   // shipped, unlabelled until this pass.

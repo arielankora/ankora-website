@@ -145,6 +145,46 @@ test.describe.serial("one task, from opening it to closing it", () => {
     await expect(page.getByText("עדיין לא דווח זמן על המשימה הזו")).toHaveCount(0);
   });
 
+  // 28.10.2026: time the timer missed, reported from the task itself.
+  // Yesterday and at an hour nobody works, so it can neither be in the
+  // future nor overlap another spec's entry; the backdated reason is part
+  // of the same form.
+  test("time the timer missed is reported from the task, and lands on it", async ({ page }) => {
+    await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
+    const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(
+      new Date(Date.now() - 24 * 60 * 60 * 1000)
+    );
+
+    await page.getByRole("button", { name: "דיווח ידני" }).click();
+    const form = page.getByTestId("task-manual-entry");
+    await form.locator('input[name="date"]').fill(yesterday);
+    await form.locator('input[name="startTime"]').fill("03:17");
+    await form.locator('input[name="endTime"]').fill("03:41");
+    await form.locator('input[name="backdateReason"]').fill("נשכח לדווח בזמן");
+    await form.getByRole("button", { name: "שמירת דיווח" }).click();
+
+    await expect(page.getByText("הדיווח נשמר")).toBeVisible({ timeout: 30_000 });
+    await expect(form).toHaveCount(0);
+    await page.reload({ waitUntil: "domcontentloaded" });
+    // The timer's few seconds round away; the 24 minutes are this entry.
+    await expect(page.getByTestId("task-reported-total")).toContainText(/0:2[45]/);
+  });
+
+  // "שיתוף": nothing is sent from the app, so what is checked is the
+  // draft it opens - addressed, and carrying the task's own link.
+  test("sharing the task opens a draft that links back to it", async ({ page }) => {
+    await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
+
+    await page.getByRole("button", { name: "שיתוף" }).click();
+    const panel = page.getByTestId("task-share");
+    await panel.getByPlaceholder(/העברתי אלייך/).fill("בדיקה");
+
+    const mail = decodeURIComponent((await panel.getByTestId("task-share-mail").getAttribute("href")) ?? "");
+    expect(mail.startsWith("mailto:")).toBe(true);
+    expect(mail).toContain("/app/tasks/demo-task-screen-fixture");
+    expect(mail).toContain("בדיקה");
+  });
+
   test("a promise the client can see refuses to close without a sentence for them", async ({ page }) => {
     await page.goto(FIXTURE_URL, { waitUntil: "domcontentloaded" });
 
