@@ -15,6 +15,7 @@ import {
   type PickHistory,
 } from "@/lib/mcp/category-pick";
 import { serializeTeamMember } from "@/lib/mcp/serialize";
+import { AI_ALLOWED_TASK_WHERE, AI_EXCLUDED_TOOL_MESSAGE, taskAiExclusion } from "@/lib/ai-exclusion";
 
 // Phase 14 (MCP server writes, docs/adr/0005): turning the names a model
 // says into the ids the domain layer wants.
@@ -49,11 +50,18 @@ export type Lookup<T> = { ok: true; value: T } | { ok: false; message: string };
 /// against. Admins see every active client; an employee sees only their
 /// assigned ones, so the same name can resolve for one user and be
 /// refused for another - which is correct.
+///
+/// 28.10.2026: a client marked "בלי AI" is not a candidate. Naming one gets
+/// the "בלי AI" answer rather than "not found", so the model can tell the
+/// user why instead of guessing at a typo; it never appears in the list of
+/// near matches.
 export async function lookupClient(actor: User, name: string): Promise<Lookup<Named>> {
-  const clients = await listAccessibleClients(actor);
-  const candidates: Named[] = clients.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name }));
+  const clients: (Named & { aiExcluded?: boolean })[] = await listAccessibleClients(actor);
+  const candidates: Named[] = clients.filter((c) => !c.aiExcluded).map((c) => ({ id: c.id, name: c.name }));
   const result = resolveByName(name, candidates);
   if (result.status === "ok") return { ok: true, value: result.match };
+  const marked = clients.filter((c) => c.aiExcluded).map((c) => ({ id: c.id, name: c.name }));
+  if (marked.length > 0 && resolveByName(name, marked).status === "ok") return { ok: false, message: AI_EXCLUDED_TOOL_MESSAGE };
   return { ok: false, message: describeResolveFailure(result, "client", candidates) };
 }
 
@@ -130,13 +138,16 @@ export async function autoPickCategory(actor: User, clientId: string, text: stri
         parentId: null,
         categoryId: { in: usableIds },
         clientId: { in: accessible.map((c) => c.id) },
+        // 28.10.2026: a title can be quoted back as the reason for a
+        // pick, so a "בלי AI" task is not evidence.
+        ...AI_ALLOWED_TASK_WHERE,
       },
       orderBy: { createdAt: "desc" },
       take: 400,
       select: { categoryId: true, title: true },
     }),
     prisma.timeEntry.findMany({
-      where: { deletedAt: null, clientId, categoryId: { in: usableIds }, note: { not: null } },
+      where: { deletedAt: null, clientId, categoryId: { in: usableIds }, note: { not: null }, OR: [{ taskId: null }, { task: AI_ALLOWED_TASK_WHERE }] },
       orderBy: { startAt: "desc" },
       take: 300,
       select: { categoryId: true, note: true },
@@ -283,6 +294,8 @@ export async function lookupTask(
   const tasks = await listTasks(actor, {
     clientId: opts.clientId,
     statusIn: opts.includeClosed ? undefined : OPEN_STATUSES,
+    // 28.10.2026: "בלי AI" tasks are not candidates (see lookupClient).
+    forAi: true,
   });
 
   // resolveByName works on `name`; a task's is its title. The client rides
@@ -300,6 +313,11 @@ export async function lookupTask(
 
   const result = resolveByName(title, candidates);
   if (result.status === "ok") return { ok: true, value: result.match };
+  if (result.status === "none") {
+    const all = await listTasks(actor, { clientId: opts.clientId, statusIn: opts.includeClosed ? undefined : OPEN_STATUSES });
+    const marked = all.filter((t: { id: string }) => !candidates.some((c) => c.id === t.id)).map((t: { id: string; title: string }) => ({ id: t.id, name: t.title }));
+    if (marked.length > 0 && resolveByName(title, marked).status === "ok") return { ok: false, message: AI_EXCLUDED_TOOL_MESSAGE };
+  }
   return { ok: false, message: describeResolveFailure(result, "task", candidates) };
 }
 
@@ -318,11 +336,21 @@ export async function lookupTaskById(actor: User, taskId: string): Promise<Looku
   if (!id) return notFound;
   const task = await prisma.task.findFirst({
     where: { id, deletedAt: null },
-    select: { id: true, title: true, clientId: true, client: { select: { name: true } } },
+    select: {
+      id: true,
+      title: true,
+      clientId: true,
+      aiExcluded: true,
+      client: { select: { name: true, aiExcluded: true } },
+      parent: { select: { aiExcluded: true } },
+    },
   });
   if (!task) return notFound;
   const accessible = await listAccessibleClients(actor);
   if (!accessible.some((c: Named) => c.id === task.clientId)) return notFound;
+  // 28.10.2026: after the access check, so a marked task the actor cannot
+  // see still reads as not found.
+  if (taskAiExclusion(task)) return { ok: false, message: AI_EXCLUDED_TOOL_MESSAGE };
   return { ok: true, value: { id: task.id, name: task.title, clientId: task.clientId, clientName: task.client?.name ?? null } };
 }
 

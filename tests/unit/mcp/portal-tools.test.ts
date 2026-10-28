@@ -38,6 +38,8 @@ const decisions = vi.hoisted(() => ({
 const summaries = vi.hoisted(() => ({ getApprovedSummaries: vi.fn() }));
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/app-domain/client-portal", () => portal);
 vi.mock("@/lib/app-domain/decisions", () => decisions);
 vi.mock("@/lib/app-domain/portal-summary", () => summaries);
@@ -110,7 +112,7 @@ const OPEN_DECISION = {
 beforeEach(() => {
   vi.clearAllMocks();
   auth.actorFromAuthInfo.mockReturnValue(OREN);
-  portal.resolvePortalClient.mockResolvedValue({ clientUserRole: "ADMIN" });
+  portal.resolvePortalClient.mockResolvedValue({ clientUserRole: "ADMIN", client: { aiExcluded: false } });
   decisions.getPortalDecisions.mockResolvedValue({ open: [OPEN_DECISION], closed: [] });
   tools = collectTools();
 });
@@ -262,7 +264,7 @@ describe("answer_decision", () => {
   });
 
   it("refuses a viewer in words, and writes nothing", async () => {
-    portal.resolvePortalClient.mockResolvedValue({ clientUserRole: "VIEWER" });
+    portal.resolvePortalClient.mockResolvedValue({ clientUserRole: "VIEWER", client: { aiExcluded: false } });
     const out = await call("answer_decision", { decision: "סף האישור", option: "3,000" });
     expect(decisions.respondToDecision).not.toHaveBeenCalled();
     expect(out.text).toContain("admin");

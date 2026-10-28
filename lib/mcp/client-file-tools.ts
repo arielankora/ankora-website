@@ -1,4 +1,6 @@
 import "server-only";
+import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
+import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import { toolFailure, toolJson, toolText } from "@/lib/mcp/errors";
@@ -234,6 +236,10 @@ export function registerClientFileTools(server: McpServer): void {
         if (!client.ok) return toolText(client.message);
         if (!args.sourceCode && !args.newSource) return toolText("Say where this comes from: pass `sourceCode` for a source already in the register, or `newSource`.");
         const ns = args.newSource;
+        // 28.10.2026: a "בלי AI" task or document is not a source. The
+        // client is checked by lookupClient; these two arrive as raw ids.
+        if (ns?.taskId && (await isTaskAiExcluded(ns.taskId))) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
+        if (ns?.documentId && (await isDocumentAiExcluded(ns.documentId))) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         if (ns?.date && !/^\d{4}-\d{2}-\d{2}$/.test(ns.date)) return toolText("newSource.date must be YYYY-MM-DD.");
         if (ns?.kind === "EMAIL" && !ns.gmailThreadId) return toolText("newSource of kind EMAIL needs `gmailThreadId`, so the same thread is never registered twice.");
         const newSource = ns
@@ -574,7 +580,10 @@ export function registerClientFileTools(server: McpServer): void {
     async (_args: Record<string, never>, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const routines = await listMyRoutines(actor);
+        // 28.10.2026: nothing of a "בלי AI" client is listed.
+        const listed = await listMyRoutines(actor);
+        const marked = await aiExcludedClientIds(listed.map((r) => r.clientId));
+        const routines = listed.filter((r) => !marked.has(r.clientId));
         return toolJson({
           count: routines.length,
           routines: routines.map((r) => ({

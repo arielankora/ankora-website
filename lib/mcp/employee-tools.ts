@@ -1,4 +1,6 @@
 import "server-only";
+import { aiExcludedTaskIds, isDocumentAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
+import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import type { AgreementKind, User } from "@prisma/client";
@@ -165,6 +167,7 @@ export function registerEmployeeTools(server: McpServer): void {
       try {
         const actor = actorOf(ctx);
         assertCan(actor.role, "time_entry.edit_others");
+        if (await isDocumentAiExcluded(args.documentId)) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         const out = await dismissPdfUpload(actor, args.documentId, args.reason);
         return toolJson({ dismissed: true, documentId: out.documentId, kind: out.kind });
       } catch (err) {
@@ -193,7 +196,10 @@ export function registerEmployeeTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const who = await resolvePerson(actor, args);
         if (!who.ok) return toolText(who.text);
-        return toolJson(await getEmployeeStatus(actor, who.id));
+        // 28.10.2026: a lifecycle task marked "בלי AI" is not listed.
+        const status = await getEmployeeStatus(actor, who.id);
+        const marked = await aiExcludedTaskIds(status.lifecycleTasks.map((t) => t.taskId));
+        return toolJson({ ...status, lifecycleTasks: status.lifecycleTasks.filter((t) => !marked.has(t.taskId)) });
       } catch (err) {
         if (err instanceof EmployeeNotFoundError) return toolText("No Ankora staff member with that id. Call list_team_members with includeInactive: true to find them.");
         console.error("[mcp] get_employee_status failed", err);
@@ -235,6 +241,7 @@ export function registerEmployeeTools(server: McpServer): void {
         const signedAt = parseIsraelDateTime(args.signedAt);
         if (!signedAt) return toolText("signedAt must be YYYY-MM-DD or YYYY-MM-DD HH:MM (Israel time). Nothing was recorded.");
 
+        if (await isDocumentAiExcluded(args.documentId)) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
         const { row, alreadyRecorded } = await recordPdfSignatureFromDocument(actor, {
           userId: who.id,
           kind: args.kind,

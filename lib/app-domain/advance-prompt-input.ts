@@ -7,6 +7,7 @@ import type { TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { formatDecimalHours } from "@/lib/hours-format";
 import { taskUrl } from "@/lib/mcp/serialize";
 import { appBaseUrl } from "@/lib/email-templates";
+import { taskAiExclusion } from "@/lib/ai-exclusion";
 import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, SOURCES_LOOKBACK_DAYS, type AdvancePromptSources } from "@/lib/advance-prompt";
 
 // "קדם עם קלוד" (10.10.2026): turns what the task screen already loaded
@@ -18,6 +19,11 @@ import { buildAdvancePrompt, buildLessonsPrompt, fileSizeLabel, fileTypeLabel, S
 //
 // The access rule is inherited, not restated: `detail` exists only if
 // getTaskDetail decided this person may see the task.
+//
+// 28.10.2026: "בלי AI". A marked task, a step under one, or any task of a
+// marked client gets no prompt at all (null), and the screen shows why.
+// Checked here and not only on the screen, so no caller can build one.
+// A document marked on its own is left out of an unmarked task's prompt.
 
 /// Recent comments carried in the prompt. The rest stay one get_task away.
 const MAX_PROMPT_COMMENTS = 30;
@@ -32,8 +38,9 @@ export async function advancePromptFor(
   detail: Detail,
   plan: TaskPlanRow | null,
   mode: AdvancePromptMode = "plan"
-): Promise<string> {
+): Promise<string | null> {
   const { task, subtasks, thread, time } = detail;
+  if (taskAiExclusion(task)) return null;
   const tz = actor.timezone || "Asia/Jerusalem";
   const day = new Intl.DateTimeFormat("he-IL", { timeZone: tz, day: "2-digit", month: "2-digit", year: "numeric" });
   const dayTime = new Intl.DateTimeFormat("he-IL", {
@@ -59,7 +66,7 @@ export async function advancePromptFor(
   // Files with their ids, oldest first, so Claude can read them with
   // read_document (MCP, 12.10.2026) instead of only knowing they exist.
   const files = thread
-    .flatMap((e) => (e.kind === "file" ? [e] : []))
+    .flatMap((e) => (e.kind === "file" && !e.aiExcluded ? [e] : []))
     .reverse()
     .map((f) => ({
       documentId: f.id,

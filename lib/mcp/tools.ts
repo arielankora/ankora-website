@@ -57,6 +57,8 @@ import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { appBaseUrl } from "@/lib/email-templates";
 import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
 import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
+import { AI_REDACTED, redactEntriesForAi } from "@/lib/mcp/ai-redact";
+import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
@@ -110,14 +112,24 @@ async function resolveRunningTimer(
     if (!match) {
       return { ok: false, text: `No timer is running for ${client.value.name}. Running timers: ${names}. Nothing was changed.` };
     }
-    return { ok: true, entry: match };
+    return guardRunning(match);
   }
 
-  if (running.length === 1) return { ok: true, entry: running[0] };
+  if (running.length === 1) return guardRunning(running[0]);
   return {
     ok: false,
     text: `${running.length} timers are running (${names}). Nothing was changed. Ask the user which one to ${verb}, then call again with that client's name in \`client\`.`,
   };
+}
+
+/// 28.10.2026: a timer on a "בלי AI" task or client is stopped and noted in
+/// the app, not from here: the note is written about the very material.
+async function guardRunning(
+  entry: Awaited<ReturnType<typeof getActiveTimers>>[number]
+): Promise<{ ok: true; entry: Awaited<ReturnType<typeof getActiveTimers>>[number] } | { ok: false; text: string }> {
+  const [redacted] = await redactEntriesForAi([entry], { keepExcludedClients: true });
+  if (redacted.aiExcluded) return { ok: false, text: `${AI_EXCLUDED_TOOL_MESSAGE} Nothing was changed.` };
+  return { ok: true, entry };
 }
 
 function actorOf(ctx: ServerContext): User {
@@ -216,7 +228,9 @@ export function registerAnkoraTools(server: McpServer): void {
     async (_args: unknown, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
-        const clients = await listAccessibleClients(actor);
+        // 28.10.2026: a client marked "בלי AI" is not listed. Naming it in
+        // any tool gets the "בלי AI" answer (lookupClient).
+        const clients = (await listAccessibleClients(actor)).filter((c) => !c.aiExcluded);
         return toolJson({ count: clients.length, clients: clients.map(serializeClient) });
       } catch (err) {
         console.error("[mcp] list_my_clients failed", err);
@@ -263,12 +277,14 @@ export function registerAnkoraTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const running = await getActiveTimers(actor.id);
         if (running.length === 0) return toolText("No timer is currently running for this user.");
+        const shown = await redactEntriesForAi(running, { keepExcludedClients: true });
         return toolJson({
           count: running.length,
           maxParallel: MAX_PARALLEL_TIMERS,
-          timers: running.map((entry) => ({
+          timers: shown.map(({ entry, aiExcluded }) => ({
             ...serializeTimeEntry(entry),
             elapsedMinutes: elapsedMinutes(entry.startAt),
+            ...(aiExcluded ? AI_REDACTED : {}),
           })),
           userTimezone: actor.timezone,
         });
@@ -303,13 +319,14 @@ export function registerAnkoraTools(server: McpServer): void {
           from: args.from ? localDateTimeToUtc(args.from, "00:00", actor.timezone) : undefined,
           to: args.to ? localDateTimeToUtc(args.to, "00:00", actor.timezone) : undefined,
         });
-        const page = entries.slice(0, args.limit ?? MAX_ENTRIES);
+        const shown = await redactEntriesForAi(entries);
+        const page = shown.slice(0, args.limit ?? MAX_ENTRIES);
         const serialized: SerializedTimeEntry[] = [];
-        for (const entry of page) serialized.push(serializeTimeEntry(entry));
+        for (const { entry, aiExcluded } of page) serialized.push({ ...serializeTimeEntry(entry), ...(aiExcluded ? AI_REDACTED : {}) });
         return toolJson({
           count: page.length,
-          truncated: entries.length > page.length,
-          totalMatching: entries.length,
+          truncated: shown.length > page.length,
+          totalMatching: shown.length,
           userTimezone: actor.timezone,
           entries: serialized,
         });
@@ -404,14 +421,15 @@ export function registerAnkoraTools(server: McpServer): void {
           from: args.from ? localDateTimeToUtc(args.from, "00:00", actor.timezone) : undefined,
           to: args.to ? localDateTimeToUtc(args.to, "00:00", actor.timezone) : undefined,
         });
-        const page = entries.slice(0, args.limit ?? MAX_ENTRIES);
+        const shown = await redactEntriesForAi(entries);
+        const page = shown.slice(0, args.limit ?? MAX_ENTRIES);
         const serialized = [];
-        for (const entry of page) serialized.push(serializeTeamTimeEntry(entry));
+        for (const { entry, aiExcluded } of page) serialized.push({ ...serializeTeamTimeEntry(entry), ...(aiExcluded ? AI_REDACTED : {}) });
         return toolJson({
           person: personName,
           count: page.length,
-          truncated: entries.length > page.length,
-          totalMatching: entries.length,
+          truncated: shown.length > page.length,
+          totalMatching: shown.length,
           timezone: actor.timezone,
           entries: serialized,
         });
@@ -792,6 +810,8 @@ export function registerAnkoraTools(server: McpServer): void {
           args.overdue && dueBy ? new Date(Math.min(now.getTime(), dueBy.getTime())) : args.overdue ? now : dueBy;
 
         const tasks = await listTasks(actor, {
+          // 28.10.2026: nothing marked "בלי AI" is listed.
+          forAi: true,
           clientId,
           assignedToId,
           unassigned: args.unassigned || undefined,

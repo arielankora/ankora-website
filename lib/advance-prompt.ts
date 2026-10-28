@@ -19,6 +19,7 @@
 // The prompt is written in Hebrew because the conversation it starts is in
 // Hebrew. Tool names, the task id and field values stay as they are.
 
+import { NO_AI_MEETING_RULE } from "./ai-exclusion";
 import { PROPOSE_MAPPING_STEP_TITLE, PROPOSE_STEP_TITLE } from "./procedure-to-file";
 
 export type AdvancePromptStep = {
@@ -275,6 +276,8 @@ export function sourcesRules(input: Pick<AdvancePromptInput, "clientName" | "tas
     // Keyword search in Fireflies missed the key meeting ("Guy / Ariel",
     // the client's name transcribed as Nax); only participants found it.
     "- **הקלטות (Fireflies):** החשבון משותף לכמה לקוחות, ולכן אף פעם לא מחפשים לפי תאריך בלבד. מחפשים לפי משתתפים מהלקוח (כתובות בדומיין של הלקוח שעלו במיילים שנמצאו או במשימה), ולפי מילות המפתח בכותרת ובתמלול. התמלול כותב שמות לפעמים אחרת, ולכן כדאי לנסות כמה כתיבים. פגישה של לקוח אחר שעלתה בחיפוש: לא פותחים אותה.",
+    // 28.10.2026: "בלי AI" in a recorded meeting (lib/ai-exclusion.ts).
+    NO_AI_MEETING_RULE,
     `- טווח: מ-${src.fromLabel} (${SOURCES_LOOKBACK_DAYS} יום לפני פתיחת המשימה) ועד היום. במייל: after:${src.fromIso.replace(/-/g, "/")}. ב-Fireflies: from:${src.fromIso}.`,
     "- מקור שלא מחובר: שורה אחת שהוא לא היה זמין, וממשיכים. לא עוצרים בגללו.",
     "- **בתוכנית:** בחלק \"מה ידוע\", שורה ראשונה שמתחילה ב\"מקורות:\". מה נבדק ומאיזה חשבון (למשל איזו תיבת מייל), מה נמצא (מספר שרשורים, קבצים ופגישות), ומה לא היה זמין או לא היה משותף.",

@@ -1,4 +1,5 @@
 import "server-only";
+import { NO_AI_MEETING_MARKER } from "@/lib/ai-exclusion";
 import { prisma } from "@/lib/prisma";
 import type { User } from "@prisma/client";
 import { assertCan } from "@/lib/app-auth/permissions";
@@ -45,7 +46,8 @@ export async function extractionBrief(actor: User, now = new Date()) {
   ]);
 
   const nameOf = new Map(clients.map((c) => [c.id, c.name]));
-  const processed = sources.flatMap((s) =>
+  const marked = new Set(clients.filter((c) => c.aiExcluded).map((c) => c.id));
+  const processed = sources.filter((s) => !marked.has(s.clientId)).flatMap((s) =>
     (Array.isArray(s.externalRefs) ? (s.externalRefs as { system?: string; id?: string }[]) : [])
       .filter((r) => r?.system === "FIREFLIES" && r.id)
       .map((r) => ({ firefliesId: r.id!, client: nameOf.get(s.clientId) ?? "", sourceCode: s.code, title: s.title }))
@@ -56,9 +58,20 @@ export async function extractionBrief(actor: User, now = new Date()) {
       version: guide?.version ?? null,
       rules: guide ? guideLines(guide.body) : DEFAULT_EXTRACTION_GUIDE_LINES,
     },
+    // 28.10.2026: a client marked "בלי AI" stays on the list, by name and
+    // domains only, so a run can recognise its meetings and leave them
+    // unopened. Dropping it would let one of its recordings pass for
+    // internal or for another client's.
     clients: clients
       .filter((c) => !c.isInternal)
-      .map((c) => ({
+      .map((c) => c.aiExcluded ? {
+        name: c.name,
+        aiExcluded: true as const,
+        instruction: 'Marked "בלי AI": skip every meeting of this client. Do not open its transcript or summary, and propose nothing from it.',
+        domains: domains
+          .filter((d) => d.clientId === c.id)
+          .map((d) => ({ domain: d.domain, kind: d.kind, organization: d.organization?.name ?? null })),
+      } : {
         name: c.name,
         domains: domains
           .filter((d) => d.clientId === c.id)
@@ -67,7 +80,13 @@ export async function extractionBrief(actor: User, now = new Date()) {
           .filter((r) => r.clientId === c.id)
           .map(ruleLine)
           .filter((l): l is string => !!l),
-      })),
+      }),
+    // 28.10.2026: a meeting where a "בלי AI" subject came up is marked in
+    // its title by whoever ran it, and a run leaves it unopened.
+    noAiMeetings: {
+      titleMarker: NO_AI_MEETING_MARKER,
+      instruction: `Skip any meeting whose title contains "${NO_AI_MEETING_MARKER}": a subject marked "בלי AI" came up in it. Do not open its transcript or summary, and propose nothing from it.`,
+    },
     processedRecordings: processed,
     processedWindowDays: PROCESSED_WINDOW_DAYS,
   };

@@ -68,6 +68,8 @@ const plans = vi.hoisted(() => {
 // 19.10.2026: the closing check behind update_task's `reminder`.
 const procedure = vi.hoisted(() => ({ procedureReminderFor: vi.fn(async (): Promise<unknown> => null) }));
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/app-domain/time-entries", () => ({}));
 vi.mock("@/lib/app-domain/procedure-to-file", () => procedure);
 vi.mock("@/lib/app-domain/tasks", () => tasks);

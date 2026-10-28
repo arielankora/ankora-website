@@ -19,7 +19,11 @@ import { canSendToAi, type KnowledgeAudienceLike } from "@/lib/knowledge";
 // the version for Claude: names only, no contact details, nothing
 // sensitive, nothing restricted to others (spec 6.3). A pasted prompt leaves the product.
 
-export async function extractPromptFor(actor: User, clientId: string): Promise<string> {
+/// 28.10.2026: null for a client marked "בלי AI". Nothing of theirs goes
+/// into a prompt, so there is nothing to extract with Claude.
+export async function extractPromptFor(actor: User, clientId: string): Promise<string | null> {
+  const flag = await prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { aiExcluded: true } });
+  if (flag.aiExcluded) return null;
   const [client, facts, people, systems, sources, domains, requestTypes, guide, policies] = await Promise.all([
     prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true } }),
     listClientFacts(actor, clientId),

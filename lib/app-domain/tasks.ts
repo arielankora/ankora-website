@@ -17,6 +17,7 @@ import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
 import { isMappingTask } from "@/lib/procedure-to-file";
+import { AI_ALLOWED_TASK_WHERE, AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE } from "@/lib/ai-exclusion";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -102,6 +103,10 @@ const ALL_ROLES: UserRole[] = ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE",
 const MANAGING_ROLES: UserRole[] = ALL_ROLES.filter(canManageClients);
 
 export type TaskFilters = {
+  /// 28.10.2026: for an AI-facing reader (the MCP tools). Leaves out
+  /// everything marked "בלי AI": the task, a step under a marked task, and
+  /// every task of a marked client. See lib/ai-exclusion.ts.
+  forAi?: boolean;
   clientId?: string;
   categoryId?: string;
   status?: TaskStatus;
@@ -251,6 +256,7 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // pill stays inside that pill, and "שלי" narrows a search rather
       // than widening it. Two ORs cannot share one key, hence the array.
       AND: [
+        ...(filters.forAi ? [AI_ALLOWED_TASK_WHERE] : []),
         ...(search ? [{ OR: searchWhere(search) }] : []),
         ...(filters.involvedUserId
           ? [{ OR: [{ assignedToId: filters.involvedUserId }, { supervisorId: filters.involvedUserId }] }]
@@ -1034,6 +1040,9 @@ export type TaskPatch = {
   requiresApproval?: boolean;
   /// 20.10.2026: see Task.mappingTask.
   mappingTask?: boolean;
+  /// 28.10.2026: see Task.aiExcluded. Not on a step, and clearing it
+  /// needs client.manage.
+  aiExcluded?: boolean;
 };
 
 /// The general task mutation. Every field is optional and only the keys
@@ -1234,6 +1243,11 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // not a decision that the task stopped mapping, and the toggle is there
   // for that.
   else if (patch.description !== undefined && !task.parentId && isMappingTask(patch.description)) data.mappingTask = true;
+  if (patch.aiExcluded !== undefined && patch.aiExcluded !== task.aiExcluded) {
+    if (task.parentId) throw new Error(AI_EXCLUSION_ON_STEP_MESSAGE);
+    if (!patch.aiExcluded && !can(actor.role, "client.manage")) throw new ForbiddenError(AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE);
+    data.aiExcluded = patch.aiExcluded;
+  }
   if (patch.priority !== undefined) data.priority = patch.priority;
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.categoryId !== undefined) {
@@ -1465,6 +1479,10 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   const blockAsked = patch.block !== undefined;
   const blocking = blockAsked && updated.blockedOn !== null && task.blockedOn === null;
   const unblocking = blockAsked && updated.blockedOn === null && task.blockedOn !== null;
+  /// 28.10.2026: marking a task "בלי AI" and clearing it are their own
+  /// lines too. "מי הסיר את הסימון" is the question a client asks.
+  const aiMarking = updated.aiExcluded && !task.aiExcluded;
+  const aiClearing = !updated.aiExcluded && task.aiExcluded;
 
   await recordAudit({
     actorId: actor.id,
@@ -1475,7 +1493,7 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
     // it; the test is not. (Nor may this comment name that key, for the
     // same reason: the scanner would match the comment instead.)
     // prettier-ignore
-    action: blocking ? "task.blocked" : unblocking ? "task.unblocked" : approving ? "task.approve" : statusOnly ? "task.status_change" : "task.update",
+    action: aiMarking ? "task.ai_excluded" : aiClearing ? "task.ai_included" : blocking ? "task.blocked" : unblocking ? "task.unblocked" : approving ? "task.approve" : statusOnly ? "task.status_change" : "task.update",
     entityType: "Task",
     entityId: taskId,
     clientId: task.clientId,
@@ -1545,6 +1563,10 @@ const TASK_AUDIT_LABELS: Record<string, string> = {
   "task.plan_approved": "תוכנית העבודה אושרה",
   "task.plan_steps_applied": "תוכנית העבודה הפכה לשלבים",
   "task.advance_prompt_copied": "הועתק פרומט לקלוד",
+  // 28.10.2026: "בלי AI". Its own line, with who and when: the question a
+  // client asks about it is exactly "מי סימן ומתי, ומי הסיר".
+  "task.ai_excluded": "המשימה סומנה בלי AI",
+  "task.ai_included": "הסימון בלי AI הוסר",
 };
 
 /// Audit actions the thread deliberately drops, because the thing they
@@ -1602,6 +1624,8 @@ export type TaskThreadEntry =
       /// somebody chose to share or not, and that choice should not be
       /// invisible to the next person.
       clientVisible: boolean;
+      /// 28.10.2026: the document's own "בלי AI" mark.
+      aiExcluded: boolean;
     };
 
 /// Field names as a person would say them. Only the fields worth naming
@@ -1624,6 +1648,7 @@ const FIELD_LABELS: Record<string, string> = {
   clientOutcome: "משפט התוצאה",
   supplierName: "ספק",
   supplierExperience: "חוויה מהספק",
+  aiExcluded: "בלי AI",
 };
 
 /// Server-owned columns. They move on their own as a consequence of
@@ -1830,7 +1855,9 @@ export async function getTaskDetail(actor: User, taskId: string) {
   const task = await prisma.task.findFirst({
     where: { id: taskId, deletedAt: null },
     include: {
-      client: { select: { id: true, name: true } },
+      client: { select: { id: true, name: true, aiExcluded: true } },
+      // 28.10.2026: a step inherits its task's "בלי AI" (lib/ai-exclusion.ts).
+      parent: { select: { aiExcluded: true } },
       category: { select: { id: true, name: true } },
       assignedTo: { select: { id: true, name: true } },
       // Tasks phase 2. Two names the screen shows and never writes: who
@@ -1906,6 +1933,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
         mimeType: true,
         sizeBytes: true,
         clientVisible: true,
+        aiExcluded: true,
         createdAt: true,
         uploadedBy: { select: { name: true } },
       },
@@ -1977,6 +2005,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
       mimeType: f.mimeType,
       sizeBytes: f.sizeBytes,
       clientVisible: f.clientVisible,
+      aiExcluded: f.aiExcluded,
     })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 

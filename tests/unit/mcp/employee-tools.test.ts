@@ -49,6 +49,8 @@ const permissions = vi.hoisted(() => {
   };
 });
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/app-domain/employee-status", () => status);
 vi.mock("@/lib/app-domain/agreements", () => agreements);
 vi.mock("@/lib/mcp/lookup", () => lookup);
@@ -223,10 +225,10 @@ describe("get_blank_agreement_pdf", () => {
 describe("get_employee_status", () => {
   it("resolves a person by name among staff of any status", async () => {
     lookup.lookupStaffMember.mockResolvedValue({ ok: true, value: { id: "u-new", name: "דנה", email: "d@a" } });
-    status.getEmployeeStatus.mockResolvedValue({ id: "u-new", personalEmailOnFile: true });
+    status.getEmployeeStatus.mockResolvedValue({ id: "u-new", personalEmailOnFile: true, lifecycleTasks: [] });
     const out = json(await tools.get("get_employee_status")!.handler({ person: "דנה" }, CTX));
     expect(status.getEmployeeStatus).toHaveBeenCalledWith(ADMIN, "u-new");
-    expect(out).toEqual({ id: "u-new", personalEmailOnFile: true });
+    expect(out).toEqual({ id: "u-new", personalEmailOnFile: true, lifecycleTasks: [] });
   });
 
   it("takes an id as given, and says so plainly when it is nobody", async () => {

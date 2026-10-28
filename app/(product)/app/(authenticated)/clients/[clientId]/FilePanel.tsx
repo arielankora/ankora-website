@@ -8,6 +8,7 @@ import {
   removeClientDocumentAction,
   setClientDocumentKindAction,
   setClientDocumentVisibilityAction,
+  setClientDocumentAiExcludedAction,
 } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { MessageClient, type ComposerProps } from "@/components/app/MessageClient";
@@ -26,6 +27,11 @@ export interface DocumentRow {
   title: string;
   kind: ClientDocumentKind;
   clientVisible: boolean;
+  /// 28.10.2026: the document's own "בלי AI" mark.
+  aiExcluded: boolean;
+  /// Set when the mark comes from the document's task (its own toggle
+  /// then has nothing to add).
+  aiExcludedByTask: boolean;
   sizeBytes: number | null;
   createdAt: string;
   uploadedByName: string | null;
@@ -52,9 +58,12 @@ export function DocumentsPanel({
   clientId,
   documents,
   storageReady,
+  canClearAiExclusion = false,
 }: {
   clientId: string;
   documents: DocumentRow[];
+  /// 28.10.2026: whether this person may clear "בלי AI" (a manager).
+  canClearAiExclusion?: boolean;
   /// False until the Drive folder for client documents exists and is
   /// shared with the service account. The form is built either way and
   /// says so, per the spec's rule for a capability waiting on something
@@ -126,6 +135,30 @@ export function DocumentsPanel({
                 >
                   {d.clientVisible ? "הלקוח רואה" : "מוסתר"}
                 </button>
+                {d.aiExcludedByTask ? (
+                  <span className="rounded-full border border-app-border bg-app-surface-sunken px-2.5 py-1 text-app-text-secondary">
+                    בלי AI (מהמשימה)
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy || (d.aiExcluded && !canClearAiExclusion)}
+                    title={d.aiExcluded && !canClearAiExclusion ? "רק מנהל יכול להסיר" : undefined}
+                    onClick={() =>
+                      startTransition(async () => {
+                        const res = await setClientDocumentAiExcludedAction(d.id, !d.aiExcluded);
+                        setRowError(res.ok ? null : res.error);
+                      })
+                    }
+                    className={`rounded-full border px-2.5 py-1 ${
+                      d.aiExcluded
+                        ? "border-app-border-strong bg-app-surface-sunken text-app-text-primary"
+                        : "border-app-border text-app-text-tertiary"
+                    }`}
+                  >
+                    {d.aiExcluded ? "בלי AI" : "מותר ל-AI"}
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={busy}

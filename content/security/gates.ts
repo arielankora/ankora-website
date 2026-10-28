@@ -15,9 +15,11 @@ export const SECURITY_GATES = {
   /** Fireflies terms on our plan checked: no training, business retention.
    *  Checked 17.10.2026: no training, not kept by its model vendors. */
   firefliesTier: true,
-  /** A client can ask that a task or material stay away from AI. Today the
-   *  operations manager handles it by hand (Ariel, 22.10.2026); the copy
-   *  says so and does not promise a marking in the system. */
+  /** A client can ask that a task, a document or everything of theirs not
+   *  be worked on with AI. Marked in the system since 28.10.2026 ("בלי AI",
+   *  lib/ai-exclusion.ts): no prompt, no MCP tool and no portal connector
+   *  reaches a marked item, and lib/mcp/ai-exclusion-coverage.ts holds every
+   *  tool to it. Calls are still recorded and transcribed (Ariel). */
   noAi: true,
   /** Every team member has signed the personal confidentiality undertaking.
    *  All active staff signed in the app by 18.10.2026; signing is required

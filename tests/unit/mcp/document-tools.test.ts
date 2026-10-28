@@ -47,6 +47,8 @@ const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 // 20.10.2026: set_document_kind writes through the client-documents domain.
 const documents = vi.hoisted(() => ({ setClientDocumentKind: vi.fn() }));
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/app-domain/mcp-files", () => files);
 vi.mock("@/lib/app-domain/client-documents", () => documents);
 vi.mock("@/lib/app-domain/time-entries", () => ({}));

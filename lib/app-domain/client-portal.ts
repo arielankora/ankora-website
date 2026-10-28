@@ -268,17 +268,20 @@ interface PortalEntryRow {
   employee?: string;
 }
 
-async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEmployeeNames: boolean) {
+/// `forAi` (28.10.2026): for the portal's MCP connector. An entry on a task
+/// marked "בלי AI" is named by its category, never by the task's title.
+async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEmployeeNames: boolean, forAi = false) {
   const entries = await prisma.timeEntry.findMany({
     where: { clientId, deletedAt: null, endAt: { not: null }, startAt: { gte: from, lt: to } },
     orderBy: { startAt: "asc" },
-    include: { category: true, task: true, user: true },
+    include: { category: true, task: { include: { parent: { select: { aiExcluded: true } } } }, user: true },
   });
 
   return entries.map((e): PortalEntryRow => {
+    const hidden = forAi && !!e.task && (e.task.aiExcluded || !!e.task.parent?.aiExcluded);
     const row: PortalEntryRow = {
       date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
-      activity: e.task?.title ?? e.category.name,
+      activity: (hidden ? null : e.task?.title) ?? e.category.name,
       category: e.category.name,
       billableMinutes: toMinutes(e.billableSeconds),
     };
@@ -319,12 +322,12 @@ function topActivities(rows: PortalEntryRow[], limit = 5) {
 /// Spec 13's Weekly Activity: "משימות שבוצעו, שעות לפי משימה/קטגוריה,
 /// עובדים לפי הגדרת privacy." weekStart defaults to the current week;
 /// callers (the portal screen) can page backward via the same param.
-export async function getWeeklyActivity(actor: User, weekStart?: Date) {
+export async function getWeeklyActivity(actor: User, weekStart?: Date, opts: { forAi?: boolean } = {}) {
   const { client } = await resolvePortalClient(actor);
   const from = startOfWeek(weekStart ?? new Date());
   const to = endOfWeek(from);
 
-  const rows = await fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames);
+  const rows = await fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames, opts.forAi);
   const totalMinutes = rows.reduce((s, r) => s + r.billableMinutes, 0);
 
   const byCategory = new Map<string, number>();
@@ -376,13 +379,13 @@ async function nextAutoSendLabel(clientId: string): Promise<string | null> {
 /// Spec 13's Monthly Detailed report / spec 14.1's "Monthly Detailed" row:
 /// "שורה לכל Entry/Task: תאריך, משימה, קטגוריה, זמן לחיוב, סיכומים."
 /// monthStart defaults to the current calendar month.
-export async function getMonthlyDetailed(actor: User, monthStart?: Date) {
+export async function getMonthlyDetailed(actor: User, monthStart?: Date, opts: { forAi?: boolean } = {}) {
   const { client } = await resolvePortalClient(actor);
   const from = startOfMonth(monthStart ?? new Date());
   const to = endOfMonth(from);
 
   const [rows, tasksCompleted, autoSendLabel] = await Promise.all([
-    fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames),
+    fetchPortalEntries(client.id, from, to, client.portalShowEmployeeNames, opts.forAi),
     tasksCompletedCount(client.id, from, to),
     nextAutoSendLabel(client.id),
   ]);
