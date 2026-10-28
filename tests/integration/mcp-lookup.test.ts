@@ -22,6 +22,7 @@ vi.mock("@/lib/mcp/auth", () => ({
 
 import { registerAnkoraTools } from "@/lib/mcp/tools";
 import {
+  autoPickCategory,
   canSeeOthersTime,
   lookupCategory,
   lookupClient,
@@ -443,5 +444,41 @@ describe("usableCategoryById() - the same rule as the picker, asked by id", () =
     expect(await usableCategoryById(client.id, theirs.id)).toBeNull();
     expect(await usableCategoryById(client.id, retired.id)).toBeNull();
     expect(await usableCategoryById(client.id, "clxxxxxxxxxxxxxxxxxxxxxxxx")).toBeNull();
+  });
+});
+
+// autoPickCategory had no test against a database until 28.10.2026, when
+// the coverage floor noticed that the two lines turning earlier work into
+// evidence had never run: every caller's test mocks it. Its own comment
+// makes a promise worth holding it to - the reason it quotes back must
+// never come from a client the actor cannot see.
+describe("autoPickCategory() - a category for a task that has none", () => {
+  it("files by earlier work on the actor's own clients, and quotes it as the reason", async () => {
+    const { hadas, nux, general, nuxOnly } = await setup();
+    await prisma.task.create({ data: { clientId: nux.id, title: "הפקת תלושי שכר לחודש", categoryId: nuxOnly.id } });
+    await createTestTimeEntry({ userId: hadas.id, clientId: nux.id, categoryId: general.id, note: "שיחת תיאום עם רואה החשבון" });
+
+    const pick = await autoPickCategory(hadas, nux.id, "תלושי שכר לנובמבר");
+    expect(pick).toMatchObject({ id: nuxOnly.id, basis: "similar", example: "הפקת תלושי שכר לחודש" });
+
+    const byNote = await autoPickCategory(hadas, nux.id, "תיאום עם רואה החשבון");
+    expect(byNote?.id).toBe(general.id);
+  });
+
+  it("never quotes work from a client the actor is not on", async () => {
+    const { hadas, nux, secret, general } = await setup();
+    // A global category, so it is a candidate on NUX too; only the
+    // evidence for it lives on a client Hadas cannot see.
+    await prisma.task.create({ data: { clientId: secret.id, title: "בדיקת נאותות למיזוג הסודי", categoryId: general.id } });
+
+    const pick = await autoPickCategory(hadas, nux.id, "בדיקת נאותות למיזוג");
+    expect(pick?.basis).not.toBe("similar");
+    expect(JSON.stringify(pick)).not.toContain("הסודי");
+  });
+
+  it("answers null when the client has no category it may use", async () => {
+    const { hadas, nux } = await setup();
+    await prisma.category.updateMany({ data: { active: false } });
+    expect(await autoPickCategory(hadas, nux.id, "כל דבר")).toBeNull();
   });
 });

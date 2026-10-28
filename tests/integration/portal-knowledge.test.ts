@@ -44,4 +44,29 @@ describe("the client file in the portal", () => {
     expect(by.processes[0]).toMatchObject({ text: "תשלומי ספקים", tag: "בחפיפה אלינו" });
     expect(by.processes[0].detail).toContain("הבא:");
   });
+
+  // 28.10.2026: the people group had never had anyone in it in a test, so
+  // the two lines that carry a contact's and an organisation's name into
+  // it had never run (the coverage floor's finding on run #606).
+  it("lists the people and organisations marked visible, under their names", async () => {
+    const { client, user } = await setup();
+    const shown = await prisma.person.create({ data: { name: "אורן לוי" } });
+    const hidden = await prisma.person.create({ data: { name: "דנה כהן" } });
+    const bank = await prisma.organization.create({ data: { name: "בנק הפועלים" } });
+    await prisma.clientContact.createMany({
+      data: [
+        { clientId: client.id, personId: shown.id, role: "סמנכ״ל כספים", clientVisible: true },
+        { clientId: client.id, personId: hidden.id, role: "יועצת", clientVisible: false },
+      ],
+    });
+    await prisma.clientOrganization.create({ data: { clientId: client.id, organizationId: bank.id, role: "בנק עיקרי", clientVisible: true } });
+
+    const { knowledge } = await getPortalFile(user);
+    const people = knowledge.find((g) => g.key === "people")!.items;
+    expect(people).toEqual([
+      expect.objectContaining({ text: "אורן לוי", detail: "סמנכ״ל כספים" }),
+      expect.objectContaining({ text: "בנק הפועלים", detail: "בנק עיקרי" }),
+    ]);
+    expect(JSON.stringify(knowledge)).not.toContain("דנה כהן");
+  });
 });
