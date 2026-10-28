@@ -36,7 +36,8 @@ import { addClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
 import { addProcess, linkProcessDates, saveProcessVersion } from "@/lib/app-domain/processes";
 import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
-import { addClientFact, addClientFactSources, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
+import { addClientFact, addClientFactSources, answerClientQuestion, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
+import { FACT_KIND_LABELS, isQuestion, type FactKindLike } from "@/lib/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
 import { addClientPolicy } from "@/lib/app-domain/client-policies";
@@ -235,6 +236,20 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
   }
   if (item.target === "POLICY") {
     flags.push({ code: "POLICY", message: "באישור, הכלל נכנס לתיק כמוצע. מנהל מאשר אותו בנפרד כדי שייכנס לתוקף." });
+  }
+  // A new version of another kind is not one (see apply): say what
+  // approving it does instead.
+  if (item.action === "SUPERSEDE" && item.target === "FACT" && item.targetId) {
+    const old = await prisma.clientFact.findUnique({ where: { id: item.targetId }, select: { kind: true, answeredAt: true } });
+    if (old && old.kind !== item.payload.kind) {
+      flags.push({
+        code: "KIND",
+        message:
+          isQuestion(old.kind) && !old.answeredAt
+            ? "הפריט בתיק הוא שאלה פתוחה. באישור, הטקסט הזה נרשם כתשובה שלה והשאלה נסגרת."
+            : `הפריט בתיק הוא ${FACT_KIND_LABELS[old.kind]}, וההצעה היא ${FACT_KIND_LABELS[item.payload.kind as FactKindLike] ?? "סוג אחר"}. באישור, היא נכנסת כפריט חדש, והפריט שבתיק נשאר.`,
+      });
+    }
   }
   // A change to an item is about that item: "already in the file" is the point.
   if (item.action === "SUPERSEDE") return flags.filter((f) => f.code !== "DUPLICATE");
@@ -588,7 +603,18 @@ async function apply(
     const f = withoutLinkNames(PAYLOADS.FACT.parse(payload));
     const { ownerName: _o, ...fact } = f;
     const input = { ...fact, ...linked, ...owner, sources, validUntil: date(f.validUntil), decidedAt: date(f.decidedAt) };
-    if (p.action === "SUPERSEDE") return (await supersedeClientFact(actor, p.targetId!, input)).id;
+    if (p.action === "SUPERSEDE") {
+      // A new version is of the same kind (client-facts.ts). Another kind
+      // is not: an open question meets its answer, anything else enters
+      // as an item of its own (28.10.2026, NUX: a note that answered the
+      // question on US vacations failed on approve).
+      const old = await prisma.clientFact.findUnique({ where: { id: p.targetId! }, select: { kind: true, answeredAt: true } });
+      if (old && old.kind !== f.kind) {
+        if (isQuestion(old.kind) && !old.answeredAt) return (await answerClientQuestion(actor, p.targetId!, { answer: f.body, sources })).id;
+        return (await addClientFact(actor, { ...input, clientId: p.clientId })).id;
+      }
+      return (await supersedeClientFact(actor, p.targetId!, input)).id;
+    }
     if (p.action === "CONTRADICT") return (await recordContradiction(actor, p.targetId!, { value: f.body, sources })).id;
     return (await addClientFact(actor, { ...input, clientId: p.clientId })).id;
   }

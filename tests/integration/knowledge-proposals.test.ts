@@ -133,6 +133,33 @@ describe("knowledge proposals", () => {
     expect(after.alternatives).toEqual([expect.objectContaining({ value: "הבנק בישראל: הפועלים", sources: [{ code: "S2", at: "21:30" }] })]);
   });
 
+  it("a new version of another kind answers an open question, or enters as a new item", async () => {
+    const { client, user } = await setup();
+    await addClientSource(user, { clientId: client.id, kind: "PERSON", title: "x" }); // S1
+    const question = await addClientFact(user, { clientId: client.id, kind: "QUESTION", body: "ימי חופש לעובדים בארה\"ב: מה המדיניות?", sources: [{ code: "S1" }] });
+    const pref = await addClientFact(user, { clientId: client.id, kind: "PREFERENCE", body: "WhatsApp קודם", sources: [{ code: "S1" }] });
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING, // S2
+      items: [
+        { target: "FACT", reason: "נאמר בפגישה", action: "SUPERSEDE", targetId: question.id, payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "Unlimited Vacation, עם דיווח מראש" }, at: "91:32" },
+        { target: "FACT", reason: "נאמר בפגישה", action: "SUPERSEDE", targetId: pref.id, payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "Slack לעניינים דחופים" }, at: "10:00" },
+      ],
+    });
+    const [answer, note] = (await listOpenBatches(user)).find((b) => b.id === r.batchId)!.proposals;
+    expect(answer.flags).toEqual(expect.arrayContaining([expect.objectContaining({ code: "KIND", message: expect.stringContaining("תשובה") })]));
+    expect(note.flags).toEqual(expect.arrayContaining([expect.objectContaining({ code: "KIND", message: expect.stringContaining("פריט חדש") })]));
+
+    expect((await approveProposal(user, answer.id)).resultId).toBe(question.id);
+    const answered = await prisma.clientFact.findUniqueOrThrow({ where: { id: question.id } });
+    expect(answered).toMatchObject({ kind: "QUESTION", answer: "Unlimited Vacation, עם דיווח מראש", knowledgeStatus: "CONFIRMED" });
+    expect(answered.answeredAt).not.toBeNull();
+
+    const added = await prisma.clientFact.findUniqueOrThrow({ where: { id: (await approveProposal(user, note.id)).resultId! } });
+    expect(added).toMatchObject({ kind: "NOTE", body: "Slack לעניינים דחופים" });
+    expect((await prisma.clientFact.findUniqueOrThrow({ where: { id: pref.id } })).knowledgeStatus).not.toBe("SUPERSEDED");
+  });
+
   it("flags what is already in the file, and a rejection needs a reason", async () => {
     const { client, user } = await setup();
     await addClientSource(user, { clientId: client.id, kind: "PERSON", title: "x" });
