@@ -24,6 +24,21 @@ import type { Prisma } from "@prisma/client";
 /// no title, no content, and not even which level carries the mark.
 export const AI_EXCLUDED_MESSAGE = "הפריט מסומן \"בלי AI\" ומטופל בידי אדם בלבד.";
 
+/// The same answer for an MCP tool, in the language the tool messages are
+/// written in. It tells the model what to do next, not what the item is.
+export const AI_EXCLUDED_TOOL_MESSAGE =
+  'This is marked "בלי AI" (no AI) at the client\'s request: a person handles it, and it is not available through this connection. Do not work on it here. Tell the user to handle it in the Ankora app.';
+
+/// Thrown by a domain function asked for something marked "בלי AI" on
+/// behalf of an AI-facing reader. Named so lib/mcp/errors.ts can turn it
+/// into AI_EXCLUDED_TOOL_MESSAGE rather than a generic server error.
+export class AiExcludedError extends Error {
+  constructor() {
+    super(AI_EXCLUDED_TOOL_MESSAGE);
+    this.name = "AiExcludedError";
+  }
+}
+
 /// Refused when someone without client.manage tries to clear a mark.
 export const AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE =
   "רק מנהל יכול להסיר סימון \"בלי AI\". הסרה שולחת את החומר חזרה למערכות AI, ולכן היא החלטה של מנהל.";

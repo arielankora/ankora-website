@@ -28,6 +28,8 @@ const drive = vi.hoisted(() => ({ clientDocumentsFolder: vi.fn(() => "folder"), 
 const audit = vi.hoisted(() => ({ recordAudit: vi.fn() }));
 const clients = vi.hoisted(() => ({ listAccessibleClients: vi.fn(async () => [{ id: "c-nux" }]) }));
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/prisma", () => ({
   prisma: { mcpFileTicket: db.ticket, user: db.user, clientDocument: db.clientDocument, task: db.task },
 }));

@@ -91,7 +91,8 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     channel: s.channel,
   });
   const runs = await prisma.task.findMany({
-    where: { processId: p.id, parentId: null, deletedAt: null },
+    // 28.10.2026: a run marked "בלי AI" is not listed to Claude.
+    where: { processId: p.id, parentId: null, deletedAt: null, aiExcluded: false },
     orderBy: { createdAt: "desc" },
     take: 5,
     select: { id: true, title: true, status: true, dueDate: true },

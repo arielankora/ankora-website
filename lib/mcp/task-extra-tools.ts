@@ -1,4 +1,5 @@
 import "server-only";
+import { aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import type { User } from "@prisma/client";
@@ -680,7 +681,10 @@ export function registerTaskExtraTools(server: McpServer): void {
         const actor = actorOf(ctx);
         const client = await lookupClient(actor, args.client);
         if (!client.ok) return toolText(client.message);
-        const all = await listDecisionsForClient(actor, client.value.id);
+        // 28.10.2026: a decision about a "בלי AI" task is about the material.
+        const listed = await listDecisionsForClient(actor, client.value.id);
+        const marked = await aiExcludedTaskIds(listed.flatMap((d) => (d.taskId ? [d.taskId] : [])));
+        const all = listed.filter((d) => !d.taskId || !marked.has(d.taskId));
         const shown = args.includeClosed ? all : all.filter((d) => d.status === "OPEN");
         return toolJson({
           client: client.value.name,

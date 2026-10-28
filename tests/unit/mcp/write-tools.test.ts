@@ -77,6 +77,8 @@ const tasks = vi.hoisted(() => ({
 
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
 
+// 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
+vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
 vi.mock("@/lib/app-domain/time-entries", () => domain);
 vi.mock("@/lib/app-domain/tasks", () => tasks);
 vi.mock("@/lib/mcp/lookup", () => lookup);

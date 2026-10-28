@@ -17,7 +17,7 @@ import { findTemplate } from "@/lib/app-domain/sop-templates";
 import { notifyTaskPeople } from "@/lib/app-domain/notifications";
 import { alertIfUrgentComment, alertIfUrgentLanded } from "@/lib/app-domain/urgent-tasks";
 import { isMappingTask } from "@/lib/procedure-to-file";
-import { AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE } from "@/lib/ai-exclusion";
+import { AI_ALLOWED_TASK_WHERE, AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE } from "@/lib/ai-exclusion";
 
 // Phase 9 gap-fix (docs/adr/0001 section 17.2): spec section 11's
 // dedicated "Tasks" screen - open/recent tasks, filterable by client/
@@ -103,6 +103,10 @@ const ALL_ROLES: UserRole[] = ["SUPER_ADMIN", "ANKORA_ADMIN", "ANKORA_EMPLOYEE",
 const MANAGING_ROLES: UserRole[] = ALL_ROLES.filter(canManageClients);
 
 export type TaskFilters = {
+  /// 28.10.2026: for an AI-facing reader (the MCP tools). Leaves out
+  /// everything marked "בלי AI": the task, a step under a marked task, and
+  /// every task of a marked client. See lib/ai-exclusion.ts.
+  forAi?: boolean;
   clientId?: string;
   categoryId?: string;
   status?: TaskStatus;
@@ -252,6 +256,7 @@ export async function listTasks(actor: User, filters: TaskFilters = {}) {
       // pill stays inside that pill, and "שלי" narrows a search rather
       // than widening it. Two ORs cannot share one key, hence the array.
       AND: [
+        ...(filters.forAi ? [AI_ALLOWED_TASK_WHERE] : []),
         ...(search ? [{ OR: searchWhere(search) }] : []),
         ...(filters.involvedUserId
           ? [{ OR: [{ assignedToId: filters.involvedUserId }, { supervisorId: filters.involvedUserId }] }]

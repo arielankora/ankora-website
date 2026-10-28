@@ -1,4 +1,6 @@
 import "server-only";
+import { AI_ALLOWED_DOCUMENT_WHERE, AiExcludedError } from "@/lib/ai-exclusion";
+import { isDocumentAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
 import type { ClientDocumentKind, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -210,6 +212,8 @@ export async function listDocumentsForMcp(actor: User, where: { clientId?: strin
       deletedAt: null,
       clientId: where.clientId ?? { in: [...ids] },
       ...(where.taskId ? { taskId: where.taskId } : {}),
+      // 28.10.2026: nothing marked "בלי AI" is listed to Claude.
+      AND: [AI_ALLOWED_DOCUMENT_WHERE],
     },
     orderBy: { createdAt: "desc" },
     take: 100,
@@ -226,6 +230,9 @@ export async function findDocumentForMcp(actor: User, documentId: string): Promi
   const doc = await prisma.clientDocument.findFirst({ where: { id, deletedAt: null }, select: DOC_SELECT });
   if (!doc) return null;
   if (!(await accessibleClientIds(actor)).has(doc.clientId)) return null;
+  // 28.10.2026: after the access check, so a document the person cannot
+  // see still reads as not found.
+  if (await isDocumentAiExcluded(doc.id)) throw new AiExcludedError();
   return doc;
 }
 
