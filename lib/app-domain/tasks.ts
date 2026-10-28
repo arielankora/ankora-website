@@ -1615,6 +1615,8 @@ export type TaskThreadEntry =
       /// somebody chose to share or not, and that choice should not be
       /// invisible to the next person.
       clientVisible: boolean;
+      /// 28.10.2026: the document's own "בלי AI" mark.
+      aiExcluded: boolean;
     };
 
 /// Field names as a person would say them. Only the fields worth naming
@@ -1921,6 +1923,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
         mimeType: true,
         sizeBytes: true,
         clientVisible: true,
+        aiExcluded: true,
         createdAt: true,
         uploadedBy: { select: { name: true } },
       },
@@ -1992,6 +1995,7 @@ export async function getTaskDetail(actor: User, taskId: string) {
       mimeType: f.mimeType,
       sizeBytes: f.sizeBytes,
       clientVisible: f.clientVisible,
+      aiExcluded: f.aiExcluded,
     })),
   ].sort((a, b) => b.at.getTime() - a.at.getTime());
 

@@ -160,6 +160,8 @@ export default async function TaskDetailPage(props: {
   // lessons instead.
   const advanceMode = isClosed ? ("lessons" as const) : ("plan" as const);
   const advancePrompt = isStep ? null : await advancePromptFor(user, detail, currentPlan, advanceMode);
+  // 28.10.2026: "בלי AI". No prompt was built; say so where the button was.
+  const aiExcluded = taskAiExclusion(task) !== null;
 
   // Learning from runs (spec 5.4): a closed run asks once about its
   // procedure.
@@ -274,7 +276,7 @@ export default async function TaskDetailPage(props: {
           the record below them. Nothing here sends by itself: it opens a
           draft, and a person presses send. See
           claude/client-communication-rule-2026-09-25.md. */}
-      {(composer || advancePrompt) && (
+      {(composer || advancePrompt || (aiExcluded && !isStep)) && (
         <div className="flex flex-wrap items-start gap-2">
           {composer && (
             <MessageClient
@@ -288,6 +290,11 @@ export default async function TaskDetailPage(props: {
           )}
           {advancePrompt && (
             <AdvanceWithClaude taskId={task.id} prompt={advancePrompt} hasPlan={currentPlan !== null} mode={advanceMode} />
+          )}
+          {aiExcluded && !isStep && (
+            <p className="rounded-full border border-app-border bg-app-surface-sunken px-3 py-1.5 text-[13px] text-app-text-secondary">
+              בלי AI: אין &quot;קדם עם קלוד&quot; במשימה הזו. היא מטופלת בידי אדם בלבד.
+            </p>
           )}
           {!isStep && !isClosed && !currentPlan && <NewPlanEditor taskId={task.id} />}
         </div>

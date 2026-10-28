@@ -4,6 +4,7 @@ import { can } from "@/lib/app-auth/permissions";
 import { runReport, REPORT_DEFINITIONS, type ReportColumn, type ReportType } from "@/lib/app-domain/reports";
 import { formatReportCell } from "@/lib/report-cell";
 import { listTimeEntriesForAdmin } from "@/lib/app-domain/time-entries";
+import { prisma } from "@/lib/prisma";
 import { listClients } from "@/lib/app-domain/clients";
 import { listCategories } from "@/lib/app-domain/categories";
 import { listUsers } from "@/lib/app-domain/users";
@@ -133,8 +134,19 @@ export default async function AdminReportsPage(
     let promptText: string | null = null;
     let filename = "";
 
-    if (client) {
+    // 28.10.2026: "בלי AI". A marked client gets no prompt at all; on any
+    // other client, an entry on a marked task keeps its hours and loses
+    // its title and note, which are the material the client asked to keep
+    // away from AI.
+    if (client && !client.aiExcluded) {
       const entries = await listTimeEntriesForAdmin({ clientId: client.id, from, to });
+      const parentIds = [...new Set(entries.flatMap((e) => (e.task?.parentId ? [e.task.parentId] : [])))];
+      const markedParents = new Set(
+        parentIds.length > 0
+          ? (await prisma.task.findMany({ where: { id: { in: parentIds }, aiExcluded: true }, select: { id: true } })).map((t) => t.id)
+          : []
+      );
+      const hidden = (e: (typeof entries)[number]) => !!e.task && (e.task.aiExcluded || (!!e.task.parentId && markedParents.has(e.task.parentId)));
 
       const totalSeconds = entries.reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
 
@@ -144,11 +156,11 @@ export default async function AdminReportsPage(
         categoryName: e.category.name,
         durationLabel: formatDuration(e.actualSeconds),
         sourceLabel: formatSource(e.source),
-        note: e.note,
+        note: hidden(e) ? null : e.note,
         // What the client would call it, as the portal already does
         // (client-portal.ts): clientTitle when set, the title otherwise.
-        taskTitle: e.task ? e.task.clientTitle?.trim() || e.task.title : null,
-        taskInternalTitle: e.task?.title ?? null,
+        taskTitle: hidden(e) ? "משימה בלי AI" : e.task ? e.task.clientTitle?.trim() || e.task.title : null,
+        taskInternalTitle: hidden(e) ? null : (e.task?.title ?? null),
         isEdited: e.isEdited,
       }));
 
@@ -188,6 +200,12 @@ export default async function AdminReportsPage(
           )}
 
           {client && promptText && <ClientSummaryView text={promptText} filename={filename} />}
+
+          {client?.aiExcluded && (
+            <div className="rounded-2xl border border-app-border bg-white px-5 py-8 text-center text-sm text-app-text-secondary">
+              בלי AI: הלקוח ביקש ששום דבר שלו לא יעבור דרך AI, ולכן אין כאן תקציר להדבקה.
+            </div>
+          )}
         </div>
       </>
     );
