@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Eye, EyeOff, Hourglass, Pause, Play, ShieldCheck, Undo2 } from "lucide-react";
+import { CheckCircle2, Clock, Eye, EyeOff, Hourglass, Pause, Play, Share2, ShieldCheck, Undo2 } from "lucide-react";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { formatDuration } from "@/lib/time-entry-format";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -12,6 +12,8 @@ import {
   stopTimerForTaskAction,
   updateTaskDetailAction,
 } from "./actions";
+import { TaskManualEntry } from "./TaskManualEntry";
+import { TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
 import { AI_EXCLUSION_SOURCE_LABEL, type AiExclusionSource } from "@/lib/ai-exclusion";
 
@@ -88,6 +90,8 @@ export type TaskDetailData = {
 export function TaskDetail({
   task,
   people,
+  shareWith = [],
+  taskUrl = "",
   categories,
   activeTimers,
   canApprove,
@@ -97,6 +101,11 @@ export function TaskDetail({
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
+  /// The same people, with the WhatsApp number from their profile, for
+  /// "שיתוף". Separate from `people` so the pickers never carry it.
+  shareWith?: SharePerson[];
+  /// The task's absolute address, for a message that leaves the app.
+  taskUrl?: string;
   categories: { id: string; name: string }[];
   activeTimers: TaskActiveTimer[];
   /// Whether this person may sign this task off. Decided on the server,
@@ -112,6 +121,9 @@ export function TaskDetail({
 }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
+  /// Which of the two panels under the header is open, if either:
+  /// "דיווח ידני" or "שיתוף" (28.10.2026). One at a time.
+  const [panel, setPanel] = useState<"entry" | "share" | null>(null);
 
   const [title, setTitle] = useState(task.title);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -254,7 +266,30 @@ export function TaskDetail({
               already added up to were at the bottom of the screen. The
               total sits under the button and links to the breakdown. */}
           <div className="flex shrink-0 flex-col items-end gap-1.5">
-            <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
+            {/* 28.10.2026: beside the timer, the two other things a person
+                does with a task they are holding: report time the timer
+                missed, and tell someone about it. */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <button
+                type="button"
+                aria-expanded={panel === "share"}
+                onClick={() => setPanel(panel === "share" ? null : "share")}
+                className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
+              >
+                <Share2 size={15} />
+                שיתוף
+              </button>
+              <button
+                type="button"
+                aria-expanded={panel === "entry"}
+                onClick={() => setPanel(panel === "entry" ? null : "entry")}
+                className="flex items-center gap-2 rounded-full border border-app-border bg-white px-4 py-2 text-[13.5px] font-medium text-app-text-primary hover:border-app-border-strong"
+              >
+                <Clock size={15} />
+                דיווח ידני
+              </button>
+              <TimerButton task={task} activeTimers={activeTimers} disabled={pending} />
+            </div>
             <a
               href="#task-time"
               data-testid="task-reported-total"
@@ -270,6 +305,25 @@ export function TaskDetail({
             </a>
           </div>
         </div>
+
+        {panel === "entry" && (
+          <TaskManualEntry taskId={task.id} taskTitle={title} onDone={() => setPanel(null)} />
+        )}
+        {panel === "share" && (
+          <TaskShare
+            task={{
+              title,
+              clientName: task.clientName,
+              statusLabel: STATUS_LABELS[status],
+              dueDate: task.dueDate,
+              priorityLabel: priority === "HIGH" || priority === "URGENT" ? PRIORITY_LABELS[priority] : null,
+            }}
+            url={taskUrl}
+            people={shareWith}
+            defaultRecipientId={task.assignedToId && task.assignedToId !== viewerId ? task.assignedToId : null}
+            onDone={() => setPanel(null)}
+          />
+        )}
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
           <Select

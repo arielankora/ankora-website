@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createManualEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
+import { BackdateReasonField, OverlapNotice, todayKey } from "./ManualEntryParts";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -18,17 +19,6 @@ function SubmitButton({ pending }: { pending: boolean }) {
       {pending ? "שומר..." : "הוספת דיווח"}
     </button>
   );
-}
-
-function formatTimeRange(startIso: string, endIso: string | null): string {
-  const fmt = new Intl.DateTimeFormat("he-IL", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jerusalem" });
-  const start = fmt.format(new Date(startIso));
-  if (!endIso) return `${start} (טיימר פעיל)`;
-  return `${start}\u2013${fmt.format(new Date(endIso))}`;
-}
-
-function todayKey(): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
 }
 
 // App redesign (handoff README, screen 3 "הזמן שלי"): "הזנה בשורה אחת -
@@ -161,41 +151,9 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
         <SubmitButton pending={pending} />
       </div>
 
-      {isBackdated && (
-        <div className="mt-3 flex items-center gap-2.5 rounded-[10px] border border-gold/35 bg-gold/8 px-3 py-2.5">
-          <span className="shrink-0 text-[12.5px] text-app-text-accent">דיווח ליום קודם - נדרשת סיבה</span>
-          <input
-            name="backdateReason"
-            required
-            placeholder="למשל: נשכח לדווח בזמן"
-            className="flex-1 rounded-lg border border-app-border-strong bg-white px-2.5 py-2 text-[13px] text-app-text-primary outline-none focus:border-gold"
-          />
-        </div>
-      )}
+      {isBackdated && <BackdateReasonField />}
       {result?.overlapWarning && !warningDismissed && (
-        <div className="mt-3 rounded-[10px] border border-app-warning/35 bg-app-warning-soft px-3 py-2.5 text-[12.5px] text-app-warning">
-          <p>
-            קיים כבר דיווח בשעה זו עבור {result.overlapWarning.clientName} (
-            {formatTimeRange(result.overlapWarning.startAt, result.overlapWarning.endAt)}). דיווח מקביל אפשרי
-            רק כשמדובר בלקוחות שונים - אם אכן כך, אפשר לשמור בכל זאת.
-          </p>
-          <div className="mt-2 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={saveAnyway}
-              className="rounded-full border border-app-warning/45 px-3.5 py-1.5 text-[12px] font-medium text-app-warning hover:bg-app-warning-soft"
-            >
-              שמירה בכל זאת
-            </button>
-            <button
-              type="button"
-              onClick={() => setWarningDismissed(true)}
-              className="text-[12px] text-app-text-secondary hover:text-app-text-primary"
-            >
-              ביטול
-            </button>
-          </div>
-        </div>
+        <OverlapNotice warning={result.overlapWarning} onSaveAnyway={saveAnyway} onDismiss={() => setWarningDismissed(true)} />
       )}
       {result?.error && (
         <p className="mt-3 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-[12.5px] text-app-error">

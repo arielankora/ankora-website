@@ -95,6 +95,30 @@ export async function updateOwnName(actor: User, name: string): Promise<void> {
   });
 }
 
+/// 28.10.2026: the number "שיתוף" on a task opens WhatsApp with. Empty
+/// clears it. Kept as typed, the way Client.whatsappNumber is, and only
+/// checked for being a number at all: lib/whatsapp.ts already turns every
+/// Israeli spelling of one into the same wa.me link.
+export async function updateOwnWhatsappNumber(actor: User, raw: string): Promise<void> {
+  const trimmed = raw.trim();
+  if (trimmed) {
+    if (!/^[+\d\s()-]+$/.test(trimmed)) throw new Error("מספר הוואטסאפ יכול להכיל רק ספרות, רווחים, מקפים ו-+.");
+    const digits = trimmed.replace(/\D/g, "").length;
+    if (digits < 9 || digits > 15) throw new Error("מספר הוואטסאפ לא נראה תקין.");
+  }
+  const next = trimmed || null;
+
+  await prisma.user.update({ where: { id: actor.id }, data: { whatsappNumber: next } });
+  await recordAudit({
+    actorId: actor.id,
+    action: "profile.whatsapp_update",
+    entityType: "User",
+    entityId: actor.id,
+    before: { whatsappNumber: actor.whatsappNumber },
+    after: { whatsappNumber: next },
+  });
+}
+
 /// App redesign, Profile screen (screen 18): backs the prototype's
 /// "עודכנה לפני X" password-last-changed line with a real value instead of
 /// the prototype's fabricated "לפני 3 חודשים" example text. There's no
