@@ -481,7 +481,8 @@ export async function lookupContact(actor: User, query: string) {
   const managerOf = new Map(accessible.map((c) => [c.id, c.accountManagerId]));
   const viewer = { id: actor.id, isManager: canManageClients(actor.role) };
   const links = await prisma.clientContact.findMany({
-    where: { personId: person.id, deletedAt: null, clientId: { in: accessible.map((c) => c.id) }, sensitivity: "NORMAL" },
+    // 28.10.2026: the answer goes to Claude, so a "בלי AI" client is not in it.
+    where: { personId: person.id, deletedAt: null, clientId: { in: accessible.map((c) => c.id) }, sensitivity: "NORMAL", client: { aiExcluded: false } },
     include: { client: { select: { name: true } } },
   });
   return links

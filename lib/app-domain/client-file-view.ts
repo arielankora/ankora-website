@@ -1,4 +1,5 @@
 import "server-only";
+import { AI_ALLOWED_TASK_WHERE, AiExcludedError } from "@/lib/ai-exclusion";
 import { readinessLabel } from "@/lib/process-readiness";
 import { prisma } from "@/lib/prisma";
 import { RECEIPT_LABEL } from "@/lib/date-receipt";
@@ -85,7 +86,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
   const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, openLessons, batches] = await Promise.all([
-    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true } }),
+    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true, aiExcluded: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
     listClientFacts(actor, clientId),
@@ -107,7 +108,8 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
     daysSinceLastBatch(clientId),
     // Section 7.2: suppliers named on the client's tasks (decision 2).
     prisma.task.findMany({
-      where: { clientId, deletedAt: null, parentId: null, supplierName: { not: null } },
+      // 28.10.2026: the title of a "בלי AI" task is not written for AI.
+      where: { clientId, deletedAt: null, parentId: null, supplierName: { not: null }, ...(ai ? AI_ALLOWED_TASK_WHERE : {}) },
       orderBy: { createdAt: "desc" },
       take: 200,
       select: { title: true, supplierName: true, supplierExperience: true, supplierRecordedAt: true, createdAt: true },
@@ -122,6 +124,10 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       select: { createdAt: true, via: true, note: true, sourceId: true, proposals: { select: { state: true } } },
     }),
   ]);
+  // 28.10.2026: nothing of a "בלי AI" client is written for AI. The MCP
+  // tools refuse such a client before they get here; this holds for any
+  // other caller that asks for the AI version.
+  if (ai && client.aiExcluded) throw new AiExcludedError();
   const ownerIds = [...new Set([...processes.flatMap((p) => [p.ownerId, p.backupOwnerId, p.approverUserId]), ...facts.current.map((f) => f.assigneeId)].filter((x): x is string => !!x))];
   const ownerName = new Map((await prisma.user.findMany({ where: { id: { in: ownerIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
   const narrative = (kind: string) => narratives.find((n) => n.kind === kind)?.current?.body ?? null;

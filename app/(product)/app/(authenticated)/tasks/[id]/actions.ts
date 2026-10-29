@@ -86,11 +86,14 @@ export async function updateTaskDetailAction(input: {
   block?: { on: TaskBlocker; reason?: string | null } | null;
   /// 20.10.2026: see Task.mappingTask.
   mappingTask?: boolean;
+  /// 28.10.2026: see Task.aiExcluded.
+  aiExcluded?: boolean;
 }) {
   const user = await requireUser();
   try {
     const updated = await updateTask(user, input.taskId, {
       mappingTask: input.mappingTask,
+      aiExcluded: input.aiExcluded,
       title: input.title,
       description: input.description,
       priority: input.priority,

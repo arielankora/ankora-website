@@ -439,6 +439,7 @@ const legal: LegalContent = {
             "**Ankora does not train models on the client's data.** Neither its own models nor those of others. Ankora's engagement with its AI providers prohibits the provider from training models on data that passes through it.",
             "A decision made towards the client or towards a third party is always made by a person. The data passed to the AI systems is limited to what the task requires.",
             "Access credentials for the client's systems are never passed to AI systems.",
+            "**The client may ask that a task, a document, or all of its data not be worked on with AI.** The request is marked in Ankora's system. From the moment it is marked, the marked data is not fed into the AI tools Ankora works with and is handled by a person only. Calls continue to be recorded and transcribed as described in the privacy policy, section 5. The mark does not apply to data processed with AI before it was recorded.",
           ],
         },
         {

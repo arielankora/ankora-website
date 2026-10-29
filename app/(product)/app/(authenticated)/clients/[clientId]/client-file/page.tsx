@@ -48,7 +48,7 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
   const { clientId } = await props.params;
   const user = await requireUser();
   let doc;
-  let extractPrompt: string;
+  let extractPrompt: string | null;
   try {
     [doc, extractPrompt] = await Promise.all([buildClientFile(user, clientId, { audience: "staff" }), extractPromptFor(user, clientId)]);
   } catch (err) {
@@ -78,7 +78,11 @@ export default async function ClientFilePage(props: { params: Promise<{ clientId
         )}
         <p className="mt-2 text-xs leading-relaxed text-app-text-secondary">{HOW_TO_READ}</p>
         <div className="mt-3">
-          <ExtractWithClaude prompt={extractPrompt} />
+          {extractPrompt ? (
+            <ExtractWithClaude prompt={extractPrompt} />
+          ) : (
+            <p className="text-xs text-app-text-secondary">בלי AI: הלקוח ביקש ששום דבר שלו לא יעבור דרך AI, ולכן אין חילוץ עם קלוד.</p>
+          )}
         </div>
       </div>
 

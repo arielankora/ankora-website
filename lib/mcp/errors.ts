@@ -14,6 +14,7 @@
 // tests/unit/mcp/errors.test.ts run it directly. It also survives the
 // class being re-exported or wrapped somewhere in between, which
 // `instanceof` does not.
+import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 
 export type McpToolError = {
   /// Sent back to the model. Says what went wrong AND what to try next.
@@ -57,6 +58,11 @@ const KNOWN: Record<string, McpToolError> = {
     message:
       "The user already has the maximum number of timers running. Call get_active_timer to see them, then ask the user which one to stop with stop_timer (pass its client) before starting another.",
     recoverable: true,
+  },
+  // 28.10.2026: see lib/ai-exclusion.ts.
+  AiExcludedError: {
+    message: AI_EXCLUDED_TOOL_MESSAGE,
+    recoverable: false,
   },
   ParallelTimerConfirmationRequiredError: {
     message:

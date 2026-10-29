@@ -1,4 +1,5 @@
 import "server-only";
+import { aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
 import { z } from "zod";
 import type { McpServer, ServerContext } from "@modelcontextprotocol/server";
 import type { User } from "@prisma/client";
@@ -105,6 +106,29 @@ function noonOf(date: string): Date {
   return localDateTimeToUtc(date, "12:00");
 }
 
+/// 28.10.2026: "בלי AI". A client who asked that nothing of theirs pass
+/// through AI gets no answers through this connector either: it is an AI
+/// reading their data, whoever connected it. Null when the client is not
+/// marked.
+async function portalAiBlocked(actor: User): Promise<string | null> {
+  const { client } = await resolvePortalClient(actor);
+  return client.aiExcluded
+    ? 'This account is marked "בלי AI": at the client\'s own request, nothing of theirs is available through an AI connection. Tell the user to use the Ankora portal in the browser, or to ask their operations manager.'
+    : null;
+}
+
+/// The promises an AI may read: none of a task marked "בלי AI".
+async function aiVisible(promises: PortalPromise[]): Promise<PortalPromise[]> {
+  const marked = await aiExcludedTaskIds(promises.map((p) => p.id));
+  return promises.filter((p) => !marked.has(p.id));
+}
+
+/// The decisions an AI may read: none about a task marked "בלי AI".
+async function aiVisibleDecisions<T extends { taskId: string | null }>(decisions: T[]): Promise<T[]> {
+  const marked = await aiExcludedTaskIds(decisions.flatMap((d) => (d.taskId ? [d.taskId] : [])));
+  return decisions.filter((d) => !d.taskId || !marked.has(d.taskId));
+}
+
 export function registerPortalTools(server: McpServer): void {
   server.registerTool(
     "get_status",
@@ -119,15 +143,17 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
         const tz = actor.timezone;
         const [home, counts] = await Promise.all([getPortalHome(actor), getPortalProgress(actor)]);
         return toolJson({
           client: home.client.name,
           progress: progressOf(counts),
           decisionsWaitingForYou: home.openDecisions,
-          waitingForYou: home.waitingOnClient.map((p) => serializePromise(p, tz)),
-          inProgress: home.inProgress.map((p) => serializePromise(p, tz)),
-          recentlyDone: home.recentlyDone.map((p) => serializePromise(p, tz)),
+          waitingForYou: (await aiVisible(home.waitingOnClient)).map((p) => serializePromise(p, tz)),
+          inProgress: (await aiVisible(home.inProgress)).map((p) => serializePromise(p, tz)),
+          recentlyDone: (await aiVisible(home.recentlyDone)).map((p) => serializePromise(p, tz)),
           hourBank: home.cycle
             ? {
                 usedHours: minutesToHours(home.cycle.usedMinutes),
@@ -176,7 +202,10 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
-        const [{ client, promises }, counts] = await Promise.all([getPortalTimeline(actor), getPortalProgress(actor)]);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
+        const [{ client, promises: all }, counts] = await Promise.all([getPortalTimeline(actor), getPortalProgress(actor)]);
+        const promises = await aiVisible(all);
         const q = args.search?.trim().toLowerCase();
         const shown = promises
           .filter((p) => !args.stage || p.stage === args.stage)
@@ -187,7 +216,7 @@ export function registerPortalTools(server: McpServer): void {
           count: shown.length,
           // The stream is bounded (TIMELINE_TAKE); say so rather than let
           // the model present a partial list as the whole of it.
-          listTruncated: promises.length < counts.total,
+          listTruncated: all.length < counts.total,
           tasks: shown.map((p) => serializePromise(p, actor.timezone)),
         });
       } catch (err) {
@@ -212,7 +241,10 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
-        const { open, closed } = await getPortalDecisions(actor);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
+        const decisions = await getPortalDecisions(actor);
+        const [open, closed] = await Promise.all([aiVisibleDecisions(decisions.open), aiVisibleDecisions(decisions.closed)]);
         const tz = actor.timezone;
         return toolJson({
           open: open.map((d) => serializeDecision(d, tz)),
@@ -241,6 +273,8 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
 
         // Said here, in words, before the domain's ForbiddenError would
         // say it as a generic refusal.
@@ -251,7 +285,7 @@ export function registerPortalTools(server: McpServer): void {
           );
         }
 
-        const { open } = await getPortalDecisions(actor);
+        const open = await aiVisibleDecisions((await getPortalDecisions(actor)).open);
         const candidates = open.map((d) => ({ id: d.id, name: d.question, view: d }));
         if (candidates.length === 0) return toolText("There are no open decisions to answer.");
         const decision = resolveByName(args.decision, candidates);
@@ -290,7 +324,9 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
-        const w = await getWeeklyActivity(actor, args.weekOf ? noonOf(args.weekOf) : undefined);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
+        const w = await getWeeklyActivity(actor, args.weekOf ? noonOf(args.weekOf) : undefined, { forAi: true });
         const tz = actor.timezone;
         return toolJson({
           from: day(w.from, tz),
@@ -323,8 +359,10 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
         const anchor = args.month ? noonOf(`${args.month}-01`) : undefined;
-        const monthly = await getMonthlyDetailed(actor, anchor);
+        const monthly = await getMonthlyDetailed(actor, anchor, { forAi: true });
         const [categories, summaries] = await Promise.all([
           getCategorySummary(actor, monthly.from, monthly.to),
           getApprovedSummaries(actor),
@@ -365,6 +403,8 @@ export function registerPortalTools(server: McpServer): void {
       try {
         const actor = portalActor(ctx);
         if (!actor) return toolText(STAFF_ON_PORTAL_MESSAGE);
+        const blocked = await portalAiBlocked(actor);
+        if (blocked) return toolText(blocked);
         const [dash, history] = await Promise.all([getPortalDashboard(actor), getPortalHistory(actor)]);
         const tz = actor.timezone;
         const u = dash.snapshot?.utilization;

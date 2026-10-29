@@ -113,6 +113,21 @@ export function EditClientForm({
         </span>
       </label>
 
+      <label className="flex items-start gap-3 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="aiExcluded"
+          defaultChecked={client.aiExcluded}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
+        />
+        <span>
+          <span className="block text-sm text-app-text-primary">בלי AI</span>
+          <span className="block text-[11px] text-app-text-tertiary">
+            הלקוח ביקש ששום דבר שלו לא יעבור דרך מערכות AI: משימות, מסמכים ותיק הלקוח. הכול מטופל בידי אדם.
+          </span>
+        </span>
+      </label>
+
       {/* Portal phase 2. Three fields that only matter because of the
           portal, grouped so they read as one subject rather than as more
           client settings. */}

@@ -52,6 +52,9 @@ export interface DecisionView {
   options: DecisionOptionView[];
   /// The promise this decision blocks, in the client's words.
   taskTitle: string | null;
+  /// 28.10.2026: so an AI-facing reader can leave out a decision about a
+  /// task marked "בלי AI".
+  taskId: string | null;
   answer: {
     optionLabel: string;
     amountMinor: number | null;
@@ -72,7 +75,7 @@ function toView(decision: {
   status: string;
   createdAt: Date;
   options: DecisionOptionView[];
-  task: { title: string; clientTitle: string | null } | null;
+  task: { id: string; title: string; clientTitle: string | null } | null;
   response: { optionLabelSnapshot: string; amountMinorSnapshot: number | null; respondedAt: Date; respondedBy: { name: string } } | null;
 }): DecisionView {
   const ceiling = decision.ceilingMinorAtCreation;
@@ -88,6 +91,7 @@ function toView(decision: {
     createdAt: decision.createdAt,
     options: decision.options,
     taskTitle: decision.task ? decision.task.clientTitle?.trim() || decision.task.title : null,
+    taskId: decision.task?.id ?? null,
     answer: decision.response
       ? {
           optionLabel: decision.response.optionLabelSnapshot,
@@ -104,7 +108,7 @@ const DECISION_INCLUDE = {
     select: { id: true, label: true, detail: true, amountMinor: true, recommended: true },
     orderBy: { position: "asc" as const },
   },
-  task: { select: { title: true, clientTitle: true } },
+  task: { select: { id: true, title: true, clientTitle: true } },
   response: {
     select: {
       optionLabelSnapshot: true,

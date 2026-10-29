@@ -15,6 +15,7 @@ import {
 import { TaskManualEntry } from "./TaskManualEntry";
 import { TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
+import { AI_EXCLUSION_SOURCE_LABEL, type AiExclusionSource } from "@/lib/ai-exclusion";
 
 // Mirrors the label maps in lib/app-domain/tasks.ts. Duplicated rather
 // than imported for the same reason TaskRow duplicates its own: that
@@ -67,6 +68,11 @@ export type TaskDetailData = {
   /// 20.10.2026: a mapping task (Task.mappingTask). Null on a step, which
   /// has no toggle.
   mappingTask: boolean | null;
+  /// 28.10.2026: the task's own "בלי AI" mark (Task.aiExcluded). Null on
+  /// a step, which inherits it and has no toggle.
+  aiExcluded: boolean | null;
+  /// Where the effective mark comes from, or null when there is none.
+  aiExclusionSource: AiExclusionSource | null;
   clientOutcome: string | null;
   /// Tasks phase 5. Null means nothing is holding this up.
   blockedOn: TaskBlocker | null;
@@ -89,6 +95,7 @@ export function TaskDetail({
   categories,
   activeTimers,
   canApprove,
+  canClearAiExclusion = false,
   leadComment = null,
   viewerId = null,
 }: {
@@ -104,6 +111,8 @@ export function TaskDetail({
   /// Whether this person may sign this task off. Decided on the server,
   /// where the rule lives.
   canApprove: boolean;
+  /// 28.10.2026: whether this person may clear "בלי AI" (a manager).
+  canClearAiExclusion?: boolean;
   /// The earliest comment, shown in place of an empty description.
   leadComment?: { author: string | null; body: string } | null;
   /// Who is looking. Only used to word the urgent toast: nobody is
@@ -127,6 +136,7 @@ export function TaskDetail({
   const [supervisorId, setSupervisorId] = useState(task.supervisorId ?? "");
   const [requiresApproval, setRequiresApproval] = useState(task.requiresApproval);
   const [mappingTask, setMappingTask] = useState(task.mappingTask);
+  const [aiExcluded, setAiExcluded] = useState(task.aiExcluded);
   /// The status the person is trying to reach, held while they are being
   /// asked for the outcome sentence first. Null when nothing is pending.
   ///
@@ -409,6 +419,39 @@ export function TaskDetail({
             />
             משימת מיפוי: הממצאים מוצעים לתיק הלקוח לפני הסגירה
           </label>
+        )}
+
+        {/* 28.10.2026: "בלי AI". Inherited from the client or the task
+            above, it is a fact here, not a toggle. */}
+        {task.aiExclusionSource === "CLIENT" || task.aiExclusionSource === "PARENT_TASK" ? (
+          <p className="mt-3 w-fit rounded-full border border-app-border bg-app-surface-sunken px-3 py-1.5 text-[13px] text-app-text-secondary">
+            בלי AI: {AI_EXCLUSION_SOURCE_LABEL[task.aiExclusionSource]}. מטופל בידי אדם בלבד.
+          </p>
+        ) : (
+          aiExcluded !== null && (
+            <label className="mt-3 flex w-fit items-center gap-2 rounded-full border border-app-border px-3 py-1.5 text-[13px] text-app-text-secondary">
+              <input
+                type="checkbox"
+                checked={aiExcluded}
+                disabled={pending || (aiExcluded && !canClearAiExclusion)}
+                onChange={async (e) => {
+                  const next = e.target.checked;
+                  setAiExcluded(next);
+                  const ok = await write(
+                    { aiExcluded: next },
+                    {
+                      title: next ? "המשימה סומנה בלי AI" : "הסימון בלי AI הוסר",
+                      description: next ? "המשימה, השלבים והמסמכים שלה לא יעברו דרך מערכות AI." : title,
+                    }
+                  );
+                  if (!ok) setAiExcluded(!next);
+                }}
+                className="h-3.5 w-3.5 accent-app-text-primary"
+              />
+              בלי AI: המשימה מטופלת בידי אדם בלבד
+              {aiExcluded && !canClearAiExclusion && <span className="text-app-text-tertiary">(רק מנהל יכול להסיר)</span>}
+            </label>
+          )
         )}
 
         <Timestamps task={task} />

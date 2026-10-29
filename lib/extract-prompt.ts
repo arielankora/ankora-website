@@ -89,6 +89,10 @@ export function buildExtractPrompt(input: ExtractPromptInput): string {
     input.focus
       ? `1. המקור: ${input.focus}. קרא אותו (Fireflies להקלטה, read_document למסמך בתיק).`
       : "1. שאל אותי מה המקור. אם זו הקלטה, חפש אותה ב-Fireflies לפי התאריך והכותרת והראה לי מה מצאת לפני שאתה קורא. אם זה מסמך, list_documents ו-read_document.",
+    // 28.10.2026: "בלי AI" in a recorded meeting. Written out rather than
+    // imported, this file being free of project imports; the same rule as
+    // NO_AI_MEETING_RULE in lib/ai-exclusion.ts.
+    '   פגישה שבכותרת שלה מופיע "[בלי AI]": לא פותחים אותה, לא מצטטים ממנה ולא מציעים ממנה ידע. עלה בה נושא שסומן "בלי AI", והוא מטופל בידי אדם.',
     "2. קרא את התיק הנוכחי עם get_client_file, כדי לא להציע מה שכבר שם. כל פריט שם מסתיים ב-(id: ...), וזה ה-targetId לעדכון שלו.",
     "3. הכן טיוטה: טבלה עם סוג הפריט, הטקסט, הסטטוס המוצע, הדקה והסיבה. סמן מה סותר או מחליף פריט קיים.",
     "   כלל שהלקוח קבע (מה מותר, מה אסור, מי מאשר, מה לא מספרים למי) הוא target POLICY. בכלל שמתיר משהו (סף, אישור) כתוב גם interimStatement: מה עושים עד שמנהל מאשר אותו.",

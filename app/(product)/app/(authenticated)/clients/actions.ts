@@ -11,6 +11,7 @@ import {
   removeClientDocument,
   setClientDocumentKind,
   setClientDocumentVisibility,
+  setClientDocumentAiExcluded,
   DriveNotConfiguredError,
 } from "@/lib/app-domain/client-documents";
 import {
@@ -75,6 +76,8 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       // A checkbox sends nothing when unchecked, and it is always on the
       // form, so absent means "not internal".
       isInternal: formData.get("isInternal") === "on",
+      // 28.10.2026: "בלי AI" for the whole client. Always on the form.
+      aiExcluded: formData.get("aiExcluded") === "on",
       // Org brain (spec 3.3). Always on the form.
       kind: formData.get("kind") === "PRIVATE" ? "PRIVATE" : "BUSINESS",
       industry: String(formData.get("industry") || "") || null,
@@ -236,6 +239,17 @@ export async function setClientDocumentVisibilityAction(documentId: string, clie
     const doc = await setClientDocumentVisibility(user, documentId, clientVisible);
     revalidatePath(`/app/clients/${doc.clientId}`);
     return { ok: true as const, clientVisible: doc.clientVisible };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function setClientDocumentAiExcludedAction(documentId: string, aiExcluded: boolean) {
+  const user = await requireUser();
+  try {
+    const doc = await setClientDocumentAiExcluded(user, documentId, aiExcluded);
+    revalidatePath(`/app/clients/${doc.clientId}`);
+    return { ok: true as const, aiExcluded: doc.aiExcluded };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

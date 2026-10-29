@@ -488,6 +488,10 @@ model Client {
   /// as a client that does not exist (9.10.2026, Ariel).
   isInternal Boolean @default(false)
 
+  /// 28.10.2026: nothing of this client passes through AI: its tasks, its
+  /// documents and its file. See Task.aiExcluded and lib/ai-exclusion.ts.
+  aiExcluded Boolean @default(false)
+
   /// Org brain (spec 3.3): a business or a private person, and in a few
   /// words what they do ("חברה, סטארטאפ AI"). One file template for both
   /// (decision 7); the kind says which sections a reader expects to see
@@ -811,6 +815,15 @@ model Task {
   /// first detected: a reworded description silently turned the check off.
   /// Existing tasks were marked from that line by the migration.
   mappingTask      Boolean          @default(false)
+
+  /// 28.10.2026: the client asked that this task stay away from AI. A
+  /// person handles it, and nothing AI-facing reads it: the "קדם עם קלוד"
+  /// prompt, the MCP tools, the extraction prompts. Set on a task only; a
+  /// step inherits its task's mark, a document inherits its task's, and
+  /// Client.aiExcluded covers everything of that client
+  /// (lib/ai-exclusion.ts). Any staff member may set it, only a manager
+  /// may clear it: clearing is the direction that sends material to AI.
+  aiExcluded       Boolean          @default(false)
 
   // Portal phase 1 ("הבטחות"). Three fields, and deliberately not a
   // second status column.
@@ -2313,6 +2326,10 @@ model ClientDocument {
   /// filing something means the client can have it. The toggle exists for
   /// the case where a document is prepared before it is ready to be seen.
   clientVisible Boolean @default(true)
+
+  /// 28.10.2026: this document stays away from AI. It is also excluded
+  /// when its task or its client is. See Task.aiExcluded.
+  aiExcluded Boolean @default(false)
 
   uploadedById String?
   createdAt    DateTime  @default(now())

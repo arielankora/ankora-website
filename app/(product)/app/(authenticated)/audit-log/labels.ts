@@ -170,6 +170,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "client_document.add": "צירוף מסמך לתיק הלקוח",
   "client_document.visibility": "שינוי חשיפת מסמך ללקוח",
   "client_document.kind": "שינוי סוג מסמך",
+  "client_document.ai_excluded": "מסמך סומן בלי AI",
+  "client_document.ai_included": "הסימון בלי AI הוסר ממסמך",
   "client_document.remove": "הסרת מסמך מתיק הלקוח",
   "client_document.read": "קריאת מסמך מתיק הלקוח דרך קלוד",
   "portal_summary.generate": "הפקת טיוטת סיכום חודשי",
@@ -197,6 +199,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "employee.sign_links_expired": "ביטול קישורי חתימה בהשעיה",
   "client.create": "יצירת לקוח",
   "client.settings_change": "עדכון הגדרות לקוח",
+  "client.ai_excluded": "לקוח סומן בלי AI",
+  "client.ai_included": "הסימון בלי AI הוסר מלקוח",
   "client.archive": "העברת לקוח לארכיון",
   "client.restore": "שחזור לקוח מהארכיון",
   "category.create": "יצירת קטגוריה",
@@ -254,6 +258,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "client.message_sent": "הודעה נשלחה ללקוח",
   "task.blocked": "המשימה ממתינה",
   "task.unblocked": "ההמתנה הסתיימה",
+  "task.ai_excluded": "המשימה סומנה בלי AI",
+  "task.ai_included": "הסימון בלי AI הוסר ממשימה",
   "profile.password_change": "החלפת סיסמה עצמית",
   // Claude (MCP) grants, both directions: the consent endpoint has
   // recorded "granted" since Phase 15, revoking is new in Phase 4.

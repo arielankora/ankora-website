@@ -94,7 +94,7 @@ const security: SecurityPageContent = {
       },
       {
         title: "You decide.",
-        body: "Ask, and a task or a document stays away from AI systems. Your operations manager handles it personally.",
+        body: "Ask, and a task, a document or everything of yours is marked \"no AI\" in our system. Nothing marked goes into our AI-assisted work, and your Operations Manager handles it personally.",
         gate: "noAi",
       },
     ],

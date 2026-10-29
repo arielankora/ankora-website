@@ -1,7 +1,8 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
+import { ForbiddenError, assertCan, can } from "@/lib/app-auth/permissions";
+import { AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE } from "@/lib/ai-exclusion";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { clientDocumentsFolder, uploadFileToDriveFolder } from "@/lib/google-drive";
 import type { ClientDocumentKind, User } from "@prisma/client";
@@ -48,7 +49,7 @@ export async function listClientDocuments(actor: User, clientId: string) {
     orderBy: { createdAt: "desc" },
     include: {
       uploadedBy: { select: { name: true } },
-      task: { select: { id: true, title: true, clientTitle: true } },
+      task: { select: { id: true, title: true, clientTitle: true, aiExcluded: true, parent: { select: { aiExcluded: true } } } },
     },
   });
 }
@@ -168,6 +169,33 @@ export async function setClientDocumentVisibility(actor: User, documentId: strin
     clientId: doc.clientId,
     before: existing,
     after: doc,
+  });
+
+  return doc;
+}
+
+/// 28.10.2026: "בלי AI" on one document (ClientDocument.aiExcluded). Any
+/// staff member on the client may set it; clearing needs client.manage,
+/// the same rule as on a task.
+export async function setClientDocumentAiExcluded(actor: User, documentId: string, aiExcluded: boolean) {
+  assertCan(actor.role, "time_entry.create_self");
+
+  const existing = await prisma.clientDocument.findFirst({ where: { id: documentId, deletedAt: null } });
+  if (!existing) throw new Error("המסמך לא נמצא.");
+  await assertClientAccess(actor, existing.clientId);
+  if (existing.aiExcluded === aiExcluded) return existing;
+  if (!aiExcluded && !can(actor.role, "client.manage")) throw new ForbiddenError(AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE);
+
+  const doc = await prisma.clientDocument.update({ where: { id: documentId }, data: { aiExcluded } });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: aiExcluded ? "client_document.ai_excluded" : "client_document.ai_included",
+    entityType: "ClientDocument",
+    entityId: doc.id,
+    clientId: doc.clientId,
+    before: { aiExcluded: existing.aiExcluded },
+    after: { aiExcluded: doc.aiExcluded },
   });
 
   return doc;

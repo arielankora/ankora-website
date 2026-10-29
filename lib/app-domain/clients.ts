@@ -118,6 +118,9 @@ export async function updateClient(
     /// Ankora's own work, kept out of the home-page hours chart. See
     /// Client.isInternal.
     isInternal?: boolean;
+    /// 28.10.2026: nothing of this client passes through AI. See
+    /// Client.aiExcluded.
+    aiExcluded?: boolean;
     /// Org brain (spec 3.3).
     kind?: ClientKind;
     industry?: string | null;
@@ -165,6 +168,7 @@ export async function updateClient(
       preferenceMatters: input.preferenceMatters === null ? null : input.preferenceMatters?.trim() || undefined,
       preferenceNever: input.preferenceNever === null ? null : input.preferenceNever?.trim() || undefined,
       isInternal: input.isInternal,
+      aiExcluded: input.aiExcluded,
       kind: input.kind,
       industry: input.industry === null ? null : input.industry?.trim() || undefined,
       // Only stamp the editor when a preference actually moved, so the
@@ -184,6 +188,19 @@ export async function updateClient(
     before,
     after: client,
   });
+  // 28.10.2026: "בלי AI" on the whole client gets its own line, beside the
+  // settings change, so the question "מתי ומי" has a direct answer.
+  if (input.aiExcluded !== undefined && input.aiExcluded !== before.aiExcluded) {
+    await recordAudit({
+      actorId: actor.id,
+      action: client.aiExcluded ? "client.ai_excluded" : "client.ai_included",
+      entityType: "Client",
+      entityId: clientId,
+      clientId,
+      before: { aiExcluded: before.aiExcluded },
+      after: { aiExcluded: client.aiExcluded },
+    });
+  }
   if (archiving) {
     await recordAudit({
       actorId: actor.id,
