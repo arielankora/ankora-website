@@ -129,7 +129,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               <Link
                 href={`/app/timer?tab=mine&week=${prevWeek}`}
                 aria-label="שבוע קודם"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ›
               </Link>
@@ -139,7 +139,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               <Link
                 href={`/app/timer?tab=mine&week=${nextWeek}`}
                 aria-label="שבוע הבא"
-                className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ‹
               </Link>
@@ -151,7 +151,10 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-7 gap-2">
+          {/* On a 360-375px phone a cell is about 36px wide, and with
+              p-2.5 the date ("30.10") ran over its border (mobile check,
+              30.10.2026), so the cells are tighter until sm. */}
+          <div className="mt-4 grid grid-cols-7 gap-1 sm:gap-2">
             {days.map((day) => {
               const key = dateKey(day);
               const daySeconds = (byDay.get(key) ?? []).reduce((sum, e) => sum + (e.actualSeconds ?? 0), 0);
@@ -161,7 +164,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               return (
                 <div
                   key={key}
-                  className={`rounded-xl p-2.5 text-center ${
+                  className={`min-w-0 rounded-xl px-0.5 py-2.5 text-center sm:p-2.5 ${
                     isToday ? "border-2 border-gold bg-gold/6" : "border border-app-border"
                   }`}
                 >

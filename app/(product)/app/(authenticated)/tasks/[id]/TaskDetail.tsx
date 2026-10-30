@@ -264,8 +264,12 @@ export function TaskDetail({
 
           {/* Ariel, 19.10.2026: the timer was here, the hours it had
               already added up to were at the bottom of the screen. The
-              total sits under the button and links to the breakdown. */}
-          <div className="flex shrink-0 flex-col items-end gap-1.5">
+              total sits under the button and links to the breakdown.
+              max-w-full, not shrink-0 (mobile check, 30.10.2026): with three
+              buttons the row is wider than a 360-375px phone, and a block
+              that cannot shrink never lets the row inside it wrap, so the
+              whole page scrolled sideways. */}
+          <div className="flex min-w-0 max-w-full flex-col items-end gap-1.5">
             {/* 28.10.2026: beside the timer, the two other things a person
                 does with a task they are holding: report time the timer
                 missed, and tell someone about it. */}
