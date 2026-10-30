@@ -761,7 +761,7 @@ function StartFields({
           <span className={label}>קטגוריה</span>
           <select value={categoryId} onChange={(e) => onCategory(e.target.value)} disabled={!clientId} className={field}>
             <option value="" className="text-app-text-primary">
-              בחירת קטגוריה
+              {clientId ? "בחירת קטגוריה" : "קודם בוחרים לקוח"}
             </option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id} className="text-app-text-primary">
