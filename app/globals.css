@@ -123,3 +123,26 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Native date and time fields on a phone (mobile check, 20.10.2026).
+   iOS Safari gives these inputs an intrinsic minimum width that ignores
+   width:100% and flex-basis, so in a narrow row they spilled over the
+   field beside them. An empty one also collapses on iOS, so a form that
+   needs a steady field height sets it on the field itself. The value is
+   laid out left to right: a device set to English renders "20 Oct 2026",
+   and inside an RTL page the bidi algorithm reordered it to
+   "Oct 2026 20". */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  min-width: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  direction: ltr;
+  text-align: right;
+}
+input[type="date"]::-webkit-date-and-time-value,
+input[type="time"]::-webkit-date-and-time-value,
+input[type="datetime-local"]::-webkit-date-and-time-value {
+  text-align: right;
+}

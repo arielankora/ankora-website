@@ -759,9 +759,18 @@ function StartFields({
         </label>
         <label className="block">
           <span className={label}>קטגוריה</span>
-          <select value={categoryId} onChange={(e) => onCategory(e.target.value)} disabled={!clientId} className={field}>
+          {/* aria-label pins the name to the visible label: through the wrapping
+              label it also took the shown option, and "קודם בוחרים לקוח"
+              made this field answer to "לקוח" as well. */}
+          <select
+            aria-label="קטגוריה"
+            value={categoryId}
+            onChange={(e) => onCategory(e.target.value)}
+            disabled={!clientId}
+            className={field}
+          >
             <option value="" className="text-app-text-primary">
-              בחירת קטגוריה
+              {clientId ? "בחירת קטגוריה" : "קודם בוחרים לקוח"}
             </option>
             {categories.map((cat) => (
               <option key={cat.id} value={cat.id} className="text-app-text-primary">

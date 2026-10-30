@@ -33,7 +33,7 @@ export function ForgotPasswordForm() {
             </a>
           </p>
         )}
-        <Link href="/app/login" className="mt-1 block text-xs text-app-text-accent">
+        <Link href="/app/login" className="mt-1 block py-2 text-xs text-app-text-accent">
           חזרה לכניסה
         </Link>
       </div>
@@ -58,7 +58,7 @@ export function ForgotPasswordForm() {
 
       <p className="mt-4 text-xs text-app-text-secondary">אם הכתובת קיימת במערכת יישלח מייל. מטעמי אבטחה לא נציין אם היא קיימת.</p>
 
-      <Link href="/app/login" className="mt-4 block text-xs text-app-text-accent">
+      <Link href="/app/login" className="mt-2 block py-2 text-xs text-app-text-accent">
         חזרה לכניסה
       </Link>
     </form>

@@ -46,6 +46,12 @@ export const viewport: Viewport = {
   themeColor: "#1B2A3D",
   width: "device-width",
   initialScale: 1,
+  // statusBarStyle "black-translucent" draws the page under the iPhone
+  // status bar once the app is added to the home screen. Without
+  // viewport-fit=cover, env(safe-area-inset-*) stays 0 and the logo sat
+  // under the clock (mobile check, 20.10.2026, iPhone 15 Pro Max). With it,
+  // each shell pads its own top edge and the bottom nav its bottom edge.
+  viewportFit: "cover",
 };
 
 // App redesign (design_handoff_ankora_app_redesign/README.md, "State

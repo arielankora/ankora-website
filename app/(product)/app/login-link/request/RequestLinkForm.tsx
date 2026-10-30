@@ -33,7 +33,7 @@ export function RequestLinkForm() {
             </a>
           </p>
         )}
-        <Link href="/app/login" className="mt-1 block text-xs text-app-text-accent">
+        <Link href="/app/login" className="mt-1 block py-2 text-xs text-app-text-accent">
           כניסה עם סיסמה
         </Link>
       </div>
@@ -61,7 +61,7 @@ export function RequestLinkForm() {
         הקישור נשלח רק לכתובת שרשומה כמשתמש פורטל. מטעמי אבטחה לא נציין אם היא קיימת.
       </p>
 
-      <Link href="/app/login" className="mt-4 block text-xs text-app-text-accent">
+      <Link href="/app/login" className="mt-2 block py-2 text-xs text-app-text-accent">
         כניסה עם סיסמה
       </Link>
     </form>

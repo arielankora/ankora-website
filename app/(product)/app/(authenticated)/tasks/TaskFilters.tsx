@@ -217,8 +217,11 @@ function Select({
   options: { value: string; label: string }[];
   onChange: (value: string) => void;
 }) {
+  // On a phone the two selects share one row (mobile check, 30.10.2026):
+  // each on its own line, the filters alone filled the first screen of an
+  // iPhone SE and no task showed without scrolling.
   return (
-    <label className="flex items-center gap-2 rounded-full border border-app-border bg-white px-3 py-2 text-[13px]">
+    <label className="flex min-w-0 flex-1 basis-[140px] items-center gap-2 rounded-full border border-app-border bg-white px-3 py-2 text-[13px] sm:flex-none sm:basis-auto">
       <span className="text-app-text-tertiary">{label}</span>
       <select
         // Same reason as the search box: an unset dropdown contributes
@@ -231,7 +234,7 @@ function Select({
         aria-label={label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="max-w-[160px] cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none"
+        className="min-w-0 flex-1 cursor-pointer truncate bg-transparent font-medium text-app-text-primary outline-none sm:max-w-[160px]"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

@@ -30,7 +30,7 @@ export default async function ConfidentialityPage() {
   const body = unescapeMarkdown(agreementBody(loadAgreementText(agreement)));
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+    <main className="mx-auto max-w-2xl px-4 py-10 pt-[calc(2.5rem+env(safe-area-inset-top))] sm:px-6">
       <div className="flex items-center justify-between gap-4">
         <span className="font-assistant text-sm font-semibold tracking-[0.2em] text-app-text-accent">ANKORA</span>
         <LogoutButton />

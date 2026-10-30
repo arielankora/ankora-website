@@ -26,6 +26,9 @@ function SubmitButton({ pending }: { pending: boolean }) {
 // laid out with flex-wrap + explicit flex-basis per field rather than a
 // fixed-column grid, which the README explicitly calls out as the wrong
 // approach here ("אסור grid עם עמודות קבועות - הוא קורס בחלון צר").
+// Fields that belong together wrap together (mobile check, 20.10.2026):
+// on a phone "מ־" landed beside the date and "עד" beside the client, so
+// the two times now share one group, and so do client and category.
 //
 // Spec "אישור דיווח שעות חופף בין לקוחות שונים": a cross-client overlap comes
 // back from the server action as `overlapWarning`, not `error` - shown here as a
@@ -76,7 +79,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
       <p className="mb-3 text-[13px] font-medium text-app-text-primary">הוספת דיווח - שורה אחת</p>
       <div className="flex flex-wrap items-end gap-2.5">
-        <label className="block" style={{ flex: "0 0 150px" }}>
+        <label className="block min-w-0" style={{ flex: "1 1 150px" }}>
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">תאריך</span>
           <input
             type="date"
@@ -85,28 +88,31 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             max={todayKey()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
-        <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">מ־</span>
+        <div className="flex min-w-0 gap-2.5" style={{ flex: "1 1 220px" }}>
+        <label className="block min-w-0 flex-1">
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">משעה</span>
           <input
             type="time"
             name="startTime"
             required
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
-        <label className="block" style={{ flex: "0 0 108px" }}>
-          <span className="mb-1.5 block text-[11px] text-app-text-secondary">עד</span>
+        <label className="block min-w-0 flex-1">
+          <span className="mb-1.5 block text-[11px] text-app-text-secondary">עד שעה</span>
           <input
             type="time"
             name="endTime"
             required
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
-        <label className="block min-w-0" style={{ flex: "1 1 180px" }}>
+        </div>
+        <div className="flex min-w-0 gap-2.5" style={{ flex: "1 1 280px" }}>
+        <label className="block min-w-0 flex-1">
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">לקוח *</span>
           <select
             name="clientId"
@@ -123,15 +129,16 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             ))}
           </select>
         </label>
-        <label className="block min-w-0" style={{ flex: "1 1 140px" }}>
+        <label className="block min-w-0 flex-1">
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">קטגוריה *</span>
           <select
             name="categoryId"
+            aria-label="קטגוריה"
             required
             disabled={!clientId}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
           >
-            <option value="">בחירה</option>
+            <option value="">{clientId ? "בחירה" : "קודם בוחרים לקוח"}</option>
             {availableCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {cat.name}
@@ -139,6 +146,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             ))}
           </select>
         </label>
+        </div>
         <label className="block min-w-0" style={{ flex: "1 1 200px" }}>
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">הערה *</span>
           <input

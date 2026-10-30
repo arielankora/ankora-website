@@ -12,7 +12,7 @@ import type { ReactNode } from "react";
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
     <div className="grid min-h-screen grid-cols-[repeat(auto-fit,minmax(320px,1fr))]">
-      <div className="relative flex flex-col justify-between overflow-hidden bg-navy px-8 py-12 text-cream-warm sm:px-10">
+      <div className="relative flex flex-col justify-between overflow-hidden bg-navy px-8 py-12 pt-[calc(3rem+env(safe-area-inset-top))] text-cream-warm sm:px-10">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(55%_55%_at_65%_30%,rgba(176,141,87,0.24)_0%,rgba(176,141,87,0)_70%)]" />
         <span className="relative font-assistant text-sm font-semibold tracking-[0.2em] text-gold-light">ANKORA</span>
         <div className="relative max-w-[380px]">
