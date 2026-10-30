@@ -48,7 +48,7 @@ test("an approved procedure reads as a document and downloads as PDF and Word", 
   await dialog.locator('input[name="purpose"]').fill("לפתוח ולסגור משתמשים עם תיעוד");
   await dialog.locator('input[name="triggerKinds"][value="EVENT"]').check();
   await dialog.locator('input[name="sources"]').fill(code);
-  await dialog.getByText("למסמך הנוהל (תחולה, הגדרות, בקרות)").click({ timeout: 15_000 });
+  await dialog.locator("section", { hasText: "חריגים ומסמך הנוהל" }).getByText("הצג עוד").click({ timeout: 15_000 });
   await dialog.locator('textarea[name="scope"]').fill("כל העובדים בישראל");
   await dialog.locator('input[name="controlRefs"]').fill("CC6.2, CC6.3");
   await submit(page, "הוספה לתיק");

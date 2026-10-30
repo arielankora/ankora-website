@@ -164,6 +164,7 @@ test.describe("clients/process-actions", () => {
     // The seeded admin owns it, so it lands in this session's routine.
     const owner = dialog.locator('select[name="ownerId"] option', { hasText: "מנהל Ankora" }).first();
     await dialog.locator('select[name="ownerId"]').selectOption((await owner.getAttribute("value"))!);
+    await dialog.locator("section", { hasText: "זמנים ובקרה" }).getByText("הצג עוד").click();
     await dialog.locator('input[name="checkEveryDays"]').fill("7");
     await dialog.locator('input[name="checkText"]').fill("שאין חשבוניות תקועות");
     await dialog.locator('input[name="sources"]').fill(code);
