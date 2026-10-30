@@ -305,10 +305,12 @@ function SystemChecks({ options, selected, permissions }: { options: Option[]; s
 
 /// 30.10.2026 (Ariel): one titled group of the process form. The fields
 /// in `more` sit behind "הצג עוד" and stay in the form while folded, so
-/// they are still sent on save. The group opens by itself when one of them
-/// holds a value or is a gap the process still shows: nothing filled in,
-/// and nothing the card asks for, is ever out of sight.
-function FormGroup({ title, children, more, open = false }: { title: string; children?: ReactNode; more?: ReactNode; open?: boolean }) {
+/// they are still sent on save. The group opens by itself only when it
+/// holds a gap the process still shows. Opening it whenever a field had a
+/// value would unfold every group of a mature process, which is the
+/// crowding this replaced, so a filled group stays folded and says how
+/// many of its fields are filled instead.
+function FormGroup({ title, children, more, open = false, filled = 0 }: { title: string; children?: ReactNode; more?: ReactNode; open?: boolean; filled?: number }) {
   return (
     <section className="flex flex-col gap-3.5">
       <h3 className="border-b border-app-border pb-1.5 text-xs font-semibold text-app-text-primary">{title}</h3>
@@ -316,7 +318,7 @@ function FormGroup({ title, children, more, open = false }: { title: string; chi
       {more && (
         <details open={open} className="group">
           <summary className="cursor-pointer list-none text-xs font-medium text-app-text-accent hover:underline">
-            <span className="group-open:hidden">הצג עוד</span>
+            <span className="group-open:hidden">{filled > 0 ? `הצג עוד (${filled === 1 ? "שדה אחד מלא" : `${filled} מלאים`})` : "הצג עוד"}</span>
             <span className="hidden group-open:inline">הצג פחות</span>
           </summary>
           <div className="mt-3 flex flex-col gap-3.5">{more}</div>
@@ -350,6 +352,7 @@ function ProcessForm({
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.knowledgeStatus ?? "CONFIRMED");
   const e = existing;
   const gap = (k: keyof typeof FIELD_LABELS) => !!e?.missing?.includes(FIELD_LABELS[k]);
+  const filled = (...values: unknown[]) => values.filter((v) => (Array.isArray(v) ? v.length > 0 : v !== null && v !== undefined && v !== "")).length;
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="clientId" value={clientId} />
@@ -381,7 +384,8 @@ function ProcessForm({
 
       <FormGroup
         title="מי"
-        open={!!(e?.backupOwnerId || e?.executorText || e?.approverUserId || e?.approverContactId || e?.approverText || gap("approvals"))}
+        open={gap("approvals")}
+        filled={filled(e?.backupOwnerId, e?.executorText, e?.approverUserId, e?.approverContactId, e?.approverText)}
         more={
           <>
             <div className="grid gap-3.5 lg:grid-cols-2">
@@ -461,7 +465,7 @@ function ProcessForm({
 
       <FormGroup
         title="זמנים ובקרה"
-        open={!!(e?.businessCalendar || e?.reviewEveryDays || e?.checkEveryDays || e?.checkText)}
+        filled={filled(e?.businessCalendar, e?.reviewEveryDays, e?.checkEveryDays, e?.checkText)}
         more={
           <>
             <div className="grid gap-3.5 lg:grid-cols-2">
@@ -503,7 +507,8 @@ function ProcessForm({
 
       <FormGroup
         title="מערכות וגורמים"
-        open={!!(e?.externalPartyContactIds?.length || e?.externalPartyText || e?.approvalPolicyIds?.length || e?.approvalText || gap("external") || gap("approvals"))}
+        open={gap("external") || gap("approvals")}
+        filled={filled(e?.externalPartyContactIds, e?.externalPartyText, e?.approvalPolicyIds, e?.approvalText)}
         more={
           <>
             <div>
@@ -556,7 +561,8 @@ function ProcessForm({
 
       <FormGroup
         title="חריגים ומסמך הנוהל"
-        open={!!(e?.exceptionPlaybook || e?.scope || e?.definitions || e?.controlRefs?.length || e?.relatedDocs || gap("exceptions"))}
+        open={gap("exceptions")}
+        filled={filled(e?.exceptionPlaybook, e?.scope, e?.definitions, e?.controlRefs, e?.relatedDocs)}
         more={
           <>
             <Field label="נוהל חריגים">
