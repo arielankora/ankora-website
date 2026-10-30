@@ -1,7 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
-import { toggleTaskDoneAction, updateTaskPortalAction } from "./actions";
+import { toggleTaskDoneAction, updateTaskDueDateAction, updateTaskPortalAction } from "./actions";
 import { useTaskList } from "./TaskListProvider";
 import { taskHref } from "./list-query";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -325,9 +325,55 @@ export function TaskRow({
     }
   }
 
-  const dueLabel = task.dueDate
+  // 30.10.2026: the date is editable from the row. The cell stays the
+  // short label and opens the browser's own picker over it, rather than
+  // turning into a date field: a date field is about 130px wide and the
+  // column on a desk is 56.
+  const [dueDate, setDueDate] = useState(task.dueDate);
+  const [duePending, setDuePending] = useState(false);
+  const dueInput = useRef<HTMLInputElement>(null);
+
+  function openDuePicker() {
+    const input = dueInput.current;
+    if (!input) return;
+    try {
+      input.showPicker();
+    } catch {
+      // Older browsers have no showPicker; focusing the field still lets
+      // a keyboard change it.
+      input.focus();
+    }
+  }
+
+  async function changeDueDate(value: string | null, isUndo = false) {
+    const previous = dueDate;
+    const next = value ? new Date(value).toISOString() : null;
+    if ((previous?.slice(0, 10) ?? null) === (next?.slice(0, 10) ?? null)) return;
+    setDueDate(next);
+    setDuePending(true);
+    const result = await updateTaskDueDateAction({ taskId: task.id, dueDate: value });
+    setDuePending(false);
+    if (!result.ok) {
+      setDueDate(previous);
+      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      return;
+    }
+    setDueDate(result.dueDate);
+    if (isUndo) {
+      showToast({ tone: "info", title: "השינוי בוטל", description: task.title });
+      return;
+    }
+    showToast({
+      tone: "success",
+      title: value ? "תאריך היעד עודכן" : "תאריך היעד הוסר",
+      description: task.title,
+      undo: () => changeDueDate(previous ? previous.slice(0, 10) : null, true),
+    });
+  }
+
+  const dueLabel = dueDate
     ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
-        new Date(task.dueDate)
+        new Date(dueDate)
       )
     : "-";
 
@@ -613,8 +659,28 @@ export function TaskRow({
           is its own column. `contents` lets the two spans become grid
           cells on a desk while staying one flex line on a phone. */}
       <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[12px] text-app-text-secondary [grid-area:meta] xl:contents">
-        <span data-cell="date" className="shrink-0 [grid-area:date] xl:text-end xl:text-xs xl:text-app-text-tertiary">
-          {dueLabel}
+        <span data-cell="date" className="relative shrink-0 [grid-area:date] xl:text-end xl:text-xs xl:text-app-text-tertiary">
+          <button
+            type="button"
+            disabled={duePending}
+            onClick={openDuePicker}
+            aria-label={dueDate ? `תאריך יעד ${dueLabel}, שינוי` : "הוספת תאריך יעד"}
+            title={dueDate ? "שינוי תאריך היעד" : "הוספת תאריך יעד"}
+            className="rounded-[6px] px-1 -mx-1 hover:bg-app-surface-sunken hover:text-app-text-primary disabled:opacity-50"
+          >
+            {dueLabel}
+          </button>
+          {/* The picker's anchor. Invisible and out of the tab order: the
+              button above is the control, this only holds the value. */}
+          <input
+            ref={dueInput}
+            type="date"
+            tabIndex={-1}
+            aria-hidden
+            value={dueDate ? dueDate.slice(0, 10) : ""}
+            onChange={(e) => changeDueDate(e.target.value || null)}
+            className="pointer-events-none absolute inset-0 h-full w-full opacity-0"
+          />
         </span>
         <span aria-hidden className="text-app-text-tertiary xl:hidden">
           ·

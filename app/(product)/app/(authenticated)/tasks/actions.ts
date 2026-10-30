@@ -202,6 +202,26 @@ export async function toggleTaskDoneAction(input: {
   }
 }
 
+// 30.10.2026: the due date, written from the row. The list is where
+// people see that a date is wrong, and opening the task to fix it was
+// the errand. Same "2026-09-24" in, same parsing as the task screen's
+// updateTaskDetailAction, so both write the same instant.
+export async function updateTaskDueDateAction(input: { taskId: string; dueDate: string | null }) {
+  const user = await requireUser();
+  try {
+    const updated = await updateTask(user, input.taskId, {
+      dueDate: input.dueDate ? new Date(input.dueDate) : null,
+    });
+    revalidatePath("/app/tasks");
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/portal");
+    revalidatePath("/app");
+    return { ok: true as const, dueDate: updated.dueDate?.toISOString() ?? null };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
 // Portal phase 1. The three portal fields a task carries, written from
 // the row itself.
 //
