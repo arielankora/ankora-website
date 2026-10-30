@@ -154,9 +154,9 @@ export function AppShell({
       <CommandPalette actions={items.map((i) => ({ href: i.href, label: i.label }))} clients={clients} />
 
       <div className="min-w-0 flex-1">
-        <header className="border-b border-app-border bg-white md:hidden">
+        <header className="border-b border-app-border bg-white pt-[env(safe-area-inset-top)] md:hidden">
           <div className="flex items-center justify-between gap-4 px-6 py-4">
-            <Link href="/app" className="text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
+            <Link href="/app" className="-my-2.5 py-2.5 text-sm font-semibold uppercase tracking-[0.16em] text-app-text-accent">
               Ankora
             </Link>
             <NotificationsBell notifications={notifications} unreadCount={unreadCount} />
@@ -174,8 +174,10 @@ export function AppShell({
 
         {/* 16px sides on a phone, 28px from md. At 28px a 360px phone kept
             304px for content, and the tasks list (26.9.2026) was one of
-            several screens that ran out of room because of it. */}
-        <main className="mx-auto max-w-appContent space-y-4 px-4 py-5 pb-24 md:px-7 md:py-7 md:pb-7">
+            several screens that ran out of room because of it. The bottom
+            padding clears the fixed BottomNav, which grows by the home
+            indicator's inset, so the padding grows by it too. */}
+        <main className="mx-auto max-w-appContent space-y-4 px-4 py-5 pb-[calc(6rem+env(safe-area-inset-bottom))] md:px-7 md:py-7 md:pb-7">
           <OfflineBanner />
           <Suspense fallback={null}>
             <HashScroll />
