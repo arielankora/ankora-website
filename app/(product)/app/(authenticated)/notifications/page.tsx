@@ -87,7 +87,7 @@ export default async function NotificationsPage() {
               {!n.readAt && (
                 <form action={markNotificationReadAction}>
                   <input type="hidden" name="notificationId" value={n.id} />
-                  <button type="submit" className="whitespace-nowrap text-xs text-app-text-tertiary hover:text-app-text-primary">
+                  <button type="submit" className="whitespace-nowrap py-2 text-xs text-app-text-tertiary hover:text-app-text-primary">
                     סימון כנקרא
                   </button>
                 </form>

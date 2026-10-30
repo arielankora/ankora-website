@@ -99,7 +99,7 @@ export function GuideBrowser({ groups }: { groups: GuideGroup[] }) {
                 <ul className="mt-1.5 space-y-1">
                   {group.sections.map((section) => (
                     <li key={section.id}>
-                      <a href={`#${section.id}`} className="text-sm text-app-text-secondary hover:text-app-text-primary hover:underline">
+                      <a href={`#${section.id}`} className="inline-block py-1.5 text-sm text-app-text-secondary hover:text-app-text-primary hover:underline">
                         <Hl text={section.title} words={words} />
                       </a>
                     </li>
