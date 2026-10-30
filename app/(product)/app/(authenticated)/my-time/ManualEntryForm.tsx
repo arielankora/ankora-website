@@ -133,6 +133,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">קטגוריה *</span>
           <select
             name="categoryId"
+            aria-label="קטגוריה"
             required
             disabled={!clientId}
             className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold disabled:opacity-40"
