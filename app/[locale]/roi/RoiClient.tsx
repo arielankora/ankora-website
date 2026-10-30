@@ -23,6 +23,8 @@ import { cn } from "@/lib/utils";
  *
  * ₪160 per hour excluding VAT, decided 9.10.2026, so the calculator quotes the same
  * rate as the highlighted package on the pricing page. It was ₪130 before that.
+ * The packages were reworked on 30.10.2026 (five packages, ₪135 to ₪180); the
+ * highlighted one is still ₪160, so this rate did not change.
  */
 const ANKORA_RATE = 160;
 const EMPLOYER_OVERHEAD_MULTIPLIER = 1.33;

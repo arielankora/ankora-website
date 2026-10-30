@@ -424,8 +424,12 @@ export interface PagesContent {
       label: string;
       title: string;
       sub: string;
+      // Shown under each package's rate; {pct} is its saving per hour against the
+      // first package. The first package has no saving and shows no line.
+      savings: string;
       // hoursPerMonth and hourlyRate are the numbers behind `hours` and `rate`,
-      // used for the Offer JSON-LD on the pricing page.
+      // used for the Offer JSON-LD on the pricing page. `hours` is a range, so
+      // hoursPerMonth is its lower bound and the Offer price is a "from" price.
       items: {
         name: string;
         hours: string;

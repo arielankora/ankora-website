@@ -57,6 +57,8 @@ export default function PricingClient({ params }: { params: { locale: string } }
   const locale = (params.locale === "en" ? "en" : "he") as Locale;
   const dict = getDictionary(locale);
   const p = dict.pages.pricing;
+  // Savings on each package are measured against the first (smallest) one.
+  const baseRate = p.tiers.items[0].hourlyRate;
 
   return (
     <>
@@ -146,7 +148,9 @@ export default function PricingClient({ params }: { params: { locale: string } }
       <SectionShell>
         <SectionHead label={p.tiers.label} title={p.tiers.title} body={p.tiers.sub} />
         <RevealStagger className="mt-14">
-          <HairlineGrid minCell={260}>
+          {/* 200, not 260: five packages since 30.10.2026, and at 260 the fifth
+              wrapped onto a row of its own on a laptop screen. */}
+          <HairlineGrid minCell={200}>
             {p.tiers.items.map((tier) => (
               <motion.div key={tier.name} variants={staggerItem} className="h-full">
                 <HairlineGridCell
@@ -162,6 +166,14 @@ export default function PricingClient({ params }: { params: { locale: string } }
                     {tier.rate}
                   </div>
                   <div className="mt-2 font-assistant text-sm text-muted">{tier.hours}</div>
+                  {tier.hourlyRate < baseRate && (
+                    <div className="mt-2 font-assistant text-sm font-semibold text-gold">
+                      {p.tiers.savings.replace(
+                        "{pct}",
+                        String(Math.round((1 - tier.hourlyRate / baseRate) * 100))
+                      )}
+                    </div>
+                  )}
                   <p className="mt-5 font-assistant text-sm font-light leading-[1.7] text-muted">
                     {tier.blurb}
                   </p>
