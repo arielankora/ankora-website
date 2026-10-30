@@ -187,7 +187,12 @@ export function Drawer({
             onClick={dismiss}
             className="absolute inset-0 bg-app-surface-nav/30"
           />
-          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white shadow-lg sm:max-w-md">
+          {/* 30.10.2026 (Ariel): half the screen on a desktop, not a
+              quarter. A mature client's process form ran to dozens of
+              fields in a 28rem column and took endless scrolling. Every
+              drawer gets the width, and the content stops at 48rem so a
+              short form on a wide screen does not stretch its inputs. */}
+          <div className="absolute inset-y-0 end-0 flex w-full max-w-sm flex-col border-s border-app-border bg-white shadow-lg sm:max-w-xl lg:w-1/2 lg:max-w-none">
             <div className="flex items-center justify-between border-b border-app-border px-5 py-4">
               <h2 className="text-base font-medium text-app-text-primary">{title}</h2>
               <button
@@ -200,9 +205,11 @@ export function Drawer({
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
-              <DrawerCloseContext.Provider value={closeAfterWrite}>
-                {children}
-              </DrawerCloseContext.Provider>
+              <div className="max-w-3xl">
+                <DrawerCloseContext.Provider value={closeAfterWrite}>
+                  {children}
+                </DrawerCloseContext.Provider>
+              </div>
             </div>
           </div>
         </div>

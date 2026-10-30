@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -40,7 +40,7 @@ import { formatAmount } from "@/lib/policy-params";
 import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
 import { nextSteps, type DateCandidate, type NextStep, type ProcessFacts, type StepOp } from "@/lib/next-steps";
 import { RUNS_LABEL } from "@/lib/process-readiness";
-import { documentationLine } from "@/lib/process-rules";
+import { FIELD_LABELS, documentationLine } from "@/lib/process-rules";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
@@ -303,6 +303,29 @@ function SystemChecks({ options, selected, permissions }: { options: Option[]; s
   );
 }
 
+/// 30.10.2026 (Ariel): one titled group of the process form. The fields
+/// in `more` sit behind "הצג עוד" and stay in the form while folded, so
+/// they are still sent on save. The group opens by itself when one of them
+/// holds a value or is a gap the process still shows: nothing filled in,
+/// and nothing the card asks for, is ever out of sight.
+function FormGroup({ title, children, more, open = false }: { title: string; children?: ReactNode; more?: ReactNode; open?: boolean }) {
+  return (
+    <section className="flex flex-col gap-3.5">
+      <h3 className="border-b border-app-border pb-1.5 text-xs font-semibold text-app-text-primary">{title}</h3>
+      {children}
+      {more && (
+        <details open={open} className="group">
+          <summary className="cursor-pointer list-none text-xs font-medium text-app-text-accent hover:underline">
+            <span className="group-open:hidden">הצג עוד</span>
+            <span className="hidden group-open:inline">הצג פחות</span>
+          </summary>
+          <div className="mt-3 flex flex-col gap-3.5">{more}</div>
+        </details>
+      )}
+    </section>
+  );
+}
+
 function ProcessForm({
   clientId,
   existing,
@@ -325,194 +348,247 @@ function ProcessForm({
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(existing ? updateProcessAction : addProcessAction, close);
   const [status, setStatus] = useState<KnowledgeStatusLike>(existing?.knowledgeStatus ?? "CONFIRMED");
+  const e = existing;
+  const gap = (k: keyof typeof FIELD_LABELS) => !!e?.missing?.includes(FIELD_LABELS[k]);
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+    <form onSubmit={onSubmit} className="flex flex-col gap-6">
       <input type="hidden" name="clientId" value={clientId} />
-      {existing && <input type="hidden" name="id" value={existing.id} />}
-      <Field label="שם התהליך *">
-        <input name="title" required defaultValue={existing?.title ?? ""} placeholder="תשלומי ספקים, LTD" className={INPUT} />
-      </Field>
-      <Field label="למה הוא קיים">
-        <input name="purpose" defaultValue={existing?.purpose ?? ""} className={INPUT} />
-      </Field>
-      <fieldset>
-        <legend className={LABEL}>מה מפעיל אותו</legend>
-        <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
-          {(Object.keys(TRIGGER_LABELS) as TriggerLike[]).map((t) => (
-            <label key={t} className="flex items-center gap-1.5 text-sm text-app-text-primary">
-              <input type="checkbox" name="triggerKinds" value={t} defaultChecked={existing?.triggerKinds.includes(t)} className="h-4 w-4 accent-gold" />
-              {TRIGGER_LABELS[t]}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      <Field label="הטריגר במילים">
-        <input name="triggerText" defaultValue={existing?.triggerText ?? ""} placeholder="פעמיים בחודש, ב-10 וב-25" className={INPUT} />
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="בעלים">
-          <select name="ownerId" defaultValue={existing?.ownerId ?? ""} className={INPUT}>
-            <option value="">לא נקבע</option>
-            {staff.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="מחליף (לא חובה)">
-          <select name="backupOwnerId" defaultValue={existing?.backupOwnerId ?? ""} className={INPUT}>
-            <option value="">אין</option>
-            {staff.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <div className="grid grid-cols-[1fr_7rem] gap-3">
-        <Field label="SLA">
-          <input name="slaText" defaultValue={existing?.slaText ?? ""} placeholder="החומר אצל איילה יומיים עסקים לפני" className={INPUT} />
-        </Field>
-        <Field label="ימי עסקים">
-          <input name="slaBusinessDays" inputMode="numeric" defaultValue={existing?.slaBusinessDays ?? ""} className={INPUT} />
-        </Field>
-      </div>
-      <div>
-        <span className={LABEL}>מערכות</span>
-        <SystemChecks options={systems} selected={existing?.requiredSystemIds ?? []} permissions={existing?.requiredSystemPermissions ?? {}} />
-      </div>
-      <div>
-        <span className={LABEL}>גורם חיצוני</span>
-        <Checks name="externalPartyContactIds" options={contacts} selected={existing?.externalPartyContactIds ?? []} />
-        <input name="externalPartyText" defaultValue={existing?.externalPartyText ?? ""} placeholder='Nextage, או "אין"' className={INPUT} />
-      </div>
-      <div>
-        <span className={LABEL}>מי מאשר שלב שדורש אישור</span>
-        <div className="grid grid-cols-2 gap-3">
-          <select name="approverUserId" defaultValue={existing?.approverUserId ?? ""} aria-label="מאשר באנקורה" className={INPUT}>
-            <option value="">אף אחד באנקורה</option>
-            {staff.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} (מאשר במערכת)
-              </option>
-            ))}
-          </select>
-          <select name="approverContactId" defaultValue={existing?.approverContactId ?? ""} aria-label="מאשר אצל הלקוח" className={INPUT}>
-            <option value="">אף אחד אצל הלקוח</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="mt-1 text-[11px] text-app-text-tertiary">מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.</p>
-        <input name="approverText" defaultValue={existing?.approverText ?? ""} placeholder="או במילים: מורשה חתימה בבנק" className={INPUT} />
-      </div>
-      <div>
-        <span className={LABEL}>ספי אישור</span>
-        <Checks name="approvalPolicyIds" options={rules} selected={existing?.approvalPolicyIds ?? []} />
-        <input name="approvalText" defaultValue={existing?.approvalText ?? ""} placeholder='ספק חדש: אישור רו"ח, או "אין"' className={INPUT} />
-      </div>
-      <Field label="סקירת הנוהל כל (ימים)">
-        <input name="reviewEveryDays" inputMode="numeric" defaultValue={existing?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
-      </Field>
-      <div className="grid grid-cols-[7rem_1fr] gap-3">
-        <Field label="בדיקה כל (ימים)">
-          <input name="checkEveryDays" inputMode="numeric" defaultValue={existing?.checkEveryDays ?? ""} placeholder="7" className={INPUT} />
-        </Field>
-        <Field label="מה בודקים (לתהליך שוטף)">
-          <input name="checkText" defaultValue={existing?.checkText ?? ""} placeholder="שאין חשבוניות תקועות" className={INPUT} />
-        </Field>
-      </div>
-      <Field label="נוהל חריגים">
-        <textarea name="exceptionPlaybook" rows={3} defaultValue={existing?.exceptionPlaybook ?? ""} placeholder="מה עושים כשמשהו חורג" className={INPUT} />
-      </Field>
-      <details className="rounded-lg border border-app-border px-3 py-2" open={!!(existing?.scope || existing?.definitions || existing?.controlRefs?.length || existing?.relatedDocs)}>
-        <summary className="cursor-pointer text-xs font-medium text-app-text-secondary">למסמך הנוהל (תחולה, הגדרות, בקרות)</summary>
-        <p className="mt-1 text-[11px] text-app-text-tertiary">מה שנוהל SOC 2 צריך ואין בשדות למעלה. נכנס למסמך שמייצאים ללקוח או למבקר, וננעל עם כל גרסה מאושרת.</p>
-        <div className="mt-2 space-y-3">
-          <Field label="תחולה">
-            <textarea name="scope" rows={2} defaultValue={existing?.scope ?? ""} placeholder="על מי ועל מה הנוהל חל, ועל מה לא" className={INPUT} />
+      {e && <input type="hidden" name="id" value={e.id} />}
+      <FormGroup title="מה ומתי">
+        <div className="grid gap-3.5 lg:grid-cols-2">
+          <Field label="שם התהליך *">
+            <input name="title" required defaultValue={e?.title ?? ""} placeholder="תשלומי ספקים, LTD" className={INPUT} />
           </Field>
-          <Field label="הגדרות (מונח: הסבר, שורה לכל מונח)">
-            <textarea name="definitions" rows={2} defaultValue={existing?.definitions ?? ""} placeholder="Offboarding: עזיבת עובד" className={INPUT} />
+          <Field label="למה הוא קיים">
+            <input name="purpose" defaultValue={e?.purpose ?? ""} className={INPUT} />
           </Field>
-          <div className="grid grid-cols-[1fr_9rem] gap-3">
-            <Field label="בקרות (מופרדות בפסיק)">
-              <input name="controlRefs" dir="ltr" defaultValue={existing?.controlRefs?.join(", ") ?? ""} placeholder="CC6.2, CC6.3" className={INPUT} />
-            </Field>
-            <Field label="סיווג">
-              <select name="classification" defaultValue={existing?.classification ?? "CONFIDENTIAL"} className={INPUT}>
-                <option value="CONFIDENTIAL">סודי</option>
-                <option value="INTERNAL">פנימי</option>
-                <option value="PUBLIC">ציבורי</option>
-              </select>
-            </Field>
+        </div>
+        <fieldset>
+          <legend className={LABEL}>מה מפעיל אותו</legend>
+          <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+            {(Object.keys(TRIGGER_LABELS) as TriggerLike[]).map((t) => (
+              <label key={t} className="flex items-center gap-1.5 text-sm text-app-text-primary">
+                <input type="checkbox" name="triggerKinds" value={t} defaultChecked={e?.triggerKinds.includes(t)} className="h-4 w-4 accent-gold" />
+                {TRIGGER_LABELS[t]}
+              </label>
+            ))}
           </div>
-          <Field label="מסמכים קשורים">
-            <textarea name="relatedDocs" rows={2} defaultValue={existing?.relatedDocs ?? ""} placeholder="מדיניות בקרת גישה, נוהל קליטת עובד" className={INPUT} />
+        </fieldset>
+        <Field label="הטריגר במילים">
+          <input name="triggerText" defaultValue={e?.triggerText ?? ""} placeholder="פעמיים בחודש, ב-10 וב-25" className={INPUT} />
+        </Field>
+      </FormGroup>
+
+      <FormGroup
+        title="מי"
+        open={!!(e?.backupOwnerId || e?.executorText || e?.approverUserId || e?.approverContactId || e?.approverText || gap("approvals"))}
+        more={
+          <>
+            <div className="grid gap-3.5 lg:grid-cols-2">
+              <Field label="מחליף (לא חובה)">
+                <select name="backupOwnerId" defaultValue={e?.backupOwnerId ?? ""} className={INPUT}>
+                  <option value="">אין</option>
+                  {staff.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field label="מבצע במילים">
+                <input name="executorText" defaultValue={e?.executorText ?? ""} placeholder="גיא" className={INPUT} />
+              </Field>
+            </div>
+            <div>
+              <span className={LABEL}>מי מאשר שלב שדורש אישור</span>
+              <div className="grid grid-cols-2 gap-3">
+                <select name="approverUserId" defaultValue={e?.approverUserId ?? ""} aria-label="מאשר באנקורה" className={INPUT}>
+                  <option value="">אף אחד באנקורה</option>
+                  {staff.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} (מאשר במערכת)
+                    </option>
+                  ))}
+                </select>
+                <select name="approverContactId" defaultValue={e?.approverContactId ?? ""} aria-label="מאשר אצל הלקוח" className={INPUT}>
+                  <option value="">אף אחד אצל הלקוח</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-1 text-[11px] text-app-text-tertiary">מאשר באנקורה חותם במערכת: השלב מחכה לו, והריצה לא נסגרת לפניו. מאשר אצל הלקוח מופיע בשם, והאישור ממנו נאסף בחוץ.</p>
+              <input name="approverText" defaultValue={e?.approverText ?? ""} placeholder="או במילים: מורשה חתימה בבנק" className={INPUT} />
+            </div>
+          </>
+        }
+      >
+        <div className="grid gap-3.5 lg:grid-cols-3">
+          <Field label="בעלים">
+            <select name="ownerId" defaultValue={e?.ownerId ?? ""} className={INPUT}>
+              <option value="">לא נקבע</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="מי מבצע היום באנקורה">
+            <select name="executorUserId" defaultValue={e?.executorUserId ?? ""} aria-label="מבצע באנקורה" className={INPUT}>
+              <option value="">אף אחד באנקורה</option>
+              {staff.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="מי מבצע היום אצל הלקוח">
+            <select name="executorContactId" defaultValue={e?.executorContactId ?? ""} aria-label="מבצע אצל הלקוח" className={INPUT}>
+              <option value="">אף אחד אצל הלקוח</option>
+              {contacts.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
-      </details>
-      <EntitySelect entities={entities} defaultValue={existing?.entityId} />
-      <Field label="לוח ימי עבודה">
-        <select name="businessCalendar" defaultValue={existing?.businessCalendar ?? ""} aria-label="לוח ימי עבודה" className={INPUT}>
-          <option value="">לפי המדינה של הישות</option>
-          {BUSINESS_CALENDARS.map((c) => (
-            <option key={c} value={c}>
-              {BUSINESS_CALENDAR_LABELS[c]}
-            </option>
-          ))}
-        </select>
-        <span className="mt-1 block text-xs text-app-text-tertiary">הריצות והמועדים שפותחים את התהליך נספרים לפיו.</span>
-      </Field>
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="מי מבצע היום">
-          <select name="executorUserId" defaultValue={existing?.executorUserId ?? ""} aria-label="מבצע באנקורה" className={INPUT}>
-            <option value="">אף אחד באנקורה</option>
-            {staff.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </select>
-          <select name="executorContactId" defaultValue={existing?.executorContactId ?? ""} aria-label="מבצע אצל הלקוח" className={`${INPUT} mt-1.5`}>
-            <option value="">אף אחד אצל הלקוח</option>
-            {contacts.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <input name="executorText" defaultValue={existing?.executorText ?? ""} placeholder="או במילים: גיא" className={`${INPUT} mt-1.5`} />
-        </Field>
-        <Field label="איפה בחפיפה">
-          <select name="transitionStatus" defaultValue={existing?.transitionStatus ?? "WITH_CLIENT"} className={INPUT}>
-            {(Object.keys(TRANSITION_LABELS) as TransitionLike[]).map((t) => (
-              <option key={t} value={t}>
-                {TRANSITION_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-      <Field label="מה ידוע על התהליך">
-        <select name="knowledgeStatus" value={status} onChange={(e) => setStatus(e.target.value as KnowledgeStatusLike)} className={INPUT}>
-          <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
-          <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
-          <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
-        </select>
-      </Field>
-      <SourcesField options={sourceOptions} defaultValue={existing?.sources.join(", ")} status={status} confirmedBefore={existing?.knowledgeStatus === "CONFIRMED"} />
-      <ItemExtras existing={existing} owner={false} disclose audience />
-      {status !== "CONFIRMED" && (
-        <Field label="מה יסגור את זה *">
-          <input name="toResolve" required defaultValue={existing?.toResolve ?? ""} className={INPUT} />
-        </Field>
-      )}
+      </FormGroup>
+
+      <FormGroup
+        title="זמנים ובקרה"
+        open={!!(e?.businessCalendar || e?.reviewEveryDays || e?.checkEveryDays || e?.checkText)}
+        more={
+          <>
+            <div className="grid gap-3.5 lg:grid-cols-2">
+              <Field label="לוח ימי עבודה">
+                <select name="businessCalendar" defaultValue={e?.businessCalendar ?? ""} aria-label="לוח ימי עבודה" className={INPUT}>
+                  <option value="">לפי המדינה של הישות</option>
+                  {BUSINESS_CALENDARS.map((c) => (
+                    <option key={c} value={c}>
+                      {BUSINESS_CALENDAR_LABELS[c]}
+                    </option>
+                  ))}
+                </select>
+                <span className="mt-1 block text-xs text-app-text-tertiary">הריצות והמועדים שפותחים את התהליך נספרים לפיו.</span>
+              </Field>
+              <Field label="סקירת הנוהל כל (ימים)">
+                <input name="reviewEveryDays" inputMode="numeric" defaultValue={e?.reviewEveryDays ?? ""} placeholder="90" className={INPUT} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-[7rem_1fr] gap-3">
+              <Field label="בדיקה כל (ימים)">
+                <input name="checkEveryDays" inputMode="numeric" defaultValue={e?.checkEveryDays ?? ""} placeholder="7" className={INPUT} />
+              </Field>
+              <Field label="מה בודקים (לתהליך שוטף)">
+                <input name="checkText" defaultValue={e?.checkText ?? ""} placeholder="שאין חשבוניות תקועות" className={INPUT} />
+              </Field>
+            </div>
+          </>
+        }
+      >
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <Field label="SLA">
+            <input name="slaText" defaultValue={e?.slaText ?? ""} placeholder="החומר אצל איילה יומיים עסקים לפני" className={INPUT} />
+          </Field>
+          <Field label="ימי עסקים">
+            <input name="slaBusinessDays" inputMode="numeric" defaultValue={e?.slaBusinessDays ?? ""} className={INPUT} />
+          </Field>
+        </div>
+      </FormGroup>
+
+      <FormGroup
+        title="מערכות וגורמים"
+        open={!!(e?.externalPartyContactIds?.length || e?.externalPartyText || e?.approvalPolicyIds?.length || e?.approvalText || gap("external") || gap("approvals"))}
+        more={
+          <>
+            <div>
+              <span className={LABEL}>גורם חיצוני</span>
+              <Checks name="externalPartyContactIds" options={contacts} selected={e?.externalPartyContactIds ?? []} />
+              <input name="externalPartyText" defaultValue={e?.externalPartyText ?? ""} placeholder='Nextage, או "אין"' className={INPUT} />
+            </div>
+            <div>
+              <span className={LABEL}>ספי אישור</span>
+              <Checks name="approvalPolicyIds" options={rules} selected={e?.approvalPolicyIds ?? []} />
+              <input name="approvalText" defaultValue={e?.approvalText ?? ""} placeholder='ספק חדש: אישור רו"ח, או "אין"' className={INPUT} />
+            </div>
+          </>
+        }
+      >
+        <div>
+          <span className={LABEL}>מערכות</span>
+          <SystemChecks options={systems} selected={e?.requiredSystemIds ?? []} permissions={e?.requiredSystemPermissions ?? {}} />
+        </div>
+      </FormGroup>
+
+      <FormGroup title="מצב">
+        <div className="grid gap-3.5 lg:grid-cols-2">
+          <Field label="איפה בחפיפה">
+            <select name="transitionStatus" defaultValue={e?.transitionStatus ?? "WITH_CLIENT"} className={INPUT}>
+              {(Object.keys(TRANSITION_LABELS) as TransitionLike[]).map((t) => (
+                <option key={t} value={t}>
+                  {TRANSITION_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="מה ידוע על התהליך">
+            <select name="knowledgeStatus" value={status} onChange={(ev) => setStatus(ev.target.value as KnowledgeStatusLike)} className={INPUT}>
+              <option value="CONFIRMED">{KNOWLEDGE_STATUS_LABELS.CONFIRMED}</option>
+              <option value="UNCERTAIN">{KNOWLEDGE_STATUS_LABELS.UNCERTAIN}</option>
+              <option value="MISSING">{KNOWLEDGE_STATUS_LABELS.MISSING}</option>
+            </select>
+          </Field>
+        </div>
+        {status !== "CONFIRMED" && (
+          <Field label="מה יסגור את זה *">
+            <input name="toResolve" required defaultValue={e?.toResolve ?? ""} className={INPUT} />
+          </Field>
+        )}
+        <EntitySelect entities={entities} defaultValue={e?.entityId} />
+        <SourcesField options={sourceOptions} defaultValue={e?.sources.join(", ")} status={status} confirmedBefore={e?.knowledgeStatus === "CONFIRMED"} />
+        <ItemExtras existing={e} owner={false} disclose audience />
+      </FormGroup>
+
+      <FormGroup
+        title="חריגים ומסמך הנוהל"
+        open={!!(e?.exceptionPlaybook || e?.scope || e?.definitions || e?.controlRefs?.length || e?.relatedDocs || gap("exceptions"))}
+        more={
+          <>
+            <Field label="נוהל חריגים">
+              <textarea name="exceptionPlaybook" rows={3} defaultValue={e?.exceptionPlaybook ?? ""} placeholder="מה עושים כשמשהו חורג" className={INPUT} />
+            </Field>
+            <p className="text-[11px] text-app-text-tertiary">מה שנוהל SOC 2 צריך ואין בשדות למעלה. נכנס למסמך שמייצאים ללקוח או למבקר, וננעל עם כל גרסה מאושרת.</p>
+            <div className="grid gap-3.5 lg:grid-cols-2">
+              <Field label="תחולה">
+                <textarea name="scope" rows={2} defaultValue={e?.scope ?? ""} placeholder="על מי ועל מה הנוהל חל, ועל מה לא" className={INPUT} />
+              </Field>
+              <Field label="הגדרות (מונח: הסבר, שורה לכל מונח)">
+                <textarea name="definitions" rows={2} defaultValue={e?.definitions ?? ""} placeholder="Offboarding: עזיבת עובד" className={INPUT} />
+              </Field>
+            </div>
+            <div className="grid grid-cols-[1fr_9rem] gap-3">
+              <Field label="בקרות (מופרדות בפסיק)">
+                <input name="controlRefs" dir="ltr" defaultValue={e?.controlRefs?.join(", ") ?? ""} placeholder="CC6.2, CC6.3" className={INPUT} />
+              </Field>
+              <Field label="סיווג">
+                <select name="classification" defaultValue={e?.classification ?? "CONFIDENTIAL"} className={INPUT}>
+                  <option value="CONFIDENTIAL">סודי</option>
+                  <option value="INTERNAL">פנימי</option>
+                  <option value="PUBLIC">ציבורי</option>
+                </select>
+              </Field>
+            </div>
+            <Field label="מסמכים קשורים">
+              <textarea name="relatedDocs" rows={2} defaultValue={e?.relatedDocs ?? ""} placeholder="מדיניות בקרת גישה, נוהל קליטת עובד" className={INPUT} />
+            </Field>
+          </>
+        }
+      />
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
         {pending ? "שומר..." : existing ? "שמירה" : "הוספה לתיק"}
