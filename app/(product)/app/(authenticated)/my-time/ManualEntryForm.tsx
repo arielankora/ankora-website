@@ -88,7 +88,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             max={todayKey()}
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <div className="flex min-w-0 gap-2.5" style={{ flex: "1 1 220px" }}>
@@ -98,7 +98,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             type="time"
             name="startTime"
             required
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         <label className="block min-w-0 flex-1">
@@ -107,7 +107,7 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
             type="time"
             name="endTime"
             required
-            className="w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
+            className="min-h-[42px] w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold"
           />
         </label>
         </div>

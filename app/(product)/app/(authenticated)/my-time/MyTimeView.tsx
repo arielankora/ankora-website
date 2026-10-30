@@ -129,7 +129,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               <Link
                 href={`/app/timer?tab=mine&week=${prevWeek}`}
                 aria-label="שבוע קודם"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ›
               </Link>
@@ -139,7 +139,7 @@ export async function MyTimeView({ searchParams }: { searchParams: { week?: stri
               <Link
                 href={`/app/timer?tab=mine&week=${nextWeek}`}
                 aria-label="שבוע הבא"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-app-border text-app-text-primary hover:border-gold"
               >
                 ‹
               </Link>

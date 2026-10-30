@@ -127,15 +127,15 @@ body {
 /* Native date and time fields on a phone (mobile check, 20.10.2026).
    iOS Safari gives these inputs an intrinsic minimum width that ignores
    width:100% and flex-basis, so in a narrow row they spilled over the
-   field beside them; empty, they also collapse to the height of their
-   (missing) text. The value itself is laid out left to right, because a
-   device set to English renders "20 Oct 2026", and inside an RTL page the
-   bidi algorithm reordered it to "Oct 2026 20". */
+   field beside them. An empty one also collapses on iOS, so a form that
+   needs a steady field height sets it on the field itself. The value is
+   laid out left to right: a device set to English renders "20 Oct 2026",
+   and inside an RTL page the bidi algorithm reordered it to
+   "Oct 2026 20". */
 input[type="date"],
 input[type="time"],
 input[type="datetime-local"] {
   min-width: 0;
-  min-height: 2.625rem;
   -webkit-appearance: none;
   appearance: none;
   direction: ltr;
