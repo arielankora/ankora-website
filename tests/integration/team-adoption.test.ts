@@ -204,10 +204,6 @@ describe("what the client reads", () => {
     });
 
     const { periodStart, periodEnd } = monthRange(new Date());
-    // Closed inside the month the draft is for (31.10.2026): monthRange is
-    // built in UTC from Israel's month, so in Israel's first hours of a
-    // month "now" fell before its start and the test failed then.
-    await prisma.task.update({ where: { id: task.id }, data: { completedAt: new Date(periodStart.getTime() + 5 * 24 * 60 * 60 * 1000) } });
     const draft = await buildSummaryDraft(client.id, periodStart, periodEnd);
 
     expect(draft.text).toContain("המזגן תוקן והוחלף בו הפילטר.");
