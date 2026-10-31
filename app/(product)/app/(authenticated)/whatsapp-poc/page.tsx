@@ -2,9 +2,11 @@ import Link from "next/link";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { canSendTo, canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { normalizePhone } from "@/lib/contact-normalize";
 import {
   UnipileError,
   cleanCursor,
+  findChatByPhone,
   getChat,
   isConfigured,
   isHiddenChat,
@@ -51,7 +53,7 @@ function chatHref(chatId: string, cursor: string | null) {
   return `/app/whatsapp-poc?${params.toString()}`;
 }
 
-export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string; cursor?: string }> }) {
+export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string; cursor?: string; phone?: string }> }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   const config = readPocConfig();
@@ -86,6 +88,17 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
   // or a link kept from before) is read on its own.
   const requestedId = searchParams.chat && searchParams.chat.length <= 200 ? searchParams.chat : null;
   let selected: PocChat | null = chats.find((c) => c.id === requestedId) ?? null;
+  let phoneNotFound = false;
+  if (!selected && !requestedId && searchParams.phone) {
+    const phone = normalizePhone(searchParams.phone.slice(0, 40));
+    try {
+      selected = phone ? await findChatByPhone(config, phone) : null;
+      phoneNotFound = selected === null;
+    } catch (err) {
+      if (!(err instanceof UnipileError)) throw err;
+      loadError = err.message;
+    }
+  }
   if (!selected && requestedId) {
     try {
       const chat = await getChat(config, requestedId);
@@ -120,6 +133,27 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
           {loadError}
         </p>
       ) : null}
+
+      <form method="get" action="/app/whatsapp-poc" className="flex flex-wrap items-end gap-3">
+        <div>
+          <label htmlFor="poc-phone" className="block text-xs font-medium text-app-text-secondary">
+            פתיחת שיחה לפי מספר
+          </label>
+          <input
+            id="poc-phone"
+            name="phone"
+            type="tel"
+            dir="ltr"
+            defaultValue={searchParams.phone ?? ""}
+            placeholder="055-1234567"
+            className="mt-1.5 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+          />
+        </div>
+        <button type="submit" className="min-h-11 rounded-lg border border-app-border-strong px-4 text-sm text-app-text-primary">
+          פתיחה
+        </button>
+        {phoneNotFound ? <p className="text-sm text-app-text-secondary">לא נמצאה שיחה עם המספר הזה.</p> : null}
+      </form>
 
       <div className="grid gap-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <nav aria-label="שיחות" className="overflow-hidden rounded-2xl border border-app-border bg-white">

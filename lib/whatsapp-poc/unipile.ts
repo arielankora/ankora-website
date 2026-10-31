@@ -198,6 +198,37 @@ export async function getChat(config: { apiKey: string; accountId: string }, cha
   return toPocChat(body as RawChat);
 }
 
+/// The WhatsApp address of a number: "+972541234567" gives
+/// "972541234567@s.whatsapp.net". Null for anything that is not E.164.
+export function whatsappAddress(phone: string | null): string | null {
+  if (!phone || !/^\+\d{8,15}$/.test(phone)) return null;
+  return `${phone.slice(1)}@s.whatsapp.net`;
+}
+
+/// A 1:1 chat found by the other side's number, or null when there is no
+/// such WhatsApp user or no chat with them.
+///
+/// 31.10.2026: needed because Unipile's chat list did not move a chat up
+/// when new messages arrived in it. A chat active today could sit far
+/// below 30 chats whose last activity was the day before, so the list
+/// alone could not reach it.
+export async function findChatByPhone(
+  config: { apiKey: string; accountId: string },
+  phone: string,
+): Promise<PocChat | null> {
+  const address = whatsappAddress(phone);
+  if (!address) return null;
+  try {
+    const profile = await call(config, `/users/${encodeURIComponent(address)}`);
+    const userId = str((profile as { id?: unknown } | null)?.id);
+    if (!userId) return null;
+    return await getChat(config, userId);
+  } catch (err) {
+    if (err instanceof UnipileError && err.status === 404) return null;
+    throw err;
+  }
+}
+
 /// Newest first from Unipile; returned oldest first, as a conversation reads.
 export async function listMessages(
   config: { apiKey: string; accountId: string },

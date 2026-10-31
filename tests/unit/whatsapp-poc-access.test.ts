@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { cleanCursor, isHiddenChat, toPocChat, toPocMessage } from "@/lib/whatsapp-poc/unipile";
+import { cleanCursor, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -117,5 +117,17 @@ describe("WhatsApp POC: the chat list", () => {
     expect(cleanCursor(undefined)).toBeNull();
     expect(cleanCursor("a b")).toBeNull();
     expect(cleanCursor("x".repeat(501))).toBeNull();
+  });
+});
+
+describe("WhatsApp POC: opening a chat by number", () => {
+  it("turns an E.164 number into its WhatsApp address", () => {
+    expect(whatsappAddress("+972553302266")).toBe("972553302266@s.whatsapp.net");
+  });
+
+  it("refuses anything that is not E.164", () => {
+    expect(whatsappAddress(null)).toBeNull();
+    expect(whatsappAddress("0553302266")).toBeNull();
+    expect(whatsappAddress("+97255/../x")).toBeNull();
   });
 });
