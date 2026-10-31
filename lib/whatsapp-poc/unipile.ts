@@ -173,13 +173,11 @@ export function isHiddenChat(chat: PocChat): boolean {
 }
 
 export const CHAT_PAGE_SIZE = 30;
-const MAX_OFFSET = 3000;
+const FETCH_PAGE_SIZE = 50;
+const MAX_CHATS = 200;
+const MAX_OFFSET = MAX_CHATS - CHAT_PAGE_SIZE;
 
 /// The page offset from the URL: a whole multiple of the page size, or 0.
-///
-/// 31.10.2026: Unipile pages WhatsApp chats by offset. It returns no
-/// next_cursor for this provider, so a cursor-based "older" link never
-/// appeared.
 export function parseOffset(raw: string | undefined | null): number {
   if (!raw || !/^\d{1,5}$/.test(raw)) return 0;
   const n = Number(raw);
@@ -187,21 +185,53 @@ export function parseOffset(raw: string | undefined | null): number {
   return n;
 }
 
+function time(iso: string | null): number {
+  const t = iso ? Date.parse(iso) : NaN;
+  return Number.isNaN(t) ? 0 : t;
+}
+
+/// One entry per chat id, newest activity first, without the status feed.
+///
+/// 31.10.2026: Unipile's WhatsApp chat list is not a stable list. It gave
+/// no next_cursor, its offset pages overlapped (5 of 31 chats on page two
+/// were already on page one), and one chat came back three times on the
+/// same page. So the list is read once, as a whole, and ordered and paged
+/// here. Of two copies of a chat, the one with the later activity wins.
+export function mergeChats(raw: PocChat[]): PocChat[] {
+  const byId = new Map<string, PocChat>();
+  for (const chat of raw) {
+    if (isHiddenChat(chat)) continue;
+    const seen = byId.get(chat.id);
+    if (!seen || time(chat.lastMessageAt) > time(seen.lastMessageAt)) byId.set(chat.id, chat);
+  }
+  return [...byId.values()].sort((a, b) => time(b.lastMessageAt) - time(a.lastMessageAt));
+}
+
+async function fetchAllChats(config: { apiKey: string; accountId: string }): Promise<PocChat[]> {
+  const all: PocChat[] = [];
+  for (let offset = 0; offset < MAX_CHATS; offset += FETCH_PAGE_SIZE) {
+    const query: Record<string, string> = { limit: String(FETCH_PAGE_SIZE) };
+    if (offset > 0) query.offset = String(offset);
+    const raw = dataArray(await call(config, "/chats", { query }));
+    for (const c of raw) {
+      const chat = toPocChat(c as RawChat);
+      if (chat) all.push(chat);
+    }
+    if (raw.length < FETCH_PAGE_SIZE) break;
+  }
+  return all;
+}
+
 export async function listChats(
   config: { apiKey: string; accountId: string },
   options: { offset?: number } = {},
 ): Promise<{ chats: PocChat[]; hasMore: boolean }> {
   const offset = options.offset ?? 0;
-  const query: Record<string, string> = { limit: String(CHAT_PAGE_SIZE) };
-  if (offset > 0) query.offset = String(offset);
-  const body = await call(config, "/chats", { query });
-  const raw = dataArray(body);
-  const chats = raw
-    .map((c) => toPocChat(c as RawChat))
-    .filter((c): c is PocChat => c !== null && !isHiddenChat(c));
-  // A full page means there may be more. Counted before the status feed is
-  // dropped, so that one hidden chat does not end the list early.
-  return { chats, hasMore: raw.length >= CHAT_PAGE_SIZE && offset + CHAT_PAGE_SIZE <= MAX_OFFSET };
+  const merged = mergeChats(await fetchAllChats(config));
+  return {
+    chats: merged.slice(offset, offset + CHAT_PAGE_SIZE),
+    hasMore: offset + CHAT_PAGE_SIZE < merged.length,
+  };
 }
 
 export async function getChat(config: { apiKey: string; accountId: string }, chatId: string): Promise<PocChat | null> {

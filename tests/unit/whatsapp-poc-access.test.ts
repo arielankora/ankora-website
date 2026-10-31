@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { mergeChats, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -120,6 +120,7 @@ describe("WhatsApp POC: the chat list", () => {
     expect(parseOffset("-30")).toBe(0);
     expect(parseOffset("1e3")).toBe(0);
     expect(parseOffset("99990")).toBe(0);
+    expect(parseOffset("180")).toBe(0);
   });
 });
 
@@ -132,5 +133,30 @@ describe("WhatsApp POC: opening a chat by number", () => {
     expect(whatsappAddress(null)).toBeNull();
     expect(whatsappAddress("0553302266")).toBeNull();
     expect(whatsappAddress("+97255/../x")).toBeNull();
+  });
+});
+
+describe("WhatsApp POC: merging Unipile's chat list", () => {
+  const chat = (id: string, at: string | null) => toPocChat({ id, name: id, type: "1to1", last_message_timestamp: at ?? undefined })!;
+
+  it("keeps one entry per chat, the copy with the latest activity", () => {
+    const merged = mergeChats([
+      chat("a@lid", "2026-10-30T10:00:00Z"),
+      chat("b@lid", "2026-10-31T09:00:00Z"),
+      chat("a@lid", "2026-10-31T12:00:00Z"),
+      chat("a@lid", "2026-10-29T08:00:00Z"),
+    ]);
+    expect(merged.map((c) => c.id)).toEqual(["a@lid", "b@lid"]);
+    expect(merged[0].lastMessageAt).toBe("2026-10-31T12:00:00Z");
+  });
+
+  it("orders newest first, puts chats without a date last, and drops the status feed", () => {
+    const merged = mergeChats([
+      chat("old@lid", "2026-10-01T00:00:00Z"),
+      chat("none@lid", null),
+      chat("status@broadcast", "2026-10-31T23:00:00Z"),
+      chat("new@lid", "2026-10-31T00:00:00Z"),
+    ]);
+    expect(merged.map((c) => c.id)).toEqual(["new@lid", "old@lid", "none@lid"]);
   });
 });
