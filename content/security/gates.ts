@@ -25,8 +25,10 @@ export const SECURITY_GATES = {
    *  All active staff signed in the app by 18.10.2026; signing is required
    *  before any client data is shown (app layout). */
   confidentiality: true,
-  /** A written DPA with every vendor: Vercel Pro and the Google Workspace CDPA. */
-  vendorDpas: true,
+  /** A written DPA with every vendor: Vercel Pro and the Google Workspace CDPA.
+   *  Closed 31.10.2026 while the Unipile DPA is unsigned (task "הוספת Unipile
+   *  כתת-מעבד", step "חתום על ה-DPA"). Open it again once that DPA is signed. */
+  vendorDpas: false,
   /** A completed security questionnaire ready to send on request. */
   questionnaire: true,
 } as const;
