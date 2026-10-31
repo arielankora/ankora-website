@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { prisma } from "./setup";
 import { createTestUser, createTestClient, createTestCategory, createTestClientUser } from "./factories";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { monthRangeInZone } from "@/lib/timezone";
 
 // Client isolation across every number the portal shows a client.
 //
@@ -332,11 +333,15 @@ describe("getCategorySummary() - client isolation and percentages", () => {
     const client = await createTestClient();
     const cat = await createTestCategory({ clientId: client.id, name: "עכשיו" });
     const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    // Not before the month began: run in the first minutes of an Israeli
+    // month, "16 minutes ago" is last month and the default range rightly
+    // leaves it out (1.11.2026).
+    const monthStart = monthRangeInZone(new Date()).start.getTime();
     await seedEntry({
       userId: employee.id,
       clientId: client.id,
       categoryId: cat.id,
-      startAt: new Date(Date.now() - 60_000 - 900_000),
+      startAt: new Date(Math.max(Date.now() - 60_000 - 900_000, monthStart)),
       actualSeconds: 900,
       billableSeconds: 900,
     });
