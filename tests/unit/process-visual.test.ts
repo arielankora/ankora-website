@@ -72,6 +72,11 @@ describe("process visual", () => {
     expect(v.groups).toEqual([{ day: null, steps: [expect.objectContaining({ n: 1 })] }]);
   });
 
+  it("calls day 0 the date for a process that runs by one, and the start otherwise", () => {
+    expect(buildProcessVisual(onboarding).dayZeroLabel).toBe("התחלה");
+    expect(buildProcessVisual({ ...onboarding, triggerKinds: ["SCHEDULED"] }).dayZeroLabel).toBe("המועד");
+  });
+
   it("names days before the run's date", () => {
     expect(dayLabel(0)).toBe("יום 0");
     expect(dayLabel(3)).toBe("יום 3");

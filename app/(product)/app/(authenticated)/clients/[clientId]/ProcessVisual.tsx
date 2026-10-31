@@ -12,9 +12,9 @@ const TICK_STYLE: Record<VisualTick["marks"][number], string> = {
   late: "border-app-warning bg-app-warning",
 };
 
-function tickText(t: VisualTick): string[] {
+function tickText(t: VisualTick, dayZero: string, date: string | null): string[] {
   const out: string[] = [];
-  if (t.marks.includes("start")) out.push("התחלה");
+  if (t.marks.includes("start")) out.push(date ? `${dayZero}: ${date}` : dayZero);
   if (t.stepCount > 0) out.push(t.stepCount === 1 ? "שלב אחד" : `${t.stepCount} שלבים`);
   if (t.marks.includes("sla")) out.push("סוף הזמן המוגדר");
   if (t.marks.includes("late")) out.push("אחרי הזמן המוגדר");
@@ -23,6 +23,7 @@ function tickText(t: VisualTick): string[] {
 
 export function ProcessVisual({ nextDate, ...input }: VisualInput & { nextDate?: string | null }) {
   const v = buildProcessVisual(input);
+  const next = nextDate && v.dayZeroLabel === "המועד" ? new Date(nextDate).toLocaleDateString("he-IL") : null;
   if (input.steps.length === 0) {
     return <p className="text-sm text-app-text-secondary">אין עדיין נוהל מאושר, ולכן אין מה לצייר.</p>;
   }
@@ -54,7 +55,7 @@ export function ProcessVisual({ nextDate, ...input }: VisualInput & { nextDate?:
               <li key={t.day} className="relative flex flex-col items-center gap-1 px-1 text-center">
                 <span className={`z-[1] h-4 w-4 rounded-full border-2 ${TICK_STYLE[mark]}`} aria-hidden />
                 <span className="text-xs font-bold tabular-nums text-app-text-primary">{dayLabel(t.day)}</span>
-                {tickText(t).map((line) => (
+                {tickText(t, v.dayZeroLabel, next).map((line) => (
                   <span key={line} className="line-clamp-2 text-[11px] leading-tight text-app-text-secondary">
                     {line}
                   </span>
