@@ -36,7 +36,13 @@ describe("TaskShare", () => {
     expect(wa.startsWith("https://wa.me/972521234567?text=")).toBe(true);
     for (const part of ["היי הדס,", "העברתי אלייך", TASK.title, "Grantor", URL]) expect(wa).toContain(part);
 
-    const mail = decoded("task-share-mail");
+    const gmail = decoded("task-share-mail");
+    expect(gmail.startsWith("https://mail.google.com/mail/?view=cm&fs=1&to=hadas@example.com&su=")).toBe(true);
+    expect(gmail).toContain(URL);
+    expect(gmail).toContain("העברתי אלייך");
+    expect(screen.getByTestId("task-share-mail").getAttribute("target")).toBe("_blank");
+
+    const mail = decoded("task-share-mailto");
     expect(mail.startsWith("mailto:hadas@example.com?subject=")).toBe(true);
     expect(mail).toContain(URL);
     expect(mail).toContain("העברתי אלייך");
@@ -47,13 +53,37 @@ describe("TaskShare", () => {
 
     expect(screen.queryByTestId("task-share-whatsapp")).toBeNull();
     expect(screen.getByTestId("task-share-no-whatsapp").textContent).toContain("נועה כהן");
-    expect(decoded("task-share-mail").startsWith("mailto:noa@example.com?")).toBe(true);
+    expect(decoded("task-share-mail")).toContain("to=noa@example.com&");
+    expect(decoded("task-share-mailto").startsWith("mailto:noa@example.com?")).toBe(true);
   });
 
   it("with no recipient, lets WhatsApp pick the contact", () => {
     render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId={null} onDone={vi.fn()} />);
 
     expect(decoded("task-share-whatsapp").startsWith("https://wa.me/?text=")).toBe(true);
-    expect(decoded("task-share-mail").startsWith("mailto:?subject=")).toBe(true);
+    expect(decoded("task-share-mail")).toContain("&to=&su=");
+    expect(decoded("task-share-mailto").startsWith("mailto:?subject=")).toBe(true);
+  });
+
+  // 31.10.2026: a click on "מייל" used to do nothing visible in a browser
+  // with no mail app. Every action now says what happened.
+  it("says what happened after the mail button is clicked", () => {
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
+    expect(screen.queryByTestId("task-share-feedback")).toBeNull();
+
+    fireEvent.click(screen.getByTestId("task-share-mail"));
+    expect(screen.getByTestId("task-share-feedback").textContent).toContain("Gmail");
+  });
+
+  it("copies the whole message and confirms it", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
+
+    fireEvent.click(screen.getByTestId("task-share-copy"));
+    expect(await screen.findByText(/ההודעה הועתקה/)).toBeTruthy();
+    const copied = writeText.mock.calls[0][0] as string;
+    expect(copied).toContain(TASK.title);
+    expect(copied).toContain(URL);
   });
 });
