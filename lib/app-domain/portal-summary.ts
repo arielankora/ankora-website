@@ -6,6 +6,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { resolvePortalClient } from "@/lib/app-domain/client-portal";
 import { OPEN_STATUSES, TOP_LEVEL_ONLY } from "@/lib/app-domain/tasks";
 import type { User } from "@prisma/client";
+import { monthRangeInZone } from "@/lib/timezone";
 
 // Portal phase 3: the monthly summary.
 //
@@ -35,19 +36,16 @@ function monthName(date: Date): string {
 
 /// The calendar month containing `anchor`, in the client's timezone sense
 /// of a month. Returned as the half-open range every query here uses.
+///
+/// 1.11.2026: the range used to start at UTC midnight on the 1st, two or
+/// three hours after the Israeli month began. Work closed in those hours
+/// fell out of both months: before the new month's range, and after the
+/// old month had ended in Israel. QA caught it by running at 00:06 on
+/// 1.11, when the summary said "no promise closed in November 2026" right
+/// after one closed. Now local midnight to local midnight.
 export function monthRange(anchor: Date): { periodStart: Date; periodEnd: Date } {
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: JERUSALEM, year: "numeric", month: "2-digit" })
-    .format(anchor)
-    .split("-");
-  const year = Number(parts[0]);
-  const month = Number(parts[1]);
-  // Built in UTC from the Jerusalem calendar month. Jerusalem is ahead of
-  // UTC, so this is off by the offset at the boundary - which matters for
-  // a report of the month and not for a sentence about it, and choosing
-  // the simpler arithmetic keeps this readable by whoever checks it.
-  const periodStart = new Date(Date.UTC(year, month - 1, 1));
-  const periodEnd = new Date(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1));
-  return { periodStart, periodEnd };
+  const { start, end } = monthRangeInZone(anchor, JERUSALEM);
+  return { periodStart: start, periodEnd: end };
 }
 
 function list(names: string[], max = 3): string {
@@ -186,30 +184,37 @@ export async function generatePortalSummary(actor: User, clientId: string, ancho
   const { periodStart, periodEnd } = monthRange(anchor);
   const draft = await buildSummaryDraft(clientId, periodStart, periodEnd);
 
-  const summary = await prisma.portalSummary.upsert({
-    where: { clientId_periodStart: { clientId, periodStart } },
-    create: {
-      clientId,
-      periodStart,
-      periodEnd,
-      draft: draft.text,
-      sourceTaskIds: draft.sourceTaskIds,
-      sourceDecisionIds: draft.sourceDecisionIds,
-    },
-    update: {
-      periodEnd,
-      draft: draft.text,
-      sourceTaskIds: draft.sourceTaskIds,
-      sourceDecisionIds: draft.sourceDecisionIds,
-      generatedAt: new Date(),
-      // Regenerating un-approves: what the person signed is no longer
-      // what the row says, and carrying the approval over would attach
-      // their name to words they never read.
-      status: "DRAFT",
-      approvedById: null,
-      approvedAt: null,
-    },
+  // Rows stored before 1.11.2026 carry the old UTC-midnight periodStart,
+  // which still falls inside this month's range. Matching on the range,
+  // not the exact instant, regenerates that row in place instead of
+  // adding a second summary for the same month that could be approved
+  // by mistake.
+  const existing = await prisma.portalSummary.findFirst({
+    where: { clientId, periodStart: { gte: periodStart, lt: periodEnd } },
+    orderBy: { periodStart: "asc" },
+    select: { id: true },
   });
+  const content = {
+    periodEnd,
+    draft: draft.text,
+    sourceTaskIds: draft.sourceTaskIds,
+    sourceDecisionIds: draft.sourceDecisionIds,
+  };
+  const summary = existing
+    ? await prisma.portalSummary.update({
+        where: { id: existing.id },
+        data: {
+          ...content,
+          generatedAt: new Date(),
+          // Regenerating un-approves: what the person signed is no longer
+          // what the row says, and carrying the approval over would attach
+          // their name to words they never read.
+          status: "DRAFT",
+          approvedById: null,
+          approvedAt: null,
+        },
+      })
+    : await prisma.portalSummary.create({ data: { clientId, periodStart, ...content } });
 
   await recordAudit({
     actorId: actor.id,
