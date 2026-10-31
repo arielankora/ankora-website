@@ -129,6 +129,9 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
         <p className="mt-1 text-sm text-app-text-secondary">
           נקרא בזמן אמת מ-Unipile ולא נשמר במערכת. שליחה רק למספרי הבדיקה.
         </p>
+        <Link href="/app/whatsapp-poc/calls" className="mt-1 inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+          הקלטות שיחה
+        </Link>
       </div>
 
       {loadError ? (

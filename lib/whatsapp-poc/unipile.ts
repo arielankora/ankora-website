@@ -23,17 +23,30 @@ export type PocConfig = {
   accountId: string | null;
   viewers: string[];
   sendTo: string[];
+  /// Stage 2: the aloha@ mailbox as a Unipile account ("acc_...").
+  mailAccountId: string | null;
+  /// Stage 2: Ankora's own number on the Aloha line, to tell incoming
+  /// calls from outgoing ones.
+  lineNumber: string | null;
+  /// Stage 2: transcription is offered only when this is set.
+  hasOpenAiKey: boolean;
 };
+
+function accountIdFrom(raw: string | undefined): string | null {
+  const value = raw?.trim() || "";
+  return /^acc_[A-Za-z0-9]+$/.test(value) ? value : null;
+}
 
 export function readPocConfig(): PocConfig {
   const apiKey = process.env.UNIPILE_API_KEY?.trim() || null;
-  const rawAccount = process.env.UNIPILE_WHATSAPP_ACCOUNT_ID?.trim() || "";
-  const accountId = /^acc_[A-Za-z0-9]+$/.test(rawAccount) ? rawAccount : null;
   return {
     apiKey,
-    accountId,
+    accountId: accountIdFrom(process.env.UNIPILE_WHATSAPP_ACCOUNT_ID),
     viewers: parseEmailList(process.env.WHATSAPP_POC_VIEWERS),
     sendTo: parsePhoneList(process.env.WHATSAPP_POC_SEND_TO),
+    mailAccountId: accountIdFrom(process.env.ALOHA_UNIPILE_ACCOUNT_ID),
+    lineNumber: parsePhoneList(process.env.ALOHA_LINE_NUMBER)[0] ?? null,
+    hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY?.trim()),
   };
 }
 
