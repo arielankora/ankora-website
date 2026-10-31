@@ -42,10 +42,6 @@ describe("TaskShare", () => {
     expect(gmail).toContain("העברתי אלייך");
     expect(screen.getByTestId("task-share-mail").getAttribute("target")).toBe("_blank");
 
-    const mail = decoded("task-share-mailto");
-    expect(mail.startsWith("mailto:hadas@example.com?subject=")).toBe(true);
-    expect(mail).toContain(URL);
-    expect(mail).toContain("העברתי אלייך");
   });
 
   it("says whose number is missing instead of linking to nobody", () => {
@@ -54,7 +50,6 @@ describe("TaskShare", () => {
     expect(screen.queryByTestId("task-share-whatsapp")).toBeNull();
     expect(screen.getByTestId("task-share-no-whatsapp").textContent).toContain("נועה כהן");
     expect(decoded("task-share-mail")).toContain("to=noa@example.com&");
-    expect(decoded("task-share-mailto").startsWith("mailto:noa@example.com?")).toBe(true);
   });
 
   it("with no recipient, lets WhatsApp pick the contact", () => {
@@ -62,7 +57,7 @@ describe("TaskShare", () => {
 
     expect(decoded("task-share-whatsapp").startsWith("https://wa.me/?text=")).toBe(true);
     expect(decoded("task-share-mail")).toContain("&to=&su=");
-    expect(decoded("task-share-mailto").startsWith("mailto:?subject=")).toBe(true);
+    expect(screen.queryByTestId("task-share-mailto")).toBeNull();
   });
 
   // 31.10.2026: a click on "מייל" used to do nothing visible in a browser
@@ -73,6 +68,24 @@ describe("TaskShare", () => {
 
     fireEvent.click(screen.getByTestId("task-share-mail"));
     expect(screen.getByTestId("task-share-feedback").textContent).toContain("Gmail");
+  });
+
+  // A browser signed in to a private Google account too would open the
+  // draft there; authuser picks the sharer's work account.
+  it("opens the draft in the sharer's own Google account", () => {
+    render(
+      <TaskShare
+        task={TASK}
+        url={URL}
+        people={PEOPLE}
+        defaultRecipientId="u1"
+        senderEmail="ariel@ankora.co.il"
+        onDone={vi.fn()}
+      />
+    );
+    expect(
+      decoded("task-share-mail").startsWith("https://mail.google.com/mail/?authuser=ariel@ankora.co.il&view=cm&fs=1&to=hadas@example.com&su=")
+    ).toBe(true);
   });
 
   it("copies the whole message and confirms it", async () => {

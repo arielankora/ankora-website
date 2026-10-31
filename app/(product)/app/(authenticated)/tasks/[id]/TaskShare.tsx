@@ -23,28 +23,32 @@ const FIELD =
 // an empty "to".
 //
 // 31.10.2026: the mail button was a bare mailto: link. In a browser with
-// no mail app set up to handle mailto (most of the team works in Gmail on
-// the web) the click did nothing and said nothing. The button now opens a
-// Gmail draft in a new tab, which works for everyone signed in to their
-// work Google account. The mailto: link stays as a smaller option for
-// whoever has a mail app, "העתקה" copies the whole message, and after any
-// of them a line says what just happened and what to do if nothing opened.
+// no mail app set up to handle mailto the click did nothing and said
+// nothing. Everyone on the team works in Gmail in the browser, so the
+// button opens a Gmail draft in a new tab, with authuser set to the
+// sharer's own address: a browser signed in to a private Google account
+// as well would otherwise open the draft there. No mailto: fallback, since
+// nobody uses a mail app. "העתקת ההודעה" covers a blocked tab, and after
+// either action a line says what happened.
 export function TaskShare({
   task,
   url,
   people,
   defaultRecipientId,
+  senderEmail = null,
   onDone,
 }: {
   task: { title: string; clientName: string; statusLabel: string; dueDate: string | null; priorityLabel: string | null };
   url: string;
   people: SharePerson[];
   defaultRecipientId: string | null;
+  /// The sharer's work address, so the draft opens in that Google account.
+  senderEmail?: string | null;
   onDone: () => void;
 }) {
   const [recipientId, setRecipientId] = useState(defaultRecipientId ?? "");
   const [note, setNote] = useState("");
-  const [feedback, setFeedback] = useState<"gmail" | "mailto" | "copied" | "copy-failed" | null>(null);
+  const [feedback, setFeedback] = useState<"gmail" | "copied" | "copy-failed" | null>(null);
   const recipient = people.find((p) => p.id === recipientId) ?? null;
 
   const subject = `משימה: ${task.title} (${task.clientName})`;
@@ -59,12 +63,19 @@ export function TaskShare({
     return lines.join("\n");
   }, [recipient, note, task, url]);
 
-  const gmailHref = `https://mail.google.com/mail/?view=cm&fs=1&to=${
-    recipient ? encodeURIComponent(recipient.email) : ""
-  }&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  const mailHref = `mailto:${recipient ? encodeURIComponent(recipient.email) : ""}?subject=${encodeURIComponent(
-    subject
-  )}&body=${encodeURIComponent(body)}`;
+  // encodeURIComponent, not URLSearchParams: the latter writes spaces as
+  // "+", and a "+" in the note must stay a "+".
+  const gmailQuery: [string, string][] = [
+    ...(senderEmail ? [["authuser", senderEmail] as [string, string]] : []),
+    ["view", "cm"],
+    ["fs", "1"],
+    ["to", recipient?.email ?? ""],
+    ["su", subject],
+    ["body", body],
+  ];
+  const gmailHref = `https://mail.google.com/mail/?${gmailQuery
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&")}`;
   // wa.me with no number opens WhatsApp's contact picker with the text.
   const waHref = recipient
     ? whatsappHref(recipient.whatsappNumber, body)
@@ -124,7 +135,7 @@ export function TaskShare({
             className="flex items-center gap-1.5 rounded-full border border-app-surface-nav bg-white px-4 py-2.5 text-sm font-medium text-app-text-primary"
           >
             <Mail size={15} />
-            מייל
+            טיוטה ב-Gmail
           </a>
           {waHref ? (
             <a
@@ -155,14 +166,6 @@ export function TaskShare({
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-app-text-secondary">
-        <a
-          href={mailHref}
-          onClick={() => setFeedback("mailto")}
-          data-testid="task-share-mailto"
-          className="underline underline-offset-2 hover:text-app-text-primary"
-        >
-          פתיחה באפליקציית המייל במחשב
-        </a>
         <button
           type="button"
           onClick={copyMessage}
@@ -183,11 +186,9 @@ export function TaskShare({
 }
 
 const FEEDBACK = {
-  gmail:
-    "טיוטה נפתחה ב-Gmail בלשונית חדשה, עם הנמען, הנושא והקישור למשימה. לא נפתחה לשונית? בדקו שהדפדפן לא חסם חלון קופץ, או העתיקו את ההודעה.",
-  mailto: "ביקשנו מהמחשב לפתוח טיוטה באפליקציית המייל. אם לא נפתח כלום, אין אפליקציית מייל מוגדרת: השתמשו בכפתור מייל או העתיקו את ההודעה.",
+  gmail: "הטיוטה נפתחה ב-Gmail בלשונית חדשה. לא נפתחה? הדפדפן כנראה חסם חלון קופץ: העתיקו את ההודעה.",
   copied: "ההודעה הועתקה, כולל הקישור למשימה. אפשר להדביק אותה בכל מייל או צ'אט.",
-  "copy-failed": "הדפדפן לא אפשר העתקה. השתמשו בכפתור מייל.",
+  "copy-failed": "הדפדפן לא אפשר העתקה. נסו את כפתור Gmail.",
 } as const;
 
 function formatDay(iso: string): string {
