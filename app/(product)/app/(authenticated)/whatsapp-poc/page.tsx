@@ -4,7 +4,10 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { canSendTo, canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import {
   UnipileError,
+  cleanCursor,
+  getChat,
   isConfigured,
+  isHiddenChat,
   listChats,
   listMessages,
   readPocConfig,
@@ -42,7 +45,13 @@ function attachmentLabel(a: PocMessage["attachments"][number]) {
   return ATTACHMENT_LABEL[a.type] ?? "קובץ";
 }
 
-export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string }> }) {
+function chatHref(chatId: string, cursor: string | null) {
+  const params = new URLSearchParams({ chat: chatId });
+  if (cursor) params.set("cursor", cursor);
+  return `/app/whatsapp-poc?${params.toString()}`;
+}
+
+export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string; cursor?: string }> }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   const config = readPocConfig();
@@ -62,16 +71,30 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
     );
   }
 
+  const cursor = cleanCursor(searchParams.cursor);
   let chats: PocChat[] = [];
+  let nextCursor: string | null = null;
   let loadError: string | null = null;
   try {
-    chats = await listChats(config);
+    ({ chats, nextCursor } = await listChats(config, { cursor }));
   } catch (err) {
     if (!(err instanceof UnipileError)) throw err;
     loadError = err.message;
   }
 
-  const selected = chats.find((c) => c.id === searchParams.chat) ?? null;
+  // A chat that is not on the page of the list being shown (an older one,
+  // or a link kept from before) is read on its own.
+  const requestedId = searchParams.chat && searchParams.chat.length <= 200 ? searchParams.chat : null;
+  let selected: PocChat | null = chats.find((c) => c.id === requestedId) ?? null;
+  if (!selected && requestedId) {
+    try {
+      const chat = await getChat(config, requestedId);
+      selected = chat && !isHiddenChat(chat) ? chat : null;
+    } catch (err) {
+      if (!(err instanceof UnipileError)) throw err;
+      loadError = err.message;
+    }
+  }
   let messages: PocMessage[] = [];
   if (selected) {
     try {
@@ -104,7 +127,7 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
             {chats.map((chat) => (
               <li key={chat.id}>
                 <Link
-                  href={`/app/whatsapp-poc?chat=${encodeURIComponent(chat.id)}`}
+                  href={chatHref(chat.id, cursor)}
                   aria-current={selected?.id === chat.id ? "page" : undefined}
                   className={`block px-4 py-3 text-sm hover:bg-app-surface-sunken ${selected?.id === chat.id ? "bg-app-surface-sunken" : ""}`}
                 >
@@ -126,6 +149,23 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
               <li className="px-4 py-3 text-sm text-app-text-secondary">אין שיחות.</li>
             ) : null}
           </ul>
+          {nextCursor || cursor ? (
+            <div className="flex flex-wrap gap-4 border-t border-app-border px-4 py-3 text-sm">
+              {cursor ? (
+                <Link href="/app/whatsapp-poc" className="inline-flex min-h-11 items-center text-app-text-primary underline">
+                  לשיחות האחרונות
+                </Link>
+              ) : null}
+              {nextCursor ? (
+                <Link
+                  href={`/app/whatsapp-poc?${new URLSearchParams({ cursor: nextCursor }).toString()}`}
+                  className="inline-flex min-h-11 items-center text-app-text-primary underline"
+                >
+                  שיחות ישנות יותר
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
         </nav>
 
         <section aria-label="הודעות" className="flex min-h-[20rem] flex-col rounded-2xl border border-app-border bg-white">
@@ -150,6 +190,11 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
                       ) : null}
                       {m.isDeleted ? (
                         <p className="italic text-app-text-secondary">ההודעה נמחקה</p>
+                      ) : !m.text && m.attachments.length === 0 ? (
+                        // Unipile returns some WhatsApp kinds (a poll, a
+                        // location, a contact card, some stickers) with
+                        // neither text nor an attachment.
+                        <p className="italic text-app-text-secondary">[הודעה שאינה טקסט, לא מוצגת כאן]</p>
                       ) : (
                         <p className="whitespace-pre-wrap break-words text-app-text-primary">{m.text}</p>
                       )}
