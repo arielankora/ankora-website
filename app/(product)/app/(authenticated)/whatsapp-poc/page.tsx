@@ -5,12 +5,13 @@ import { canSendTo, canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { normalizePhone } from "@/lib/contact-normalize";
 import {
   UnipileError,
-  cleanCursor,
+  CHAT_PAGE_SIZE,
   findChatByPhone,
   getChat,
   isConfigured,
   isHiddenChat,
   listChats,
+  parseOffset,
   listMessages,
   readPocConfig,
   type PocChat,
@@ -47,13 +48,15 @@ function attachmentLabel(a: PocMessage["attachments"][number]) {
   return ATTACHMENT_LABEL[a.type] ?? "קובץ";
 }
 
-function chatHref(chatId: string, cursor: string | null) {
-  const params = new URLSearchParams({ chat: chatId });
-  if (cursor) params.set("cursor", cursor);
-  return `/app/whatsapp-poc?${params.toString()}`;
+function pageHref(params: { chat?: string; offset?: number }) {
+  const q = new URLSearchParams();
+  if (params.chat) q.set("chat", params.chat);
+  if (params.offset) q.set("offset", String(params.offset));
+  const s = q.toString();
+  return s ? `/app/whatsapp-poc?${s}` : "/app/whatsapp-poc";
 }
 
-export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string; cursor?: string; phone?: string }> }) {
+export default async function WhatsappPocPage(props: { searchParams: Promise<{ chat?: string; offset?: string; phone?: string }> }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   const config = readPocConfig();
@@ -73,12 +76,12 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
     );
   }
 
-  const cursor = cleanCursor(searchParams.cursor);
+  const offset = parseOffset(searchParams.offset);
   let chats: PocChat[] = [];
-  let nextCursor: string | null = null;
+  let hasMore = false;
   let loadError: string | null = null;
   try {
-    ({ chats, nextCursor } = await listChats(config, { cursor }));
+    ({ chats, hasMore } = await listChats(config, { offset }));
   } catch (err) {
     if (!(err instanceof UnipileError)) throw err;
     loadError = err.message;
@@ -161,7 +164,7 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
             {chats.map((chat) => (
               <li key={chat.id}>
                 <Link
-                  href={chatHref(chat.id, cursor)}
+                  href={pageHref({ chat: chat.id, offset })}
                   aria-current={selected?.id === chat.id ? "page" : undefined}
                   className={`block px-4 py-3 text-sm hover:bg-app-surface-sunken ${selected?.id === chat.id ? "bg-app-surface-sunken" : ""}`}
                 >
@@ -183,16 +186,16 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
               <li className="px-4 py-3 text-sm text-app-text-secondary">אין שיחות.</li>
             ) : null}
           </ul>
-          {nextCursor || cursor ? (
+          {hasMore || offset > 0 ? (
             <div className="flex flex-wrap gap-4 border-t border-app-border px-4 py-3 text-sm">
-              {cursor ? (
-                <Link href="/app/whatsapp-poc" className="inline-flex min-h-11 items-center text-app-text-primary underline">
-                  לשיחות האחרונות
+              {offset > 0 ? (
+                <Link href={pageHref({ offset: offset - CHAT_PAGE_SIZE })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
+                  שיחות חדשות יותר
                 </Link>
               ) : null}
-              {nextCursor ? (
+              {hasMore ? (
                 <Link
-                  href={`/app/whatsapp-poc?${new URLSearchParams({ cursor: nextCursor }).toString()}`}
+                  href={pageHref({ offset: offset + CHAT_PAGE_SIZE })}
                   className="inline-flex min-h-11 items-center text-app-text-primary underline"
                 >
                   שיחות ישנות יותר

@@ -172,25 +172,36 @@ export function isHiddenChat(chat: PocChat): boolean {
   return chat.id === "status@broadcast" || chat.id.endsWith("@broadcast");
 }
 
-/// A cursor as Unipile hands it out is opaque. It travels back through our
-/// own URL, so only a short run of printable characters is accepted; the
-/// URL builders escape it.
-export function cleanCursor(raw: string | undefined | null): string | null {
-  if (!raw || raw.length > 500 || !/^[\x21-\x7e]+$/.test(raw)) return null;
-  return raw;
+export const CHAT_PAGE_SIZE = 30;
+const MAX_OFFSET = 3000;
+
+/// The page offset from the URL: a whole multiple of the page size, or 0.
+///
+/// 31.10.2026: Unipile pages WhatsApp chats by offset. It returns no
+/// next_cursor for this provider, so a cursor-based "older" link never
+/// appeared.
+export function parseOffset(raw: string | undefined | null): number {
+  if (!raw || !/^\d{1,5}$/.test(raw)) return 0;
+  const n = Number(raw);
+  if (n > MAX_OFFSET || n % CHAT_PAGE_SIZE !== 0) return 0;
+  return n;
 }
 
 export async function listChats(
   config: { apiKey: string; accountId: string },
-  options: { limit?: number; cursor?: string | null } = {},
-): Promise<{ chats: PocChat[]; nextCursor: string | null }> {
-  const query: Record<string, string> = { limit: String(options.limit ?? 30) };
-  if (options.cursor) query.cursor = options.cursor;
+  options: { offset?: number } = {},
+): Promise<{ chats: PocChat[]; hasMore: boolean }> {
+  const offset = options.offset ?? 0;
+  const query: Record<string, string> = { limit: String(CHAT_PAGE_SIZE) };
+  if (offset > 0) query.offset = String(offset);
   const body = await call(config, "/chats", { query });
-  const chats = dataArray(body)
+  const raw = dataArray(body);
+  const chats = raw
     .map((c) => toPocChat(c as RawChat))
     .filter((c): c is PocChat => c !== null && !isHiddenChat(c));
-  return { chats, nextCursor: cleanCursor(str((body as { next_cursor?: unknown } | null)?.next_cursor)) };
+  // A full page means there may be more. Counted before the status feed is
+  // dropped, so that one hidden chat does not end the list early.
+  return { chats, hasMore: raw.length >= CHAT_PAGE_SIZE && offset + CHAT_PAGE_SIZE <= MAX_OFFSET };
 }
 
 export async function getChat(config: { apiKey: string; accountId: string }, chatId: string): Promise<PocChat | null> {

@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { cleanCursor, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -112,11 +112,14 @@ describe("WhatsApp POC: the chat list", () => {
     expect(person && isHiddenChat(person)).toBe(false);
   });
 
-  it("passes an ordinary cursor and drops anything odd", () => {
-    expect(cleanCursor("eyJvZmZzZXQiOjMwfQ==")).toBe("eyJvZmZzZXQiOjMwfQ==");
-    expect(cleanCursor(undefined)).toBeNull();
-    expect(cleanCursor("a b")).toBeNull();
-    expect(cleanCursor("x".repeat(501))).toBeNull();
+  it("accepts a page offset and turns anything odd into the first page", () => {
+    expect(parseOffset("30")).toBe(30);
+    expect(parseOffset("90")).toBe(90);
+    expect(parseOffset(undefined)).toBe(0);
+    expect(parseOffset("31")).toBe(0);
+    expect(parseOffset("-30")).toBe(0);
+    expect(parseOffset("1e3")).toBe(0);
+    expect(parseOffset("99990")).toBe(0);
   });
 });
 
