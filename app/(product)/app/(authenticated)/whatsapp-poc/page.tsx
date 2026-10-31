@@ -79,10 +79,9 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
   const offset = parseOffset(searchParams.offset);
   let chats: PocChat[] = [];
   let hasMore = false;
-  let stale = false;
   let loadError: string | null = null;
   try {
-    ({ chats, hasMore, stale } = await listChats(config, { offset }));
+    ({ chats, hasMore } = await listChats(config, { offset }));
   } catch (err) {
     if (!(err instanceof UnipileError)) throw err;
     loadError = err.message;
@@ -131,12 +130,6 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
           נקרא בזמן אמת מ-Unipile ולא נשמר במערכת. שליחה רק למספרי הבדיקה.
         </p>
       </div>
-
-      {stale ? (
-        <p className="rounded-lg bg-app-surface-sunken p-3 text-sm text-app-text-secondary">
-          Unipile מגביל כרגע את קצב הבקשות, אז מוצגת רשימת השיחות מלפני כמה דקות.
-        </p>
-      ) : null}
 
       {loadError ? (
         <p role="alert" className="rounded-lg bg-app-error-soft p-3 text-sm text-app-error">

@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, mergeChats, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -161,58 +161,73 @@ describe("WhatsApp POC: merging Unipile's chat list", () => {
   });
 });
 
-describe("WhatsApp POC: remembering the chat list for a minute", () => {
+describe("WhatsApp POC: remembering the chat list", () => {
   const config = { apiKey: "k", accountId: "acc_test" };
-  const list = [toPocChat({ id: "a@lid", name: "A", type: "1to1", last_message_timestamp: "2026-10-31T10:00:00Z" })!];
+  const chat = (id: string) => toPocChat({ id, name: id, type: "1to1", last_message_timestamp: "2026-10-31T10:00:00Z" })!;
+  const first = [chat("a@lid")];
+  const second = [chat("b@lid")];
+  // Runs scheduled work at once and waits for it, as afterResponse does
+  // outside a request.
+  const inline = async (work: () => Promise<void>) => {
+    await work().catch(() => undefined);
+  };
 
-  it("reads Unipile once within a minute, then again after it", async () => {
+  it("reads Unipile once within a minute", async () => {
     resetChatListCache();
     let calls = 0;
     const fetchAll = async () => {
       calls += 1;
-      return list;
+      return first;
     };
     let t = 1_000_000;
-    await loadMergedChats(config, fetchAll, () => t);
+    await loadMergedChats(config, fetchAll, () => t, inline);
     t += CHAT_LIST_FRESH_MS - 1;
-    await loadMergedChats(config, fetchAll, () => t);
+    await loadMergedChats(config, fetchAll, () => t, inline);
     expect(calls).toBe(1);
-    t += 2;
-    await loadMergedChats(config, fetchAll, () => t);
-    expect(calls).toBe(2);
   });
 
-  it("shows the last list, marked stale, when Unipile answers 429", async () => {
+  it("after a minute shows the old list at once and refreshes it for the next load", async () => {
     resetChatListCache();
     let t = 2_000_000;
-    await loadMergedChats(config, async () => list, () => t);
+    await loadMergedChats(config, async () => first, () => t, inline);
     t += CHAT_LIST_FRESH_MS + 1;
-    const result = await loadMergedChats(
-      config,
-      async () => {
-        throw new UnipileError("rate", 429);
-      },
-      () => t,
-    );
-    expect(result).toEqual({ chats: list, stale: true });
+    const scheduled: Array<() => Promise<void>> = [];
+    const later = (work: () => Promise<void>) => {
+      scheduled.push(work);
+    };
+    const shown = await loadMergedChats(config, async () => second, () => t, later);
+    expect(shown).toEqual({ chats: first, refreshing: true });
+    expect(scheduled).toHaveLength(1);
+    await scheduled[0]();
+    const next = await loadMergedChats(config, async () => second, () => t, later);
+    expect(next.chats).toEqual(second);
   });
 
-  it("does not hide other errors, and has nothing to show with no earlier list", async () => {
+  it("keeps the old list when the background read fails, a 429 included", async () => {
+    resetChatListCache();
+    let t = 3_000_000;
+    await loadMergedChats(config, async () => first, () => t, inline);
+    t += CHAT_LIST_FRESH_MS + 1;
+    const failing = async (): Promise<PocChat[]> => {
+      throw new UnipileError("rate", 429);
+    };
+    const shown = await loadMergedChats(config, failing, () => t, inline);
+    expect(shown.chats).toEqual(first);
+    const again = await loadMergedChats(config, failing, () => t, inline);
+    expect(again.chats).toEqual(first);
+  });
+
+  it("waits for a read when there is no list or it is over ten minutes old", async () => {
     resetChatListCache();
     await expect(
       loadMergedChats(config, async () => {
         throw new UnipileError("rate", 429);
       }),
     ).rejects.toThrow("rate");
-    await loadMergedChats(config, async () => list, () => 0);
-    await expect(
-      loadMergedChats(
-        config,
-        async () => {
-          throw new UnipileError("down", 500);
-        },
-        () => CHAT_LIST_FRESH_MS + 1,
-      ),
-    ).rejects.toThrow("down");
+    let t = 4_000_000;
+    await loadMergedChats(config, async () => first, () => t, inline);
+    t += CHAT_LIST_MAX_AGE_MS + 1;
+    const shown = await loadMergedChats(config, async () => second, () => t, inline);
+    expect(shown).toEqual({ chats: second, refreshing: false });
   });
 });

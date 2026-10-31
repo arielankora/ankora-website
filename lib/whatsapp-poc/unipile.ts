@@ -1,4 +1,5 @@
 import "server-only";
+import { afterResponse } from "@/lib/after-response";
 import { parseEmailList, parsePhoneList } from "./access";
 
 // WhatsApp POC (31.10.2026): a thin, read-mostly client for the Unipile v2
@@ -228,53 +229,76 @@ async function fetchAllChats(config: { apiKey: string; accountId: string }): Pro
 // 1.11.2026: reading the whole list costs up to four calls, and doing that
 // on every page load made the screen take 6 to 12 seconds and, by the
 // fourth load in two minutes, drew a 429 from Unipile. So the merged list
-// is kept in this server instance's memory for a minute. Paging and
-// opening a chat inside that minute reuse it; only the open chat's
-// messages are read live. If Unipile refuses with 429, the last list read
-// (up to ten minutes old) is shown rather than an empty screen.
+// is kept in this server instance's memory:
+//   - under a minute old, it is used as is;
+//   - up to ten minutes old, it is shown at once and re-read after the
+//     response has gone out, so the next load has the new one;
+//   - older, or none yet (a fresh instance), the person waits for a read.
+// A 429 or any other failure of the background read leaves the old list
+// in place; it is logged, and the person never sees it.
 //
 // The memory is per instance and is never written anywhere. It holds what
 // the screen already shows: chat names and the last message preview.
 export const CHAT_LIST_FRESH_MS = 60_000;
-const CHAT_LIST_STALE_MS = 10 * 60_000;
+export const CHAT_LIST_MAX_AGE_MS = 10 * 60_000;
 
+type Config = { apiKey: string; accountId: string };
 type CachedList = { accountId: string; at: number; chats: PocChat[] };
 let cachedList: CachedList | null = null;
+let refreshing: Promise<void> | null = null;
 
 /// For tests: forget the remembered list.
 export function resetChatListCache(): void {
   cachedList = null;
+  refreshing = null;
+}
+
+type Schedule = (work: () => Promise<void>) => void | Promise<void>;
+const scheduleAfterResponse: Schedule = (work) => afterResponse("whatsapp-poc chat list refresh", work);
+
+async function readAndRemember(config: Config, fetchAll: (config: Config) => Promise<PocChat[]>, now: () => number) {
+  const chats = mergeChats(await fetchAll(config));
+  cachedList = { accountId: config.accountId, at: now(), chats };
+  return chats;
 }
 
 export async function loadMergedChats(
-  config: { apiKey: string; accountId: string },
-  fetchAll: (config: { apiKey: string; accountId: string }) => Promise<PocChat[]> = fetchAllChats,
+  config: Config,
+  fetchAll: (config: Config) => Promise<PocChat[]> = fetchAllChats,
   now: () => number = Date.now,
-): Promise<{ chats: PocChat[]; stale: boolean }> {
+  schedule: Schedule = scheduleAfterResponse,
+): Promise<{ chats: PocChat[]; refreshing: boolean }> {
   const cached = cachedList && cachedList.accountId === config.accountId ? cachedList : null;
-  if (cached && now() - cached.at < CHAT_LIST_FRESH_MS) return { chats: cached.chats, stale: false };
-  try {
-    const chats = mergeChats(await fetchAll(config));
-    cachedList = { accountId: config.accountId, at: now(), chats };
-    return { chats, stale: false };
-  } catch (err) {
-    if (err instanceof UnipileError && err.status === 429 && cached && now() - cached.at < CHAT_LIST_STALE_MS) {
-      return { chats: cached.chats, stale: true };
+  const age = cached ? now() - cached.at : Infinity;
+
+  if (cached && age < CHAT_LIST_FRESH_MS) return { chats: cached.chats, refreshing: false };
+
+  if (cached && age < CHAT_LIST_MAX_AGE_MS) {
+    if (!refreshing) {
+      const run = async () => {
+        try {
+          await readAndRemember(config, fetchAll, now);
+        } finally {
+          refreshing = null;
+        }
+      };
+      refreshing = Promise.resolve(schedule(run)).then(() => undefined);
     }
-    throw err;
+    return { chats: cached.chats, refreshing: true };
   }
+
+  return { chats: await readAndRemember(config, fetchAll, now), refreshing: false };
 }
 
 export async function listChats(
-  config: { apiKey: string; accountId: string },
+  config: Config,
   options: { offset?: number } = {},
-): Promise<{ chats: PocChat[]; hasMore: boolean; stale: boolean }> {
+): Promise<{ chats: PocChat[]; hasMore: boolean }> {
   const offset = options.offset ?? 0;
-  const { chats: merged, stale } = await loadMergedChats(config);
+  const { chats: merged } = await loadMergedChats(config);
   return {
     chats: merged.slice(offset, offset + CHAT_PAGE_SIZE),
     hasMore: offset + CHAT_PAGE_SIZE < merged.length,
-    stale,
   };
 }
 
