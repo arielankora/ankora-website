@@ -99,7 +99,7 @@ describe("items uncertain only because Ankora wrote them", () => {
       source: { kind: "ANKORA_DOCUMENT", title: "סיכום פגישת היכרות", weight: "PRIMARY" },
       items: [{ target: "FACT", reason: "נדב אמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "PREFERENCE", body: "המלצה אחת ולא כמה" } }],
     });
-    const source = await prisma.clientSource.findFirstOrThrow({ where: { clientId: client.id, code: r.sourceCode } });
+    const source = await prisma.clientSource.findFirstOrThrow({ where: { clientId: client.id, code: r.sourceCode! } });
     expect(source).toMatchObject({ kind: "ANKORA_DOCUMENT", weight: "PRIMARY" });
     const [batch] = (await listOpenBatches(anna)).filter((b) => b.id === r.batchId);
     expect(codes(batch.proposals[0].flags)).not.toContain("R14");

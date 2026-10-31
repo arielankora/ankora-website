@@ -336,11 +336,61 @@ const HAS_STATUS: ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "SY
 /// What a proposal must say before anyone reads it, or null. Refused when
 /// it arrives, with this line back to Claude: the reviewer should never
 /// have to guess why, or how sure.
-export function missingRequired(target: ProposalTargetLike, payload: Record<string, unknown>, reason: string | null | undefined): string | null {
-  if (!reason?.trim()) return "חסרה סיבה: משפט אחד, למה זה נכון ומאיפה.";
-  const question = target === "FACT" && payload.kind === "QUESTION";
-  if (HAS_STATUS.includes(target) && !question && !payload.knowledgeStatus) return "חסר סטטוס: CONFIRMED, UNCERTAIN או MISSING.";
+export function missingRequired(target: ProposalTargetLike, payload: Record<string, unknown>, reason: string | null | undefined, path = "items[i]"): string | null {
+  if (!reason?.trim()) return `חסרה סיבה ב-${path}.reason: משפט אחד, למה זה נכון ומאיפה.`;
+  if (needsStatus(target, payload) && !payload.knowledgeStatus) return `חסר סטטוס ב-${path}.status: CONFIRMED, UNCERTAIN או MISSING.`;
   return null;
+}
+
+export const KNOWLEDGE_STATUSES = ["CONFIRMED", "UNCERTAIN", "MISSING"] as const;
+export type KnowledgeStatusInput = (typeof KNOWLEDGE_STATUSES)[number];
+
+/// Whether an item carries a knowledge status at all: a question is not
+/// "confirmed", and a task, a date, a free text and a domain are only
+/// approved.
+export function needsStatus(target: ProposalTargetLike, payload: Record<string, unknown>): boolean {
+  return HAS_STATUS.includes(target) && !(target === "FACT" && payload.kind === "QUESTION");
+}
+
+/// 31.10.2026: the status an item says nothing about, read from how sure
+/// Claude is. Only HIGH is confirmed; MISSING is never guessed.
+export function statusFromConfidence(confidence: string | null | undefined): KnowledgeStatusInput {
+  return confidence === "HIGH" ? "CONFIRMED" : "UNCERTAIN";
+}
+
+/// The item's status, wherever it was sent, written to
+/// `payload.knowledgeStatus` where the rest of the server reads it.
+///
+/// 31.10.2026: the tool's input schema had no status field, and the
+/// description said `payload.knowledgeStatus` only near its end, which
+/// clients cut off. A `status` sent on the item was stripped by zod
+/// before it got here, and one sent in the payload was not the name read,
+/// so every item came back "חסר סטטוס". Now it is read from
+/// `payload.knowledgeStatus`, `status` on the item, or `status` in the
+/// payload, and when none is sent it comes from `confidence`.
+export function resolveKnowledgeStatus(
+  item: { target: ProposalTargetLike; payload: Record<string, unknown>; status?: unknown; confidence?: string | null },
+  path = "items[i]"
+): { ok: true; payload: Record<string, unknown>; defaulted: boolean } | { ok: false; reason: string } {
+  const payload = { ...(item.payload ?? {}) };
+  if (!needsStatus(item.target, payload)) return { ok: true, payload, defaulted: false };
+  const sent: { where: string; value: unknown }[] = [
+    { where: `${path}.payload.knowledgeStatus`, value: payload.knowledgeStatus },
+    { where: `${path}.status`, value: item.status },
+    { where: `${path}.payload.status`, value: payload.status },
+  ].filter((s) => s.value !== undefined && s.value !== null && s.value !== "");
+  delete payload.status;
+  for (const s of sent) {
+    if (!KNOWLEDGE_STATUSES.includes(s.value as KnowledgeStatusInput)) {
+      return { ok: false, reason: `סטטוס לא תקין ב-${s.where}: "${String(s.value)}". הערכים האפשריים: CONFIRMED, UNCERTAIN או MISSING.` };
+    }
+  }
+  const values = [...new Set(sent.map((s) => s.value as KnowledgeStatusInput))];
+  if (values.length > 1) {
+    return { ok: false, reason: `סטטוסים סותרים ב-${sent.map((s) => s.where).join(" וב-")}: ${values.join(", ")}. שולחים סטטוס אחד, ב-${path}.status.` };
+  }
+  if (values.length === 1) return { ok: true, payload: { ...payload, knowledgeStatus: values[0] }, defaulted: false };
+  return { ok: true, payload: { ...payload, knowledgeStatus: statusFromConfidence(item.confidence) }, defaulted: true };
 }
 
 export type ConfidenceLike = "HIGH" | "MEDIUM" | "LOW";
