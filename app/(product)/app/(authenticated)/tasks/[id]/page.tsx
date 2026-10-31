@@ -275,6 +275,7 @@ export default async function TaskDetailPage(props: {
         canClearAiExclusion={can(user.role, "client.manage")}
         leadComment={leadComment}
         viewerId={user.id}
+        viewerEmail={user.email}
         // Only this person's own timers, and only enough of each to
         // answer three questions: is it on this task, is it on this
         // task's client (then it has to stop first), and what to call it.

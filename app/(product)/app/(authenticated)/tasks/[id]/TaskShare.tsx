@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Mail, MessageCircle } from "lucide-react";
+import { Check, Copy, Mail, MessageCircle } from "lucide-react";
 import { whatsappHref } from "@/lib/whatsapp";
 
 export type SharePerson = { id: string; name: string; email: string; whatsappNumber: string | null };
@@ -21,21 +21,34 @@ const FIELD =
 // reached that way, and the panel says so instead of offering a link to
 // nobody. "בלי נמען" opens WhatsApp's own contact picker, or a mail with
 // an empty "to".
+//
+// 31.10.2026: the mail button was a bare mailto: link. In a browser with
+// no mail app set up to handle mailto the click did nothing and said
+// nothing. Everyone on the team works in Gmail in the browser, so the
+// button opens a Gmail draft in a new tab, with authuser set to the
+// sharer's own address: a browser signed in to a private Google account
+// as well would otherwise open the draft there. No mailto: fallback, since
+// nobody uses a mail app. "העתקת ההודעה" covers a blocked tab, and after
+// either action a line says what happened.
 export function TaskShare({
   task,
   url,
   people,
   defaultRecipientId,
+  senderEmail = null,
   onDone,
 }: {
   task: { title: string; clientName: string; statusLabel: string; dueDate: string | null; priorityLabel: string | null };
   url: string;
   people: SharePerson[];
   defaultRecipientId: string | null;
+  /// The sharer's work address, so the draft opens in that Google account.
+  senderEmail?: string | null;
   onDone: () => void;
 }) {
   const [recipientId, setRecipientId] = useState(defaultRecipientId ?? "");
   const [note, setNote] = useState("");
+  const [feedback, setFeedback] = useState<"gmail" | "copied" | "copy-failed" | null>(null);
   const recipient = people.find((p) => p.id === recipientId) ?? null;
 
   const subject = `משימה: ${task.title} (${task.clientName})`;
@@ -50,13 +63,32 @@ export function TaskShare({
     return lines.join("\n");
   }, [recipient, note, task, url]);
 
-  const mailHref = `mailto:${recipient ? encodeURIComponent(recipient.email) : ""}?subject=${encodeURIComponent(
-    subject
-  )}&body=${encodeURIComponent(body)}`;
+  // encodeURIComponent, not URLSearchParams: the latter writes spaces as
+  // "+", and a "+" in the note must stay a "+".
+  const gmailQuery: [string, string][] = [
+    ...(senderEmail ? [["authuser", senderEmail] as [string, string]] : []),
+    ["view", "cm"],
+    ["fs", "1"],
+    ["to", recipient?.email ?? ""],
+    ["su", subject],
+    ["body", body],
+  ];
+  const gmailHref = `https://mail.google.com/mail/?${gmailQuery
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&")}`;
   // wa.me with no number opens WhatsApp's contact picker with the text.
   const waHref = recipient
     ? whatsappHref(recipient.whatsappNumber, body)
     : `https://wa.me/?text=${encodeURIComponent(body)}`;
+
+  async function copyMessage() {
+    try {
+      await navigator.clipboard.writeText(`${subject}\n\n${body}`);
+      setFeedback("copied");
+    } catch {
+      setFeedback("copy-failed");
+    }
+  }
 
   return (
     <div data-testid="task-share" className="mt-4 rounded-xl border border-app-border bg-app-surface-sunken p-4">
@@ -95,12 +127,15 @@ export function TaskShare({
             סגירה
           </button>
           <a
-            href={mailHref}
+            href={gmailHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() => setFeedback("gmail")}
             data-testid="task-share-mail"
             className="flex items-center gap-1.5 rounded-full border border-app-surface-nav bg-white px-4 py-2.5 text-sm font-medium text-app-text-primary"
           >
             <Mail size={15} />
-            מייל
+            טיוטה ב-Gmail
           </a>
           {waHref ? (
             <a
@@ -130,9 +165,31 @@ export function TaskShare({
           בוואטסאפ עצמו. כל אחד מוסיף את המספר שלו במסך הפרופיל.
         </p>
       )}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12.5px] text-app-text-secondary">
+        <button
+          type="button"
+          onClick={copyMessage}
+          data-testid="task-share-copy"
+          className="flex items-center gap-1 underline underline-offset-2 hover:text-app-text-primary"
+        >
+          {feedback === "copied" ? <Check size={13} /> : <Copy size={13} />}
+          העתקת ההודעה
+        </button>
+      </div>
+      {feedback && (
+        <p role="status" data-testid="task-share-feedback" className="mt-2 text-[12.5px] text-app-text-primary">
+          {FEEDBACK[feedback]}
+        </p>
+      )}
     </div>
   );
 }
+
+const FEEDBACK = {
+  gmail: "הטיוטה נפתחה ב-Gmail בלשונית חדשה. לא נפתחה? הדפדפן כנראה חסם חלון קופץ: העתיקו את ההודעה.",
+  copied: "ההודעה הועתקה, כולל הקישור למשימה. אפשר להדביק אותה בכל מייל או צ'אט.",
+  "copy-failed": "הדפדפן לא אפשר העתקה. נסו את כפתור Gmail.",
+} as const;
 
 function formatDay(iso: string): string {
   return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(new Date(iso));

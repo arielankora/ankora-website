@@ -98,6 +98,7 @@ export function TaskDetail({
   canClearAiExclusion = false,
   leadComment = null,
   viewerId = null,
+  viewerEmail = null,
 }: {
   task: TaskDetailData;
   people: { id: string; name: string; email: string }[];
@@ -118,6 +119,9 @@ export function TaskDetail({
   /// Who is looking. Only used to word the urgent toast: nobody is
   /// messaged about their own task.
   viewerId?: string | null;
+  /// The viewer's work address, so "שיתוף" opens the Gmail draft in that
+  /// Google account even when the browser is signed in to several.
+  viewerEmail?: string | null;
 }) {
   const { showToast } = useToast();
   const [pending, setPending] = useState(false);
@@ -324,6 +328,7 @@ export function TaskDetail({
             }}
             url={taskUrl}
             people={shareWith}
+            senderEmail={viewerEmail}
             defaultRecipientId={task.assignedToId && task.assignedToId !== viewerId ? task.assignedToId : null}
             onDone={() => setPanel(null)}
           />
