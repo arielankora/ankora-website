@@ -2003,8 +2003,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-28",
       "riskReason": "\"בלי AI\": מה שכלי ה-MCP והפרומפטים משאירים בחוץ. כל כלי מכוסה במפה ובבדיקה (lib/mcp/ai-exclusion-coverage.ts), והכלל עצמו בבדיקות אינטגרציה."
+    },
+    "domain:stranger-tests": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-10-31",
+      "riskReason": "Stranger test: an answer goes into the client file confirmed, sourced to who answered, with no proposal; a rule changes only on an explicit yes, and only by a manager or the client's account manager. Logic and permissions in tests/integration/stranger-tests.test.ts"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-28"
+  "lastScan": "2026-10-31"
 }
