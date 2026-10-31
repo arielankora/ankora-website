@@ -1,6 +1,7 @@
 "use client";
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import type { CreatedTaskRow } from "./actions";
+import { parseSort, sortParam, sortRows, type Sort } from "./task-sort";
 
 // The list holds its own rows, and a task that was just created is
 // handed to it rather than fetched.
@@ -53,9 +54,40 @@ type TaskListValue = {
   /// screen can lead back to this list as filtered. Empty outside the
   /// tasks screen, where a row links to the task plainly.
   listQuery: string;
+  /// 31.10.2026: the column the list is sorted by, or null for the
+  /// server's order. See task-sort.ts.
+  sort: Sort;
+  setSort: (sort: Sort) => void;
 };
 
-const TaskListContext = createContext<TaskListValue>({ rows: [], addCreated: () => {}, listQuery: "" });
+const TaskListContext = createContext<TaskListValue>({
+  rows: [],
+  addCreated: () => {},
+  listQuery: "",
+  sort: null,
+  setSort: () => {},
+});
+
+/// The sort is mirrored into `?sort=` with replaceState, the same as the
+/// clients search (ClientsGrid.tsx): no navigation, no RSC fetch of this
+/// screen, nothing that can be aborted, and no history entry per click.
+function mirrorSort(sort: Sort) {
+  const url = new URL(window.location.href);
+  const value = sortParam(sort);
+  if (value) url.searchParams.set("sort", value);
+  else url.searchParams.delete("sort");
+  window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+}
+
+/// The list's query with the sort as it is now, rather than as it was
+/// when the server rendered the page.
+function withSort(listQuery: string, sort: Sort): string {
+  const params = new URLSearchParams(listQuery);
+  const value = sortParam(sort);
+  if (value) params.set("sort", value);
+  else params.delete("sort");
+  return params.toString();
+}
 
 export function useTaskList() {
   return useContext(TaskListContext);
@@ -112,14 +144,30 @@ export function TaskListProvider({
   rows,
   filters,
   listQuery = "",
+  initialSort,
   children,
 }: {
   rows: ListRow[];
   filters: ListFilters;
   listQuery?: string;
+  /// The page's `?sort=`, read once. After that the browser owns it.
+  initialSort?: string;
   children: ReactNode;
 }) {
   const [extra, setExtra] = useState<ListRow[]>([]);
+  const [sort, setSortState] = useState<Sort>(() => parseSort(initialSort));
+  const setSort = useCallback((next: Sort) => {
+    setSortState(next);
+    mirrorSort(next);
+  }, []);
+  // The pills, toggles and filters are links rendered by the server, so
+  // they lead to an address without the sort chosen since. This
+  // component outlives that navigation and still holds the sort: put it
+  // back in the address, so a reload or a copied link keeps it.
+  useEffect(() => {
+    if (sort) mirrorSort(sort);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [listQuery]);
 
   // Everything the server sent, plus anything it has not had a chance to
   // send yet, with the server winning on any id it already knows. That
@@ -144,8 +192,8 @@ export function TaskListProvider({
   // drawn twice for as long as the page is open. Seen in QA on 15.10.2026.
   const all = useMemo(() => {
     const known = new Set(rows.map((r) => r.id));
-    return [...extra.filter((r) => !known.has(r.id)), ...rows];
-  }, [extra, rows]);
+    return [...extra.filter((r) => !known.has(r.id)), ...sortRows(rows, sort)];
+  }, [extra, rows, sort]);
 
   const value = useMemo<TaskListValue>(
     () => ({
@@ -154,9 +202,11 @@ export function TaskListProvider({
         if (!accepts(task, filters)) return;
         setExtra((prev) => (prev.some((r) => r.id === task.id) ? prev : [task, ...prev]));
       },
-      listQuery,
+      listQuery: withSort(listQuery, sort),
+      sort,
+      setSort,
     }),
-    [all, filters, listQuery]
+    [all, filters, listQuery, sort, setSort]
   );
 
   return <TaskListContext.Provider value={value}>{children}</TaskListContext.Provider>;
