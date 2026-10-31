@@ -95,6 +95,15 @@ test.describe("clients/process-actions", () => {
     await expect(card().getByTestId("process-readiness")).toHaveText("רץ");
     await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "true");
 
+    // 31.10.2026: the approved procedure drawn as a band of days over its steps.
+    await card().getByRole("button", { name: "תרשים" }).click();
+    const chart = page.getByRole("dialog");
+    await expect(chart.getByTestId("process-visual")).toBeVisible();
+    await expect(chart.getByTestId("process-visual")).toContainText("מעבירים תשלום לספק");
+    await expect(chart.getByTestId("process-visual")).toContainText("יום 0");
+    await chart.getByRole("button", { name: "סגירה" }).last().click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+
     // An event happened: a run opens as a task, and the card links to it.
     await card().getByRole("button", { name: "פתיחת ריצה" }).click();
     const start = page.getByRole("dialog");

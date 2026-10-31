@@ -43,6 +43,7 @@ import { RUNS_LABEL } from "@/lib/process-readiness";
 import { FIELD_LABELS, documentationLine } from "@/lib/process-rules";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
+import { ProcessVisual } from "./ProcessVisual";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
@@ -1171,6 +1172,17 @@ function ProcessCard({
             <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-document-link">
               מסמך הנוהל
             </Link>
+          )}
+          {p.current && (
+            <Drawer triggerLabel="תרשים" title={`תרשים: ${p.code} ${p.title}`} variant="link">
+              <ProcessVisual
+                triggerKinds={p.triggerKinds}
+                triggerText={p.triggerText}
+                slaBusinessDays={p.slaBusinessDays}
+                nextDate={p.nextDate}
+                steps={p.current.steps}
+              />
+            </Drawer>
           )}
           <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
             <ProcessForm clientId={clientId} existing={p} {...form} />
