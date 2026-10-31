@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
+import { approvesProceduresOf } from "@/lib/procedure-approval";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
@@ -172,8 +173,14 @@ export async function updateClientPolicy(actor: User, id: string, input: Partial
 }
 
 export async function approveClientPolicy(actor: User, id: string) {
-  assertManager(actor);
   const before = await findPolicy(actor, id);
+  // 31.10.2026: a manager, or the client's account manager (as for a
+  // procedure, lib/procedure-approval.ts). Retiring a rule stays a
+  // manager's.
+  const client = await prisma.client.findUnique({ where: { id: before.clientId }, select: { accountManagerId: true } });
+  if (!approvesProceduresOf({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null })) {
+    throw new Error("רק מנהל או מנהל התיק של הלקוח מאשרים כלל של לקוח.");
+  }
   if (before.status !== "PROPOSED") throw new Error("רק כלל מוצע מאשרים.");
   if (before.knowledgeStatus !== "CONFIRMED") {
     throw new Error("הכלל עצמו עוד לא ודאי. קודם מוודאים מול הלקוח מה הוא אמר, ורק אז מאשרים.");

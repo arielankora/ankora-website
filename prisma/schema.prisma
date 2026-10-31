@@ -3830,6 +3830,7 @@ model Process {
   requestTypes RequestType[]
   dates    ImportantDate[]
   checks   ProcessCheck[]
+  strangerTests ProcessStrangerTest[]
 
   @@unique([clientId, seq])
   @@unique([clientId, code])
@@ -3900,6 +3901,86 @@ model ProcessCheck {
 
   @@index([processId, createdAt])
   @@map("process_checks")
+}
+
+/// Stranger test (31.10.2026, Ariel): "could someone who has never done
+/// this run it tomorrow?". Claude walks the procedure against the client's
+/// file as a stranger would, and records where it would get stuck, as
+/// questions. Not a score of fields: what is still unknown. The latest
+/// test of a process is its readiness; a new one replaces the questions
+/// of the last that were not answered.
+model ProcessStrangerTest {
+  id         String   @id @default(cuid())
+  processId  String
+  clientId   String
+  /// The procedure version walked: the draft when there is one, else the
+  /// approved one. Null when there are no steps yet.
+  version    Int?
+  summary    String?
+  ranById    String?
+  /// The source (ClientSource code) the answers are recorded under,
+  /// created with the first answer.
+  sourceCode String?
+  createdAt  DateTime @default(now())
+
+  process   Process                   @relation(fields: [processId], references: [id], onDelete: Cascade)
+  questions ProcessStrangerQuestion[]
+
+  @@index([processId, createdAt])
+  @@map("process_stranger_tests")
+}
+
+enum StrangerSeverity {
+  /// A stranger cannot go on without the answer.
+  BLOCKER
+  /// They can go on, slowly, or by asking someone.
+  SLOWS
+  /// It would be better known; nothing waits on it.
+  IMPROVES
+}
+
+enum StrangerAskWho {
+  /// Someone at Ankora knows: the owner, the account manager.
+  ANKORA
+  /// Only the client, or a supplier of theirs, knows.
+  CLIENT
+}
+
+enum StrangerQuestionStatus {
+  OPEN
+  /// Answered: the answer went into the file as it was given, no proposal
+  /// and no approval round (Ariel, 31.10.2026). A rule changes only on an
+  /// explicit yes from someone who approves the client's rules.
+  ANSWERED
+  NOT_RELEVANT
+  /// A later test of the process replaced it.
+  REPLACED
+}
+
+model ProcessStrangerQuestion {
+  id           String                 @id @default(cuid())
+  testId       String
+  processId    String
+  clientId     String
+  /// The step it is about, 1-based; null for the process as a whole.
+  step         Int?
+  severity     StrangerSeverity
+  askWho       StrangerAskWho
+  question     String
+  status       StrangerQuestionStatus @default(OPEN)
+  answer       String?
+  answeredById String?
+  answeredAt   DateTime?
+  /// What the answer became in the file: a fact, or a rule it changed.
+  factId       String?
+  policyId     String?
+  createdAt    DateTime               @default(now())
+
+  test ProcessStrangerTest @relation(fields: [testId], references: [id], onDelete: Cascade)
+
+  @@index([processId, status])
+  @@index([testId])
+  @@map("process_stranger_questions")
 }
 
 model ProcessVersion {

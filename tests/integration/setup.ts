@@ -47,6 +47,8 @@ const TABLES = [
   "client_organizations",
   "extraction_guides",
   "request_types",
+  "process_stranger_questions",
+  "process_stranger_tests",
   "process_checks",
   "process_lessons",
   "process_versions",

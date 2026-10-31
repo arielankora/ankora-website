@@ -26,8 +26,8 @@ import { planPreview, procedurePreview, rulePreview } from "@/lib/approvals-prev
 //   tasks       the task's supervisor (assertApprovable).
 //   exceptions  the client's rule approvers, or whoever may approve
 //               exceptions when the client names none (canApproveForClient).
-//   rules       a manager (approveClientPolicy).
-//   procedures  a manager (approveProcessVersion).
+//   rules       a manager, or the client's account manager (approveClientPolicy).
+//   procedures  a manager, or the client's account manager (approveProcessVersion).
 //   knowledge   anyone on the client (the review screen, as it was).
 //   plans       the task's assignee and supervisor (approveTaskPlan writes
 //               for anyone on the task; these are the two it is waiting on).
@@ -122,9 +122,12 @@ async function exceptions(s: Scope): Promise<ApprovalItem[]> {
 }
 
 async function rules(s: Scope): Promise<ApprovalItem[]> {
-  if (!s.manager || s.clients.length === 0) return [];
+  // 31.10.2026: the account manager approves their client's rules too
+  // (approveClientPolicy). The internal file stays a manager's.
+  const approving = s.clients.filter((c) => approvesProceduresOf({ userId: s.user.id, isManager: s.manager, accountManagerId: c.accountManagerId }) && (s.manager || !s.internal.has(c.id)));
+  if (approving.length === 0) return [];
   const rows = await prisma.clientPolicy.findMany({
-    where: { status: "PROPOSED", deletedAt: null, clientId: { in: s.clients.map((c) => c.id) } },
+    where: { status: "PROPOSED", deletedAt: null, clientId: { in: approving.map((c) => c.id) } },
     include: { client: { select: { name: true } } },
   });
   // 22.10.2026: a rule not yet confirmed is a question to the client

@@ -12,6 +12,8 @@ import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
 import { BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
 import { calendarOfProcess } from "@/lib/app-domain/date-calendars";
+import { strangerQuestionsOf, strangerStates } from "@/lib/app-domain/stranger-tests";
+import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine } from "@/lib/stranger-test";
 
 // Org brain (claude/org-brain-spec-2026-10-12.md, 8): a client's processes
 // and rules, for Claude.
@@ -37,7 +39,9 @@ async function namesFor(processes: Processes, clientId: string) {
   return { user: new Map(users.map((u) => [u.id, u.name])), system: new Map(systems.map((s) => [s.id, s.systemName])) };
 }
 
-function summary(p: Processes[number], user: Map<string, string>) {
+type Stranger = Awaited<ReturnType<typeof strangerStates>>;
+
+function summary(p: Processes[number], user: Map<string, string>, stranger: Stranger) {
   const reason = readReviewReason(p.reviewReason);
   return {
     code: p.code,
@@ -52,6 +56,8 @@ function summary(p: Processes[number], user: Map<string, string>) {
     // 25.10.2026: whether it runs, and how well it is written down.
     runs: readinessLabel(p.readiness),
     documentation: `${p.documentation.score}/${p.documentation.of}`,
+    // 31.10.2026: could a stranger run it? What is still open.
+    strangerTest: strangerLine(stranger.get(p.id) ?? null),
     notApplicable: p.notApplicable.length ? p.notApplicable.map((k) => FIELD_LABELS[k]) : null,
     needsReview: reason ? REVIEW_REASON_LABELS[reason] : null,
     approvedVersion: p.current?.version ?? null,
@@ -66,8 +72,8 @@ const visible = (actor: User) => (r: Parameters<typeof canSendToAi>[0]) => canSe
 
 export async function mcpListProcesses(actor: User, clientId: string) {
   const processes = (await listProcesses(actor, clientId)).filter(visible(actor));
-  const { user } = await namesFor(processes, clientId);
-  return processes.map((p) => summary(p, user));
+  const [{ user }, stranger] = await Promise.all([namesFor(processes, clientId), strangerStates(processes.map((p) => p.id))]);
+  return processes.map((p) => summary(p, user, stranger));
 }
 
 /// One process in full: everything list_processes says, the approved
@@ -76,7 +82,7 @@ export async function mcpListProcesses(actor: User, clientId: string) {
 export async function mcpGetProcess(actor: User, clientId: string, processId: string) {
   const p = (await listProcesses(actor, clientId)).filter(visible(actor)).find((x) => x.id === processId);
   if (!p) return null;
-  const { user, system } = await namesFor([p], clientId);
+  const [{ user, system }, stranger, questions] = await Promise.all([namesFor([p], clientId), strangerStates([p.id]), strangerQuestionsOf(p.id)]);
   const step = (s: ProcessStep, i: number) => ({
     n: i + 1,
     title: s.title,
@@ -98,7 +104,7 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     select: { id: true, title: true, status: true, dueDate: true },
   });
   return {
-    ...summary(p, user),
+    ...summary(p, user, stranger),
     sla: p.slaText,
     // Decision 6: business days are counted on this calendar, for its
     // steps and for the dates that start it.
@@ -144,6 +150,13 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     recentRuns: runs.map((r) => ({ taskId: r.id, title: r.title, status: r.status, due: day(r.dueDate) })),
     // Spec 5.4: what people who closed runs said, still waiting for the
     // next version. Read them before drafting one.
+    // 31.10.2026: the stranger test. Open questions to ask (answer them
+    // with answer_stranger_question), and what was answered, which is
+    // part of how the process is run.
+    strangerQuestions: {
+      open: questions.open.map((q) => ({ id: q.id, step: q.step, severity: STRANGER_SEVERITY_LABELS[q.severity], askWho: STRANGER_ASK_WHO_LABELS[q.askWho], question: q.question })),
+      answered: questions.answered.map((q) => ({ step: q.step, question: q.question, answer: q.answer })),
+    },
     openLessons: (await prisma.processLesson.findMany({ where: { processId: p.id, status: "OPEN" }, orderBy: { createdAt: "asc" }, select: { body: true, version: true, createdAt: true } })).map((l) => ({
       lesson: l.body,
       fromVersion: l.version,

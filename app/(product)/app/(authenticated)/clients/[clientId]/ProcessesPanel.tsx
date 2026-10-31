@@ -41,6 +41,7 @@ import { REVIEW_REASON_LABELS, type ReviewReason } from "@/lib/process-review";
 import { nextSteps, type DateCandidate, type NextStep, type ProcessFacts, type StepOp } from "@/lib/next-steps";
 import { RUNS_LABEL } from "@/lib/process-readiness";
 import { FIELD_LABELS, documentationLine } from "@/lib/process-rules";
+import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine, type StrangerAskWhoLike, type StrangerSeverityLike, type StrangerState } from "@/lib/stranger-test";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
 import { ProcessVisual, ViewSwitch, useProcessView } from "./ProcessVisual";
@@ -148,6 +149,13 @@ export type PanelProcess = {
   checks: { id: string; outcome: "OK" | "ISSUE"; note: string | null; createdAt: string; checkedByName: string | null; taskId: string | null }[];
   /// Spec 5.4: what people who closed runs said about the procedure.
   lessons: PanelLesson[];
+  /// 31.10.2026: the latest stranger test, its open questions, and the
+  /// prompt that runs a new one (lib/stranger-test.ts).
+  stranger?: {
+    state: StrangerState | null;
+    open: { id: string; step: number | null; severity: StrangerSeverityLike; askWho: StrangerAskWhoLike; question: string }[];
+    prompt: string;
+  };
 };
 
 export type PanelLesson = {
@@ -1069,6 +1077,14 @@ function ProcessCard({
                 {documentationLine(p.doc)}
               </span>
             )}
+            {p.stranger && (
+              <span
+                className={`text-[11px] ${p.stranger.state && p.stranger.state.blockers > 0 ? "text-app-error" : p.stranger.state && p.stranger.state.open === 0 ? "text-app-success" : "text-app-text-tertiary"}`}
+                data-testid="process-stranger"
+              >
+                {strangerLine(p.stranger.state)}
+              </span>
+            )}
             {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
             {p.current && (
               <span className="ms-auto">
@@ -1087,6 +1103,8 @@ function ProcessCard({
               .filter(Boolean)
               .join(" · ")}
           </p>
+
+          {p.stranger && <StrangerBlock stranger={p.stranger} />}
 
           {first ? (
             <div className={`mt-2 rounded-lg px-3 py-2 ${first.blocking ? "bg-app-error-soft" : "bg-app-warning-soft"}`} data-testid="process-next-step" data-step={first.kind}>
@@ -1352,5 +1370,49 @@ function Body({
         </div>
       )}
     </>
+  );
+}
+
+/// 31.10.2026: the stranger test on the card. The open questions, the
+/// blocking ones first, and the prompt that runs a new test in Claude. The
+/// answers are given to Claude, which writes them into the file.
+function StrangerBlock({ stranger }: { stranger: NonNullable<PanelProcess["stranger"]> }) {
+  const [copied, setCopied] = useState(false);
+  const [all, setAll] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(stranger.prompt);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // The prompt is not shown; a refused clipboard leaves the button as it was.
+    }
+  }
+  const shown = all ? stranger.open : stranger.open.slice(0, 3);
+  return (
+    <div className="mt-2" data-testid="process-stranger-block">
+      {shown.length > 0 && (
+        <ul className="space-y-1">
+          {shown.map((q) => (
+            <li key={q.id} className="text-[11.5px] text-app-text-secondary" data-testid="stranger-question" data-severity={q.severity}>
+              <span className={q.severity === "BLOCKER" ? "font-medium text-app-error" : "font-medium text-app-text-primary"}>{STRANGER_SEVERITY_LABELS[q.severity]}</span>
+              {q.step ? ` · שלב ${q.step}` : ""}
+              {` · ${STRANGER_ASK_WHO_LABELS[q.askWho]}: `}
+              {q.question}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-1 flex flex-wrap items-center gap-3 text-[11.5px]">
+        {stranger.open.length > 3 && (
+          <button type="button" onClick={() => setAll(!all)} className="text-app-text-secondary hover:underline">
+            {all ? "פחות" : `עוד ${stranger.open.length - 3}`}
+          </button>
+        )}
+        <button type="button" onClick={copy} className="font-medium text-app-text-accent hover:underline" data-testid="stranger-copy">
+          {copied ? "הועתק. מדביקים ב-Claude" : stranger.state ? "מבחן זר חדש: העתקת הנחיה ל-Claude" : "מבחן הזר: העתקת הנחיה ל-Claude"}
+        </button>
+      </div>
+    </div>
   );
 }
