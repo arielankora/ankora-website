@@ -400,7 +400,7 @@ describe("request types and the extraction brief", () => {
     expect(b.processedRecordings).toEqual([{ firefliesId: "ff-123", client: "NUX", sourceCode: "S1", title: "Nextage & Ankora" }]);
   });
 
-  it("spec 5.2: an item without a reason or a status is refused on arrival, and confidence is kept", async () => {
+  it("spec 5.2: an item without a reason is refused on arrival, and confidence is kept", async () => {
     const { client, user } = await setup();
     const r = await proposeKnowledge(user, {
       clientId: client.id,
@@ -412,14 +412,123 @@ describe("request types and the extraction brief", () => {
         { target: "SYSTEM", reason: "נאמר ב-09:00", confidence: "SURE", payload: { systemName: "Doka", knowledgeStatus: "CONFIRMED" } },
       ],
     });
-    expect(r.proposed).toBe(2);
-    expect(r.dropped).toEqual([
-      { index: 0, reason: expect.stringContaining("חסרה סיבה") },
-      { index: 1, reason: expect.stringContaining("חסר סטטוס") },
-    ]);
+    // 31.10.2026: no status is no longer a refusal; it comes from confidence.
+    expect(r.proposed).toBe(3);
+    expect(r.dropped).toEqual([{ index: 0, reason: expect.stringContaining("items[0].reason") }]);
     const rows = await prisma.knowledgeProposal.findMany({ where: { batchId: r.batchId! }, orderBy: { createdAt: "asc" } });
     // A level that is not one of the three is no level.
-    expect(rows.map((p) => p.confidence)).toEqual(["LOW", null]);
+    expect(rows.map((p) => p.confidence)).toEqual([null, "LOW", null]);
+  });
+});
+
+// 31.10.2026, RIMED: every item came back "חסר סטטוס", because the tool's
+// schema had no status field and a `status` sent was stripped or not read.
+// And a new source was registered even when every item was dropped (S15,
+// S16, empty).
+describe("the status of a proposal", () => {
+  const statusOf = async (batchId: string) =>
+    (await prisma.knowledgeProposal.findMany({ where: { batchId }, orderBy: { createdAt: "asc" } })).map((p) => (p.payload as { knowledgeStatus?: string }).knowledgeStatus);
+
+  it("without a status, comes from confidence: HIGH is confirmed, anything else uncertain", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נאמר", confidence: "HIGH", payload: { kind: "PREFERENCE", body: "וואטסאפ קודם" } },
+        { target: "FACT", reason: "נאמר", confidence: "MEDIUM", payload: { kind: "NOTE", body: "אולי Slack" } },
+        { target: "FACT", reason: "נאמר", confidence: "LOW", payload: { kind: "NOTE", body: "אולי מייל" } },
+        { target: "FACT", reason: "נאמר", payload: { kind: "NOTE", body: "בלי ביטחון" } },
+      ],
+    });
+    expect(r).toMatchObject({ proposed: 4, dropped: [] });
+    expect(await statusOf(r.batchId!)).toEqual(["CONFIRMED", "UNCERTAIN", "UNCERTAIN", "UNCERTAIN"]);
+  });
+
+  it("a valid status is kept as sent, on the item or in the payload", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נאמר", confidence: "HIGH", status: "MISSING", payload: { kind: "NOTE", body: "חסר מספר עוסק", toResolve: "לבקש מאורן" } },
+        { target: "FACT", reason: "נאמר", confidence: "LOW", status: "CONFIRMED", payload: { kind: "NOTE", body: "אמר במפורש" } },
+        { target: "FACT", reason: "נאמר", confidence: "HIGH", payload: { kind: "NOTE", body: "לא ודאי", status: "UNCERTAIN", toResolve: "לשאול" } },
+        { target: "FACT", reason: "נאמר", payload: { kind: "NOTE", body: "השם הישן", knowledgeStatus: "CONFIRMED" } },
+      ],
+    });
+    expect(r).toMatchObject({ proposed: 4, dropped: [] });
+    expect(await statusOf(r.batchId!)).toEqual(["MISSING", "CONFIRMED", "UNCERTAIN", "CONFIRMED"]);
+    const payloads = (await prisma.knowledgeProposal.findMany({ where: { batchId: r.batchId! } })).map((p) => p.payload as Record<string, unknown>);
+    expect(payloads.every((p) => !("status" in p))).toBe(true);
+  });
+
+  it("a status that is not one of the three is refused, and the reply says where", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: { code: (await addClientSource(user, { clientId: client.id, kind: "TRANSCRIPT", title: "x" })).code },
+      items: [
+        { target: "FACT", reason: "נאמר", status: "SURE", payload: { kind: "NOTE", body: "א" } },
+        { target: "FACT", reason: "נאמר", payload: { kind: "NOTE", body: "ב", knowledgeStatus: "MAYBE" } },
+        { target: "FACT", reason: "נאמר", status: "CONFIRMED", payload: { kind: "NOTE", body: "ג", knowledgeStatus: "UNCERTAIN", toResolve: "?" } },
+        { target: "FACT", reason: "נאמר", status: "CONFIRMED", payload: { kind: "NOTE", body: "ד" } },
+      ],
+    });
+    expect(r.proposed).toBe(1);
+    expect(r.dropped).toEqual([
+      { index: 0, reason: expect.stringContaining("items[0].status") },
+      { index: 1, reason: expect.stringContaining("items[1].payload.knowledgeStatus") },
+      { index: 2, reason: expect.stringContaining("סותרים") },
+    ]);
+  });
+
+  it("a status on a task, a date or a question is not asked for, and not added", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נשאל", confidence: "HIGH", payload: { kind: "QUESTION", body: "מי מורשה החתימה?" } },
+        { target: "TASK", reason: "הובטח", confidence: "HIGH", status: "CONFIRMED", payload: { title: "לשלוח לדנה את החוזה" } },
+      ],
+    });
+    expect(r).toMatchObject({ proposed: 2, dropped: [] });
+    expect(await statusOf(r.batchId!)).toEqual([undefined, undefined]);
+  });
+
+  it("when every item is dropped, a new source is not registered", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: { kind: "PERSON", title: "שיחה עם אורן" },
+      items: [
+        { target: "FACT", payload: { kind: "NOTE", body: "בלי סיבה" } },
+        { target: "FACT", reason: "נאמר", status: "SURE", payload: { kind: "NOTE", body: "סטטוס שגוי" } },
+      ],
+    });
+    expect(r).toMatchObject({ batchId: null, sourceCode: null, proposed: 0 });
+    expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(0);
+    expect(await prisma.knowledgeBatch.count({ where: { clientId: client.id } })).toBe(0);
+
+    // Sent again with one good item: registered once, as S1, and cited.
+    const ok = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: { kind: "PERSON", title: "שיחה עם אורן" },
+      items: [{ target: "FACT", reason: "נאמר", confidence: "HIGH", payload: { kind: "PREFERENCE", body: "מייל ולא טלפון" } }],
+    });
+    expect(ok).toMatchObject({ sourceCode: "S1", proposed: 1 });
+    expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(1);
+    const [p] = await prisma.knowledgeProposal.findMany({ where: { batchId: ok.batchId! } });
+    expect((p.payload as { sources: unknown }).sources).toEqual([{ code: "S1" }]);
+  });
+
+  it("an existing source with every item dropped is left as it was", async () => {
+    const { client, user } = await setup();
+    const s = await addClientSource(user, { clientId: client.id, kind: "TRANSCRIPT", title: "x" });
+    const r = await proposeKnowledge(user, { clientId: client.id, source: { code: s.code }, items: [{ target: "FACT", payload: { kind: "NOTE", body: "בלי סיבה" } }] });
+    expect(r).toMatchObject({ batchId: null, sourceCode: s.code, proposed: 0 });
+    expect(await prisma.clientSource.count({ where: { clientId: client.id, deletedAt: null } })).toBe(1);
   });
 });
 

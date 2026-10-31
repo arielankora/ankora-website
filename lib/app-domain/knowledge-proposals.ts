@@ -6,7 +6,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { findSecrets } from "@/lib/secret-scan";
 import { normalizeDomain, normalizeEmail } from "@/lib/contact-normalize";
-import { readSourceRefs, type SourceRef } from "@/lib/knowledge-sources";
+import { defaultWeight, readSourceRefs, sourceCode, type SourceRef } from "@/lib/knowledge-sources";
 import {
   PAYLOADS,
   normalizeForMatch,
@@ -19,6 +19,7 @@ import {
   bulkApproveBlocker,
   MAX_BULK,
   missingRequired,
+  resolveKnowledgeStatus,
   CONFIDENCE_LEVELS,
   type ConfidenceLike,
   firefliesLink,
@@ -88,6 +89,9 @@ export type ProposalItemInput = {
   quote?: string | null;
   /// How sure Claude is: HIGH, MEDIUM or LOW (spec 5.2).
   confidence?: string | null;
+  /// CONFIRMED, UNCERTAIN or MISSING (31.10.2026): the same as
+  /// `payload.knowledgeStatus`. Without either, it comes from `confidence`.
+  status?: string | null;
 };
 
 export type BatchSourceInput =
@@ -114,7 +118,9 @@ export type ProposeInput = {
 
 export type ProposeResult = {
   batchId: string | null;
-  sourceCode: string;
+  /// Null when the source was new and nothing was kept: it is not
+  /// registered (31.10.2026).
+  sourceCode: string | null;
   proposed: number;
   dropped: { index: number; reason: string }[];
   secretTaskId: string | null;
@@ -134,30 +140,59 @@ export function isSensitive(payload: unknown): boolean {
 
 export const SENSITIVE_PROPOSED = "knowledge.sensitive_proposed";
 
-/// The batch's source: an existing code, the source already registered
-/// for the same recording, or a new one.
-async function resolveSource(actor: User, clientId: string, source: BatchSourceInput) {
+/// The batch's source as it is known before anything is written: one
+/// already in the register (an existing code, or the source already
+/// registered for the same recording), or one still to register.
+///
+/// 31.10.2026: a new source used to be registered before any item was
+/// read, so a batch whose items were all dropped left an empty source
+/// behind (RIMED S15 and S16). Now it is registered only when at least
+/// one item is kept, together with the batch.
+type PlannedSource =
+  | { existing: true; id: string; code: string; title: string; weight: string; restriction: string }
+  | { existing: false; code: string; title: string; weight: string; restriction: string; input: Exclude<BatchSourceInput, { code: string }> };
+
+async function planSource(clientId: string, source: BatchSourceInput): Promise<PlannedSource> {
   if ("code" in source) {
     const found = await prisma.clientSource.findFirst({ where: { clientId, code: source.code.trim().toUpperCase(), deletedAt: null } });
     if (!found) throw new Error(`המקור ${source.code} לא קיים במרשם של הלקוח.`);
-    return found;
+    return { existing: true, ...found };
   }
   const ids = (source.externalIds ?? []).map((i) => i.trim()).filter(Boolean);
   if (ids.length > 0) {
     const existing = await prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, orderBy: { seq: "asc" } });
     const same = existing.find((s) => Array.isArray(s.externalRefs) && (s.externalRefs as { id?: string }[]).some((r) => r?.id && ids.includes(r.id)));
-    if (same) return same;
+    if (same) return { existing: true, ...same };
   }
-  return addClientSource(actor, {
+  if (!source.title.trim()) throw new Error("צריך שם למקור.");
+  // The code it will most likely get, so a text that cites it is not
+  // flagged as citing a code that is not in the register. The real code
+  // is set once the source is registered.
+  const last = await prisma.clientSource.findFirst({ where: { clientId }, orderBy: { seq: "desc" }, select: { seq: true } });
+  return {
+    existing: false,
+    code: sourceCode((last?.seq ?? 0) + 1),
+    title: source.title.trim(),
+    weight: source.weight ?? defaultWeight(source.kind),
+    restriction: source.restriction ?? "NONE",
+    input: { ...source, externalIds: ids },
+  };
+}
+
+async function registerPlanned(actor: User, clientId: string, planned: PlannedSource): Promise<{ id: string; code: string; created: boolean }> {
+  if (planned.existing) return { id: planned.id, code: planned.code, created: false };
+  const s = planned.input;
+  const created = await addClientSource(actor, {
     clientId,
-    kind: source.kind,
-    title: source.title,
-    occurredAt: source.occurredAt ?? null,
-    participants: source.participants,
-    externalIds: ids,
-    restriction: source.restriction,
-    weight: source.weight,
+    kind: s.kind,
+    title: s.title,
+    occurredAt: s.occurredAt ?? null,
+    participants: s.participants,
+    externalIds: s.externalIds,
+    restriction: s.restriction,
+    weight: s.weight,
   });
+  return { id: created.id, code: created.code, created: true };
 }
 
 /// What the reviewer should know before approving, found without asking
@@ -269,14 +304,15 @@ export async function proposeKnowledge(
   if (input.items.length === 0) throw new Error("אין פריטים באצווה.");
   if (input.items.length > MAX_ITEMS) throw new Error(`עד ${MAX_ITEMS} פריטים באצווה. מחלקים לכמה אצוות.`);
 
-  const source = await resolveSource(actor, input.clientId, input.source);
-  const codes = await registerCodes(input.clientId);
+  const source = await planSource(input.clientId, input.source);
+  const codes = [...(await registerCodes(input.clientId)), ...(source.existing ? [] : [source.code])];
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
   const possibleMatches: ProposeResult["possibleMatches"] = [];
 
   for (const [i, raw] of input.items.entries()) {
     const index = options.indexes?.[i] ?? i;
+    const path = `items[${index}]`;
     const item = { ...raw, action: raw.action ?? "CREATE" };
     // Secrets first, on everything the item carries, before anything else
     // looks at it: a refused item's text is never stored anywhere.
@@ -294,8 +330,16 @@ export async function proposeKnowledge(
       dropped.push({ index, reason: "סוג פריט לא מוכר." });
       continue;
     }
-    // Spec 5.2: a reason and a status, or it is not read at all.
-    const missing = missingRequired(item.target, item.payload ?? {}, item.reason);
+    // Spec 5.2: a reason and a status, or it is not read at all. The
+    // status may be sent on the item or in the payload, and without one it
+    // comes from the confidence (31.10.2026).
+    const status = resolveKnowledgeStatus(item, path);
+    if (!status.ok) {
+      dropped.push({ index, reason: status.reason });
+      continue;
+    }
+    item.payload = status.payload;
+    const missing = missingRequired(item.target, item.payload, item.reason, path);
     if (missing) {
       dropped.push({ index, reason: missing });
       continue;
@@ -305,7 +349,7 @@ export async function proposeKnowledge(
     const updating = (item.action === "SUPERSEDE" || item.action === "CONTRADICT") && isUpdatable(item.target);
     const parsed = updating ? (schema as unknown as { partial: () => typeof schema }).partial().safeParse(item.payload) : schema.safeParse(item.payload);
     if (!parsed.success) {
-      dropped.push({ index, reason: `הפריט לא בנוי נכון: ${parsed.error.issues.map((i) => `${i.path.join(".")} ${i.message}`).join("; ")}` });
+      dropped.push({ index, reason: `הפריט לא בנוי נכון: ${parsed.error.issues.map((i) => `${[`${path}.payload`, ...i.path].join(".")} ${i.message}`).join("; ")}` });
       continue;
     }
     if (updating) {
@@ -326,6 +370,7 @@ export async function proposeKnowledge(
     }
     // The batch's source, at the minute, and any other register codes
     // that say the same.
+    // A new source's code is set when it is registered, below.
     const refs: SourceRef[] = [item.at ? { code: source.code, at: item.at } : { code: source.code }];
     for (const c of item.alsoSources ?? []) if (/^S\d+$/i.test(c.trim())) refs.push({ code: c.trim().toUpperCase() });
     const payload: Record<string, unknown> = { ...(parsed.data as Record<string, unknown>), sources: refs };
@@ -349,7 +394,7 @@ export async function proposeKnowledge(
     // The secret was said; it has to be changed. The task says where, never what.
     const task = await createTask(actor, {
       clientId: input.clientId,
-      title: `להחליף סוד שנאמר ב-${source.code}: ${source.title}`.slice(0, 200),
+      title: (source.existing ? `להחליף סוד שנאמר ב-${source.code}: ${source.title}` : `להחליף סוד שנאמר ב: ${source.title}`).slice(0, 200),
       description: "בהצעות מהמקור הזה נמצאו סיסמה, מפתח או מספר כרטיס. הם לא נשמרו בתיק. מי שנחשף להם צריך להחליף אותם, ולשמור את החדשים בכספת.",
       assignedToId: actor.id,
       priority: "HIGH",
@@ -357,41 +402,58 @@ export async function proposeKnowledge(
     secretTaskId = task.id;
   }
 
+  // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.code, proposed: 0, dropped, secretTaskId, possibleMatches };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches };
   }
 
-  const batch = await prisma.knowledgeBatch.create({
-    data: {
-      clientId: input.clientId,
-      sourceId: source.id,
-      via: input.via ?? "MCP",
-      note: input.note?.trim() || null,
-      // Only the index and the reason: never the dropped text.
-      dropped: dropped as Prisma.InputJsonValue,
-      createdById: options.createdById === undefined ? actor.id : options.createdById,
-      proposals: {
-        create: accepted.map(({ item, payload, flags }) => ({
-          clientId: input.clientId,
-          target: item.target,
-          action: item.action,
-          targetId: item.targetId ?? null,
-          payload: payload as Prisma.InputJsonValue,
-          reason: item.reason?.trim() || null,
-          quote: item.quote?.trim() || null,
-          confidence: CONFIDENCE_LEVELS.includes(item.confidence as ConfidenceLike) ? item.confidence : null,
-          flags: flags as Prisma.InputJsonValue,
-        })),
+  // The source and the batch go in together: a new source is registered
+  // only now, and removed again if the batch cannot be written, so the
+  // register never keeps a source with nothing from it.
+  const registered = await registerPlanned(actor, input.clientId, source);
+  if (registered.code !== source.code) {
+    for (const a of accepted) {
+      a.payload.sources = (a.payload.sources as SourceRef[]).map((r) => (r.code === source.code ? { ...r, code: registered.code } : r));
+    }
+  }
+  let batch;
+  try {
+    // One write: the batch and its proposals together.
+    batch = await prisma.knowledgeBatch.create({
+      data: {
+        clientId: input.clientId,
+        sourceId: registered.id,
+        via: input.via ?? "MCP",
+        note: input.note?.trim() || null,
+        // Only the index and the reason: never the dropped text.
+        dropped: dropped as Prisma.InputJsonValue,
+        createdById: options.createdById === undefined ? actor.id : options.createdById,
+        proposals: {
+          create: accepted.map(({ item, payload, flags }) => ({
+            clientId: input.clientId,
+            target: item.target,
+            action: item.action,
+            targetId: item.targetId ?? null,
+            payload: payload as Prisma.InputJsonValue,
+            reason: item.reason?.trim() || null,
+            quote: item.quote?.trim() || null,
+            confidence: CONFIDENCE_LEVELS.includes(item.confidence as ConfidenceLike) ? item.confidence : null,
+            flags: flags as Prisma.InputJsonValue,
+          })),
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    if (registered.created) await prisma.clientSource.delete({ where: { id: registered.id } }).catch(() => {});
+    throw err;
+  }
   const sensitive = accepted.filter(({ payload }) => isSensitive(payload)).length;
   if (sensitive > 0) {
     const client = await prisma.client.findUniqueOrThrow({ where: { id: input.clientId }, select: { name: true } });
     await notifyRuleApprovers(input.clientId, actor.id, {
       type: SENSITIVE_PROPOSED,
       title: `${client.name}: מידע רגיש ממתין לאישור שלך`,
-      body: `${sensitive === 1 ? "פריט רגיש אחד" : `${sensitive} פריטים רגישים`} מ-${source.code} ${source.title}. רק מי שמאשר מידע רגיש אצל הלקוח רואה אותם.`.slice(0, 500),
+      body: `${sensitive === 1 ? "פריט רגיש אחד" : `${sensitive} פריטים רגישים`} מ-${registered.code} ${source.title}. רק מי שמאשר מידע רגיש אצל הלקוח רואה אותם.`.slice(0, 500),
       entityType: "Knowledge",
     });
   }
@@ -401,9 +463,9 @@ export async function proposeKnowledge(
     entityType: "KnowledgeBatch",
     entityId: batch.id,
     clientId: input.clientId,
-    after: { sourceCode: source.code, proposed: accepted.length, dropped: dropped.length },
+    after: { sourceCode: registered.code, proposed: accepted.length, dropped: dropped.length },
   });
-  return { batchId: batch.id, sourceCode: source.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches };
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches };
 }
 
 // ---------------------------------------------------------------------------
