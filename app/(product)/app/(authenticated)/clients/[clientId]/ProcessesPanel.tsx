@@ -43,6 +43,7 @@ import { RUNS_LABEL } from "@/lib/process-readiness";
 import { FIELD_LABELS, documentationLine } from "@/lib/process-rules";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
+import { ProcessVisual } from "./ProcessVisual";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
@@ -1249,6 +1250,17 @@ function Body({
             </div>
           )}
           <StepList steps={p.current.steps} systemName={systemName} />
+          <div className="mt-1.5">
+            <Drawer triggerLabel="תרשים" title={`תרשים: ${p.code} ${p.title}`} variant="link">
+              <ProcessVisual
+                triggerKinds={p.triggerKinds}
+                triggerText={p.triggerText}
+                slaBusinessDays={p.slaBusinessDays}
+                nextDate={p.nextDate}
+                steps={p.current.steps}
+              />
+            </Drawer>
+          </div>
           {p.current.highlights && <p className="mt-1 text-xs text-app-text-secondary">דגשים: {p.current.highlights}</p>}
           {p.current.checks.some((c) => !c.excepted) && (
             <div className="mt-1.5 rounded-lg border border-app-error/30 bg-app-error-soft px-3 py-2">
