@@ -29,10 +29,15 @@ export function FilePartsNav({ base, current, counts }: { base: string; current:
     router.replace(`${base}&section=${part}#${anchor}`);
   }, [base, current, router]);
 
-  const items: { key: FileSection; label: string; count: number | null; attention?: boolean }[] = [
+  type Item = { key: FileSection; label: string; count: number | null; attention?: boolean };
+  const all: Item[] = [
     { key: "all", label: ALL_LABEL, count: null },
-    ...FILE_SECTIONS.map((s) => ({ key: s.key, label: s.label, count: counts[s.key]?.count ?? null, attention: counts[s.key]?.attention })),
+    ...FILE_SECTIONS.map((s): Item => ({ key: s.key, label: s.label, count: counts[s.key]?.count ?? null, attention: counts[s.key]?.attention })),
   ];
+  const items = all
+    // "ממתין לאישור" leads the index while something waits, and is gone otherwise.
+    .filter((it) => it.key !== "pending" || (it.count ?? 0) > 0)
+    .sort((a, b) => (a.key === "pending" ? -1 : b.key === "pending" ? 1 : 0));
 
   return (
     <nav aria-label="חלקי התיק" className="lg:sticky lg:top-4 lg:self-start" data-testid="file-parts-nav">

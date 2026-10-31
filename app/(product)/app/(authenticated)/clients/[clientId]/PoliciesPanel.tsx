@@ -523,17 +523,29 @@ export function PoliciesPanel({
 export function DisclosureBanner({ rules }: { rules: { id: string; title: string; text: string; proposed: boolean }[] }) {
   if (rules.length === 0) return null;
   return (
-    <div role="note" className="rounded-2xl border border-app-warning/30 bg-app-warning-soft px-5 py-4">
-      <p className="text-sm font-medium text-app-warning">לפני שמדברים עם מישהו אצל הלקוח</p>
-      <ul className="mt-1.5 space-y-1">
-        {rules.map((r) => (
-          <li key={r.id} className="text-xs text-app-warning">
-            <span className="font-medium">{r.title}: </span>
-            {r.text}
-            {r.proposed && <span className="text-app-warning"> (מוצע)</span>}
-          </li>
-        ))}
-      </ul>
+    // 31.10.2026: one line, so the file's index stays near the top. The first
+    // rule is always in full; the others open under "עוד".
+    <div role="note" className="rounded-xl border border-app-warning/30 bg-app-warning-soft px-4 py-2 text-xs text-app-warning" data-testid="disclosure-banner">
+      <p>
+        <span className="font-medium">לפני שמדברים עם מישהו אצל הלקוח: </span>
+        <span className="font-medium">{rules[0].title}: </span>
+        {rules[0].text}
+        {rules[0].proposed && " (מוצע)"}
+      </p>
+      {rules.length > 1 && (
+        <details className="mt-1">
+          <summary className="cursor-pointer font-medium">{rules.length === 2 ? "עוד כלל אחד" : `עוד ${rules.length - 1} כללים`}</summary>
+          <ul className="mt-1 space-y-1">
+            {rules.slice(1).map((r) => (
+              <li key={r.id}>
+                <span className="font-medium">{r.title}: </span>
+                {r.text}
+                {r.proposed && " (מוצע)"}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
     </div>
   );
 }

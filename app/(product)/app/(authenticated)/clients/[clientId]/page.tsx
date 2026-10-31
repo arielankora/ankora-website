@@ -134,8 +134,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   const tab = sp?.tab === "file" ? "file" : "work";
   // 31.10.2026: the file in parts. The part in the address, else the one
   // last opened (a cookie), else the whole file (lib/client-file-parts.ts).
-  const part: FileSection = tab === "file" ? resolveFileSection(sp?.section, (await cookies()).get(FILE_SECTION_COOKIE)?.value) : "all";
-  const show = (key: FileSectionKey) => showsSection(part, key);
+  const remembered: FileSection = tab === "file" ? resolveFileSection(sp?.section, (await cookies()).get(FILE_SECTION_COOKIE)?.value) : "all";
   // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
   // Opened from "אישורים": back there, to the same tab (22.10.2026).
   const viaApprovals = approvalsBack(sp?.fromApprovals);
@@ -342,6 +341,22 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     ? await listHolidaySubscriptionsForClient(user, client.id)
     : [];
 
+  // Possible duplicates: waiting for a person, read with the pending batches.
+  const dupPairs = tab === "file" ? [
+    ...duplicatePairs("CONTACT", people.contacts.flatMap((c) => (c.person.name ? [{ id: c.id, name: c.person.name }] : []))),
+    ...duplicatePairs("ORGANIZATION", people.organizations.map((o) => ({ id: o.id, name: o.organization.name }))),
+    ...duplicatePairs("SYSTEM", systems.map((x) => ({ id: x.id, name: x.systemName }))),
+    ...duplicatePairs("ENTITY", entities.map((e) => ({ id: e.id, name: e.name }))),
+    ...dateDuplicatePairs(
+      "DATE",
+      clientDates.filter((d) => !d.holidayKey && d.status !== "ARCHIVED").map((d) => ({ id: d.id, name: d.title, key: dateKeyFromRow(d) }))
+    ),
+            ] : [];
+  const pendingCount = openBatches.reduce((n, b) => n + b.proposals.filter((x) => x.state === "PENDING").length, 0) + dupPairs.length;
+  // "ממתין לאישור" remembered but nothing waits any more: the whole file.
+  const part: FileSection = remembered === "pending" && pendingCount === 0 ? "all" : remembered;
+  const show = (key: FileSectionKey) => showsSection(part, key);
+
   return (
     <>
       <div className="space-y-6">
@@ -431,40 +446,25 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
           ))}
         </nav>
 
-        {tab === "file" && openBatches.length > 0 && (
-          <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-sm font-medium text-app-text-primary">ממתין לאישור</h2>
-              <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
-                בלשונית ידע מהחילוץ, עם סינון
-              </Link>
-            </div>
-            {openBatches.map((b) => (
-              <ReviewBatch key={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
-            ))}
-          </section>
-        )}
-
-        {tab === "file" && (
-          <PossibleDuplicates
-            pairs={[
-              ...duplicatePairs("CONTACT", people.contacts.flatMap((c) => (c.person.name ? [{ id: c.id, name: c.person.name }] : []))),
-              ...duplicatePairs("ORGANIZATION", people.organizations.map((o) => ({ id: o.id, name: o.organization.name }))),
-              ...duplicatePairs("SYSTEM", systems.map((x) => ({ id: x.id, name: x.systemName }))),
-              ...duplicatePairs("ENTITY", entities.map((e) => ({ id: e.id, name: e.name }))),
-              ...dateDuplicatePairs(
-                "DATE",
-                clientDates.filter((d) => !d.holidayKey && d.status !== "ARCHIVED").map((d) => ({ id: d.id, name: d.title, key: dateKeyFromRow(d) }))
-              ),
-            ]}
-          />
-        )}
-
         {tab === "file" && (
           <ItemStaffProvider staff={staff.map((u) => ({ id: u.id, name: u.name }))}>
             <div className="space-y-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
-              <FilePartsNav base={`/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`} current={part} counts={partCounts} />
+              <FilePartsNav base={`/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`} current={part} counts={{ ...partCounts, pending: { count: pendingCount, attention: pendingCount > 0 } }} />
               <div className="min-w-0 space-y-6" data-testid="file-part" data-part={part}>
+                {show("pending") && openBatches.length > 0 && (
+                  <section id="client-pending" className="space-y-3" data-testid="client-pending-proposals">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <h2 className="text-sm font-medium text-app-text-primary">ממתין לאישור</h2>
+                      <Link href={`/app/approvals?tab=knowledge&clientId=${client.id}`} className="text-xs text-app-text-accent hover:underline">
+                        בלשונית ידע מהחילוץ, עם סינון
+                      </Link>
+                    </div>
+                    {openBatches.map((b) => (
+                      <ReviewBatch key={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
+                    ))}
+                  </section>
+                )}
+                {show("pending") && <PossibleDuplicates pairs={dupPairs} />}
             {show("overview") && (
               <>
             <NarrativesPanel
