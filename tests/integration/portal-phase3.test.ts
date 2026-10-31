@@ -237,6 +237,10 @@ describe("portal summary", () => {
     await seedTask(client.id, { title: "עוד פתוחה", status: "IN_PROGRESS", clientVisible: true });
 
     const { periodStart, periodEnd } = monthRange(new Date());
+    // Closed inside the month the draft is for (31.10.2026): monthRange is
+    // built in UTC from Israel's month, so in Israel's first hours of a
+    // month "now" fell before its start and the test failed then.
+    await prisma.task.update({ where: { id: done.id }, data: { completedAt: new Date(periodStart.getTime() + 5 * 24 * 60 * 60 * 1000) } });
     const draft = await buildSummaryDraft(client.id, periodStart, periodEnd);
 
     expect(draft.text).toContain("חידוש הביטוח");

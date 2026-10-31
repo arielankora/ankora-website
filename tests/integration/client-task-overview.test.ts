@@ -54,7 +54,10 @@ describe("clientTaskOverview()", () => {
     const client = await createTestClient();
     const category = await createTestCategory();
     const actor = await employeeOn(client.id);
-    const now = new Date();
+    // A fixed instant mid-month (31.10.2026): with the real clock, in the
+    // first half hour of a month in Israel the entry fell in the month
+    // before, and the test failed for half an hour every month.
+    const now = new Date("2026-10-15T09:00:00Z");
     await createTestTimeEntry({
       userId: actor.id,
       clientId: client.id,
