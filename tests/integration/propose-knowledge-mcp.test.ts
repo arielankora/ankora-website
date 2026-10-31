@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import type { User } from "@prisma/client";
-import type { z } from "zod";
 import { prisma } from "./setup";
 import { createTestClient, createTestUser } from "./factories";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -16,12 +15,22 @@ vi.mock("@/lib/mcp/auth", () => ({
 import { registerAnkoraTools } from "@/lib/mcp/tools";
 
 type Handler = (args: unknown, ctx: unknown) => Promise<{ content: { text: string }[] }>;
-const tools = new Map<string, { schema: z.ZodType; handler: Handler }>();
-registerAnkoraTools({ registerTool: (name: string, c: { inputSchema: z.ZodType }, h: Handler) => tools.set(name, { schema: c.inputSchema, handler: h }) } as never);
+// Since #361 the tool publishes a Standard Schema (lib/mcp/proposal-schema.ts,
+// publishAs), not a zod object, so it is validated the way the MCP server
+// does: through `~standard.validate`.
+type Issue = { message: string; path?: readonly (PropertyKey | { key: PropertyKey })[] };
+type Validated = { value?: unknown; issues?: readonly Issue[] };
+type Standard = { "~standard": { validate: (v: unknown) => Validated | Promise<Validated> } };
+const tools = new Map<string, { schema: Standard; handler: Handler }>();
+registerAnkoraTools({ registerTool: (name: string, c: { inputSchema: Standard }, h: Handler) => tools.set(name, { schema: c.inputSchema, handler: h }) } as never);
+
+const pathOf = (i: Issue) => (i.path ?? []).map((p) => (typeof p === "object" && p !== null ? String(p.key) : String(p))).join(".");
 
 async function propose(user: User, args: unknown) {
   const tool = tools.get("propose_knowledge")!;
-  const parsed = tool.schema.parse(args);
+  const result = await tool.schema["~standard"].validate(args);
+  if (result.issues) throw new Error(result.issues.map((i) => `${pathOf(i)}: ${i.message}`).join("; "));
+  const parsed = result.value;
   const text = (await tool.handler(parsed, { http: { authInfo: { extra: { user } } } })).content.map((c) => c.text).join("");
   return JSON.parse(text);
 }
