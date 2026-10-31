@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { FILE_SECTION_COOKIE, resolveFileSection, showsSection, type FileSection, type FileSectionKey } from "@/lib/client-file-parts";
+import { FilePartsNav, type PartCount } from "./FilePartsNav";
 import { PageBack } from "@/components/app/BackSlot";
 import { CLIENTS_LIST_KEYS, clientsBackTitle, listBackHref } from "@/lib/list-back";
 import { approvalsBack } from "@/lib/approvals";
@@ -122,13 +125,17 @@ function serverNow(): number {
   return Date.now();
 }
 
-export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; from?: string | string[]; fromApprovals?: string | string[] }> }) {
+export default async function ClientDetailPage(props: { params: Promise<{ clientId: string }>; searchParams?: Promise<{ tab?: string; section?: string; from?: string | string[]; fromApprovals?: string | string[] }> }) {
   const params = await props.params;
   // Two tabs (org-brain spec 6.1): the day-to-day work, and the client
   // file. The file has a dozen sections, and on one long page they would
   // bury the tasks people open this screen for.
   const sp = await props.searchParams;
   const tab = sp?.tab === "file" ? "file" : "work";
+  // 31.10.2026: the file in parts. The part in the address, else the one
+  // last opened (a cookie), else the whole file (lib/client-file-parts.ts).
+  const part: FileSection = tab === "file" ? resolveFileSection(sp?.section, (await cookies()).get(FILE_SECTION_COOKIE)?.value) : "all";
+  const show = (key: FileSectionKey) => showsSection(part, key);
   // Back to the list as it was, search included (19.10.2026, lib/list-back.ts).
   // Opened from "אישורים": back there, to the same tab (22.10.2026).
   const viaApprovals = approvalsBack(sp?.fromApprovals);
@@ -258,6 +265,17 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   );
   // Spec 3.11: what each rule said before, from the audit log.
   const policyPast = await policyHistory(user, client.id, policies);
+  // How much each part of the file holds, and where something waits.
+  const partCounts: Partial<Record<FileSectionKey, PartCount>> = {
+    overview: { count: entities.length },
+    people: { count: people.contacts.length + people.organizations.length },
+    facts: { count: facts.current.length },
+    processes: { count: processes.length, attention: processes.some((p) => p.status === "DRAFT") },
+    rules: { count: policies.filter((p) => p.status !== "RETIRED").length, attention: policies.some((p) => p.status === "PROPOSED") },
+    requests: { count: requestTypes.length },
+    systems: { count: systems.length },
+    sources: { count: sources.length },
+  };
   // Spec 5.4: what people who closed runs said about each procedure.
   const lessons = await listLessons(processes.map((p) => p.id));
   const todayKey = localDateKey(new Date(), TIMEZONE);
@@ -444,6 +462,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
 
         {tab === "file" && (
           <ItemStaffProvider staff={staff.map((u) => ({ id: u.id, name: u.name }))}>
+            <div className="space-y-4 lg:grid lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6 lg:space-y-0">
+              <FilePartsNav base={`/app/clients/${client.id}?tab=file${fromParam ? `&${fromParam}` : ""}`} current={part} counts={partCounts} />
+              <div className="min-w-0 space-y-6" data-testid="file-part" data-part={part}>
+            {show("overview") && (
+              <>
             <NarrativesPanel
               clientId={client.id}
               narratives={narratives.map((n) => ({
@@ -486,7 +509,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 };
               })}
             />
+              </>
+            )}
 
+            {show("people") && (
+              <>
             <PeoplePanel
               clientId={client.id}
               organizationNames={organizationNames}
@@ -531,7 +558,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 sources: readSourceRefs(o.sources).map(formatSourceRef),
               }))}
             />
+              </>
+            )}
 
+            {show("facts") && (
+              <>
             <FactsPanel
               clientId={client.id}
               now={renderedAt}
@@ -541,7 +572,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               facts={facts.current.map(toPanelFact)}
               history={facts.superseded.map(toPanelFact)}
             />
+              </>
+            )}
 
+            {show("processes") && (
+              <>
             <ProcessesPanel
               clientId={client.id}
               userId={user.id}
@@ -675,7 +710,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   })),
               }))}
             />
+              </>
+            )}
 
+            {show("rules") && (
+              <>
             <PoliciesPanel
               clientId={client.id}
               sourceOptions={sourceOptions}
@@ -733,7 +772,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 })),
               }))}
             />
+              </>
+            )}
 
+            {show("requests") && (
+              <>
             <RequestTypesPanel
               clientId={client.id}
               ruleWarnings={warnings.requestTypes}
@@ -762,7 +805,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 sources: readSourceRefs(r.sources).map(formatSourceRef),
               }))}
             />
+              </>
+            )}
 
+            {show("systems") && (
+              <>
             <SystemsPanel
               clientId={client.id}
               ruleWarnings={warnings.systems}
@@ -796,7 +843,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                 sources: readSourceRefs(s.sources).map(formatSourceRef),
               }))}
             />
+              </>
+            )}
 
+            {show("sources") && (
+              <>
             <SourcesPanel
               clientId={client.id}
               sources={sources.map((s) => ({
@@ -820,7 +871,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               lowered={Object.fromEntries(lowered.map((l) => [l.code, l.count]))}
               canConfirm={canManageClients(user.role)}
             />
+              </>
+            )}
 
+              </div>
+            </div>
           </ItemStaffProvider>
         )}
 
