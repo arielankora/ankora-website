@@ -25,8 +25,10 @@ describe("client file parts", () => {
   it("opens the part an anchor names, and the whole file for any other", () => {
     expect(sectionOfAnchor("processes")).toBe("processes");
     expect(sectionOfAnchor("rules")).toBe("rules");
+    expect(sectionOfAnchor("client-pending")).toBe("pending");
     expect(sectionOfAnchor("item-abc")).toBe("all");
     expect(fileSectionLabel("all")).toBe("הכול");
     expect(fileSectionLabel("processes")).toBe("תהליכים ונהלים");
+    expect(FILE_SECTIONS[0]).toEqual({ key: "pending", label: "ממתין לאישור" });
   });
 });

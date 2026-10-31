@@ -5,6 +5,7 @@
 // the index and the tests agree on what a part holds.
 
 export const FILE_SECTIONS = [
+  { key: "pending", label: "ממתין לאישור" },
   { key: "overview", label: "סקירה וישויות" },
   { key: "people", label: "אנשים וספקים" },
   { key: "facts", label: "עובדות ושאלות" },
@@ -44,6 +45,7 @@ export function showsSection(current: FileSection, key: FileSectionKey): boolean
 export function sectionOfAnchor(anchor: string): FileSection {
   if (anchor === "processes") return "processes";
   if (anchor === "rules") return "rules";
+  if (anchor === "client-pending") return "pending";
   return "all";
 }
 
