@@ -156,8 +156,8 @@ describe("prompts", () => {
   });
 
   it("keeps the step lists exact and dash free", () => {
-    expect(prompts.ONBOARDING_STEPS).toHaveLength(9);
-    expect(prompts.OFFBOARDING_STEPS).toHaveLength(9);
+    expect(prompts.ONBOARDING_STEPS).toHaveLength(12);
+    expect(prompts.OFFBOARDING_STEPS).toHaveLength(10);
     expect(prompts.ONBOARDING_STEPS[prompts.ONBOARDING_SIGN_STEP]).toBe("אישור ההתחייבות באפליקציה והגדרת passkey");
     expect([...prompts.ONBOARDING_STEPS, ...prompts.OFFBOARDING_STEPS].some(hasDash)).toBe(false);
   });
