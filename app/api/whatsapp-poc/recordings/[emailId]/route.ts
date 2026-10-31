@@ -9,7 +9,7 @@ import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 // screen. Same gate as the screen. Nothing is cached or stored.
 export async function GET(
   _request: Request,
-  props: { params: Promise<{ emailId: string; attachmentId: string }> },
+  props: { params: Promise<{ emailId: string }> },
 ) {
   let user;
   try {
@@ -22,9 +22,9 @@ export async function GET(
   if (!canViewWhatsappPoc(user, config.viewers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!config.apiKey || !config.mailAccountId) return NextResponse.json({ error: "Not configured" }, { status: 404 });
 
-  const { emailId, attachmentId } = await props.params;
+  const { emailId } = await props.params;
   try {
-    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId, attachmentId);
+    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
     if (!audio) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return new NextResponse(audio.bytes, {
       headers: {

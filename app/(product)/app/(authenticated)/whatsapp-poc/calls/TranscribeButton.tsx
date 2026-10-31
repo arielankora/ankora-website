@@ -2,12 +2,11 @@
 import { useActionState } from "react";
 import { transcribeRecordingAction, type TranscribeState } from "./actions";
 
-export function TranscribeButton({ emailId, attachmentId }: { emailId: string; attachmentId: string }) {
+export function TranscribeButton({ emailId }: { emailId: string }) {
   const [state, action, pending] = useActionState<TranscribeState | undefined, FormData>(transcribeRecordingAction, undefined);
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="emailId" value={emailId} />
-      <input type="hidden" name="attachmentId" value={attachmentId} />
       {!state?.text ? (
         <button
           type="submit"

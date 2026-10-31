@@ -5,6 +5,7 @@ import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { callSide, listRecordings, type Recording } from "@/lib/whatsapp-poc/recordings";
 import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { RecordingPlayer } from "./RecordingPlayer";
 import { TranscribeButton } from "./TranscribeButton";
 
 // WhatsApp POC, stage 2 (1.11.2026): the Aloha line's call recordings,
@@ -112,13 +113,8 @@ export default async function WhatsappPocCallsPage() {
               <p dir="ltr" className="text-end text-xs text-app-text-secondary">
                 {side.direction === "unknown" ? `${r.from} → ${r.to}` : side.other}
               </p>
-              <audio
-                controls
-                preload="none"
-                className="w-full"
-                src={`/api/whatsapp-poc/recordings/${encodeURIComponent(r.emailId)}/${encodeURIComponent(r.attachmentId)}`}
-              />
-              {config.hasOpenAiKey ? <TranscribeButton emailId={r.emailId} attachmentId={r.attachmentId} /> : null}
+              <RecordingPlayer src={`/api/whatsapp-poc/recordings/${encodeURIComponent(r.emailId)}`} />
+              {config.hasOpenAiKey ? <TranscribeButton emailId={r.emailId} /> : null}
             </li>
           );
         })}

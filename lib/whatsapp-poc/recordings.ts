@@ -127,23 +127,28 @@ export function isSafeId(id: string): boolean {
   return id.length > 0 && id.length <= 1000 && /^[A-Za-z0-9_-]+$/.test(id);
 }
 
-/// One recording's audio. The email is read first and must be a recording
-/// email whose audio attachment is the one asked for, so this cannot be
-/// used to pull any other attachment out of the mailbox.
+/// One recording's audio, by email id alone. The email is read first and
+/// must be a recording email from Aloha; its audio attachment is the only
+/// file that can come back, so this cannot pull anything else out of the
+/// mailbox.
+///
+/// 1.11.2026: the attachment is found again on every request rather than
+/// taken from the list. Gmail issues a new attachment id each time an
+/// email is read, so the id the list had shown was already stale when the
+/// player asked for it, and every recording answered 404.
 export async function fetchRecordingAudio(
   config: { apiKey: string; mailAccountId: string },
   emailId: string,
-  attachmentId: string,
 ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
-  if (!isSafeId(emailId) || !isSafeId(attachmentId)) return null;
+  if (!isSafeId(emailId)) return null;
   const emailUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}`);
   const email = (await (await unipileFetch(config.apiKey, emailUrl, "application/json")).json()) as RawEmail & {
     from?: Array<{ email?: unknown }>;
   };
   const sender = email.from?.[0]?.email;
   const rec = toRecording(email);
-  if (sender !== RECORDING_SENDER || !rec || rec.attachmentId !== attachmentId) return null;
-  const fileUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}/attachments/${attachmentId}`);
+  if (sender !== RECORDING_SENDER || !rec || !isSafeId(rec.attachmentId)) return null;
+  const fileUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}/attachments/${rec.attachmentId}`);
   const file = await unipileFetch(config.apiKey, fileUrl, "*/*");
   const contentType = file.headers.get("content-type") ?? "audio/mpeg";
   return { bytes: await file.arrayBuffer(), contentType: contentType.startsWith("audio/") ? contentType : "audio/mpeg" };

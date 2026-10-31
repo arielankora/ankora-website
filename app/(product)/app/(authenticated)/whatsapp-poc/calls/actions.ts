@@ -23,10 +23,9 @@ export async function transcribeRecordingAction(
   if (!config.hasOpenAiKey) return { error: "התמלול לא מוגדר בסביבה הזו." };
 
   const emailId = String(formData.get("emailId") || "");
-  const attachmentId = String(formData.get("attachmentId") || "");
 
   try {
-    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId, attachmentId);
+    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
     if (!audio) return { error: "ההקלטה לא נמצאה." };
     await recordAudit({
       actorId: user.id,
