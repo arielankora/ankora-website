@@ -9,6 +9,7 @@ import { actorOf, findTask, TASK_ARGS } from "@/lib/mcp/task-extra-tools";
 import { recordRunLesson } from "@/lib/app-domain/process-lessons";
 import { LESSON_QUESTION } from "@/lib/process-lessons";
 import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
+import { publishAs, publishedInput } from "@/lib/mcp/proposal-schema";
 import { buildClientFile } from "@/lib/app-domain/client-file-view";
 import { toMarkdown } from "@/lib/client-file-document";
 import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
@@ -74,6 +75,81 @@ async function resolveProcess(client: { id: string; name: string }, query: strin
 // Markdown rather than JSON on purpose: it is read, not parsed, and every
 // line already carries its status and its sources in the notation the
 // people who wrote it use.
+
+/// propose_knowledge's call, as the SDK validates it. `payload` is any
+/// object here on purpose: each item's payload is checked on its own by
+/// proposeKnowledge, so one bad item is dropped with its path and the rest
+/// go through. What the client is shown is richer: publishedInput adds
+/// every target's fields and closed lists, from the same PAYLOADS.
+const PROPOSE_INPUT = z.object({
+    client: z.string().describe("Client name, as the user said it."),
+    sourceCode: z.string().optional().describe("An existing source code in the client's register, e.g. S3."),
+    newSource: z
+      .object({
+        kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT", "EMAIL"]),
+        title: z.string(),
+        date: z.string().optional().describe("YYYY-MM-DD"),
+        participants: z.array(z.string()).max(MAX_PARTICIPANTS).optional(),
+        firefliesId: z.string().optional(),
+        gmailThreadId: z.string().optional().describe("For kind EMAIL: the Gmail thread id, so the same thread is one source."),
+        documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
+        taskId: z.string().optional().describe("For kind TASK: the task the knowledge came out of, such as a mapping task."),
+        topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
+        clientConversation: z
+          .boolean()
+          .optional()
+          .describe("For kind ANKORA_DOCUMENT only: true when the document writes down what the client said in a conversation with them (an intake summary typed during the meeting). Its items are then not lowered to uncertain just because Ankora wrote them."),
+      })
+      .optional(),
+    note: z.string().optional().describe("One line: what was read, what was left out."),
+    uncertain: z
+      .object({
+        candidates: z.array(z.string()).min(2).max(6).describe("Every client the meeting could belong to, by name, including `client`."),
+        reason: z.string().describe("Why `client` is the likely one: what in the title or the content points to it."),
+      })
+      .optional()
+      .describe("Only when it is not clear whose meeting this is. Needs newSource of kind TRANSCRIPT."),
+    items: z
+      .array(
+        z.object({
+          target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE", "POLICY", "ENTITY", "NARRATIVE", "PROCESS", "DOMAIN", "TASK", "DATE"]),
+          action: z.enum(["CREATE", "SUPERSEDE", "CONTRADICT"]).optional(),
+          targetId: z.string().optional(),
+          payload: z.record(z.string(), z.unknown()),
+          at: z.string().optional(),
+          alsoSources: z.array(z.string()).max(MAX_ALSO_SOURCES).optional(),
+          reason: z.string().optional(),
+          quote: z.string().optional(),
+          confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
+          status: z
+            .enum(["CONFIRMED", "UNCERTAIN", "MISSING"])
+            .optional()
+            .describe(
+              "CONFIRMED: the client or their supplier said or showed it explicitly. UNCERTAIN: said, but not clearly or not by them (add payload.toResolve). MISSING: needed and not known (add payload.toResolve). Left out: HIGH confidence is CONFIRMED, anything else UNCERTAIN. Not for NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact."
+            ),
+          client: z.string().optional().describe("For a meeting about several clients: this item's client, by name. Defaults to `client`."),
+        })
+      )
+      .min(1)
+      .max(60),
+  });
+
+/// Kept short, with STATUS first: Claude clients cut a tool description
+/// after about 4,000 characters (31.10.2026 the cut fell in the middle of
+/// the payloads). The fields and their values are in the schema; only what
+/// the schema cannot say is here. tests/unit/mcp/propose-knowledge-status
+/// holds the length.
+export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
+  "Sends proposed items for a client's file, from ONE source (a meeting, a document, an email thread). Nothing enters the file until a person approves each item on Ankora's review screen.",
+  "STATUS, on each item as `status`: CONFIRMED (the client or their supplier said or showed it explicitly), UNCERTAIN (said unclearly, or only by Ankora) or MISSING (needed, and we do not have it). With UNCERTAIN or MISSING add payload.toResolve: what would close it. Left out, HIGH confidence is CONFIRMED and anything else UNCERTAIN. Not used on NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact.",
+  "FIELDS: each item's `payload` is described in the schema per target (payload.anyOf, titled by target), with every closed list. For example FACT.kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE) and FACT.topic (COMMUNICATION, REPORTING, DOCUMENTS, AUTOMATION, ADMINS, PAYMENTS, SUPPLIERS, OTHER). A value outside a list drops that item, and the reply says where (items[0].payload.topic).",
+  "Each item needs `reason` (one sentence: why it is true and where it was said), and should have `confidence` (the review screen orders by it, lowest first) and `at` (minute in the recording, \"08:13\"). `quote` is optional and short, never from a topics-only source.",
+  "SOURCE: `sourceCode` (\"S3\") for a source in the client's register (get_client_file lists it), or `newSource` to register one; it is registered only when at least one item is kept. A recording is found again by firefliesId and an email thread (kind EMAIL) by gmailThreadId, so sending it twice makes no second source. An email thread is a source only when it is this client's; quote only what the client or their supplier wrote.",
+  "CHANGES: to change an item already in the file, action SUPERSEDE with `targetId` (the id after the item in get_client_file) and only the fields that change. When someone said otherwise and it is not clear who is right, CONTRADICT with its targetId: nothing is overwritten. Never propose a second item for something in the file: names vary between meetings (\"Washington DOR\" and \"Washington Department of Revenue\"), so look for one first. The reply's `possibleMatches` lists new items that may already exist; resend them as SUPERSEDE or leave them to the reviewer.",
+  "NAMES (entityName, routeToNames, systemNames and the like) link to the item in the file with that name on approval; name only what is in the file or in the same batch. Every payload except NARRATIVE, DOMAIN, TASK and DATE may carry externalRefs, ownerName (the person at Ankora who keeps it right) and clientVisible (true only when it is the client's to see; never with sensitivity SENSITIVE or doNotDisclose).",
+  "Never include passwords, keys or card numbers: such an item is dropped and a task to change the secret opens. sensitivity SENSITIVE for medical, political or personal information. Leave out small talk, guesses and Ankora's own commercial terms.",
+  "WHOSE MEETING: a participant from a client's domain decides. A meeting about several clients: each item its own `client`, with newSource. Not clear and nobody decides: pass the likely `client` and `uncertain` with all candidates; nothing enters a file until a person picks.",
+].join(" ");
 
 export function registerClientFileTools(server: McpServer): void {
   server.registerTool(
@@ -153,77 +229,10 @@ export function registerClientFileTools(server: McpServer): void {
     "propose_knowledge",
     {
       title: "Propose knowledge for a client file",
-      description: [
-        "Sends a batch of proposed items for a client's file, from ONE source (a meeting or a document). Nothing enters the file until a person approves each item on Ankora's review screen; there is no tool that approves.",
-        "STATUS, set on each item as `status`: CONFIRMED (the client or their supplier said or showed it explicitly), UNCERTAIN (said, but not clearly, or only by Ankora) or MISSING (we know it is needed and do not have it). With UNCERTAIN or MISSING, add `toResolve` in the payload: what would close it. Left out, it comes from `confidence`: HIGH is CONFIRMED, MEDIUM or LOW (or no confidence) is UNCERTAIN; MISSING only when sent. Not used on NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact. (`payload.knowledgeStatus` is the same field and still accepted.) A source given as newSource is registered only when at least one item is kept.",
-        "Source: pass `sourceCode` (\"S3\") if the source is already in the client's register (get_client_file lists it), or `newSource` to register it. A recording is found again by its `firefliesId`, and an email thread (kind EMAIL) by its `gmailThreadId`, so sending the same meeting or thread twice does not create a second source. An email thread is a source only when it is this client's, by its domains or people; quote only what the client or their supplier wrote, never a password, code or access detail.",
-        "Each item: `target` FACT | CONTACT | ORGANIZATION | SYSTEM | REQUEST_TYPE | POLICY | ENTITY | NARRATIVE | PROCESS | DOMAIN | TASK | DATE, `payload` with that item's fields, `at` (minute in the recording, \"08:13\"), `reason` (one sentence: why it is true and where it was said; required), `confidence` (HIGH, MEDIUM or LOW: how sure you are; the review screen orders by it, lowest first), and optionally `quote` (short; never from a topics-only source).",
-        "FACT payload: kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE), body, and as relevant topic, referTo, validUntil or validUntilEvent (TEMPORARY needs one), decidedAt (ONE_OFF_DECISION needs it), decidedBy, and for a PREFERENCE subjectName: whose preference it is (a contact or a firm in the file, by name).",
-        "CONTACT payload: name and/or role, relationship (CLIENT_STAFF, PROVIDER, ADVISOR, INVESTOR, SUPPLIER), emails, phones, organizationName, context, channelOrder, isPrimary, isDecisionMaker, entityName (the client's legal entity they work with).",
-        "ORGANIZATION payload: name, domains, role, relationship, monthlyCostMinor (agorot or cents), currency, notes. SYSTEM payload: systemName, purpose, url, accountUsed, ourPermission, accessStatus, blocker, clientAdmin, notes, entityName, and how it is billed: billingCycle (MONTHLY, ANNUAL, OTHER), billingCostMinor (agorot or cents), billingCurrency (ILS, USD, EUR), cardLast4 (the last four digits only, never more), invoiceTo (where the invoice arrives). REQUEST_TYPE payload (what comes in, from whom, and how it is answered): title, fromWho, arrivesVia, handling, routeToNames (the contacts it goes to, by name), processName (the process it sets off, by code like P3 or title), entityName.",
-        "POLICY payload (a rule the client set): kind (DATA_HANDLING what may enter the file, DISCLOSURE who must not be told what, COMMUNICATION, SEPARATION, APPROVAL_REQUIRED, THRESHOLD, REQUIRED_STEP, TIMING, FORBIDDEN, INFO), title, statement, rationale, and for THRESHOLD and APPROVAL_REQUIRED an interimStatement: the careful rule that applies until a manager approves it. effectiveFrom and reviewBy (YYYY-MM-DD) when the client said from when it holds, or when it should be looked at again. params (and interimParams for the interim rule) when the rule says something the server can check: amountMinor and currency (THRESHOLD), appliesToTags (step tags such as PAYMENT, CLIENT_MESSAGE), leadBusinessDays (TIMING), channels and invoiceTo (COMMUNICATION), mustInclude (REQUIRED_STEP), entityName for a rule of one entity, entityNames for the entities a SEPARATION rule keeps apart. A rule enters the file as proposed; it binds once a manager approves it.",
-        "ENTITY payload (a legal entity of the client): name, legalName, registrationNumber, country, currency, billingAddress, parentName (an entity already in the file). NARRATIVE payload: kind (OVERVIEW the client in a paragraph, BACKGROUND, OUR_ROLE what Ankora does for them) and body: the WHOLE new text, which replaces the current one; cite sources inside it as [S1 08:13]. PROCESS payload (something that recurs; a one-time project is a task, not a process): title, purpose, triggerKinds (SCHEDULED, EVENT, ON_DEMAND, CONTINUOUS), triggerText, slaText, externalPartyText, approverText, approvalText, exceptionPlaybook, executorText (who does it today), transitionStatus (WITH_CLIENT, IN_HANDOVER, WITH_ANKORA, NOT_PLANNED), entityName, externalPartyNames (the outside contacts, by name), systemNames (the systems it needs, by name as in the file), approverName (a person at Ankora or a contact), approvalPolicyTitles (the client's approval rules, by title), notApplicableFields (sla, systems, approvals, external, exceptions: documentation fields that do not apply to this process, so they are not counted or shown as gaps; only when the client or the work makes it clear, e.g. no outside party), and steps when the procedure was described: title, mode (MANUAL, ASSISTED, AUTOMATED), offsetBusinessDays, actionTags, systemNames, output, verification, requiresApproval. It enters as a draft; a manager approves the procedure separately. DOMAIN payload: domain, kind (CLIENT their own, PARTNER a supplier's), organizationName for a partner.",
-        "TASK payload (something someone has to DO, not something to know about the client: a document to send, a call to set up, a check promised in the meeting): title: what to do, as an action (\"לשלוח לדנה את החוזה המעודכן\"), never a fact or a question (a title ending in \"?\" opens as \"לברר: ...\"), and as said: description, dueDate (YYYY-MM-DD; without one it is due in 3 business days), assigneeName (the person at Ankora), priority (LOW, NORMAL, HIGH, URGENT). Approving it opens a task on the client, with the reason, quote and moment in the recording; it never enters the file. Never put an action item in a FACT. What the same moment teaches about the client (a preference, a rule) is a separate item. A task is read by everyone on the client: nothing sensitive goes in one. No knowledgeStatus, ownerName or clientVisible on a TASK.",
-        "DATE payload (a date of the client's own: a payday, a deadline, a departure, the start of an audit, an event that recurs): title, recurrence (ONCE, ANNUAL, MONTHLY, WEEKLY), and date (YYYY-MM-DD, for ONCE and ANNUAL), dayOfMonth (MONTHLY, with intervalMonths for every 2, 3, 4 or 6 months), or weekday (0 Sunday to 6 Saturday, WEEKLY). As said: dayAlternatives (the days it may fall on, \"the 8th or the 9th\"), ifNotBusinessDay (BEFORE or AFTER), businessCalendar (IL or US), conditionText, expectsReceipt and expectedFrom (something due to reach us that day, and from whom), processName (the process it starts), responsibleName (the person at Ankora), taskDaysBefore (open a task that many days before), category (BUSINESS_FINANCE by default; PEOPLE_FAMILY, DOCUMENTS_AUTHORITIES, VEHICLE_PROPERTY, HEALTH_TRAVEL, GENERAL), notes. No knowledgeStatus on a DATE. Approving it adds it to the client's dates, with reminders. Work that recurs (payroll every month, supplier payments on the 10th and 25th) is a PROCESS with its DATE, not a fact. A date on the same day as one already in the file, under almost the same title (\"יום הולדת של אורן\" and \"יום הולדת של אורן מירון (לידה...)\"), comes back in possibleMatches: if it is the same date, leave it out.",
-        "Names (entityName, routeToNames, systemNames and the like) are linked to the item in the file with that name when the proposal is approved; one that matches nothing, or more than one, is flagged on the card and left unlinked. Name only what is in the file or proposed in the same batch.",
-        "An item without a reason, or with a status that is not one of the three, is dropped and the reply says why and where (items[0].status). Payloads may also carry sensitivity. Set sensitivity SENSITIVE for medical, political or personal information, or whatever the client's data-handling rules call sensitive: such an item is shown and decided only by the client's approvers for sensitive information, and never leaves the product through MCP once in the file.",
-        "Every payload except NARRATIVE, DOMAIN, TASK and DATE may also carry externalRefs: where the item lives in the team's other registers, as said or written (an array like [\"RAID-002\", \"HND-014\", \"ClickUp:86c1x\"]). Every payload except NARRATIVE, DOMAIN, TASK and DATE may also carry ownerName (the person at Ankora who keeps the item right, by name; for a PROCESS, its owner) and clientVisible: true only when the client said it, or it is theirs to see (their own systems, their request types, a rule they set). Leave it out otherwise; never for anything sensitive or with doNotDisclose.",
-        "To change an item already in the file, set action SUPERSEDE with `targetId`: the id printed after the item in get_client_file, as (id: ...). For a fact it writes a new version beside the old one. For a CONTACT, ORGANIZATION, SYSTEM, REQUEST_TYPE, POLICY, ENTITY or PROCESS the payload carries only the fields that changed (an organization's name never changes), plus knowledgeStatus; the rest stays as it is, the sources are added to the item's, a changed rule goes back to proposed until a manager approves it, and new PROCESS steps become a new draft procedure. When someone said otherwise about an item and it is not clear which is right, use CONTRADICT with its targetId and a payload of what was said: nothing is overwritten; a fact keeps both versions, any other item becomes uncertain with what was said as what would close it. Never propose a second item for something already in the file. Names are written differently from one meeting to the next (a first name and the full name, \"Washington DOR\" and \"Washington Department of Revenue\"): before a new CONTACT, ORGANIZATION, SYSTEM or ENTITY, look in the file for one whose name is part of it or contains it, and propose a SUPERSEDE of that one. The reply lists in `possibleMatches` every new item whose name may be one already in the file, with the existing ids; send those again as SUPERSEDE with the right targetId, or leave them for the reviewer, who can add each to the existing item.",
-        "Never include passwords, keys or card numbers: such items are dropped and a task to change the secret is opened. Leave out small talk, momentary technical issues, guesses, and Ankora's own commercial terms.",
-        "Whose meeting it is: a participant from a client's domain decides; so does a partner linked to one client only. A meeting about several clients (a supplier reviewing two of them): give each item its own `client`, and each goes only to that client's file, with the meeting registered in each one's register (newSource, not sourceCode). A partner linked to several clients and nobody on the call who decides: do not guess. Pass `client` as the one you think, and `uncertain` with all the clients it could be and the reason; nothing enters any file, and the batch waits until a person picks the client on the review screen.",
-      ].join(" "),
-      inputSchema: z.object({
-        client: z.string().describe("Client name, as the user said it."),
-        sourceCode: z.string().optional().describe("An existing source code in the client's register, e.g. S3."),
-        newSource: z
-          .object({
-            kind: z.enum(["TRANSCRIPT", "CLIENT_DOCUMENT", "TASK", "PERSON", "ANKORA_DOCUMENT", "EMAIL"]),
-            title: z.string(),
-            date: z.string().optional().describe("YYYY-MM-DD"),
-            participants: z.array(z.string()).max(MAX_PARTICIPANTS).optional(),
-            firefliesId: z.string().optional(),
-            gmailThreadId: z.string().optional().describe("For kind EMAIL: the Gmail thread id, so the same thread is one source."),
-            documentId: z.string().optional().describe("For a document in the client's file (list_documents)."),
-            taskId: z.string().optional().describe("For kind TASK: the task the knowledge came out of, such as a mapping task."),
-            topicsOnly: z.boolean().optional().describe("True for a restricted meeting: topics only, no quotes."),
-            clientConversation: z
-              .boolean()
-              .optional()
-              .describe("For kind ANKORA_DOCUMENT only: true when the document writes down what the client said in a conversation with them (an intake summary typed during the meeting). Its items are then not lowered to uncertain just because Ankora wrote them."),
-          })
-          .optional(),
-        note: z.string().optional().describe("One line: what was read, what was left out."),
-        uncertain: z
-          .object({
-            candidates: z.array(z.string()).min(2).max(6).describe("Every client the meeting could belong to, by name, including `client`."),
-            reason: z.string().describe("Why `client` is the likely one: what in the title or the content points to it."),
-          })
-          .optional()
-          .describe("Only when it is not clear whose meeting this is. Needs newSource of kind TRANSCRIPT."),
-        items: z
-          .array(
-            z.object({
-              target: z.enum(["FACT", "CONTACT", "ORGANIZATION", "SYSTEM", "REQUEST_TYPE", "POLICY", "ENTITY", "NARRATIVE", "PROCESS", "DOMAIN", "TASK", "DATE"]),
-              action: z.enum(["CREATE", "SUPERSEDE", "CONTRADICT"]).optional(),
-              targetId: z.string().optional(),
-              payload: z.record(z.string(), z.unknown()),
-              at: z.string().optional(),
-              alsoSources: z.array(z.string()).max(MAX_ALSO_SOURCES).optional(),
-              reason: z.string().optional(),
-              quote: z.string().optional(),
-              confidence: z.enum(["HIGH", "MEDIUM", "LOW"]).optional(),
-              status: z
-                .enum(["CONFIRMED", "UNCERTAIN", "MISSING"])
-                .optional()
-                .describe(
-                  "CONFIRMED: the client or their supplier said or showed it explicitly. UNCERTAIN: said, but not clearly or not by them (add payload.toResolve). MISSING: needed and not known (add payload.toResolve). Left out: HIGH confidence is CONFIRMED, anything else UNCERTAIN. Not for NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact."
-                ),
-              client: z.string().optional().describe("For a meeting about several clients: this item's client, by name. Defaults to `client`."),
-            })
-          )
-          .min(1)
-          .max(60),
-      }),
+      description: PROPOSE_KNOWLEDGE_DESCRIPTION,
+      // Published with each target's payload fields and closed lists, from
+      // the schemas the server validates with (lib/mcp/proposal-schema.ts).
+      inputSchema: publishAs(PROPOSE_INPUT, () => publishedInput(PROPOSE_INPUT)),
       annotations: TOOL_ANNOTATIONS.propose_knowledge,
     },
     async (
