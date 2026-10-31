@@ -1,0 +1,1594 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`propose_knowledge payloads, as tools/list publishes them > matches the snapshot 1`] = `
+{
+  "properties": {
+    "client": {
+      "description": "Client name, as the user said it.",
+      "type": "string",
+    },
+    "items": {
+      "items": {
+        "properties": {
+          "action": {
+            "enum": [
+              "CREATE",
+              "SUPERSEDE",
+              "CONTRADICT",
+            ],
+            "type": "string",
+          },
+          "alsoSources": {
+            "items": {
+              "type": "string",
+            },
+            "maxItems": 20,
+            "type": "array",
+          },
+          "at": {
+            "type": "string",
+          },
+          "client": {
+            "description": "For a meeting about several clients: this item's client, by name. Defaults to \`client\`.",
+            "type": "string",
+          },
+          "confidence": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+            ],
+            "type": "string",
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "description": "When target is FACT. A fact about the client. TEMPORARY needs validUntil or validUntilEvent; ONE_OFF_DECISION needs decidedAt; PREFERENCE takes subjectName (whose preference: a contact or firm in the file, by name). Never an action item: that is a TASK. On CREATE it needs kind, body; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "body": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "decidedAt": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "decidedBy": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "kind": {
+                    "enum": [
+                      "SCOPE_IN",
+                      "SCOPE_OUT",
+                      "PREFERENCE",
+                      "REQUIREMENT",
+                      "LOCATION",
+                      "FINANCE",
+                      "TEMPORARY",
+                      "ONE_OFF_DECISION",
+                      "QUESTION",
+                      "NOTE",
+                    ],
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "referTo": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "subjectName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "topic": {
+                    "enum": [
+                      "COMMUNICATION",
+                      "REPORTING",
+                      "DOCUMENTS",
+                      "AUTOMATION",
+                      "ADMINS",
+                      "PAYMENTS",
+                      "SUPPLIERS",
+                      "OTHER",
+                    ],
+                    "type": "string",
+                  },
+                  "validUntil": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "validUntilEvent": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                },
+                "title": "FACT",
+                "type": "object",
+              },
+              {
+                "description": "When target is CONTACT. A person. Needs name or role. entityName: the client's legal entity they work with.",
+                "properties": {
+                  "channelOrder": {
+                    "items": {
+                      "maxLength": 50,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "context": {
+                    "maxLength": 2000,
+                    "type": "string",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "emails": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "entityName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "isDecisionMaker": {
+                    "type": "boolean",
+                  },
+                  "isPrimary": {
+                    "type": "boolean",
+                  },
+                  "name": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "organizationName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "phones": {
+                    "items": {
+                      "maxLength": 50,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "relationship": {
+                    "enum": [
+                      "CLIENT_STAFF",
+                      "PROVIDER",
+                      "ADVISOR",
+                      "INVESTOR",
+                      "SUPPLIER",
+                      "ANKORA",
+                    ],
+                    "type": "string",
+                  },
+                  "role": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "CONTACT",
+                "type": "object",
+              },
+              {
+                "description": "When target is ORGANIZATION. A supplier, provider, advisor or investor. monthlyCostMinor in agorot or cents. Its name never changes on SUPERSEDE. On CREATE it needs name; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "currency": {
+                    "enum": [
+                      "ILS",
+                      "USD",
+                    ],
+                    "type": "string",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "domains": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "monthlyCostMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "name": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "notes": {
+                    "maxLength": 2000,
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "relationship": {
+                    "enum": [
+                      "PROVIDER",
+                      "ADVISOR",
+                      "SUPPLIER",
+                      "INVESTOR",
+                    ],
+                    "type": "string",
+                  },
+                  "role": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "ORGANIZATION",
+                "type": "object",
+              },
+              {
+                "description": "When target is SYSTEM. A system the client uses. billingCostMinor in agorot or cents; cardLast4 is the last four digits only, never more; invoiceTo: where the invoice arrives. On CREATE it needs systemName; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "accessStatus": {
+                    "enum": [
+                      "HAS_ACCESS",
+                      "PENDING",
+                      "NO_ACCESS",
+                      "NOT_NEEDED",
+                    ],
+                    "type": "string",
+                  },
+                  "accountUsed": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "billingCostMinor": {
+                    "maximum": 9007199254740991,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "billingCurrency": {
+                    "enum": [
+                      "ILS",
+                      "USD",
+                      "EUR",
+                    ],
+                    "type": "string",
+                  },
+                  "billingCycle": {
+                    "enum": [
+                      "MONTHLY",
+                      "ANNUAL",
+                      "OTHER",
+                    ],
+                    "type": "string",
+                  },
+                  "blocker": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "cardLast4": {
+                    "pattern": "^\\d{4}$",
+                    "type": "string",
+                  },
+                  "clientAdmin": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "entityName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "invoiceTo": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "notes": {
+                    "maxLength": 2000,
+                    "type": "string",
+                  },
+                  "ourPermission": {
+                    "enum": [
+                      "NONE",
+                      "VIEWER",
+                      "USER",
+                      "BILLING",
+                      "ADMIN",
+                      "OWNER",
+                    ],
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "purpose": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "systemName": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "url": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "SYSTEM",
+                "type": "object",
+              },
+              {
+                "description": "When target is REQUEST_TYPE. What comes in, from whom, and how it is answered. routeToNames: the contacts it goes to; processName: the process it sets off (P3 or title). On CREATE it needs title, handling; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "arrivesVia": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "entityName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "fromWho": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "handling": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "processName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "routeToNames": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "REQUEST_TYPE",
+                "type": "object",
+              },
+              {
+                "description": "When target is POLICY. A rule the client set. Enters as proposed and binds once a manager approves it. THRESHOLD and APPROVAL_REQUIRED take interimStatement (and interimParams): the careful rule until approval. params only when the rule says something the server can check; keys a kind does not take are ignored. On CREATE it needs kind, title, statement; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "effectiveFrom": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "interimParams": {
+                    "description": "params of the interim rule.",
+                    "properties": {
+                      "amountMinor": {
+                        "description": "THRESHOLD: above this a person approves, in agorot or cents.",
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "appliesToTags": {
+                        "description": "The step tags the rule is about.",
+                        "items": {
+                          "enum": [
+                            "PAYMENT",
+                            "PURCHASE",
+                            "INVOICE",
+                            "SUPPLIER_NEW",
+                            "CONTRACT",
+                            "PRICE_CHANGE",
+                            "REFUND",
+                            "CLIENT_MESSAGE",
+                            "CREDENTIAL_ACCESS",
+                            "DATA_EXPORT",
+                            "HR",
+                            "LEGAL",
+                            "BANK_SIGNATURE",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "channels": {
+                        "description": "COMMUNICATION: the channels a client message may go through.",
+                        "items": {
+                          "enum": [
+                            "EMAIL",
+                            "WHATSAPP",
+                            "SLACK",
+                            "PHONE",
+                            "PORTAL",
+                            "OTHER",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "currency": {
+                        "description": "THRESHOLD: three letters, such as ILS.",
+                        "type": "string",
+                      },
+                      "entityName": {
+                        "description": "A rule of one entity, by name.",
+                        "type": "string",
+                      },
+                      "entityNames": {
+                        "description": "SEPARATION: the entities kept apart, by name.",
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "invoiceTo": {
+                        "description": "COMMUNICATION: addresses or domains invoices must arrive at.",
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "leadBusinessDays": {
+                        "description": "TIMING: business days before the date.",
+                        "maximum": 60,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "mustInclude": {
+                        "description": "REQUIRED_STEP: words a step must contain.",
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                  "interimStatement": {
+                    "maxLength": 1000,
+                    "type": "string",
+                  },
+                  "kind": {
+                    "enum": [
+                      "DATA_HANDLING",
+                      "DISCLOSURE",
+                      "COMMUNICATION",
+                      "SEPARATION",
+                      "APPROVAL_REQUIRED",
+                      "THRESHOLD",
+                      "REQUIRED_STEP",
+                      "TIMING",
+                      "FORBIDDEN",
+                      "INFO",
+                    ],
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "params": {
+                    "description": "What the server can check. Each kind reads only its keys.",
+                    "properties": {
+                      "amountMinor": {
+                        "description": "THRESHOLD: above this a person approves, in agorot or cents.",
+                        "maximum": 9007199254740991,
+                        "minimum": 0,
+                        "type": "integer",
+                      },
+                      "appliesToTags": {
+                        "description": "The step tags the rule is about.",
+                        "items": {
+                          "enum": [
+                            "PAYMENT",
+                            "PURCHASE",
+                            "INVOICE",
+                            "SUPPLIER_NEW",
+                            "CONTRACT",
+                            "PRICE_CHANGE",
+                            "REFUND",
+                            "CLIENT_MESSAGE",
+                            "CREDENTIAL_ACCESS",
+                            "DATA_EXPORT",
+                            "HR",
+                            "LEGAL",
+                            "BANK_SIGNATURE",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "channels": {
+                        "description": "COMMUNICATION: the channels a client message may go through.",
+                        "items": {
+                          "enum": [
+                            "EMAIL",
+                            "WHATSAPP",
+                            "SLACK",
+                            "PHONE",
+                            "PORTAL",
+                            "OTHER",
+                          ],
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "currency": {
+                        "description": "THRESHOLD: three letters, such as ILS.",
+                        "type": "string",
+                      },
+                      "entityName": {
+                        "description": "A rule of one entity, by name.",
+                        "type": "string",
+                      },
+                      "entityNames": {
+                        "description": "SEPARATION: the entities kept apart, by name.",
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "invoiceTo": {
+                        "description": "COMMUNICATION: addresses or domains invoices must arrive at.",
+                        "items": {
+                          "type": "string",
+                        },
+                        "type": "array",
+                      },
+                      "leadBusinessDays": {
+                        "description": "TIMING: business days before the date.",
+                        "maximum": 60,
+                        "minimum": 1,
+                        "type": "integer",
+                      },
+                      "mustInclude": {
+                        "description": "REQUIRED_STEP: words a step must contain.",
+                        "type": "string",
+                      },
+                    },
+                    "type": "object",
+                  },
+                  "rationale": {
+                    "maxLength": 1000,
+                    "type": "string",
+                  },
+                  "reviewBy": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "statement": {
+                    "maxLength": 2000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "POLICY",
+                "type": "object",
+              },
+              {
+                "description": "When target is ENTITY. A legal entity of the client. parentName: an entity already in the file. On CREATE it needs name; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "billingAddress": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "country": {
+                    "maxLength": 100,
+                    "type": "string",
+                  },
+                  "currency": {
+                    "maxLength": 10,
+                    "type": "string",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "legalName": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "name": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "parentName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "registrationNumber": {
+                    "maxLength": 100,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "ENTITY",
+                "type": "object",
+              },
+              {
+                "description": "When target is NARRATIVE. One of the file's free texts. body is the WHOLE new text and replaces the current one; cite sources inside it as [S1 08:13]. No status. On CREATE it needs kind, body; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "body": {
+                    "maxLength": 20000,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "kind": {
+                    "enum": [
+                      "OVERVIEW",
+                      "BACKGROUND",
+                      "OUR_ROLE",
+                    ],
+                    "type": "string",
+                  },
+                },
+                "title": "NARRATIVE",
+                "type": "object",
+              },
+              {
+                "description": "When target is PROCESS. Something that recurs (a one-time project is a TASK). Enters as a draft; a manager approves the procedure. notApplicableFields only when it is clear a documentation field does not apply. steps when the procedure was described. On CREATE it needs title; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "approvalPolicyTitles": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "approvalText": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "approverName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "approverText": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": "boolean",
+                  },
+                  "doNotDisclose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "entityName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "exceptionPlaybook": {
+                    "maxLength": 4000,
+                    "type": "string",
+                  },
+                  "executorText": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "externalPartyNames": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 10,
+                    "type": "array",
+                  },
+                  "externalPartyText": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "externalRefs": {
+                    "items": {
+                      "anyOf": [
+                        {
+                          "maxLength": 120,
+                          "type": "string",
+                        },
+                        {
+                          "properties": {
+                            "id": {
+                              "maxLength": 120,
+                              "type": "string",
+                            },
+                            "system": {
+                              "maxLength": 60,
+                              "type": "string",
+                            },
+                          },
+                          "required": [
+                            "system",
+                            "id",
+                          ],
+                          "type": "object",
+                        },
+                      ],
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "highlights": {
+                    "maxLength": 4000,
+                    "type": "string",
+                  },
+                  "importance": {
+                    "enum": [
+                      "NORMAL",
+                      "LOW",
+                    ],
+                    "type": "string",
+                  },
+                  "notApplicableFields": {
+                    "items": {
+                      "enum": [
+                        "sla",
+                        "systems",
+                        "approvals",
+                        "external",
+                        "exceptions",
+                      ],
+                      "type": "string",
+                    },
+                    "maxItems": 5,
+                    "type": "array",
+                  },
+                  "outputs": {
+                    "maxLength": 2000,
+                    "type": "string",
+                  },
+                  "ownerName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "purpose": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "slaText": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "steps": {
+                    "items": {
+                      "properties": {
+                        "actionTags": {
+                          "items": {
+                            "enum": [
+                              "PAYMENT",
+                              "PURCHASE",
+                              "INVOICE",
+                              "SUPPLIER_NEW",
+                              "CONTRACT",
+                              "PRICE_CHANGE",
+                              "REFUND",
+                              "CLIENT_MESSAGE",
+                              "CREDENTIAL_ACCESS",
+                              "DATA_EXPORT",
+                              "HR",
+                              "LEGAL",
+                              "BANK_SIGNATURE",
+                            ],
+                            "type": "string",
+                          },
+                          "type": "array",
+                        },
+                        "mode": {
+                          "enum": [
+                            "MANUAL",
+                            "ASSISTED",
+                            "AUTOMATED",
+                          ],
+                          "type": "string",
+                        },
+                        "offsetBusinessDays": {
+                          "maximum": 60,
+                          "minimum": -60,
+                          "type": "integer",
+                        },
+                        "output": {
+                          "maxLength": 500,
+                          "type": "string",
+                        },
+                        "requiresApproval": {
+                          "type": "boolean",
+                        },
+                        "systemNames": {
+                          "items": {
+                            "maxLength": 200,
+                            "type": "string",
+                          },
+                          "maxItems": 10,
+                          "type": "array",
+                        },
+                        "title": {
+                          "maxLength": 300,
+                          "minLength": 1,
+                          "type": "string",
+                        },
+                        "verification": {
+                          "maxLength": 500,
+                          "type": "string",
+                        },
+                      },
+                      "required": [
+                        "title",
+                      ],
+                      "type": "object",
+                    },
+                    "maxItems": 15,
+                    "type": "array",
+                  },
+                  "systemNames": {
+                    "items": {
+                      "maxLength": 200,
+                      "type": "string",
+                    },
+                    "maxItems": 20,
+                    "type": "array",
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "toResolve": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                  "transitionStatus": {
+                    "enum": [
+                      "WITH_CLIENT",
+                      "IN_HANDOVER",
+                      "WITH_ANKORA",
+                      "NOT_PLANNED",
+                    ],
+                    "type": "string",
+                  },
+                  "triggerKinds": {
+                    "items": {
+                      "enum": [
+                        "SCHEDULED",
+                        "EVENT",
+                        "ON_DEMAND",
+                        "CONTINUOUS",
+                      ],
+                      "type": "string",
+                    },
+                    "maxItems": 4,
+                    "type": "array",
+                  },
+                  "triggerText": {
+                    "maxLength": 500,
+                    "type": "string",
+                  },
+                },
+                "title": "PROCESS",
+                "type": "object",
+              },
+              {
+                "description": "When target is DOMAIN. An email domain of the client (CLIENT) or of a supplier (PARTNER, with organizationName). No status. On CREATE it needs domain, kind; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "domain": {
+                    "maxLength": 200,
+                    "minLength": 3,
+                    "type": "string",
+                  },
+                  "kind": {
+                    "enum": [
+                      "CLIENT",
+                      "PARTNER",
+                    ],
+                    "type": "string",
+                  },
+                  "organizationName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                },
+                "title": "DOMAIN",
+                "type": "object",
+              },
+              {
+                "description": "When target is TASK. Something someone has to DO (a document to send, a call to set up), as an action, never a fact or a question. Without dueDate it is due in 3 business days. Read by everyone on the client: nothing sensitive. Never enters the file. No status, ownerName or clientVisible. On CREATE it needs title; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "assigneeName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "description": {
+                    "maxLength": 4000,
+                    "type": "string",
+                  },
+                  "dueDate": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "priority": {
+                    "enum": [
+                      "LOW",
+                      "NORMAL",
+                      "HIGH",
+                      "URGENT",
+                    ],
+                    "type": "string",
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                },
+                "title": "TASK",
+                "type": "object",
+              },
+              {
+                "description": "When target is DATE. A date of the client's own (payday, deadline, departure). date for ONCE and ANNUAL, dayOfMonth for MONTHLY (intervalMonths 2, 3, 4 or 6), weekday for WEEKLY (0 Sunday). Recurring work is a PROCESS with its DATE. One on the same day as a date in the file, under almost the same title, comes back in possibleMatches: if it is the same, leave it out. No status. On CREATE it needs title, recurrence; on SUPERSEDE or CONTRADICT, only the fields that change.",
+                "properties": {
+                  "businessCalendar": {
+                    "enum": [
+                      "IL",
+                      "US",
+                    ],
+                    "type": "string",
+                  },
+                  "category": {
+                    "enum": [
+                      "PEOPLE_FAMILY",
+                      "DOCUMENTS_AUTHORITIES",
+                      "BUSINESS_FINANCE",
+                      "VEHICLE_PROPERTY",
+                      "HEALTH_TRAVEL",
+                      "GENERAL",
+                    ],
+                    "type": "string",
+                  },
+                  "clientVisible": {
+                    "type": [
+                      "boolean",
+                      "null",
+                    ],
+                  },
+                  "conditionText": {
+                    "maxLength": 300,
+                    "type": "string",
+                  },
+                  "date": {
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                    "type": "string",
+                  },
+                  "dayAlternatives": {
+                    "items": {
+                      "maximum": 31,
+                      "minimum": 1,
+                      "type": "integer",
+                    },
+                    "maxItems": 5,
+                    "type": "array",
+                  },
+                  "dayOfMonth": {
+                    "maximum": 31,
+                    "minimum": 1,
+                    "type": "integer",
+                  },
+                  "expectedFrom": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "expectsReceipt": {
+                    "type": [
+                      "boolean",
+                      "null",
+                    ],
+                  },
+                  "ifNotBusinessDay": {
+                    "enum": [
+                      "BEFORE",
+                      "AFTER",
+                    ],
+                    "type": "string",
+                  },
+                  "intervalMonths": {
+                    "maximum": 9007199254740991,
+                    "minimum": -9007199254740991,
+                    "type": "integer",
+                  },
+                  "notes": {
+                    "maxLength": 1000,
+                    "type": "string",
+                  },
+                  "processName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "recurrence": {
+                    "enum": [
+                      "ONCE",
+                      "ANNUAL",
+                      "MONTHLY",
+                      "WEEKLY",
+                    ],
+                    "type": "string",
+                  },
+                  "responsibleName": {
+                    "maxLength": 200,
+                    "type": "string",
+                  },
+                  "sensitivity": {
+                    "enum": [
+                      "NORMAL",
+                      "SENSITIVE",
+                    ],
+                    "type": "string",
+                  },
+                  "taskDaysBefore": {
+                    "maximum": 60,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                  "title": {
+                    "maxLength": 200,
+                    "minLength": 1,
+                    "type": "string",
+                  },
+                  "weekday": {
+                    "maximum": 6,
+                    "minimum": 0,
+                    "type": "integer",
+                  },
+                },
+                "title": "DATE",
+                "type": "object",
+              },
+            ],
+            "description": "This item's fields, by its target: use the variant whose title is the item's target.",
+          },
+          "quote": {
+            "type": "string",
+          },
+          "reason": {
+            "type": "string",
+          },
+          "status": {
+            "description": "CONFIRMED: the client or their supplier said or showed it explicitly. UNCERTAIN: said, but not clearly or not by them (add payload.toResolve). MISSING: needed and not known (add payload.toResolve). Left out: HIGH confidence is CONFIRMED, anything else UNCERTAIN. Not for NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact.",
+            "enum": [
+              "CONFIRMED",
+              "UNCERTAIN",
+              "MISSING",
+            ],
+            "type": "string",
+          },
+          "target": {
+            "enum": [
+              "FACT",
+              "CONTACT",
+              "ORGANIZATION",
+              "SYSTEM",
+              "REQUEST_TYPE",
+              "POLICY",
+              "ENTITY",
+              "NARRATIVE",
+              "PROCESS",
+              "DOMAIN",
+              "TASK",
+              "DATE",
+            ],
+            "type": "string",
+          },
+          "targetId": {
+            "type": "string",
+          },
+        },
+        "required": [
+          "target",
+          "payload",
+        ],
+        "type": "object",
+      },
+      "maxItems": 60,
+      "minItems": 1,
+      "type": "array",
+    },
+    "newSource": {
+      "properties": {
+        "clientConversation": {
+          "description": "For kind ANKORA_DOCUMENT only: true when the document writes down what the client said in a conversation with them (an intake summary typed during the meeting). Its items are then not lowered to uncertain just because Ankora wrote them.",
+          "type": "boolean",
+        },
+        "date": {
+          "description": "YYYY-MM-DD",
+          "type": "string",
+        },
+        "documentId": {
+          "description": "For a document in the client's file (list_documents).",
+          "type": "string",
+        },
+        "firefliesId": {
+          "type": "string",
+        },
+        "gmailThreadId": {
+          "description": "For kind EMAIL: the Gmail thread id, so the same thread is one source.",
+          "type": "string",
+        },
+        "kind": {
+          "enum": [
+            "TRANSCRIPT",
+            "CLIENT_DOCUMENT",
+            "TASK",
+            "PERSON",
+            "ANKORA_DOCUMENT",
+            "EMAIL",
+          ],
+          "type": "string",
+        },
+        "participants": {
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 50,
+          "type": "array",
+        },
+        "taskId": {
+          "description": "For kind TASK: the task the knowledge came out of, such as a mapping task.",
+          "type": "string",
+        },
+        "title": {
+          "type": "string",
+        },
+        "topicsOnly": {
+          "description": "True for a restricted meeting: topics only, no quotes.",
+          "type": "boolean",
+        },
+      },
+      "required": [
+        "kind",
+        "title",
+      ],
+      "type": "object",
+    },
+    "note": {
+      "description": "One line: what was read, what was left out.",
+      "type": "string",
+    },
+    "sourceCode": {
+      "description": "An existing source code in the client's register, e.g. S3.",
+      "type": "string",
+    },
+    "uncertain": {
+      "description": "Only when it is not clear whose meeting this is. Needs newSource of kind TRANSCRIPT.",
+      "properties": {
+        "candidates": {
+          "description": "Every client the meeting could belong to, by name, including \`client\`.",
+          "items": {
+            "type": "string",
+          },
+          "maxItems": 6,
+          "minItems": 2,
+          "type": "array",
+        },
+        "reason": {
+          "description": "Why \`client\` is the likely one: what in the title or the content points to it.",
+          "type": "string",
+        },
+      },
+      "required": [
+        "candidates",
+        "reason",
+      ],
+      "type": "object",
+    },
+  },
+  "required": [
+    "client",
+    "items",
+  ],
+  "type": "object",
+}
+`;
