@@ -1,10 +1,11 @@
 "use client";
-import { ListChecks } from "lucide-react";
+import { ArrowDown, ArrowUp, ListChecks } from "lucide-react";
 import { EmptyState } from "@/components/app/states/EmptyState";
 import { TaskRow } from "./TaskRow";
 import { TaskBoard } from "./TaskBoard";
 import { useTaskList, type ListRow } from "./TaskListProvider";
 import type { MineScope } from "./mine-scope";
+import { SORT_KEYS, SORT_LABELS, nextSort, parseSort, sortParam, type SortKey } from "./task-sort";
 
 // Everything below the filter bar on the tasks screen: the empty state,
 // the board, the grouped list and the flat list.
@@ -96,6 +97,7 @@ export function TaskListView({
   if (grouped) {
     return (
       <div className="space-y-5">
+        <SortSelect />
         {groupByClient(rows).map(([clientName, inClient]) => (
           <section key={clientName}>
             <h2 className="text-sm font-medium text-app-text-primary">
@@ -120,14 +122,47 @@ export function TaskListView({
     // The header sits outside the divided list: a hidden first child
     // still counts for `divide-y`, and gave the first card a stray top
     // border on a phone.
-    <div className="rounded-2xl border border-app-border bg-white">
-      <ColumnHeader />
-      <div className="divide-y divide-app-border">
-        {rows.map((row) => (
-          <TaskRow key={row.id} task={row} />
-        ))}
+    <div className="space-y-3">
+      <SortSelect />
+      <div className="rounded-2xl border border-app-border bg-white">
+        <ColumnHeader />
+        <div className="divide-y divide-app-border">
+          {rows.map((row) => (
+            <TaskRow key={row.id} task={row} />
+          ))}
+        </div>
       </div>
     </div>
+  );
+}
+
+/// The sort on a phone, where there is no header to click.
+///
+/// Below xl the rows are cards and the column names are hidden, so the
+/// same choice is a select. One value per column and direction, plus the
+/// default; from xl it is hidden and the header does the job.
+function SortSelect() {
+  const { sort, setSort } = useTaskList();
+  return (
+    <label className="flex w-fit items-center gap-2 rounded-full border border-app-border bg-white px-3 py-1.5 text-[13px] text-app-text-secondary xl:hidden">
+      מיון
+      <select
+        aria-label="מיון"
+        value={sortParam(sort) ?? ""}
+        onChange={(e) => setSort(parseSort(e.target.value))}
+        className="bg-transparent text-app-text-primary outline-none"
+      >
+        <option value="">ברירת מחדל</option>
+        {SORT_KEYS.flatMap((key) => [
+          <option key={key} value={key}>
+            {SORT_LABELS[key]}, {key === "due" ? "מהמוקדם" : key === "status" ? "מפתוחות" : "א-ת"}
+          </option>,
+          <option key={`-${key}`} value={`-${key}`}>
+            {SORT_LABELS[key]}, {key === "due" ? "מהמאוחר" : key === "status" ? "מהושלמו" : "ת-א"}
+          </option>,
+        ])}
+      </select>
+    </label>
   );
 }
 
@@ -137,22 +172,45 @@ export function TaskListView({
 /// over their columns. Below xl every value on the card carries its own
 /// label ("אחראי:", "מפקח:") or is self-evident (a client, a date), and
 /// a header over a stack of cards would label nothing.
+///
+/// 31.10.2026: each name is a button that sorts by its column (see
+/// task-sort.ts), with an arrow on the one in use.
 function ColumnHeader() {
   return (
     <div
-      aria-hidden
       data-testid="task-columns"
       className="hidden border-b border-app-border grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-app-text-tertiary xl:grid"
     >
       <span />
-      <span>לקוח</span>
-      <span>משימה</span>
-      <span className="text-end">תאריך</span>
-      <span>אחראי</span>
-      <span>סטטוס</span>
-      <span>מפקח</span>
+      <SortButton column="client" />
+      <SortButton column="title" />
+      <SortButton column="due" end />
+      <SortButton column="assignee" />
+      <SortButton column="status" />
+      <SortButton column="supervisor" />
       <span />
     </div>
+  );
+}
+
+function SortButton({ column, end = false }: { column: SortKey; end?: boolean }) {
+  const { sort, setSort } = useTaskList();
+  const active = sort?.key === column;
+  const Arrow = sort?.desc ? ArrowDown : ArrowUp;
+  return (
+    <button
+      type="button"
+      onClick={() => setSort(nextSort(sort, column))}
+      aria-label={
+        active ? `${SORT_LABELS[column]}, ממוין ${sort.desc ? "בסדר יורד" : "בסדר עולה"}` : `מיון לפי ${SORT_LABELS[column]}`
+      }
+      className={`flex min-w-0 items-center gap-1 hover:text-app-text-primary ${end ? "justify-self-end" : "justify-self-start"} ${
+        active ? "text-app-text-primary" : ""
+      }`}
+    >
+      <span>{SORT_LABELS[column]}</span>
+      {active && <Arrow size={12} strokeWidth={2} aria-hidden />}
+    </button>
   );
 }
 
