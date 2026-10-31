@@ -179,10 +179,14 @@ test.describe.serial("one task, from opening it to closing it", () => {
     const panel = page.getByTestId("task-share");
     await panel.getByPlaceholder(/העברתי אלייך/).fill("בדיקה");
 
-    const mail = decodeURIComponent((await panel.getByTestId("task-share-mail").getAttribute("href")) ?? "");
-    expect(mail.startsWith("mailto:")).toBe(true);
+    // 31.10.2026: a Gmail draft in a new tab, in the sharer's own account.
+    // A bare mailto: did nothing in a browser with no mail app.
+    const button = panel.getByTestId("task-share-mail");
+    const mail = decodeURIComponent((await button.getAttribute("href")) ?? "");
+    expect(mail.startsWith("https://mail.google.com/mail/?authuser=")).toBe(true);
     expect(mail).toContain("/app/tasks/demo-task-screen-fixture");
     expect(mail).toContain("בדיקה");
+    expect(await button.getAttribute("target")).toBe("_blank");
   });
 
   test("a promise the client can see refuses to close without a sentence for them", async ({ page }) => {
