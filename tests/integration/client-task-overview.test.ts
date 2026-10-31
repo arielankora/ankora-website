@@ -54,7 +54,9 @@ describe("clientTaskOverview()", () => {
     const client = await createTestClient();
     const category = await createTestCategory();
     const actor = await employeeOn(client.id);
-    const now = new Date();
+    // A fixed mid-month instant, not the clock: run in the first half hour
+    // of an Israeli month, "30 minutes ago" is last month (1.11.2026).
+    const now = new Date("2026-06-15T09:00:00Z");
     await createTestTimeEntry({
       userId: actor.id,
       clientId: client.id,

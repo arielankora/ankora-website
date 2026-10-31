@@ -60,7 +60,9 @@ async function namesOf(ids: (string | null | undefined)[]): Promise<Map<string, 
 }
 
 const day = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "UTC" }).format(d);
-const month = (d: Date) => new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "UTC" }).format(d);
+// Israel, not UTC: a summary's periodStart is local midnight on the 1st,
+// which in UTC is still the last day of the month before (1.11.2026).
+const month = (d: Date) => new Intl.DateTimeFormat("he-IL", { month: "long", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
 
 async function tasks(s: Scope): Promise<ApprovalItem[]> {
   const ids = s.clients.map((c) => c.id);
