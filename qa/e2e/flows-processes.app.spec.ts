@@ -37,6 +37,25 @@ async function submit(page: import("@playwright/test").Page, button: string) {
 }
 
 test.describe("clients/process-actions", () => {
+  // 31.10.2026: the file shows one part at a time, and the part last
+  // opened comes back; "הכול" is the long view as it was.
+  test("the client file opens one part at a time and remembers it", async ({ page }) => {
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    await expect(page.getByTestId("file-part")).toHaveAttribute("data-part", "all");
+    const nav = page.getByTestId("file-parts-nav");
+    await nav.getByRole("link", { name: /תהליכים ונהלים/ }).click();
+    await expect(page).toHaveURL(/section=processes/, { timeout: 15_000 });
+    await expect(page.locator("#processes")).toBeVisible();
+    await expect(page.locator("#rules")).toHaveCount(0);
+
+    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    await expect(page.getByTestId("file-part")).toHaveAttribute("data-part", "processes");
+
+    await page.getByTestId("file-parts-nav").getByRole("link", { name: "הכול", exact: true }).click();
+    await expect(page.getByTestId("file-part")).toHaveAttribute("data-part", "all", { timeout: 15_000 });
+    await expect(page.locator("#rules")).toBeVisible();
+  });
+
   test("a procedure that automates a payment is held back; fixed, a manager approves it", async ({ page }) => {
     const title = tag("[E2E] תהליך");
 
