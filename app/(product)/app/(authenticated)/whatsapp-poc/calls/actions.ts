@@ -4,7 +4,8 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
-import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 
 export type TranscribeState = { text?: string; error?: string };
 
@@ -33,6 +34,38 @@ export async function transcribeRecordingAction(
       entityType: "CallRecording",
       entityId: emailId,
       after: { sizeBytes: audio.bytes.byteLength, model: "whisper-1" },
+    });
+    const text = await transcribeHebrew(audio);
+    return { text: text || "(לא זוהה דיבור)" };
+  } catch (err) {
+    if (err instanceof UnipileError || err instanceof TranscriptionError) return { error: err.message };
+    throw err;
+  }
+}
+
+// The same, for a WhatsApp voice message in the chat view.
+export async function transcribeVoiceNoteAction(
+  _prev: TranscribeState | undefined,
+  formData: FormData,
+): Promise<TranscribeState> {
+  const user = await requireUser();
+  const config = readPocConfig();
+  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
+  if (!isConfigured(config)) return { error: "ה-POC לא מוגדר בסביבה הזו." };
+  if (!config.hasOpenAiKey) return { error: "התמלול לא מוגדר בסביבה הזו." };
+
+  const chatId = String(formData.get("chatId") || "");
+  const messageId = String(formData.get("messageId") || "");
+
+  try {
+    const audio = await fetchVoiceNote(config, chatId, messageId);
+    if (!audio) return { error: "ההודעה הקולית לא נמצאה." };
+    await recordAudit({
+      actorId: user.id,
+      action: "whatsapp_poc.voice_note_transcribed",
+      entityType: "WhatsAppChat",
+      entityId: chatId,
+      after: { messageId, sizeBytes: audio.bytes.byteLength, model: "whisper-1" },
     });
     const text = await transcribeHebrew(audio);
     return { text: text || "(לא זוהה דיבור)" };

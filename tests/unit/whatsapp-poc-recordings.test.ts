@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { callSide, isSafeId, parseRecordingEmail, toRecording } from "@/lib/whatsapp-poc/recordings";
+import { isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
+import { toPocMessage } from "@/lib/whatsapp-poc/unipile";
 
 // The shape below is Aloha's email as it arrives in aloha@ (1.11.2026),
 // with made-up numbers.
@@ -76,5 +78,35 @@ describe("WhatsApp POC: ids passed to Unipile", () => {
     expect(isSafeId("../emails")).toBe(false);
     expect(isSafeId("a/b")).toBe(false);
     expect(isSafeId("")).toBe(false);
+  });
+});
+
+describe("WhatsApp POC: voice messages", () => {
+  it("keeps a voice message's id, type and duration from Unipile's shape", () => {
+    const m = toPocMessage({
+      id: "AC089CFDDF8B02E1E9630906DD4B02E2",
+      timestamp: "2026-10-31T19:03:54.000Z",
+      attachments: [
+        { id: "AC089CFDDF8B02E1E9630906DD4B02E2", type: "audio", mimetype: "audio/ogg; codecs=opus", voice_note: true, duration: 31 },
+      ],
+    });
+    expect(m?.attachments[0]).toEqual({
+      id: "AC089CFDDF8B02E1E9630906DD4B02E2",
+      type: "audio",
+      mimetype: "audio/ogg; codecs=opus",
+      voiceNote: true,
+      duration: 31,
+    });
+  });
+
+  it("accepts WhatsApp chat and message ids and refuses anything that could change the path", () => {
+    expect(isSafeChatId("236739352334449@lid")).toBe(true);
+    expect(isSafeChatId("120363026068747244@g.us")).toBe(true);
+    expect(isSafeChatId("../x@lid")).toBe(false);
+    expect(isSafeChatId("a/b@lid")).toBe(false);
+    expect(isSafeChatId("no-at-sign")).toBe(false);
+    expect(isSafeMessageId("3AC952BF8F3A4C48E01B")).toBe(true);
+    expect(isSafeMessageId("a/b")).toBe(false);
+    expect(isSafeMessageId("")).toBe(false);
   });
 });

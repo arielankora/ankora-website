@@ -317,6 +317,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "passkey.link_code_failure": "קוד שגוי בהוספת מכשיר",
   "whatsapp_poc.message_sent": "שליחת הודעת WhatsApp ממסך הבדיקה",
   "whatsapp_poc.recording_transcribed": "שליחת הקלטת שיחה לתמלול",
+  "whatsapp_poc.voice_note_transcribed": "שליחת הודעה קולית ב-WhatsApp לתמלול",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

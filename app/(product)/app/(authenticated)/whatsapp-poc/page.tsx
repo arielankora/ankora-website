@@ -18,6 +18,8 @@ import {
   type PocMessage,
 } from "@/lib/whatsapp-poc/unipile";
 import { SendForm } from "./SendForm";
+import { RecordingPlayer } from "./calls/RecordingPlayer";
+import { TranscribeButton } from "./calls/TranscribeButton";
 
 // WhatsApp POC, stage 1 (31.10.2026): a manager reads the chats of one
 // WhatsApp number live from Unipile and can answer a test number. Nothing
@@ -238,11 +240,28 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
                       ) : (
                         <p className="whitespace-pre-wrap break-words text-app-text-primary">{m.text}</p>
                       )}
-                      {m.attachments.map((a, i) => (
-                        <p key={i} className="text-xs text-app-text-secondary">
-                          [{attachmentLabel(a)}]
-                        </p>
-                      ))}
+                      {m.attachments.map((a, i) =>
+                        a.type === "audio" && a.id ? (
+                          // A voice message (or any audio): played and, when
+                          // a transcription key is set, transcribed here.
+                          <div key={i} className="mt-1 min-w-64 space-y-2">
+                            <p className="text-xs text-app-text-secondary">
+                              {attachmentLabel(a)}
+                              {a.duration ? ` · ${Math.floor(a.duration / 60)}:${String(Math.round(a.duration % 60)).padStart(2, "0")}` : ""}
+                            </p>
+                            <RecordingPlayer
+                              src={`/api/whatsapp-poc/voice/${encodeURIComponent(selected.id)}/${encodeURIComponent(m.id)}`}
+                            />
+                            {config.hasOpenAiKey ? (
+                              <TranscribeButton kind="voice" chatId={selected.id} messageId={m.id} />
+                            ) : null}
+                          </div>
+                        ) : (
+                          <p key={i} className="text-xs text-app-text-secondary">
+                            [{attachmentLabel(a)}]
+                          </p>
+                        ),
+                      )}
                       <p className="mt-1 text-xs text-app-text-secondary">
                         {m.isSender ? "את/ה · " : ""}
                         {formatDateTime(m.timestamp)}

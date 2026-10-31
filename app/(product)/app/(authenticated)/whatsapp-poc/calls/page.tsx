@@ -114,7 +114,7 @@ export default async function WhatsappPocCallsPage() {
                 {side.direction === "unknown" ? `${r.from} → ${r.to}` : side.other}
               </p>
               <RecordingPlayer src={`/api/whatsapp-poc/recordings/${encodeURIComponent(r.emailId)}`} />
-              {config.hasOpenAiKey ? <TranscribeButton emailId={r.emailId} /> : null}
+              {config.hasOpenAiKey ? <TranscribeButton kind="recording" emailId={r.emailId} /> : null}
             </li>
           );
         })}

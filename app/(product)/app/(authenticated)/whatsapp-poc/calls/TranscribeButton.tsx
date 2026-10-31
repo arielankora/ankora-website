@@ -1,12 +1,24 @@
 "use client";
 import { useActionState } from "react";
-import { transcribeRecordingAction, type TranscribeState } from "./actions";
+import { transcribeRecordingAction, transcribeVoiceNoteAction, type TranscribeState } from "./actions";
 
-export function TranscribeButton({ emailId }: { emailId: string }) {
-  const [state, action, pending] = useActionState<TranscribeState | undefined, FormData>(transcribeRecordingAction, undefined);
+// One button for both kinds of audio: a call recording (by email id) and a
+// WhatsApp voice message (by chat and message id).
+type Target = { kind: "recording"; emailId: string } | { kind: "voice"; chatId: string; messageId: string };
+
+export function TranscribeButton(props: Target) {
+  const serverAction = props.kind === "recording" ? transcribeRecordingAction : transcribeVoiceNoteAction;
+  const [state, action, pending] = useActionState<TranscribeState | undefined, FormData>(serverAction, undefined);
   return (
     <form action={action} className="space-y-2">
-      <input type="hidden" name="emailId" value={emailId} />
+      {props.kind === "recording" ? (
+        <input type="hidden" name="emailId" value={props.emailId} />
+      ) : (
+        <>
+          <input type="hidden" name="chatId" value={props.chatId} />
+          <input type="hidden" name="messageId" value={props.messageId} />
+        </>
+      )}
       {!state?.text ? (
         <button
           type="submit"

@@ -26,7 +26,10 @@ export async function transcribeHebrew(audio: { bytes: ArrayBuffer; contentType:
   if (audio.bytes.byteLength > MAX_AUDIO_BYTES) throw new TranscriptionError("ההקלטה גדולה מ-25MB, מעל המגבלה של OpenAI.");
 
   const form = new FormData();
-  form.set("file", new Blob([audio.bytes], { type: audio.contentType }), "recording.mp3");
+  // Whisper reads the format from the file name: WhatsApp voice messages
+  // are Ogg Opus, Aloha's recordings are MP3.
+  const name = audio.contentType.includes("ogg") ? "voice.ogg" : "recording.mp3";
+  form.set("file", new Blob([audio.bytes], { type: audio.contentType }), name);
   form.set("model", "whisper-1");
   form.set("language", "he");
   form.set("response_format", "text");

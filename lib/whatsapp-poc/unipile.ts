@@ -64,7 +64,14 @@ export type PocChat = {
   lastMessagePreview: string | null;
 };
 
-export type PocAttachment = { type: string; mimetype: string | null; voiceNote: boolean };
+export type PocAttachment = {
+  id: string | null;
+  type: string;
+  mimetype: string | null;
+  voiceNote: boolean;
+  /// Seconds, for audio.
+  duration: number | null;
+};
 
 export type PocMessage = {
   id: string;
@@ -156,7 +163,7 @@ type RawMessage = {
   is_deleted?: unknown;
   is_event?: unknown;
   sender?: { display_name?: unknown } | null;
-  attachments?: Array<{ type?: unknown; mimetype?: unknown; voice_note?: unknown }> | null;
+  attachments?: Array<{ id?: unknown; type?: unknown; mimetype?: unknown; voice_note?: unknown; duration?: unknown }> | null;
 };
 
 export function toPocMessage(raw: RawMessage): PocMessage | null {
@@ -171,9 +178,11 @@ export function toPocMessage(raw: RawMessage): PocMessage | null {
     senderName: str(raw.sender?.display_name),
     isDeleted: raw.is_deleted === true,
     attachments: (raw.attachments ?? []).map((a) => ({
+      id: str(a.id),
       type: str(a.type) ?? "file",
       mimetype: str(a.mimetype),
       voiceNote: a.voice_note === true,
+      duration: typeof a.duration === "number" ? a.duration : null,
     })),
   };
 }
