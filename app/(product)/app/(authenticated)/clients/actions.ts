@@ -78,6 +78,8 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       isInternal: formData.get("isInternal") === "on",
       // 28.10.2026: "בלי AI" for the whole client. Always on the form.
       aiExcluded: formData.get("aiExcluded") === "on",
+      // 31.10.2026: separation in approving procedures. Always on the form.
+      procedureApprovalSeparation: formData.get("procedureApprovalSeparation") === "on",
       // Org brain (spec 3.3). Always on the form.
       kind: formData.get("kind") === "PRIVATE" ? "PRIVATE" : "BUSINESS",
       industry: String(formData.get("industry") || "") || null,

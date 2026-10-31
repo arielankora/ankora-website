@@ -56,6 +56,8 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_policies: "lookupClient",
   start_process: "lookupClient",
   record_run_lesson: "findTask",
+  record_stranger_test: "lookupClient",
+  answer_stranger_question: "lookupClient; the question must be of that client",
   list_my_routines: "routines of a marked client are left out",
   record_process_check: "lookupClient",
   get_extraction_brief: "a marked client is listed by name and domains only, with the instruction to skip its meetings; its recordings are left out",

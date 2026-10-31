@@ -142,6 +142,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Process: { decision: "DUMP", table: "processes", reason: "The client's recurring processes: owner, trigger, SLA, systems, approvals and handover status. Typed by people." },
   ProcessCheck: { decision: "DUMP", table: "process_checks", reason: "Each check of an ongoing process: who looked, what they found, and the task an issue opened." },
   ProcessLesson: { decision: "DUMP", table: "process_lessons", reason: "What the person who closed a run said about the procedure, and whether it went into the next version." },
+  ProcessStrangerTest: { decision: "DUMP", table: "process_stranger_tests", reason: "Each stranger test of a procedure: who ran it, on which version, and where its answers are sourced." },
+  ProcessStrangerQuestion: { decision: "DUMP", table: "process_stranger_questions", reason: "Where a stranger would get stuck in a procedure, and what people answered. Typed by people and Claude." },
   ProcessVersion: { decision: "DUMP", table: "process_versions", reason: "Every version of every procedure, and who approved it. A run is opened from the approved one." },
   EmployeeAgreement: { decision: "DUMP", table: "employee_agreements", reason: "Every signed confidentiality undertaking and deletion declaration: who, which version, when, from where, and the hash of the text. Evidence that cannot be typed again." },
   PolicyException: { decision: "DUMP", table: "policy_exceptions", reason: "Every exception to a client's rules: what, why, until when, who asked and who approved. The audit answer to 'why was the rule broken'." },

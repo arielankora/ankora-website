@@ -129,6 +129,36 @@ describe("procedures", () => {
     await expect(removeProcess(hadas, p.id)).rejects.toThrow("מבטלים");
   });
 
+  it("the client's account manager approves its procedures; with separation, not the version they wrote (31.10.2026)", async () => {
+    const { client, hadas, ariel } = await setup();
+    const p = await addProcess(hadas, { clientId: client.id, title: "גבייה", sources: S1 });
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "דרישת תשלום" }], baseVersion: 0 });
+    await expect(approveProcessVersion(hadas, p.id, 1)).rejects.toThrow("מנהל התיק");
+
+    // Hadas is the account manager: an employee, and she approves.
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: hadas.id } });
+    await approveProcessVersion(hadas, p.id, 1);
+    expect((await listProcesses(hadas, client.id))[0].status).toBe("ACTIVE");
+
+    // The account manager of another client approves nothing here.
+    const other = await createTestClient({ name: "Grantor" });
+    const { user: anna } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await prisma.userClientAccess.create({ data: { userId: anna.id, clientId: client.id } });
+    await prisma.client.update({ where: { id: other.id }, data: { accountManagerId: anna.id } });
+    await saveProcessVersion(hadas, p.id, { steps: [{ title: "דרישת תשלום" }, { title: "חשבונית" }], baseVersion: 1 });
+    await expect(approveProcessVersion(anna, p.id, 2)).rejects.toThrow("מנהל התיק");
+
+    // Separation: whoever wrote the version does not approve it, a manager
+    // included; someone else does.
+    await prisma.client.update({ where: { id: client.id }, data: { procedureApprovalSeparation: true } });
+    await expect(approveProcessVersion(hadas, p.id, 2)).rejects.toThrow("הפרדה");
+    await approveProcessVersion(ariel, p.id, 2);
+    await saveProcessVersion(ariel, p.id, { steps: [{ title: "דרישת תשלום" }], baseVersion: 2 });
+    await expect(approveProcessVersion(ariel, p.id, 3)).rejects.toThrow("הפרדה");
+    await approveProcessVersion(hadas, p.id, 3);
+    expect((await listProcesses(hadas, client.id))[0].current!.version).toBe(3);
+  });
+
   it("checks the client's rules that say what to check: a threshold blocks, a missing required step needs an exception", async () => {
     const { client, hadas, ariel: before } = await setup();
     const ariel = await prisma.user.update({ where: { id: before.id }, data: { canApproveExceptions: true } });

@@ -8,6 +8,7 @@ import { approvalsBack } from "@/lib/approvals";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
+import { approvesProceduresOf, mayApproveProcedure } from "@/lib/procedure-approval";
 import { getClient, listStaffForAssignment } from "@/lib/app-domain/clients";
 import { ItemStaffProvider } from "./knowledge-ui";
 import { listDecisionsForClient } from "@/lib/app-domain/decisions";
@@ -61,6 +62,8 @@ const POLICY_KINDS: PolicyKind[] = ["DATA_HANDLING", "DISCLOSURE", "COMMUNICATIO
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
 import { listProcesses, ruleWarnings } from "@/lib/app-domain/processes";
 import { listLessons } from "@/lib/app-domain/process-lessons";
+import { strangerPanel } from "@/lib/app-domain/stranger-tests";
+import { strangerPrompt } from "@/lib/stranger-test";
 import { listProcessRuns } from "@/lib/app-domain/process-runs";
 import { listProcessChecks } from "@/lib/app-domain/process-checks";
 import { localDateKey, TIMEZONE } from "@/lib/timezone";
@@ -276,7 +279,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
     sources: { count: sources.length },
   };
   // Spec 5.4: what people who closed runs said about each procedure.
-  const lessons = await listLessons(processes.map((p) => p.id));
+  const [lessons, stranger] = await Promise.all([listLessons(processes.map((p) => p.id)), strangerPanel(processes.map((p) => p.id))]);
   const todayKey = localDateKey(new Date(), TIMEZONE);
   const shortDate = (d: Date) => new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Asia/Jerusalem" }).format(d);
   const entityOptions = entities.map((e) => ({ id: e.id, name: e.name }));
@@ -692,8 +695,30 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   taskId: c.taskId,
                 })),
                 draft: p.draft
-                  ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
+                  ? {
+                      version: p.draft.version,
+                      steps: p.draft.steps,
+                      highlights: p.draft.highlights,
+                      outputs: p.draft.outputs,
+                      changeNote: p.draft.changeNote,
+                      checks: p.draft.checks,
+                      // 31.10.2026: a manager or the client's account
+                      // manager, less the author under separation.
+                      mayApprove: mayApproveProcedure({
+                        userId: user.id,
+                        isManager: canManageClients(user.role),
+                        accountManagerId: client.accountManagerId,
+                        separation: client.procedureApprovalSeparation,
+                        authorId: p.draft.createdById,
+                      }),
+                    }
                   : null,
+                // 31.10.2026: the stranger test, and the prompt that runs it.
+                stranger: {
+                  state: stranger.get(p.id)?.state ?? null,
+                  open: stranger.get(p.id)?.open ?? [],
+                  prompt: strangerPrompt(client.name, p.code, p.title),
+                },
                 lessons: lessons
                   .filter((l) => l.processId === p.id)
                   .map((l) => ({
@@ -719,6 +744,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
               clientId={client.id}
               sourceOptions={sourceOptions}
               canApprove={can(user.role, "client.manage")}
+              canApproveRules={!client.isInternal || canManageClients(user.role) ? approvesProceduresOf({ userId: user.id, isManager: canManageClients(user.role), accountManagerId: client.accountManagerId }) : false}
               exceptions={exceptions.map((e) => ({
                 id: e.id,
                 policyId: e.policyId,

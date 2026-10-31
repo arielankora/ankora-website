@@ -112,7 +112,11 @@ function plural(n: number, one: string, many: string): string {
 /// `manager`: whether the person may carry out the steps only a manager
 /// may (approve a procedure, close a task, mark a review); otherwise the
 /// step leads to the process instead of a button that would fail.
-export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
+/// `approveProcedure`: whether they may approve this process's draft
+/// (lib/procedure-approval.ts: a manager, or the client's account
+/// manager, less the author when the client asks for separation).
+/// Defaults to `manager`.
+export function nextSteps(p: ProcessFacts, manager: boolean, approveProcedure: boolean = manager): NextStep[] {
   const out: NextStep[] = [];
   const scheduled = p.triggerKinds.includes("SCHEDULED");
 
@@ -159,9 +163,9 @@ export function nextSteps(p: ProcessFacts, manager: boolean): NextStep[] {
       out.push({
         kind: "procedure_draft",
         title: `טיוטת נוהל, גרסה ${p.draft.version}, מחכה לאישור`,
-        recommend: manager ? "לקרוא ולאשר" : "לבקש ממנהל לאשר",
+        recommend: approveProcedure ? "לקרוא ולאשר" : "לבקש ממנהל או ממנהל התיק לאשר",
         why: p.status === "ACTIVE" ? "עד האישור הריצות ממשיכות לפי הגרסה הקודמת." : "בלי נוהל מאושר התהליך לא פותח ריצות.",
-        fix: manager ? { kind: "op", op: { type: "approve_procedure", processId: p.id, version: p.draft.version }, label: "אישור הנוהל" } : { kind: "open", label: "לנוהל" },
+        fix: approveProcedure ? { kind: "op", op: { type: "approve_procedure", processId: p.id, version: p.draft.version }, label: "אישור הנוהל" } : { kind: "open", label: "לנוהל" },
         blocking: true,
       });
     }

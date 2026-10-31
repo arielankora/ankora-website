@@ -121,6 +121,8 @@ export async function updateClient(
     /// 28.10.2026: nothing of this client passes through AI. See
     /// Client.aiExcluded.
     aiExcluded?: boolean;
+    /// Client.procedureApprovalSeparation.
+    procedureApprovalSeparation?: boolean;
     /// Org brain (spec 3.3).
     kind?: ClientKind;
     industry?: string | null;
@@ -169,6 +171,7 @@ export async function updateClient(
       preferenceNever: input.preferenceNever === null ? null : input.preferenceNever?.trim() || undefined,
       isInternal: input.isInternal,
       aiExcluded: input.aiExcluded,
+      procedureApprovalSeparation: input.procedureApprovalSeparation,
       kind: input.kind,
       industry: input.industry === null ? null : input.industry?.trim() || undefined,
       // Only stamp the editor when a preference actually moved, so the

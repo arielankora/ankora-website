@@ -20,6 +20,9 @@ import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
 import { prisma } from "@/lib/prisma";
+import { canSendToAi } from "@/lib/knowledge";
+import { answerStrangerQuestion, recordStrangerTest, RULE_CHANGE_NEEDS_YES } from "@/lib/app-domain/stranger-tests";
+import { STRANGER_ASK_WHO_LABELS, STRANGER_SEVERITY_LABELS, strangerLine, type AnswerFactKind } from "@/lib/stranger-test";
 import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-live";
 import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
@@ -649,6 +652,136 @@ export function registerClientFileTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] record_process_check failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // 31.10.2026: the stranger test (lib/stranger-test.ts). Claude walks a
+  // procedure as someone who has never run it, records where it would get
+  // stuck, then asks the user and records each answer straight into the
+  // client's file.
+  server.registerTool(
+    "record_stranger_test",
+    {
+      title: "Record a stranger test of a process",
+      description: [
+        "The stranger test: could someone who has never done this process run it tomorrow, from what Ankora has written down?",
+        "Before calling: read the process (get_process: steps, open lessons, the questions already answered), the client's file (get_client_file, or get_client_changes if read in this conversation), and the documents that matter (list_documents). Then walk every step as a stranger: what do I do, where, with what input, how do I know it is done, who do I ask. Wherever you would get stuck, that is a question.",
+        "Do not ask what the file or the procedure already answers, and do not ask for documentation for its own sake: only what would stop or slow a real run. severity: BLOCKER (cannot go on without it), SLOWS (can go on, slowly or by asking), IMPROVES (nothing waits on it). askWho: ANKORA (the owner or the account manager knows) or CLIENT (only the client or their supplier knows). step: the step it is about, or omit for the process as a whole.",
+        "The questions of the previous test that were not answered are replaced by these. After recording, ask the user the questions one at a time, BLOCKER first, and record each answer with answer_stranger_question.",
+      ].join(" "),
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        process: z.string().describe('The process code ("P2") or its title.'),
+        summary: z.string().max(2000).optional().describe("One or two sentences: could a stranger run it, and what stops them."),
+        questions: z
+          .array(
+            z.object({
+              step: z.number().int().optional(),
+              severity: z.enum(["BLOCKER", "SLOWS", "IMPROVES"]),
+              askWho: z.enum(["ANKORA", "CLIENT"]),
+              question: z.string().max(1000).describe("In Hebrew, as you would ask the person."),
+            })
+          )
+          .max(40),
+      }),
+      annotations: TOOL_ANNOTATIONS.record_stranger_test,
+    },
+    async (
+      args: { client: string; process: string; summary?: string; questions: { step?: number; severity: "BLOCKER" | "SLOWS" | "IMPROVES"; askWho: "ANKORA" | "CLIENT"; question: string }[] },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const process = await resolveProcess(client.value, args.process);
+        if (!process.ok) return toolText(process.message);
+        const test = await recordStrangerTest(actor, process.id, { summary: args.summary ?? null, questions: args.questions });
+        const order = { BLOCKER: 0, SLOWS: 1, IMPROVES: 2 } as const;
+        return toolJson({
+          testId: test.id,
+          version: test.version,
+          readiness: strangerLine({ at: test.createdAt, open: test.questions.length, blockers: test.questions.filter((q) => q.severity === "BLOCKER").length, answered: 0 }),
+          ask: [...test.questions]
+            .sort((a, b) => order[a.severity] - order[b.severity])
+            .map((q) => ({ questionId: q.id, step: q.step, severity: STRANGER_SEVERITY_LABELS[q.severity], askWho: STRANGER_ASK_WHO_LABELS[q.askWho], question: q.question })),
+          next: "Ask the user these one at a time, BLOCKER first, and record each answer with answer_stranger_question.",
+        });
+      } catch (err) {
+        console.error("[mcp] record_stranger_test failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "answer_stranger_question",
+    {
+      title: "Record the answer to a stranger-test question",
+      description: [
+        "Records the user's answer to one question of a stranger test (record_stranger_test, or the open questions in get_process). The answer goes straight into the client's file as a confirmed fact, sourced to the person who answered: no proposal and no approval round. Write `answer` as a fact that stands on its own in the file, in Hebrew, in the user's words; the process code and step are added for you. `kind`: what it is in the file (NOTE by default; REQUIREMENT, PREFERENCE, LOCATION for where something lives, FINANCE, SCOPE_IN, SCOPE_OUT). `toldBy`: who said it, when the user is relaying someone (the client, a supplier).",
+        'When the answer changes one of the client\'s rules (list_policies), STOP before calling and ask the user, in these words: "זה משנה את הכלל <title> מ-<what it says now> ל-<what it would say>. אתה מאשר את השינוי?". Only on a clear yes, pass `ruleChange` with `userConfirmed: true`: the rule is changed and approved at once, its old version kept in its history. Only a manager or the client\'s account manager can; anyone else gets an error, and the answer is then recorded without `ruleChange`. On a no, record the answer without `ruleChange`.',
+        "`notRelevant: true` closes a question that does not apply; nothing goes into the file.",
+      ].join(" "),
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        questionId: z.string().describe("The question's id, from record_stranger_test or get_process."),
+        answer: z.string().max(2000).optional(),
+        kind: z.enum(["NOTE", "REQUIREMENT", "PREFERENCE", "LOCATION", "FINANCE", "SCOPE_IN", "SCOPE_OUT"]).optional(),
+        toldBy: z.string().max(200).optional(),
+        notRelevant: z.boolean().optional(),
+        ruleChange: z
+          .object({
+            rule: z.string().describe("The rule's id or its exact title, from list_policies."),
+            newStatement: z.string().max(2000).describe("What the rule says from now on."),
+            userConfirmed: z.boolean().describe("True only after the user said yes to the change, in this conversation."),
+          })
+          .optional(),
+      }),
+      annotations: TOOL_ANNOTATIONS.answer_stranger_question,
+    },
+    async (
+      args: {
+        client: string;
+        questionId: string;
+        answer?: string;
+        kind?: AnswerFactKind;
+        toldBy?: string;
+        notRelevant?: boolean;
+        ruleChange?: { rule: string; newStatement: string; userConfirmed: boolean };
+      },
+      ctx: ServerContext
+    ) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const question = await prisma.processStrangerQuestion.findFirst({ where: { id: args.questionId, clientId: client.value.id }, select: { id: true } });
+        if (!question) return toolText(`No stranger-test question ${args.questionId} for ${client.value.name}. Read get_process for the open questions.`);
+        let ruleChange = null;
+        if (args.ruleChange) {
+          if (!args.ruleChange.userConfirmed) return toolText(RULE_CHANGE_NEEDS_YES);
+          const q = args.ruleChange.rule.trim();
+          const rules = (await prisma.clientPolicy.findMany({ where: { clientId: client.value.id, deletedAt: null, status: { not: "RETIRED" }, OR: [{ id: q }, { title: q }] } })).filter((r) => canSendToAi(r, actor.id));
+          if (rules.length !== 1) return toolText(rules.length ? `"${q}" matches several rules. Pass the rule's id from list_policies.` : `No rule "${q}" for ${client.value.name}. Read list_policies for the rules and their ids.`);
+          ruleChange = { policyId: rules[0].id, statement: args.ruleChange.newStatement, userConfirmed: true };
+        }
+        const r = await answerStrangerQuestion(actor, question.id, {
+          answer: args.answer ?? null,
+          kind: args.kind ?? null,
+          toldBy: args.toldBy ?? null,
+          notRelevant: args.notRelevant ?? false,
+          ruleChange,
+        });
+        return toolJson({
+          recorded: args.notRelevant ? "not relevant" : r.policyId ? "rule changed and approved" : "in the client's file",
+          factId: r.factId,
+          ruleId: r.policyId,
+        });
+      } catch (err) {
+        console.error("[mcp] answer_stranger_question failed", err);
         return toolFailure(err);
       }
     }

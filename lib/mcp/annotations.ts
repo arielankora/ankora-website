@@ -122,6 +122,10 @@ export const TOOL_ANNOTATIONS = {
   // The answer about a run's procedure (spec 5.4). One per run: a second
   // call is refused, not applied twice.
   record_run_lesson: WRITES,
+  // 31.10.2026: the stranger test. Each call records another test, or
+  // writes an answer into the client's file.
+  record_stranger_test: WRITES,
+  answer_stranger_question: WRITES,
   // Opens a run of a process (spec 8): a task with the procedure's steps.
   // Each call opens another run, so it is not idempotent.
   start_process: WRITES,
@@ -177,6 +181,8 @@ export const WRITE_TOOLS = [
   "record_process_check",
   "save_procedure_translation",
   "record_run_lesson",
+  "record_stranger_test",
+  "answer_stranger_question",
   "record_pdf_signature",
   "issue_agreement_upload_code",
   "dismiss_pdf_upload",

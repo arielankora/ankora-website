@@ -310,6 +310,7 @@ export function PoliciesPanel({
   policies,
   sourceOptions,
   canApprove,
+  canApproveRules,
   exceptions,
   approvers,
   clientApproverIds,
@@ -324,6 +325,9 @@ export function PoliciesPanel({
   sourceOptions: SourceOption[];
   /// Approves and retires rules, and names the client's approvers: a manager.
   canApprove: boolean;
+  /// 31.10.2026: approves a proposed rule: a manager, or the client's
+  /// account manager. Defaults to `canApprove`.
+  canApproveRules?: boolean;
   exceptions: PanelException[];
   /// Who decides exceptions and sensitive items for this client, now.
   approvers: { id: string; name: string }[];
@@ -430,7 +434,7 @@ export function PoliciesPanel({
                 {/* A rule we are not sure the client said cannot become binding
                     (approveClientPolicy). Say how to get there, instead of
                     offering an approval the server refuses (20.10.2026). */}
-                {canApprove && p.status === "PROPOSED" && p.knowledgeStatus !== "CONFIRMED" && (
+                {(canApproveRules ?? canApprove) && p.status === "PROPOSED" && p.knowledgeStatus !== "CONFIRMED" && (
                   <p className="mt-1 text-[11px] text-app-text-secondary" data-testid="policy-approve-blocked">
                     לפני שמאשרים: מוודאים מול הלקוח שזה מה שהוא אמר, ובעריכה מסמנים &quot;{KNOWLEDGE_STATUS_LABELS.CONFIRMED}&quot; עם המקור שמאשר. אחר כך אפשר לאשר את הכלל.
                   </p>
@@ -476,7 +480,7 @@ export function PoliciesPanel({
                   ))}
               </div>
               <div className="flex shrink-0 items-center gap-3 text-xs">
-                {canApprove && p.status === "PROPOSED" && p.knowledgeStatus === "CONFIRMED" && (
+                {(canApproveRules ?? canApprove) && p.status === "PROPOSED" && p.knowledgeStatus === "CONFIRMED" && (
                   <button type="button" onClick={() => approve(p)} className="font-medium text-app-text-accent hover:underline">
                     אישור הכלל
                   </button>
