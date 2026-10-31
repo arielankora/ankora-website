@@ -66,8 +66,13 @@ describe("TaskShare", () => {
     render(<TaskShare task={TASK} url={URL} people={PEOPLE} defaultRecipientId="u1" onDone={vi.fn()} />);
     expect(screen.queryByTestId("task-share-feedback")).toBeNull();
 
+    expect(screen.queryByTestId("task-share-rtl-hint")).toBeNull();
+
     fireEvent.click(screen.getByTestId("task-share-mail"));
     expect(screen.getByTestId("task-share-feedback").textContent).toContain("Gmail");
+    // Gmail takes no direction from the link, so the panel says how to
+    // right-align the draft there (1.11.2026).
+    expect(screen.getByTestId("task-share-rtl-hint").textContent).toContain("Right-to-left editing support");
   });
 
   // A browser signed in to a private Google account too would open the

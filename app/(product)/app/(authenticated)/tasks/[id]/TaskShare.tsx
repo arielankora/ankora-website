@@ -181,6 +181,21 @@ export function TaskShare({
           {FEEDBACK[feedback]}
         </p>
       )}
+      {feedback === "gmail" && (
+        // 1.11.2026: Gmail fills the body from the link as plain text and
+        // takes no direction from it, so Hebrew lands left-aligned. Nothing
+        // in the link can change that; the fix is one click inside Gmail.
+        <div data-testid="task-share-rtl-hint" className="mt-2 text-[12px] leading-relaxed text-app-text-secondary">
+          <p>
+            הטקסט בטיוטה מיושר לשמאל? Gmail לא מקבל כיוון מהקישור. ליישור לימין: לחצו בגוף המייל, סמנו הכל (Cmd+A
+            או Ctrl+A), פתחו את סרגל העיצוב (הסמל Aa) ולחצו על כפתור הכתיבה מימין לשמאל.
+          </p>
+          <p className="mt-1">
+            אין כפתור כזה? מפעילים פעם אחת: בהגדרות של Gmail, See all settings, בלשונית General, בשורה Right-to-left
+            editing support, בוחרים ON ושומרים בתחתית העמוד.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
