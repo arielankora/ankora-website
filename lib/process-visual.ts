@@ -39,6 +39,9 @@ export type VisualGroup = { day: number | null; steps: VisualStep[] };
 export type ProcessVisual = {
   /// "כשמשהו קורה: פתיחת משתמש..." or the kinds alone.
   startLabel: string;
+  /// What day 0 is: the date itself for a process that runs by one,
+  /// otherwise the moment it starts.
+  dayZeroLabel: "המועד" | "התחלה";
   sla: number | null;
   ticks: VisualTick[];
   groups: VisualGroup[];
@@ -100,6 +103,7 @@ export function buildProcessVisual(input: VisualInput): ProcessVisual {
 
   return {
     startLabel,
+    dayZeroLabel: input.triggerKinds.includes("SCHEDULED") ? "המועד" : "התחלה",
     sla,
     ticks,
     groups,
