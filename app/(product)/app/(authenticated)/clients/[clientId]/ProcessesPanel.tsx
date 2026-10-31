@@ -126,7 +126,8 @@ export type PanelProcess = {
   dateIds: string[];
   latestVersion: number;
   current: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; approvedByName: string | null; checks: PanelCheck[]; approvedAt?: string | null; atApproval?: PanelCheck[] | null } | null;
-  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[] } | null;
+  /// `mayApprove`: whether the viewer may approve it (lib/procedure-approval.ts).
+  draft: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; changeNote: string | null; checks: PanelCheck[]; mayApprove?: boolean } | null;
   runs: { id: string; title: string; status: string; dueDate: string | null }[];
   /// An ongoing process: its check, when the next one is due, and the last ones.
   checkEveryDays: number | null;
@@ -1001,7 +1002,7 @@ function ProcessCard({
     return () => window.removeEventListener("hashchange", check);
   }, [p.id]);
   const canMark = canApprove || (!!userId && p.ownerId === userId);
-  const steps = nextSteps(factsOf(p, canMark), canApprove);
+  const steps = nextSteps(factsOf(p, canMark), canApprove, p.draft?.mayApprove ?? canApprove);
   // 25.10.2026: documentation is never "the next step"; it is listed last,
   // quietly, under what actually needs doing.
   const [first, ...others] = steps.filter((st) => st.kind !== "doc_field");

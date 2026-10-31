@@ -492,6 +492,11 @@ model Client {
   /// documents and its file. See Task.aiExcluded and lib/ai-exclusion.ts.
   aiExcluded Boolean @default(false)
 
+  /// 31.10.2026: whoever wrote a version of one of this client's
+  /// procedures does not approve it (lib/procedure-approval.ts). For a
+  /// client whose auditor asks for it; off by default.
+  procedureApprovalSeparation Boolean @default(false)
+
   /// Org brain (spec 3.3): a business or a private person, and in a few
   /// words what they do ("חברה, סטארטאפ AI"). One file template for both
   /// (decision 7); the kind says which sections a reader expects to see

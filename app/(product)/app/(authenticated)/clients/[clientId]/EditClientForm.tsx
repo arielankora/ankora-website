@@ -128,6 +128,21 @@ export function EditClientForm({
         </span>
       </label>
 
+      <label className="flex items-start gap-3 sm:col-span-2">
+        <input
+          type="checkbox"
+          name="procedureApprovalSeparation"
+          defaultChecked={client.procedureApprovalSeparation}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-app-text-primary"
+        />
+        <span>
+          <span className="block text-sm text-app-text-primary">הפרדה באישור נהלים</span>
+          <span className="block text-[11px] text-app-text-tertiary">
+            מי שכתב גרסה של נוהל לא מאשר אותה. ללקוח שהמבקר שלו מבקש הפרדה. כבוי: מנהל התיק או מנהל מאשרים כל נוהל.
+          </span>
+        </span>
+      </label>
+
       {/* Portal phase 2. Three fields that only matter because of the
           portal, grouped so they read as one subject rather than as more
           client settings. */}

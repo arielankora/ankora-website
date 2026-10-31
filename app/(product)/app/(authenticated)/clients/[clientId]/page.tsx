@@ -8,6 +8,7 @@ import { approvalsBack } from "@/lib/approvals";
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
+import { mayApproveProcedure } from "@/lib/procedure-approval";
 import { getClient, listStaffForAssignment } from "@/lib/app-domain/clients";
 import { ItemStaffProvider } from "./knowledge-ui";
 import { listDecisionsForClient } from "@/lib/app-domain/decisions";
@@ -692,7 +693,23 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   taskId: c.taskId,
                 })),
                 draft: p.draft
-                  ? { version: p.draft.version, steps: p.draft.steps, highlights: p.draft.highlights, outputs: p.draft.outputs, changeNote: p.draft.changeNote, checks: p.draft.checks }
+                  ? {
+                      version: p.draft.version,
+                      steps: p.draft.steps,
+                      highlights: p.draft.highlights,
+                      outputs: p.draft.outputs,
+                      changeNote: p.draft.changeNote,
+                      checks: p.draft.checks,
+                      // 31.10.2026: a manager or the client's account
+                      // manager, less the author under separation.
+                      mayApprove: mayApproveProcedure({
+                        userId: user.id,
+                        isManager: canManageClients(user.role),
+                        accountManagerId: client.accountManagerId,
+                        separation: client.procedureApprovalSeparation,
+                        authorId: p.draft.createdById,
+                      }),
+                    }
                   : null,
                 lessons: lessons
                   .filter((l) => l.processId === p.id)

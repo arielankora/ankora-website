@@ -1,6 +1,7 @@
 import "server-only";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { approvesProceduresOf, procedureApprovalBlocker } from "@/lib/procedure-approval";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
@@ -36,7 +37,7 @@ import { planPreview, procedurePreview, rulePreview } from "@/lib/approvals-prev
 type Scope = {
   user: User;
   manager: boolean;
-  clients: { id: string; name: string; accountManagerId: string | null; ruleApproverIds: string[]; isInternal: boolean }[];
+  clients: { id: string; name: string; accountManagerId: string | null; ruleApproverIds: string[]; isInternal: boolean; procedureApprovalSeparation: boolean }[];
   internal: Set<string>;
 };
 
@@ -158,9 +159,12 @@ async function rules(s: Scope): Promise<ApprovalItem[]> {
 }
 
 async function procedures(s: Scope): Promise<ApprovalItem[]> {
-  if (!s.manager || s.clients.length === 0) return [];
+  // 31.10.2026: a manager, for every client; the account manager, for
+  // their own (lib/procedure-approval.ts).
+  const approving = s.clients.filter((c) => approvesProceduresOf({ userId: s.user.id, isManager: s.manager, accountManagerId: c.accountManagerId }));
+  if (approving.length === 0) return [];
   const drafts = await prisma.processVersion.findMany({
-    where: { status: "DRAFT", process: { deletedAt: null, status: { not: "RETIRED" }, clientId: { in: s.clients.map((c) => c.id) } } },
+    where: { status: "DRAFT", process: { deletedAt: null, status: { not: "RETIRED" }, clientId: { in: approving.map((c) => c.id) } } },
     include: {
       process: { select: { id: true, code: true, title: true, clientId: true, entityId: true, externalPartyContactIds: true, client: { select: { name: true } } } },
     },
@@ -195,6 +199,15 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
     const checks = processChecks({ steps, highlights: d.highlights, outputs: d.outputs }, d.process, contexts.get(d.process.clientId)!);
     const preview = procedurePreview({ steps, highlights: d.highlights, outputs: d.outputs }, systems, checks);
     const held = preview.problems.length > 0;
+    // With the client's separation on, the author of the version sees it
+    // waiting for someone else, not a button that fails.
+    const separated = procedureApprovalBlocker({
+      userId: s.user.id,
+      isManager: s.manager,
+      accountManagerId: approving.find((c) => c.id === d.process.clientId)?.accountManagerId ?? null,
+      separation: approving.find((c) => c.id === d.process.clientId)?.procedureApprovalSeparation ?? false,
+      authorId: d.createdById,
+    });
     return {
       kind: "procedure",
       id: d.processId,
@@ -207,9 +220,13 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       by: names.get(d.createdById ?? "") ?? null,
       href: itemHref(d.process.clientId, d.processId),
       preview,
-      blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : null,
-      actions: { approve: held ? null : "אישור הנוהל", reject: null },
-      recommend: held ? { text: "לתקן בתהליך, ואז לאשר", why: "נוהל שלא עומד בכללים של הלקוח לא מאושר." } : { text: "לקרוא ולאשר", why: "עובר את כל הבדיקות מול הכללים של הלקוח. בלי נוהל מאושר התהליך לא פותח ריצות." },
+      blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : separated,
+      actions: { approve: held || separated ? null : "אישור הנוהל", reject: null },
+      recommend: held
+        ? { text: "לתקן בתהליך, ואז לאשר", why: "נוהל שלא עומד בכללים של הלקוח לא מאושר." }
+        : separated
+          ? { text: "מישהו אחר מאשר", why: "הלקוח ביקש הפרדה בין מי שכותב נוהל לבין מי שמאשר אותו." }
+          : { text: "לקרוא ולאשר", why: "עובר את כל הבדיקות מול הכללים של הלקוח. בלי נוהל מאושר התהליך לא פותח ריצות." },
       // Waiting on this is waiting with the work: no run opens without it.
       blocking: !held,
     };

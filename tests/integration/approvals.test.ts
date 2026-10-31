@@ -89,6 +89,21 @@ describe("approvals", () => {
     expect((await mine(hadas, client.id)).some((i) => i.kind === "exception")).toBe(false);
   });
 
+  // 31.10.2026: the client's account manager approves its procedures. With
+  // separation, the author sees the row held, not a button that fails.
+  it("gives a procedure to the client's account manager too, and holds it from its author under separation", async () => {
+    const { client, anna, ariel, process } = await setup();
+    await prisma.client.update({ where: { id: client.id }, data: { accountManagerId: anna.id } });
+    expect((await mine(anna, client.id)).find((i) => i.kind === "procedure")).toMatchObject({ id: process.id, actions: { approve: "אישור הנוהל" } });
+
+    await prisma.processVersion.updateMany({ where: { processId: process.id }, data: { createdById: anna.id } });
+    await prisma.client.update({ where: { id: client.id }, data: { procedureApprovalSeparation: true } });
+    const held = (await mine(anna, client.id)).find((i) => i.kind === "procedure");
+    expect(held?.actions.approve).toBeNull();
+    expect(held?.blocked).toMatch("הפרדה");
+    expect((await mine(ariel, client.id)).find((i) => i.kind === "procedure")?.actions.approve).toBe("אישור הנוהל");
+  });
+
   it("puts what is not yet confirmed on its owner's card, as questions to the client", async () => {
     const { client, ariel, anna, hadas, unsure } = await setup();
     // No owner and no account manager: on nobody's own card, only in everyone's.

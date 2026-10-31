@@ -2,6 +2,7 @@ import "server-only";
 import { Prisma } from "@prisma/client";
 import type { KnowledgeAudience, ProcedureClassification, ProcessStatus, ProcessTransition, ProcessTrigger, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { approvesProceduresOf, NOT_APPROVER, procedureApprovalBlocker } from "@/lib/procedure-approval";
 import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canSeeKnowledgeItem } from "@/lib/knowledge";
@@ -459,11 +460,17 @@ export async function checkProcessVersion(
 }
 
 export async function approveProcessVersion(actor: User, processId: string, version: number) {
-  if (!canManageClients(actor.role)) throw new Error("רק מנהל מאשר נוהל.");
   const process = await findProcess(actor, processId);
+  // 31.10.2026: a manager, or the client's account manager; with the
+  // client's separation on, not whoever wrote the version.
+  const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
+  const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
+  if (!approvesProceduresOf(approver)) throw new Error(NOT_APPROVER);
   const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
   if (!latest || latest.version !== version) throw new Error("זו לא הגרסה האחרונה של הנוהל. רעננו ונסו שוב.");
   if (latest.status !== "DRAFT") throw new Error("הגרסה הזו כבר מאושרת.");
+  const blocker = procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: latest.createdById });
+  if (blocker) throw new Error(blocker);
   const checks = await checkProcessVersion(process, latest);
   const blocking = holdsApproval(checks);
   if (blocking.length) throw new Error(`הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}`);
