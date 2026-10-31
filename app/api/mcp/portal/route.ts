@@ -1,3 +1,4 @@
+import { MCP_SERVER_VERSION } from "@/lib/mcp/server-version";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { registerPortalTools } from "@/lib/mcp/portal-tools";
 import { verifyMcpBearerToken } from "@/lib/mcp/auth";
@@ -33,7 +34,7 @@ const handler = createMcpHandler(registerPortalTools, {
   ...TOOL_INPUT_LIMIT,
   serverInfo: {
     name: "ankora-client-portal",
-    version: "0.1.0",
+    version: MCP_SERVER_VERSION,
   },
   // See app/api/mcp/route.ts: a stateless server has nothing to stream,
   // and an open SSE stream on a serverless function is a timeout loop.

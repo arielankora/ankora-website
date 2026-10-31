@@ -1,3 +1,4 @@
+import { MCP_SERVER_VERSION } from "@/lib/mcp/server-version";
 import { createMcpHandler, withMcpAuth } from "mcp-handler";
 import { registerAnkoraTools } from "@/lib/mcp/tools";
 import { verifyMcpBearerToken } from "@/lib/mcp/auth";
@@ -46,7 +47,7 @@ const handler = createMcpHandler(registerAnkoraTools, {
   ...TOOL_INPUT_LIMIT,
   serverInfo: {
     name: "ankora-time-tracking",
-    version: "0.1.0",
+    version: MCP_SERVER_VERSION,
   },
   // Refuse `subscriptions/listen` instead of opening a stream for it.
   //
