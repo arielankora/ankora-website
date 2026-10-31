@@ -95,14 +95,16 @@ test.describe("clients/process-actions", () => {
     await expect(card().getByTestId("process-readiness")).toHaveText("רץ");
     await expect(card().getByTestId("process-readiness")).toHaveAttribute("data-ready", "true");
 
-    // 31.10.2026: the approved procedure drawn as a band of days over its steps.
-    await card().getByRole("button", { name: "תרשים" }).click();
-    const chart = page.getByRole("dialog");
-    await expect(chart.getByTestId("process-visual")).toBeVisible();
-    await expect(chart.getByTestId("process-visual")).toContainText("מעבירים תשלום לספק");
-    await expect(chart.getByTestId("process-visual")).toContainText("יום 0");
-    await chart.getByRole("button", { name: "סגירה" }).last().click();
-    await expect(page.getByRole("dialog")).toHaveCount(0);
+    // 31.10.2026: the approved procedure is drawn in the card by default, as
+    // a band of days over its steps; "טקסט" hides it, "תרשים" brings it back.
+    const switcher = card().getByTestId("process-view-switch");
+    await expect(switcher.getByRole("button", { name: "תרשים" })).toHaveAttribute("aria-pressed", "true");
+    await expect(card().getByTestId("process-visual")).toBeVisible();
+    await expect(card().getByTestId("process-visual")).toContainText("מעבירים תשלום לספק");
+    await switcher.getByRole("button", { name: "טקסט" }).click();
+    await expect(card().getByTestId("process-visual")).toHaveCount(0);
+    await switcher.getByRole("button", { name: "תרשים" }).click();
+    await expect(card().getByTestId("process-visual")).toBeVisible();
 
     // An event happened: a run opens as a task, and the card links to it.
     await card().getByRole("button", { name: "פתיחת ריצה" }).click();
