@@ -127,6 +127,11 @@ describe("propose_knowledge", () => {
     );
   });
 
+  it("passes an item's status on to the domain, where it is read (31.10.2026)", async () => {
+    await call({ client: "nux", sourceCode: "S4", items: [{ ...ITEM, reason: "r", status: "CONFIRMED" }] });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ items: [expect.objectContaining({ status: "CONFIRMED" })] }), { indexes: [0] });
+  });
+
   it("takes a task as the source, so a mapping task can be cited (19.10.2026)", async () => {
     await call({ client: "nux", newSource: { kind: "TASK", title: "מיפוי SaaS", taskId: "t-map" }, items: [ITEM] });
     expect(proposals.proposeKnowledge).toHaveBeenCalledWith(
