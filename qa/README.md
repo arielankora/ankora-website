@@ -25,7 +25,8 @@ how much of the product gets looked at.
 | Live production probe | ✓ | ✓ | ✓ |
 | Integration tests, production build | | ✓ | ✓ |
 | Browser end-to-end, dependency advisories | | ✓ | ✓ |
-| Permission matrix, boundary & data integrity | | | ✓ |
+| Boundary scan, entry-point guards (source scans) | ✓ | ✓ | ✓ |
+| Permission matrix by role, run against the app (not written yet) | | | ✓ |
 | Accessibility, RTL, performance budgets | | | ✓ |
 
 ## The three ideas this suite is built on
