@@ -160,6 +160,7 @@ const legal: LegalContent = {
               ["Resend", "Sending messages from the system", "Contact details and message content", "United States"],
               ["Google Workspace", "Email, calendar and document storage", "Operational correspondence and documents", "Global"],
               ["Fireflies", "Transcription and summary of calls", "Recordings and transcripts", "United States"],
+              ["Unipile", "Connecting messaging channels, such as WhatsApp, to the operational layer", "Messages, contact details and correspondence", "France, with intermediate servers in the European Union, Israel, the United States and Singapore"],
               ["Anthropic", "The operational AI layer", "Operational client data", "United States"],
               ["OpenAI", "The operational AI layer", "Operational client data", "United States"],
               ["Google Analytics", "Measurement of use of the marketing site", "Anonymous usage data", "Global"],
@@ -170,7 +171,7 @@ const legal: LegalContent = {
           id: "transfer-of-information-outside-israel",
           title: "8. Transfer of information outside Israel",
           body: [
-            "The service relies on leading international tools, and the information is therefore stored on their servers in the United States, in line with the standards under which the world's leading software companies operate. These are the same providers used by the largest companies in the world, and the engagement with each of them includes information security and confidentiality undertakings.",
+            "The service relies on leading international tools, and the information is therefore stored on their servers, mostly in the United States and partly in the European Union, and some traffic passes through intermediate servers in other countries, as set out in the table in section 7. All of this is in line with the standards under which the world's leading software companies operate. These are the same providers used by the largest companies in the world, and the engagement with each of them includes information security and confidentiality undertakings.",
           ],
         },
         {
@@ -478,7 +479,7 @@ const legal: LegalContent = {
           id: "location-of-the-data",
           title: "12. Location of the data",
           body: [
-            "The data is stored on the servers of the sub-processors in the United States, as detailed in the privacy policy. The client approves the transfer.",
+            "The data is stored on the servers of the sub-processors, mostly in the United States and partly in the European Union, and some traffic passes through intermediate servers in other countries, as detailed in section 7 of the privacy policy. The client approves the transfer.",
           ],
         },
         {
@@ -513,7 +514,7 @@ const legal: LegalContent = {
             "Applies only to a client to whom the GDPR applies. The client is the controller and Ankora is the processor within the meaning of Article 28.",
             "The subject matter, duration, nature and purpose of the processing, the types of personal data and the categories of data subjects are as set out in sections 2 and 13 above.",
             "Ankora will assist the client in meeting its obligations under Articles 32 to 36, including security of processing, breach notification and data protection impact assessment, to a reasonable extent and taking account of the information available to it.",
-            "Transfers of personal data from the European Union to Israel rely on the European Commission's adequacy decision for Israel, reaffirmed in January 2024 and subject to periodic review. Onward transfer to the sub-processors in the United States relies on those providers' own transfer mechanisms, including standard contractual clauses or certification under the EU and US Data Privacy Framework.",
+            "Transfers of personal data from the European Union to Israel rely on the European Commission's adequacy decision for Israel, reaffirmed in January 2024 and subject to periodic review. Onward transfer to the sub-processors in the United States and in other countries outside the European Economic Area relies on those providers' own transfer mechanisms, including standard contractual clauses or certification under the EU and US Data Privacy Framework.",
             "Data transferred to Israel from the European Economic Area is also subject to the Israeli Privacy Protection Regulations on data transferred to Israel from the EEA, and Ankora acts in accordance with them.",
           ],
         },

@@ -171,7 +171,7 @@ const security: SecurityPageContent = {
     title: "כל ספק, בשמו.",
     body: [
       {
-        text: "האפליקציה ומסד הנתונים מאוחסנים בארצות הברית. מייל ומסמכים נשמרים בתשתית הגלובלית של Google Workspace.",
+        text: "האפליקציה ומסד הנתונים מאוחסנים בארצות הברית. מייל ומסמכים נשמרים בתשתית הגלובלית של Google Workspace. חיבור ערוצי ההודעות עובר דרך Unipile, שמאחסן בצרפת ומעביר תעבורה מוצפנת דרך שרתי ביניים באיחוד האירופי, בישראל, בארצות הברית ובסינגפור.",
       },
       { text: "עם כל ספק יש הסכם עיבוד מידע בכתב.", gate: "vendorDpas" },
       { text: "על כל ספק חדש תקבלו הודעה מראש." },
@@ -185,6 +185,7 @@ const security: SecurityPageContent = {
       { name: "Resend", role: "שליחת מיילים", location: "ארצות הברית", policyUrl: "https://resend.com/legal/privacy-policy" },
       { name: "Google Workspace", role: "מייל, מסמכים וגיבויים", location: "גלובלי", policyUrl: "https://policies.google.com/privacy" },
       { name: "Fireflies", role: "תמלול שיחות", location: "ארצות הברית", policyUrl: "https://fireflies.ai/privacy-policy" },
+      { name: "Unipile", role: "חיבור ערוצי הודעות", location: "צרפת, עם שרתי ביניים", policyUrl: "https://www.unipile.com/privacy-policy/" },
       { name: "Anthropic", role: "AI (Claude)", location: "ארצות הברית", policyUrl: "https://www.anthropic.com/legal/privacy" },
       { name: "OpenAI", role: "AI", location: "ארצות הברית", policyUrl: "https://openai.com/policies/privacy-policy/", gate: "openaiTier" },
       { name: "Google Analytics", role: "מדידת השימוש באתר השיווקי", location: "גלובלי", policyUrl: "https://policies.google.com/privacy" },

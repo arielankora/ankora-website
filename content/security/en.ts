@@ -171,7 +171,7 @@ const security: SecurityPageContent = {
     title: "Every vendor, by name.",
     body: [
       {
-        text: "The application and the database are hosted in the United States. Email and documents are kept on Google Workspace's global infrastructure.",
+        text: "The application and the database are hosted in the United States. Email and documents are kept on Google Workspace's global infrastructure. Messaging channels are connected through Unipile, which stores data in France and routes encrypted traffic through intermediate servers in the European Union, Israel, the United States and Singapore.",
       },
       { text: "We have a written data processing agreement with every vendor.", gate: "vendorDpas" },
       { text: "You will be notified before any new vendor is added." },
@@ -185,6 +185,7 @@ const security: SecurityPageContent = {
       { name: "Resend", role: "Email delivery", location: "United States", policyUrl: "https://resend.com/legal/privacy-policy" },
       { name: "Google Workspace", role: "Email, documents and backups", location: "Global", policyUrl: "https://policies.google.com/privacy" },
       { name: "Fireflies", role: "Call transcription", location: "United States", policyUrl: "https://fireflies.ai/privacy-policy" },
+      { name: "Unipile", role: "Messaging channel connection", location: "France, with intermediate servers", policyUrl: "https://www.unipile.com/privacy-policy/" },
       { name: "Anthropic", role: "AI (Claude)", location: "United States", policyUrl: "https://www.anthropic.com/legal/privacy" },
       { name: "OpenAI", role: "AI", location: "United States", policyUrl: "https://openai.com/policies/privacy-policy/", gate: "openaiTier" },
       { name: "Google Analytics", role: "Marketing site measurement", location: "Global", policyUrl: "https://policies.google.com/privacy" },
