@@ -166,11 +166,31 @@ function dataArray(body: unknown): unknown[] {
   return Array.isArray(data) ? data : [];
 }
 
-export async function listChats(config: { apiKey: string; accountId: string }, limit = 30): Promise<PocChat[]> {
-  const body = await call(config, "/chats", { query: { limit: String(limit) } });
-  return dataArray(body)
+/// WhatsApp's own "status" feed (status@broadcast) arrives as a chat. It is
+/// nobody's conversation, so it is left out of the list.
+export function isHiddenChat(chat: PocChat): boolean {
+  return chat.id === "status@broadcast" || chat.id.endsWith("@broadcast");
+}
+
+/// A cursor as Unipile hands it out is opaque. It travels back through our
+/// own URL, so only a short run of printable characters is accepted; the
+/// URL builders escape it.
+export function cleanCursor(raw: string | undefined | null): string | null {
+  if (!raw || raw.length > 500 || !/^[\x21-\x7e]+$/.test(raw)) return null;
+  return raw;
+}
+
+export async function listChats(
+  config: { apiKey: string; accountId: string },
+  options: { limit?: number; cursor?: string | null } = {},
+): Promise<{ chats: PocChat[]; nextCursor: string | null }> {
+  const query: Record<string, string> = { limit: String(options.limit ?? 30) };
+  if (options.cursor) query.cursor = options.cursor;
+  const body = await call(config, "/chats", { query });
+  const chats = dataArray(body)
     .map((c) => toPocChat(c as RawChat))
-    .filter((c): c is PocChat => c !== null);
+    .filter((c): c is PocChat => c !== null && !isHiddenChat(c));
+  return { chats, nextCursor: cleanCursor(str((body as { next_cursor?: unknown } | null)?.next_cursor)) };
 }
 
 export async function getChat(config: { apiKey: string; accountId: string }, chatId: string): Promise<PocChat | null> {

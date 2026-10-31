@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { toPocChat, toPocMessage } from "@/lib/whatsapp-poc/unipile";
+import { cleanCursor, isHiddenChat, toPocChat, toPocMessage } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -101,5 +101,21 @@ describe("WhatsApp POC: reading Unipile's shapes", () => {
       attachments: [{ type: "audio", voice_note: true }],
     });
     expect(m).toMatchObject({ id: "m", isSender: true, attachments: [{ type: "audio", voiceNote: true }] });
+  });
+});
+
+describe("WhatsApp POC: the chat list", () => {
+  it("hides WhatsApp's status feed", () => {
+    const status = toPocChat({ id: "status@broadcast", name: "status", type: "1to1" });
+    expect(status && isHiddenChat(status)).toBe(true);
+    const person = toPocChat({ id: "1@lid", name: "A", type: "1to1" });
+    expect(person && isHiddenChat(person)).toBe(false);
+  });
+
+  it("passes an ordinary cursor and drops anything odd", () => {
+    expect(cleanCursor("eyJvZmZzZXQiOjMwfQ==")).toBe("eyJvZmZzZXQiOjMwfQ==");
+    expect(cleanCursor(undefined)).toBeNull();
+    expect(cleanCursor("a b")).toBeNull();
+    expect(cleanCursor("x".repeat(501))).toBeNull();
   });
 });
