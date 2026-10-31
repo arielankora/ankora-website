@@ -43,7 +43,7 @@ import { RUNS_LABEL } from "@/lib/process-readiness";
 import { FIELD_LABELS, documentationLine } from "@/lib/process-rules";
 import { CHECK_STATE_LABELS, type CheckState } from "@/lib/process-checks";
 import { ProcessCheckForm } from "./ProcessCheckForm";
-import { ProcessVisual } from "./ProcessVisual";
+import { ProcessVisual, ViewSwitch, useProcessView } from "./ProcessVisual";
 import { LESSON_STATUS_LABELS, type LessonStatusLike } from "@/lib/process-lessons";
 import { EntitySelect, Field, INPUT, LABEL, SourceCodes, SourcesField, StatusLine, type EntityOption, type SourceOption, ItemExtras, ItemTags } from "./knowledge-ui";
 import { BUSINESS_CALENDARS, BUSINESS_CALENDAR_LABELS } from "@/lib/business-calendar";
@@ -990,6 +990,7 @@ function ProcessCard({
   act: (fn: () => Promise<{ error?: string }>, ok: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(!!p.draft);
+  const [view, setView] = useProcessView();
   useEffect(() => {
     // Arriving on this process by its link opens it.
     const check = () => {
@@ -1068,6 +1069,11 @@ function ProcessCard({
               </span>
             )}
             {p.reviewReason && <StatusBadge label="דורש סקירה" tone="red" />}
+            {p.current && (
+              <span className="ms-auto">
+                <ViewSwitch view={view} onChange={setView} />
+              </span>
+            )}
           </div>
           <p className="mt-1 text-xs text-app-text-secondary">
             {[
@@ -1087,14 +1093,14 @@ function ProcessCard({
                 <p className="min-w-0 flex-1 text-xs text-app-text-primary">
                   <span className="font-medium">הצעד הבא: </span>
                   {first.title}
+                  {first.recommend && (
+                    <span className="text-[11.5px] text-app-text-secondary">
+                      {" · "}מומלץ: {first.recommend}.{first.why && ` ${first.why}`}
+                    </span>
+                  )}
                 </p>
                 {fixButton(first, true)}
               </div>
-              {first.recommend && (
-                <p className="mt-0.5 text-[11.5px] text-app-text-secondary">
-                  מומלץ: {first.recommend}.{first.why && ` ${first.why}`}
-                </p>
-              )}
             </div>
           ) : (
             <p className="mt-2 text-xs font-medium text-app-success" data-testid="process-next-step" data-step="none">
@@ -1146,6 +1152,16 @@ function ProcessCard({
             </p>
           )}
 
+          {p.current && view === "visual" && (
+            <ProcessVisual
+              triggerKinds={p.triggerKinds}
+              triggerText={p.triggerText}
+              slaBusinessDays={p.slaBusinessDays}
+              nextDate={p.nextDate}
+              steps={p.current.steps}
+            />
+          )}
+
           <details className="mt-2" open={open} onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)} data-testid="process-details">
             <summary className="cursor-pointer text-xs font-medium text-app-text-secondary hover:text-app-text-primary">פרטים</summary>
             <div className="mt-1.5">
@@ -1167,31 +1183,14 @@ function ProcessCard({
             </div>
           </details>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-2 text-xs">
-          {p.latestVersion > 0 && (
-            <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-document-link">
-              מסמך הנוהל
-            </Link>
-          )}
-          {p.current && (
-            <Drawer triggerLabel="תרשים" title={`תרשים: ${p.code} ${p.title}`} variant="link">
-              <ProcessVisual
-                triggerKinds={p.triggerKinds}
-                triggerText={p.triggerText}
-                slaBusinessDays={p.slaBusinessDays}
-                nextDate={p.nextDate}
-                steps={p.current.steps}
-              />
-            </Drawer>
-          )}
-          <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
-            <ProcessForm clientId={clientId} existing={p} {...form} />
-          </Drawer>
-          <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
-            <ProcedureEditor clientId={clientId} process={p} systems={systems} />
-          </Drawer>
+        <div className="flex shrink-0 flex-col items-end gap-2 text-xs" data-testid="process-actions">
           {p.status === "ACTIVE" && p.triggerKinds.some((t) => t !== "CONTINUOUS") && (
-            <Drawer triggerLabel="פתיחת ריצה" title={`ריצה: ${p.code} ${p.title}`} variant="link">
+            <Drawer
+              triggerLabel="פתיחת ריצה"
+              title={`ריצה: ${p.code} ${p.title}`}
+              variant="link"
+              triggerClassName="rounded-full bg-app-accent px-3 py-1.5 font-medium !text-app-text-primary"
+            >
               <StartRunForm clientId={clientId} process={p} />
             </Drawer>
           )}
@@ -1200,25 +1199,43 @@ function ProcessCard({
               <ProcessCheckForm clientId={clientId} processId={p.id} checkText={p.checkText} steps={p.current?.steps.map((st) => st.title) ?? []} />
             </Drawer>
           )}
+          <Drawer triggerLabel="עריכה" title={`עריכה: ${p.code} ${p.title}`} variant="link">
+            <ProcessForm clientId={clientId} existing={p} {...form} />
+          </Drawer>
+          <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
+            <ProcedureEditor clientId={clientId} process={p} systems={systems} />
+          </Drawer>
           {p.triggerKinds.includes("SCHEDULED") && (
             <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
               <DatesForm clientId={clientId} process={p} dates={dates} />
             </Drawer>
           )}
-          {canApprove && p.status === "ACTIVE" && (
-            <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-app-text-tertiary hover:text-app-text-primary">
-              השהיה
-            </button>
+          {p.latestVersion > 0 && (
+            <Link href={`/app/clients/${clientId}/processes/${p.id}/document`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-document-link">
+              מסמך הנוהל
+            </Link>
           )}
-          {canApprove && p.status === "PAUSED" && (
-            <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-app-text-tertiary hover:text-app-text-primary">
-              חידוש
-            </button>
-          )}
-          {p.status === "DRAFT" && (
-            <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-app-text-tertiary hover:text-app-error">
-              הסרה
-            </button>
+          {((canApprove && (p.status === "ACTIVE" || p.status === "PAUSED")) || p.status === "DRAFT") && (
+            <details className="relative" data-testid="process-more">
+              <summary className="cursor-pointer list-none text-app-text-tertiary hover:text-app-text-primary">עוד ▾</summary>
+              <div className="absolute end-0 z-10 mt-1 flex min-w-[7rem] flex-col items-start gap-2 rounded-lg border border-app-border bg-app-surface-card p-2.5 shadow-md">
+                {canApprove && p.status === "ACTIVE" && (
+                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "PAUSED", clientId), "התהליך הושהה")} className="text-app-text-secondary hover:text-app-text-primary">
+                    השהיה
+                  </button>
+                )}
+                {canApprove && p.status === "PAUSED" && (
+                  <button type="button" onClick={() => act(() => setProcessStatusAction(p.id, "ACTIVE", clientId), "התהליך חודש")} className="text-app-text-secondary hover:text-app-text-primary">
+                    חידוש
+                  </button>
+                )}
+                {p.status === "DRAFT" && (
+                  <button type="button" onClick={() => act(() => removeProcessAction(p.id, clientId), "התהליך הוסר")} className="text-app-text-secondary hover:text-app-error">
+                    הסרה
+                  </button>
+                )}
+              </div>
+            </details>
           )}
         </div>
       </div>
