@@ -97,6 +97,9 @@ async function call(
   }
   if (!response.ok) {
     // The body can echo identifiers; it is not shown or logged.
+    if (response.status === 429) {
+      throw new UnipileError("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.", 429);
+    }
     throw new UnipileError(`Unipile החזיר שגיאה ${response.status}.`, response.status);
   }
   return response.json();
@@ -222,15 +225,56 @@ async function fetchAllChats(config: { apiKey: string; accountId: string }): Pro
   return all;
 }
 
+// 1.11.2026: reading the whole list costs up to four calls, and doing that
+// on every page load made the screen take 6 to 12 seconds and, by the
+// fourth load in two minutes, drew a 429 from Unipile. So the merged list
+// is kept in this server instance's memory for a minute. Paging and
+// opening a chat inside that minute reuse it; only the open chat's
+// messages are read live. If Unipile refuses with 429, the last list read
+// (up to ten minutes old) is shown rather than an empty screen.
+//
+// The memory is per instance and is never written anywhere. It holds what
+// the screen already shows: chat names and the last message preview.
+export const CHAT_LIST_FRESH_MS = 60_000;
+const CHAT_LIST_STALE_MS = 10 * 60_000;
+
+type CachedList = { accountId: string; at: number; chats: PocChat[] };
+let cachedList: CachedList | null = null;
+
+/// For tests: forget the remembered list.
+export function resetChatListCache(): void {
+  cachedList = null;
+}
+
+export async function loadMergedChats(
+  config: { apiKey: string; accountId: string },
+  fetchAll: (config: { apiKey: string; accountId: string }) => Promise<PocChat[]> = fetchAllChats,
+  now: () => number = Date.now,
+): Promise<{ chats: PocChat[]; stale: boolean }> {
+  const cached = cachedList && cachedList.accountId === config.accountId ? cachedList : null;
+  if (cached && now() - cached.at < CHAT_LIST_FRESH_MS) return { chats: cached.chats, stale: false };
+  try {
+    const chats = mergeChats(await fetchAll(config));
+    cachedList = { accountId: config.accountId, at: now(), chats };
+    return { chats, stale: false };
+  } catch (err) {
+    if (err instanceof UnipileError && err.status === 429 && cached && now() - cached.at < CHAT_LIST_STALE_MS) {
+      return { chats: cached.chats, stale: true };
+    }
+    throw err;
+  }
+}
+
 export async function listChats(
   config: { apiKey: string; accountId: string },
   options: { offset?: number } = {},
-): Promise<{ chats: PocChat[]; hasMore: boolean }> {
+): Promise<{ chats: PocChat[]; hasMore: boolean; stale: boolean }> {
   const offset = options.offset ?? 0;
-  const merged = mergeChats(await fetchAllChats(config));
+  const { chats: merged, stale } = await loadMergedChats(config);
   return {
     chats: merged.slice(offset, offset + CHAT_PAGE_SIZE),
     hasMore: offset + CHAT_PAGE_SIZE < merged.length,
+    stale,
   };
 }
 

@@ -8,7 +8,7 @@ import {
   parsePhoneList,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
-import { mergeChats, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, mergeChats, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
 
 describe("WhatsApp POC: who may see the screen", () => {
   const viewers = parseEmailList("Ariel@Ankora.co.il, hadas@ankora.co.il");
@@ -158,5 +158,61 @@ describe("WhatsApp POC: merging Unipile's chat list", () => {
       chat("new@lid", "2026-10-31T00:00:00Z"),
     ]);
     expect(merged.map((c) => c.id)).toEqual(["new@lid", "old@lid", "none@lid"]);
+  });
+});
+
+describe("WhatsApp POC: remembering the chat list for a minute", () => {
+  const config = { apiKey: "k", accountId: "acc_test" };
+  const list = [toPocChat({ id: "a@lid", name: "A", type: "1to1", last_message_timestamp: "2026-10-31T10:00:00Z" })!];
+
+  it("reads Unipile once within a minute, then again after it", async () => {
+    resetChatListCache();
+    let calls = 0;
+    const fetchAll = async () => {
+      calls += 1;
+      return list;
+    };
+    let t = 1_000_000;
+    await loadMergedChats(config, fetchAll, () => t);
+    t += CHAT_LIST_FRESH_MS - 1;
+    await loadMergedChats(config, fetchAll, () => t);
+    expect(calls).toBe(1);
+    t += 2;
+    await loadMergedChats(config, fetchAll, () => t);
+    expect(calls).toBe(2);
+  });
+
+  it("shows the last list, marked stale, when Unipile answers 429", async () => {
+    resetChatListCache();
+    let t = 2_000_000;
+    await loadMergedChats(config, async () => list, () => t);
+    t += CHAT_LIST_FRESH_MS + 1;
+    const result = await loadMergedChats(
+      config,
+      async () => {
+        throw new UnipileError("rate", 429);
+      },
+      () => t,
+    );
+    expect(result).toEqual({ chats: list, stale: true });
+  });
+
+  it("does not hide other errors, and has nothing to show with no earlier list", async () => {
+    resetChatListCache();
+    await expect(
+      loadMergedChats(config, async () => {
+        throw new UnipileError("rate", 429);
+      }),
+    ).rejects.toThrow("rate");
+    await loadMergedChats(config, async () => list, () => 0);
+    await expect(
+      loadMergedChats(
+        config,
+        async () => {
+          throw new UnipileError("down", 500);
+        },
+        () => CHAT_LIST_FRESH_MS + 1,
+      ),
+    ).rejects.toThrow("down");
   });
 });
