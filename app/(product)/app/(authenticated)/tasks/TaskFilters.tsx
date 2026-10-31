@@ -85,7 +85,7 @@ export function TaskFilters({
   ///
   /// Only the ones that are actually set. An empty hidden input still
   /// submits, and `?status=&mine=` reads as a filter set to nothing.
-  const CARRIED = ["status", "mine", "group", "view"] as const;
+  const CARRIED = ["status", "mine", "group", "view", "sort"] as const;
   const carried = CARRIED.map((key) => [key, params.get(key)] as const).filter(
     (pair): pair is readonly [(typeof CARRIED)[number], string] => !!pair[1]
   );

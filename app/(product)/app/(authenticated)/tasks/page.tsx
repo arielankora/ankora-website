@@ -84,6 +84,7 @@ export default async function TasksPage(props: {
     q?: string;
     group?: string;
     view?: string;
+    sort?: string;
   }>;
 }) {
   const searchParams = await props.searchParams;
@@ -242,6 +243,7 @@ export default async function TasksPage(props: {
         <TaskListProvider
           rows={tasks.map(toRow)}
           listQuery={listQueryOf(searchParams)}
+          initialSort={searchParams.sort}
           // What a newly created task has to survive to belong on the
           // screen as it is filtered right now. The client's NAME and not
           // only its id, because the row the action returns carries the

@@ -24,7 +24,7 @@ import { calendarBackHref, CALENDAR_FROM_PREFIX, cleanCalendarQuery } from "@/li
 /// Every key the tasks list reads. A filter added to page.tsx that is
 /// not listed here is simply not carried back, which is the safe way to
 /// fail.
-export const LIST_QUERY_KEYS = ["clientId", "categoryId", "status", "mine", "closed", "q", "group", "view"] as const;
+export const LIST_QUERY_KEYS = ["clientId", "categoryId", "status", "mine", "closed", "q", "group", "view", "sort"] as const;
 
 function clean(input: URLSearchParams): string {
   const out = new URLSearchParams();
