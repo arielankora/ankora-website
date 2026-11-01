@@ -264,7 +264,7 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 49 tools, by family:
+the Model Context Protocol. 51 tools, by family:
 
 | | |
 | --- | --- |
