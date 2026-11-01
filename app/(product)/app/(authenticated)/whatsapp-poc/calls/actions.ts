@@ -6,6 +6,8 @@ import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { TRANSCRIBE_MODELS, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
 import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
+import { isAiExcludedNumber, storedRecordingAudio } from "@/lib/comms/call-store";
+import { prisma } from "@/lib/prisma";
 
 export type TranscribeState = { text?: string; error?: string };
 
@@ -25,8 +27,16 @@ export async function transcribeRecordingAction(
 
   const emailId = String(formData.get("emailId") || "");
 
+  // 1.11.2026: a stored recording is transcribed on arrival; this button
+  // is the retry for one that failed, and its result is saved with it. A
+  // number of a client marked "בלי AI" is never sent.
+  const stored = await prisma.callRecording.findUnique({ where: { emailId }, include: { transcript: true } });
+  if (stored && (await isAiExcludedNumber(stored.otherPhone))) return { error: "הלקוח מסומן \"בלי AI\". ההקלטה לא נשלחת לתמלול." };
+
   try {
-    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
+    const audio = stored
+      ? await storedRecordingAudio(stored)
+      : await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
     if (!audio) return { error: "ההקלטה לא נמצאה." };
     await recordAudit({
       actorId: user.id,
@@ -35,8 +45,15 @@ export async function transcribeRecordingAction(
       entityId: emailId,
       after: { sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const { text } = await transcribeHebrew(audio);
-    return { text: text || "(לא זוהה דיבור)" };
+    const { text, model } = await transcribeHebrew(audio);
+    const shown = text || "(לא זוהה דיבור)";
+    if (stored?.transcript) {
+      await prisma.transcript.update({
+        where: { id: stored.transcript.id },
+        data: { status: "DONE", text: shown, model, doneAt: new Date(), lastError: null },
+      });
+    }
+    return { text: shown };
   } catch (err) {
     if (err instanceof UnipileError || err instanceof TranscriptionError) return { error: err.message };
     throw err;

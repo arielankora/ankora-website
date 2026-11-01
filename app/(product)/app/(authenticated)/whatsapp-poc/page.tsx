@@ -41,7 +41,9 @@ import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
-import { TranscribeButton } from "./calls/TranscribeButton";
+import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
+import { prisma } from "@/lib/prisma";
+import type { TranscriptStatus } from "@prisma/client";
 
 // Communications screen (1.11.2026, from Ariel's review of the design on
 // Claude Design): WhatsApp and the Aloha line's call recordings in one
@@ -217,7 +219,38 @@ function MessageBubble({ m, chat }: { m: PocMessage; chat: PocChat }) {
   );
 }
 
-function CallCard({ call, transcribe }: { call: InboxCall & { sizeBytes: number | null }; transcribe: boolean }) {
+type PageCall = InboxCall & {
+  sizeBytes: number | null;
+  durationSec: number | null;
+  /// Null for a recording read live from the mailbox (nothing stored yet).
+  transcript: { status: TranscriptStatus; text: string | null } | null;
+  audioRemoved: boolean;
+};
+
+/// What sits under a recording's player: the stored transcript, its state,
+/// or (for one read live, or a failed one) the button.
+function CallTranscript({ call, canTranscribe }: { call: PageCall; canTranscribe: boolean }) {
+  const t = call.transcript;
+  if (t?.status === "DONE" && t.text) return <TranscriptText text={t.text} />;
+  if (t?.status === "SKIPPED") return <p className="text-sm text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>;
+  if (t?.status === "PENDING") return <p className="text-sm text-app-text-secondary">התמלול בתור, ויופיע כאן כשיסתיים.</p>;
+  if (!canTranscribe) return null;
+  return (
+    <div className="space-y-1">
+      {t?.status === "FAILED" ? <p className="text-sm text-app-error">התמלול נכשל שלוש פעמים.</p> : null}
+      <TranscribeButton kind="recording" emailId={call.emailId} label={t?.status === "FAILED" ? "לנסות שוב" : "תמלול"} />
+    </div>
+  );
+}
+
+function callMeta(call: PageCall) {
+  const parts: string[] = [];
+  if (call.durationSec) parts.push(`${formatDuration(call.durationSec)} דק׳`);
+  else if (call.sizeBytes) parts.push(formatSize(call.sizeBytes));
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
+function CallCard({ call, transcribe }: { call: PageCall; transcribe: boolean }) {
   return (
     <li className="space-y-3 rounded-xl border border-app-info-soft bg-white p-4 ring-1 ring-app-border">
       <div className="flex items-center gap-3">
@@ -225,15 +258,21 @@ function CallCard({ call, transcribe }: { call: InboxCall & { sizeBytes: number 
         <div>
           <p className="text-[15px] font-medium text-app-text-primary">{DIRECTION_LABEL[call.direction]}</p>
           <p className="text-xs text-app-text-secondary">
-            {formatTime(call.callAt)} · הקו של אנקורה{call.sizeBytes ? ` · ${formatSize(call.sizeBytes)}` : ""}
+            {formatTime(call.callAt)} · הקו של אנקורה{callMeta(call)}
           </p>
         </div>
       </div>
-      <RecordingPlayer src={recordingHref(call.emailId)} />
-      {transcribe ? <TranscribeButton kind="recording" emailId={call.emailId} /> : null}
+      {call.audioRemoved ? (
+        <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+      ) : (
+        <RecordingPlayer src={recordingHref(call.emailId)} />
+      )}
+      <CallTranscript call={call} canTranscribe={transcribe} />
     </li>
   );
 }
+
+const DIRECTION_FROM_DB = { IN: "in", OUT: "out", UNKNOWN: "unknown" } as const;
 
 export default async function CommunicationsPage(props: {
   searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string }>;
@@ -271,21 +310,50 @@ export default async function CommunicationsPage(props: {
       waError = err.message;
     }
   }
-  let recordings: Recording[] = [];
+  // 1.11.2026 (stage 2): the recordings are stored as they arrive
+  // (lib/comms/call-store.ts) and read from here. Until the first are
+  // stored, the mailbox is read live as before.
+  let calls: PageCall[] = [];
   let callsError: string | null = null;
   let callsStale = false;
-  if (mailConfig) {
+  const stored = await prisma.callRecording.findMany({
+    orderBy: { callAt: "desc" },
+    take: 300,
+    include: { transcript: { select: { status: true, text: true } } },
+  });
+  if (stored.length > 0) {
+    calls = stored.map((r) => ({
+      emailId: r.emailId,
+      callAt: r.callAt.toISOString(),
+      direction: DIRECTION_FROM_DB[r.direction],
+      other: r.otherPhone,
+      sizeBytes: r.sizeBytes,
+      durationSec: r.durationSec,
+      transcript: r.transcript,
+      audioRemoved: r.audioDeletedAt !== null,
+    }));
+  } else if (mailConfig) {
+    let recordings: Recording[] = [];
     try {
       ({ recordings, stale: callsStale } = await listRecordingsCached(mailConfig));
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
       callsError = err.message;
     }
+    calls = recordings.map((r) => {
+      const side = callSide(r, config.lineNumber);
+      return {
+        emailId: r.emailId,
+        callAt: r.callAt,
+        direction: side.direction,
+        other: side.other,
+        sizeBytes: r.sizeBytes,
+        durationSec: null,
+        transcript: null,
+        audioRemoved: false,
+      };
+    });
   }
-  const calls: Array<InboxCall & { sizeBytes: number | null }> = recordings.map((r) => {
-    const side = callSide(r, config.lineNumber);
-    return { emailId: r.emailId, callAt: r.callAt, direction: side.direction, other: side.other, sizeBytes: r.sizeBytes };
-  });
 
   // Which contact is open: from the list (?c=), an old link (?chat=), or
   // the "open by number" box (?phone=).
@@ -443,7 +511,7 @@ export default async function CommunicationsPage(props: {
                         <p className="text-xs text-app-text-secondary">
                           {DIRECTION_SHORT[call.direction] ? `${DIRECTION_SHORT[call.direction]} · ` : ""}
                           {formatDateTime(call.callAt)}
-                          {call.sizeBytes ? ` · ${formatSize(call.sizeBytes)}` : ""}
+                          {callMeta(call)}
                           {o?.personName ? (
                             <span dir="ltr" className="ms-1">
                               {call.other}
@@ -463,8 +531,12 @@ export default async function CommunicationsPage(props: {
                       </Link>
                     )}
                   </div>
-                  <RecordingPlayer src={recordingHref(call.emailId)} />
-                  {config.hasOpenAiKey ? <TranscribeButton kind="recording" emailId={call.emailId} /> : null}
+                  {call.audioRemoved ? (
+                    <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+                  ) : (
+                    <RecordingPlayer src={recordingHref(call.emailId)} />
+                  )}
+                  <CallTranscript call={call} canTranscribe={config.hasOpenAiKey} />
                 </li>
               );
             })}

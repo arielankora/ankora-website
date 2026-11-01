@@ -2060,6 +2060,27 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-11-01"
+    },
+    "api:/api/cron/comms-recordings": {
+      "kind": "api",
+      "area": "cron",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-01"
+    },
+    "api:/api/webhooks/unipile": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-01"
+    },
+    "cron:/api/cron/comms-recordings": {
+      "kind": "cron",
+      "area": "cron",
+      "risk": "critical",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-01"
     }
   },
   "waivers": {},

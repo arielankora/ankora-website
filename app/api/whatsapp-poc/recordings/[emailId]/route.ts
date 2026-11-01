@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
+import { storedRecordingAudio } from "@/lib/comms/call-store";
+import { prisma } from "@/lib/prisma";
 import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 
 // WhatsApp POC, stage 2: one call recording's audio, streamed from the
 // aloha@ mailbox through Unipile, for the <audio> player on the calls
-// screen. Same gate as the screen. Nothing is cached or stored.
+// screen. Same gate as the screen. 1.11.2026: a stored recording is served
+// from its Drive copy (lib/comms/call-store.ts), else from the mailbox.
 export async function GET(
   _request: Request,
   props: { params: Promise<{ emailId: string }> },
@@ -24,7 +27,11 @@ export async function GET(
 
   const { emailId } = await props.params;
   try {
-    const audio = await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
+    const stored = emailId.length <= 1000 ? await prisma.callRecording.findUnique({ where: { emailId } }) : null;
+    if (stored?.audioDeletedAt) return NextResponse.json({ error: "Audio removed after 12 months" }, { status: 410 });
+    const audio = stored
+      ? await storedRecordingAudio(stored)
+      : await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);
     if (!audio) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return new NextResponse(audio.bytes, {
       headers: {
