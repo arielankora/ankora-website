@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { attachmentDisposition } from "@/lib/http-headers";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
@@ -36,16 +37,16 @@ export async function GET(
     );
     if (!file) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const inline = inlineKind(file.contentType) !== null;
-    return new NextResponse(file.bytes, {
-      headers: {
-        "content-type": inline ? file.contentType : "application/octet-stream",
-        "content-length": String(file.bytes.byteLength),
-        "cache-control": "private, no-store",
-        "content-disposition": inline ? "inline" : "attachment",
-        "x-content-type-options": "nosniff",
-        "content-security-policy": "sandbox; default-src 'none'",
-      },
-    });
+    const headers: Record<string, string> = {
+      "content-type": inline ? file.contentType : "application/octet-stream",
+      "content-length": String(file.bytes.byteLength),
+      "cache-control": "private, no-store",
+      "x-content-type-options": "nosniff",
+      "content-security-policy": "sandbox; default-src 'none'",
+    };
+    // Inline is the default; anything else is forced to a download.
+    if (!inline) headers["content-disposition"] = attachmentDisposition("whatsapp-attachment");
+    return new NextResponse(file.bytes, { headers });
   } catch (err) {
     if (err instanceof UnipileError) {
       return NextResponse.json({ error: err.message }, { status: err.status === 429 ? 429 : 502 });

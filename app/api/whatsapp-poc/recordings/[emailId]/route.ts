@@ -31,7 +31,6 @@ export async function GET(
         "content-type": audio.contentType,
         "content-length": String(audio.bytes.byteLength),
         "cache-control": "private, no-store",
-        "content-disposition": "inline",
       },
     });
   } catch (err) {

@@ -27,7 +27,6 @@ export async function GET(_request: Request, props: { params: Promise<{ chatId: 
         "content-type": audio.contentType,
         "content-length": String(audio.bytes.byteLength),
         "cache-control": "private, no-store",
-        "content-disposition": "inline",
       },
     });
   } catch (err) {
