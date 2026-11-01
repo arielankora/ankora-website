@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { callSide, isSafeId, parseRecordingEmail, toRecording } from "@/lib/whatsapp-poc/recordings";
-import { isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
+import { inlineKind, isSafeChatId, isSafeMessageId } from "@/lib/whatsapp-poc/voice-notes";
 import { toPocMessage } from "@/lib/whatsapp-poc/unipile";
 
 // The shape below is Aloha's email as it arrives in aloha@ (1.11.2026),
@@ -108,5 +108,17 @@ describe("WhatsApp POC: voice messages", () => {
     expect(isSafeMessageId("3AC952BF8F3A4C48E01B")).toBe(true);
     expect(isSafeMessageId("a/b")).toBe(false);
     expect(isSafeMessageId("")).toBe(false);
+  });
+});
+
+describe("WhatsApp POC: which attachments open inline", () => {
+  it("shows images, video and audio, and never SVG or documents", () => {
+    expect(inlineKind("image/jpeg")).toBe("image");
+    expect(inlineKind("image/webp")).toBe("image");
+    expect(inlineKind("video/mp4")).toBe("video");
+    expect(inlineKind("audio/ogg; codecs=opus")).toBe("audio");
+    expect(inlineKind("image/svg+xml")).toBeNull();
+    expect(inlineKind("text/html")).toBeNull();
+    expect(inlineKind("application/pdf")).toBeNull();
   });
 });

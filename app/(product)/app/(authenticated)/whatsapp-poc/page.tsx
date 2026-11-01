@@ -50,6 +50,10 @@ function attachmentLabel(a: PocMessage["attachments"][number]) {
   return ATTACHMENT_LABEL[a.type] ?? "קובץ";
 }
 
+function mediaHref(chatId: string, messageId: string, attachmentId: string) {
+  return `/api/whatsapp-poc/media/${encodeURIComponent(chatId)}/${encodeURIComponent(messageId)}/${encodeURIComponent(attachmentId)}`;
+}
+
 function pageHref(params: { chat?: string; offset?: number }) {
   const q = new URLSearchParams();
   if (params.chat) q.set("chat", params.chat);
@@ -256,6 +260,40 @@ export default async function WhatsappPocPage(props: { searchParams: Promise<{ c
                               <TranscribeButton kind="voice" chatId={selected.id} messageId={m.id} />
                             ) : null}
                           </div>
+                        ) : a.id && (a.type === "img" || a.type === "image") ? (
+                          // 1.11.2026: images shown in the bubble, through the
+                          // same gated route as every other attachment.
+                          <a
+                            key={i}
+                            href={mediaHref(selected.id, m.id, a.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1 block"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request file; next/image would cache it */}
+                            <img
+                              src={mediaHref(selected.id, m.id, a.id)}
+                              alt={attachmentLabel(a)}
+                              loading="lazy"
+                              className="max-h-72 max-w-full rounded-lg"
+                            />
+                          </a>
+                        ) : a.id && a.type === "video" ? (
+                          <video
+                            key={i}
+                            controls
+                            preload="none"
+                            className="mt-1 max-h-72 max-w-full rounded-lg"
+                            src={mediaHref(selected.id, m.id, a.id)}
+                          />
+                        ) : a.id ? (
+                          <a
+                            key={i}
+                            href={mediaHref(selected.id, m.id, a.id)}
+                            className="mt-1 inline-flex min-h-11 items-center text-xs text-app-text-primary underline"
+                          >
+                            הורדת {attachmentLabel(a)}
+                          </a>
                         ) : (
                           <p key={i} className="text-xs text-app-text-secondary">
                             [{attachmentLabel(a)}]

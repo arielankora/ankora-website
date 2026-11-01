@@ -58,3 +58,36 @@ export async function fetchVoiceNote(
   const contentType = header.startsWith("audio/") ? header : (audio.mimetype ?? "audio/ogg");
   return { bytes, contentType };
 }
+
+/// Kinds of file a message may carry that the chat view shows inline.
+/// Everything else (documents, contact cards) is offered as a download.
+/// SVG is left out of inline on purpose: it can carry script.
+export function inlineKind(mimetype: string): "image" | "video" | "audio" | null {
+  const m = mimetype.toLowerCase().split(";")[0].trim();
+  if (m === "image/svg+xml") return null;
+  if (m.startsWith("image/")) return "image";
+  if (m.startsWith("video/")) return "video";
+  if (m.startsWith("audio/")) return "audio";
+  return null;
+}
+
+/// Any one attachment of a message (1.11.2026: images, videos and files,
+/// after voice messages). The message is read first and the attachment
+/// must be one of its own, by id.
+export async function fetchMessageAttachment(
+  config: { apiKey: string; accountId: string },
+  chatId: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  if (!isSafeChatId(chatId) || !isSafeMessageId(messageId) || !isSafeMessageId(attachmentId)) return null;
+  const messageUrl = `${BASE_URL}/${config.accountId}/chats/${encodeURIComponent(chatId)}/messages/${encodeURIComponent(messageId)}`;
+  const message = toPocMessage(await (await get(config.apiKey, messageUrl, "application/json")).json());
+  const attachment = message?.attachments.find((a) => a.id === attachmentId);
+  if (!message || !attachment) return null;
+  const file = await get(config.apiKey, `${messageUrl}/attachments/${encodeURIComponent(attachmentId)}`, "*/*");
+  const bytes = await file.arrayBuffer();
+  if (bytes.byteLength > MAX_BYTES) return null;
+  const contentType = file.headers.get("content-type") || attachment.mimetype || "application/octet-stream";
+  return { bytes, contentType };
+}
