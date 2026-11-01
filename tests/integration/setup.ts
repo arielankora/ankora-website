@@ -23,6 +23,12 @@ const TABLES = [
   // recordings they belong to. No foreign keys to anything else.
   "transcripts",
   "call_recordings",
+  // Stage 3: messages before conversations before channels.
+  "comms_attachments",
+  "comms_messages",
+  "comms_conversations",
+  "comms_blocks",
+  "comms_channels",
   // Phase 4 tables truncate before the Phase 3 tables they (loosely)
   // reference - email_deliveries -> alert_events -> alert_rules -> clients.
   // alert_events.hourBankId is a plain column (no FK - see ADR 11.3), so

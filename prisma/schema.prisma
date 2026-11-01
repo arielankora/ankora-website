@@ -275,6 +275,7 @@ model User {
 
   @@index([role, status])
   @@map("users")
+  commsChannels CommsChannel[] @relation("CommsChannelOwner")
 }
 
 /// Spec 4.2: "Forgot password באמצעות link חד-פעמי עם expiry." Only the
@@ -4196,6 +4197,8 @@ model CallRecording {
 model Transcript {
   id          String           @id @default(cuid())
   recordingId String?          @unique
+  /// Stage 3: a WhatsApp voice message instead of a call recording.
+  attachmentId String?         @unique
   status      TranscriptStatus @default(PENDING)
   text        String?
   model       String?
@@ -4205,8 +4208,151 @@ model Transcript {
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
-  recording CallRecording? @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  recording  CallRecording?   @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  attachment CommsAttachment? @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
 
   @@index([status, createdAt])
   @@map("transcripts")
+}
+
+// ---------------------------------------------------------------------------
+// Communications storage, stage 3 (1.11.2026, spec "שמירת שיחות, הקלטות
+// ותמלולים"): WhatsApp conversations kept here, for every connected number,
+// except numbers on its block list. Which client a conversation belongs to
+// is worked out on read from its number and the client files, like the
+// call recordings.
+// ---------------------------------------------------------------------------
+
+/// A WhatsApp number connected through Unipile, and whose it is.
+model CommsChannel {
+  id                String    @id @default(cuid())
+  /// Unipile's account id ("acc_...").
+  accountId         String    @unique
+  phone             String?
+  ownerUserId       String
+  /// People who never see this number's conversations, whatever else
+  /// says (Ariel, 1.11.2026: Hadas does not see conversations from his
+  /// number, not even with her own clients).
+  excludedViewerIds String[]  @default([])
+  /// Nothing is stored until the owner has gone through the block list
+  /// and pressed "התחל לשמור".
+  storeEnabled      Boolean   @default(false)
+  storeStartedAt    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  owner         User                @relation("CommsChannelOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  conversations CommsConversation[]
+  blocks        CommsBlock[]
+
+  @@map("comms_channels")
+}
+
+model CommsConversation {
+  id             String    @id @default(cuid())
+  channelId      String
+  /// Unipile's chat id.
+  externalChatId String
+  isGroup        Boolean   @default(false)
+  /// The other side of a 1:1 chat, E.164.
+  otherPhone     String?
+  name           String
+  lastMessageAt  DateTime?
+  /// A group belongs to a client only when someone says so.
+  groupClientId  String?
+  /// When its history was read once (the first load, or after a block
+  /// was lifted). Null: still to do.
+  backfilledAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  channel  CommsChannel   @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  messages CommsMessage[]
+
+  @@unique([channelId, externalChatId])
+  @@index([otherPhone])
+  @@index([channelId, lastMessageAt])
+  @@map("comms_conversations")
+}
+
+model CommsMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  externalId     String
+  at             DateTime
+  isSender       Boolean  @default(false)
+  senderName     String?
+  text           String   @default("")
+  isDeleted      Boolean  @default(false)
+  isEdited       Boolean  @default(false)
+  /// A block on its number is waiting for a manager: kept, shown to nobody,
+  /// not transcribed, not extracted.
+  held           Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  conversation CommsConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  attachments  CommsAttachment[]
+
+  @@unique([conversationId, externalId])
+  @@index([conversationId, at])
+  @@map("comms_messages")
+}
+
+model CommsAttachment {
+  id          String   @id @default(cuid())
+  messageId   String
+  externalId  String
+  type        String
+  mimetype    String?
+  voiceNote   Boolean  @default(false)
+  durationSec Int?
+  fileName    String?
+  /// Voice messages only: the audio is copied to Drive. Other files are
+  /// read from Unipile when opened.
+  driveFileId String?
+  createdAt   DateTime @default(now())
+
+  message    CommsMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  transcript Transcript?
+
+  @@unique([messageId, externalId])
+  @@map("comms_attachments")
+}
+
+enum CommsBlockKind {
+  PHONE
+  CHAT
+}
+
+enum CommsBlockStatus {
+  /// Asked by an employee, waiting for a manager. Its messages are held.
+  PENDING
+  /// In force: nothing from it is kept.
+  APPROVED
+  REJECTED
+  /// Lifted by a manager. What was deleted stays deleted.
+  REVOKED
+}
+
+/// "לא לשמור שיחות עם המספר הזה", per connected number.
+model CommsBlock {
+  id            String           @id @default(cuid())
+  channelId     String
+  kind          CommsBlockKind
+  /// E.164 for PHONE, Unipile's chat id for CHAT (a group).
+  value         String
+  /// The name shown in the request, so a manager knows who it is.
+  label         String?
+  status        CommsBlockStatus
+  requestedById String
+  requestedAt   DateTime         @default(now())
+  decidedById   String?
+  decidedAt     DateTime?
+
+  channel CommsChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([channelId, kind, value])
+  @@index([status])
+  @@map("comms_blocks")
 }

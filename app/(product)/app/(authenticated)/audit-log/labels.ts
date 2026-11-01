@@ -70,6 +70,9 @@ export const ENTITY_TYPES = [
   "WhatsAppChat",
   // WhatsApp POC stage 2: a call recording sent for transcription.
   "CallRecording",
+  "CommsChannel",
+  "CommsBlock",
+  "CommsConversation",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -319,6 +322,13 @@ export const ACTION_LABEL: Record<string, string> = {
   "whatsapp_poc.recording_transcribed": "שליחת הקלטת שיחה לתמלול",
   "whatsapp_poc.voice_note_transcribed": "שליחת הודעה קולית ב-WhatsApp לתמלול",
   "call_recording.retention_sweep": "מחיקת הקלטות שיחה לפי זמן השמירה",
+  "comms_channel.connected": "חיבור מספר WhatsApp לשמירה",
+  "comms_channel.store_started": "התחלת שמירה של שיחות WhatsApp",
+  "comms_block.requested": "בקשה לא לשמור שיחות עם מספר",
+  "comms_block.approved": "חסימת מספר משמירה, ומחיקת מה שנשמר ממנו",
+  "comms_block.rejected": "דחיית בקשת חסימה",
+  "comms_block.revoked": "ביטול חסימת מספר",
+  "comms_whatsapp.retention_sweep": "מחיקת שיחות WhatsApp לפי זמן השמירה",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

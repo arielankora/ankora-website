@@ -2065,21 +2065,35 @@
       "kind": "api",
       "area": "cron",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-11-01"
     },
     "api:/api/webhooks/unipile": {
       "kind": "api",
       "area": "api",
       "risk": "high",
-      "riskAssigned": false,
+      "riskAssigned": true,
       "firstSeen": "2026-11-01"
     },
     "cron:/api/cron/comms-recordings": {
       "kind": "cron",
       "area": "cron",
       "risk": "critical",
-      "riskAssigned": false,
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/setup/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "screen:/app/whatsapp-poc/setup": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
       "firstSeen": "2026-11-01"
     }
   },

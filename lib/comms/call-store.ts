@@ -7,6 +7,7 @@ import { callSide, fetchRecording, fetchRecordingAudio, listRecordingPage, type 
 import { TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
 import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { mp3DurationSeconds } from "./mp3-duration";
+import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 
 // Communications storage, stage 2 (1.11.2026, spec "שמירת שיחות, הקלטות
 // ותמלולים", approved by Ariel). The Aloha line's recordings are kept here:
@@ -127,22 +128,51 @@ export async function storedRecordingAudio(rec: {
   return mail ? fetchRecordingAudio(mail, rec.emailId) : null;
 }
 
+/// A stored WhatsApp voice message's audio: its Drive copy, else Unipile.
+export async function storedVoiceAudio(a: {
+  externalId: string;
+  driveFileId: string | null;
+  mimetype: string | null;
+  message: { externalId: string; conversation: { externalChatId: string; channel: { accountId: string } } };
+}): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  if (a.driveFileId) {
+    const file = await downloadFileFromDrive(a.driveFileId);
+    if (file.ok && file.body) return { bytes: file.body, contentType: a.mimetype ?? "audio/ogg" };
+  }
+  const apiKey = process.env.UNIPILE_API_KEY?.trim();
+  if (!apiKey) return null;
+  return fetchVoiceNote(
+    { apiKey, accountId: a.message.conversation.channel.accountId },
+    a.message.conversation.externalChatId,
+    a.message.externalId,
+  );
+}
+
 export type TranscribeOutcome = "done" | "failed" | "retry" | "capped" | "skipped" | "unavailable";
 
 /// Transcribe one queued recording. A 429 from OpenAI (the monthly cap, or
 /// a burst limit) leaves it waiting without using up an attempt.
 export async function transcribeRecording(transcriptId: string): Promise<TranscribeOutcome> {
-  const t = await prisma.transcript.findUnique({ where: { id: transcriptId }, include: { recording: true } });
-  if (!t || !t.recording || (t.status !== "PENDING" && t.status !== "FAILED")) return "unavailable";
+  const t = await prisma.transcript.findUnique({
+    where: { id: transcriptId },
+    include: {
+      recording: true,
+      attachment: { include: { message: { include: { conversation: { include: { channel: true } } } } } },
+    },
+  });
+  if (!t || (!t.recording && !t.attachment) || (t.status !== "PENDING" && t.status !== "FAILED")) return "unavailable";
   if (!process.env.OPENAI_API_KEY?.trim()) return "unavailable";
+  // Stage 3: a voice message held by a block request waits for the decision.
+  if (t.attachment?.message.held) return "unavailable";
 
-  if (await isAiExcludedNumber(t.recording.otherPhone)) {
+  const phone = t.recording?.otherPhone ?? t.attachment?.message.conversation.otherPhone ?? null;
+  if (phone && (await isAiExcludedNumber(phone))) {
     await prisma.transcript.update({ where: { id: t.id }, data: { status: "SKIPPED" } });
     return "skipped";
   }
 
   try {
-    const audio = await storedRecordingAudio(t.recording);
+    const audio = t.recording ? await storedRecordingAudio(t.recording) : await storedVoiceAudio(t.attachment!);
     if (!audio) throw new TranscriptionError("קובץ השמע לא נמצא.");
     const { text, model } = await transcribeHebrew(audio);
     await prisma.transcript.update({
@@ -173,7 +203,7 @@ export async function transcribePending(options: { budgetMs: number; max?: numbe
   const start = now();
   const counts: Record<TranscribeOutcome, number> = { done: 0, failed: 0, retry: 0, capped: 0, skipped: 0, unavailable: 0 };
   const queue = await prisma.transcript.findMany({
-    where: { status: "PENDING", recordingId: { not: null }, attempts: { lt: TRANSCRIBE_MAX_ATTEMPTS } },
+    where: { status: "PENDING", attempts: { lt: TRANSCRIBE_MAX_ATTEMPTS } },
     orderBy: { createdAt: "asc" },
     take: options.max ?? 50,
     select: { id: true },
