@@ -273,6 +273,7 @@ the Model Context Protocol. 49 tools, by family:
 | Tasks (`task-extra-tools.ts`, 10) | `get_task`, task steps (`add_task_steps`, `replace_task_steps`, `set_task_step`), the work plan (`get_task_plan`, `save_task_plan`, `apply_task_plan_steps`), `add_task_comment`, `create_decision`, `list_decisions` |
 | Client file (`client-file-tools.ts`, 17) | `get_client_file`, `get_client_brief`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief` |
 | Documents (`document-tools.ts`, 5) | `list_documents`, `read_document`, `set_document_kind`, `start_document_upload`, `upload_document` |
+| Hour bank (`hour-bank-tools.ts`, 1) | `get_hours_bank`: the Hour Banks screen's figures for one client, optionally as of a date, in whole minutes. Adjustments go to managers only, flagged as internal |
 | Internal suppliers (`employee-tools.ts`, 5) | `get_employee_status`, `get_blank_agreement_pdf`, `issue_agreement_upload_code`, `record_pdf_signature`, `dismiss_pdf_upload` |
 
 A second, separate server at `/api/mcp/portal` (`portal-tools.ts`) serves

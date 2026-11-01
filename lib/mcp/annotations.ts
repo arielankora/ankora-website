@@ -114,6 +114,9 @@ export const TOOL_ANNOTATIONS = {
   list_processes: READ_ONLY,
   get_process: READ_ONLY,
   list_policies: READ_ONLY,
+  // 1.11.2026: a client's hour bank as of a date, computed on each call.
+  // Unlike the screen it closes nothing and refreshes no cache.
+  get_hours_bank: READ_ONLY,
   // The procedure as a document (23.10.2026): the Hebrew to translate, and
   // the English saved as a draft a manager approves on the screen. Saving
   // again replaces the draft, so a retry does no harm.
