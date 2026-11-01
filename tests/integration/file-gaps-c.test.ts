@@ -6,7 +6,7 @@ import { addClientFact } from "@/lib/app-domain/client-facts";
 import { addProcess } from "@/lib/app-domain/processes";
 import { createImportantDate } from "@/lib/app-domain/important-dates";
 import { collectApprovals } from "@/lib/app-domain/approvals";
-import { collectQuestionCards } from "@/lib/app-domain/client-questions";
+import { askClientAbout, collectQuestionCards } from "@/lib/app-domain/client-questions";
 import { runStep } from "@/lib/app-domain/process-next-steps";
 import { confirmSourceWithClient, loweredBySource } from "@/lib/app-domain/source-confirmation";
 import { closeTaskCoveredByProcess, coveredTasksForClient } from "@/lib/app-domain/process-overlap";
@@ -70,7 +70,8 @@ describe("items uncertain only because Ankora wrote them", () => {
     const fromMeeting = await addClientFact(anna, { clientId: client.id, kind: "NOTE", body: "וואטסאפ", knowledgeStatus: "CONFIRMED", sources: [{ code: "S1" }] });
 
     expect(await loweredBySource([client.id])).toEqual([{ clientId: client.id, code: "S2", title: "תיק לקוח נדב (Word)", count: 1 }]);
-    // On the client's card of questions, for a manager.
+    // On the client's card of questions, for a manager, once someone chose to ask.
+    await askClientAbout(ariel, client.id, [other.id]);
     const cards = (await collectQuestionCards(ariel, { scope: "all" })).filter((c) => c.clientId === client.id);
     expect(cards.flatMap((c) => c.lowered)).toEqual([{ clientId: client.id, code: "S2", title: "תיק לקוח נדב (Word)", count: 1 }]);
     // Not a manager: neither the button nor the action.

@@ -34,6 +34,9 @@ import { listClientPeople, listOrganizationNames } from "@/lib/app-domain/client
 import { effectiveStatus, missingLine, parseFieldStatus, type MissingFieldsTarget } from "@/lib/knowledge";
 import { SourcesPanel } from "./SourcesPanel";
 import { loweredBySource } from "@/lib/app-domain/source-confirmation";
+import { collectQuestionCards, listUncertainItems } from "@/lib/app-domain/client-questions";
+import { questionsDraft } from "@/lib/client-questions";
+import { ClientQuestions } from "./ClientQuestions";
 import { coveredTasksForClient } from "@/lib/app-domain/process-overlap";
 import { stepCandidates } from "@/lib/app-domain/process-next-steps";
 import { FIELD_LABELS } from "@/lib/process-rules";
@@ -252,6 +255,13 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
   // tab, with the same card and actions as on "ממתין לאישור".
   // Everything on this client waiting on this person, on "אישורים".
   const approvalsHere = await countApprovalsForClient(user, client.id).catch(() => 0);
+  // 1.11.2026: the questions for this client live here, not on
+  // "אישורים": every card of the client, for everyone who works on it.
+  const [questionCards, uncertainItems] = await Promise.all([
+    collectQuestionCards(user, { scope: "client", clientId: client.id }).catch(() => []),
+    tab === "file" ? listUncertainItems(user, client.id).catch(() => []) : Promise.resolve([]),
+  ]);
+  const openQuestions = questionCards.reduce((n, c) => n + c.items.filter((i) => !i.askedAt).length, 0);
   // 21.10.2026: per source, the items uncertain only because it is
   // Ankora's own document; and the open tasks an approved process covers.
   const [lowered, covered] = tab === "file" ? await Promise.all([loweredBySource([client.id]).catch(() => []), coveredTasksForClient(user, client.id).catch(() => [])]) : [[], []];
@@ -384,6 +394,11 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   {pendingProposals === 1 ? "הצעה אחת לתיק" : `${pendingProposals} הצעות לתיק`}
                 </Link>
               )}
+              {openQuestions > 0 && (
+                <Link href={`/app/clients/${client.id}?tab=file#client-questions`} className="text-sm text-app-text-accent hover:underline" data-testid="client-questions-link">
+                  {openQuestions === 1 ? "שאלה אחת לברר עם הלקוח" : `${openQuestions} שאלות לברר עם הלקוח`}
+                </Link>
+              )}
               <Link href={`/app/clients/${client.id}/client-file`} className="text-sm text-app-text-accent hover:underline">
                 תיק הלקוח לקריאה
               </Link>
@@ -468,6 +483,19 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                   </section>
                 )}
                 {show("pending") && <PossibleDuplicates pairs={dupPairs} />}
+                {show("facts") && (
+                  <ClientQuestions
+                    clientId={client.id}
+                    manager={canManageClients(user.role)}
+                    uncertain={uncertainItems}
+                    cards={questionCards.map((c) => ({
+                      ...c,
+                      items: c.items.map((i) => ({ ...i, askedAt: i.askedAt ? i.askedAt.toISOString() : null })),
+                      snoozed: c.snoozed.map((x) => ({ ...x, until: x.until.toISOString() })),
+                      draft: questionsDraft({ contactName: c.contactName, senderName: user.name, items: c.items.filter((i) => !i.askedAt) }),
+                    }))}
+                  />
+                )}
             {show("overview") && (
               <>
             <NarrativesPanel

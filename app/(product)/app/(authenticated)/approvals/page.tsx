@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
-import { can, canManageClients } from "@/lib/app-auth/permissions";
+import { can } from "@/lib/app-auth/permissions";
 import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
-import { collectQuestionCards } from "@/lib/app-domain/client-questions";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
   APPROVAL_TABS,
@@ -13,27 +12,25 @@ import {
   forClient,
   onlyMine,
   parseApprovalsParams,
+  questionsRedirect,
   tabCounts,
   visibleTabs,
   waitedLabel,
   withApprovalsBack,
   type ApprovalItem,
-  type ApprovalTab,
 } from "@/lib/approvals";
 import { rankApprovals } from "@/lib/next-steps";
-import { questionsDraft } from "@/lib/client-questions";
 import { ApprovalRow } from "./ApprovalRow";
 import { BulkRules } from "./BulkRules";
-import { QuestionCardView } from "./QuestionCard";
 import { KnowledgeReview } from "../knowledge/KnowledgeReview";
 
 // "אישורים" (Ariel, 20.10.2026; simplified 22.10.2026): only decisions,
 // each one with what is recommended and why, and a button that carries it
 // out. "היום" on top: what stops work first, then what has a date this
-// week. The items not yet confirmed are not decisions of the manager's:
-// they are the file owner's "שאלות ללקוח", one card per client, with a
-// message to send. lib/approvals.ts holds the tabs; lib/next-steps.ts the
-// recommendations and the order.
+// week. The questions for a client are not decisions: since 1.11.2026
+// they live on the client's page ("מה לברר עם הלקוח"), and the old
+// addresses of their tab lead there. lib/approvals.ts holds the tabs;
+// lib/next-steps.ts the recommendations and the order.
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -41,24 +38,22 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   const params = await props.searchParams;
   const user = await requireUser();
   if (!can(user.role, "time_entry.create_self")) redirect("/app");
+  const moved = questionsRedirect(params);
+  if (moved) redirect(moved);
   const { tab, clientId } = parseApprovalsParams(params);
-  const manager = canManageClients(user.role);
-  // "של כולם" (22.10.2026): everyone's questions for a manager, and on
-  // the decisions, the meetings other people sent too. A chosen client
-  // shows that client's meetings whoever sent them.
-  const everyone = params.scope === "all" && (manager || tab !== "questions");
+  // "של כולם" (22.10.2026): the meetings other people sent too. A chosen
+  // client shows that client's meetings whoever sent them.
+  const everyone = params.scope === "all";
   const now = new Date();
   // "של כולם" stays while the tab or the client changes.
   const withScope = (href: string) => (everyone ? `${href}${href.includes("?") ? "&" : "?"}scope=all` : href);
 
-  const [everything, myCards, knowledgeAll, knowledgeClient] = await Promise.all([
+  const [everything, knowledgeAll, knowledgeClient] = await Promise.all([
     collectApprovals(user),
-    collectQuestionCards(user),
     countMyPendingProposals(user, { everyone }),
     clientId ? countMyPendingProposals(user, { clientId, everyone: true }) : Promise.resolve(null),
   ]);
   const allItems = everyone ? everything : onlyMine(everything);
-  const cards = tab === "questions" && everyone ? await collectQuestionCards(user, { scope: "all" }) : myCards;
 
   // The client chips count the decisions, the tabs count the chosen client.
   const clients = new Map<string, { name: string; count: number }>();
@@ -68,12 +63,9 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
     c.count += i.weight ?? 1;
     clients.set(i.clientId, c);
   }
-  for (const c of cards) if (!clients.has(c.clientId)) clients.set(c.clientId, { name: c.clientName, count: 0 });
 
   const items = clientId ? forClient(everything, clientId) : allItems;
-  const shownCards = clientId ? cards.filter((c) => c.clientId === clientId) : cards;
-  const myQuestions = (clientId ? myCards.filter((c) => c.clientId === clientId) : myCards).reduce((n, c) => n + c.items.filter((i) => !i.askedAt).length, 0);
-  const counts = tabCounts(items, myQuestions, clientId ? (knowledgeClient ?? 0) : knowledgeAll);
+  const counts = tabCounts(items, clientId ? (knowledgeClient ?? 0) : knowledgeAll);
   const tabs = visibleTabs(counts, tab);
 
   const rowOf = (i: ApprovalItem, showLabel: boolean) => ({
@@ -141,7 +133,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
         tabs={tabs.map((t) => ({ key: t.key, label: t.count > 0 ? `${t.label} (${t.count})` : t.label, href: withScope(approvalsHref(t.key, clientId)) }))}
       />
 
-      {tab !== "questions" && !clientId && (
+      {!clientId && (
         <ScopeToggle
           everyone={everyone}
           mineHref={approvalsHref(tab, clientId)}
@@ -152,19 +144,9 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
 
       {tab === "knowledge" ? (
         <KnowledgeReview searchParams={clientId ? { ...params, clientId } : params} mineOnly={!everyone && !clientId} />
-      ) : tab === "questions" ? (
-        <Questions cards={shownCards} manager={manager} everyone={everyone} clientId={clientId} senderName={user.name} tab={tab} />
       ) : ofTab.length === 0 ? (
         <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary" data-testid="approvals-empty">
           {tab === "all" ? "אין כרגע שום דבר שמחכה להחלטה שלך." : `אין כרגע ${APPROVAL_TABS.find((t) => t.key === tab)?.label ?? ""} שמחכים לך.`}
-          {counts.questions > 0 && (
-            <>
-              {" "}
-              <a href={approvalsHref("questions", clientId)} className="text-app-text-accent hover:underline">
-                {counts.questions === 1 ? "שאלה אחת ללקוח" : `${counts.questions} שאלות ללקוחות`}
-              </a>
-            </>
-          )}
         </div>
       ) : (
         <div className="space-y-5">
@@ -188,71 +170,6 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
             </section>
           )}
         </div>
-      )}
-    </div>
-  );
-}
-
-function Questions({
-  cards,
-  manager,
-  everyone,
-  clientId,
-  senderName,
-  tab,
-}: {
-  cards: Awaited<ReturnType<typeof collectQuestionCards>>;
-  manager: boolean;
-  everyone: boolean;
-  clientId: string | null;
-  senderName: string;
-  tab: ApprovalTab;
-}) {
-  const scopeHref = (all: boolean) => {
-    const base = approvalsHref(tab, clientId);
-    return all ? `${base}${base.includes("?") ? "&" : "?"}scope=all` : base;
-  };
-  return (
-    <div className="space-y-3" data-testid="questions">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-app-text-secondary">
-          מה שעוד לא אומת בתיק, והשאלות הפתוחות: כרטיס לכל לקוח, אצל מי שאחראי על הפריטים. שואלים את הלקוח בהודעה אחת, וכשהוא עונה, התשובות נכנסות לתיק בחילוץ.
-        </p>
-        {manager && (
-          <div className="flex items-center gap-1.5 text-[12.5px]" data-testid="questions-scope">
-            <a href={scopeHref(false)} aria-current={!everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${!everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
-              שלי
-            </a>
-            <a href={scopeHref(true)} aria-current={everyone ? "true" : undefined} className={`rounded-full border px-3 py-1 ${everyone ? "border-app-accent bg-app-accent-soft text-app-text-primary" : "border-app-border text-app-text-secondary"}`}>
-              של כולם
-            </a>
-          </div>
-        )}
-      </div>
-      {cards.length === 0 ? (
-        <div className="rounded-2xl border border-app-border bg-white p-8 text-center text-sm text-app-text-tertiary">
-          {everyone ? "אין כרגע שאלות פתוחות לאף לקוח." : "אין כרגע שאלות שמחכות לך."}
-          {manager && !everyone && (
-            <>
-              {" "}
-              <a href={scopeHref(true)} className="text-app-text-accent hover:underline">
-                לשאלות של כולם
-              </a>
-            </>
-          )}
-        </div>
-      ) : (
-        cards.map((c) => (
-          <QuestionCardView
-            key={`${c.clientId}:${c.ownerId ?? "none"}`}
-            card={{
-              ...c,
-              items: c.items.map((i) => ({ ...i, href: withApprovalsBack(i.href, tab, clientId), askedAt: i.askedAt ? i.askedAt.toISOString() : null })),
-              draft: questionsDraft({ contactName: c.contactName, senderName, items: c.items.filter((i) => !i.askedAt) }),
-            }}
-            manager={manager}
-          />
-        ))
       )}
     </div>
   );
