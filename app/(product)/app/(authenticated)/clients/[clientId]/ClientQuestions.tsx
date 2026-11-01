@@ -127,11 +127,14 @@ function QuestionCardView({ card, manager }: { card: CardView; manager: boolean 
       )}
 
       {card.items.length > 0 && (
-        <ol className="mt-3 divide-y divide-app-border">
+        // Rows are divs with list roles, not <li>: the file's own panels
+        // list the same items as <li>, and a row here must not stand in
+        // for the item itself (what finds "the item's row" finds that one).
+        <div role="list" className="mt-3 divide-y divide-app-border">
           {card.items.map((i, n) => (
             <QuestionLine key={i.id} clientId={card.clientId} item={i} n={n + 1} />
           ))}
-        </ol>
+        </div>
       )}
 
       {card.snoozed.length > 0 && (
@@ -179,7 +182,7 @@ function QuestionLine({ clientId, item, n }: { clientId: string; item: Item; n: 
     });
 
   return (
-    <li className="py-2 text-[12.5px] leading-relaxed" data-testid="question-item">
+    <div role="listitem" className="py-2 text-[12.5px] leading-relaxed" data-testid="question-item">
       <div>
         <span className="text-app-text-tertiary">{n}. </span>
         <a href={item.href} className="text-app-text-primary hover:text-app-text-accent hover:underline">
@@ -234,7 +237,7 @@ function QuestionLine({ clientId, item, n }: { clientId: string; item: Item; n: 
           </button>
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
@@ -255,9 +258,9 @@ function UncertainList({ clientId, items }: { clientId: string; items: Uncertain
       <summary className="cursor-pointer text-[12.5px] text-app-text-secondary">
         {items.length === 1 ? "פריט אחד בתיק עדיין לא ודאי" : `${items.length} פריטים בתיק עדיין לא ודאיים`}. הם לא שאלות עד שמישהו בוחר לשאול עליהם.
       </summary>
-      <ul className="mt-2 divide-y divide-app-border">
+      <div role="list" className="mt-2 divide-y divide-app-border">
         {items.map((i) => (
-          <li key={i.id} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5 text-[12.5px]" data-testid="uncertain-item">
+          <div role="listitem" key={i.id} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5 text-[12.5px]" data-testid="uncertain-item">
             <span className="min-w-0">
               <a href={i.href} className="text-app-text-primary hover:text-app-text-accent hover:underline">
                 {i.title}
@@ -275,9 +278,9 @@ function UncertainList({ clientId, items }: { clientId: string; items: Uncertain
                 לשאול את הלקוח
               </button>
             )}
-          </li>
+          </div>
         ))}
-      </ul>
+      </div>
     </details>
   );
 }
