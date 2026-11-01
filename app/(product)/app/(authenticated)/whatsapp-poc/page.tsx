@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArrowRight, MessageCircle, Phone, Search } from "lucide-react";
 import { ScrollToActive } from "./ScrollToActive";
+import { BlockButton } from "./setup/SetupForms";
+import { canManageClients } from "@/lib/app-auth/permissions";
+import { listStoredChats, listStoredMessages, storedChannelFor, type StoredTranscript } from "@/lib/comms/stored-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -167,7 +170,7 @@ function Banner({ tone, children }: { tone: "error" | "warning" | "info"; childr
   );
 }
 
-function MessageBubble({ m, chat }: { m: PocMessage; chat: PocChat }) {
+function MessageBubble({ m, chat, transcript }: { m: PocMessage; chat: PocChat; transcript?: StoredTranscript }) {
   const mine = m.isSender;
   return (
     <li className={`flex ${mine ? "justify-end" : "justify-start"}`}>
@@ -194,7 +197,15 @@ function MessageBubble({ m, chat }: { m: PocMessage; chat: PocChat }) {
                 {a.duration ? ` · ${formatDuration(a.duration)}` : ""}
               </p>
               <RecordingPlayer src={`/api/whatsapp-poc/voice/${encodeURIComponent(chat.id)}/${encodeURIComponent(m.id)}`} />
-              <TranscribeButton kind="voice" chatId={chat.id} messageId={m.id} />
+              {transcript?.status === "DONE" && transcript.text ? (
+                <TranscriptText text={transcript.text} />
+              ) : transcript?.status === "PENDING" ? (
+                <p className="text-xs text-app-text-secondary">התמלול בתור.</p>
+              ) : transcript?.status === "SKIPPED" ? (
+                <p className="text-xs text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>
+              ) : (
+                <TranscribeButton kind="voice" chatId={chat.id} messageId={m.id} />
+              )}
             </div>
           ) : a.id && (a.type === "img" || a.type === "image") ? (
             <a key={i} href={mediaHref(chat.id, m.id, a.id)} target="_blank" rel="noopener noreferrer" className="block">
@@ -305,7 +316,13 @@ export default async function CommunicationsPage(props: {
   // The two sources, each on its own: one failing leaves the other.
   let chats: PocChat[] = [];
   let waError: string | null = null;
-  if (waConfig) {
+  // Stage 3: once a number is stored, its conversations are read from here,
+  // filtered by who may see them, and Unipile is not asked for the list.
+  const channel = await storedChannelFor(config.accountId);
+  const storedWa = Boolean(channel?.storeEnabled);
+  if (channel && storedWa) {
+    chats = await listStoredChats(channel, user);
+  } else if (waConfig) {
     try {
       chats = (await loadMergedChats(waConfig)).chats;
     } catch (err) {
@@ -401,7 +418,10 @@ export default async function CommunicationsPage(props: {
   }
 
   let messages: PocMessage[] = [];
-  if (chat && waConfig) {
+  let voiceTranscripts = new Map<string, StoredTranscript>();
+  if (chat && channel && storedWa && chats.some((c) => c.id === chat!.id)) {
+    ({ messages, transcripts: voiceTranscripts } = await listStoredMessages(channel, chat.id));
+  } else if (chat && waConfig && !storedWa) {
     try {
       messages = await listMessages(waConfig, chat.id);
     } catch (err) {
@@ -465,6 +485,9 @@ export default async function CommunicationsPage(props: {
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
           <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. שליחה רק למספרי הבדיקה.</p>
+          <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+            {storedWa ? "שמירת שיחות: רשימת החסימה" : "שמירת שיחות WhatsApp: הגדרה"}
+          </Link>
         </div>
         {/* On a phone the box folds away, so the list starts near the top. */}
         <details className="w-full sm:hidden" open={badPhone || undefined}>
@@ -674,6 +697,15 @@ export default async function CommunicationsPage(props: {
                         לקוח: {c.name}
                       </Link>
                     ))}
+                    {channel && chat ? (
+                      <BlockButton
+                        channelId={channel.id}
+                        kind={selectedPhone ? "PHONE" : "CHAT"}
+                        value={selectedPhone ?? chat.id}
+                        label={contactName}
+                        manager={canManageClients(user.role)}
+                      />
+                    ) : null}
                     <TaskFromConversation
                       clients={clientOptions}
                       defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
@@ -694,7 +726,7 @@ export default async function CommunicationsPage(props: {
                     ) : null;
                     if (item.kind === "message") {
                       const m = messageById.get(item.id);
-                      return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} />] : day;
+                      return m && chat ? [day, <MessageBubble key={`m-${m.id}`} m={m} chat={chat} transcript={voiceTranscripts.get(m.id)} />] : day;
                     }
                     const call = callById.get(item.id);
                     return call ? [day, <CallCard key={`c-${call.emailId}`} call={call} transcribe={config.hasOpenAiKey} />] : day;

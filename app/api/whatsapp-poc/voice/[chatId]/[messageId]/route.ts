@@ -3,6 +3,8 @@ import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
+import { downloadFileFromDrive } from "@/lib/google-drive";
+import { prisma } from "@/lib/prisma";
 
 // WhatsApp POC: one WhatsApp voice message's audio, for the player in the
 // chat view. Same gate as the screen. Nothing is cached or stored.
@@ -20,7 +22,20 @@ export async function GET(_request: Request, props: { params: Promise<{ chatId: 
 
   const { chatId, messageId } = await props.params;
   try {
-    const audio = await fetchVoiceNote(config, decodeURIComponent(chatId), decodeURIComponent(messageId));
+    // Stage 3: a stored voice message is played from its Drive copy.
+    const stored = await prisma.commsAttachment.findFirst({
+      where: {
+        type: "audio",
+        driveFileId: { not: null },
+        message: { externalId: decodeURIComponent(messageId), held: false, conversation: { externalChatId: decodeURIComponent(chatId) } },
+      },
+      select: { driveFileId: true, mimetype: true },
+    });
+    const fromDrive = stored?.driveFileId ? await downloadFileFromDrive(stored.driveFileId) : null;
+    const audio =
+      fromDrive?.ok && fromDrive.body
+        ? { bytes: fromDrive.body, contentType: stored?.mimetype ?? "audio/ogg" }
+        : await fetchVoiceNote(config, decodeURIComponent(chatId), decodeURIComponent(messageId));
     if (!audio) return NextResponse.json({ error: "Not found" }, { status: 404 });
     return new NextResponse(audio.bytes, {
       headers: {
