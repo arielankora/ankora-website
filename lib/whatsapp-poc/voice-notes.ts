@@ -1,5 +1,5 @@
 import "server-only";
-import { UnipileError, toPocMessage } from "./unipile";
+import { UnipileError, rateLimitError, toPocMessage } from "./unipile";
 
 // WhatsApp POC (1.11.2026): a WhatsApp voice message's audio, for the
 // player and the transcribe button in the chat view.
@@ -36,7 +36,7 @@ async function get(apiKey: string, url: string, accept: string): Promise<Respons
   } catch {
     throw new UnipileError("Unipile לא ענה.", null);
   }
-  if (response.status === 429) throw new UnipileError("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.", 429);
+  if (response.status === 429) throw await rateLimitError(response);
   if (!response.ok) throw new UnipileError(`Unipile החזיר שגיאה ${response.status}.`, response.status);
   return response;
 }

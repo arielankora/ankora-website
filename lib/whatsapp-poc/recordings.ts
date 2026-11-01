@@ -1,7 +1,7 @@
 import "server-only";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { localDateTimeToUtc } from "@/lib/timezone";
-import { UnipileError } from "./unipile";
+import { UnipileError, rateLimitError } from "./unipile";
 
 // WhatsApp POC, stage 2 (1.11.2026): call recordings from the Aloha line.
 //
@@ -102,7 +102,7 @@ async function unipileFetch(apiKey: string, url: URL, accept: string): Promise<R
   } catch {
     throw new UnipileError("Unipile לא ענה.", null);
   }
-  if (response.status === 429) throw new UnipileError("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.", 429);
+  if (response.status === 429) throw await rateLimitError(response);
   if (!response.ok) throw new UnipileError(`Unipile החזיר שגיאה ${response.status}.`, response.status);
   return response;
 }
