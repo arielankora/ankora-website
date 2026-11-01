@@ -15,7 +15,7 @@ import {
   type InboxChat,
   type PhoneOwner,
 } from "@/lib/whatsapp-poc/inbox";
-import { listRecordingsCached, resetRecordingsCache, type Recording } from "@/lib/whatsapp-poc/recordings";
+import { RECORDINGS_FRESH_MS, RECORDINGS_MAX_AGE_MS, listRecordingsCached, resetRecordingsCache, type Recording } from "@/lib/whatsapp-poc/recordings";
 
 const A = "+972541111111";
 const B = "+972542222222";
@@ -139,11 +139,11 @@ describe("listRecordingsCached", () => {
     await listRecordingsCached(cfg, read, () => t);
     expect(read).toHaveBeenCalledTimes(1);
 
-    t = 10 * 60_000;
+    t = RECORDINGS_FRESH_MS + 1;
     read.mockRejectedValueOnce(new Error("429"));
     expect(await listRecordingsCached(cfg, read, () => t)).toEqual({ recordings: [rec], stale: true });
 
-    t = 3 * 60 * 60_000;
+    t = RECORDINGS_MAX_AGE_MS + 1;
     read.mockRejectedValueOnce(new Error("429"));
     await expect(listRecordingsCached(cfg, read, () => t)).rejects.toThrow("429");
   });

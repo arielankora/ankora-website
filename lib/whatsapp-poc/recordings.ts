@@ -157,12 +157,12 @@ export async function fetchRecordingAudio(
 // 1.11.2026 (communications screen): the recordings now load with every
 // view of the screen, next to the chat list, and Unipile counts requests
 // per route against a quota (see unipile.ts). So the list is kept in this
-// instance's memory for five minutes, and if a read fails (a 429 above
-// all) a list up to two hours old is shown instead of nothing. Like the
+// instance's memory for fifteen minutes, and if a read fails (a 429
+// above all) a list up to six hours old is shown instead of nothing. Like the
 // chat list, it holds only what the screen shows and is never written
 // anywhere.
-export const RECORDINGS_FRESH_MS = 5 * 60_000;
-export const RECORDINGS_MAX_AGE_MS = 2 * 60 * 60_000;
+export const RECORDINGS_FRESH_MS = 15 * 60_000;
+export const RECORDINGS_MAX_AGE_MS = 6 * 60 * 60_000;
 let cachedRecordings: { accountId: string; at: number; recordings: Recording[] } | null = null;
 
 /// For tests: forget the remembered list.

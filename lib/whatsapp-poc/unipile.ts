@@ -291,8 +291,10 @@ async function fetchAllChats(config: { apiKey: string; accountId: string }): Pro
 // Ten minutes fresh and two hours as a fallback (1.11.2026, after the
 // quota above): a list read stays in use far longer, so a morning of use
 // costs a handful of requests rather than one per minute.
-export const CHAT_LIST_FRESH_MS = 10 * 60_000;
-export const CHAT_LIST_MAX_AGE_MS = 2 * 60 * 60_000;
+// 1.11.2026 (Ariel): longer still, to spend fewer requests. Thirty
+// minutes fresh, six hours as a fallback.
+export const CHAT_LIST_FRESH_MS = 30 * 60_000;
+export const CHAT_LIST_MAX_AGE_MS = 6 * 60 * 60_000;
 
 type Config = { apiKey: string; accountId: string };
 type CachedList = { accountId: string; at: number; chats: PocChat[] };
