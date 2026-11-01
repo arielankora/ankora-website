@@ -8,6 +8,7 @@ import {
   knowledgeBatchIsMine,
   onlyMine,
   parseApprovalsParams,
+  questionsRedirect,
   sortByWaiting,
   tabCounts,
   visibleTabs,
@@ -35,8 +36,8 @@ function item(over: Partial<ApprovalItem>): ApprovalItem {
 }
 
 describe("approvals", () => {
-  it("keeps the tabs in the agreed order, most urgent first, the questions last", () => {
-    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "internal", "knowledge", "plan", "summary", "guide", "check", "questions"]);
+  it("keeps the tabs in the agreed order, most urgent first, and only decisions", () => {
+    expect(APPROVAL_TABS.map((t) => t.key)).toEqual(["all", "task", "exception", "rule", "procedure", "process", "internal", "knowledge", "plan", "summary", "guide", "check"]);
   });
 
   it("lists what waited longest first", () => {
@@ -44,29 +45,28 @@ describe("approvals", () => {
     expect(rows.map((r) => r.title)).toEqual(["א", "ב", "ג"]);
   });
 
-  it("counts a knowledge batch as its proposals, and leaves the questions for the client out of all", () => {
-    const counts = tabCounts([item({ kind: "task" }), item({ kind: "rule" }), item({ kind: "rule" }), item({ kind: "knowledge", weight: 6 }), item({ kind: "process" })], 9);
+  it("counts a knowledge batch as its proposals", () => {
+    const counts = tabCounts([item({ kind: "task" }), item({ kind: "rule" }), item({ kind: "rule" }), item({ kind: "knowledge", weight: 6 }), item({ kind: "process" })]);
     expect(counts.task).toBe(1);
     expect(counts.rule).toBe(2);
     expect(counts.knowledge).toBe(6);
     expect(counts.process).toBe(1);
     expect(counts.all).toBe(10);
-    expect(counts.questions).toBe(9);
   });
 
   it("takes the review screen's own count for knowledge when it is given", () => {
-    const counts = tabCounts([item({ kind: "knowledge", weight: 6 }), item({ kind: "task" })], 0, 7);
+    const counts = tabCounts([item({ kind: "knowledge", weight: 6 }), item({ kind: "task" })], 7);
     expect(counts.knowledge).toBe(7);
     expect(counts.all).toBe(8);
   });
 
-  it("shows all, the tabs that hold something, the questions, and the one asked for", () => {
-    const counts = tabCounts([item({ kind: "task" }), item({ kind: "exception" })], 0);
-    expect(visibleTabs(counts, "all").map((t) => t.key)).toEqual(["all", "task", "exception", "questions"]);
+  it("shows all, the tabs that hold something, and the one asked for", () => {
+    const counts = tabCounts([item({ kind: "task" }), item({ kind: "exception" })]);
+    expect(visibleTabs(counts, "all").map((t) => t.key)).toEqual(["all", "task", "exception"]);
     // A manager-only tab never shows to someone with nothing in it...
     expect(visibleTabs(counts, "all").some((t) => t.key === "rule")).toBe(false);
     // ...unless it is the address they opened.
-    expect(visibleTabs(counts, "guide").map((t) => t.key)).toEqual(["all", "task", "exception", "guide", "questions"]);
+    expect(visibleTabs(counts, "guide").map((t) => t.key)).toEqual(["all", "task", "exception", "guide"]);
   });
 
   it("filters by client, and keeps rows that belong to no client out of a client's view", () => {
@@ -79,8 +79,16 @@ describe("approvals", () => {
     expect(parseApprovalsParams({ tab: "rule", clientId: "c1" })).toEqual({ tab: "rule", clientId: "c1" });
     expect(parseApprovalsParams({ tab: "nonsense", client: "c2" })).toEqual({ tab: "all", clientId: "c2" });
     expect(parseApprovalsParams({})).toEqual({ tab: "all", clientId: null });
-    // "לבדיקה" became the questions for the client on 22.10.2026.
-    expect(parseApprovalsParams({ tab: "review" })).toEqual({ tab: "questions", clientId: null });
+    expect(parseApprovalsParams({ tab: "questions" })).toEqual({ tab: "all", clientId: null });
+  });
+
+  it("sends the old addresses of the questions to the client's page", () => {
+    // "לבדיקה" until 22.10.2026, "שאלות ללקוח" until 1.11.2026.
+    expect(questionsRedirect({ tab: "review" })).toBe("/app/approvals");
+    expect(questionsRedirect({ tab: "questions", clientId: "c1", scope: "all" })).toBe("/app/clients/c1?tab=file#client-questions");
+    expect(questionsRedirect({ tab: "questions", client: "c2" })).toBe("/app/clients/c2?tab=file#client-questions");
+    expect(questionsRedirect({ tab: "rule", clientId: "c1" })).toBeNull();
+    expect(questionsRedirect({})).toBeNull();
   });
 
   it("writes the address back", () => {

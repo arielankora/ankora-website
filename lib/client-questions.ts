@@ -7,6 +7,13 @@
 // person who owns the file, with the questions numbered and a draft to
 // send. Nothing is sent from here.
 //
+// 1.11.2026 (Ariel: "it feels like a nuisance"): the card left
+// "אישורים", which is decisions only, for the client's own page. It holds
+// only what somebody meant to ask: the file's open questions, and an
+// uncertain item someone chose to ask about ("לשאול את הלקוח"). Every
+// line can be closed as not relevant, checked by us as a task, or put off
+// to a date.
+//
 // Pure: which items make a question, how it reads, and the message.
 
 /// The reason #318 gives an item that is uncertain only because Ankora
@@ -99,4 +106,58 @@ export function sendTaskTitle(count: number, contactName: string | null): string
 /// account manager. A question goes to whoever chases it first.
 export function cardOwner(item: { ownerId: string | null; assigneeId?: string | null }, accountManagerId: string | null): string | null {
   return item.assigneeId ?? item.ownerId ?? accountManagerId;
+}
+
+/// The audit actions that hold a question's state, so no column is added:
+/// an uncertain item put on the card or taken off it, and a line put off.
+export const ASK_CLIENT = "client_file.ask_client";
+export const SNOOZED = "client_file.question_snoozed";
+
+type Event = { afterJson: unknown; createdAt: Date };
+
+function itemIds(after: unknown): string[] {
+  const ids = (after as { itemIds?: unknown } | null)?.itemIds;
+  return Array.isArray(ids) ? ids.filter((x): x is string => typeof x === "string") : [];
+}
+
+/// Which uncertain items are on the card: the latest word on each wins.
+/// The events in the order they happened.
+export function readAskFlags(events: Event[]): Set<string> {
+  const on = new Map<string, boolean>();
+  for (const e of events) {
+    const flag = (e.afterJson as { on?: unknown } | null)?.on !== false;
+    for (const id of itemIds(e.afterJson)) on.set(id, flag);
+  }
+  return new Set([...on].filter(([, v]) => v).map(([k]) => k));
+}
+
+/// Until when each line is put off: the latest word on each wins.
+export function readSnoozes(events: Event[]): Map<string, Date> {
+  const out = new Map<string, Date>();
+  for (const e of events) {
+    const raw = (e.afterJson as { until?: unknown } | null)?.until;
+    const until = typeof raw === "string" ? new Date(raw) : null;
+    if (!until || Number.isNaN(until.getTime())) continue;
+    for (const id of itemIds(e.afterJson)) out.set(id, until);
+  }
+  return out;
+}
+
+/// A date to put a question off to: tomorrow at the earliest, a year at
+/// most. Null when it is fine.
+export function snoozeError(until: Date, now: Date): string | null {
+  if (Number.isNaN(until.getTime())) return "צריך לבחור תאריך.";
+  if (until.getTime() <= now.getTime()) return "התאריך צריך להיות בעתיד.";
+  if (until.getTime() > now.getTime() + 366 * 86_400_000) return "אפשר לדחות עד שנה קדימה.";
+  return null;
+}
+
+/// The answer a question closed as not relevant keeps, with why.
+export function dismissedAnswer(reason: string): string {
+  return `לא רלוונטי: ${clean(reason).replace(/\.$/, "")}.`;
+}
+
+/// The internal task for an uncertain item we check ourselves.
+export function checkTaskTitle(title: string): string {
+  return `לבדוק בתיק: ${clip(title, 110)}`;
 }
