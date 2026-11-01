@@ -231,3 +231,17 @@ describe("WhatsApp POC: remembering the chat list", () => {
     expect(shown).toEqual({ chats: second, refreshing: false });
   });
 });
+
+describe("WhatsApp POC: Unipile's 429", () => {
+  it("passes on the wait Unipile states for a quota", async () => {
+    const { rateLimitMessage } = await import("@/lib/whatsapp-poc/unipile");
+    expect(rateLimitMessage("We only allow 100 requests. Retry in 15 hours.")).toContain("15 שעות");
+    expect(rateLimitMessage("Retry in 2 minutes")).toContain("2 דקות");
+  });
+
+  it("falls back to a short wait when Unipile names none", async () => {
+    const { rateLimitMessage } = await import("@/lib/whatsapp-poc/unipile");
+    expect(rateLimitMessage(undefined)).toBe("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.");
+    expect(rateLimitMessage("Too many requests")).toBe("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.");
+  });
+});

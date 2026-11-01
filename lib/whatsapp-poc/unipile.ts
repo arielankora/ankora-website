@@ -83,6 +83,31 @@ export type PocMessage = {
   isDeleted: boolean;
 };
 
+/// What to tell a person when Unipile answers 429.
+///
+/// 1.11.2026: Unipile's 429 is not always a short burst limit. On the chat
+/// list it was a quota: "We only allow 100 requests. Retry in 15 hours."
+/// Telling someone to try again in a minute was wrong for most of a day,
+/// so the wait Unipile states is passed on when there is one.
+export function rateLimitMessage(title: unknown): string {
+  const t = typeof title === "string" ? title : "";
+  const m = /retry in (\d+)\s*(second|minute|hour|day)s?/i.exec(t);
+  if (!m) return "Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.";
+  const n = Number(m[1]);
+  const unit = { second: "שניות", minute: "דקות", hour: "שעות", day: "ימים" }[m[2].toLowerCase() as "second" | "minute" | "hour" | "day"];
+  return `המכסה של Unipile לבקשה הזו נוצלה, והיא תתחדש בעוד כ-${n} ${unit}. אפשר עדיין לפתוח שיחה לפי מספר.`;
+}
+
+export async function rateLimitError(response: Response): Promise<UnipileError> {
+  let title: unknown = null;
+  try {
+    title = ((await response.json()) as { title?: unknown } | null)?.title;
+  } catch {
+    // No body, or not JSON: the generic message stands.
+  }
+  return new UnipileError(rateLimitMessage(title), 429);
+}
+
 export class UnipileError extends Error {
   constructor(
     message: string,
@@ -118,9 +143,7 @@ async function call(
   }
   if (!response.ok) {
     // The body can echo identifiers; it is not shown or logged.
-    if (response.status === 429) {
-      throw new UnipileError("Unipile מגביל כרגע את קצב הבקשות. נסו שוב בעוד דקה.", 429);
-    }
+    if (response.status === 429) throw await rateLimitError(response);
     throw new UnipileError(`Unipile החזיר שגיאה ${response.status}.`, response.status);
   }
   return response.json();
@@ -199,9 +222,13 @@ export function isHiddenChat(chat: PocChat): boolean {
 }
 
 export const CHAT_PAGE_SIZE = 30;
-const FETCH_PAGE_SIZE = 50;
-const MAX_CHATS = 200;
-const MAX_OFFSET = MAX_CHATS - CHAT_PAGE_SIZE;
+// One request per read of the list (1.11.2026). Unipile counts requests
+// per route and account against a quota, and four pages of 50 on every
+// read used up 100 requests to /chats in one evening of testing. The 100
+// most recent chats are enough for the POC; older ones open by number.
+const FETCH_PAGE_SIZE = 100;
+const MAX_CHATS = 100;
+const MAX_OFFSET = Math.floor((MAX_CHATS - 1) / CHAT_PAGE_SIZE) * CHAT_PAGE_SIZE;
 
 /// The page offset from the URL: a whole multiple of the page size, or 0.
 export function parseOffset(raw: string | undefined | null): number {
@@ -248,12 +275,12 @@ async function fetchAllChats(config: { apiKey: string; accountId: string }): Pro
   return all;
 }
 
-// 1.11.2026: reading the whole list costs up to four calls, and doing that
+// 1.11.2026: reading the whole list once cost up to four calls (now one), and doing that
 // on every page load made the screen take 6 to 12 seconds and, by the
 // fourth load in two minutes, drew a 429 from Unipile. So the merged list
 // is kept in this server instance's memory:
-//   - under a minute old, it is used as is;
-//   - up to ten minutes old, it is shown at once and re-read after the
+//   - under ten minutes old, it is used as is;
+//   - up to two hours old, it is shown at once and re-read after the
 //     response has gone out, so the next load has the new one;
 //   - older, or none yet (a fresh instance), the person waits for a read.
 // A 429 or any other failure of the background read leaves the old list
@@ -261,8 +288,11 @@ async function fetchAllChats(config: { apiKey: string; accountId: string }): Pro
 //
 // The memory is per instance and is never written anywhere. It holds what
 // the screen already shows: chat names and the last message preview.
-export const CHAT_LIST_FRESH_MS = 60_000;
-export const CHAT_LIST_MAX_AGE_MS = 10 * 60_000;
+// Ten minutes fresh and two hours as a fallback (1.11.2026, after the
+// quota above): a list read stays in use far longer, so a morning of use
+// costs a handful of requests rather than one per minute.
+export const CHAT_LIST_FRESH_MS = 10 * 60_000;
+export const CHAT_LIST_MAX_AGE_MS = 2 * 60 * 60_000;
 
 type Config = { apiKey: string; accountId: string };
 type CachedList = { accountId: string; at: number; chats: PocChat[] };
