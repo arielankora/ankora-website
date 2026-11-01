@@ -1,12 +1,15 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
-import { BlockError, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
+import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
+import { transcribeRecording } from "@/lib/comms/call-store";
+import { afterResponse } from "@/lib/after-response";
 import { prisma } from "@/lib/prisma";
 
 export type SetupState = { error?: string; ok?: string };
@@ -118,8 +121,17 @@ export async function startStoringAction(_prev: SetupState | undefined, formData
     if (err instanceof BlockError) return { error: err.message };
     throw err;
   }
+  // The history starts loading now, not at night: as much as a minute
+  // allows, after the answer has gone out. The nightly run does the rest.
+  const channelId = String(formData.get("channelId") || "");
+  await afterResponse("comms: first history load", async () => {
+    const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
+    if (channel) await backfillChannel(channel, { budgetMs: 50_000, transcribe: transcribeRecording });
+  });
   refresh();
-  return { ok: "השמירה התחילה. ההיסטוריה נטענת בהדרגה, בלילות הקרובים." };
+  // The form that would show a message is gone from the page once storing
+  // has started, so the page itself says so (?started=1).
+  redirect("/app/whatsapp-poc/setup?started=1");
 }
 
 export async function decideBlockAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
@@ -147,4 +159,18 @@ export async function revokeBlockAction(_prev: SetupState | undefined, formData:
   }
   refresh();
   return { ok: "החסימה בוטלה. מעכשיו השיחות נשמרות שוב." };
+}
+
+/// "טעינת היסטוריה עכשיו": the next part of the history, now, instead of at
+/// night. Up to about a minute of loading per press, after the answer.
+export async function loadHistoryAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const g = await gate();
+  if (g.error) return { error: g.error };
+  const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
+  if (!channel?.storeEnabled) return { error: "השמירה עוד לא התחילה." };
+  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "אין הרשאה." };
+  await afterResponse("comms: history load on request", async () => {
+    await backfillChannel(channel, { budgetMs: 50_000, transcribe: transcribeRecording });
+  });
+  return { ok: "הטעינה רצה ברקע, כדקה. רעננו את מסך התקשורת בעוד דקה. אפשר ללחוץ שוב כדי להמשיך." };
 }

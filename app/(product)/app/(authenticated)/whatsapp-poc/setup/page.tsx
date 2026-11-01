@@ -3,11 +3,11 @@ import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
-import { chatPhone } from "@/lib/whatsapp-poc/inbox";
+import { chatPhone, displayPhone } from "@/lib/whatsapp-poc/inbox";
 import { UnipileError, isConfigured, loadMergedChats, readPocConfig, type PocChat } from "@/lib/whatsapp-poc/unipile";
 import { blockStateFor } from "@/lib/comms/visibility";
 import { prisma } from "@/lib/prisma";
-import { BlockManyForm, ConnectForm, DecideForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
+import { BlockManyForm, ConnectForm, DecideForm, LoadHistoryForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
 
 // Communications storage, stage 3 (1.11.2026): connecting a WhatsApp number
 // for storing, the "לא לשמור" list before anything is kept, "התחל לשמור",
@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
 
 const STATUS_LABEL = { PENDING: "ממתין למנהל", APPROVED: "חסום", REJECTED: "נדחה", REVOKED: "בוטל" } as const;
 
-export default async function CommsSetupPage() {
+export default async function CommsSetupPage(props: { searchParams: Promise<{ started?: string }> }) {
+  const { started } = await props.searchParams;
   const user = await requireUser();
   const config = readPocConfig();
   if (!canViewWhatsappPoc(user, config.viewers)) return <Forbidden />;
@@ -92,11 +93,14 @@ export default async function CommsSetupPage() {
       key: c.id,
       value: `${kind}|${value}|${c.name}`,
       name: c.name,
-      detail: phone ?? (c.type === "group" ? "קבוצה" : ""),
+      detail: phone ? displayPhone(phone) : c.type === "group" ? "קבוצה" : "",
       blocked: blockStateFor(channel.blocks, { phone, chatId: c.id }) !== "none",
     };
   });
 
+  const loaded = channel.storeEnabled
+    ? await prisma.commsConversation.count({ where: { channelId: channel.id, backfilledAt: { not: null } } })
+    : 0;
   const pending = channel.blocks.filter((b) => b.status === "PENDING");
   const active = channel.blocks.filter((b) => b.status === "APPROVED");
 
@@ -104,11 +108,23 @@ export default async function CommsSetupPage() {
     <div className="space-y-4">
       {header}
 
+      {started === "1" && channel.storeEnabled ? (
+        <p role="status" className="rounded-lg bg-app-success-soft p-3 text-sm text-app-text-primary">
+          השמירה התחילה. מעכשיו כל הודעה חדשה נשמרת, חוץ ממה שברשימת החסימה. ההיסטוריה של השיחות נטענת בהדרגה, בריצה הלילית.
+        </p>
+      ) : null}
+
       <section className="space-y-1 rounded-2xl border border-app-border bg-white p-4 text-sm text-app-text-primary">
         <p>
           המספר מחובר. בעלים: {channel.owner.name}. מצב: {channel.storeEnabled ? "נשמר" : "עוד לא נשמר"}.
         </p>
         {excludedNames.length ? <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {excludedNames.join(", ")}.</p> : null}
+        {channel.storeEnabled ? (
+          <p className="text-app-text-secondary">
+            היסטוריה: נטענו {loaded} שיחות. ההמשך נטען בריצה הלילית, או עכשיו:
+          </p>
+        ) : null}
+        {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}
       </section>
 
       {!channel.storeEnabled && isOwnerOrManager ? (
@@ -137,7 +153,7 @@ export default async function CommsSetupPage() {
                 <p className="text-sm text-app-text-primary">
                   {b.label ?? "ללא שם"}{" "}
                   <span dir="ltr" className="text-xs text-app-text-secondary">
-                    {b.kind === "PHONE" ? b.value : "קבוצה"}
+                    {b.kind === "PHONE" ? displayPhone(b.value) : "קבוצה"}
                   </span>
                 </p>
                 {manager ? <DecideForm blockId={b.id} /> : <p className="text-xs text-app-text-secondary">ממתין להחלטת מנהל.</p>}
@@ -156,7 +172,7 @@ export default async function CommsSetupPage() {
               <span className="text-sm text-app-text-primary">
                 {b.label ?? "ללא שם"}{" "}
                 <span dir="ltr" className="text-xs text-app-text-secondary">
-                  {b.kind === "PHONE" ? b.value : "קבוצה"}
+                  {b.kind === "PHONE" ? displayPhone(b.value) : "קבוצה"}
                 </span>{" "}
                 <span className="text-xs text-app-text-secondary">· {STATUS_LABEL[b.status]}</span>
               </span>

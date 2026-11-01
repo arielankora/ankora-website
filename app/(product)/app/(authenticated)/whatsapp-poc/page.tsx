@@ -3,7 +3,7 @@ import { ArrowRight, MessageCircle, Phone, Search } from "lucide-react";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { canManageClients } from "@/lib/app-auth/permissions";
-import { listStoredChats, listStoredMessages, storedChannelFor, type StoredTranscript } from "@/lib/comms/stored-chats";
+import { listStoredChats, listStoredMessages, storedChannelFor, withLiveChats, type StoredTranscript } from "@/lib/comms/stored-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -22,6 +22,8 @@ import {
   parseFilter,
   parseKey,
   phoneKey,
+  displayPhone,
+  isPlausiblePhone,
   chatKey,
   proposeTask,
   type InboxCall,
@@ -320,8 +322,19 @@ export default async function CommunicationsPage(props: {
   // filtered by who may see them, and Unipile is not asked for the list.
   const channel = await storedChannelFor(config.accountId);
   const storedWa = Boolean(channel?.storeEnabled);
+  let storedIds = new Set<string>();
   if (channel && storedWa) {
-    chats = await listStoredChats(channel, user);
+    const stored = await listStoredChats(channel, user);
+    storedIds = new Set(stored.map((c) => c.id));
+    chats = stored;
+    if (waConfig) {
+      try {
+        chats = await withLiveChats(channel, user, stored, (await loadMergedChats(waConfig)).chats);
+      } catch (err) {
+        if (!(err instanceof UnipileError)) throw err;
+        waError = err.message;
+      }
+    }
   } else if (waConfig) {
     try {
       chats = (await loadMergedChats(waConfig)).chats;
@@ -419,9 +432,10 @@ export default async function CommunicationsPage(props: {
 
   let messages: PocMessage[] = [];
   let voiceTranscripts = new Map<string, StoredTranscript>();
-  if (chat && channel && storedWa && chats.some((c) => c.id === chat!.id)) {
+  const chatShown = chat !== null && chats.some((c) => c.id === chat!.id);
+  if (chat && channel && storedWa && storedIds.has(chat.id)) {
     ({ messages, transcripts: voiceTranscripts } = await listStoredMessages(channel, chat.id));
-  } else if (chat && waConfig && !storedWa) {
+  } else if (chat && waConfig && (!storedWa || chatShown)) {
     try {
       messages = await listMessages(waConfig, chat.id);
     } catch (err) {
@@ -463,7 +477,7 @@ export default async function CommunicationsPage(props: {
   const callsTable = filter === "call" && !isOpen;
 
   const chips = (
-    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="סינון">
+    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible" role="group" aria-label="סינון">
       {INBOX_FILTERS.map((f) => (
         <Link prefetch={false}
           key={f.id}
@@ -556,7 +570,7 @@ export default async function CommunicationsPage(props: {
                       <ChannelIcon channel="call" />
                       <div className="min-w-0">
                         <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call" })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
-                          {name}
+                          <bdi>{name === call.other ? displayPhone(call.other) : name}</bdi>
                         </Link>
                         <p className="text-xs text-app-text-secondary">
                           {DIRECTION_SHORT[call.direction] ? `${DIRECTION_SHORT[call.direction]} · ` : ""}
@@ -565,7 +579,7 @@ export default async function CommunicationsPage(props: {
                         </p>
                         {o?.personName ? (
                           <p dir="ltr" className="text-end text-xs text-app-text-secondary">
-                            {call.other}
+                            {displayPhone(call.other)}
                           </p>
                         ) : null}
                       </div>
@@ -634,7 +648,7 @@ export default async function CommunicationsPage(props: {
                       <ChannelIcon channel={row.channel} />
                       <span className="flex min-w-0 flex-1 flex-col gap-1">
                         <span className="flex items-baseline justify-between gap-2">
-                          <span className="truncate text-[15px] font-medium text-app-text-primary">{row.name}</span>
+                          <span className="truncate text-[15px] font-medium text-app-text-primary"><bdi>{row.name}</bdi></span>
                           <span className="flex-none text-xs text-app-text-secondary">{formatListTime(row.at, now)}</span>
                         </span>
                         <span className="flex items-center justify-between gap-2">
@@ -679,10 +693,12 @@ export default async function CommunicationsPage(props: {
                       <ArrowRight className="size-5" aria-hidden="true" />
                     </Link>
                     <div className="min-w-0">
-                      <h2 className="truncate text-lg font-medium text-app-text-primary">{contactName}</h2>
+                      <h2 className="truncate text-lg font-medium text-app-text-primary">
+                        <bdi>{contactName}</bdi>
+                      </h2>
                       {selectedPhone ? (
                         <p dir="ltr" className="text-end text-xs text-app-text-secondary">
-                          {selectedPhone}
+                          {displayPhone(selectedPhone)}
                         </p>
                       ) : null}
                     </div>
@@ -699,6 +715,7 @@ export default async function CommunicationsPage(props: {
                     ))}
                     {channel && chat ? (
                       <BlockButton
+                        key={`block-${openKey}`}
                         channelId={channel.id}
                         kind={selectedPhone ? "PHONE" : "CHAT"}
                         value={selectedPhone ?? chat.id}
@@ -706,7 +723,10 @@ export default async function CommunicationsPage(props: {
                         manager={canManageClients(user.role)}
                       />
                     ) : null}
+                    {/* Keyed by the open contact: a form that stayed mounted kept the
+                        previous contact's title and details (Ariel, 1.11.2026). */}
                     <TaskFromConversation
+                      key={`task-${openKey}`}
                       clients={clientOptions}
                       defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
                       title={proposal.title}
@@ -768,7 +788,9 @@ export default async function CommunicationsPage(props: {
             <aside aria-label="איש קשר" className="space-y-5 rounded-2xl border border-app-border bg-white p-4 lg:col-span-2 xl:col-span-1">
               <section className="space-y-1.5">
                 <h3 className="text-xs font-medium text-app-text-secondary">איש קשר</h3>
-                <p className="font-medium text-app-text-primary">{contactName}</p>
+                <p className="font-medium text-app-text-primary">
+                  <bdi>{contactName}</bdi>
+                </p>
                 {owner && owner.clients.length > 0 ? (
                   <ul className="space-y-1">
                     {owner.clients.map((c) => (
@@ -807,13 +829,16 @@ export default async function CommunicationsPage(props: {
                   <h3 className="text-xs font-medium text-app-text-secondary">מספרים מוכרים</h3>
                   <ul dir="ltr" className="space-y-0.5 text-end text-sm text-app-text-primary">
                     {(owner?.phones.length ? owner.phones : [selectedPhone]).map((p) => (
-                      <li key={p}>{p}</li>
+                      <li key={p}>{displayPhone(p)}</li>
                     ))}
                   </ul>
                   {owner && owner.contacts.length > 0 ? (
-                    <AddNumberForm contactId={owner.contacts[0].id} />
+                    <AddNumberForm key={`add-${openKey}`} contactId={owner.contacts[0].id} />
+                  ) : !isPlausiblePhone(selectedPhone) ? (
+                    <p className="text-xs text-app-text-secondary">ל-WhatsApp אין כאן מספר טלפון, אלא מזהה פנימי, ולכן אי אפשר לשייך אותו לתיק לקוח.</p>
                   ) : (
                     <AssignToClientForm
+                      key={`assign-${openKey}`}
                       phone={selectedPhone}
                       defaultName={chat?.name && chat.name !== "ללא שם" ? chat.name : ""}
                       clients={clientOptions}

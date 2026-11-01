@@ -3,7 +3,8 @@ import type { CommsChannel, TranscriptStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import type { PocChat, PocMessage } from "@/lib/whatsapp-poc/unipile";
-import { canSeeConversation, parseViewerEmails } from "./visibility";
+import { blockStateFor, canSeeConversation, parseViewerEmails } from "./visibility";
+import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 
 // Stage 3: the communications screen reads a stored number's WhatsApp
 // conversations from here, in the shapes it already draws (PocChat,
@@ -105,4 +106,31 @@ export async function listStoredMessages(
     };
   });
   return { messages, transcripts };
+}
+
+/// Until a number's history has been loaded, its stored list is short or
+/// empty (1.11.2026: the WhatsApp filter was empty right after "התחל
+/// לשמור"). So the live list from Unipile fills in the chats not stored
+/// yet, without anything on the block list (approved or pending), and only
+/// for the number's owner and the full viewers, who may see any of its
+/// conversations. Stored chats win; the result is newest first.
+export async function withLiveChats(
+  channel: CommsChannel,
+  viewer: { id: string; email: string },
+  stored: PocChat[],
+  live: PocChat[],
+): Promise<PocChat[]> {
+  const fullViewers = parseViewerEmails(process.env.COMMS_FULL_VIEWERS);
+  const email = viewer.email.trim().toLowerCase();
+  if (channel.excludedViewerIds.includes(viewer.id)) return stored;
+  if (channel.ownerUserId !== viewer.id && !fullViewers.includes(email)) return stored;
+  const blocks = await prisma.commsBlock.findMany({ where: { channelId: channel.id }, select: { kind: true, value: true, status: true } });
+  const have = new Set(stored.map((c) => c.id));
+  const extra = live.filter((c) => !have.has(c.id) && blockStateFor(blocks, { phone: phoneOf(c), chatId: c.id }) === "none");
+  const time = (c: PocChat) => (c.lastMessageAt ? Date.parse(c.lastMessageAt) : 0);
+  return [...stored, ...extra].sort((a, b) => time(b) - time(a));
+}
+
+function phoneOf(c: PocChat): string | null {
+  return chatPhone(c);
 }
