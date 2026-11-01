@@ -136,6 +136,13 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
     const phone = chatPhone(chat);
     const key = phone ? phoneKey(phone) : chatKey(chat.id);
     const owner = phone ? owners.get(phone) : undefined;
+    // Two numbers may each have a chat with the same person: one row, the
+    // latest activity of the two.
+    const seen = rows.get(key);
+    if (seen && !later(seen.at, chat.lastMessageAt)) {
+      seen.unreadCount += chat.unreadCount;
+      continue;
+    }
     rows.set(key, {
       key,
       name: chat.name,

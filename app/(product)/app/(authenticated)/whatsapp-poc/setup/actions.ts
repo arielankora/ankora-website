@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { commsAccess } from "@/lib/comms/access";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
@@ -21,31 +21,35 @@ function refresh() {
 
 async function gate() {
   const user = await requireUser();
-  const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { user, error: "אין הרשאה." as const };
-  return { user, config, error: null };
+  const access = await commsAccess(user);
+  if (!access.allowed && !canManageClients(user.role)) return { user, access, error: "אין הרשאה." as const };
+  return { user, access, error: null };
 }
 
-/// Connect the configured WhatsApp account as a channel, owned by the person
-/// connecting it, with the people who must never see its conversations.
+/// Connect a WhatsApp number (a Unipile account) as a channel: whose it is,
+/// and who must never see its conversations. A manager may connect a number
+/// for someone else; anyone else, only as their own.
 export async function connectChannelAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
-  const g = await gate();
-  if (g.error || !g.config) return { error: g.error ?? "אין הרשאה." };
-  const accountId = g.config.accountId;
-  if (!accountId) return { error: "חשבון WhatsApp לא מוגדר בסביבה הזו." };
-  const excluded = formData.getAll("excluded").map(String).filter((id) => id && id !== g.user.id);
+  const user = await requireUser();
+  if (user.role === "CLIENT_USER") return { error: "אין הרשאה." };
+  const manager = canManageClients(user.role);
+  const accountId = String(formData.get("accountId") || "").trim();
+  if (!/^acc_[A-Za-z0-9]+$/.test(accountId)) return { error: "מזהה חשבון לא תקין (acc_...)." };
+  const ownerUserId = manager ? String(formData.get("ownerUserId") || user.id) : user.id;
+  const owner = await prisma.user.findFirst({ where: { id: ownerUserId, deletedAt: null, role: { not: "CLIENT_USER" } }, select: { id: true } });
+  if (!owner) return { error: "הבעלים לא נמצא." };
+  if (await prisma.commsChannel.findUnique({ where: { accountId } })) return { error: "המספר הזה כבר מחובר." };
+  const excluded = formData.getAll("excluded").map(String).filter((id) => id && id !== ownerUserId);
   const valid = await prisma.user.findMany({ where: { id: { in: excluded }, deletedAt: null }, select: { id: true } });
-  const channel = await prisma.commsChannel.upsert({
-    where: { accountId },
-    create: { accountId, ownerUserId: g.user.id, excludedViewerIds: valid.map((u) => u.id) },
-    update: { excludedViewerIds: valid.map((u) => u.id) },
+  const channel = await prisma.commsChannel.create({
+    data: { accountId, ownerUserId, excludedViewerIds: valid.map((u) => u.id) },
   });
   await recordAudit({
-    actorId: g.user.id,
+    actorId: user.id,
     action: "comms_channel.connected",
     entityType: "CommsChannel",
     entityId: channel.id,
-    after: { excludedViewerIds: channel.excludedViewerIds },
+    after: { ownerUserId, excludedViewerIds: channel.excludedViewerIds },
   });
   refresh();
   return { ok: "המספר מחובר. עכשיו מסמנים מה לא לשמור." };

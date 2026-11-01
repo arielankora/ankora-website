@@ -2,12 +2,13 @@ import Link from "next/link";
 import { ArrowRight, MessageCircle, Phone, Search } from "lucide-react";
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
-import { canManageClients } from "@/lib/app-auth/permissions";
-import { listStoredChats, listStoredMessages, storedChannelFor, withLiveChats, type StoredTranscript } from "@/lib/comms/stored-chats";
+import type { StoredTranscript } from "@/lib/comms/stored-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { canSendTo, canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { canSendTo } from "@/lib/whatsapp-poc/access";
+import { canSeeCall, commsAccess } from "@/lib/comms/access";
+import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
 import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phone";
 import { normalizePhone } from "@/lib/contact-normalize";
 import {
@@ -33,12 +34,6 @@ import {
 import { callSide, listRecordingsCached, type Recording } from "@/lib/whatsapp-poc/recordings";
 import {
   UnipileError,
-  findChatByPhone,
-  getChat,
-  isConfigured,
-  isHiddenChat,
-  listMessages,
-  loadMergedChats,
   readPocConfig,
   type PocChat,
   type PocMessage,
@@ -127,8 +122,8 @@ function attachmentLabel(a: PocMessage["attachments"][number]) {
   return ATTACHMENT_LABEL[a.type] ?? "קובץ";
 }
 
-function mediaHref(chatId: string, messageId: string, attachmentId: string) {
-  return `/api/whatsapp-poc/media/${encodeURIComponent(chatId)}/${encodeURIComponent(messageId)}/${encodeURIComponent(attachmentId)}`;
+function mediaHref(chatId: string, messageId: string, attachmentId: string, numberKey: string) {
+  return `/api/whatsapp-poc/media/${encodeURIComponent(chatId)}/${encodeURIComponent(messageId)}/${encodeURIComponent(attachmentId)}?n=${encodeURIComponent(numberKey)}`;
 }
 
 function recordingHref(emailId: string) {
@@ -172,7 +167,7 @@ function Banner({ tone, children }: { tone: "error" | "warning" | "info"; childr
   );
 }
 
-function MessageBubble({ m, chat, transcript }: { m: PocMessage; chat: PocChat; transcript?: StoredTranscript }) {
+function MessageBubble({ m, chat, transcript }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript }) {
   const mine = m.isSender;
   return (
     <li className={`flex ${mine ? "justify-end" : "justify-start"}`}>
@@ -198,7 +193,7 @@ function MessageBubble({ m, chat, transcript }: { m: PocMessage; chat: PocChat; 
                 {attachmentLabel(a)}
                 {a.duration ? ` · ${formatDuration(a.duration)}` : ""}
               </p>
-              <RecordingPlayer src={`/api/whatsapp-poc/voice/${encodeURIComponent(chat.id)}/${encodeURIComponent(m.id)}`} />
+              <RecordingPlayer src={`/api/whatsapp-poc/voice/${encodeURIComponent(m.chatId)}/${encodeURIComponent(m.id)}?n=${encodeURIComponent(m.numberKey)}`} />
               {transcript?.status === "DONE" && transcript.text ? (
                 <TranscriptText text={transcript.text} />
               ) : transcript?.status === "PENDING" ? (
@@ -206,18 +201,18 @@ function MessageBubble({ m, chat, transcript }: { m: PocMessage; chat: PocChat; 
               ) : transcript?.status === "SKIPPED" ? (
                 <p className="text-xs text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>
               ) : (
-                <TranscribeButton kind="voice" chatId={chat.id} messageId={m.id} />
+                <TranscribeButton kind="voice" chatId={m.chatId} messageId={m.id} numberKey={m.numberKey} />
               )}
             </div>
           ) : a.id && (a.type === "img" || a.type === "image") ? (
-            <a key={i} href={mediaHref(chat.id, m.id, a.id)} target="_blank" rel="noopener noreferrer" className="block">
+            <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} target="_blank" rel="noopener noreferrer" className="block">
               {/* eslint-disable-next-line @next/next/no-img-element -- a private, per-request file; next/image would cache it */}
-              <img src={mediaHref(chat.id, m.id, a.id)} alt={attachmentLabel(a)} loading="lazy" className="max-h-72 max-w-full rounded-lg" />
+              <img src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} alt={attachmentLabel(a)} loading="lazy" className="max-h-72 max-w-full rounded-lg" />
             </a>
           ) : a.id && a.type === "video" ? (
-            <video key={i} controls preload="none" className="max-h-72 max-w-full rounded-lg" src={mediaHref(chat.id, m.id, a.id)} />
+            <video key={i} controls preload="none" className="max-h-72 max-w-full rounded-lg" src={mediaHref(m.chatId, m.id, a.id, m.numberKey)} />
           ) : a.id ? (
-            <a key={i} href={mediaHref(chat.id, m.id, a.id)} className="inline-flex min-h-11 items-center text-xs underline">
+            <a key={i} href={mediaHref(m.chatId, m.id, a.id, m.numberKey)} className="inline-flex min-h-11 items-center text-xs underline">
               הורדת {attachmentLabel(a)}
             </a>
           ) : (
@@ -296,53 +291,22 @@ export default async function CommunicationsPage(props: {
   const searchParams = await props.searchParams;
   const user = await requireUser();
   const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return <Forbidden />;
+  const access = await commsAccess(user);
+  if (!access.allowed) return <Forbidden />;
 
   const filter = parseFilter(searchParams.filter);
   const query = (searchParams.q ?? "").slice(0, 80);
   const now = new Date();
 
-  const waConfig = isConfigured(config) ? config : null;
-  const waReady = waConfig !== null;
   const mailConfig = config.apiKey && config.mailAccountId ? { apiKey: config.apiKey, mailAccountId: config.mailAccountId } : null;
-  const callsReady = mailConfig !== null;
-  if (!waReady && !callsReady) {
-    return (
-      <div className="space-y-2">
-        <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
-        <p className="text-sm text-app-text-secondary">המסך לא מוגדר בסביבה הזו. חסרים UNIPILE_API_KEY ומזהי החשבונות.</p>
-      </div>
-    );
-  }
 
-  // The two sources, each on its own: one failing leaves the other.
-  let chats: PocChat[] = [];
-  let waError: string | null = null;
-  // Stage 3: once a number is stored, its conversations are read from here,
-  // filtered by who may see them, and Unipile is not asked for the list.
-  const channel = await storedChannelFor(config.accountId);
-  const storedWa = Boolean(channel?.storeEnabled);
-  let storedIds = new Set<string>();
-  if (channel && storedWa) {
-    const stored = await listStoredChats(channel, user);
-    storedIds = new Set(stored.map((c) => c.id));
-    chats = stored;
-    if (waConfig) {
-      try {
-        chats = await withLiveChats(channel, user, stored, (await loadMergedChats(waConfig)).chats);
-      } catch (err) {
-        if (!(err instanceof UnipileError)) throw err;
-        waError = err.message;
-      }
-    }
-  } else if (waConfig) {
-    try {
-      chats = (await loadMergedChats(waConfig)).chats;
-    } catch (err) {
-      if (!(err instanceof UnipileError)) throw err;
-      waError = err.message;
-    }
-  }
+  // WhatsApp: every connected number the person may see (lib/comms/inbox-loader.ts).
+  const wa = await loadWhatsapp(user, access);
+  const chats = wa.chats;
+  let waError: string | null = wa.error;
+  const waReady = Boolean(config.apiKey);
+  const accounts = lookupAccounts(wa, user, access);
+
   // 1.11.2026 (stage 2): the recordings are stored as they arrive
   // (lib/comms/call-store.ts) and read from here. Until the first are
   // stored, the mailbox is read live as before.
@@ -388,6 +352,19 @@ export default async function CommunicationsPage(props: {
     });
   }
 
+  // Each call only to whom may see it: the full viewers and the line's
+  // people see all, an account manager the calls of their clients.
+  if (!access.allCalls && calls.length > 0) {
+    const callOwners = await matchPhones(calls.map((c) => c.other));
+    const ids = [...new Set([...callOwners.values()].flatMap((o) => o.clients.map((c) => c.id)))];
+    const managers = new Map(
+      (await prisma.client.findMany({ where: { id: { in: ids } }, select: { id: true, accountManagerId: true } })).map((c) => [c.id, c.accountManagerId]),
+    );
+    calls = calls.filter((c) =>
+      canSeeCall(access, user.id, (callOwners.get(c.other)?.clients ?? []).map((cl) => ({ accountManagerId: managers.get(cl.id) ?? null }))),
+    );
+  }
+
   // Which contact is open: from the list (?c=), an old link (?chat=), or
   // the "open by number" box (?phone=).
   let selectedKey = parseKey(searchParams.c);
@@ -397,19 +374,23 @@ export default async function CommunicationsPage(props: {
   if (phoneFromBox) selectedKey = { phone: phoneFromBox };
   const badPhone = Boolean(searchParams.phone) && !phoneFromBox;
 
-  // The chat of the open contact. A number with no chat in the list is
+  // The chats of the open contact. A number with no chat in the lists is
   // looked up at Unipile only when asked (the box, or the "find" link),
   // because every lookup counts against the quota.
   let chat: PocChat | null = null;
+  let openChats: PocChat[] = [];
+  let found: Awaited<ReturnType<typeof findChat>> = null;
   let selectedPhone: string | null = null;
   let lookedUp = false;
   if (selectedKey && "phone" in selectedKey) {
     selectedPhone = selectedKey.phone;
-    chat = chats.find((c) => chatPhone(c) === selectedPhone) ?? null;
-    if (!chat && waConfig && (phoneFromBox || searchParams.wa === "1")) {
+    openChats = chatsWithPhone(wa, selectedPhone);
+    chat = openChats[0] ?? null;
+    if (!chat && accounts.length > 0 && (phoneFromBox || searchParams.wa === "1")) {
       lookedUp = true;
       try {
-        chat = await findChatByPhone(waConfig, selectedPhone);
+        found = await findChat(accounts, { phone: selectedPhone });
+        chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
         waError = err.message;
@@ -418,10 +399,11 @@ export default async function CommunicationsPage(props: {
   } else if (selectedKey && "chatId" in selectedKey) {
     const id = selectedKey.chatId;
     chat = chats.find((c) => c.id === id) ?? null;
-    if (!chat && waConfig) {
+    if (chat) openChats = [chat];
+    else if (accounts.length > 0) {
       try {
-        const found = await getChat(waConfig, id);
-        chat = found && !isHiddenChat(found) ? found : null;
+        found = await findChat(accounts, { chatId: id });
+        chat = found?.chat ?? null;
       } catch (err) {
         if (!(err instanceof UnipileError)) throw err;
         waError = err.message;
@@ -430,19 +412,12 @@ export default async function CommunicationsPage(props: {
     selectedPhone = chat ? chatPhone(chat) : null;
   }
 
-  let messages: PocMessage[] = [];
-  let voiceTranscripts = new Map<string, StoredTranscript>();
-  const chatShown = chat !== null && chats.some((c) => c.id === chat!.id);
-  if (chat && channel && storedWa && storedIds.has(chat.id)) {
-    ({ messages, transcripts: voiceTranscripts } = await listStoredMessages(channel, chat.id));
-  } else if (chat && waConfig && (!storedWa || chatShown)) {
-    try {
-      messages = await listMessages(waConfig, chat.id);
-    } catch (err) {
-      if (!(err instanceof UnipileError)) throw err;
-      waError = err.message;
-    }
-  }
+  const loaded = chat ? await loadMessages(wa, openChats, found) : { messages: [] as PageMessage[], transcripts: new Map<string, StoredTranscript>(), error: null };
+  const messages = loaded.messages;
+  const voiceTranscripts = loaded.transcripts;
+  if (loaded.error) waError = loaded.error;
+  // The open chat's number: where the block button and the reply act.
+  const chatInfo: ChannelInfo | null = chat ? (wa.channelOf.get(chat.id) ?? found?.info ?? null) : null;
 
   const owners = await matchPhones([
     ...chats.map((c) => chatPhone(c)).filter((p): p is string => Boolean(p)),
@@ -461,7 +436,12 @@ export default async function CommunicationsPage(props: {
   const messageById = new Map(messages.map((m) => [m.id, m]));
   const callById = new Map(contactCalls.map((c) => [c.emailId, c]));
   const contactName = owner?.personName ?? openRow?.name ?? chat?.name ?? selectedPhone ?? "";
-  const mayReply = chat !== null && chat.type === "1to1" && canSendTo(chat.phone, config.sendTo);
+  // A reply goes out only from the person's own number (or, for the full
+  // viewers, the configured number before it was connected), and only to a
+  // test number.
+  const replyAs =
+    chat && chatInfo && (chatInfo.ownerUserId === user.id || (chatInfo.id === null && access.full)) ? chatInfo : null;
+  const mayReply = chat !== null && replyAs !== null && chat.type === "1to1" && canSendTo(chat.phone, config.sendTo);
 
   const accessible = isOpen || filter === "call" ? await listAccessibleClients(user) : [];
   const clientOptions = accessible.map((c) => ({ id: c.id, name: c.name }));
@@ -500,7 +480,7 @@ export default async function CommunicationsPage(props: {
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
           <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. שליחה רק למספרי הבדיקה.</p>
           <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-            {storedWa ? "שמירת שיחות: רשימת החסימה" : "שמירת שיחות WhatsApp: הגדרה"}
+            שמירת שיחות WhatsApp: מספרים ורשימת חסימה
           </Link>
         </div>
         {/* On a phone the box folds away, so the list starts near the top. */}
@@ -713,14 +693,14 @@ export default async function CommunicationsPage(props: {
                         לקוח: {c.name}
                       </Link>
                     ))}
-                    {channel && chat ? (
+                    {chatInfo?.id && chat ? (
                       <BlockButton
                         key={`block-${openKey}`}
-                        channelId={channel.id}
+                        channelId={chatInfo.id}
                         kind={selectedPhone ? "PHONE" : "CHAT"}
                         value={selectedPhone ?? chat.id}
                         label={contactName}
-                        manager={canManageClients(user.role)}
+                        manager={access.manager}
                       />
                     ) : null}
                     {/* Keyed by the open contact: a form that stayed mounted kept the
@@ -757,7 +737,7 @@ export default async function CommunicationsPage(props: {
                 {chat ? (
                   mayReply ? (
                     <div className="bg-white">
-                      <SendForm chatId={chat.id} />
+                      <SendForm chatId={chat.id} channelId={replyAs?.id ?? ""} />
                     </div>
                   ) : (
                     <p className="border-t border-app-border bg-white p-4 text-xs text-app-text-secondary">

@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
-import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { accountForChatFile } from "@/lib/comms/route-access";
+import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 import { downloadFileFromDrive } from "@/lib/google-drive";
 import { prisma } from "@/lib/prisma";
 
 // WhatsApp POC: one WhatsApp voice message's audio, for the player in the
 // chat view. Same gate as the screen. Nothing is cached or stored.
-export async function GET(_request: Request, props: { params: Promise<{ chatId: string; messageId: string }> }) {
+export async function GET(
+  request: Request, props: { params: Promise<{ chatId: string; messageId: string }> }) {
   let user;
   try {
     user = await requireUserOrThrow();
@@ -16,11 +17,11 @@ export async function GET(_request: Request, props: { params: Promise<{ chatId: 
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     throw err;
   }
-  const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (!isConfigured(config)) return NextResponse.json({ error: "Not configured" }, { status: 404 });
 
   const { chatId, messageId } = await props.params;
+  // 1.11.2026 (several numbers): the chat's own number (?n=), checked.
+  const config = await accountForChatFile(user, new URL(request.url).searchParams.get("n"), decodeURIComponent(chatId));
+  if (!config) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     // Stage 3: a stored voice message is played from its Drive copy.
     const stored = await prisma.commsAttachment.findFirst({

@@ -58,13 +58,54 @@ function ConfirmSubmit(props: { label: string; question: string; yes: string; pe
 const primary = "min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white disabled:opacity-60";
 const secondary = "min-h-11 rounded-lg border border-app-border-strong bg-white px-4 text-sm text-app-text-primary disabled:opacity-60";
 
-export function ConnectForm({ people }: { people: Array<{ id: string; name: string }> }) {
+export function ConnectForm(props: {
+  accounts: Array<{ id: string; name: string }>;
+  manualAccount: boolean;
+  people: Array<{ id: string; name: string }>;
+  /// Managers choose whose number it is; anyone else connects their own.
+  owners: Array<{ id: string; name: string }> | null;
+  selfId: string;
+}) {
   const [state, action, pending] = useActionState(connectChannelAction, undefined);
+  const field = "mt-1 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
   return (
     <form action={action} className="space-y-3">
+      <div>
+        <label htmlFor="connect-account" className="block text-xs font-medium text-app-text-secondary">
+          החשבון ב-Unipile
+        </label>
+        {props.manualAccount ? (
+          <input id="connect-account" name="accountId" dir="ltr" required placeholder="acc_..." className={field} />
+        ) : (
+          <select id="connect-account" name="accountId" required defaultValue="" className={field}>
+            <option value="" disabled>
+              בחירת מספר
+            </option>
+            {props.accounts.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+      {props.owners ? (
+        <div>
+          <label htmlFor="connect-owner" className="block text-xs font-medium text-app-text-secondary">
+            של מי המספר
+          </label>
+          <select id="connect-owner" name="ownerUserId" defaultValue={props.selfId} className={field}>
+            {props.owners.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
       <fieldset className="space-y-1">
         <legend className="text-sm font-medium text-app-text-primary">מי לא יראה אף שיחה מהמספר הזה, גם לא עם לקוחות שלו</legend>
-        {people.map((p) => (
+        {props.people.map((p) => (
           <label key={p.id} className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
             <input type="checkbox" name="excluded" value={p.id} className="size-5" />
             {p.name}

@@ -5,7 +5,7 @@ import { transcribeRecordingAction, transcribeVoiceNoteAction, type TranscribeSt
 // One button for both kinds of audio: a call recording (by email id) and a
 // WhatsApp voice message (by chat and message id). Once there is a text,
 // it can be hidden and shown again, and copied (to paste into a task).
-type Target = { kind: "recording"; emailId: string } | { kind: "voice"; chatId: string; messageId: string };
+type Target = { kind: "recording"; emailId: string } | { kind: "voice"; chatId: string; messageId: string; numberKey: string };
 
 /// A transcript with "hide" and "copy". Used for a stored transcript too
 /// (1.11.2026: recordings are transcribed on arrival, no button needed).
@@ -67,6 +67,7 @@ export function TranscribeButton(props: Target & { label?: string }) {
         <>
           <input type="hidden" name="chatId" value={props.chatId} />
           <input type="hidden" name="messageId" value={props.messageId} />
+          <input type="hidden" name="numberKey" value={props.numberKey} />
         </>
       )}
       <button

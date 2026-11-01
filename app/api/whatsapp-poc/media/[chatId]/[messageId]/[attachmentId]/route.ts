@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { attachmentDisposition } from "@/lib/http-headers";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
-import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { accountForChatFile } from "@/lib/comms/route-access";
+import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { fetchMessageAttachment, inlineKind } from "@/lib/whatsapp-poc/voice-notes";
 
 // WhatsApp POC: one file attached to a WhatsApp message (an image, a video,
@@ -13,7 +13,7 @@ import { fetchMessageAttachment, inlineKind } from "@/lib/whatsapp-poc/voice-not
 // as a download, with nosniff and a sandbox CSP, so a file someone sent
 // (an HTML page, an SVG) can never run as a page on our own domain.
 export async function GET(
-  _request: Request,
+  request: Request,
   props: { params: Promise<{ chatId: string; messageId: string; attachmentId: string }> },
 ) {
   let user;
@@ -23,11 +23,11 @@ export async function GET(
     if (err instanceof UnauthorizedError) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     throw err;
   }
-  const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  if (!isConfigured(config)) return NextResponse.json({ error: "Not configured" }, { status: 404 });
 
   const { chatId, messageId, attachmentId } = await props.params;
+  // 1.11.2026 (several numbers): the chat's own number (?n=), checked.
+  const config = await accountForChatFile(user, new URL(request.url).searchParams.get("n"), decodeURIComponent(chatId));
+  if (!config) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   try {
     const file = await fetchMessageAttachment(
       config,

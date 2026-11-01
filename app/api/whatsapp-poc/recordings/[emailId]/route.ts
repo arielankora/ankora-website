@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireUserOrThrow, UnauthorizedError } from "@/lib/app-auth/session";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { canSeeCall, commsAccess } from "@/lib/comms/access";
+import { matchPhones } from "@/lib/whatsapp-poc/clients-by-phone";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { storedRecordingAudio } from "@/lib/comms/call-store";
 import { prisma } from "@/lib/prisma";
@@ -22,13 +23,22 @@ export async function GET(
     throw err;
   }
   const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const access = await commsAccess(user);
+  if (!access.allowed) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!config.apiKey || !config.mailAccountId) return NextResponse.json({ error: "Not configured" }, { status: 404 });
 
   const { emailId } = await props.params;
   try {
     const stored = emailId.length <= 1000 ? await prisma.callRecording.findUnique({ where: { emailId } }) : null;
     if (stored?.audioDeletedAt) return NextResponse.json({ error: "Audio removed after 12 months" }, { status: 410 });
+    // 1.11.2026 (several numbers): a call only to whom may see it. A
+    // recording not stored yet is read live, as before, by the line's people.
+    if (!access.allCalls) {
+      if (!stored) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      const ids = ((await matchPhones([stored.otherPhone])).get(stored.otherPhone)?.clients ?? []).map((c) => c.id);
+      const clients = await prisma.client.findMany({ where: { id: { in: ids } }, select: { accountManagerId: true } });
+      if (!canSeeCall(access, user.id, clients)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     const audio = stored
       ? await storedRecordingAudio(stored)
       : await fetchRecordingAudio({ apiKey: config.apiKey, mailAccountId: config.mailAccountId }, emailId);

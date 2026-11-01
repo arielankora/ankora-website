@@ -408,3 +408,25 @@ export async function listMessages(
 export async function sendText(config: { apiKey: string; accountId: string }, chatId: string, text: string): Promise<void> {
   await call(config, `/chats/${encodeURIComponent(chatId)}/messages/send`, { method: "POST", body: { text } });
 }
+
+/// The WhatsApp accounts this API key reaches (1.11.2026, several numbers),
+/// for the setup screen's "חיבור מספר". A key that may not list accounts
+/// answers with an error; the screen then asks for the id instead.
+export async function listWhatsappAccounts(apiKey: string): Promise<Array<{ id: string; name: string }>> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}/accounts/?limit=100`, {
+      headers: { "X-API-KEY": apiKey, accept: "application/json" },
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch {
+    throw new UnipileError("Unipile לא ענה.", null);
+  }
+  if (response.status === 429) throw await rateLimitError(response);
+  if (!response.ok) throw new UnipileError(`Unipile החזיר שגיאה ${response.status}.`, response.status);
+  const items = dataArray(await response.json()) as Array<{ id?: unknown; provider?: unknown; type?: unknown; name?: unknown }>;
+  return items
+    .filter((a) => typeof a.id === "string" && /^acc_[A-Za-z0-9]+$/.test(a.id) && String(a.provider ?? a.type ?? "").toLowerCase() === "whatsapp")
+    .map((a) => ({ id: a.id as string, name: typeof a.name === "string" && a.name ? a.name : (a.id as string) }));
+}

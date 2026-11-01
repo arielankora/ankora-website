@@ -2,8 +2,6 @@ import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
-import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BottomNav } from "./BottomNav";
 import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -64,10 +62,10 @@ function navItemsFor(role: User["role"], options: { whatsappPoc?: boolean } = {}
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "לקוחות" });
   if (tracks) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "לקוחות" });
   if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "לקוחות" });
-  // WhatsApp POC (1.11.2026): only for the addresses in
-  // WHATSAPP_POC_VIEWERS (Ariel), the same list the screens check. Anyone
+  // Communications (1.11.2026): only for those the screen opens to
+  // (lib/comms/access.ts), the same rule the screens check. Anyone
   // else neither sees the link nor gets past the screen's own gate.
-  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "תקשורת (בדיקה)", group: "לקוחות" });
+  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "תקשורת", group: "לקוחות" });
 
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "בקרה" });
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "בקרה" });
@@ -121,6 +119,7 @@ export function AppShell({
   supervising,
   approvals = 0,
   clients,
+  showComms,
   children,
 }: {
   user: User;
@@ -135,9 +134,11 @@ export function AppShell({
   /// Everything waiting on this person's approval (lib/approvals.ts).
   approvals?: number;
   clients: { id: string; name: string }[];
+  /// The communications screen, for those it opens to (lib/comms/access.ts).
+  showComms?: boolean;
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role, { whatsappPoc: canViewWhatsappPoc(user, readPocConfig().viewers) });
+  const items = navItemsFor(user.role, { whatsappPoc: showComms ?? false });
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { CONFIDENTIALITY_SIGN_PATH, confidentialitySignatures, mustSignConfidentiality } from "@/lib/agreements";
 import { AppShell } from "@/components/app/AppShell";
+import { commsAccess } from "@/lib/comms/access";
 import { can } from "@/lib/app-auth/permissions";
 import { getActiveTimers } from "@/lib/app-domain/time-entries";
 import { listNotificationsForUser, unreadNotificationCount } from "@/lib/app-domain/notifications";
@@ -99,9 +100,14 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
       canTrackTime ? countApprovals(user).catch(() => 0) : Promise.resolve(0),
     ]);
 
+  // The communications screen's menu entry, for those it opens to
+  // (lib/comms/access.ts). A failure leaves the entry out, never the page.
+  const showComms = await commsAccess(user).then((a) => a.allowed).catch(() => false);
+
   return (
     <AppShell
       user={user}
+      showComms={showComms}
       // Parallel timers: one pill, for the oldest, with "+1" when a
       // second is running. The timer screen is where both are shown.
       activeTimer={
