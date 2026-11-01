@@ -2103,6 +2103,14 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-11-01"
+    },
+    "domain:internal-client-id": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01",
+      "riskReason": "קובע אם לקוח הוא התיק הפנימי של אנקורה. בתיק הזה מסמך של אנקורה נחשב מקור ראשי, ופריטים שמאושרים בו לא יורדים ללא ודאי. טעות כאן מאשרת פריטים של לקוח אמיתי בלי אישור מהלקוח."
     }
   },
   "waivers": {},
