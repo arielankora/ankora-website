@@ -2011,8 +2011,57 @@
       "riskAssigned": true,
       "firstSeen": "2026-10-31",
       "riskReason": "Stranger test: an answer goes into the client file confirmed, sourced to who answered, with no proposal; a rule changes only on an explicit yes, and only by a manager or the client's account manager. Logic and permissions in tests/integration/stranger-tests.test.ts"
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/calls/actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "api:/api/whatsapp-poc/media/[chatId]/[messageId]/[attachmentId]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "api:/api/whatsapp-poc/recordings/[emailId]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "api:/api/whatsapp-poc/voice/[chatId]/[messageId]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "screen:/app/whatsapp-poc": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
+    },
+    "screen:/app/whatsapp-poc/calls": {
+      "kind": "screen",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01"
     }
   },
   "waivers": {},
-  "lastScan": "2026-10-31"
+  "lastScan": "2026-11-01"
 }

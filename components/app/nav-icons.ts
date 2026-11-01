@@ -19,6 +19,7 @@ import {
   User,
   KeyRound,
   Inbox,
+  MessageCircle,
   type LucideIcon,
 } from "lucide-react";
 
@@ -45,6 +46,7 @@ export const NAV_ICONS: Record<string, LucideIcon> = {
   "/app/report-schedules": CalendarClock,
   "/app/audit-log": ScrollText,
   "/app/integrations": Plug,
+  "/app/whatsapp-poc": MessageCircle,
   "/app/guide": BookOpen,
   "/app/notifications": Bell,
   "/app/profile": User,

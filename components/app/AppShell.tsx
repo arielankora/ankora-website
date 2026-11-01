@@ -2,6 +2,8 @@ import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import type { User } from "@prisma/client";
 import { can } from "@/lib/app-auth/permissions";
+import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BottomNav } from "./BottomNav";
 import { ACCOUNT_GROUP, Sidebar, type NavItem } from "./Sidebar";
 import { TopBar } from "./TopBar";
@@ -19,7 +21,7 @@ const ROLE_LABELS: Record<User["role"], string> = {
   CLIENT_USER: "לקוח",
 };
 
-function navItemsFor(role: User["role"]): NavItem[] {
+function navItemsFor(role: User["role"], options: { whatsappPoc?: boolean } = {}): NavItem[] {
   // 19.10.2026 (canvas "Ankora App UI Round", task cmvddvqqv000plc08l6qzt2ho):
   // four groups instead of six, by what the person came to do, and the
   // account items moved out of the list into the menu under the person's
@@ -62,6 +64,10 @@ function navItemsFor(role: User["role"]): NavItem[] {
   if (can(role, "client.manage")) items.push({ href: "/app/clients", label: "לקוחות", group: "לקוחות" });
   if (tracks) items.push({ href: "/app/important-dates", label: "מועדים חשובים", group: "לקוחות" });
   if (can(role, "credential.view")) items.push({ href: "/app/credentials", label: "מערכות וגישות", group: "לקוחות" });
+  // WhatsApp POC (1.11.2026): only for the addresses in
+  // WHATSAPP_POC_VIEWERS (Ariel), the same list the screens check. Anyone
+  // else neither sees the link nor gets past the screen's own gate.
+  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "WhatsApp (בדיקה)", group: "לקוחות" });
 
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "בקרה" });
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "בקרה" });
@@ -131,7 +137,7 @@ export function AppShell({
   clients: { id: string; name: string }[];
   children: ReactNode;
 }) {
-  const items = navItemsFor(user.role);
+  const items = navItemsFor(user.role, { whatsappPoc: canViewWhatsappPoc(user, readPocConfig().viewers) });
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (

@@ -66,6 +66,10 @@ export const ENTITY_TYPES = [
   // Employee agreements.
   "EmployeeAgreement",
   "AgreementSignLink",
+  // WhatsApp POC (31.10.2026): a message sent from the test screen.
+  "WhatsAppChat",
+  // WhatsApp POC stage 2: a call recording sent for transcription.
+  "CallRecording",
 ];
 
 export const ACTION_LABEL: Record<string, string> = {
@@ -311,6 +315,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "passkey.link_code": "הפקת קוד להוספת מכשיר",
   "passkey.link_code_used": "הוספת מכשיר בקוד ממכשיר מחובר",
   "passkey.link_code_failure": "קוד שגוי בהוספת מכשיר",
+  "whatsapp_poc.message_sent": "שליחת הודעת WhatsApp ממסך הבדיקה",
+  "whatsapp_poc.recording_transcribed": "שליחת הקלטת שיחה לתמלול",
+  "whatsapp_poc.voice_note_transcribed": "שליחת הודעה קולית ב-WhatsApp לתמלול",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג
