@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { ForbiddenError, assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
+import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { emailDomain, isPublicEmailDomain, normalizeDomain } from "@/lib/contact-normalize";
 import {
   checkSources,
@@ -116,7 +117,8 @@ export async function addClientSource(actor: User, input: ClientSourceInput) {
           seq,
           code: sourceCode(seq),
           kind: input.kind,
-          weight: input.weight ?? defaultWeight(input.kind),
+          // Ankora's own file: its documents are the client's word (loadRegister).
+          weight: input.weight ?? ((await isInternalClient(input.clientId)) ? "PRIMARY" : defaultWeight(input.kind)),
           title,
           occurredAt: input.occurredAt ?? null,
           participants: (input.participants ?? []).map((p) => p.trim()).filter(Boolean),
@@ -248,11 +250,17 @@ export async function listClientSources(actor: User, clientId: string) {
   return prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, orderBy: { seq: "asc" } });
 }
 
+/// The register as the source rules read it. In Ankora's own file
+/// (1.11.2026) Ankora is the client: its own document is the client's
+/// word, not a summary of it, so R14 has nothing to lower there. Ariel's
+/// own procedure, approved by him, came to "אישורים" marked uncertain
+/// because "the source is an Ankora document".
 async function loadRegister(clientId: string): Promise<RegisterEntry[]> {
-  return prisma.clientSource.findMany({
+  const rows = await prisma.clientSource.findMany({
     where: { clientId, deletedAt: null },
     select: { code: true, weight: true },
   });
+  return (await isInternalClient(clientId)) ? rows.map((r) => ({ ...r, weight: "PRIMARY" as const })) : rows;
 }
 
 /// The source rules for one item about to be written (spec 1.6, R14,

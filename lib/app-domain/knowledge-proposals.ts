@@ -48,6 +48,7 @@ import { duplicateFlag, findExisting, keepsSources, withLiveDuplicate, type Exis
 import { dateProposalKey, dateSchedule } from "@/lib/date-proposals";
 import { entityByName, resolveLinks, withoutLinkNames } from "@/lib/app-domain/proposal-links";
 import { applyContradiction, applyUpdate, currentItem, isUpdatable } from "@/lib/app-domain/proposal-updates";
+import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
 import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
@@ -305,6 +306,9 @@ export async function proposeKnowledge(
   if (input.items.length > MAX_ITEMS) throw new Error(`עד ${MAX_ITEMS} פריטים באצווה. מחלקים לכמה אצוות.`);
 
   const source = await planSource(input.clientId, input.source);
+  // Ankora's own file: its documents are the client's word (R14 does not
+  // lower them there, client-sources.ts loadRegister), so no flag says so.
+  const weight = (await isInternalClient(input.clientId)) ? "PRIMARY" : source.weight;
   const codes = [...(await registerCodes(input.clientId)), ...(source.existing ? [] : [source.code])];
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
@@ -381,7 +385,7 @@ export async function proposeKnowledge(
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    const flags = await flagsFor(input.clientId, { ...item, payload }, source.weight, codes);
+    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes);
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
@@ -526,8 +530,16 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
       if (pr.state === "PENDING" && pr.action === "CREATE") alreadyIn.set(pr.id, await findExisting(b.clientId, pr.target, pr.action, pr.payload as Record<string, unknown>));
     }
   }
-  const liveFlags = (pr: { id: string; target: string; flags: Prisma.JsonValue }) =>
-    alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(pr.flags) ? pr.flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : pr.flags;
+  // A batch of Ankora's own file that arrived before 1.11.2026 still
+  // carries the R14 flag: approving it no longer lowers anything there.
+  const internal = new Set<string>();
+  for (const clientId of new Set(batches.map((b) => b.clientId))) if (await isInternalClient(clientId)) internal.add(clientId);
+  const withoutR14 = (clientId: string, flags: Prisma.JsonValue) =>
+    internal.has(clientId) && Array.isArray(flags) ? ((flags as ProposalFlag[]).filter((f) => f.code !== "R14") as Prisma.JsonValue) : flags;
+  const liveFlags = (pr: { id: string; clientId: string; target: string; flags: Prisma.JsonValue }) => {
+    const flags = withoutR14(pr.clientId, pr.flags);
+    return alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(flags) ? flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : flags;
+  };
   return batches.map((b) => ({
     ...b,
     source: b.sourceId ? sourceById.get(b.sourceId) ?? null : null,
