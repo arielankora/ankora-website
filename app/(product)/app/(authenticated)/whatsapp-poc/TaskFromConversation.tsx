@@ -31,7 +31,7 @@ export function TaskFromConversation(props: {
   }
   return (
     <details className="group relative">
-      <summary className="flex min-h-9 cursor-pointer list-none items-center rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary">
+      <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary">
         צור משימה מהשיחה
       </summary>
       <form
@@ -66,7 +66,7 @@ export function TaskFromConversation(props: {
           <textarea id="task-description" name="description" rows={6} defaultValue={props.description} className={input} />
         </div>
         <label className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
-          <input type="checkbox" name="urgent" />
+          <input type="checkbox" name="urgent" className="size-5" />
           דחוף
         </label>
         <button type="submit" disabled={pending} className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white disabled:opacity-60">

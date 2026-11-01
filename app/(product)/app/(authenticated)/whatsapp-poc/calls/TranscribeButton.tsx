@@ -14,13 +14,24 @@ export function TranscriptText({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {
+    let ok = false;
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      ok = true;
     } catch {
-      setCopied(false);
+      // Older Safari, or a page without clipboard permission: the old way.
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.select();
+      ok = document.execCommand("copy");
+      area.remove();
     }
+    setCopied(ok);
+    setTimeout(() => setCopied(false), 3000);
   }
 
   return (
@@ -30,8 +41,11 @@ export function TranscriptText({ text }: { text: string }) {
           {hidden ? "הצגת התמלול" : "הסתרת התמלול"}
         </button>
         <button type="button" onClick={copy} className="min-h-11 text-app-text-primary underline">
-          {copied ? "הועתק" : "העתקת התמלול"}
+          העתקת התמלול
         </button>
+        <span role="status" className="inline-flex min-h-11 items-center text-app-success">
+          {copied ? "התמלול הועתק" : ""}
+        </span>
       </div>
       {!hidden ? (
         <p className="whitespace-pre-wrap rounded-lg bg-app-surface-sunken p-3 text-sm leading-relaxed text-app-text-primary">{text}</p>

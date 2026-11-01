@@ -123,6 +123,12 @@ describe("keys and small helpers", () => {
     expect(p.description).toContain("שיחה נכנסת אחרונה");
     expect(p.description).toContain("דנה: שלחתי את הדוחות");
     expect(p.description).toContain("אנחנו: קיבלתי");
+    expect(p.description).not.toContain("תמלול השיחה האחרונה");
+  });
+
+  it("adds the latest call's transcript to the proposed task", () => {
+    const p = proposeTask({ name: "דנה", phone: A, lastMessages: [], lastCall: null, transcript: "  ביקשה דוח רבעוני  " });
+    expect(p.description).toContain("תמלול השיחה האחרונה:\nביקשה דוח רבעוני");
   });
 });
 

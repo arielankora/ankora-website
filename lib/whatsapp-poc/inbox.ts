@@ -224,6 +224,8 @@ export function proposeTask(input: {
   phone: string | null;
   lastMessages: Array<{ text: string; isSender: boolean }>;
   lastCall: { at: string; direction: "in" | "out" | "unknown" } | null;
+  /// The latest call's stored transcript, when there is one.
+  transcript?: string | null;
 }): { title: string; description: string } {
   const who = input.name || input.phone || "איש קשר";
   const lines: string[] = [];
@@ -238,6 +240,9 @@ export function proposeTask(input: {
   if (texts.length > 0) {
     lines.push("", "הודעות אחרונות:");
     for (const m of texts) lines.push(`${m.isSender ? "אנחנו" : who}: ${m.text.trim().slice(0, 300)}`);
+  }
+  if (input.transcript?.trim()) {
+    lines.push("", "תמלול השיחה האחרונה:", input.transcript.trim().slice(0, 3000));
   }
   return { title: `מעקב: שיחה עם ${who}`, description: lines.join("\n") };
 }
