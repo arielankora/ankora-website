@@ -13,6 +13,7 @@ import {
   getAlertCoverage,
 } from "@/lib/app-domain/alerts";
 import { createClient } from "@/lib/app-domain/clients";
+import { prisma as appPrisma } from "@/lib/prisma";
 
 // Phase 4 - spec 9/9.1/9.2 (Alerts). Needs a real Prisma client +
 // reachable DATABASE_URL, same as every other tests/integration/*.test.ts
@@ -129,6 +130,57 @@ describe("evaluateAlertsForClient() - ADR 11.3 dedupe/retrigger, end to end", ()
     await evaluateAlertsForClient(client.id);
     expect(await prisma.alertEvent.count()).toBe(1);
     expect(sendEmail).toHaveBeenCalledTimes(2);
+  });
+
+  it.fails("fires once even when two evaluations of the same client interleave (KNOWN BUG: remove .fails when fixed)", async () => {
+    // Since #87 every time-entry write evaluates alerts in after(), so two
+    // saves landing together evaluate the same client concurrently. The
+    // decision is read-then-create with no lock and no unique constraint:
+    // both see "no prior event" and both fire, mailing the client twice.
+    const { superAdmin, client } = await setup();
+    await openFutureBank(superAdmin, client.id, 100);
+    const category = await createTestCategory({ clientId: client.id });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await createTestTimeEntry({
+      userId: employee.id,
+      clientId: client.id,
+      categoryId: category.id,
+      startAt: new Date(),
+      endAt: new Date(Date.now() + 90 * 60_000),
+    });
+    await createAlertRule(superAdmin, client.id, {
+      type: "UTILIZATION_PCT",
+      thresholdValue: 80,
+      recipientsAnkora: ["ops@ankora.co.il"],
+      recipientsClient: ["finance@client.example"],
+    });
+
+    // Force the interleaving instead of hoping for it: each evaluation
+    // holds its "any prior event?" answer until BOTH have read, so both
+    // decide on the same empty history. Without this the test depends on
+    // timing (cold versus warm connection pool) and is unreliable.
+    // The spy goes on the application's own client: setup.ts's `prisma` is a
+    // separate instance, and patching it would intercept nothing.
+    const realFindMany = appPrisma.alertEvent.findMany.bind(appPrisma.alertEvent);
+    let read = 0;
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const spy = vi.spyOn(appPrisma.alertEvent, "findMany").mockImplementation(((args: unknown) =>
+      realFindMany(args as never).then(async (rows) => {
+        read += 1;
+        if (read >= 2) release();
+        await Promise.race([gate, new Promise<void>((resolve) => setTimeout(resolve, 10_000))]);
+        return rows;
+      })) as never);
+    try {
+      await Promise.all([evaluateAlertsForClient(client.id), evaluateAlertsForClient(client.id)]);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(read).toBe(2); // the barrier really held both evaluations
+
+    expect(await prisma.alertEvent.count()).toBe(1);
+    expect(sendEmail).toHaveBeenCalledTimes(2); // one ankora + one client email, not four
   });
 
   it("resolves an open event once consumption drops back below threshold, without sending an email for the resolve", async () => {
