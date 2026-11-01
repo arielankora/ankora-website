@@ -715,6 +715,7 @@ export default async function CommunicationsPage(props: {
                     ))}
                     {channel && chat ? (
                       <BlockButton
+                        key={`block-${openKey}`}
                         channelId={channel.id}
                         kind={selectedPhone ? "PHONE" : "CHAT"}
                         value={selectedPhone ?? chat.id}
@@ -722,7 +723,10 @@ export default async function CommunicationsPage(props: {
                         manager={canManageClients(user.role)}
                       />
                     ) : null}
+                    {/* Keyed by the open contact: a form that stayed mounted kept the
+                        previous contact's title and details (Ariel, 1.11.2026). */}
                     <TaskFromConversation
+                      key={`task-${openKey}`}
                       clients={clientOptions}
                       defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
                       title={proposal.title}
@@ -829,11 +833,12 @@ export default async function CommunicationsPage(props: {
                     ))}
                   </ul>
                   {owner && owner.contacts.length > 0 ? (
-                    <AddNumberForm contactId={owner.contacts[0].id} />
+                    <AddNumberForm key={`add-${openKey}`} contactId={owner.contacts[0].id} />
                   ) : !isPlausiblePhone(selectedPhone) ? (
                     <p className="text-xs text-app-text-secondary">ל-WhatsApp אין כאן מספר טלפון, אלא מזהה פנימי, ולכן אי אפשר לשייך אותו לתיק לקוח.</p>
                   ) : (
                     <AssignToClientForm
+                      key={`assign-${openKey}`}
                       phone={selectedPhone}
                       defaultName={chat?.name && chat.name !== "ללא שם" ? chat.name : ""}
                       clients={clientOptions}
