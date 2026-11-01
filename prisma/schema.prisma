@@ -4136,3 +4136,77 @@ model AgreementSignLink {
   @@index([userId])
   @@map("agreement_sign_links")
 }
+
+// ---------------------------------------------------------------------------
+// Communications storage, stage 2 (1.11.2026, spec "שמירת שיחות, הקלטות
+// ותמלולים", approved by Ariel): the Aloha line's call recordings and their
+// transcripts are kept here instead of being read live from the mailbox on
+// every view. The audio itself is copied to a private Drive folder. Which
+// client a recording belongs to is worked out when it is read, from the
+// other number and the client files, never copied onto the row, so a
+// number added to a client's file later claims its past calls too.
+// ---------------------------------------------------------------------------
+
+enum CallDirection {
+  IN
+  OUT
+  UNKNOWN
+}
+
+enum TranscriptStatus {
+  /// Waiting for its turn, or for the monthly spending cap to renew.
+  PENDING
+  DONE
+  /// Three attempts failed. A person can retry from the screen.
+  FAILED
+  /// Not sent: the number belongs to a client marked "בלי AI".
+  SKIPPED
+}
+
+model CallRecording {
+  id            String        @id @default(cuid())
+  /// Unipile's id of the Aloha email. Stable, unlike its attachment ids.
+  emailId       String        @unique
+  mailAccountId String
+  fromPhone     String
+  toPhone       String
+  /// The number on the other side of our line, E.164.
+  otherPhone    String
+  direction     CallDirection
+  callAt        DateTime
+  durationSec   Int?
+  sizeBytes     Int?
+  mimeType      String        @default("audio/mpeg")
+  /// The copy in Drive. Null until copied, or once removed after 12 months
+  /// (audioDeletedAt), when only the transcript is left.
+  driveFileId    String?
+  audioDeletedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  transcript Transcript?
+
+  @@index([otherPhone, callAt])
+  @@index([callAt])
+  @@map("call_recordings")
+}
+
+/// A transcript of one piece of audio. Stage 2: call recordings. Stage 3
+/// adds WhatsApp voice messages as a second owner.
+model Transcript {
+  id          String           @id @default(cuid())
+  recordingId String?          @unique
+  status      TranscriptStatus @default(PENDING)
+  text        String?
+  model       String?
+  attempts    Int              @default(0)
+  lastError   String?
+  doneAt      DateTime?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  recording CallRecording? @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@map("transcripts")
+}

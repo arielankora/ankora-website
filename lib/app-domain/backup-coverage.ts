@@ -142,6 +142,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Process: { decision: "DUMP", table: "processes", reason: "The client's recurring processes: owner, trigger, SLA, systems, approvals and handover status. Typed by people." },
   ProcessCheck: { decision: "DUMP", table: "process_checks", reason: "Each check of an ongoing process: who looked, what they found, and the task an issue opened." },
   ProcessLesson: { decision: "DUMP", table: "process_lessons", reason: "What the person who closed a run said about the procedure, and whether it went into the next version." },
+  CallRecording: { decision: "DUMP", table: "call_recordings", reason: "The Aloha line's calls: numbers, direction, time and where the audio sits in Drive. The audio itself is in Drive, not here." },
+  Transcript: { decision: "DUMP", table: "transcripts", reason: "The text of each call recording, transcribed once at a cost. Cannot be produced again once the audio is removed after 12 months." },
   ProcessStrangerTest: { decision: "DUMP", table: "process_stranger_tests", reason: "Each stranger test of a procedure: who ran it, on which version, and where its answers are sourced." },
   ProcessStrangerQuestion: { decision: "DUMP", table: "process_stranger_questions", reason: "Where a stranger would get stuck in a procedure, and what people answered. Typed by people and Claude." },
   ProcessVersion: { decision: "DUMP", table: "process_versions", reason: "Every version of every procedure, and who approved it. A run is opened from the approved one." },

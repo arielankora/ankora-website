@@ -140,6 +140,16 @@ export async function fetchRecordingAudio(
   config: { apiKey: string; mailAccountId: string },
   emailId: string,
 ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
+  const found = await fetchRecording(config, emailId);
+  return found ? found.audio : null;
+}
+
+/// The recording email, parsed, and its audio. Same checks as above; used
+/// when a recording is stored (lib/comms/call-store.ts).
+export async function fetchRecording(
+  config: { apiKey: string; mailAccountId: string },
+  emailId: string,
+): Promise<{ recording: Recording; audio: { bytes: ArrayBuffer; contentType: string } } | null> {
   if (!isSafeId(emailId)) return null;
   const emailUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}`);
   const email = (await (await unipileFetch(config.apiKey, emailUrl, "application/json")).json()) as RawEmail & {
@@ -151,7 +161,30 @@ export async function fetchRecordingAudio(
   const fileUrl = new URL(`${BASE_URL}/${config.mailAccountId}/emails/${emailId}/attachments/${rec.attachmentId}`);
   const file = await unipileFetch(config.apiKey, fileUrl, "*/*");
   const contentType = file.headers.get("content-type") ?? "audio/mpeg";
-  return { bytes: await file.arrayBuffer(), contentType: contentType.startsWith("audio/") ? contentType : "audio/mpeg" };
+  return {
+    recording: rec,
+    audio: { bytes: await file.arrayBuffer(), contentType: contentType.startsWith("audio/") ? contentType : "audio/mpeg" },
+  };
+}
+
+/// One page of recording emails, newest first, with the cursor to the next
+/// page (Unipile's next_cursor), for the nightly reconcile.
+export async function listRecordingPage(
+  config: { apiKey: string; mailAccountId: string },
+  cursor: string | null,
+  limit = 50,
+): Promise<{ recordings: Recording[]; nextCursor: string | null }> {
+  const url = new URL(`${BASE_URL}/${config.mailAccountId}/emails`);
+  url.searchParams.set("from", RECORDING_SENDER);
+  url.searchParams.set("limit", String(limit));
+  if (cursor) url.searchParams.set("cursor", cursor);
+  const response = await unipileFetch(config.apiKey, url, "application/json");
+  const body = (await response.json()) as { data?: unknown; next_cursor?: unknown };
+  const data = Array.isArray(body.data) ? body.data : [];
+  return {
+    recordings: data.map((e) => toRecording(e as RawEmail)).filter((r): r is Recording => r !== null),
+    nextCursor: typeof body.next_cursor === "string" && body.next_cursor ? body.next_cursor : null,
+  };
 }
 
 // 1.11.2026 (communications screen): the recordings now load with every

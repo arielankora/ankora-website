@@ -14,7 +14,12 @@ export const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 const TIMEOUT_MS = 120_000;
 
 export class TranscriptionError extends Error {
-  constructor(message: string) {
+  /// OpenAI's status when it answered (429 = the cap or a rate limit), or
+  /// null when it did not, or nothing was sent.
+  constructor(
+    message: string,
+    readonly status: number | null = null,
+  ) {
     super(message);
     this.name = "TranscriptionError";
   }
@@ -65,7 +70,7 @@ export async function transcribeHebrew(audio: {
     // cap, a bad key or an overload is the same for every model.
     if (response.status !== 400 && response.status !== 404) break;
   }
-  if (lastStatus === 429) throw new TranscriptionError("OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.");
-  if (lastStatus === 401 || lastStatus === 403) throw new TranscriptionError("OpenAI דחה את המפתח.");
-  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}.`);
+  if (lastStatus === 429) throw new TranscriptionError("OpenAI מגביל את הבקשות, או שהגענו לתקרת ההוצאה החודשית.", 429);
+  if (lastStatus === 401 || lastStatus === 403) throw new TranscriptionError("OpenAI דחה את המפתח.", lastStatus);
+  throw new TranscriptionError(`OpenAI החזיר שגיאה ${lastStatus}.`, lastStatus);
 }

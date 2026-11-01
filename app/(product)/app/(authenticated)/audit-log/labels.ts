@@ -318,6 +318,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "whatsapp_poc.message_sent": "שליחת הודעת WhatsApp ממסך הבדיקה",
   "whatsapp_poc.recording_transcribed": "שליחת הקלטת שיחה לתמלול",
   "whatsapp_poc.voice_note_transcribed": "שליחת הודעה קולית ב-WhatsApp לתמלול",
+  "call_recording.retention_sweep": "מחיקת הקלטות שיחה לפי זמן השמירה",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

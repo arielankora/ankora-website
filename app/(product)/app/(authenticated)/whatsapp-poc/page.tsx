@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowRight, MessageCircle, Phone } from "lucide-react";
+import { ArrowRight, MessageCircle, Phone, Search } from "lucide-react";
+import { ScrollToActive } from "./ScrollToActive";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -41,7 +42,9 @@ import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
-import { TranscribeButton } from "./calls/TranscribeButton";
+import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
+import { prisma } from "@/lib/prisma";
+import type { TranscriptStatus } from "@prisma/client";
 
 // Communications screen (1.11.2026, from Ariel's review of the design on
 // Claude Design): WhatsApp and the Aloha line's call recordings in one
@@ -62,12 +65,13 @@ export const dynamic = "force-dynamic";
 const BASE = "/app/whatsapp-poc";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function href(params: { c?: string | null; filter?: InboxFilter; q?: string; wa?: boolean }) {
+function href(params: { c?: string | null; filter?: InboxFilter; q?: string; wa?: boolean; assign?: boolean }) {
   const q = new URLSearchParams();
   if (params.filter && params.filter !== "all") q.set("filter", params.filter);
   if (params.q) q.set("q", params.q);
   if (params.c) q.set("c", params.c);
   if (params.wa) q.set("wa", "1");
+  if (params.assign) q.set("assign", "1");
   const s = q.toString();
   return s ? `${BASE}?${s}` : BASE;
 }
@@ -97,6 +101,7 @@ function formatDateTime(iso: string) {
 
 function formatSize(bytes: number | null) {
   if (!bytes) return "";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))}KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
 }
 
@@ -217,7 +222,38 @@ function MessageBubble({ m, chat }: { m: PocMessage; chat: PocChat }) {
   );
 }
 
-function CallCard({ call, transcribe }: { call: InboxCall & { sizeBytes: number | null }; transcribe: boolean }) {
+type PageCall = InboxCall & {
+  sizeBytes: number | null;
+  durationSec: number | null;
+  /// Null for a recording read live from the mailbox (nothing stored yet).
+  transcript: { status: TranscriptStatus; text: string | null } | null;
+  audioRemoved: boolean;
+};
+
+/// What sits under a recording's player: the stored transcript, its state,
+/// or (for one read live, or a failed one) the button.
+function CallTranscript({ call, canTranscribe }: { call: PageCall; canTranscribe: boolean }) {
+  const t = call.transcript;
+  if (t?.status === "DONE" && t.text) return <TranscriptText text={t.text} />;
+  if (t?.status === "SKIPPED") return <p className="text-sm text-app-text-secondary">לא מתומלל: הלקוח מסומן &quot;בלי AI&quot;.</p>;
+  if (t?.status === "PENDING") return <p className="text-sm text-app-text-secondary">התמלול בתור, ויופיע כאן כשיסתיים.</p>;
+  if (!canTranscribe) return null;
+  return (
+    <div className="space-y-1">
+      {t?.status === "FAILED" ? <p className="text-sm text-app-error">התמלול נכשל שלוש פעמים.</p> : null}
+      <TranscribeButton kind="recording" emailId={call.emailId} label={t?.status === "FAILED" ? "לנסות שוב" : "תמלול"} />
+    </div>
+  );
+}
+
+function callMeta(call: PageCall) {
+  const parts: string[] = [];
+  if (call.durationSec) parts.push(`${formatDuration(call.durationSec)} דק׳`);
+  else if (call.sizeBytes) parts.push(formatSize(call.sizeBytes));
+  return parts.length ? ` · ${parts.join(" · ")}` : "";
+}
+
+function CallCard({ call, transcribe }: { call: PageCall; transcribe: boolean }) {
   return (
     <li className="space-y-3 rounded-xl border border-app-info-soft bg-white p-4 ring-1 ring-app-border">
       <div className="flex items-center gap-3">
@@ -225,18 +261,24 @@ function CallCard({ call, transcribe }: { call: InboxCall & { sizeBytes: number 
         <div>
           <p className="text-[15px] font-medium text-app-text-primary">{DIRECTION_LABEL[call.direction]}</p>
           <p className="text-xs text-app-text-secondary">
-            {formatTime(call.callAt)} · הקו של אנקורה{call.sizeBytes ? ` · ${formatSize(call.sizeBytes)}` : ""}
+            {formatTime(call.callAt)} · הקו של אנקורה{callMeta(call)}
           </p>
         </div>
       </div>
-      <RecordingPlayer src={recordingHref(call.emailId)} />
-      {transcribe ? <TranscribeButton kind="recording" emailId={call.emailId} /> : null}
+      {call.audioRemoved ? (
+        <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+      ) : (
+        <RecordingPlayer src={recordingHref(call.emailId)} />
+      )}
+      <CallTranscript call={call} canTranscribe={transcribe} />
     </li>
   );
 }
 
+const DIRECTION_FROM_DB = { IN: "in", OUT: "out", UNKNOWN: "unknown" } as const;
+
 export default async function CommunicationsPage(props: {
-  searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string }>;
+  searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string; assign?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
@@ -271,21 +313,50 @@ export default async function CommunicationsPage(props: {
       waError = err.message;
     }
   }
-  let recordings: Recording[] = [];
+  // 1.11.2026 (stage 2): the recordings are stored as they arrive
+  // (lib/comms/call-store.ts) and read from here. Until the first are
+  // stored, the mailbox is read live as before.
+  let calls: PageCall[] = [];
   let callsError: string | null = null;
   let callsStale = false;
-  if (mailConfig) {
+  const stored = await prisma.callRecording.findMany({
+    orderBy: { callAt: "desc" },
+    take: 300,
+    include: { transcript: { select: { status: true, text: true } } },
+  });
+  if (stored.length > 0) {
+    calls = stored.map((r) => ({
+      emailId: r.emailId,
+      callAt: r.callAt.toISOString(),
+      direction: DIRECTION_FROM_DB[r.direction],
+      other: r.otherPhone,
+      sizeBytes: r.sizeBytes,
+      durationSec: r.durationSec,
+      transcript: r.transcript,
+      audioRemoved: r.audioDeletedAt !== null,
+    }));
+  } else if (mailConfig) {
+    let recordings: Recording[] = [];
     try {
       ({ recordings, stale: callsStale } = await listRecordingsCached(mailConfig));
     } catch (err) {
       if (!(err instanceof UnipileError)) throw err;
       callsError = err.message;
     }
+    calls = recordings.map((r) => {
+      const side = callSide(r, config.lineNumber);
+      return {
+        emailId: r.emailId,
+        callAt: r.callAt,
+        direction: side.direction,
+        other: side.other,
+        sizeBytes: r.sizeBytes,
+        durationSec: null,
+        transcript: null,
+        audioRemoved: false,
+      };
+    });
   }
-  const calls: Array<InboxCall & { sizeBytes: number | null }> = recordings.map((r) => {
-    const side = callSide(r, config.lineNumber);
-    return { emailId: r.emailId, callAt: r.callAt, direction: side.direction, other: side.other, sizeBytes: r.sizeBytes };
-  });
 
   // Which contact is open: from the list (?c=), an old link (?chat=), or
   // the "open by number" box (?phone=).
@@ -366,18 +437,19 @@ export default async function CommunicationsPage(props: {
     phone: selectedPhone,
     lastMessages: messages.map((m) => ({ text: m.text, isSender: m.isSender })),
     lastCall: contactCalls[0] ? { at: contactCalls[0].callAt, direction: contactCalls[0].direction } : null,
+    transcript: contactCalls.find((c) => c.transcript?.status === "DONE")?.transcript?.text ?? null,
   });
 
   const callsTable = filter === "call" && !isOpen;
 
   const chips = (
-    <div className="flex flex-wrap gap-1.5" role="group" aria-label="סינון">
+    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label="סינון">
       {INBOX_FILTERS.map((f) => (
-        <Link
+        <Link prefetch={false}
           key={f.id}
           href={href({ filter: f.id, q: query, c: callsTable || f.id === "call" ? null : openKey })}
           aria-current={filter === f.id ? "page" : undefined}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 text-[13px] ${
+          className={`inline-flex min-h-9 flex-none items-center whitespace-nowrap rounded-full border px-3 text-[13px] ${
             filter === f.id ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-white text-app-text-secondary"
           }`}
         >
@@ -389,12 +461,35 @@ export default async function CommunicationsPage(props: {
 
   return (
     <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
-          <p className="mt-0.5 text-sm text-app-text-secondary">WhatsApp ושיחות טלפון במקום אחד. בדיקה: נקרא בזמן אמת ולא נשמר במערכת.</p>
+          <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. שליחה רק למספרי הבדיקה.</p>
         </div>
-        <form method="get" action={BASE} className="flex flex-wrap items-end gap-2">
+        {/* On a phone the box folds away, so the list starts near the top. */}
+        <details className="w-full sm:hidden" open={badPhone || undefined}>
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm text-app-text-primary underline">פתיחה לפי מספר</summary>
+          <form method="get" action={BASE} className="flex flex-wrap items-end gap-2 pb-2">
+          <div>
+            <label htmlFor="open-phone-m" className="block text-xs font-medium text-app-text-secondary">
+              פתיחה לפי מספר
+            </label>
+            <input
+              id="open-phone-m"
+              name="phone"
+              type="tel"
+              dir="ltr"
+              defaultValue={searchParams.phone ?? ""}
+              placeholder="050-0000000"
+              className="mt-1 w-44 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            />
+          </div>
+          <button type="submit" className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white">
+            פתיחה
+          </button>
+        </form>
+        </details>
+        <form method="get" action={BASE} className="hidden flex-wrap items-end gap-2 sm:flex">
           <div>
             <label htmlFor="open-phone" className="block text-xs font-medium text-app-text-secondary">
               פתיחה לפי מספר
@@ -409,7 +504,7 @@ export default async function CommunicationsPage(props: {
               className="mt-1 w-44 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
             />
           </div>
-          <button type="submit" className="min-h-10 rounded-lg bg-navy px-4 text-sm font-medium text-white">
+          <button type="submit" className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white">
             פתיחה
           </button>
         </form>
@@ -437,34 +532,38 @@ export default async function CommunicationsPage(props: {
                     <div className="flex min-w-0 items-center gap-3">
                       <ChannelIcon channel="call" />
                       <div className="min-w-0">
-                        <Link href={href({ c: phoneKey(call.other) })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
+                        <Link prefetch={false} href={href({ c: phoneKey(call.other), filter: "call" })} className="font-medium text-app-text-primary underline-offset-2 hover:underline">
                           {name}
                         </Link>
                         <p className="text-xs text-app-text-secondary">
                           {DIRECTION_SHORT[call.direction] ? `${DIRECTION_SHORT[call.direction]} · ` : ""}
                           {formatDateTime(call.callAt)}
-                          {call.sizeBytes ? ` · ${formatSize(call.sizeBytes)}` : ""}
-                          {o?.personName ? (
-                            <span dir="ltr" className="ms-1">
-                              {call.other}
-                            </span>
-                          ) : null}
+                          {callMeta(call)}
                         </p>
+                        {o?.personName ? (
+                          <p dir="ltr" className="text-end text-xs text-app-text-secondary">
+                            {call.other}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     {o && o.clients.length > 0 ? (
                       <ClientTag clients={o.clients} />
                     ) : (
-                      <Link
-                        href={href({ c: phoneKey(call.other) })}
-                        className="inline-flex min-h-9 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
+                      <Link prefetch={false}
+                        href={href({ c: phoneKey(call.other), filter: "call", assign: true })}
+                        className="inline-flex min-h-11 items-center rounded-full border border-dashed border-app-warning px-3 text-xs text-app-warning"
                       >
                         שיוך ללקוח
                       </Link>
                     )}
                   </div>
-                  <RecordingPlayer src={recordingHref(call.emailId)} />
-                  {config.hasOpenAiKey ? <TranscribeButton kind="recording" emailId={call.emailId} /> : null}
+                  {call.audioRemoved ? (
+                    <p className="text-sm text-app-text-secondary">קובץ השמע נמחק אחרי 12 חודשים. התמלול נשמר.</p>
+                  ) : (
+                    <RecordingPlayer src={recordingHref(call.emailId)} />
+                  )}
+                  <CallTranscript call={call} canTranscribe={config.hasOpenAiKey} />
                 </li>
               );
             })}
@@ -476,10 +575,10 @@ export default async function CommunicationsPage(props: {
           {/* The list. On a phone it gives way to the open conversation. */}
           <nav
             aria-label="אנשי קשר"
-            className={`${isOpen ? "hidden lg:flex" : "flex"} max-h-[78vh] flex-col overflow-hidden rounded-2xl border border-app-border bg-white`}
+            className={`${isOpen ? "hidden lg:flex" : "flex"} max-h-[78vh] w-full min-w-0 flex-col overflow-hidden rounded-2xl border border-app-border bg-white`}
           >
             <div className="space-y-3 border-b border-app-border p-3">
-              <form method="get" action={BASE}>
+              <form method="get" action={BASE} className="flex gap-2">
                 {filter !== "all" ? <input type="hidden" name="filter" value={filter} /> : null}
                 <label htmlFor="inbox-q" className="sr-only">
                   חיפוש
@@ -490,8 +589,11 @@ export default async function CommunicationsPage(props: {
                   type="search"
                   defaultValue={query}
                   placeholder="חיפוש לפי שם, מספר או לקוח"
-                  className="w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+                  className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
                 />
+                <button type="submit" aria-label="חיפוש" className="flex size-11 flex-none items-center justify-center rounded-lg border border-app-border-strong text-app-text-primary">
+                  <Search className="size-4" aria-hidden="true" />
+                </button>
               </form>
               {chips}
             </div>
@@ -500,9 +602,10 @@ export default async function CommunicationsPage(props: {
                 const active = row.key === openKey;
                 return (
                   <li key={row.key}>
-                    <Link
+                    <Link prefetch={false}
                       href={href({ c: row.key, filter, q: query })}
                       aria-current={active ? "page" : undefined}
+                      data-inbox-row=""
                       className={`flex gap-3 px-3 py-3 ${active ? "bg-app-accent-soft" : "hover:bg-app-surface-sunken"}`}
                     >
                       <ChannelIcon channel={row.channel} />
@@ -524,9 +627,16 @@ export default async function CommunicationsPage(props: {
                 );
               })}
               {visible.length === 0 ? (
-                <li className="p-4 text-sm text-app-text-secondary">{query || filter !== "all" ? "אין תוצאות." : "אין שיחות."}</li>
+                <li className="p-4 text-sm text-app-text-secondary">
+                  {filter === "wa" && waError
+                    ? "WhatsApp לא זמין כרגע, ולכן אין כאן שיחות. הסיבה מופיעה בראש המסך."
+                    : query || filter !== "all"
+                      ? "אין תוצאות."
+                      : "אין שיחות."}
+                </li>
               ) : null}
             </ul>
+            <ScrollToActive />
           </nav>
 
           {/* The timeline of the open contact. */}
@@ -538,7 +648,7 @@ export default async function CommunicationsPage(props: {
               <>
                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border bg-white px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2">
-                    <Link
+                    <Link prefetch={false}
                       href={href({ filter, q: query })}
                       aria-label="חזרה לרשימה"
                       className="flex size-11 flex-none items-center justify-center rounded-lg text-app-text-primary lg:hidden"
@@ -556,7 +666,7 @@ export default async function CommunicationsPage(props: {
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {owner?.clients.map((c) => (
-                      <Link
+                      <Link prefetch={false}
                         key={c.id}
                         href={`/app/clients/${c.id}`}
                         className="inline-flex min-h-9 items-center rounded-lg bg-app-accent-soft px-3 text-[13px] font-medium text-app-text-accent"
@@ -604,10 +714,12 @@ export default async function CommunicationsPage(props: {
                   )
                 ) : selectedPhone && waReady ? (
                   <div className="border-t border-app-border bg-white p-4 text-sm text-app-text-secondary">
-                    {lookedUp ? (
+                    {lookedUp && waError ? (
+                      `לא היה אפשר לבדוק אם יש שיחת WhatsApp עם המספר: ${waError}`
+                    ) : lookedUp ? (
                       "לא נמצאה שיחת WhatsApp עם המספר הזה."
                     ) : (
-                      <Link href={href({ c: phoneKey(selectedPhone), filter, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
+                      <Link prefetch={false} href={href({ c: phoneKey(selectedPhone), filter, q: query, wa: true })} className="inline-flex min-h-11 items-center text-app-text-primary underline">
                         חיפוש שיחת WhatsApp עם המספר הזה
                       </Link>
                     )}
@@ -629,7 +741,7 @@ export default async function CommunicationsPage(props: {
                   <ul className="space-y-1">
                     {owner.clients.map((c) => (
                       <li key={c.id}>
-                        <Link href={`/app/clients/${c.id}`} className="inline-flex min-h-9 items-center text-sm text-app-text-accent underline">
+                        <Link prefetch={false} href={`/app/clients/${c.id}`} className="inline-flex min-h-9 items-center text-sm text-app-text-accent underline">
                           לתיק הלקוח: {c.name}
                         </Link>
                       </li>
@@ -652,7 +764,10 @@ export default async function CommunicationsPage(props: {
                     <p className="text-xs text-app-text-secondary">שיחות</p>
                   </div>
                 </div>
-                <p className="text-xs text-app-text-tertiary">מתוך 40 ההודעות ו-25 ההקלטות האחרונות שנטענו.</p>
+                <p className="text-xs text-app-text-tertiary">
+                  {chat ? "ההודעות: מתוך 40 האחרונות שנטענו. " : waError ? "WhatsApp לא נטען, ולכן ההודעות לא נספרו. " : ""}
+                  {stored.length > 0 ? "השיחות: מכל ההקלטות השמורות." : "השיחות: מתוך ההקלטות האחרונות שנטענו."}
+                </p>
               </section>
 
               {selectedPhone ? (
@@ -666,7 +781,12 @@ export default async function CommunicationsPage(props: {
                   {owner && owner.contacts.length > 0 ? (
                     <AddNumberForm contactId={owner.contacts[0].id} />
                   ) : (
-                    <AssignToClientForm phone={selectedPhone} defaultName={chat?.name && chat.name !== "ללא שם" ? chat.name : ""} clients={clientOptions} />
+                    <AssignToClientForm
+                      phone={selectedPhone}
+                      defaultName={chat?.name && chat.name !== "ללא שם" ? chat.name : ""}
+                      clients={clientOptions}
+                      defaultOpen={searchParams.assign === "1"}
+                    />
                   )}
                 </section>
               ) : null}
