@@ -1,10 +1,11 @@
 "use server";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
+import { commsAccess } from "@/lib/comms/access";
+import { accountForChatFile } from "@/lib/comms/route-access";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { TRANSCRIBE_MODELS, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
-import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
+import { UnipileError, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 import { isAiExcludedNumber, storedRecordingAudio } from "@/lib/comms/call-store";
 import { prisma } from "@/lib/prisma";
@@ -21,7 +22,7 @@ export async function transcribeRecordingAction(
 ): Promise<TranscribeState> {
   const user = await requireUser();
   const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
+  if (!(await commsAccess(user)).allowed) return { error: "אין הרשאה." };
   if (!config.apiKey || !config.mailAccountId) return { error: "ההקלטות לא מוגדרות בסביבה הזו." };
   if (!config.hasOpenAiKey) return { error: "התמלול לא מוגדר בסביבה הזו." };
 
@@ -67,15 +68,16 @@ export async function transcribeVoiceNoteAction(
 ): Promise<TranscribeState> {
   const user = await requireUser();
   const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
-  if (!isConfigured(config)) return { error: "ה-POC לא מוגדר בסביבה הזו." };
   if (!config.hasOpenAiKey) return { error: "התמלול לא מוגדר בסביבה הזו." };
 
   const chatId = String(formData.get("chatId") || "");
   const messageId = String(formData.get("messageId") || "");
+  // The chat's own number, checked like the audio route (several numbers).
+  const unipile = await accountForChatFile(user, String(formData.get("numberKey") || "-"), chatId);
+  if (!unipile) return { error: "אין הרשאה." };
 
   try {
-    const audio = await fetchVoiceNote(config, chatId, messageId);
+    const audio = await fetchVoiceNote(unipile, chatId, messageId);
     if (!audio) return { error: "ההודעה הקולית לא נמצאה." };
     await recordAudit({
       actorId: user.id,

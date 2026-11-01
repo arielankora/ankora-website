@@ -2,8 +2,9 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { canSendTo, canViewWhatsappPoc, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
-import { UnipileError, getChat, isConfigured, readPocConfig, sendText } from "@/lib/whatsapp-poc/unipile";
+import { canSendTo, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
+import { commsAccess } from "@/lib/comms/access";
+import { UnipileError, getChat, readPocConfig, sendText } from "@/lib/whatsapp-poc/unipile";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientContact, updateClientContact } from "@/lib/app-domain/client-contacts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
@@ -19,21 +20,36 @@ export type SendState = { error?: string; sent?: boolean };
 export async function sendPocMessageAction(_prev: SendState | undefined, formData: FormData): Promise<SendState> {
   const user = await requireUser();
   const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
-  if (!isConfigured(config)) return { error: "ה-POC לא מוגדר בסביבה הזו." };
+  const access = await commsAccess(user);
+  if (!access.allowed) return { error: "אין הרשאה." };
 
   const chatId = String(formData.get("chatId") || "");
   if (!chatId || chatId.length > 200) return { error: "שיחה לא תקינה." };
+
+  // 1.11.2026 (several numbers): the message goes out from the sender's own
+  // number. A connected number only by its owner; the configured number
+  // before it was connected, only by the full viewers.
+  const channelId = String(formData.get("channelId") || "");
+  let accountId: string | null = null;
+  if (channelId) {
+    const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
+    if (!channel || channel.ownerUserId !== user.id) return { error: "אפשר לשלוח רק מהמספר שלך." };
+    accountId = channel.accountId;
+  } else if (access.full && config.accountId && !(await prisma.commsChannel.findUnique({ where: { accountId: config.accountId } }))) {
+    accountId = config.accountId;
+  }
+  if (!accountId || !config.apiKey) return { error: "אפשר לשלוח רק מהמספר שלך." };
+  const unipile = { apiKey: config.apiKey, accountId };
 
   const checked = checkMessageText(formData.get("text"));
   if (!checked.ok) return { error: checked.error };
 
   try {
-    const chat = await getChat(config, chatId);
+    const chat = await getChat(unipile, chatId);
     if (!chat || chat.type !== "1to1" || !canSendTo(chat.phone, config.sendTo)) {
       return { error: "שליחה מותרת רק למספרים שברשימת הבדיקה." };
     }
-    await sendText(config, chat.id, checked.text);
+    await sendText(unipile, chat.id, checked.text);
     await recordAudit({
       actorId: user.id,
       action: "whatsapp_poc.message_sent",
@@ -68,8 +84,7 @@ function contactError(err: unknown): string {
 /// client.
 export async function assignNumberToClientAction(_prev: ContactState | undefined, formData: FormData): Promise<ContactState> {
   const user = await requireUser();
-  const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
+  if (!(await commsAccess(user)).allowed) return { error: "אין הרשאה." };
 
   const phone = normalizePhone(String(formData.get("phone") || "").slice(0, 40));
   if (!phone || !/^\+\d{8,15}$/.test(phone)) return { error: "מספר לא תקין." };
@@ -121,8 +136,7 @@ export async function assignNumberToClientAction(_prev: ContactState | undefined
 /// refuse from the client file.
 export async function addNumberToContactAction(_prev: ContactState | undefined, formData: FormData): Promise<ContactState> {
   const user = await requireUser();
-  const config = readPocConfig();
-  if (!canViewWhatsappPoc(user, config.viewers)) return { error: "אין הרשאה." };
+  if (!(await commsAccess(user)).allowed) return { error: "אין הרשאה." };
 
   const contactId = String(formData.get("contactId") || "");
   if (!contactId || contactId.length > 64) return { error: "איש הקשר לא נמצא." };
