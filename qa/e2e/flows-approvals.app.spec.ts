@@ -10,6 +10,7 @@ import { test, expect } from "./fixtures";
 //
 // @covers screen:/app/approvals
 // @covers action:(product)/app/(authenticated)/approvals/actions
+// @covers action:(product)/app/(authenticated)/clients/question-actions
 
 test.describe.configure({ timeout: 90_000 });
 
@@ -86,8 +87,8 @@ test.describe("approvals", () => {
     await expect(page.locator("li", { hasText: "[DEMO] הצעה" }).first()).toBeVisible();
   });
 
-  // 22.10.2026: decisions only, each with a recommendation; what is not
-  // yet confirmed is questions for the client, on its owner's card.
+  // 22.10.2026: decisions only, each with a recommendation. 1.11.2026: the
+  // questions for a client left this screen for the client's page.
   test("all opens on today's few, each row with what is recommended and a button", async ({ page }) => {
     await page.goto("/app/approvals");
     const today = page.getByTestId("approvals-today");
@@ -100,17 +101,17 @@ test.describe("approvals", () => {
     await expect(first.getByRole("button").or(first.getByTestId("approval-go")).first()).toBeVisible();
   });
 
-  test("the old address of the things to check opens the questions for the client", async ({ page }) => {
+  test("the old addresses of the questions lead to the client's page, and the tab is gone", async ({ page }) => {
     await page.goto("/app/approvals?tab=review");
-    await expect(page.getByRole("navigation", { name: "סוגי אישורים" }).getByRole("link", { name: /^שאלות ללקוח/ })).toHaveAttribute("aria-current", "page");
-    await expect(page.getByTestId("questions")).toBeVisible();
-    // A manager may look at everyone's cards.
-    await expect(page.getByTestId("questions-scope")).toBeVisible();
+    await expect(page).toHaveURL(/\/app\/approvals$/, { timeout: 30_000 });
+    await expect(page.getByRole("navigation", { name: "סוגי אישורים" }).getByRole("link", { name: /^שאלות ללקוח/ })).toHaveCount(0);
+    await page.goto(`/app/approvals?tab=questions&clientId=${CLIENT}&scope=all`);
+    await expect(page).toHaveURL(new RegExp(`/app/clients/${CLIENT}\\?tab=file#client-questions`), { timeout: 30_000 });
   });
 
-  test("an item not yet confirmed becomes a question on the client's card, with a message drafted", async ({ page }) => {
+  test("an uncertain item is a question only once asked about, and a line can be put off", async ({ page }) => {
     const title = tag("[E2E] סוג פנייה לשאלה");
-    await page.goto(`/app/clients/${CLIENT}?tab=file`);
+    await page.goto(`/app/clients/${CLIENT}?tab=file&section=all`);
     await page.getByRole("button", { name: "+ סוג פנייה", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
@@ -120,15 +121,36 @@ test.describe("approvals", () => {
     await dialog.locator('input[name="toResolve"]').fill("לברר עם המנכ״ל מי עונה");
     await submit(page, "הוספה לתיק");
 
-    await page.goto(`/app/approvals?tab=questions&clientId=${CLIENT}&scope=all`);
+    // Not on a card by itself: in the list of uncertain items, one press away.
+    const section = page.getByTestId("client-questions");
+    await expect(section.getByTestId("question-item").filter({ hasText: title })).toHaveCount(0);
+    const list = section.getByTestId("uncertain-items");
+    await list.locator("summary").click();
+    const uncertain = list.getByTestId("uncertain-item").filter({ hasText: title });
+    const asked = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await uncertain.getByRole("button", { name: "לשאול את הלקוח" }).click();
+    await asked;
+    await page.reload();
+
     const card = page.getByTestId("question-card").filter({ hasText: title }).first();
     await expect(card, "the item is not on a card").toBeVisible({ timeout: 30_000 });
-    await expect(card.getByTestId("question-item").filter({ hasText: title })).toContainText("לברר עם המנכ״ל מי עונה");
+    const line = card.getByTestId("question-item").filter({ hasText: title });
+    await expect(line).toContainText("לברר עם המנכ״ל מי עונה");
     await card.getByTestId("question-draft-toggle").click();
     const draft = card.getByTestId("question-draft").locator("textarea");
-    await expect(draft).toBeVisible();
     await expect(draft).toHaveValue(/^היי/);
     await expect(draft).toHaveValue(new RegExp("לברר עם המנכ״ל מי עונה"));
+
+    // "לדחות עד": off the card until the date, and said so under it.
+    await line.getByRole("button", { name: "לדחות עד..." }).click();
+    const ahead = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+    await line.getByTestId("question-snooze").locator('input[type="date"]').fill(ahead);
+    const snoozed = page.waitForResponse((r) => r.request().method() === "POST" && r.status() < 400);
+    await line.getByRole("button", { name: "דחייה" }).click();
+    await snoozed;
+    await page.reload();
+    await expect(page.getByTestId("question-item").filter({ hasText: title })).toHaveCount(0);
+    await expect(page.getByTestId("question-snoozed").filter({ hasText: title.slice(0, 40) }).first()).toBeVisible();
 
     // Clean up: the request type goes, and its question with it.
     await page.goto(`/app/clients/${CLIENT}?tab=file`);

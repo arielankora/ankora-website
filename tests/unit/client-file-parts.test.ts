@@ -26,6 +26,7 @@ describe("client file parts", () => {
     expect(sectionOfAnchor("processes")).toBe("processes");
     expect(sectionOfAnchor("rules")).toBe("rules");
     expect(sectionOfAnchor("client-pending")).toBe("pending");
+    expect(sectionOfAnchor("client-questions")).toBe("facts");
     expect(sectionOfAnchor("item-abc")).toBe("all");
     expect(fileSectionLabel("all")).toBe("הכול");
     expect(fileSectionLabel("processes")).toBe("תהליכים ונהלים");

@@ -494,7 +494,7 @@ export async function collectApprovals(user: User): Promise<ApprovalItem[]> {
 export async function countApprovals(user: User): Promise<number> {
   if (!can(user.role, "time_entry.create_self")) return 0;
   const [items, proposals] = await Promise.all([collectApprovals(user).then(onlyMine), countMyPendingProposals(user)]);
-  return tabCounts(items, 0, proposals).all;
+  return tabCounts(items, proposals).all;
 }
 
 /// The proposals waiting on this person (22.10.2026). `everyone`: a

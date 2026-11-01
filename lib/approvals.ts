@@ -17,18 +17,18 @@ import type { StepOp } from "@/lib/next-steps";
 /// duplicate tasks to close, a review), and "check" what an
 /// admin checks (a signed PDF). What used to be "לבדיקה", items not yet
 /// confirmed, is no longer a decision of the manager's: it is the file
-/// owner's "שאלות ללקוח" (lib/client-questions.ts).
+/// owner's "שאלות ללקוח" (lib/client-questions.ts), which since 1.11.2026
+/// live on the client's page, not here.
 ///
 /// "internal" (22.10.2026): items of Ankora's own file, uncertain only
 /// because Ankora wrote them. There Ankora is the client, so they are a
 /// manager's decision, not a question to a client.
 export type ApprovalKind = "task" | "exception" | "rule" | "procedure" | "process" | "internal" | "knowledge" | "plan" | "summary" | "guide" | "check";
 
-export type ApprovalTab = "all" | ApprovalKind | "questions";
+export type ApprovalTab = "all" | ApprovalKind;
 
 /// The order of the tabs, most urgent first: somebody is stopped on a
-/// signature, then an exception has a date, then the file itself. The
-/// questions last: they are work, not decisions, and not in the count.
+/// signature, then an exception has a date, then the file itself.
 export const APPROVAL_TABS: { key: ApprovalTab; label: string }[] = [
   { key: "all", label: "הכול" },
   { key: "task", label: "משימות לחתימה" },
@@ -42,7 +42,6 @@ export const APPROVAL_TABS: { key: ApprovalTab; label: string }[] = [
   { key: "summary", label: "סיכומים ללקוח" },
   { key: "guide", label: "מדריך חילוץ" },
   { key: "check", label: "לבדיקה" },
-  { key: "questions", label: "שאלות ללקוח" },
 ];
 
 /// The label beside each row in "הכול", and its colour.
@@ -141,25 +140,21 @@ export function forClient<T extends { clientId: string | null }>(rows: T[], clie
   return clientId ? rows.filter((r) => r.clientId === clientId) : rows;
 }
 
-/// How many each tab holds. "הכול" is every decision, not the questions
-/// for the client: those are work, and are not waiting on a decision. A
-/// knowledge batch counts as its proposals, the way the review screen
-/// always counted.
-export function tabCounts(items: ApprovalItem[], questions: number, knowledgeTotal?: number): Record<ApprovalTab, number> {
+/// How many each tab holds. "הכול" is every decision. A knowledge batch
+/// counts as its proposals, the way the review screen always counted.
+export function tabCounts(items: ApprovalItem[], knowledgeTotal?: number): Record<ApprovalTab, number> {
   const out = Object.fromEntries(APPROVAL_TABS.map((t) => [t.key, 0])) as Record<ApprovalTab, number>;
   for (const i of items) out[i.kind] += i.weight ?? 1;
   if (knowledgeTotal !== undefined) out.knowledge = knowledgeTotal;
   out.all = (Object.keys(KIND_LABELS) as ApprovalKind[]).reduce((n, k) => n + out[k], 0);
-  out.questions = questions;
   return out;
 }
 
 /// The tabs a person sees: "הכול" always, the rest only while they hold
-/// something, plus the one asked for. "שאלות ללקוח" always, since a
-/// manager reaches everyone's questions from there. A person who approves no rules never
+/// something, plus the one asked for. A person who approves no rules never
 /// sees a "כללים" tab with a zero in it.
 export function visibleTabs(counts: Record<ApprovalTab, number>, active: ApprovalTab): { key: ApprovalTab; label: string; count: number }[] {
-  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === "questions" || t.key === active || counts[t.key] > 0).map((t) => ({ ...t, count: counts[t.key] }));
+  return APPROVAL_TABS.filter((t) => t.key === "all" || t.key === active || counts[t.key] > 0).map((t) => ({ ...t, count: counts[t.key] }));
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -172,13 +167,21 @@ function one(v: string | string[] | undefined): string | null {
 /// `clientId`, the name the review screen always used, and `client` as an
 /// alias, so a hand-typed link works too.
 export function parseApprovalsParams(params: Params): { tab: ApprovalTab; clientId: string | null } {
-  // "review" was the tab of the items not yet confirmed, until 22.10.2026.
-  const asked = one(params.tab);
-  const tab = asked === "review" ? "questions" : asked;
+  const tab = one(params.tab);
   return {
     tab: APPROVAL_TABS.some((t) => t.key === tab) ? (tab as ApprovalTab) : "all",
     clientId: one(params.clientId) ?? one(params.client),
   };
+}
+
+/// Where an old address of the questions goes now: "review" (until
+/// 22.10.2026) and "questions" (until 1.11.2026) open the client's page at
+/// its questions, or "אישורים" itself when no client is named.
+export function questionsRedirect(params: Params): string | null {
+  const tab = one(params.tab);
+  if (tab !== "review" && tab !== "questions") return null;
+  const clientId = one(params.clientId) ?? one(params.client);
+  return clientId ? `/app/clients/${encodeURIComponent(clientId)}?tab=file#client-questions` : "/app/approvals";
 }
 
 export function approvalsHref(tab: ApprovalTab, clientId: string | null): string {

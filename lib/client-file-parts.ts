@@ -46,6 +46,7 @@ export function sectionOfAnchor(anchor: string): FileSection {
   if (anchor === "processes") return "processes";
   if (anchor === "rules") return "rules";
   if (anchor === "client-pending") return "pending";
+  if (anchor === "client-questions") return "facts";
   return "all";
 }
 

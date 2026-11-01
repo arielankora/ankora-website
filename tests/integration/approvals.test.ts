@@ -7,7 +7,7 @@ import { requestException } from "@/lib/app-domain/policy-exceptions";
 import { collectApprovals, countApprovals, countApprovalsForClient, countMyPendingProposals } from "@/lib/app-domain/approvals";
 import { INTERNAL_NOTE, approveInternalRule, approveRuleDecision, confirmInternalSource } from "@/lib/app-domain/internal-client";
 import { SECONDARY_ONLY_TO_RESOLVE } from "@/lib/knowledge-sources";
-import { collectQuestionCards, createQuestionsTask, markQuestionsAsked } from "@/lib/app-domain/client-questions";
+import { askClientAbout, checkQuestionOurselves, collectQuestionCards, createQuestionsTask, dismissQuestion, listUncertainItems, markQuestionsAsked, snoozeQuestion } from "@/lib/app-domain/client-questions";
 import { approveRulesTogether, runStep } from "@/lib/app-domain/process-next-steps";
 import { addClientFact } from "@/lib/app-domain/client-facts";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
@@ -104,14 +104,21 @@ describe("approvals", () => {
     expect((await mine(ariel, client.id)).find((i) => i.kind === "procedure")?.actions.approve).toBe("אישור הנוהל");
   });
 
-  it("puts what is not yet confirmed on its owner's card, as questions to the client", async () => {
+  it("puts on the card only what somebody meant to ask: open questions, and items chosen to ask about", async () => {
     const { client, ariel, anna, hadas, unsure } = await setup();
+    // 1.11.2026: an uncertain item alone is not a question.
+    expect((await collectQuestionCards(ariel, { scope: "all" })).filter((c) => c.clientId === client.id)).toEqual([]);
+    expect((await listUncertainItems(hadas, client.id)).map((i) => i.id)).toContain(unsure.id);
+
+    await askClientAbout(hadas, client.id, [unsure.id]);
+    expect((await listUncertainItems(hadas, client.id)).map((i) => i.id)).not.toContain(unsure.id);
     // No owner and no account manager: on nobody's own card, only in everyone's.
     expect((await collectQuestionCards(ariel)).filter((c) => c.clientId === client.id)).toEqual([]);
     const all = (await collectQuestionCards(ariel, { scope: "all" })).filter((c) => c.clientId === client.id);
     expect(all.flatMap((c) => c.items.map((i) => i.id))).toContain(unsure.id);
-    // Not a manager: never everyone's.
+    // Not a manager: never everyone's across clients, but all of a client's cards on its page.
     expect((await collectQuestionCards(hadas, { scope: "all" })).filter((c) => c.clientId === client.id)).toEqual([]);
+    expect((await collectQuestionCards(anna, { scope: "client", clientId: client.id })).flatMap((c) => c.items.map((i) => i.id))).toContain(unsure.id);
 
     await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
     const [card] = (await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id);
@@ -119,15 +126,75 @@ describe("approvals", () => {
     expect(card.items.find((i) => i.id === unsure.id)).toMatchObject({ what: "כלל", toResolve: "לשאול את אורן", href: `/app/clients/${client.id}?tab=file#item-${unsure.id}`, askedAt: null });
     expect((await collectQuestionCards(anna)).filter((c) => c.clientId === client.id)).toEqual([]);
 
-    // An open question goes on the card of whoever chases it.
+    // An open question goes on the card of whoever chases it, with nobody choosing.
     const q = await addClientFact(anna, { clientId: client.id, kind: "QUESTION", body: "מי מורשה החתימה בבנק", assigneeId: hadas.id, sources: [{ code: "S1" }] });
     const again = (await collectQuestionCards(hadas)).find((c) => c.clientId === client.id)!;
     expect(again.items.map((i) => i.id)).toEqual(expect.arrayContaining([unsure.id, q.id]));
     expect(again.items.find((i) => i.id === q.id)?.isQuestion).toBe(true);
   });
 
+  it("closes a line as not relevant, with why: a question keeps it as its answer, an item only leaves the card", async () => {
+    const { client, hadas, unsure } = await setup();
+    const q = await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "לזהות את הכאב לפי המשרות", assigneeId: hadas.id, sources: [{ code: "S1" }] });
+    await askClientAbout(hadas, client.id, [unsure.id]);
+    await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
+
+    await expect(dismissQuestion(hadas, client.id, q.id, "  ")).rejects.toThrow("בשורה אחת");
+    await dismissQuestion(hadas, client.id, q.id, "לא נבדק, ואין זמן עכשיו");
+    expect(await prisma.clientFact.findUniqueOrThrow({ where: { id: q.id } })).toMatchObject({ answer: "לא רלוונטי: לא נבדק, ואין זמן עכשיו.", knowledgeStatus: "CONFIRMED" });
+    await expect(dismissQuestion(hadas, client.id, q.id, "שוב")).rejects.toThrow("כבר נסגרה");
+
+    await dismissQuestion(hadas, client.id, unsure.id, "נבדק בפגישה הבאה");
+    // The item itself stays uncertain in the file, and can be asked about again.
+    expect((await prisma.clientPolicy.findUniqueOrThrow({ where: { id: unsure.id } })).knowledgeStatus).toBe("UNCERTAIN");
+    expect((await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id)).toEqual([]);
+    expect((await listUncertainItems(hadas, client.id)).map((i) => i.id)).toContain(unsure.id);
+    expect(await prisma.auditEvent.count({ where: { action: "client_fact.dismiss_question", entityId: q.id } })).toBe(1);
+  });
+
+  it("makes a line a task of ours, and it leaves the card", async () => {
+    const { client, hadas, unsure } = await setup();
+    const q = await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "מי מורשה החתימה", assigneeId: hadas.id, sources: [{ code: "S1" }] });
+    await askClientAbout(hadas, client.id, [unsure.id]);
+    await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
+
+    const fromQuestion = await checkQuestionOurselves(hadas, client.id, q.id);
+    expect((await prisma.clientFact.findUniqueOrThrow({ where: { id: q.id } })).taskId).toBe(fromQuestion.taskId);
+    const fromItem = await checkQuestionOurselves(hadas, client.id, unsure.id);
+    const task = await prisma.task.findUniqueOrThrow({ where: { id: fromItem.taskId } });
+    expect(task).toMatchObject({ clientId: client.id, assignedToId: hadas.id, title: "לבדוק בתיק: מתנות" });
+    expect(task.description).toContain("לשאול את אורן");
+    expect((await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id)).toEqual([]);
+  });
+
+  it("puts a line off to a date, and it comes back then", async () => {
+    const { client, hadas } = await setup();
+    const q = await addClientFact(hadas, { clientId: client.id, kind: "QUESTION", body: "לבדוק אחרי הכנס", assigneeId: hadas.id, sources: [{ code: "S1" }] });
+    const now = new Date();
+    await expect(snoozeQuestion(hadas, client.id, [q.id], new Date(now.getTime() - DAY))).rejects.toThrow("בעתיד");
+    const until = new Date(now.getTime() + 7 * DAY);
+    await snoozeQuestion(hadas, client.id, [q.id], until);
+    const [card] = (await collectQuestionCards(hadas)).filter((c) => c.clientId === client.id);
+    expect(card.items).toEqual([]);
+    expect(card.snoozed).toEqual([{ id: q.id, title: "לבדוק אחרי הכנס", until }]);
+    const later = (await collectQuestionCards(hadas, { now: new Date(until.getTime() + 1000) })).find((c) => c.clientId === client.id)!;
+    expect(later.items.map((i) => i.id)).toEqual([q.id]);
+    expect(later.snoozed).toEqual([]);
+  });
+
+  it("refuses the actions on an item of another client", async () => {
+    const { hadas, unsure } = await setup();
+    const other = await createTestClient({ name: "RIMED" });
+    await prisma.userClientAccess.create({ data: { userId: hadas.id, clientId: other.id } });
+    await expect(askClientAbout(hadas, other.id, [unsure.id])).rejects.toThrow();
+    await expect(dismissQuestion(hadas, other.id, unsure.id, "לא")).rejects.toThrow();
+    await expect(checkQuestionOurselves(hadas, other.id, unsure.id)).rejects.toThrow();
+    expect(await prisma.task.count({ where: { clientId: other.id } })).toBe(0);
+  });
+
   it("marks questions asked, by a copy or by a task to send them, and refuses items of another client", async () => {
     const { client, hadas, unsure } = await setup();
+    await askClientAbout(hadas, client.id, [unsure.id]);
     await prisma.clientPolicy.update({ where: { id: unsure.id }, data: { ownerId: hadas.id } });
     const other = await createTestClient({ name: "RIMED" });
     await expect(markQuestionsAsked(hadas, other.id, [unsure.id])).rejects.toThrow();

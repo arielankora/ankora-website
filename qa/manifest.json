@@ -2103,6 +2103,14 @@
       "risk": "high",
       "riskAssigned": true,
       "firstSeen": "2026-11-01"
+    },
+    "action:(product)/app/(authenticated)/clients/question-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01",
+      "riskReason": "שאלות ללקוח בדף הלקוח: סוגר שאלה פתוחה כלא רלוונטית עם סיבה, פותח משימה, דוחה שורה לתאריך ומוסיף פריט לא ודאי לשאלות. כל פעולה בודקת גישה ללקוח ושהפריט שלו, ונרשמת ביומן."
     }
   },
   "waivers": {},
