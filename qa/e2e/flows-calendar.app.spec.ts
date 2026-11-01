@@ -134,6 +134,11 @@ test("opening a task and going back keeps the view and the filters", async ({ pa
   await inPanel(page).locator("a").click();
   await page.waitForURL(new RegExp(`/app/tasks/${TASK}`), { timeout: 30_000 });
   await page.goBack({ waitUntil: "domcontentloaded" });
+  // The back is the App Router's own, inside the document, and goBack can
+  // return before the address changes: run #674 read the task's URL here.
+  // The task's address carries the calendar's only encoded, so this cannot
+  // match it early.
+  await page.waitForURL(/\/app\/calendar\?/, { timeout: 30_000 });
   expect(new URL(page.url()).search).toBe("?view=month&date=2030-01-08&show=tasks&mine=0&drawer=undated");
   await expect(page.getByTestId("calendar-title")).toHaveText(/ינואר 2030/, { timeout: 30_000 });
 });
