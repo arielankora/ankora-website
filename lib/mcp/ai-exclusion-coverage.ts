@@ -76,6 +76,9 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_employee_status: "marked lifecycle tasks are left out",
   record_pdf_signature: "refuses a marked document",
 
+  // lib/mcp/hour-bank-tools.ts
+  get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
+
   // lib/mcp/portal-tools.ts (the client's own connector)
   get_status: "a marked client gets no answer (portalAiBlocked); marked tasks are left out of the lists",
   "portal:list_tasks": "portalAiBlocked; marked tasks are left out",

@@ -354,6 +354,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-09-20"
     },
+    "domain:hour-bank-statement": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-01",
+      "riskReason": "get_hours_bank: the hour bank as of a date, read-only; must match the Hour Banks screen, and adjustments reach managers only, flagged as internal"
+    },
     "domain:important-dates": {
       "kind": "domain",
       "area": "app",
