@@ -153,3 +153,37 @@ export async function fetchRecordingAudio(
   const contentType = file.headers.get("content-type") ?? "audio/mpeg";
   return { bytes: await file.arrayBuffer(), contentType: contentType.startsWith("audio/") ? contentType : "audio/mpeg" };
 }
+
+// 1.11.2026 (communications screen): the recordings now load with every
+// view of the screen, next to the chat list, and Unipile counts requests
+// per route against a quota (see unipile.ts). So the list is kept in this
+// instance's memory for five minutes, and if a read fails (a 429 above
+// all) a list up to two hours old is shown instead of nothing. Like the
+// chat list, it holds only what the screen shows and is never written
+// anywhere.
+export const RECORDINGS_FRESH_MS = 5 * 60_000;
+export const RECORDINGS_MAX_AGE_MS = 2 * 60 * 60_000;
+let cachedRecordings: { accountId: string; at: number; recordings: Recording[] } | null = null;
+
+/// For tests: forget the remembered list.
+export function resetRecordingsCache(): void {
+  cachedRecordings = null;
+}
+
+export async function listRecordingsCached(
+  config: { apiKey: string; mailAccountId: string },
+  read: (config: { apiKey: string; mailAccountId: string }) => Promise<Recording[]> = (c) => listRecordings(c),
+  now: () => number = Date.now,
+): Promise<{ recordings: Recording[]; stale: boolean }> {
+  const cached = cachedRecordings && cachedRecordings.accountId === config.mailAccountId ? cachedRecordings : null;
+  const age = cached ? now() - cached.at : Infinity;
+  if (cached && age < RECORDINGS_FRESH_MS) return { recordings: cached.recordings, stale: false };
+  try {
+    const recordings = await read(config);
+    cachedRecordings = { accountId: config.mailAccountId, at: now(), recordings };
+    return { recordings, stale: false };
+  } catch (err) {
+    if (cached && age < RECORDINGS_MAX_AGE_MS) return { recordings: cached.recordings, stale: true };
+    throw err;
+  }
+}

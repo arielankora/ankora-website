@@ -67,7 +67,7 @@ function navItemsFor(role: User["role"], options: { whatsappPoc?: boolean } = {}
   // WhatsApp POC (1.11.2026): only for the addresses in
   // WHATSAPP_POC_VIEWERS (Ariel), the same list the screens check. Anyone
   // else neither sees the link nor gets past the screen's own gate.
-  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "WhatsApp (בדיקה)", group: "לקוחות" });
+  if (options.whatsappPoc) items.push({ href: "/app/whatsapp-poc", label: "תקשורת (בדיקה)", group: "לקוחות" });
 
   if (can(role, "time_entry.edit_others")) items.push({ href: "/app/time-entries", label: "דיווחי זמן", group: "בקרה" });
   if (can(role, "hour_bank.manage")) items.push({ href: "/app/hour-banks", label: "בנק שעות", group: "בקרה" });

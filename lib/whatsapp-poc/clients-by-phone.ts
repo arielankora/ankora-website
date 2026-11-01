@@ -1,7 +1,15 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
 
-export type PhoneMatch = { personName: string | null; clients: Array<{ id: string; name: string }> };
+export type PhoneMatch = {
+  personName: string | null;
+  clients: Array<{ id: string; name: string }>;
+  /// 1.11.2026 (communications screen): the person's other numbers, and
+  /// their entry in each client's file, so the screen can add a number to
+  /// the right person.
+  phones: string[];
+  contacts: Array<{ id: string; clientId: string }>;
+};
 
 /// Who a number belongs to in the client files: the person (Person.phones,
 /// stored in E.164) and every client whose file lists them. Read only.
@@ -15,15 +23,16 @@ export async function matchPhones(phones: string[]): Promise<Map<string, PhoneMa
     select: {
       name: true,
       phones: true,
-      contacts: { where: { deletedAt: null }, select: { client: { select: { id: true, name: true } } } },
+      contacts: { where: { deletedAt: null }, select: { id: true, client: { select: { id: true, name: true } } } },
     },
   });
   for (const person of people) {
     for (const phone of person.phones) {
       if (!wanted.includes(phone)) continue;
-      const existing = out.get(phone) ?? { personName: person.name, clients: [] };
+      const existing = out.get(phone) ?? { personName: person.name, clients: [], phones: person.phones, contacts: [] };
       for (const c of person.contacts) {
         if (!existing.clients.some((x) => x.id === c.client.id)) existing.clients.push(c.client);
+        existing.contacts.push({ id: c.id, clientId: c.client.id });
       }
       out.set(phone, existing);
     }
