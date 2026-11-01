@@ -24,7 +24,9 @@ export type NavCounters = {
   approvalsCount?: number;
 };
 
-/** Ticks a "H:MM" counter from an ISO start time - mirrors LiveTimerPill's own tick, kept separate since this one renders a shorter format for the nav row. */
+/** Ticks a "HH:MM:SS" counter from an ISO start time, mirroring LiveTimerPill's own tick.
+ * Until 1.11.2026 it printed HH:MM only, so for the whole first minute the
+ * row read "00:00" while the pill above counted seconds: it looked stuck. */
 function useTickingCounter(startAt: string | null | undefined): string | null {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -42,7 +44,8 @@ function useTickingCounter(startAt: string | null | undefined): string | null {
 function formatCounterTime(totalSeconds: number): string {
   const h = Math.floor(totalSeconds / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
-  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+  const sec = Math.floor(totalSeconds % 60);
+  return [h, m, sec].map((n) => String(n).padStart(2, "0")).join(":");
 }
 
 // App redesign (handoff README, App Shell section, "סייד־בר"): 252px,
