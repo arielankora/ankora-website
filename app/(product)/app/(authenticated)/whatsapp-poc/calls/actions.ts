@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { canViewWhatsappPoc } from "@/lib/whatsapp-poc/access";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
-import { TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
+import { TRANSCRIBE_MODELS, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
 import { UnipileError, isConfigured, readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { fetchVoiceNote } from "@/lib/whatsapp-poc/voice-notes";
 
@@ -33,9 +33,9 @@ export async function transcribeRecordingAction(
       action: "whatsapp_poc.recording_transcribed",
       entityType: "CallRecording",
       entityId: emailId,
-      after: { sizeBytes: audio.bytes.byteLength, model: "whisper-1" },
+      after: { sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const text = await transcribeHebrew(audio);
+    const { text } = await transcribeHebrew(audio);
     return { text: text || "(לא זוהה דיבור)" };
   } catch (err) {
     if (err instanceof UnipileError || err instanceof TranscriptionError) return { error: err.message };
@@ -65,9 +65,9 @@ export async function transcribeVoiceNoteAction(
       action: "whatsapp_poc.voice_note_transcribed",
       entityType: "WhatsAppChat",
       entityId: chatId,
-      after: { messageId, sizeBytes: audio.bytes.byteLength, model: "whisper-1" },
+      after: { messageId, sizeBytes: audio.bytes.byteLength, models: TRANSCRIBE_MODELS },
     });
-    const text = await transcribeHebrew(audio);
+    const { text } = await transcribeHebrew(audio);
     return { text: text || "(לא זוהה דיבור)" };
   } catch (err) {
     if (err instanceof UnipileError || err instanceof TranscriptionError) return { error: err.message };
