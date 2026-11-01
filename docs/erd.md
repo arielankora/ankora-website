@@ -75,6 +75,7 @@ erDiagram
         int tokenVersion
         int failedLoginAttempts
         datetime lockedUntil
+        string whatsappNumber "nullable, the number a task share opens a WhatsApp chat with, as typed on the profile screen"
         datetime deletedAt
     }
 
@@ -95,6 +96,8 @@ erDiagram
         string sourceKeywords "(list) words that name the client in a meeting title"
         string driveFolderId "nullable, the Drive folder its conversations are saved to"
         string conversationsDocId "nullable, the running conversations document"
+        bool aiExcluded "nothing of this client passes through AI: its tasks, documents and file"
+        bool procedureApprovalSeparation "whoever wrote a version of a procedure does not approve it, default false"
         datetime deletedAt
     }
 
@@ -141,6 +144,7 @@ erDiagram
         string source "local or external provider name"
         string externalRef "nullable"
         bool mappingTask "a handover mapping stage: what it learns goes to the client file before it closes"
+        bool aiExcluded "the client asked that this task stay away from AI; steps and documents inherit it"
         datetime deletedAt
     }
 
@@ -593,6 +597,7 @@ erDiagram
         string mimeType
         int sizeBytes "nullable"
         boolean clientVisible
+        boolean aiExcluded "this document stays away from AI, also when its task or client is excluded"
         string uploadedById FK "nullable"
         datetime createdAt
         datetime updatedAt
@@ -1042,6 +1047,7 @@ erDiagram
     Process ||--o{ ImportantDate : "has"
     Process ||--o{ ProcessCheck : "has"
     Process ||--o{ ProcessLesson : "has"
+    Process ||--o{ ProcessStrangerTest : "has"
     Process ||--o{ ProcessVersion : "has"
     Process ||--o{ RequestType : "has"
 
@@ -1214,6 +1220,37 @@ erDiagram
         datetime resolvedAt "nullable"
         string resolution "nullable"
     }
+
+    ProcessStrangerTest {
+        string id PK
+        string processId FK
+        string clientId
+        int version "nullable, the procedure version walked"
+        string summary "nullable"
+        string ranById "nullable"
+        string sourceCode "nullable, the source the answers are recorded under"
+        datetime createdAt
+    }
+
+    ProcessStrangerQuestion {
+        string id PK
+        string testId FK
+        string processId
+        string clientId
+        int step "nullable, 1-based, null for the process as a whole"
+        string severity "enum StrangerSeverity"
+        string askWho "enum StrangerAskWho"
+        string question
+        string status "enum StrangerQuestionStatus"
+        string answer "nullable"
+        string answeredById "nullable"
+        datetime answeredAt "nullable"
+        string factId "nullable, the fact the answer became"
+        string policyId "nullable, the rule the answer changed"
+        datetime createdAt
+    }
+
+    ProcessStrangerTest ||--o{ ProcessStrangerQuestion : "has"
 ```
 
 ### Internal suppliers: agreements
@@ -1300,6 +1337,9 @@ erDiagram
 | `SourceKind` | `TRANSCRIPT`, `CLIENT_DOCUMENT`, `TASK`, `PERSON`, `ANKORA_DOCUMENT`, `EMAIL` |
 | `SourceRestriction` | `NONE`, `TOPICS_ONLY` |
 | `SourceWeight` | `PRIMARY`, `SECONDARY` |
+| `StrangerAskWho` | `ANKORA`, `CLIENT` |
+| `StrangerQuestionStatus` | `OPEN`, `ANSWERED`, `NOT_RELEVANT`, `REPLACED` |
+| `StrangerSeverity` | `BLOCKER`, `SLOWS`, `IMPROVES` |
 | `SupplierExperience` | `GOOD`, `OK`, `AVOID` |
 | `SystemAccessStatus` | `HAS_ACCESS`, `PENDING`, `NO_ACCESS`, `NOT_NEEDED` |
 | `SystemPermission` | `NONE`, `VIEWER`, `USER`, `BILLING`, `ADMIN`, `OWNER` |
