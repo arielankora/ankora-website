@@ -6,6 +6,7 @@ import { canSendTo, canViewWhatsappPoc, checkMessageText, maskPhone } from "@/li
 import { UnipileError, getChat, isConfigured, readPocConfig, sendText } from "@/lib/whatsapp-poc/unipile";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { addClientContact, updateClientContact } from "@/lib/app-domain/client-contacts";
+import { addClientSource } from "@/lib/app-domain/client-sources";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { prisma } from "@/lib/prisma";
 
@@ -79,6 +80,25 @@ export async function assignNumberToClientAction(_prev: ContactState | undefined
   if (!name && !role) return { error: "צריך שם או תפקיד." };
 
   try {
+    // 1.11.2026 (Ariel): every item in a client's file names its source,
+    // and here the source is the person at Ankora who made the link. One
+    // entry per person, per client, per day in the client's source register.
+    const title = `שיוך מספר ממסך התקשורת, בידי ${user.name ?? user.email}`;
+    const today = new Date(new Date().toISOString().slice(0, 10) + "T00:00:00.000Z");
+    const existing = await prisma.clientSource.findFirst({
+      where: { clientId, title, occurredAt: today, deletedAt: null },
+      select: { code: true },
+    });
+    const source =
+      existing ??
+      (await addClientSource(user, {
+        clientId,
+        kind: "PERSON",
+        weight: "SECONDARY",
+        title,
+        occurredAt: today,
+        participants: [user.name ?? user.email],
+      }));
     await addClientContact(user, {
       clientId,
       name: name || null,
@@ -86,6 +106,7 @@ export async function assignNumberToClientAction(_prev: ContactState | undefined
       phones: [phone],
       knowledgeStatus: "UNCERTAIN",
       toResolve: "המספר שויך ממסך התקשורת. לאשר מול הלקוח.",
+      sources: [{ code: source.code }],
     });
   } catch (err) {
     return { error: contactError(err) };

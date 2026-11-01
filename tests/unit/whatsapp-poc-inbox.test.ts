@@ -154,3 +154,18 @@ describe("listRecordingsCached", () => {
     await expect(listRecordingsCached(cfg, read, () => t)).rejects.toThrow("429");
   });
 });
+
+import { displayPhone, isPlausiblePhone } from "@/lib/whatsapp-poc/inbox";
+
+describe("isPlausiblePhone", () => {
+  it("tells real numbers from WhatsApp's internal ids (1.11.2026)", () => {
+    expect(isPlausiblePhone("+972528549835")).toBe(true);
+    expect(isPlausiblePhone("+14155356690")).toBe(true);
+    expect(isPlausiblePhone("+995599601303")).toBe(true);
+    expect(isPlausiblePhone("+141167152890103")).toBe(false);
+    expect(isPlausiblePhone("+10394273849525")).toBe(false);
+    expect(isPlausiblePhone("+238349444976674")).toBe(false);
+    expect(displayPhone("+216256670072844")).toBe("מזהה WhatsApp (לא מספר טלפון)");
+    expect(displayPhone("+972528549835")).toBe("+972528549835");
+  });
+});

@@ -90,6 +90,28 @@ export function chatPhone(chat: Pick<InboxChat, "type" | "phone">): string | nul
   return phone && /^\+\d{8,15}$/.test(phone) ? phone : null;
 }
 
+/// Whether a "+digits" value looks like a real phone number, for display.
+///
+/// 1.11.2026: some WhatsApp chats carry an internal id (a "LID") where the
+/// number would be, and it comes out of normalizePhone as "+1411671528...".
+/// Those are 14 or 15 digits, or start with a country code that cannot be
+/// that long. They still identify the chat (and its block), so they are
+/// kept as they are; the screens just do not call them a phone number.
+export function isPlausiblePhone(phone: string | null | undefined): boolean {
+  if (!phone || !/^\+\d{8,15}$/.test(phone)) return false;
+  const digits = phone.slice(1);
+  if (digits.length >= 14) return false;
+  if (digits.startsWith("1")) return digits.length === 11;
+  if (digits.startsWith("972")) return digits.length === 11 || digits.length === 12;
+  return true;
+}
+
+/// A number as the screens show it: the number, or a plain word for an id.
+export function displayPhone(phone: string | null | undefined): string {
+  if (!phone) return "";
+  return isPlausiblePhone(phone) ? phone : "מזהה WhatsApp (לא מספר טלפון)";
+}
+
 export function formatDuration(seconds: number | null | undefined): string {
   if (!seconds || seconds < 0) return "";
   const s = Math.round(seconds);
@@ -137,7 +159,7 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
     if (!existing) {
       rows.set(key, {
         key,
-        name: owner?.personName ?? call.other,
+        name: owner?.personName ?? displayPhone(call.other),
         phone: call.other,
         chatId: null,
         channel: "call",
