@@ -10,6 +10,7 @@ import { extractionBrief } from "@/lib/app-domain/extraction-brief";
 import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import { extractPromptFor } from "@/lib/app-domain/extract-prompt-input";
 import { updateClient } from "@/lib/app-domain/clients";
+import { setClientDocumentAiExcluded } from "@/lib/app-domain/client-documents";
 import { AI_EXCLUDED_TOOL_MESSAGE, AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE, AI_EXCLUSION_ON_STEP_MESSAGE, AiExcludedError } from "@/lib/ai-exclusion";
 
 // "בלי AI" (28.10.2026): any staff member on the client marks, only a
@@ -59,6 +60,36 @@ describe("בלי AI", () => {
     const { hadas, task } = await setup();
     await updateTask(hadas, task.id, { aiExcluded: false });
     expect(await actions(task.id)).toEqual([]);
+  });
+
+  // 1.11.2026: the document's own mark had no test, and the weekly hunt's
+  // coverage floor said so (run #674: client-documents.ts 100% to 90.9%).
+  it("a document follows the task's rule: anyone on the client marks, only a manager clears", async () => {
+    const { client, hadas, ariel } = await setup();
+    const { user: outsider } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const doc = await prisma.clientDocument.create({ data: { clientId: client.id, title: "חוזה", driveFileId: "drive-contract", mimeType: "application/pdf" } });
+    const marked = async () => (await prisma.clientDocument.findUniqueOrThrow({ where: { id: doc.id } })).aiExcluded;
+
+    await expect(setClientDocumentAiExcluded(outsider, doc.id, true)).rejects.toThrow();
+    expect(await marked()).toBe(false);
+
+    await setClientDocumentAiExcluded(hadas, doc.id, true);
+    expect(await marked()).toBe(true);
+    // Unchanged: no write, no second line.
+    await setClientDocumentAiExcluded(hadas, doc.id, true);
+
+    await expect(setClientDocumentAiExcluded(hadas, doc.id, false)).rejects.toThrow(AI_EXCLUSION_CLEAR_FORBIDDEN_MESSAGE);
+    expect(await marked()).toBe(true);
+
+    await setClientDocumentAiExcluded(ariel, doc.id, false);
+    expect(await marked()).toBe(false);
+    expect(await actions(doc.id)).toEqual(["client_document.ai_excluded", "client_document.ai_included"]);
+  });
+
+  it("a deleted document cannot be marked", async () => {
+    const { client, hadas } = await setup();
+    const doc = await prisma.clientDocument.create({ data: { clientId: client.id, title: "ישן", driveFileId: "drive-old", mimeType: "application/pdf", deletedAt: new Date() } });
+    await expect(setClientDocumentAiExcluded(hadas, doc.id, true)).rejects.toThrow("המסמך לא נמצא.");
   });
 
   it("marking a client is logged on its own line", async () => {
