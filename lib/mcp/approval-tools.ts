@@ -42,7 +42,7 @@ function serializeProposal(base: string, p: ProposalForAi) {
     kind: p.kind,
     action: p.action,
     ...(p.hiddenFor
-      ? { hidden: `Sensitive. Only ${p.hiddenFor} may read and decide it.` }
+      ? { hidden: `פריט רגיש. רק ${p.hiddenFor} רואה אותו ומחליט עליו.` }
       : {
           says: p.headline,
           why: p.reason,
@@ -68,11 +68,15 @@ function serializeItem(base: string, i: ApprovalItem, timeZone: string, proposal
     recommend: i.recommend ? `${i.recommend.text}${i.recommend.why ? `. ${i.recommend.why}` : ""}` : undefined,
     blocked: i.blocked ?? undefined,
     // What decide_approval can do with it, in the screen's own words.
-    approve: i.actions.approve ?? undefined,
-    reject: i.actions.reject ? { label: i.actions.reject.label, needsReason: i.actions.reject.note } : undefined,
+    // Always present, null when the row has no such button here (a process
+    // step fixed on the process, a batch decided proposal by proposal), so
+    // "no button" is said rather than left out.
+    approve: i.actions.approve ?? null,
+    reject: i.actions.reject ? { label: i.actions.reject.label, needsReason: i.actions.reject.note } : null,
     elsewhere: !i.actions.approve && !i.actions.reject && i.kind !== "knowledge" ? (i.go ? `${i.go.label}: ${appUrl(base, i.go.href)}` : "Decided on its own screen; open the link.") : undefined,
     url: approvalRowUrl(base, i),
-    openItem: appUrl(base, i.href),
+    // A batch's own place is its card on the review, not the tab.
+    openItem: i.kind === "knowledge" && i.clientId ? batchUrl(base, i.clientId, i.id) : appUrl(base, i.href),
     proposals: proposals?.map((p) => serializeProposal(base, p)),
   };
 }
@@ -83,7 +87,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "List what waits on my approval",
       description:
-        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, what approving and rejecting do, and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
+        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
       inputSchema: z.object({
         client: z.string().optional().describe("Only this client, as the user said it."),
         kind: z.enum(KINDS).optional().describe("Only this kind of row."),
@@ -135,7 +139,7 @@ export function registerApprovalTools(server: McpServer): void {
         const base = appBaseUrl();
         if (args.kind === "knowledge") return toolText("Proposals to a client file are decided one by one with decide_knowledge_proposals, by their proposalId from list_approvals.");
         const row = await findApprovalForAi(actor, args.kind, args.id);
-        if (!row) return toolText("That row is not waiting on you now: it was decided already, or it is not yours to decide. Call list_approvals for what waits. Nothing was changed.");
+        if (!row) return toolText("No row with this kind and id is waiting on you: the id is wrong, it was already decided, or it waits on someone else. Call list_approvals for what waits now. Nothing was changed.");
         const offered = args.decision === "approve" ? row.actions.approve : row.actions.reject?.label;
         if (!offered) {
           const where = row.go ? ` ${row.go.label}: ${appUrl(base, row.go.href)}` : ` Open it: ${appUrl(base, row.href)}`;
@@ -165,7 +169,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Decide proposals to a client file",
       description:
-        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source, "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
+        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. Each result has `url` (the proposal on its card), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
       inputSchema: z.object({
         proposalIds: z.array(z.string().min(1)).min(1).max(MAX_PROPOSALS).describe("The proposals, by proposalId. Never typed or guessed."),
         decision: z.enum(["approve", "reject", "already_in_file", "task"]),
@@ -188,7 +192,15 @@ export function registerApprovalTools(server: McpServer): void {
               if (alone) throw new Error(`Approved only on its own (${alone}). Show it to the user, then call again with this id alone.`);
             }
             const r = await decideProposalForAi(actor, id, args.decision, args.reason ?? null);
-            done.push({ proposalId: id, says: r.headline, url: batchUrl(base, r.clientId, r.batchId), ...(r.taskId ? { task: appUrl(base, `/app/tasks/${r.taskId}`) } : {}) });
+            done.push({
+              proposalId: id,
+              says: r.headline,
+              // The proposal on its card. Once every proposal of a batch is
+              // decided the card leaves the review, so the result is below.
+              url: proposalUrl(base, r.clientId, id),
+              ...(r.resultId ? { result: appUrl(base, `/app/clients/${encodeURIComponent(r.clientId)}?tab=file#item-${r.resultId}`) } : {}),
+              ...(r.taskId ? { task: appUrl(base, `/app/tasks/${r.taskId}`) } : {}),
+            });
           } catch (err) {
             failed.push({ proposalId: id, error: err instanceof Error ? err.message : "Something went wrong." });
           }
