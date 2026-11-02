@@ -28,11 +28,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 type MailConfig = { apiKey: string; mailAccountId: string };
 
-export function readCallStoreConfig(): { mail: MailConfig | null; line: string | null; driveFolder: string | null } {
+export function readCallStoreConfig(): { mail: MailConfig | null; lines: string[]; driveFolder: string | null } {
   const config = readPocConfig();
   return {
     mail: config.apiKey && config.mailAccountId ? { apiKey: config.apiKey, mailAccountId: config.mailAccountId } : null,
-    line: config.lineNumber,
+    lines: config.lineNumbers,
     driveFolder: process.env.GOOGLE_DRIVE_FOLDER_CALL_RECORDINGS?.trim() || null,
   };
 }
@@ -63,14 +63,14 @@ export type StoreResult = "stored" | "exists" | "not-a-recording";
 /// second call finds the row and stops, and two calls racing meet on the
 /// unique email id.
 export async function storeRecording(emailId: string): Promise<StoreResult> {
-  const { mail, line, driveFolder } = readCallStoreConfig();
+  const { mail, lines, driveFolder } = readCallStoreConfig();
   if (!mail) return "not-a-recording";
   if (await prisma.callRecording.findUnique({ where: { emailId }, select: { id: true } })) return "exists";
 
   const found = await fetchRecording(mail, emailId);
   if (!found) return "not-a-recording";
   const { recording, audio } = found;
-  const side = callSide(recording, line);
+  const side = callSide(recording, lines);
 
   let driveFileId: string | null = null;
   if (driveFolder) {

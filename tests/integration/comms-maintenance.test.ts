@@ -8,7 +8,7 @@ vi.mock("@/lib/google-drive", () => ({
   removeDriveFile: async () => ({ ok: true, how: "deleted" }),
 }));
 
-import { sweepEndedEngagements } from "@/lib/comms/maintenance";
+import { repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
 
 // 30 days after a client's engagement ends (archived), what was kept of its
 // people goes, unless the number also belongs to a current client.
@@ -54,5 +54,27 @@ describe("sweepEndedEngagements", () => {
     expect(report).toEqual({ clients: 1, recordings: 1, conversations: 1 });
     expect((await prisma.callRecording.findMany()).map((r) => r.emailId)).toEqual(["e-shared"]);
     expect(await prisma.commsConversation.count()).toBe(0);
+  });
+});
+
+describe("repairCallLines", () => {
+  it("puts right a call stored before its line was configured", async () => {
+    const anna = "+972553356775";
+    await prisma.callRecording.create({
+      data: {
+        emailId: "e-unknown",
+        mailAccountId: "acc_m",
+        fromPhone: anna,
+        toPhone: "+972549999999",
+        otherPhone: anna,
+        direction: "UNKNOWN",
+        callAt: new Date("2026-11-02T08:00:00Z"),
+      },
+    });
+    expect(await repairCallLines(["+972553302266"])).toEqual({ repaired: 0 });
+    expect(await repairCallLines(["+972553302266", anna])).toEqual({ repaired: 1 });
+    const fixed = await prisma.callRecording.findUniqueOrThrow({ where: { emailId: "e-unknown" } });
+    expect(fixed.direction).toBe("OUT");
+    expect(fixed.otherPhone).toBe("+972549999999");
   });
 });
