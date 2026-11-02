@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readinessLabel, runBlocker, runReadiness, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
+import { readinessLabel, runBlocker, runBlockers, runReadiness, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
 import { completeness, documentation, documentationLine, processGaps, readNotApplicable, type CompletenessInput } from "@/lib/process-rules";
 
 // 25.10.2026 (Ariel: "there is always something missing"): whether a
@@ -23,6 +23,20 @@ describe("run readiness", () => {
     expect(runBlocker({ ...runs, status: "PAUSED" })).toBe("לא ירוץ: התהליך מושהה");
     expect(runBlocker({ ...runs, status: "RETIRED" })).toBe("לא ירוץ: התהליך בוטל");
     expect(readinessLabel(runReadiness({ ...runs, status: "DRAFT" }))).toBe("לא ירוץ: אין נוהל מאושר");
+  });
+
+  // 2.11.2026: P7 of Ankora's own file, in force with no trigger written and
+  // no date, read as missing one thing while "אישורים" listed two.
+  it("lists every reason, the first to fix leading", () => {
+    expect(runBlockers(runs)).toEqual([]);
+    expect(runBlockers({ ...runs, triggerText: null, nextDate: null })).toEqual(["לא ירוץ: לא כתוב מה מפעיל אותו", SCHEDULED_NO_DATE_BLOCKER]);
+    expect(runBlockers({ ...runs, ownerId: null, status: "DRAFT", triggerKinds: [] })).toEqual(["לא ירוץ: אין אחראי", "לא ירוץ: לא כתוב מה מפעיל אותו", "לא ירוץ: אין נוהל מאושר"]);
+    // A draft's missing date waits for its approval, as before.
+    expect(runBlockers({ ...runs, status: "DRAFT", nextDate: null })).toEqual(["לא ירוץ: אין נוהל מאושר"]);
+    // Retired or paused: that reason alone.
+    expect(runBlockers({ ...runs, status: "PAUSED", ownerId: null })).toEqual(["לא ירוץ: התהליך מושהה"]);
+    // The one reason the screen shows is the first of them.
+    expect(runBlocker({ ...runs, triggerText: null, nextDate: null })).toBe(runBlockers({ ...runs, triggerText: null, nextDate: null })[0]);
   });
 });
 

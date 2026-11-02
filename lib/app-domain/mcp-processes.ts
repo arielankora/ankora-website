@@ -1,5 +1,5 @@
 import "server-only";
-import { readinessLabel } from "@/lib/process-readiness";
+import { readinessLabel, runBlockers } from "@/lib/process-readiness";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/email-templates";
@@ -57,6 +57,8 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
     handover: TRANSITION_LABELS[p.transitionStatus],
     // 25.10.2026: whether it runs, and how well it is written down.
     runs: readinessLabel(p.readiness),
+    // 2.11.2026: every reason, not only the first the screen shows.
+    notRunningBecause: runBlockers({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: p.nextDate }),
     documentation: `${p.documentation.score}/${p.documentation.of}`,
     // 31.10.2026: could a stranger run it? What is still open.
     strangerTest: strangerLine(stranger.get(p.id) ?? null),
