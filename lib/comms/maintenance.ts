@@ -6,6 +6,7 @@ import { callSide, fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { readCallStoreConfig } from "./call-store";
 import { copyVoiceToDrive } from "./whatsapp-store";
+import { ENGAGEMENT_END_GRACE_DAYS } from "./engagement";
 
 // Communications storage, nightly upkeep (1.11.2026):
 //   - copies to Drive that failed on arrival are made again;
@@ -14,7 +15,7 @@ import { copyVoiceToDrive } from "./whatsapp-store";
 //     הלקוח יכול לקבל ייצוא בתוך 30 יום, ואחר כך הכל נמחק").
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-export const ENGAGEMENT_END_GRACE_DAYS = 30;
+export { ENGAGEMENT_END_GRACE_DAYS };
 
 /// Calls stored before their line was configured (2.11.2026: Anna's line
 /// joined Hadas's) carry no direction, and their "other side" may be our

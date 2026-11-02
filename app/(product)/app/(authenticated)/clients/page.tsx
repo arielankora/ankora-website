@@ -1,5 +1,6 @@
 import { requireUser } from "@/lib/app-auth/session";
-import { can } from "@/lib/app-auth/permissions";
+import { can, canManageClients } from "@/lib/app-auth/permissions";
+import { engagementDeletesOn } from "@/lib/comms/engagement";
 import { listClients, listArchivedClients } from "@/lib/app-domain/clients";
 import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
 import { Forbidden } from "@/components/app/Forbidden";
@@ -36,6 +37,11 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
   const canManageBanks = can(user.role, "hour_bank.manage");
   const canViewReports = can(user.role, "report.internal.view");
   const [clients, archived] = await Promise.all([listClients(), listArchivedClients(user)]);
+  // 2.11.2026: an archived client's conversations and recordings are kept
+  // 30 days for the export, then deleted. Managers export them from here.
+  const manager = canManageClients(user.role);
+  const exportDeadline = (archivedAt: Date) =>
+    new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(engagementDeletesOn(archivedAt));
 
   // One batched lookup for the whole list.
   //
@@ -93,7 +99,18 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
               {archived.map((c) => (
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <span className="text-sm text-app-text-primary">{c.name}</span>
-                  <RestoreClientButton clientId={c.id} />
+                  <span className="flex flex-wrap items-center gap-3">
+                    {manager && c.deletedAt ? (
+                      <a
+                        href={`/api/clients/${c.id}/comms-export`}
+                        className="inline-flex min-h-11 items-center text-sm text-app-text-accent hover:underline"
+                        title={`השיחות וההקלטות נמחקות ב-${exportDeadline(c.deletedAt)}`}
+                      >
+                        ייצוא שיחות והקלטות (עד {exportDeadline(c.deletedAt)})
+                      </a>
+                    ) : null}
+                    <RestoreClientButton clientId={c.id} />
+                  </span>
                 </li>
               ))}
             </ul>
