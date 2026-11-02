@@ -30,15 +30,25 @@ export function scheduledWithoutDate(p: { status: string; triggerKinds?: readonl
   return p.status === "ACTIVE" && (p.triggerKinds ?? []).includes("SCHEDULED") && !p.nextDate;
 }
 
+/// Every reason it will not run, the one to fix first leading; empty when
+/// it runs (2.11.2026). The screen shows the first only, as above. Claude
+/// gets them all: a process in force with no trigger written AND no date
+/// read as missing one thing, while "אישורים" listed two. A process that is
+/// retired or paused has that reason alone: the rest is moot until then.
+export function runBlockers(p: ReadinessInput): string[] {
+  if (p.status === "RETIRED") return ["לא ירוץ: התהליך בוטל"];
+  if (p.status === "PAUSED") return ["לא ירוץ: התהליך מושהה"];
+  const out: string[] = [];
+  if (!p.ownerId) out.push("לא ירוץ: אין אחראי");
+  if (p.triggerKinds.length === 0 || !p.triggerText?.trim()) out.push("לא ירוץ: לא כתוב מה מפעיל אותו");
+  if (p.status !== "ACTIVE") out.push("לא ירוץ: אין נוהל מאושר");
+  if (scheduledWithoutDate(p)) out.push(SCHEDULED_NO_DATE_BLOCKER);
+  return out;
+}
+
 /// The one reason it will not run, the one to fix first; null when it runs.
 export function runBlocker(p: ReadinessInput): string | null {
-  if (p.status === "RETIRED") return "לא ירוץ: התהליך בוטל";
-  if (p.status === "PAUSED") return "לא ירוץ: התהליך מושהה";
-  if (!p.ownerId) return "לא ירוץ: אין אחראי";
-  if (p.triggerKinds.length === 0 || !p.triggerText?.trim()) return "לא ירוץ: לא כתוב מה מפעיל אותו";
-  if (p.status !== "ACTIVE") return "לא ירוץ: אין נוהל מאושר";
-  if (scheduledWithoutDate(p)) return SCHEDULED_NO_DATE_BLOCKER;
-  return null;
+  return runBlockers(p)[0] ?? null;
 }
 
 export function runReadiness(p: ReadinessInput): RunReadiness {
