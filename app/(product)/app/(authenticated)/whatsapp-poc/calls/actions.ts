@@ -2,6 +2,7 @@
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { commsAccess } from "@/lib/comms/access";
+import { mayHearCall } from "@/lib/comms/call-access";
 import { accountForChatFile } from "@/lib/comms/route-access";
 import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { TRANSCRIBE_MODELS, TranscriptionError, transcribeHebrew } from "@/lib/whatsapp-poc/transcribe";
@@ -22,16 +23,20 @@ export async function transcribeRecordingAction(
 ): Promise<TranscribeState> {
   const user = await requireUser();
   const config = readPocConfig();
-  if (!(await commsAccess(user)).allowed) return { error: "אין הרשאה." };
+  const access = await commsAccess(user);
+  if (!access.allowed) return { error: "אין הרשאה." };
   if (!config.apiKey || !config.mailAccountId) return { error: "ההקלטות לא מוגדרות בסביבה הזו." };
   if (!config.hasOpenAiKey) return { error: "התמלול לא מוגדר בסביבה הזו." };
 
-  const emailId = String(formData.get("emailId") || "");
+  const emailId = String(formData.get("emailId") || "").slice(0, 1000);
 
   // 1.11.2026: a stored recording is transcribed on arrival; this button
   // is the retry for one that failed, and its result is saved with it. A
   // number of a client marked "בלי AI" is never sent.
   const stored = await prisma.callRecording.findUnique({ where: { emailId }, include: { transcript: true } });
+  // 2.11.2026: only a call this person may see (their line, their client,
+  // or all of them for the full and call viewers), as the audio route.
+  if (!(await mayHearCall(access, user.id, stored))) return { error: "אין הרשאה." };
   if (stored && (await isAiExcludedNumber(stored.otherPhone))) return { error: "הלקוח מסומן \"בלי AI\". ההקלטה לא נשלחת לתמלול." };
 
   try {

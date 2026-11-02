@@ -62,8 +62,13 @@ describe("WhatsApp POC: which way a call went", () => {
   const rec = { from: "+972541111111", to: "+972552222222", callAt: "2026-10-29T12:53:07.000Z" };
 
   it("sees an incoming and an outgoing call from our line", () => {
-    expect(callSide(rec, "+972552222222")).toEqual({ direction: "in", other: "+972541111111" });
-    expect(callSide(rec, "+972541111111")).toEqual({ direction: "out", other: "+972552222222" });
+    expect(callSide(rec, "+972552222222")).toEqual({ direction: "in", other: "+972541111111", line: "+972552222222" });
+    expect(callSide(rec, "+972541111111")).toEqual({ direction: "out", other: "+972552222222", line: "+972541111111" });
+  });
+
+  it("knows a call on any of several lines, and which line it was", () => {
+    expect(callSide(rec, ["+972550000000", "+972552222222"])).toEqual({ direction: "in", other: "+972541111111", line: "+972552222222" });
+    expect(callSide(rec, ["+972550000000"])).toEqual({ direction: "unknown", other: "+972541111111", line: null });
   });
 
   it("says it does not know when no line is set", () => {
