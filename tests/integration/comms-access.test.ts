@@ -11,6 +11,7 @@ beforeEach(() => {
   process.env.UNIPILE_API_KEY = "k";
   process.env.WHATSAPP_POC_VIEWERS = "";
   process.env.COMMS_CALL_VIEWERS = "";
+  process.env.ALOHA_LINE_OWNERS = "";
 });
 
 describe("commsAccess", () => {
@@ -37,6 +38,23 @@ describe("commsAccess", () => {
     const limited = { allowed: true, full: false, manager: false, allCalls: false, ownedChannelIds: [] };
     expect(canSeeCall(limited, "m1", [{ accountManagerId: "m1" }])).toBe(true);
     expect(canSeeCall(limited, "m1", [{ accountManagerId: "m2" }])).toBe(false);
+  });
+});
+
+describe("line owners (2.11.2026)", () => {
+  it("opens the screen to a line's owner and shows her every call on her line, not on another's", async () => {
+    const { user: anna } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    process.env.COMMS_FULL_VIEWERS = "";
+    process.env.ALOHA_LINE_OWNERS = `+972553356775=${anna.email},+972553302266=hadas@example.com`;
+    const access = await commsAccess(anna);
+    expect(access.allowed).toBe(true);
+    expect(access.allCalls).toBe(false);
+    expect(access.ownedLines).toEqual(["+972553356775"]);
+    expect(canSeeCall(access, anna.id, [], "+972553356775")).toBe(true);
+    expect(canSeeCall(access, anna.id, [], "+972553302266")).toBe(false);
+    expect(canSeeCall(access, anna.id, [], null)).toBe(false);
+    // Her clients' calls stay hers on any line.
+    expect(canSeeCall(access, anna.id, [{ accountManagerId: anna.id }], "+972553302266")).toBe(true);
   });
 });
 

@@ -517,7 +517,7 @@ export function ReviewBatch({
     }, {})
   );
   return (
-    <section id={batchId ? batchAnchor(batchId) : undefined} className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6">
+    <section id={batchId ? batchAnchor(batchId) : undefined} className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6 target:border-app-accent target:ring-2 target:ring-app-accent">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs text-app-text-tertiary">

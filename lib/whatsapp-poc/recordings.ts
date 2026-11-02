@@ -50,13 +50,18 @@ export function parseRecordingEmail(subject: string, bodyPlain: string): ParsedR
   return { from, to, callAt: new Date(utc.getTime() + Number(ss) * 1000).toISOString() };
 }
 
-/// The other side of the call, and which way it went, seen from our line.
-/// With no line configured, or a call that does not touch it, the
-/// direction is unknown and both numbers stay visible.
-export function callSide(rec: ParsedRecording, line: string | null): { direction: "in" | "out" | "unknown"; other: string } {
-  if (line && rec.to === line) return { direction: "in", other: rec.from };
-  if (line && rec.from === line) return { direction: "out", other: rec.to };
-  return { direction: "unknown", other: rec.from };
+/// The other side of the call, which way it went, and which of our lines
+/// it was on. Several lines (2.11.2026: Hadas's and Anna's numbers) each
+/// count as ours. With no line configured, or a call that touches none of
+/// them, the direction is unknown and both numbers stay visible.
+export function callSide(
+  rec: ParsedRecording,
+  lines: string | readonly string[] | null,
+): { direction: "in" | "out" | "unknown"; other: string; line: string | null } {
+  const ours = lines === null ? [] : typeof lines === "string" ? [lines] : lines;
+  if (ours.includes(rec.to)) return { direction: "in", other: rec.from, line: rec.to };
+  if (ours.includes(rec.from)) return { direction: "out", other: rec.to, line: rec.from };
+  return { direction: "unknown", other: rec.from, line: null };
 }
 
 export type Recording = ParsedRecording & {

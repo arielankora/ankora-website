@@ -8,6 +8,7 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { canSendTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
+import { storedCallLine } from "@/lib/comms/call-lines";
 import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
 import { matchPhones, type PhoneMatch } from "@/lib/whatsapp-poc/clients-by-phone";
 import { normalizePhone } from "@/lib/contact-normalize";
@@ -237,6 +238,8 @@ type PageCall = InboxCall & {
   /// Null for a recording read live from the mailbox (nothing stored yet).
   transcript: { status: TranscriptStatus; text: string | null } | null;
   audioRemoved: boolean;
+  /// Which of our lines the call was on, when known.
+  line: string | null;
 };
 
 /// What sits under a recording's player: the stored transcript, its state,
@@ -325,6 +328,7 @@ export default async function CommunicationsPage(props: {
       callAt: r.callAt.toISOString(),
       direction: DIRECTION_FROM_DB[r.direction],
       other: r.otherPhone,
+      line: storedCallLine(r),
       sizeBytes: r.sizeBytes,
       durationSec: r.durationSec,
       transcript: r.transcript,
@@ -339,12 +343,13 @@ export default async function CommunicationsPage(props: {
       callsError = err.message;
     }
     calls = recordings.map((r) => {
-      const side = callSide(r, config.lineNumber);
+      const side = callSide(r, config.lineNumbers);
       return {
         emailId: r.emailId,
         callAt: r.callAt,
         direction: side.direction,
         other: side.other,
+        line: side.line,
         sizeBytes: r.sizeBytes,
         durationSec: null,
         transcript: null,
@@ -353,8 +358,9 @@ export default async function CommunicationsPage(props: {
     });
   }
 
-  // Each call only to whom may see it: the full viewers and the line's
-  // people see all, an account manager the calls of their clients.
+  // Each call only to whom may see it: the full viewers and the call
+  // viewers see all, a line's owner every call on their line, an account
+  // manager the calls of their clients.
   if (!access.allCalls && calls.length > 0) {
     const callOwners = await matchPhones(calls.map((c) => c.other));
     const ids = [...new Set([...callOwners.values()].flatMap((o) => o.clients.map((c) => c.id)))];
@@ -362,7 +368,12 @@ export default async function CommunicationsPage(props: {
       (await prisma.client.findMany({ where: { id: { in: ids } }, select: { id: true, accountManagerId: true } })).map((c) => [c.id, c.accountManagerId]),
     );
     calls = calls.filter((c) =>
-      canSeeCall(access, user.id, (callOwners.get(c.other)?.clients ?? []).map((cl) => ({ accountManagerId: managers.get(cl.id) ?? null }))),
+      canSeeCall(
+        access,
+        user.id,
+        (callOwners.get(c.other)?.clients ?? []).map((cl) => ({ accountManagerId: managers.get(cl.id) ?? null })),
+        c.line,
+      ),
     );
   }
 

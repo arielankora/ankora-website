@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/lib/comms/call-store";
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
-import { completeDriveCopies, sweepEndedEngagements } from "@/lib/comms/maintenance";
+import { completeDriveCopies, repairCallLines, sweepEndedEngagements } from "@/lib/comms/maintenance";
 import { COMMS_CRON_STEPS, perChannelShare, stepBudget } from "@/lib/comms/cron-budget";
 import { prisma } from "@/lib/prisma";
 
@@ -36,6 +36,7 @@ export async function GET(request: Request) {
 
   try {
     const reconcile = await timed("reconcile", () => reconcileRecordings({ budgetMs: budget(COMMS_CRON_STEPS.reconcile) }));
+    const lines = await timed("lines", () => repairCallLines());
     // Stage 3: the WhatsApp history of each stored number, a little each
     // night until every chat has been read once.
     const channels = await prisma.commsChannel.findMany({ where: { storeEnabled: true } });
@@ -52,7 +53,7 @@ export async function GET(request: Request) {
       whatsapp: await sweepWhatsappRetention(),
       endedEngagements: await sweepEndedEngagements(),
     }));
-    const summary = { ok: true, reconcile, whatsapp, transcribe, driveCopies, retention, seconds, totalSeconds: Math.round((Date.now() - startedAt) / 1000) };
+    const summary = { ok: true, reconcile, lines, whatsapp, transcribe, driveCopies, retention, seconds, totalSeconds: Math.round((Date.now() - startedAt) / 1000) };
     console.log(`comms-recordings summary ${JSON.stringify(summary)}`);
     return NextResponse.json(summary);
   } catch (err) {

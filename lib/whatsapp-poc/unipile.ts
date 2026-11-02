@@ -28,6 +28,9 @@ export type PocConfig = {
   /// Stage 2: Ankora's own number on the Aloha line, to tell incoming
   /// calls from outgoing ones.
   lineNumber: string | null;
+  /// Every number of ours on the Aloha line (ALOHA_LINE_NUMBER may list
+  /// several, comma separated). lineNumber is the first of them.
+  lineNumbers: string[];
   /// Stage 2: transcription is offered only when this is set.
   hasOpenAiKey: boolean;
 };
@@ -46,6 +49,7 @@ export function readPocConfig(): PocConfig {
     sendTo: parsePhoneList(process.env.WHATSAPP_POC_SEND_TO),
     mailAccountId: accountIdFrom(process.env.ALOHA_UNIPILE_ACCOUNT_ID),
     lineNumber: parsePhoneList(process.env.ALOHA_LINE_NUMBER)[0] ?? null,
+    lineNumbers: parsePhoneList(process.env.ALOHA_LINE_NUMBER),
     hasOpenAiKey: Boolean(process.env.OPENAI_API_KEY?.trim()),
   };
 }

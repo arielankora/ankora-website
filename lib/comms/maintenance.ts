@@ -2,7 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { removeDriveFile, uploadLargeFileToDriveFolder } from "@/lib/google-drive";
-import { fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
+import { callSide, fetchRecordingAudio } from "@/lib/whatsapp-poc/recordings";
 import { UnipileError } from "@/lib/whatsapp-poc/unipile";
 import { readCallStoreConfig } from "./call-store";
 import { copyVoiceToDrive } from "./whatsapp-store";
@@ -16,6 +16,28 @@ import { ENGAGEMENT_END_GRACE_DAYS } from "./engagement";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 export { ENGAGEMENT_END_GRACE_DAYS };
+
+/// Calls stored before their line was configured (2.11.2026: Anna's line
+/// joined Hadas's) carry no direction, and their "other side" may be our
+/// own number. Once the line is listed in ALOHA_LINE_NUMBER, they are put
+/// right: the direction, and the real other side, which the list, the
+/// client match and the line owner's view all read.
+export async function repairCallLines(lines: readonly string[] = readCallStoreConfig().lines): Promise<{ repaired: number }> {
+  if (lines.length === 0) return { repaired: 0 };
+  const unknown = await prisma.callRecording.findMany({
+    where: { direction: "UNKNOWN", OR: [{ fromPhone: { in: [...lines] } }, { toPhone: { in: [...lines] } }] },
+    select: { id: true, fromPhone: true, toPhone: true },
+    take: 1000,
+  });
+  for (const rec of unknown) {
+    const side = callSide({ from: rec.fromPhone, to: rec.toPhone, callAt: "" }, lines);
+    await prisma.callRecording.update({
+      where: { id: rec.id },
+      data: { direction: side.direction === "in" ? "IN" : "OUT", otherPhone: side.other },
+    });
+  }
+  return { repaired: unknown.length };
+}
 
 /// Recordings and voice messages stored without their Drive copy (Drive
 /// was down, or the folder was not set yet). Their audio is still in the
