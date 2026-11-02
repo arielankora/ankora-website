@@ -158,6 +158,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
         shown.map(({ b, proposals }) => (
           <ReviewBatch
             key={b.id}
+            batchId={b.id}
             clientId={b.client.id}
             clientName={b.client.name}
             {...batchHeader(b)}

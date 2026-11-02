@@ -55,6 +55,7 @@ import { registerDocumentTools } from "@/lib/mcp/document-tools";
 import { registerClientFileTools } from "@/lib/mcp/client-file-tools";
 import { registerEmployeeTools } from "@/lib/mcp/employee-tools";
 import { registerHourBankTools } from "@/lib/mcp/hour-bank-tools";
+import { registerApprovalTools } from "@/lib/mcp/approval-tools";
 import { appBaseUrl } from "@/lib/email-templates";
 import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
 import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
@@ -1339,6 +1340,7 @@ export function registerAnkoraTools(server: McpServer): void {
   registerClientFileTools(server);
   registerEmployeeTools(server);
   registerHourBankTools(server);
+  registerApprovalTools(server);
 }
 
 export { TOOL_ANNOTATIONS, TEAM_TOOLS, WRITE_TOOLS } from "@/lib/mcp/annotations";

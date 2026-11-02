@@ -150,6 +150,13 @@ export const TOOL_ANNOTATIONS = {
   // Marks one upload reviewed; a second call is refused, not applied twice.
   dismiss_pdf_upload: WRITES,
   record_pdf_signature: { ...WRITES, idempotentHint: true },
+  // "אישורים" from Claude (lib/mcp/approval-tools.ts, 2.11.2026). The list
+  // reads. A decision is taken only on a row still waiting, so a second
+  // identical call is refused rather than applied twice. Each is a plain
+  // write, and the tool descriptions have the user asked before it.
+  list_approvals: READ_ONLY,
+  decide_approval: WRITES,
+  decide_knowledge_proposals: WRITES,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -189,6 +196,8 @@ export const WRITE_TOOLS = [
   "record_pdf_signature",
   "issue_agreement_upload_code",
   "dismiss_pdf_upload",
+  "decide_approval",
+  "decide_knowledge_proposals",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

@@ -1,4 +1,5 @@
 import "server-only";
+import { batchUrl } from "@/lib/approval-links";
 import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { z } from "zod";
@@ -323,13 +324,14 @@ export function registerClientFileTools(server: McpServer): void {
             { clientId: g.id, source: args.sourceCode && groups.size === 1 ? { code: args.sourceCode } : newSource!, note: args.note, via: "MCP", items: g.items },
             { indexes: g.indexes }
           );
-          batches.push({ client: g.name, ...result });
+          // 2.11.2026: the batch itself on the review screen, not the screen.
+          batches.push({ client: g.name, ...result, reviewUrl: result.batchId ? batchUrl(appBaseUrl(), g.id, result.batchId) : null });
         }
         const proposed = batches.reduce((n, b) => n + b.proposed, 0);
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
         const next =
           (proposed > 0
-            ? `${proposed} proposals are waiting for a person to approve them on Ankora's approvals screen (/app/approvals, tab "ידע מהחילוץ"). Nothing is in the file yet.`
+            ? `${proposed} proposals are waiting for a person to approve them: \`reviewUrl\` opens them on Ankora's approvals screen, and list_approvals with decide_knowledge_proposals decides them from here once the user says so. Nothing is in the file yet.`
             : "Nothing was proposed.") +
           (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "");
         return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });
@@ -366,7 +368,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "List a client's processes",
       description:
-        "The client's processes (P1, P2...), one line each: what it is for, its triggers, owner (and backup, only when one is set), where it stands in the handover, whether it runs (\"רץ\", or the one reason it will not: no owner, no trigger, no approved procedure, or a scheduled process with no date), how well it is documented (the documentation fields, less those marked not relevant), whether it needs review and why, the approved procedure's version, the next date and the last run. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
+        "The client's processes (P1, P2...), one line each: what it is for, its triggers, owner (and backup, only when one is set), where it stands in the handover, whether it runs (\"רץ\", or the one reason it will not: no owner, no trigger, no approved procedure, or a scheduled process with no date), how well it is documented (the documentation fields, less those marked not relevant), whether it needs review and why, the approved procedure's version, the next date, the last run, and `url`, a direct link to the process in the client's file. Use get_process for the steps. Sensitive processes, and restricted ones the user is not named on, are left out.",
       inputSchema: z.object({ client: z.string().describe("Client name, as the user said it.") }),
       annotations: TOOL_ANNOTATIONS.list_processes,
     },

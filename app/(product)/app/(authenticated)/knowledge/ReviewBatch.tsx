@@ -1,4 +1,5 @@
 "use client";
+import { batchAnchor, proposalAnchor } from "@/lib/approval-links";
 import { useState } from "react";
 import { Drawer, useDrawerClose } from "@/components/app/Drawer";
 import { useActionForm } from "@/components/app/useActionForm";
@@ -319,7 +320,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 
   if (p.state !== "PENDING") {
     return (
-      <li className="py-2.5 text-xs text-app-text-tertiary">
+      <li id={proposalAnchor(p.id)} className="py-2.5 text-xs text-app-text-tertiary scroll-mt-24 rounded-lg target:bg-app-accent-soft">
         {p.state === "APPROVED" ? (p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
@@ -334,7 +335,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 
   if (p.hiddenFor) {
     return (
-      <li className="py-3.5">
+      <li id={proposalAnchor(p.id)} className="py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
         <p className="text-xs text-app-text-tertiary">{kindLabel}</p>
         <p className="mt-0.5 text-sm text-app-text-secondary">פריט רגיש. רק {p.hiddenFor} רואה אותו ומחליט עליו.</p>
       </li>
@@ -345,7 +346,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   const blocked = p.flags.some((f) => f.block);
   const alone = bulkApproveBlocker(p);
   return (
-    <li className={`py-3.5 ${selected ? "bg-gold/[0.04]" : ""}`}>
+    <li id={proposalAnchor(p.id)} className={`py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${selected ? "bg-gold/[0.04]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <input
           type="checkbox"
@@ -451,6 +452,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 }
 
 export function ReviewBatch({
+  batchId,
   clientId,
   clientName,
   sourceLabel,
@@ -462,6 +464,8 @@ export function ReviewBatch({
   staff,
   meId,
 }: {
+  /// The batch, for the link that opens it (lib/approval-links.ts).
+  batchId?: string;
   clientId: string;
   clientName: string;
   sourceLabel: string;
@@ -513,7 +517,7 @@ export function ReviewBatch({
     }, {})
   );
   return (
-    <section className="rounded-2xl border border-app-border bg-white p-6">
+    <section id={batchId ? batchAnchor(batchId) : undefined} className="scroll-mt-24 rounded-2xl border border-app-border bg-white p-6">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs text-app-text-tertiary">
