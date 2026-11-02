@@ -1306,6 +1306,139 @@ erDiagram
 | `TaskBlocker` | `CLIENT`, `SUPPLIER`, `INTERNAL`, `OTHER` |
 | `TaskPriority` | `LOW`, `NORMAL`, `HIGH`, `URGENT` |
 
+### Communications: call recordings, transcripts and WhatsApp (November 2026)
+
+Stored copies of the Aloha line's call recordings and of the WhatsApp
+conversations of connected numbers, for the communications screen
+(`/app/whatsapp-poc`) and, later, for extraction into the client file.
+Audio files live in Google Drive (`driveFileId`); the database keeps the
+metadata, the message text and the transcripts. Retention is enforced by
+the nightly `/api/cron/comms-recordings` job: audio 12 months, text while
+the engagement is active plus 30 days, unassigned chats 12 months without
+activity.
+
+```mermaid
+erDiagram
+    CallRecording ||--o| Transcript : "transcribed as"
+    CommsAttachment ||--o| Transcript : "voice note transcribed as"
+    User ||--o{ CommsChannel : "owns number"
+    CommsChannel ||--o{ CommsConversation : "has"
+    CommsChannel ||--o{ CommsBlock : "blocks"
+    CommsConversation ||--o{ CommsMessage : "has"
+    CommsMessage ||--o{ CommsAttachment : "has"
+
+    CallRecording {
+        string id PK
+        string emailId UK "Unipile id of the Aloha email"
+        string mailAccountId
+        string fromPhone
+        string toPhone
+        string otherPhone "E.164, the other side"
+        string direction "enum CallDirection"
+        datetime callAt
+        int durationSec "nullable"
+        int sizeBytes "nullable"
+        string mimeType
+        string driveFileId "nullable"
+        datetime audioDeletedAt "nullable, after 12 months"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Transcript {
+        string id PK
+        string recordingId FK "nullable, unique"
+        string attachmentId FK "nullable, unique"
+        string status "enum TranscriptStatus"
+        string text "nullable"
+        string model "nullable"
+        int attempts
+        string lastError "nullable"
+        datetime doneAt "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CommsChannel {
+        string id PK
+        string accountId UK "Unipile WhatsApp account"
+        string phone "nullable"
+        string ownerUserId FK
+        string excludedViewerIds "string[], never see this number"
+        boolean storeEnabled
+        datetime storeStartedAt "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CommsConversation {
+        string id PK
+        string channelId FK
+        string externalChatId "unique with channelId"
+        boolean isGroup
+        string otherPhone "nullable"
+        string name
+        datetime lastMessageAt "nullable"
+        string groupClientId "nullable, plain id of a Client"
+        datetime backfilledAt "nullable"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CommsMessage {
+        string id PK
+        string conversationId FK
+        string externalId "unique with conversationId"
+        datetime at
+        boolean isSender
+        string senderName "nullable"
+        string text
+        boolean isDeleted
+        boolean isEdited
+        boolean held "hidden while a block request is pending"
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    CommsAttachment {
+        string id PK
+        string messageId FK
+        string externalId "unique with messageId"
+        string type
+        string mimetype "nullable"
+        boolean voiceNote
+        int durationSec "nullable"
+        string fileName "nullable"
+        string driveFileId "nullable, voice notes only"
+        datetime createdAt
+    }
+
+    CommsBlock {
+        string id PK
+        string channelId FK
+        string kind "enum CommsBlockKind"
+        string value "phone or chat id, unique with channelId and kind"
+        string label "nullable"
+        string status "enum CommsBlockStatus"
+        string requestedById
+        datetime requestedAt
+        string decidedById "nullable"
+        datetime decidedAt "nullable"
+    }
+```
+
+| Enum | Values |
+| --- | --- |
+| `CallDirection` | `IN`, `OUT`, `UNKNOWN` |
+| `TranscriptStatus` | `PENDING`, `DONE`, `FAILED`, `SKIPPED` |
+| `CommsBlockKind` | `PHONE`, `CHAT` |
+| `CommsBlockStatus` | `PENDING`, `APPROVED`, `REJECTED`, `REVOKED` |
+
+A `Transcript` belongs to exactly one of `recordingId` and `attachmentId`;
+this is an application-level invariant, not a database constraint.
+`CommsConversation.groupClientId`, `CommsBlock.requestedById` and
+`CommsBlock.decidedById` are plain string columns, not formal foreign keys.
+
 ## Notes on relationships not enforced by a Prisma `@relation`
 
 - `AlertEvent.hourBankId` is a plain string column, not a formal foreign key.
