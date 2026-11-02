@@ -62,6 +62,8 @@ export type PocChat = {
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /// A stored group a person assigned to a client (CommsConversation.groupClientId).
+  groupClient?: { id: string; name: string } | null;
 };
 
 export type PocAttachment = {

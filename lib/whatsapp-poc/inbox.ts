@@ -33,6 +33,7 @@ export type InboxChat = {
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  groupClient?: { id: string; name: string } | null;
 };
 
 export type InboxCall = {
@@ -154,7 +155,8 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
       preview: chat.lastMessagePreview ?? "",
       at: chat.lastMessageAt,
       unreadCount: chat.unreadCount,
-      clients: owner?.clients ?? [],
+      // A group has no number; it belongs to a client only when assigned.
+      clients: owner?.clients ?? (chat.groupClient ? [chat.groupClient] : []),
     });
   }
 
