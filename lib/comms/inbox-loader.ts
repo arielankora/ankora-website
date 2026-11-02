@@ -139,7 +139,9 @@ export async function loadMessages(
   sources: WhatsappSources,
   chats: PocChat[],
   extra: { chat: PocChat; info: ChannelInfo } | null,
-): Promise<{ messages: PageMessage[]; transcripts: Map<string, StoredTranscript>; error: string | null }> {
+  before: Date | null = null,
+): Promise<{ messages: PageMessage[]; transcripts: Map<string, StoredTranscript>; error: string | null; hasOlder: boolean }> {
+  let hasOlder = false;
   const messages: PageMessage[] = [];
   const transcripts = new Map<string, StoredTranscript>();
   let error: string | null = null;
@@ -151,7 +153,8 @@ export async function loadMessages(
   for (const { chat, info } of targets) {
     const channel = info.id ? sources.channels.find((c) => c.id === info.id) : null;
     if (channel && sources.stored.has(chat.id)) {
-      const got = await listStoredMessages(channel, chat.id);
+      const got = await listStoredMessages(channel, chat.id, 200, before);
+      if (got.hasOlder) hasOlder = true;
       for (const m of got.messages) messages.push({ ...m, chatId: chat.id, channelLabel: info.label, numberKey: info.id ?? "-" });
       for (const [k, v] of got.transcripts) transcripts.set(k, v);
       continue;
@@ -166,7 +169,7 @@ export async function loadMessages(
     }
   }
   messages.sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp));
-  return { messages, transcripts, error };
+  return { messages, transcripts, error, hasOlder };
 }
 
 export function chatsWithPhone(sources: WhatsappSources, phone: string): PocChat[] {

@@ -332,6 +332,8 @@ export const ACTION_LABEL: Record<string, string> = {
   "comms_block.rejected": "דחיית בקשת חסימה",
   "comms_block.revoked": "ביטול חסימת מספר",
   "comms_whatsapp.retention_sweep": "מחיקת שיחות WhatsApp לפי זמן השמירה",
+  "comms_group.assigned": "שיוך קבוצת WhatsApp ללקוח",
+  "comms_engagement_end.sweep": "מחיקת שיחות והקלטות של לקוח שההתקשרות איתו הסתיימה",
 };
 
 // App redesign (handoff README, screen 14 "יומן פעולות"): "שורה: תג סוג

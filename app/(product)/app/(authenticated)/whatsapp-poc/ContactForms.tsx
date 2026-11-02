@@ -1,6 +1,6 @@
 "use client";
 import { useActionState, useRef } from "react";
-import { addNumberToContactAction, assignNumberToClientAction, type ContactState } from "./actions";
+import { addNumberToContactAction, assignGroupToClientAction, assignNumberToClientAction, type ContactState } from "./actions";
 
 const input = "mt-1 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold";
 const label = "block text-xs font-medium text-app-text-secondary";
@@ -104,5 +104,39 @@ export function AddNumberForm(props: { contactId: string }) {
         ) : null}
       </form>
     </details>
+  );
+}
+
+/// A group's client: chosen once by the number's owner or a manager.
+export function GroupClientForm(props: { channelId: string; chatId: string; current: string; clients: Array<{ id: string; name: string }> }) {
+  const [state, action, pending] = useActionState<ContactState | undefined, FormData>(assignGroupToClientAction, undefined);
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="channelId" value={props.channelId} />
+      <input type="hidden" name="chatId" value={props.chatId} />
+      <label htmlFor="group-client" className={label}>
+        לקוח
+      </label>
+      <select id="group-client" name="clientId" defaultValue={props.current} className={input}>
+        <option value="">לא משויכת ללקוח</option>
+        {props.clients.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name}
+          </option>
+        ))}
+      </select>
+      <button type="submit" disabled={pending} className="min-h-11 rounded-lg bg-navy px-4 text-sm font-medium text-white disabled:opacity-60">
+        {pending ? "שומר..." : "שמירה"}
+      </button>
+      {state?.error ? (
+        <p role="alert" className="text-sm text-app-error">
+          {state.error}
+        </p>
+      ) : state?.ok ? (
+        <p role="status" className="text-sm text-app-success">
+          נשמר.
+        </p>
+      ) : null}
+    </form>
   );
 }

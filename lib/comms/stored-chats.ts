@@ -26,6 +26,14 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
       messages: { where: { held: false }, orderBy: { at: "desc" }, take: 1, select: { text: true, attachments: { select: { type: true } } } },
     },
   });
+  const groupClientNames = new Map(
+    (
+      await prisma.client.findMany({
+        where: { id: { in: conversations.map((c) => c.groupClientId).filter((id): id is string => Boolean(id)) } },
+        select: { id: true, name: true },
+      })
+    ).map((c) => [c.id, c.name]),
+  );
 
   // Which clients each conversation belongs to, and their account managers.
   const owners = await matchPhones(conversations.map((c) => c.otherPhone).filter((p): p is string => Boolean(p)));
@@ -63,6 +71,7 @@ export async function listStoredChats(channel: CommsChannel, viewer: { id: strin
         unreadCount: 0,
         lastMessageAt: c.lastMessageAt?.toISOString() ?? null,
         lastMessagePreview: preview,
+        groupClient: c.groupClientId ? { id: c.groupClientId, name: groupClientNames.get(c.groupClientId) ?? "" } : null,
       };
     });
 }
@@ -75,17 +84,21 @@ export async function listStoredMessages(
   channel: CommsChannel,
   chatId: string,
   take = 200,
-): Promise<{ messages: PocMessage[]; transcripts: Map<string, StoredTranscript> }> {
+  /// Older messages (1.11.2026): those before this instant.
+  before: Date | null = null,
+): Promise<{ messages: PocMessage[]; transcripts: Map<string, StoredTranscript>; hasOlder: boolean }> {
   const conversation = await prisma.commsConversation.findUnique({
     where: { channelId_externalChatId: { channelId: channel.id, externalChatId: chatId } },
   });
-  if (!conversation) return { messages: [], transcripts: new Map() };
-  const rows = await prisma.commsMessage.findMany({
-    where: { conversationId: conversation.id, held: false },
+  if (!conversation) return { messages: [], transcripts: new Map(), hasOlder: false };
+  const fetched = await prisma.commsMessage.findMany({
+    where: { conversationId: conversation.id, held: false, ...(before ? { at: { lt: before } } : {}) },
     orderBy: { at: "desc" },
-    take,
+    take: take + 1,
     include: { attachments: { include: { transcript: { select: { status: true, text: true } } } } },
   });
+  const hasOlder = fetched.length > take;
+  const rows = fetched.slice(0, take);
   const transcripts = new Map<string, StoredTranscript>();
   const messages: PocMessage[] = rows.reverse().map((r) => {
     for (const a of r.attachments) if (a.transcript) transcripts.set(r.externalId, a.transcript);
@@ -105,7 +118,7 @@ export async function listStoredMessages(
       })),
     };
   });
-  return { messages, transcripts };
+  return { messages, transcripts, hasOlder };
 }
 
 /// Until a number's history has been loaded, its stored list is short or

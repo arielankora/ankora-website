@@ -169,3 +169,14 @@ describe("isPlausiblePhone", () => {
     expect(displayPhone("+972528549835")).toBe("+972528549835");
   });
 });
+
+describe("buildInbox, groups", () => {
+  it("shows the client a group was assigned to", () => {
+    const rows = buildInbox(
+      [{ id: "g@g.us", name: "קבוצה", type: "group", phone: null, unreadCount: 0, lastMessageAt: null, lastMessagePreview: null, groupClient: { id: "c1", name: "לוי" } }],
+      [],
+      new Map(),
+    );
+    expect(rows[0].clients).toEqual([{ id: "c1", name: "לוי" }]);
+  });
+});

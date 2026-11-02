@@ -39,7 +39,7 @@ import {
   type PocMessage,
 } from "@/lib/whatsapp-poc/unipile";
 import { SendForm } from "./SendForm";
-import { AddNumberForm, AssignToClientForm } from "./ContactForms";
+import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
 import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
@@ -65,13 +65,14 @@ export const dynamic = "force-dynamic";
 const BASE = "/app/whatsapp-poc";
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-function href(params: { c?: string | null; filter?: InboxFilter; q?: string; wa?: boolean; assign?: boolean }) {
+function href(params: { c?: string | null; filter?: InboxFilter; q?: string; wa?: boolean; assign?: boolean; before?: string }) {
   const q = new URLSearchParams();
   if (params.filter && params.filter !== "all") q.set("filter", params.filter);
   if (params.q) q.set("q", params.q);
   if (params.c) q.set("c", params.c);
   if (params.wa) q.set("wa", "1");
   if (params.assign) q.set("assign", "1");
+  if (params.before) q.set("before", params.before);
   const s = q.toString();
   return s ? `${BASE}?${s}` : BASE;
 }
@@ -286,7 +287,7 @@ function CallCard({ call, transcribe }: { call: PageCall; transcribe: boolean })
 const DIRECTION_FROM_DB = { IN: "in", OUT: "out", UNKNOWN: "unknown" } as const;
 
 export default async function CommunicationsPage(props: {
-  searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string; assign?: string }>;
+  searchParams: Promise<{ c?: string; filter?: string; q?: string; phone?: string; wa?: string; chat?: string; assign?: string; before?: string }>;
 }) {
   const searchParams = await props.searchParams;
   const user = await requireUser();
@@ -412,7 +413,11 @@ export default async function CommunicationsPage(props: {
     selectedPhone = chat ? chatPhone(chat) : null;
   }
 
-  const loaded = chat ? await loadMessages(wa, openChats, found) : { messages: [] as PageMessage[], transcripts: new Map<string, StoredTranscript>(), error: null };
+  // Older messages: ?before=<instant> shows the 200 before it.
+  const beforeParam = searchParams.before && !Number.isNaN(Date.parse(searchParams.before)) ? new Date(searchParams.before) : null;
+  const loaded = chat
+    ? await loadMessages(wa, openChats, found, beforeParam)
+    : { messages: [] as PageMessage[], transcripts: new Map<string, StoredTranscript>(), error: null, hasOlder: false };
   const messages = loaded.messages;
   const voiceTranscripts = loaded.transcripts;
   if (loaded.error) waError = loaded.error;
@@ -716,6 +721,24 @@ export default async function CommunicationsPage(props: {
                 </header>
 
                 <ol className="flex-1 space-y-3 overflow-y-auto p-4 sm:px-6">
+                  {loaded.hasOlder && messages[0] ? (
+                    <li className="flex justify-center">
+                      <Link
+                        prefetch={false}
+                        href={href({ c: openKey, filter, q: query, before: messages[0].timestamp })}
+                        className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
+                      >
+                        הודעות קודמות
+                      </Link>
+                    </li>
+                  ) : null}
+                  {beforeParam ? (
+                    <li className="flex justify-center">
+                      <Link prefetch={false} href={href({ c: openKey, filter, q: query })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+                        חזרה להודעות האחרונות
+                      </Link>
+                    </li>
+                  ) : null}
                   {timeline.map((item, i) => {
                     const prev = timeline[i - 1];
                     const newDay = !prev || dayKey(prev.at) !== dayKey(item.at);
@@ -803,6 +826,19 @@ export default async function CommunicationsPage(props: {
                   {stored.length > 0 ? "השיחות: מכל ההקלטות השמורות." : "השיחות: מתוך ההקלטות האחרונות שנטענו."}
                 </p>
               </section>
+
+              {chat && chat.type === "group" && chatInfo?.id && wa.stored.has(chat.id) ? (
+                <section className="space-y-2">
+                  <h3 className="text-xs font-medium text-app-text-secondary">שיוך הקבוצה ללקוח</h3>
+                  <GroupClientForm
+                    key={`group-${openKey}`}
+                    channelId={chatInfo.id}
+                    chatId={chat.id}
+                    current={chat.groupClient?.id ?? ""}
+                    clients={clientOptions}
+                  />
+                </section>
+              ) : null}
 
               {selectedPhone ? (
                 <section className="space-y-2">

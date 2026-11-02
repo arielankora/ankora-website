@@ -10,6 +10,7 @@ import { addClientContact, updateClientContact } from "@/lib/app-domain/client-c
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { prisma } from "@/lib/prisma";
+import { listAccessibleClients } from "@/lib/app-domain/clients";
 
 export type SendState = { error?: string; sent?: boolean };
 
@@ -159,5 +160,41 @@ export async function addNumberToContactAction(_prev: ContactState | undefined, 
   }
   revalidatePath("/app/whatsapp-poc");
   revalidatePath(`/app/clients/${contact.clientId}`);
+  return { ok: true };
+}
+
+/// 1.11.2026: a WhatsApp group belongs to a client only when someone says
+/// so (spec "שמירת שיחות"). The number's owner, or a manager, assigns it;
+/// an empty choice removes the assignment. The client must be one the
+/// person may reach.
+export async function assignGroupToClientAction(_prev: ContactState | undefined, formData: FormData): Promise<ContactState> {
+  const user = await requireUser();
+  const access = await commsAccess(user);
+  if (!access.allowed) return { error: "אין הרשאה." };
+  const channelId = String(formData.get("channelId") || "");
+  const chatId = String(formData.get("chatId") || "").slice(0, 200);
+  const clientId = String(formData.get("clientId") || "") || null;
+
+  const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
+  if (!channel || (channel.ownerUserId !== user.id && !access.manager)) return { error: "רק בעל המספר או מנהל משייכים קבוצה." };
+  const conversation = await prisma.commsConversation.findUnique({
+    where: { channelId_externalChatId: { channelId, externalChatId: chatId } },
+  });
+  if (!conversation || !conversation.isGroup) return { error: "הקבוצה לא נמצאה בשיחות השמורות." };
+  if (clientId) {
+    const reachable = await listAccessibleClients(user);
+    if (!reachable.some((c) => c.id === clientId)) return { error: "אין לך גישה ללקוח הזה." };
+  }
+  await prisma.commsConversation.update({ where: { id: conversation.id }, data: { groupClientId: clientId } });
+  await recordAudit({
+    actorId: user.id,
+    action: "comms_group.assigned",
+    entityType: "CommsConversation",
+    entityId: conversation.id,
+    clientId,
+    before: { groupClientId: conversation.groupClientId },
+    after: { groupClientId: clientId },
+  });
+  revalidatePath("/app/whatsapp-poc");
   return { ok: true };
 }

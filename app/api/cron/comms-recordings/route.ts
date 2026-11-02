@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { authorizeCronRequest } from "@/lib/cron-auth";
 import { reconcileRecordings, sweepCallRetention, transcribePending } from "@/lib/comms/call-store";
 import { backfillChannel, sweepWhatsappRetention } from "@/lib/comms/whatsapp-store";
+import { completeDriveCopies, sweepEndedEngagements } from "@/lib/comms/maintenance";
 import { prisma } from "@/lib/prisma";
 
 // Nightly (communications storage, 1.11.2026): store the call recordings
@@ -24,9 +25,14 @@ export async function GET(request: Request) {
     for (const channel of await prisma.commsChannel.findMany({ where: { storeEnabled: true } })) {
       whatsapp.push(await backfillChannel(channel, { budgetMs: 60_000 }));
     }
-    const transcribe = await transcribePending({ budgetMs: 110_000 });
-    const retention = { calls: await sweepCallRetention(), whatsapp: await sweepWhatsappRetention() };
-    return NextResponse.json({ ok: true, reconcile, whatsapp, transcribe, retention });
+    const transcribe = await transcribePending({ budgetMs: 90_000 });
+    const driveCopies = await completeDriveCopies({ budgetMs: 30_000 });
+    const retention = {
+      calls: await sweepCallRetention(),
+      whatsapp: await sweepWhatsappRetention(),
+      endedEngagements: await sweepEndedEngagements(),
+    };
+    return NextResponse.json({ ok: true, reconcile, whatsapp, transcribe, driveCopies, retention });
   } catch (err) {
     console.error("comms-recordings cron failed:", err);
     return NextResponse.json({ error: "Unexpected error" }, { status: 500 });

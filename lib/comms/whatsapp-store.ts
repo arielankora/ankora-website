@@ -149,7 +149,7 @@ export async function storeMessage(
   return "stored";
 }
 
-async function copyVoiceToDrive(channel: CommsChannel, chatId: string, messageId: string, attachmentId: string) {
+export async function copyVoiceToDrive(channel: CommsChannel, chatId: string, messageId: string, attachmentId: string) {
   const folder = driveFolder();
   const unipile = unipileFor(channel);
   if (!folder || !unipile) return;
