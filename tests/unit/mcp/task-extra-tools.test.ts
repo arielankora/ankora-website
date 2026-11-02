@@ -380,6 +380,7 @@ describe("create_decision", () => {
 
   beforeEach(() => {
     decisions.createDecision.mockResolvedValue({
+      id: "d1",
       question: "סף אישור לתוכנה",
       options: [{ label: "3,000 דולר" }, { label: "5,000 דולר" }],
     });
@@ -422,6 +423,7 @@ describe("create_decision", () => {
     expect(tasks.updateTask).toHaveBeenCalledWith(ACTOR, "t1", { block: { on: "CLIENT", reason: "סף אישור לתוכנה" } });
     expect(out.taskMarkedWaitingOnClient).toBe(true);
     expect(out.note).toContain("not notified");
+    expect(out.url).toMatch(/\/app\/clients\/[^/]+#decision-d1$/);
   });
 
   it("does not touch the task when the waiting flag is off", async () => {
@@ -442,9 +444,10 @@ describe("list_decisions", () => {
       options: [],
     };
     decisions.listDecisionsForClient.mockResolvedValue([
-      { ...base, question: "open one", status: "OPEN", answer: null },
+      { ...base, id: "d-open", question: "open one", status: "OPEN", answer: null },
       {
         ...base,
+        id: "d-answered",
         question: "answered one",
         status: "ANSWERED",
         answer: { optionLabel: "a", amountMinor: 1000, respondedAt: new Date("2026-10-05T08:00:00Z"), respondedByName: "Oren" },
@@ -453,6 +456,8 @@ describe("list_decisions", () => {
 
     const open = await call("list_decisions", { client: "NUX" });
     expect(open.decisions.map((d: { question: string }) => d.question)).toEqual(["open one"]);
+    // 2.11.2026: each one links to itself on the client's page.
+    expect(open.decisions[0].url).toMatch(/\/app\/clients\/[^/]+#decision-d-open$/);
 
     const all = await call("list_decisions", { client: "NUX", includeClosed: true });
     expect(all.decisions[1].answer).toEqual({ chose: "a", amount: 10, by: "Oren", on: "2026-10-05" });
@@ -703,7 +708,7 @@ describe("create_decision linked by task id", () => {
   const OPTIONS = [{ label: "כן" }, { label: "לא" }];
 
   beforeEach(() => {
-    decisions.createDecision.mockResolvedValue({ question: "q", options: [{ label: "כן" }, { label: "לא" }] });
+    decisions.createDecision.mockResolvedValue({ id: "d1", question: "q", options: [{ label: "כן" }, { label: "לא" }] });
   });
 
   it("links the decision to the exact task, without a title search", async () => {

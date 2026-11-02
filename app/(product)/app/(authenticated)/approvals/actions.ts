@@ -2,34 +2,15 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { updateTask } from "@/lib/app-domain/tasks";
-import { approveException, rejectException } from "@/lib/app-domain/policy-exceptions";
-import { removeClientPolicy } from "@/lib/app-domain/client-policies";
-import { approveRuleDecision, confirmInternalSource } from "@/lib/app-domain/internal-client";
-import { approveProcessVersion } from "@/lib/app-domain/processes";
-import { approveTaskPlan } from "@/lib/app-domain/task-plans";
-import { approvePortalSummary, discardPortalSummary } from "@/lib/app-domain/portal-summary";
-import { approveGuide, rejectGuide } from "@/lib/app-domain/extraction-guide";
-import { approveRulesTogether, runStep } from "@/lib/app-domain/process-next-steps";
-import type { ApprovalKind } from "@/lib/approvals";
-import type { StepOp } from "@/lib/next-steps";
+import { decideApproval, type DecideInput } from "@/lib/app-domain/decide-approval";
+import { approveRulesTogether } from "@/lib/app-domain/process-next-steps";
 
 // The buttons on "אישורים" (lib/approvals.ts). Nothing here decides on
-// its own: every decision goes through the same domain function the
-// screen it came from calls, with the same checks and the same audit row,
-// so approving a rule here and approving it on the client's page are one
-// act with two doors.
+// its own: lib/app-domain/decide-approval.ts sends each kind through the
+// same domain function the screen it came from calls, with the same
+// checks and the same audit row, and Claude's decide_approval calls it too.
 
-export type DecideInput = {
-  kind: ApprovalKind;
-  id: string;
-  version?: number;
-  decision: "approve" | "reject";
-  note?: string;
-  clientId?: string | null;
-  /// A process decision: the step to carry out (lib/next-steps.ts).
-  op?: StepOp | null;
-};
+export type { DecideInput };
 
 function friendlyError(err: unknown): string {
   if (err instanceof ForbiddenError) return "אין לך הרשאה להחליט על זה.";
@@ -39,50 +20,8 @@ function friendlyError(err: unknown): string {
 
 export async function decideApprovalAction(input: DecideInput): Promise<{ error?: string; ok?: boolean }> {
   const user = await requireUser();
-  const approve = input.decision === "approve";
-  const note = (input.note ?? "").trim();
   try {
-    switch (input.kind) {
-      case "task":
-        await updateTask(user, input.id, { status: approve ? "DONE" : "IN_PROGRESS" });
-        break;
-      case "exception":
-        if (approve) await approveException(user, input.id, note || null);
-        else await rejectException(user, input.id, note);
-        break;
-      case "rule":
-        if (approve) await approveRuleDecision(user, input.id);
-        else await removeClientPolicy(user, input.id);
-        break;
-      case "procedure":
-        if (!approve || input.version === undefined) throw new Error("נוהל מאשרים כאן, ומתקנים אותו בתהליך עצמו.");
-        await approveProcessVersion(user, input.id, input.version);
-        break;
-      case "plan":
-        if (!approve || input.version === undefined) throw new Error("תוכנית מאשרים כאן, ומתקנים אותה במשימה עצמה.");
-        await approveTaskPlan(user, input.id, input.version);
-        break;
-      case "summary":
-        if (approve) await approvePortalSummary(user, input.id);
-        else await discardPortalSummary(user, input.id);
-        break;
-      case "guide":
-        if (approve) await approveGuide(user, input.id);
-        else await rejectGuide(user, input.id, note);
-        break;
-      case "process":
-        if (!approve || !input.op) throw new Error("אין כאן פעולה לבצע. פותחים את התהליך.");
-        await runStep(user, input.op);
-        break;
-      case "internal":
-        if (!approve || !input.clientId) throw new Error("את הפריטים של התיק הפנימי מאשרים כאן, או פותחים את התיק.");
-        await confirmInternalSource(user, input.clientId, input.id);
-        break;
-      case "check":
-        throw new Error("את החתימה בודקים עם Claude, בדף של איש הצוות.");
-      case "knowledge":
-        throw new Error("הצעות לתיק מאשרים אחת אחת, בלשונית ידע מהחילוץ.");
-    }
+    await decideApproval(user, input);
   } catch (err) {
     return { error: friendlyError(err) };
   }

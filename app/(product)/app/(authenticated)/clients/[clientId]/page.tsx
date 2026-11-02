@@ -478,7 +478,7 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
                       </Link>
                     </div>
                     {openBatches.map((b) => (
-                      <ReviewBatch key={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
+                      <ReviewBatch key={b.id} batchId={b.id} clientId={client.id} clientName={b.client.name} {...batchHeader(b)} proposals={reviewProposals(b)} staff={staff} meId={user.id} />
                     ))}
                   </section>
                 )}

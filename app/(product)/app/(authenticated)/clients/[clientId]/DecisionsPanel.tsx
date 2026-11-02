@@ -1,4 +1,5 @@
 "use client";
+import { decisionAnchor } from "@/lib/approval-links";
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { createDecisionAction, cancelDecisionAction } from "../actions";
@@ -181,7 +182,7 @@ export function DecisionsPanel({
       ) : (
         <ul className="mt-4 divide-y divide-app-border">
           {decisions.map((d) => (
-            <li key={d.id} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3">
+            <li key={d.id} id={decisionAnchor(d.id)} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 py-3 scroll-mt-24 rounded-lg target:bg-app-accent-soft">
               <span className="text-sm text-app-text-primary">{d.question}</span>
               <span className="flex items-center gap-2.5 text-[11.5px] text-app-text-tertiary">
                 {formatMinor(d.amountMinor) && <span dir="ltr" className="font-jbmono">{formatMinor(d.amountMinor)}</span>}

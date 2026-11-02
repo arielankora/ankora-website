@@ -79,6 +79,11 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   // lib/mcp/hour-bank-tools.ts
   get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
 
+  // lib/mcp/approval-tools.ts
+  list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi)",
+  decide_approval: "only a row list_approvals would show (findApprovalForAi)",
+  decide_knowledge_proposals: "a proposal of a marked client is refused (decideProposalForAi)",
+
   // lib/mcp/portal-tools.ts (the client's own connector)
   get_status: "a marked client gets no answer (portalAiBlocked); marked tasks are left out of the lists",
   "portal:list_tasks": "portalAiBlocked; marked tasks are left out",

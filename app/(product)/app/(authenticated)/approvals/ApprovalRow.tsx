@@ -1,4 +1,5 @@
 "use client";
+import { approvalAnchor } from "@/lib/approval-links";
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import type { ApprovalKind, KindTone, RowActions } from "@/lib/approvals";
@@ -70,7 +71,7 @@ export function ApprovalRow({ row }: { row: RowView }) {
   const reject = row.actions.reject;
 
   return (
-    <li className="flex flex-wrap items-start justify-between gap-3 py-3.5" data-testid="approval-row" data-kind={row.kind}>
+    <li id={approvalAnchor(row.kind, row.id)} className="flex flex-wrap items-start justify-between gap-3 py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft" data-testid="approval-row" data-kind={row.kind}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           {row.showLabel && <KindLabel label={row.label} tone={row.tone} />}

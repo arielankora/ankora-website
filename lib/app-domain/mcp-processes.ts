@@ -2,6 +2,8 @@ import "server-only";
 import { readinessLabel } from "@/lib/process-readiness";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { appBaseUrl } from "@/lib/email-templates";
+import { processUrl } from "@/lib/approval-links";
 import { canSendToAi } from "@/lib/knowledge";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
@@ -65,6 +67,8 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
     lastRun: day(p.lastRunAt),
     // Spec 6.1: shown with the item everywhere, Claude included.
     doNotDisclose: p.doNotDisclose,
+    // 2.11.2026: the process in the client's file, to hand a person.
+    url: processUrl(appBaseUrl(), p.clientId, p.id),
   };
 }
 

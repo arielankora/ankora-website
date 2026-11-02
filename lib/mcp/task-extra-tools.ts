@@ -12,6 +12,7 @@ import { createDecision, listDecisionsForClient } from "@/lib/app-domain/decisio
 import { localDateKey, localDateTimeToUtc } from "@/lib/timezone";
 import { READ_ONLY, TOOL_ANNOTATIONS, WRITES } from "@/lib/mcp/annotations";
 import { taskUrl } from "@/lib/mcp/serialize";
+import { clientDecisionUrl } from "@/lib/approval-links";
 import { appBaseUrl } from "@/lib/email-templates";
 import { PlanVersionConflictError, applyPlanSteps, getTaskPlans, saveTaskPlan, type TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { MAX_PLAN_LENGTH, MAX_PLAN_STEPS, TaskPlanRuleError } from "@/lib/task-plan-rules";
@@ -655,6 +656,7 @@ export function registerTaskExtraTools(server: McpServer): void {
           options: decision.options.map((o) => o.label),
           linkedTask: taskTitle,
           taskMarkedWaitingOnClient: waiting,
+          url: clientDecisionUrl(appBaseUrl(), client.value.id, decision.id),
           note: "The client is not notified automatically. Tell the user to send them a message.",
         });
       } catch (err) {
@@ -669,7 +671,7 @@ export function registerTaskExtraTools(server: McpServer): void {
     {
       title: "List a client's decisions",
       description:
-        "Lists the decisions Ankora has asked one client: open ones first, with their options, and answered ones with what was chosen, by whom and when.",
+        "Lists the decisions Ankora has asked one client: open ones first, with their options, and answered ones with what was chosen, by whom and when. Each has `url`, a direct link to it on the client's page in Ankora: give it as it is.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         includeClosed: z.boolean().optional().describe("Include answered and withdrawn decisions. Off by default."),
@@ -689,7 +691,8 @@ export function registerTaskExtraTools(server: McpServer): void {
         return toolJson({
           client: client.value.name,
           open: all.filter((d) => d.status === "OPEN").length,
-          decisions: shown.map((d) => serializeDecision(d, actor.timezone)),
+          // 2.11.2026: where each one is, in the client's decisions panel.
+          decisions: shown.map((d) => ({ ...serializeDecision(d, actor.timezone), url: clientDecisionUrl(appBaseUrl(), client.value.id, d.id) })),
         });
       } catch (err) {
         console.error("[mcp] list_decisions failed", err);
