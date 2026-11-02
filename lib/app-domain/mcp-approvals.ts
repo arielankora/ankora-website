@@ -118,28 +118,34 @@ export async function decideProposalForAi(
   id: string,
   decision: ProposalDecision,
   reason: string | null
-): Promise<{ clientId: string; batchId: string; headline: string; taskId: string | null }> {
+): Promise<{ clientId: string; batchId: string; headline: string; taskId: string | null; resultId: string | null }> {
   const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, batchId: true, target: true, payload: true } });
   const accessible = p ? (await listAccessibleClients(actor)).some((c) => c.id === p.clientId) : false;
   if (!p || !accessible) throw new Error("No proposal with this id is waiting for you. Call list_approvals for the current ones.");
   if ((await aiExcludedClientIds([p.clientId])).size > 0) throw new Error(AI_EXCLUDED_TOOL_MESSAGE);
   const headline = proposalHeadline(p.target as ProposalTargetLike, (p.payload ?? {}) as Record<string, unknown>);
+  // Where the decision landed (2.11.2026): the item in the file, or the
+  // task it opened, so the person can see the result, not only the card.
   let taskId: string | null = null;
+  let resultId: string | null = null;
   switch (decision) {
-    case "approve":
-      await approveProposal(actor, id);
+    case "approve": {
+      const r = await approveProposal(actor, id);
+      if (p.target === "TASK") taskId = r.resultId ?? null;
+      else resultId = r.resultId ?? null;
       break;
+    }
     case "reject":
       await rejectProposal(actor, id, reason ?? "");
       break;
     case "already_in_file":
-      await attachProposalToExisting(actor, id);
+      resultId = (await attachProposalToExisting(actor, id)).resultId ?? null;
       break;
     case "task":
       taskId = (await proposalToTask(actor, id)).taskId;
       break;
   }
-  return { clientId: p.clientId, batchId: p.batchId, headline, taskId };
+  return { clientId: p.clientId, batchId: p.batchId, headline, taskId, resultId };
 }
 
 /// Whether a proposal must be approved on its own (bulkApproveBlocker), as

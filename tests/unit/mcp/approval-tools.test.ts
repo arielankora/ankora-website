@@ -80,7 +80,19 @@ describe("list_approvals", () => {
     expect(rule.approve).toBe("אישור הכלל");
     const batch = out.approvals.find((a: { kind: string }) => a.kind === "knowledge");
     expect(batch.url).toBe(`${BASE}/app/approvals?tab=knowledge&clientId=c-nux#batch-b52`);
+    // The batch's own card, not the tab.
+    expect(batch.openItem).toBe(batch.url);
+    expect(batch.approve).toBeNull();
+    expect(batch.reject).toBeNull();
+    expect(rule.reject).toEqual({ label: "הסרה", needsReason: false });
     expect(batch.proposals[0]).toMatchObject({ proposalId: "pr1", approveAlone: "משנה פריט שכבר בתיק", url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#proposal-pr1` });
+  });
+
+  it("says who decides a sensitive proposal, in Hebrew", async () => {
+    domain.listApprovalsForAi.mockResolvedValue({ items: [BATCH], proposals: new Map([["b52", [{ ...PROPOSAL, hiddenFor: "אורן" }]]]) });
+    const out = await call("list_approvals", {});
+    expect(out.approvals[0].proposals[0].hidden).toBe("פריט רגיש. רק אורן רואה אותו ומחליט עליו.");
+    expect(out.approvals[0].proposals[0].says).toBeUndefined();
   });
 
   it("narrows to a named client, and stops on a name it cannot match", async () => {
@@ -111,7 +123,7 @@ describe("decide_approval", () => {
   it("writes nothing for a row no longer waiting", async () => {
     domain.findApprovalForAi.mockResolvedValue(null);
     const out = await call("decide_approval", { kind: "rule", id: "gone", decision: "approve" });
-    expect(out.text).toContain("not waiting on you");
+    expect(out.text).toContain("No row with this kind and id is waiting on you");
     expect(decide.decideApproval).not.toHaveBeenCalled();
   });
 
@@ -141,12 +153,13 @@ describe("decide_approval", () => {
 
 describe("decide_knowledge_proposals", () => {
   it("decides each proposal and links to its batch", async () => {
-    domain.decideProposalForAi.mockImplementation(async (_a: unknown, id: string) => ({ clientId: "c-nux", batchId: "b51", headline: `h-${id}`, taskId: null }));
+    domain.decideProposalForAi.mockImplementation(async (_a: unknown, id: string) => ({ clientId: "c-nux", batchId: "b51", headline: `h-${id}`, taskId: null, resultId: null }));
     const out = await call("decide_knowledge_proposals", { proposalIds: ["a", "b"], decision: "reject", reason: "כבר כלולה ב-S52" });
     expect(domain.decideProposalForAi).toHaveBeenCalledTimes(2);
     expect(domain.decideProposalForAi).toHaveBeenCalledWith(ACTOR, "a", "reject", "כבר כלולה ב-S52");
     expect(out.done).toBe(2);
-    expect(out.results[0].url).toBe(`${BASE}/app/approvals?tab=knowledge&clientId=c-nux#batch-b51`);
+    expect(out.results[0].url).toBe(`${BASE}/app/approvals?tab=knowledge&clientId=c-nux#proposal-a`);
+    expect(out.results[0].result).toBeUndefined();
   });
 
   it("refuses a reject without a reason, writing nothing", async () => {
@@ -157,7 +170,7 @@ describe("decide_knowledge_proposals", () => {
 
   it("approves a one-by-one proposal only in a call of its own", async () => {
     domain.proposalAloneBecause.mockImplementation(async (id: string) => (id === "change" ? "משנה פריט שכבר בתיק" : null));
-    domain.decideProposalForAi.mockResolvedValue({ clientId: "c-nux", batchId: "b52", headline: "h", taskId: null });
+    domain.decideProposalForAi.mockResolvedValue({ clientId: "c-nux", batchId: "b52", headline: "h", taskId: null, resultId: null });
     const out = await call("decide_knowledge_proposals", { proposalIds: ["new", "change"], decision: "approve" });
     expect(out.done).toBe(1);
     expect(out.errors[0]).toMatchObject({ proposalId: "change" });
@@ -168,10 +181,18 @@ describe("decide_knowledge_proposals", () => {
   });
 
   it("reports a failure and goes on with the rest", async () => {
-    domain.decideProposalForAi.mockRejectedValueOnce(new Error("אין הרשאה")).mockResolvedValueOnce({ clientId: "c-nux", batchId: "b52", headline: "h", taskId: "t9" });
+    domain.decideProposalForAi.mockRejectedValueOnce(new Error("אין הרשאה")).mockResolvedValueOnce({ clientId: "c-nux", batchId: "b52", headline: "h", taskId: "t9", resultId: null });
     const out = await call("decide_knowledge_proposals", { proposalIds: ["x", "y"], decision: "task" });
     expect(out.failed).toBe(1);
     expect(out.results[0].task).toBe(`${BASE}/app/tasks/t9`);
+  });
+});
+
+describe("where a decided proposal landed", () => {
+  it("links to the item in the client's file", async () => {
+    domain.decideProposalForAi.mockResolvedValue({ clientId: "c-nux", batchId: "b52", headline: "h", taskId: null, resultId: "fact9" });
+    const out = await call("decide_knowledge_proposals", { proposalIds: ["p1"], decision: "approve" });
+    expect(out.results[0].result).toBe(`${BASE}/app/clients/c-nux?tab=file#item-fact9`);
   });
 });
 
