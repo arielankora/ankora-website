@@ -288,7 +288,7 @@ const legal: LegalContent = {
           body: [
             "The package is purchased in advance for each month. The invoice is issued and payment is made on the 1st of the month, for that month.",
             "Payment is in advance for the month purchased, and not on net terms. Work begins after payment is received, unless the proposal provides otherwise.",
-            "Billing is by actual working time and not by time present. Every entry is recorded with a description of the task and is available to the client in the portal.",
+            "Billing is by actual working time and not by time present: by the minute, with a 15-minute minimum per task. Every entry is recorded with a description of the task and is available to the client in the portal.",
             "An unused balance rolls over to the following month as stated in the proposal. Exceeding the bank requires prior approval.",
             "Travel time, where physical attendance is required, is billed as stated in the proposal: a fixed amount for each direction, regardless of the actual travel time.",
             "Unless the proposal provides otherwise, the billed travel time is one hour for each direction.",

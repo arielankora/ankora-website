@@ -459,7 +459,7 @@ const en: Dictionary = {
         body: "No sick days, no vacation, no lunch breaks, no idle time. Every minute of actual work is tracked and reported transparently.",
         points: [
           { title: "Tracked to the minute", body: "Every task is logged precisely, with no rounding up." },
-          { title: "15-minute minimum", body: "A small task gets a small charge, not a full hour." },
+          { title: "15-minute minimum per task", body: "A small task gets a small charge, not a full hour." },
           { title: "Only actual work time", body: "No charge for waiting time, sick days, or vacation, unlike direct employment." },
         ],
       },
@@ -510,7 +510,7 @@ const en: Dictionary = {
         title: "Questions about pricing",
         items: [
           { q: "How much does Personal Operations Management cost at Ankora?", a: "₪135 to ₪180 per hour excluding VAT, depending on the size of your monthly hour bank: ₪180 an hour up to 30 hours, ₪170 up to 50 hours, ₪160 up to 80 hours, ₪150 up to 120 hours and ₪135 above 120 hours a month. The final scope is set in the intro call." },
-          { q: "What exactly am I paying for?", a: "Only time actually worked. Every task is measured to the minute, with a 15-minute minimum, and logged with a description you can see in the portal. No charge for waiting time, vacation or sick days." },
+          { q: "What exactly am I paying for?", a: "You pay only for time actually worked, by the minute, with a 15-minute minimum per task. Every task is logged with a description you can see in the portal. No charge for waiting time, vacation or sick days." },
           { q: "What happens to unused hours?", a: "They roll over to the next month as long as your package renews. When the engagement ends or the package is reduced, any unused balance expires." },
           { q: "Is there a long-term commitment?", a: "No. The engagement renews month to month, and you can stop with notice up to seven days before the end of the month, with no penalty." },
           { q: "How does this compare to a full-time Personal Assistant?", a: "A senior executive assistant in Israel costs an employer about ₪18,600 to ₪24,000 a month including employer costs. With Ankora you pay ₪1,800 to ₪6,800 a month excluding VAT, for 10 to 40 hours of actual work." },
@@ -631,7 +631,7 @@ const en: Dictionary = {
           },
           {
             q: "How much does it cost?",
-            a: "You pay only for time actually worked, from a monthly hour bank. Every task is tracked to the minute, with a 15-minute minimum, and unused hours roll over to the next month. The details are on the pricing page.",
+            a: "You pay only for time actually worked, by the minute, with a 15-minute minimum per task. Payment comes from a monthly hour bank, and unused hours roll over to the next month. The details are on the pricing page.",
           },
           {
             q: "What do I still need to do myself?",
@@ -687,7 +687,7 @@ const en: Dictionary = {
         faq: [
           {
             q: "My business is small. Is this for me?",
-            a: "Yes. You do not need a team to start. On the pricing page, the smallest example package is 10 hours a month, and a small task is tracked from 15 minutes.",
+            a: "Yes. You do not need a team to start. On the pricing page, the smallest example package is 10 hours a month, and you pay by the minute, with a 15-minute minimum per task.",
           },
           {
             q: "How is this different from an hourly freelancer?",
