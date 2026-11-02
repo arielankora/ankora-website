@@ -115,6 +115,35 @@ describe("knowledge proposals", () => {
     expect(fact.knowledgeStatus).toBe("UNCERTAIN");
   });
 
+  it("in Ankora's own file, Ankora's document is the client's word: no R14 flag, nothing lowered (1.11.2026)", async () => {
+    const { user, client } = await setup();
+    await prisma.client.update({ where: { id: client.id }, data: { isInternal: true } });
+    const doc = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: { kind: "ANKORA_DOCUMENT", title: "נוהל ספקים פנימיים" },
+      items: [{ target: "FACT", reason: "סעיף 5 בנוהל", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "סקירת הרשאות רבעונית" } }],
+    });
+    const p = (await listOpenBatches(user)).find((b) => b.id === doc.batchId)!.proposals[0];
+    expect((p.flags as { code: string }[]).map((f) => f.code)).not.toContain("R14");
+    const fact = await prisma.clientFact.findUniqueOrThrow({ where: { id: (await approveProposal(user, p.id)).resultId! } });
+    expect(fact.knowledgeStatus).toBe("CONFIRMED");
+    expect((await prisma.clientSource.findFirstOrThrow({ where: { clientId: client.id } })).weight).toBe("PRIMARY");
+
+    // A source registered as secondary before this, and a batch that came
+    // with the flag: the card no longer shows it, and approving confirms.
+    const old = await addClientSource(user, { clientId: client.id, kind: "ANKORA_DOCUMENT", title: "נוהל ישן", weight: "SECONDARY" });
+    const batch = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: { code: old.code },
+      items: [{ target: "FACT", reason: "סעיף 2", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "אין גישה לפני חתימה" } }],
+    });
+    await prisma.knowledgeProposal.updateMany({ where: { batchId: batch.batchId! }, data: { flags: [{ code: "R14", message: "המקור הוא מסמך של אנקורה, ולכן הפריט יישמר כלא ודאי." }] } });
+    const q = (await listOpenBatches(user)).find((b) => b.id === batch.batchId)!.proposals[0];
+    expect((q.flags as { code: string }[]).map((f) => f.code)).not.toContain("R14");
+    const second = await prisma.clientFact.findUniqueOrThrow({ where: { id: (await approveProposal(user, q.id)).resultId! } });
+    expect(second.knowledgeStatus).toBe("CONFIRMED");
+  });
+
   it("a contradiction joins the alternatives and never overwrites", async () => {
     const { client, user } = await setup();
     await addClientSource(user, { clientId: client.id, kind: "CLIENT_DOCUMENT", title: "טופס בנק" }); // S1
