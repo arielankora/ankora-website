@@ -28,14 +28,16 @@ export async function repairCallLines(lines: readonly string[] = readCallStoreCo
     select: { id: true, fromPhone: true, toPhone: true },
     take: 1000,
   });
-  for (const rec of unknown) {
+  // A hand-sent recording (both numbers our line) has no other side to find.
+  const fixable = unknown.filter((rec) => rec.fromPhone !== rec.toPhone);
+  for (const rec of fixable) {
     const side = callSide({ from: rec.fromPhone, to: rec.toPhone, callAt: "" }, lines);
     await prisma.callRecording.update({
       where: { id: rec.id },
       data: { direction: side.direction === "in" ? "IN" : "OUT", otherPhone: side.other },
     });
   }
-  return { repaired: unknown.length };
+  return { repaired: fixable.length };
 }
 
 /// Recordings and voice messages stored without their Drive copy (Drive

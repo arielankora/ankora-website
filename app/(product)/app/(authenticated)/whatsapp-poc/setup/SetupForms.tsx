@@ -6,6 +6,7 @@ import {
   connectChannelAction,
   decideBlockAction,
   loadHistoryAction,
+  importManualRecordingsAction,
   revokeBlockAction,
   startStoringAction,
   type SetupState,
@@ -220,6 +221,18 @@ export function BlockButton(props: { channelId: string; kind: "PHONE" | "CHAT"; 
         pendingLabel="שומר..."
         className="min-h-11 rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary"
       />
+      <Result state={state} />
+    </form>
+  );
+}
+
+export function ManualRecordingsForm() {
+  const [state, action, pending] = useActionState(importManualRecordingsAction, undefined);
+  return (
+    <form action={action} className="space-y-2">
+      <button type="submit" disabled={pending} className={secondary}>
+        {pending ? "מתחיל..." : "ייבוא הקלטות שנשלחו ידנית"}
+      </button>
       <Result state={state} />
     </form>
   );

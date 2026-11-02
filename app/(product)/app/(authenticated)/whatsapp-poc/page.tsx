@@ -440,6 +440,14 @@ export default async function CommunicationsPage(props: {
     ...calls.map((c) => c.other),
     ...(selectedPhone ? [selectedPhone] : []),
   ]);
+  // 2.11.2026: recordings Aloha sent by hand have no other side, and are
+  // stored on our own line's number. They gather in one row per line, named
+  // for what it is, and the line is never offered for a client's file.
+  for (const line of config.lineNumbers) {
+    if (calls.some((c) => c.other === line)) {
+      owners.set(line, { personName: "הקלטות בלי מספר הצד השני", clients: [], phones: [line], contacts: [] });
+    }
+  }
   const rows = buildInbox(chats, calls, owners);
   const visible = filterInbox(rows, filter, query);
 
@@ -859,7 +867,11 @@ export default async function CommunicationsPage(props: {
                       <li key={p}>{displayPhone(p)}</li>
                     ))}
                   </ul>
-                  {owner && owner.contacts.length > 0 ? (
+                  {config.lineNumbers.includes(selectedPhone) ? (
+                    <p className="text-xs text-app-text-secondary">
+                      זה מספר של אנקורה. ההקלטות כאן נשלחו מאלוהה בלי המספר של הצד השני, ולכן אי אפשר לשייך אותן לתיק לקוח.
+                    </p>
+                  ) : owner && owner.contacts.length > 0 ? (
                     <AddNumberForm key={`add-${openKey}`} contactId={owner.contacts[0].id} />
                   ) : !isPlausiblePhone(selectedPhone) ? (
                     <p className="text-xs text-app-text-secondary">ל-WhatsApp אין כאן מספר טלפון, אלא מזהה פנימי, ולכן אי אפשר לשייך אותו לתיק לקוח.</p>

@@ -32,9 +32,12 @@ export function linesOwnedBy(owners: Map<string, string>, email: string | null |
 }
 
 /// Our line on a stored call: the number that is not the other side.
-/// Unknown when the call was stored before its line was configured.
+/// Unknown when the call was stored before its line was configured. A
+/// recording Aloha sent by hand (lib/comms/manual-import.ts) has no other
+/// side, and is stored with our line in both places.
 export function storedCallLine(rec: { direction: string; fromPhone: string; toPhone: string }): string | null {
   if (rec.direction === "IN") return rec.toPhone;
   if (rec.direction === "OUT") return rec.fromPhone;
+  if (rec.fromPhone === rec.toPhone && rec.fromPhone) return rec.fromPhone;
   return null;
 }

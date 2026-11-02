@@ -325,6 +325,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "whatsapp_poc.recording_transcribed": "שליחת הקלטת שיחה לתמלול",
   "whatsapp_poc.voice_note_transcribed": "שליחת הודעה קולית ב-WhatsApp לתמלול",
   "call_recording.retention_sweep": "מחיקת הקלטות שיחה לפי זמן השמירה",
+  "call_recording.manual_import": "ייבוא הקלטות שאלוהה שלחה ידנית",
   "comms_channel.connected": "חיבור מספר WhatsApp לשמירה",
   "comms_channel.store_started": "התחלת שמירה של שיחות WhatsApp",
   "comms_block.requested": "בקשה לא לשמור שיחות עם מספר",

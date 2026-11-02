@@ -96,7 +96,7 @@ export function toRecording(raw: RawEmail): Recording | null {
   };
 }
 
-async function unipileFetch(apiKey: string, url: URL, accept: string): Promise<Response> {
+export async function unipileFetch(apiKey: string, url: URL, accept: string): Promise<Response> {
   let response: Response;
   try {
     response = await fetch(url, {

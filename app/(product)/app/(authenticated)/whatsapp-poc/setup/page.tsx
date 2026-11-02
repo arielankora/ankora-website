@@ -7,7 +7,7 @@ import { UnipileError, listWhatsappAccounts, loadMergedChats, type PocChat } fro
 import { blockStateFor } from "@/lib/comms/visibility";
 import { commsAccess } from "@/lib/comms/access";
 import { prisma } from "@/lib/prisma";
-import { BlockManyForm, ConnectForm, DecideForm, LoadHistoryForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
+import { BlockManyForm, ConnectForm, DecideForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
 
 // Communications storage (1.11.2026): the WhatsApp numbers connected for
 // storing, each with its "לא לשמור" list before anything is kept, "התחל
@@ -176,6 +176,17 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
       ) : null}
 
       {sections}
+
+      {manager ? (
+        <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
+          <h2 className="text-base font-medium text-app-text-primary">הקלטות שאלוהה שלחה ידנית</h2>
+          <p className="text-sm text-app-text-secondary">
+            כשאלוהה שולחת לתיבה מייל &quot;הקלטות עבור המספר ...&quot; עם קובצי שמע, הכפתור שומר אותם כשיחות בקו הזה, בלי המספר של הצד
+            השני. רק קו שמוגדר אצלנו נקלט, ושום הקלטה לא נשמרת פעמיים.
+          </p>
+          <ManualRecordingsForm />
+        </section>
+      ) : null}
 
       <section className="space-y-3 rounded-2xl border border-app-border bg-white p-4">
         <h2 className="text-base font-medium text-app-text-primary">חיבור מספר</h2>
