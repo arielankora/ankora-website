@@ -84,6 +84,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi)",
   decide_approval: "only a row list_approvals would show (findApprovalForAi)",
   decide_knowledge_proposals: "a proposal of a marked client is refused (decideProposalForAi)",
+  get_proposal_stats: "proposals of a marked client are left out and only counted; no proposal text is returned (proposalStatsForAi)",
 
   // lib/mcp/portal-tools.ts (the client's own connector)
   get_status: "a marked client gets no answer (portalAiBlocked); marked tasks are left out of the lists",
