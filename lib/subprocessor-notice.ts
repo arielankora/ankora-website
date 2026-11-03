@@ -24,6 +24,9 @@ export const SUBPROCESSOR_NOTICE_FILE_LINE: Record<SubprocessorNotice, string> =
   NOT_COMMITTED: "אין, מספיק עדכון באתר",
 };
 
+/// An internal client (Client.isInternal) is never on the P8 step 8 list.
+export const SUBPROCESSOR_NOTICE_INTERNAL_LINE = "לקוח פנימי, לא נכלל ברשימת הנמענים";
+
 export const SUBPROCESSOR_NOTICE_SOURCE_REQUIRED =
   "כדי לסמן יש או אין התחייבות, צריך לכתוב את המקור: החוזה והסעיף.";
 
