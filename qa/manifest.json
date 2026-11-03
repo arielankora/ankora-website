@@ -2171,9 +2171,10 @@
     "domain:auto-apply": {
       "kind": "domain",
       "area": "app",
-      "risk": "high",
-      "riskAssigned": false,
-      "firstSeen": "2026-11-03"
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-03",
+      "riskReason": "מכניס הצעות לתיקי לקוחות בלי אדם לפני הכניסה, ועוצר סוג או לקוח שמתחילים לטעות. טעות כאן כותבת מידע שגוי לתיק שהצוות וקלוד קוראים כאמת (אריאל, 3.11.2026)."
     },
     "domain:process-dates": {
       "kind": "domain",

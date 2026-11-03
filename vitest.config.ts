@@ -34,5 +34,12 @@ export default defineConfig({
     // noise), and a per-directory setting would not protect someone running
     // `npx vitest run tests/integration` by hand.
     fileParallelism: false,
+    // tests/integration/setup.ts truncates every table before each test. On
+    // a loaded CI runner that took more than the default 10 seconds once
+    // (scheduled run 714, 3.11.2026: "Hook timed out in 10000ms" in
+    // client-contacts, with "lock not available" all over the database
+    // log), and a test that never ran failed the whole night. 30 seconds is
+    // room for a slow runner; a reset that needs longer is a real problem.
+    hookTimeout: 30_000,
   },
 });
