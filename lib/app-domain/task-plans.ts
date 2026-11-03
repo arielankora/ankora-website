@@ -184,12 +184,21 @@ export async function saveTaskPlan(
     clientId: task.clientId,
     after: { planVersion: saved.version, planStatus: saved.status, origin: saved.origin, stepCount: steps.length },
   });
-  return afterApproval(actor, task.id, saved);
+  const result = await afterApproval(actor, task.id, saved);
+  // P8 (3.11.2026): a plan is often where connecting a vendor first shows.
+  const { checkVendorSignalSafely } = await import("@/lib/app-domain/vendor-detections");
+  const vendorCheck = await checkVendorSignalSafely(task.id, [body, ...steps].join("\n"));
+  return { ...result, vendorCheck };
 }
 
 /// A saved or approved plan, plus whether that approval moved the task
 /// from OPEN to IN_PROGRESS.
-export type SavedTaskPlan = TaskPlanRow & { taskStarted: boolean };
+export type SavedTaskPlan = TaskPlanRow & {
+  taskStarted: boolean;
+  /// P8: the plan looks like connecting a new vendor, and a person is to
+  /// be asked (lib/app-domain/vendor-detections.ts). Only on save.
+  vendorCheck?: import("@/lib/app-domain/vendor-detections").VendorCheck | null;
+};
 
 /// What an approved plan does to its task, on save through MCP and on
 /// approval on the screen alike: steps when it has none, and the status.

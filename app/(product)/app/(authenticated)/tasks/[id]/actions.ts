@@ -21,6 +21,7 @@ import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPla
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { recordRunLesson } from "@/lib/app-domain/process-lessons";
+import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
 import {
   friendlyError as entryError,
   overlapWarningFrom,
@@ -521,6 +522,20 @@ export async function recordRunLessonAction(input: { taskId: string; body: strin
     await recordRunLesson(user, input.taskId, input.body);
     revalidatePath(`/app/tasks/${input.taskId}`);
     return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// P8 (3.11.2026): the answer to "is this a new vendor?" on the screen.
+/// The domain checks access to the task's client and that it is still open.
+export async function decideVendorCheckAction(input: { taskId: string; detectionId: string; decision: "OPEN_RUN" | "NOT_A_VENDOR"; vendor: string | null }) {
+  const user = await requireUser();
+  try {
+    const out = await decideVendorCheck(user, input.detectionId, input.decision, input.vendor);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    if (out.runTaskId) revalidatePath(`/app/tasks/${out.runTaskId}`);
+    return { ok: true as const, status: out.status };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

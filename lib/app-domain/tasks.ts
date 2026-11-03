@@ -963,6 +963,14 @@ export async function createTask(
   );
   // Urgent work does not wait for the morning. See urgent-tasks.ts.
   await alertIfUrgentLanded(actor, task, client?.name ?? "", null);
+  // P8 (3.11.2026): does this task connect a new vendor to the product?
+  // Recorded here, in the one place every task is born, so a task opened
+  // on the screen is asked about as surely as one Claude opened. Never in
+  // the way: a failure is logged and the task stands.
+  if (!task.parentId) {
+    const { checkVendorSignalSafely } = await import("@/lib/app-domain/vendor-detections");
+    await checkVendorSignalSafely(task.id);
+  }
   return task;
 }
 
@@ -1509,6 +1517,13 @@ export async function updateTask(actor: User, taskId: string, patch: TaskPatch) 
   // And urgent work that just became this person's does not wait for the
   // morning: raised to urgent, or an urgent task handed over.
   await alertIfUrgentLanded(actor, updated, taskClientName, task);
+  // P8: a task renamed, rewritten or moved into product work that
+  // connects a vendor is asked about too (once per task; see
+  // vendor-detections.ts).
+  if (!updated.parentId && (data.title !== undefined || data.description !== undefined || data.categoryId !== undefined)) {
+    const { checkVendorSignalSafely } = await import("@/lib/app-domain/vendor-detections");
+    await checkVendorSignalSafely(updated.id);
+  }
   return updated;
 }
 

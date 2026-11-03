@@ -52,6 +52,11 @@ export type OpenRunInput = {
   fallbackCategoryId?: string | null;
   /// Null for the daily job.
   actorId: string | null;
+  /// P8 (3.11.2026): what this run is about, after the process's title
+  /// ("P8 הוספת תת-מעבד חדש: Pipedrive"), and a line above the procedure
+  /// saying where it came from. Both optional; a dated run has neither.
+  titleSuffix?: string | null;
+  descriptionPrefix?: string | null;
 };
 
 /// Opens the run, or returns null when the process cannot run: retired,
@@ -129,8 +134,8 @@ export async function openProcessRun(input: OpenRunInput) {
     data: {
       clientId: process.clientId,
       categoryId: process.categoryId ?? input.fallbackCategoryId ?? null,
-      title: `${process.code} ${process.title}`.slice(0, 200),
-      description,
+      title: `${process.code} ${process.title}${input.titleSuffix ? `: ${input.titleSuffix}` : ""}`.slice(0, 200),
+      description: input.descriptionPrefix ? `${input.descriptionPrefix}\n\n${description}` : description,
       assignedToId: assignee,
       dueDate: dayAt(runKey),
       importantDateId: input.importantDateId ?? null,

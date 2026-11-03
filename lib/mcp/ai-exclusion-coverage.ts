@@ -40,6 +40,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   apply_task_plan_steps: "findTask",
   set_task_step: "findTask",
   add_task_comment: "findTask",
+  decide_vendor_check: "the detection's source task is checked with aiExcludedTaskIds and a marked one is refused",
   create_decision: "lookupClient, then lookupTask or lookupTaskById",
   list_decisions: "lookupClient; decisions about a marked task are left out",
 

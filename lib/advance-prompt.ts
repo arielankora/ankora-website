@@ -378,6 +378,11 @@ export function buildAdvancePrompt(input: AdvancePromptInput): string {
           `- המשימה בשלב מיפוי וצפייה: לפני הסגירה, להציע לתיק הלקוח עם propose_knowledge את מה שנלמד בה (מערכות, אנשי קשר, סוגי בקשות, כללים), גם אם לא נוצר מסמך. המקור הוא המשימה עצמה (newSource מסוג TASK עם taskId "${input.taskId}"), או המסמך שתויק אם יש. מותר בלי לשאול, ואחר כך להזכיר לי לאשר.`,
         ]
       : []),
+    // P8 (3.11.2026): a new vendor connected before the subprocessor
+    // process started was the gap. The server asks on its own
+    // (lib/app-domain/vendor-detections.ts); this line covers what its
+    // word match misses.
+    "- ספק חדש: אם המשימה או התוכנית מחברות ספק, מחבר, כלי או API חדש לאפליקציה או לשירות שאנקורה נותנת ללקוחות, כך שמידע של לקוחות יעבור אליו, תשאל אותי אם לפתוח ריצת P8 (הוספת תת-מעבד). כשכלי מחזיר vendorCheck, תשאל ותענה עם decide_vendor_check. כלים לשיווק, למכירות או לתפעול הפנימי של אנקורה לא נכללים.",
     "- אף פעם: לשלוח משהו ללקוח או לספק בעצמך. אתה מנסח, אני שולח.",
     "- אם התוכנית משתנה תוך כדי ביצוע, תציע גרסה חדשה ותשמור אותה רק אחרי אישור. לא משנים תוכנית בשקט.",
     `- אם save_task_plan מחזיר שנשמרה גרסה חדשה יותר, תקרא אותה עם get_task_plan, תראה לי מה שונה ותשאל לפני שאתה שומר.`,

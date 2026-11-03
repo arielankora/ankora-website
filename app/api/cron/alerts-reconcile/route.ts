@@ -7,6 +7,7 @@ import { purgeExpiredWebsiteLeads } from "@/lib/website-leads";
 import { sendDailyTaskDigest } from "@/lib/app-domain/task-digest";
 import { notifyClientFileAttention } from "@/lib/app-domain/client-file-attention";
 import { sendWeeklyBrainMetrics } from "@/lib/app-domain/brain-metrics";
+import { openOverdueVendorRuns } from "@/lib/app-domain/vendor-detections";
 
 // Spec 9.2's "scheduled reconciliation" + retry-with-backoff ideal,
 // approximated here as a single once-daily Vercel Cron job (see ADR 11.3 -
@@ -28,7 +29,7 @@ export async function GET(request: Request) {
     // Phase 9 gap-fix (docs/adr/0001 section 17.2): long-timer
     // notifications reuse this same daily cron rather than a new job -
     // see lib/app-domain/notifications.ts's own comment for why.
-    const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles, brainMetrics] = await Promise.all([
+    const [reconciled, retried, longTimers, importantDates, digest, leadRetention, clientFiles, brainMetrics, vendorRuns] = await Promise.all([
       reconcileAllClientAlerts(),
       retryFailedEmailDeliveries(),
       notifyLongRunningTimers(),
@@ -62,6 +63,13 @@ export async function GET(request: Request) {
         console.error("[cron] sendWeeklyBrainMetrics failed", err);
         return { sent: 0, error: String(err) };
       }),
+      // P8 (3.11.2026): a "new vendor?" question nobody answered for a
+      // business day opens the subprocessor run anyway. Isolated the same
+      // way. See lib/app-domain/vendor-detections.ts.
+      openOverdueVendorRuns().catch((err) => {
+        console.error("[cron] openOverdueVendorRuns failed", err);
+        return { opened: 0, failed: 0, error: String(err) };
+      }),
     ]);
 
     return NextResponse.json({
@@ -74,6 +82,7 @@ export async function GET(request: Request) {
       leadRetention,
       clientFiles,
       brainMetrics,
+      vendorRuns,
     });
   } catch (err) {
     console.error("alerts-reconcile cron failed:", err);
