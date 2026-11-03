@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readinessLabel, runBlocker, runBlockers, runReadiness, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
+import { CONTINUOUS_NO_CHECK_BLOCKER, readinessLabel, runBlocker, runBlockers, runReadiness, SCHEDULED_NO_DATE_BLOCKER } from "@/lib/process-readiness";
 import { completeness, documentation, documentationLine, processGaps, readNotApplicable, type CompletenessInput } from "@/lib/process-rules";
 
 // 25.10.2026 (Ariel: "there is always something missing"): whether a
@@ -37,6 +37,20 @@ describe("run readiness", () => {
     expect(runBlockers({ ...runs, status: "PAUSED", ownerId: null })).toEqual(["לא ירוץ: התהליך מושהה"]);
     // The one reason the screen shows is the first of them.
     expect(runBlocker({ ...runs, triggerText: null, nextDate: null })).toBe(runBlockers({ ...runs, triggerText: null, nextDate: null })[0]);
+  });
+
+  // 3.11.2026: P7 of Grantor, ongoing only, in force, no check: in nobody's
+  // routine, and it read "רץ".
+  it("an ongoing process with no check does not run", () => {
+    const ongoing = { ...runs, triggerKinds: ["CONTINUOUS"], triggerText: "כל יום עבודה ב-9:00", nextDate: null };
+    expect(runBlockers({ ...ongoing, checkEveryDays: null })).toEqual([CONTINUOUS_NO_CHECK_BLOCKER]);
+    expect(runBlockers({ ...ongoing, checkEveryDays: 1 })).toEqual([]);
+    // A caller that did not read the field does not judge it.
+    expect(runBlockers(ongoing)).toEqual([]);
+    // Ongoing beside another trigger opens runs: not this reason.
+    expect(runBlockers({ ...ongoing, triggerKinds: ["CONTINUOUS", "EVENT"], checkEveryDays: null })).toEqual([]);
+    // A draft waits for its approval first.
+    expect(runBlockers({ ...ongoing, status: "DRAFT", checkEveryDays: null })).toEqual(["לא ירוץ: אין נוהל מאושר"]);
   });
 });
 

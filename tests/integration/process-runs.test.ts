@@ -128,6 +128,22 @@ describe("runs started by a person", () => {
     await expect(startProcessRun(stranger, process.id, new Date())).rejects.toThrow();
   });
 
+  // 3.11.2026: P7 of Grantor had two runs for 4.11, five minutes apart.
+  it("open one run a day: a second for a day with an unfinished run is refused, a finished one does not block", async () => {
+    const { hadas, process } = await setup();
+    const day = new Date("2026-11-04T00:00:00Z");
+    const first = await startProcessRun(hadas, process.id, day);
+    await expect(startProcessRun(hadas, process.id, day)).rejects.toThrow(first.id);
+    // Another day is another run.
+    await startProcessRun(hadas, process.id, new Date("2026-11-05T00:00:00Z"));
+    // The same day at another hour is the same day.
+    await expect(startProcessRun(hadas, process.id, new Date("2026-11-04T15:00:00Z"))).rejects.toThrow("כבר יש ריצה פתוחה");
+    await prisma.task.update({ where: { id: first.id }, data: { status: "ARCHIVED" } });
+    const again = await startProcessRun(hadas, process.id, day);
+    expect(again.id).not.toBe(first.id);
+    expect(await prisma.task.count({ where: { processId: process.id, parentId: null, status: { not: "ARCHIVED" } } })).toBe(2);
+  });
+
   it("copy into the run only the rules meant for everyone on the client, never a sensitive or restricted one", async () => {
     const { client, hadas, process } = await setup();
     await addClientPolicy(hadas, { clientId: client.id, kind: "INFO", title: "בירור רפואי", statement: "פרט רפואי על המנכ״ל", sensitivity: "SENSITIVE", sources: S1 });

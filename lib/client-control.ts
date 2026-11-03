@@ -61,13 +61,14 @@ export type ControlProcess = {
   triggerKinds?: readonly string[] | null;
   triggerText?: string | null;
   nextDate?: Date | null;
+  checkEveryDays?: number | null;
   readiness?: { ready: boolean; blocker: string | null };
   documentation?: { score: number; of: number };
 };
 
 function blockerOf(p: ControlProcess): string | null {
   if (p.readiness) return p.readiness.blocker;
-  return runReadiness({ status: p.status, ownerId: p.ownerId ?? null, triggerKinds: p.triggerKinds ?? [], triggerText: p.triggerText ?? null, nextDate: p.nextDate ?? null }).blocker;
+  return runReadiness({ status: p.status, ownerId: p.ownerId ?? null, triggerKinds: p.triggerKinds ?? [], triggerText: p.triggerText ?? null, nextDate: p.nextDate ?? null, checkEveryDays: p.checkEveryDays }).blocker;
 }
 
 function docShare(p: ControlProcess): number {

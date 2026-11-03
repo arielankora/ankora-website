@@ -25,6 +25,9 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 
 export const RUN_OPENED = "process.run_opened";
 
+/// A run in one of these is over: it does not stop another for its day.
+export const FINISHED_RUN_STATUSES = ["DONE", "ARCHIVED"] as const;
+
 /// The business calendar of a run (decision 6): the one set on the
 /// process, otherwise its entity's country ("US" for NUX Inc), otherwise
 /// the date's, otherwise Israel.
@@ -198,9 +201,36 @@ export async function startProcessRun(actor: User, processId: string, day: Date)
     throw new Error("תהליך שוטף לא נפתח כריצה. הוא רץ כל הזמן, ונבדק בסקירה התקופתית.");
   }
   if (Number.isNaN(day.getTime())) throw new Error("צריך תאריך לריצה.");
+  // 3.11.2026: P7 of Grantor had two runs for 4.11, opened five minutes
+  // apart, and the calendar showed both. One run of a process per day: a
+  // second one for a day that already has an unfinished run is refused,
+  // with the run that is there. A finished or archived run does not block
+  // (the work came back), and a run opened by the vendor job (P8, one per
+  // vendor) does not come through here.
+  const existing = await sameDayRun(processId, day);
+  if (existing) {
+    throw new Error(`כבר יש ריצה פתוחה של ${process.code} ליום הזה: "${existing.title}" (${existing.id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.`);
+  }
   const run = await openProcessRun({ processId, occurrence: day, actorId: actor.id, fallbackAssigneeId: actor.id });
   if (!run) throw new Error("לא ניתן לפתוח ריצה לתהליך הזה.");
   return run;
+}
+
+/// An unfinished run of the process due on the same Israel day, if any.
+/// Runs are due at UTC midnight of their day (dayAt), so the day's key is
+/// the comparison.
+export async function sameDayRun(processId: string, day: Date) {
+  const key = localDateKey(day, TIMEZONE);
+  return prisma.task.findFirst({
+    where: {
+      processId,
+      parentId: null,
+      deletedAt: null,
+      dueDate: dayAt(key),
+      status: { notIn: [...FINISHED_RUN_STATUSES] },
+    },
+    select: { id: true, title: true },
+  });
 }
 
 /// Recent runs of a process, newest first, for its card.

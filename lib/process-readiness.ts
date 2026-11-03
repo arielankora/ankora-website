@@ -4,7 +4,8 @@
 // questions were one number: does it run, and how well is it written down.
 //
 // It runs when it has an owner, says what sets it off, has an approved
-// procedure (ACTIVE), and, when it runs by a date, has a date ahead of it.
+// procedure (ACTIVE), and, when it runs by a date, has a date ahead of it,
+// and when it is only ongoing, a check every N days.
 // The first of these that is missing is the one reason shown, in red. The
 // documentation is read by documentation() in lib/process-rules.ts and is
 // shown quietly. Pure.
@@ -15,6 +16,9 @@ export type ReadinessInput = {
   triggerKinds: readonly string[];
   triggerText: string | null;
   nextDate: Date | string | null;
+  /// How often an ongoing process is checked. Left out by a caller that
+  /// does not read it: then it is not judged.
+  checkEveryDays?: number | null;
 };
 
 export type RunReadiness = { ready: boolean; blocker: string | null };
@@ -22,6 +26,17 @@ export type RunReadiness = { ready: boolean; blocker: string | null };
 export const RUNS_LABEL = "רץ";
 
 export const SCHEDULED_NO_DATE_BLOCKER = "לא ירוץ: תהליך לפי מועד בלי מועד";
+
+export const CONTINUOUS_NO_CHECK_BLOCKER = "לא ירוץ: תהליך שוטף בלי תדירות בדיקה";
+
+/// 3.11.2026 (P7 of Grantor, "every workday at 9:00"): a process in force
+/// that is only ongoing opens no runs, and with no check every N days it
+/// is in nobody's routine and reminds nobody. It read "רץ" and was on no
+/// screen. Only when the caller read the field (undefined: not judged).
+export function continuousWithoutCheck(p: { status: string; triggerKinds?: readonly string[] | null; checkEveryDays?: number | null }): boolean {
+  const kinds = p.triggerKinds ?? [];
+  return p.status === "ACTIVE" && kinds.length === 1 && kinds[0] === "CONTINUOUS" && p.checkEveryDays === null;
+}
 
 /// A process in force that runs by a date (SCHEDULED) with no date ahead:
 /// nothing opens its next run (#318). A draft does not run anyway; it is
@@ -43,6 +58,7 @@ export function runBlockers(p: ReadinessInput): string[] {
   if (p.triggerKinds.length === 0 || !p.triggerText?.trim()) out.push("לא ירוץ: לא כתוב מה מפעיל אותו");
   if (p.status !== "ACTIVE") out.push("לא ירוץ: אין נוהל מאושר");
   if (scheduledWithoutDate(p)) out.push(SCHEDULED_NO_DATE_BLOCKER);
+  if (continuousWithoutCheck(p)) out.push(CONTINUOUS_NO_CHECK_BLOCKER);
   return out;
 }
 
