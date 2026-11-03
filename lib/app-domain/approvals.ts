@@ -226,6 +226,7 @@ async function procedures(s: Scope): Promise<ApprovalItem[]> {
       href: itemHref(d.process.clientId, d.processId),
       preview,
       blocked: held ? "הנוהל לא עובר את הבדיקות. מתקנים אותו בתהליך, ואז מאשרים." : separated,
+      failing: held ? preview.problems : undefined,
       actions: { approve: held || separated ? null : "אישור הנוהל", reject: null },
       recommend: held
         ? { text: "לתקן בתהליך, ואז לאשר", why: "נוהל שלא עומד בכללים של הלקוח לא מאושר." }

@@ -79,6 +79,31 @@ describe("list_processes and get_process", () => {
     const detail = await call(hadas, "get_process", { client: "NUX", process: p1.code });
     expect(detail.json.procedure.failsRules.join()).toContain("בלי תשלומים");
   });
+
+  // 3.11.2026: a process with only a draft gave `procedure: null` and
+  // nothing else, so Claude could not see why it was blocked.
+  it("gives a draft-only process its draft steps and what holds them back, with procedure still null", async () => {
+    const { client, hadas } = await setup();
+    const p2 = await addProcess(hadas, { clientId: client.id, title: "דוח חודשי", triggerKinds: ["ON_DEMAND"], sources: S1 });
+    await saveProcessVersion(hadas, p2.id, { steps: [{ title: "שליפה", mode: "AUTOMATED" }, { title: "בדיקה" }, { title: "שמירה", mode: "AUTOMATED" }], baseVersion: 0 });
+    const detail = await call(hadas, "get_process", { client: "NUX", process: p2.code });
+    expect(detail.json.procedure).toBeNull();
+    expect(detail.json.draftVersion).toBe(1);
+    expect(detail.json.draft.version).toBe(1);
+    expect(detail.json.draft.steps.map((s: { n: number; title: string; verification: string | null }) => [s.n, s.title, s.verification])).toEqual([
+      [1, "שליפה", null],
+      [2, "בדיקה", null],
+      [3, "שמירה", null],
+    ]);
+    expect(detail.json.draft.failsRules).toEqual(["שלבים 1 ו-3 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה."]);
+  });
+
+  it("an approved procedure with no draft has draft null", async () => {
+    const { hadas, p1 } = await setup();
+    const detail = await call(hadas, "get_process", { client: "NUX", process: p1.code });
+    expect(detail.json.procedure.version).toBe(1);
+    expect(detail.json.draft).toBeNull();
+  });
 });
 
 describe("list_policies", () => {

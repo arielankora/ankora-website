@@ -69,6 +69,8 @@ function serializeItem(base: string, i: ApprovalItem, timeZone: string, proposal
     by: i.by ?? undefined,
     recommend: i.recommend ? `${i.recommend.text}${i.recommend.why ? `. ${i.recommend.why}` : ""}` : undefined,
     blocked: i.blocked ?? undefined,
+    // A procedure held back: each check it fails, as the client's file says it.
+    failing: i.failing?.length ? i.failing : undefined,
     // What decide_approval can do with it, in the screen's own words.
     // Always present, null when the row has no such button here (a process
     // step fixed on the process, a batch decided proposal by proposal), so

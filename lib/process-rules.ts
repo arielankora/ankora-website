@@ -182,6 +182,41 @@ export function blockingChecks(
   return out;
 }
 
+/// The label of the step field R3 asks for, as the procedure editor shows it.
+export const VERIFICATION_FIELD_LABEL = "איך אדם מוודא שזה קרה";
+
+/// "שלבים 2, 4 ו-5", or "שלב 3".
+export function stepList(steps: number[]): string {
+  if (steps.length === 1) return `שלב ${steps[0]}`;
+  return `שלבים ${steps.slice(0, -1).join(", ")} ו-${steps[steps.length - 1]}`;
+}
+
+/// R3 on several steps, in one sentence: "שלבים 1, 2 ו-4 אוטומטיים: ...".
+export function automatedStepsMessage(steps: number[]): string {
+  return steps.length === 1
+    ? `שלב ${steps[0]} אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.`
+    : `${stepList(steps)} אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.`;
+}
+
+/// The same R3 note on several steps becomes one line that names them
+/// (3.11.2026: five identical lines said nothing the first did not). The
+/// merged line takes the place of the first one; everything else keeps its
+/// order and its own fields.
+export function mergeStepChecks<T extends { code: string; message: string; step?: number }>(checks: T[]): (T & { steps?: number[] })[] {
+  const r3 = checks.filter((c) => c.code === "R3" && c.step);
+  if (r3.length < 2) return checks;
+  const steps = r3.map((c) => c.step!);
+  const out: (T & { steps?: number[] })[] = [];
+  for (const c of checks) {
+    if (c.code === "R3" && c.step) {
+      if (c === r3[0]) out.push({ ...c, step: undefined, steps, message: automatedStepsMessage(steps) });
+      continue;
+    }
+    out.push(c);
+  }
+  return out;
+}
+
 /// What a process needs before it can be trusted with a run (spec 3.8,
 /// Oren's nine fields). Each missing one is a gap, and the score is how
 /// many of the nine are there.

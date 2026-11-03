@@ -7,7 +7,7 @@ import { z } from "zod";
 import { citedCodes, readSourceRefs } from "@/lib/knowledge-sources";
 import { factShapeError } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
-import { blockingChecks, readSteps } from "@/lib/process-rules";
+import { automatedStepsMessage, blockingChecks, readSteps, VERIFICATION_FIELD_LABEL } from "@/lib/process-rules";
 import { clientVisibleBlocker } from "@/lib/knowledge";
 import { DatePayload, dateShapeError, dateWhen } from "@/lib/date-proposals";
 import { parseExternalRefs, readExternalRefs, refLabel } from "@/lib/external-refs";
@@ -292,11 +292,40 @@ export const suggestedToResolve = (sourceTitle?: string | null) => (sourceTitle?
 /// length: then the plain wording.
 export const suggestedVerification = (output?: string | null) => (output?.trim() && output.trim().length <= 200 ? `אדם בודק ש${output.trim()} קיים.` : "אדם בודק שהשלב בוצע.");
 
-/// "שלבים 2, 4 ו-5", or "שלב 3".
-function stepList(steps: number[]): string {
-  if (steps.length === 1) return `שלב ${steps[0]}`;
-  return `שלבים ${steps.slice(0, -1).join(", ")} ו-${steps[steps.length - 1]}`;
+/// The labels of the fields a missing-field note sends the reviewer to,
+/// as the edit form on the review card shows them (ReviewBatch uses these
+/// same words), so the note names the field the reviewer will see.
+export const EDIT_FIELD_LABELS = {
+  body: "מה",
+  validUntilEvent: "בתוקף עד אירוע",
+  decidedAt: "תאריך ההחלטה",
+  interimStatement: "עד שיאושר",
+  toResolve: "מה יסגור את זה",
+  clientVisible: "גלוי ללקוח",
+  date: "תאריך",
+} as const;
+
+/// "בעריכה, בשדה "X"": where the reviewer fills it in.
+const inField = (label: string) => `בעריכה, בשדה "${label}"`;
+
+/// Which field completes a fact that fails its shape, by the same order
+/// factShapeError checks it in.
+function factShapeField(payload: Record<string, unknown>): string | null {
+  if (typeof payload.body !== "string" || !payload.body.trim()) return EDIT_FIELD_LABELS.body;
+  if (payload.kind === "TEMPORARY") return EDIT_FIELD_LABELS.validUntilEvent;
+  if (payload.kind === "ONE_OFF_DECISION") return EDIT_FIELD_LABELS.decidedAt;
+  return null;
 }
+
+/// A date is completed in the edit only when what it lacks is its day (a
+/// one-off or annual date); a monthly or weekly day has no field there.
+function dateShapeField(payload: Record<string, unknown>): string | null {
+  return payload.recurrence === "ONCE" || payload.recurrence === "ANNUAL" ? EDIT_FIELD_LABELS.date : null;
+}
+
+/// The edit form has "מה יסגור את זה" for every item but a task, a date
+/// and a question (a question is closed by its answer).
+const hasToResolveField = (target: ProposalTargetLike, payload: Record<string, unknown>) => target !== "TASK" && target !== "DATE" && !(target === "FACT" && payload.kind === "QUESTION");
 
 /// The codes proposalProblems says, so a stored card can be said again
 /// with today's wording.
@@ -316,18 +345,27 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
         : payload.kind === "ONE_OFF_DECISION"
           ? "בלי תאריך אי אפשר לדעת אם ההחלטה עדיין בתוקף."
           : undefined;
-    if (shape) out.push({ code: "SHAPE", block: true, why, message: `${shape} משלימים בעריכה, או דוחים.` });
+    const field = factShapeField(payload);
+    if (shape) out.push({ code: "SHAPE", block: true, why, message: `${shape} משלימים ${field ? inField(field) : "בעריכה"}, או דוחים.` });
   }
   if (target === "DATE") {
     const shape = dateShapeError(payload);
-    if (shape) out.push({ code: "SHAPE", block: true, why: "בלי היום שבו המועד חל, המערכת לא יודעת מתי להזכיר.", message: `${shape} משלימים בעריכה, או דוחים.` });
+    const field = dateShapeField(payload);
+    if (shape) {
+      out.push({
+        code: "SHAPE",
+        block: true,
+        why: "בלי היום שבו המועד חל, המערכת לא יודעת מתי להזכיר.",
+        message: field ? `${shape} משלימים ${inField(field)}, או דוחים.` : `${shape} לזה אין שדה בעריכה: דוחים, ומבקשים מ-Claude לשלוח את המועד שוב עם היום.`,
+      });
+    }
   }
   if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
     out.push({
       code: "SHAPE",
       block: true,
       why: "כלל מוצע לא חל עד שמאשרים אותו, ולכן צריך לכתוב מה עושים בינתיים.",
-      message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים בנוסח המוצע, בעריכה, או דוחים.',
+      message: `חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים בנוסח המוצע, או ${inField(EDIT_FIELD_LABELS.interimStatement)}, או דוחים.`,
       fix: { label: SUGGESTED_INTERIM, edits: { interimStatement: SUGGESTED_INTERIM } },
     });
   }
@@ -338,7 +376,7 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
       code: "SHAPE",
       block: true,
       why: "בלי זה אף אחד לא יודע איך מאמתים את הפריט, והוא נשאר לא ודאי לתמיד.",
-      message: 'לא ודאי או חסר, בלי "מה יסגור את זה". משלימים בנוסח המוצע, בעריכה, או דוחים.',
+      message: `סומן לא ודאי או חסר, ולא כתוב מה יאמת אותו. משלימים בנוסח המוצע${hasToResolveField(target, payload) ? `, או ${inField(EDIT_FIELD_LABELS.toResolve)}` : ""}, או דוחים.`,
       fix: { label: toResolve, edits: { toResolve } },
     });
   }
@@ -350,7 +388,7 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
         code: "VISIBLE",
         block: true,
         why: "הלקוח רואה בפורטל רק פריט שאין סיבה להסתיר ממנו.",
-        message: `${why} מורידים את "גלוי ללקוח", או דוחים.`,
+        message: `${why} מורידים את "גלוי ללקוח" בנוסח המוצע, או ${inField(EDIT_FIELD_LABELS.clientVisible)} בוחרים "לא", או דוחים.`,
         fix: { label: 'בלי "גלוי ללקוח"', edits: { clientVisible: false } },
       });
     }
@@ -376,7 +414,9 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
         code: "R3",
         steps,
         why: "פעולה אוטומטית יכולה להיכשל בשקט, ולכן אדם צריך דרך לבדוק שהיא קרתה.",
-        message: `${stepList(steps)} ${steps.length === 1 ? "אוטומטי" : "אוטומטיים"}: צריך לכתוב איך אדם מוודא שזה קרה.${draft}`,
+        // The review's edit has no steps: the procedure's editor has the
+        // field, on the process, once it is in the file.
+        message: `${automatedStepsMessage(steps)} משלימים בנוסח המוצע, או אחרי האישור בנוהל של התהליך, ${steps.length === 1 ? "בשלב" : "בכל שלב"} בשדה "${VERIFICATION_FIELD_LABEL}".${draft}`,
         // The wording in full, step by step, before anyone presses.
         fix: { label: readSteps(payload.steps).flatMap((st, i) => (steps.includes(i + 1) ? [`שלב ${i + 1}: ${suggestedVerification(st.output)}`] : [])).join(" "), edits },
       });

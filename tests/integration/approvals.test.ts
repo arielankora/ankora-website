@@ -265,6 +265,30 @@ describe("approvals", () => {
     expect(bad?.actions.approve).toBeNull();
     expect(bad?.blocked).toContain("לא עובר את הבדיקות");
     expect(bad?.preview?.problems.length).toBeGreaterThan(0);
+    // 3.11.2026: what fails, on the row itself; a row that passes has none.
+    expect(bad?.failing).toEqual(bad?.preview?.problems);
+    expect(good?.failing).toBeUndefined();
+  });
+
+  // 3.11.2026: the row lists the checks it fails, and the same note on
+  // several automated steps is one line naming them.
+  it("lists the failing checks of a held procedure, with automated steps merged into one line", async () => {
+    const { client, ariel } = await setup();
+    const step = (over: Record<string, unknown>) => ({ title: "שלב", mode: "MANUAL", offsetBusinessDays: null, actionTags: [], systemIds: [], output: null, verification: null, requiresApproval: false, amountMaxMinor: null, currency: null, channel: null, ...over });
+    const held = await prisma.process.create({ data: { clientId: client.id, seq: 4, code: "P4", title: "דוח חודשי" } });
+    await prisma.processVersion.create({
+      data: {
+        processId: held.id,
+        version: 1,
+        status: "DRAFT",
+        steps: [step({ title: "שליפה", mode: "AUTOMATED" }), step({ title: "בדיקה" }), step({ title: "שמירה", mode: "AUTOMATED" }), step({ title: "שליחה", mode: "AUTOMATED", verification: "רואים בתיבה", actionTags: ["CLIENT_MESSAGE"] })],
+      },
+    });
+    const row = (await mine(ariel, client.id)).find((r) => r.id === held.id);
+    expect(row?.failing).toEqual([
+      "שלבים 1 ו-3 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.",
+      "שלב 4: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית.",
+    ]);
   });
 });
 

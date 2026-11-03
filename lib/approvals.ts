@@ -104,6 +104,9 @@ export type ApprovalItem = {
   /// Why there is no approve button, when there is none on purpose: a rule
   /// that is not yet confirmed with the client.
   blocked?: string | null;
+  /// A procedure held back by its checks: each check it fails, in the words
+  /// the client's file shows (3.11.2026: the row said only that it fails).
+  failing?: string[];
   /// How many it stands for: a knowledge batch counts its proposals.
   weight?: number;
   /// What it says in full, to read before deciding: a procedure's steps
