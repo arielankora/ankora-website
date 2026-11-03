@@ -13,13 +13,14 @@ import type { ListRow } from "./TaskListProvider";
 // In the address as `?sort=due` or `?sort=-due` (descending), so the way
 // back from a task returns to the same order (list-query.ts carries it).
 
-export const SORT_KEYS = ["client", "title", "due", "assignee", "status", "supervisor"] as const;
+export const SORT_KEYS = ["client", "title", "category", "due", "assignee", "status", "supervisor"] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 export type Sort = { key: SortKey; desc: boolean } | null;
 
 export const SORT_LABELS: Record<SortKey, string> = {
   client: "לקוח",
   title: "משימה",
+  category: "קטגוריה",
   due: "תאריך",
   assignee: "אחראי",
   status: "סטטוס",
@@ -62,6 +63,8 @@ function valueOf(row: ListRow, key: SortKey): string | number | null {
       return row.clientName;
     case "title":
       return row.title;
+    case "category":
+      return row.categoryName;
     case "due":
       return row.dueDate ? Date.parse(row.dueDate) : null;
     case "assignee":

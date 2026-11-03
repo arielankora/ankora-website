@@ -158,7 +158,7 @@ test.describe("desktop", () => {
     await page.screenshot({ path: `${SHOTS}/tasks-list-1280.png`, fullPage: true });
 
     const header = page.getByTestId("task-columns").first();
-    for (const label of ["לקוח", "משימה", "תאריך", "אחראי", "סטטוס", "מפקח"]) {
+    for (const label of ["לקוח", "משימה", "קטגוריה", "תאריך", "אחראי", "סטטוס", "מפקח"]) {
       await expect(header.getByText(label, { exact: true })).toBeVisible();
     }
 

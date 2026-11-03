@@ -398,8 +398,9 @@ export function TaskRow({
     // reader) that finds the wrong one.
     //
     //   below xl, a card:          from xl, one line per task:
-    //     client          icons      client | task | date | assignee
-    //     task                              | status | supervisor | icons
+    //     client          icons      client | task | category | date
+    //     task                              | assignee | status
+    //     date · assignee                   | supervisor | icons
     //     date · assignee
     //     status · supervisor
     //
@@ -416,8 +417,8 @@ export function TaskRow({
         "grid items-center gap-x-3 gap-y-1 px-4 py-3.5 xl:gap-y-0 xl:px-[18px]",
         "grid-cols-[20px_minmax(0,1fr)_auto]",
         "[grid-template-areas:'check_client_icons''check_title_title''check_meta_meta''check_status_status']",
-        "xl:grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px]",
-        "xl:[grid-template-areas:'check_client_title_date_assignee_status_supervisor_icons']",
+        "xl:grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_minmax(0,110px)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px]",
+        "xl:[grid-template-areas:'check_client_title_category_date_assignee_status_supervisor_icons']",
       ].join(" ")}
     >
       <button
@@ -489,11 +490,15 @@ export function TaskRow({
         </div>
         {/* The client moved to its own cell; what is left of this line
             is the category and, from phase 5, how far into its steps the
-            task is. Hidden entirely when there is neither. */}
+            task is. Hidden entirely when there is neither.
+            3.11.2026: from xl the category has its own column (below), so
+            on a desk this line only carries the steps. */}
         {(task.categoryName || task.stepsTotal > 0) && (
-          <p className="mt-0.5 truncate text-[11.5px] text-app-text-tertiary">
-            {task.categoryName}
-            {task.categoryName && task.stepsTotal > 0 ? " · " : ""}
+          <p className={`mt-0.5 truncate text-[11.5px] text-app-text-tertiary ${task.stepsTotal > 0 ? "" : "xl:hidden"}`}>
+            <span className="xl:hidden">
+              {task.categoryName}
+              {task.categoryName && task.stepsTotal > 0 ? " · " : ""}
+            </span>
             {task.stepsTotal > 0 && (
               <span className="font-jbmono">
                 {task.stepsDone}/{task.stepsTotal}
@@ -654,6 +659,19 @@ export function TaskRow({
             </div>
           )}
       </div>
+
+      {/* 3.11.2026: "חסר קטגוריה במסך הזה". A column of its own on a
+          desk, next to the task it describes, and sortable like the rest.
+          Below xl it stays on the line under the title, where the card
+          already shows it, so the cell is hidden there rather than
+          repeating it. */}
+      <span
+        dir="auto"
+        data-cell="category"
+        className="hidden min-w-0 truncate text-right text-xs text-app-text-secondary [grid-area:category] xl:block"
+      >
+        {task.categoryName ?? <span className="text-app-text-tertiary">ללא קטגוריה</span>}
+      </span>
 
       {/* Below xl the date and the assignee share one line; from xl each
           is its own column. `contents` lets the two spans become grid
