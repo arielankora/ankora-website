@@ -64,3 +64,18 @@ describe("missing-field notes with a suggested wording", () => {
     expect(suggestedVerification("א".repeat(201))).toBe("אדם בודק שהשלב בוצע.");
   });
 });
+
+// 3.11.2026: an open question from a meeting, marked missing and without
+// "what closes it", could not be approved: the edit has no status field
+// for a question, and the file fills "תשובה לשאלה." on its own.
+describe("an open question without what closes it", () => {
+  it("is not blocked by rule 1", () => {
+    const flags = proposalProblems("FACT", { kind: "QUESTION", body: "מה הקשר בין ISG לאגרו-נגב?", knowledgeStatus: "MISSING" }, []);
+    expect(flags.filter((f) => f.block)).toEqual([]);
+  });
+
+  it("any other uncertain fact still is", () => {
+    const flags = proposalProblems("FACT", { kind: "NOTE", body: "ISG היא חברת בת", knowledgeStatus: "UNCERTAIN" }, []);
+    expect(flags.some((f) => f.block && f.code === "SHAPE")).toBe(true);
+  });
+});

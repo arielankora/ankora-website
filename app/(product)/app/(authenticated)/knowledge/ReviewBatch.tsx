@@ -166,6 +166,12 @@ function EditForm({ p }: { p: ReviewProposal }) {
             <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
           </label>
         </>
+      ) : p.target === "FACT" && p.payload.kind === "QUESTION" ? (
+        // A question has no status, but what closes it may still be said.
+        <label className="block">
+          <span className="block text-xs font-medium text-app-text-secondary">מה יסגור אותה</span>
+          <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
+        </label>
       ) : null}
       {p.target !== "NARRATIVE" && p.target !== "DOMAIN" && p.target !== "TASK" && p.target !== "DATE" && (
         <div className="grid grid-cols-2 gap-3">
