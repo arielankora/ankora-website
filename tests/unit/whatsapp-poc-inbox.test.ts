@@ -95,7 +95,7 @@ describe("keys and small helpers", () => {
     expect(formatDuration(378)).toBe("6:18");
   });
 
-  it("orders messages and calls in one timeline, oldest first", () => {
+  it("orders messages and calls in one timeline, newest first", () => {
     const t = buildTimeline(
       [
         { id: "m2", timestamp: "2026-11-01T09:00:00Z" },
@@ -103,7 +103,7 @@ describe("keys and small helpers", () => {
       ],
       [call({ emailId: "e1", callAt: "2026-11-01T08:00:00Z" })],
     );
-    expect(t.map((i) => i.id)).toEqual(["m1", "e1", "m2"]);
+    expect(t.map((i) => i.id)).toEqual(["m2", "e1", "m1"]);
     expect(countSince(t, (i) => i.at, new Date("2026-11-01T07:30:00Z"))).toBe(2);
   });
 
