@@ -158,4 +158,22 @@ describe("nobody answers", () => {
     expect(row.autoOpened).toBe(true);
     expect(row.decidedById).toBeNull();
   });
+
+  it("opens nothing for a task dropped or deleted while it waited, and still opens for a finished one", async () => {
+    const { internal, ops, product } = await setup();
+    const dropped = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את Pipedrive" });
+    const deleted = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את Dialpad" });
+    const finished = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את Aircall" });
+    await updateTask(ops, dropped.id, { status: "ARCHIVED" });
+    await prisma.task.update({ where: { id: deleted.id }, data: { deletedAt: new Date() } });
+    await updateTask(ops, finished.id, { status: "DONE" });
+    await prisma.vendorDetection.updateMany({ data: { createdAt: new Date("2026-11-02T08:00:00Z") } });
+
+    const out = await openOverdueVendorRuns(new Date("2026-11-04T05:00:00Z"));
+    expect(out.opened).toBe(1);
+    const status = async (id: string) => (await prisma.vendorDetection.findUniqueOrThrow({ where: { sourceTaskId: id } })).status;
+    expect(await status(dropped.id)).toBe("PENDING");
+    expect(await status(deleted.id)).toBe("PENDING");
+    expect(await status(finished.id)).toBe("OPENED");
+  });
 });
