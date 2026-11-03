@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { approveProposal, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, approveWithSuggestion, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 import { liftAutoApplyPause, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
 
@@ -74,6 +74,18 @@ export async function revertProposalAction(id: string): Promise<FormState> {
   const user = await requireUser();
   try {
     await revertProposal(user, id);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+/// "להשלים בנוסח המוצע": the suggested wording, worked out on the server,
+/// and approval with it.
+export async function approveWithSuggestionAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await approveWithSuggestion(user, id);
   } catch (err) {
     return { error: friendlyError(err) };
   }

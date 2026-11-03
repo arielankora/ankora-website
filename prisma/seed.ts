@@ -669,6 +669,40 @@ async function main() {
     });
   }
 
+  // 3.11.2026: two proposals with missing fields, in their own batch so the
+  // notes above stay all notes: a proposed rule without its interim rule,
+  // and a process with three automated steps without a check. The flow
+  // test reads their cards and never approves them.
+  await prisma.knowledgeBatch.upsert({
+    where: { id: "demo-knowledge-batch-gaps" },
+    update: { closedAt: null },
+    create: { id: "demo-knowledge-batch-gaps", clientId: clientB.id, sourceId: demoSource.id, via: "MCP", note: "[DEMO] הצעות עם חוסרים", createdById: ankoraAdmin.id },
+  });
+  const gaps = [
+    { id: "demo-proposal-interim", target: "POLICY" as const, payload: { kind: "APPROVAL_REQUIRED", title: "[DEMO] כלל בלי כלל ביניים", statement: "[DEMO] כל רכישה עוברת אישור", sources: [{ code: "S9000" }] } },
+    {
+      id: "demo-proposal-automated",
+      target: "PROCESS" as const,
+      payload: {
+        title: "[DEMO] תהליך עם שלבים אוטומטיים",
+        purpose: "[DEMO] לבדיקה",
+        steps: [
+          { title: "שליחת תזכורת", mode: "AUTOMATED", output: "מייל בתיבת היוצאים" },
+          { title: "תיוק", mode: "AUTOMATED" },
+          { title: "עדכון הטבלה", mode: "AUTOMATED" },
+        ],
+        sources: [{ code: "S9000" }],
+      },
+    },
+  ];
+  for (const g of gaps) {
+    await prisma.knowledgeProposal.upsert({
+      where: { id: g.id },
+      update: { state: "PENDING", decidedById: null, decidedAt: null, rejectReason: null, edited: false, resultId: null, payload: g.payload },
+      create: { id: g.id, batchId: "demo-knowledge-batch-gaps", clientId: clientB.id, target: g.target, payload: g.payload, reason: "[DEMO] לבדיקה" },
+    });
+  }
+
   console.log("Done. Demo accounts (all share the password below):");
   console.log(`  password: ${DEMO_PASSWORD}`);
   console.log(`  ${superAdmin.email} (SUPER_ADMIN)`);
