@@ -26,6 +26,10 @@ export type CreatedTaskRow = {
   id: string;
   title: string;
   clientName: string;
+  /// 3.11.2026: the ids behind the two names, so the row can offer the
+  /// categories this client may use and show which one is selected.
+  clientId: string;
+  categoryId: string | null;
   categoryName: string | null;
   dueDate: string | null;
   status: TaskStatus;
@@ -122,6 +126,8 @@ export async function createTaskAction(_prev: FormState | undefined, formData: F
       id: created.id,
       title: created.title,
       clientName: client?.name ?? "",
+      clientId: created.clientId,
+      categoryId: created.categoryId,
       categoryName: category?.name ?? null,
       dueDate: created.dueDate?.toISOString() ?? null,
       status: created.status,
@@ -217,6 +223,26 @@ export async function updateTaskDueDateAction(input: { taskId: string; dueDate: 
     revalidatePath("/app/portal");
     revalidatePath("/app");
     return { ok: true as const, dueDate: updated.dueDate?.toISOString() ?? null };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+// 3.11.2026: the category, written from the row. Same reason as the due
+// date above: the list is where a missing or wrong category shows, and
+// opening the task to fix it was the errand. updateTask() checks that the
+// category belongs to this task's client, the same check the task screen
+// relies on, so the row cannot set something the task screen would not.
+export async function updateTaskCategoryAction(input: { taskId: string; categoryId: string | null }) {
+  const user = await requireUser();
+  try {
+    const updated = await updateTask(user, input.taskId, { categoryId: input.categoryId || null });
+    const category = updated.categoryId
+      ? await prisma.category.findUnique({ where: { id: updated.categoryId }, select: { name: true } })
+      : null;
+    revalidatePath("/app/tasks");
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    return { ok: true as const, categoryId: updated.categoryId, categoryName: category?.name ?? null };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

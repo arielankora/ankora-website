@@ -58,7 +58,13 @@ type TaskListValue = {
   /// server's order. See task-sort.ts.
   sort: Sort;
   setSort: (sort: Sort) => void;
+  /// 3.11.2026: the categories a row may offer, with the client each one
+  /// belongs to (null for a global one). Empty outside the tasks screen,
+  /// where the row shows its category as text.
+  categories: RowCategory[];
 };
+
+export type RowCategory = { id: string; name: string; clientId: string | null };
 
 const TaskListContext = createContext<TaskListValue>({
   rows: [],
@@ -66,6 +72,7 @@ const TaskListContext = createContext<TaskListValue>({
   listQuery: "",
   sort: null,
   setSort: () => {},
+  categories: [],
 });
 
 /// The sort is mirrored into `?sort=` with replaceState, the same as the
@@ -140,11 +147,14 @@ type ListFilters = {
 ///
 /// So the merged rows go out through the context instead, and the view
 /// below reads them from there.
+const NO_CATEGORIES: RowCategory[] = [];
+
 export function TaskListProvider({
   rows,
   filters,
   listQuery = "",
   initialSort,
+  categories = NO_CATEGORIES,
   children,
 }: {
   rows: ListRow[];
@@ -152,6 +162,7 @@ export function TaskListProvider({
   listQuery?: string;
   /// The page's `?sort=`, read once. After that the browser owns it.
   initialSort?: string;
+  categories?: RowCategory[];
   children: ReactNode;
 }) {
   const [extra, setExtra] = useState<ListRow[]>([]);
@@ -205,8 +216,9 @@ export function TaskListProvider({
       listQuery: withSort(listQuery, sort),
       sort,
       setSort,
+      categories,
     }),
-    [all, filters, listQuery, sort, setSort]
+    [all, filters, listQuery, sort, setSort, categories]
   );
 
   return <TaskListContext.Provider value={value}>{children}</TaskListContext.Provider>;

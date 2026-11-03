@@ -244,6 +244,13 @@ export default async function TasksPage(props: {
           rows={tasks.map(toRow)}
           listQuery={listQueryOf(searchParams)}
           initialSort={searchParams.sort}
+          // The same active categories the create form offers. Each row
+          // narrows them to its own client.
+          categories={categories.map((c) => ({
+            id: c.id,
+            name: c.name,
+            clientId: c.visibility === "GLOBAL" ? null : c.clientId,
+          }))}
           // What a newly created task has to survive to belong on the
           // screen as it is filtered right now. The client's NAME and not
           // only its id, because the row the action returns carries the
@@ -406,6 +413,8 @@ function toRow(task: Awaited<ReturnType<typeof listTasks>>[number]): ListRow {
     id: task.id,
     title: task.title,
     clientName: task.client.name,
+    clientId: task.clientId,
+    categoryId: task.categoryId,
     categoryName: task.category?.name ?? null,
     dueDate: task.dueDate?.toISOString() ?? null,
     status: task.status,
