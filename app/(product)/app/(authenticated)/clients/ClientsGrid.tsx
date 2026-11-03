@@ -131,9 +131,10 @@ export function ClientsGrid({
   }, [menuFor]);
 
   const filtered = useMemo(() => {
-    const q = query.trim();
+    // Case-insensitive: "g" finds "Grantor" (3.11.2026).
+    const q = query.trim().toLocaleLowerCase();
     if (!q) return items;
-    return items.filter((c) => c.name.includes(q));
+    return items.filter((c) => c.name.toLocaleLowerCase().includes(q));
   }, [items, query]);
 
   const fromParam = query.trim() ? new URLSearchParams({ q: query.trim() }).toString() : "";
