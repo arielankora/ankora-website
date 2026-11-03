@@ -461,6 +461,11 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
   }
 }
 
+function isUniqueViolation(err: unknown): boolean {
+  const code = (err as { code?: string } | null)?.code;
+  return code === "P2002" || code === "23505";
+}
+
 async function evaluateSingleRule(
   rule: AlertRule,
   bank: Pick<HourBank, "id"> & Partial<Pick<HourBank, "kind" | "purchasedMinutes">>,
@@ -487,9 +492,20 @@ async function evaluateSingleRule(
 
   if (action !== "fire") return;
 
-  const event = await prisma.alertEvent.create({
-    data: { ruleId: rule.id, hourBankId: bank.id, value: Math.round(currentValue) },
-  });
+  // The decision above is a read followed by this write, so two evaluations
+  // of the same client running at once (each time-entry write evaluates in
+  // after()) can both decide to fire. The partial unique index
+  // alert_events_one_open_per_rule_bank lets only one create succeed; the
+  // loser stops here, because the winner is sending the emails.
+  let event;
+  try {
+    event = await prisma.alertEvent.create({
+      data: { ruleId: rule.id, hourBankId: bank.id, value: Math.round(currentValue) },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) return;
+    throw err;
+  }
 
   const label = formatThresholdLabel(rule.type);
   const subjectAnkora = `[Ankora] התראת בנק שעות - ${clientName}`;
