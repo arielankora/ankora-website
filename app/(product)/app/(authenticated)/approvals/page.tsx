@@ -157,7 +157,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           {groups.length > 0 && <BulkRules groups={groups} />}
           <section>
             {tab === "all" && ranked.rest.length > 0 && <h2 className="mb-2 text-sm font-medium text-app-text-primary">היום</h2>}
-            <ul className="divide-y divide-app-border rounded-2xl border border-app-border bg-white px-5" data-testid={tab === "all" ? "approvals-today" : "approvals-list"}>
+            <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid={tab === "all" ? "approvals-today" : "approvals-list"}>
               {(tab === "all" ? ranked.today : [...ranked.today, ...ranked.rest]).map((i) => (
                 <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, tab === "all")} />
               ))}
@@ -166,7 +166,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           {tab === "all" && ranked.rest.length > 0 && (
             <section>
               <h2 className="mb-2 text-sm font-medium text-app-text-primary">כל השאר ({ranked.rest.length})</h2>
-              <ul className="divide-y divide-app-border rounded-2xl border border-app-border bg-white px-5" data-testid="approvals-list">
+              <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid="approvals-list">
                 {ranked.rest.map((i) => (
                   <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, true)} />
                 ))}
