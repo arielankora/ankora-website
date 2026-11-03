@@ -30,6 +30,12 @@ export function proposalAnchor(proposalId: string): string {
   return `proposal-${safe(proposalId)}`;
 }
 
+/// The id of one item on "נכנס אוטומטית", the auto-applied items a person
+/// looks at after the fact (3.11.2026).
+export function autoReviewAnchor(proposalId: string): string {
+  return `auto-${safe(proposalId)}`;
+}
+
 /// The id of one decision in the client's decisions panel.
 export function decisionAnchor(decisionId: string): string {
   return `decision-${safe(decisionId)}`;
@@ -76,4 +82,15 @@ export function processUrl(baseUrl: string, clientId: string, processId: string)
 /// A decision asked of the client, in the client's decisions panel.
 export function clientDecisionUrl(baseUrl: string, clientId: string, decisionId: string): string {
   return join(baseUrl, `/app/clients/${encodeURIComponent(clientId)}#${decisionAnchor(decisionId)}`);
+}
+
+/// An auto-applied item on "נכנס אוטומטית", on the knowledge review of its
+/// client, where it is marked "תקין" or taken out again.
+export function autoReviewUrl(baseUrl: string, clientId: string, proposalId: string): string {
+  return join(baseUrl, `${approvalsPath("knowledge", clientId)}#${autoReviewAnchor(proposalId)}`);
+}
+
+/// An item in the client's file.
+export function fileItemUrl(baseUrl: string, clientId: string, itemId: string): string {
+  return join(baseUrl, `/app/clients/${encodeURIComponent(clientId)}?tab=file#item-${safe(itemId)}`);
 }

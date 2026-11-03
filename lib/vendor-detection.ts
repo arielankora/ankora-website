@@ -211,8 +211,8 @@ function channelAfterVerb(text: string): { channel: string; vendor: string; acti
 }
 
 export function detectVendorSignal(text: string, known: string[]): VendorSignal | null {
-  const t = (text ?? "").trim();
-  if (!t) return null;
+  const cleaned = withoutCode(text ?? "").replace(HEBREW_NOT_CONNECTING, " ").trim();
+  if (!cleaned) return null;
   const knownKeys = new Map(known.map((k) => [vendorKey(k), k]));
 
   // 3.11.2026, after false alarms in production: only an explicit act of
@@ -221,24 +221,49 @@ export function detectVendorSignal(text: string, known: string[]): VendorSignal 
   // email address or a code is never a name. Whatever this misses, a new
   // dependency or environment variable in the code is caught by QA
   // (qa/checks/new-vendors.mjs), and Claude asks from context.
-  for (const [i, { re, label }] of PATTERNS.entries()) {
-    re.lastIndex = 0;
-    for (const m of t.matchAll(re)) {
-      const raw = nameOf(m, i);
-      const at = (m.index ?? 0) + m[0].indexOf(raw);
-      if (insideAddress(t, at, raw.length)) continue;
-      const name = cleanName(raw);
-      if (!name) continue;
-      const action = label(m).trim();
-      const key = vendorKey(name);
-      const existing =
-        knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
-      return { vendor: name, existingVendor: existing ?? null, matched: `${action} + ${name}` };
+  for (const t of sentencesOf(cleaned)) {
+    for (const [i, { re, label }] of PATTERNS.entries()) {
+      re.lastIndex = 0;
+      for (const m of t.matchAll(re)) {
+        const raw = nameOf(m, i);
+        const at = (m.index ?? 0) + m[0].indexOf(raw);
+        if (insideAddress(t, at, raw.length)) continue;
+        const name = cleanName(raw);
+        if (!name) continue;
+        const action = label(m).trim();
+        const key = vendorKey(name);
+        const existing =
+          knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
+        return { vendor: name, existingVendor: existing ?? null, matched: `${action} + ${name}` };
+      }
     }
   }
 
   // A channel of a vendor we have, written in Hebrew ("לחבר וואטסאפ").
-  const channel = channelAfterVerb(t);
+  const channel = channelAfterVerb(cleaned);
   if (channel) return { vendor: channel.channel, existingVendor: channel.vendor, matched: `${channel.action} + ${channel.channel}` };
   return null;
+}/// From #413 (3.11.2026): what is code, not prose, is removed before
+/// reading: inline code, URLs, paths, and identifiers (camelCase,
+/// snake_case, file.ext). A path like tests/integration/x.test.ts says
+/// neither "integration" nor "tests".
+const HEBREW_NOT_CONNECTING = /(?:בדיקות|בדיקת|טסטים של|טסט)\s+(?:יחידה,?\s+)?אינטגרציה/gu;
+
+function withoutCode(text: string): string {
+  return text
+    .replace(/`[^`]*`/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\S*\/\S*/g, " ")
+    .replace(/\b\w+(?:\.\w+)*\.[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b\w+_\w+\b/g, " ")
+    .replace(/\b[\w-]+\.(?:ts|tsx|js|mjs|json|md|sql|prisma|yml|yaml|css|html)\b/g, " ");
 }
+
+/// Sentences: a vendor counts only in the sentence that says "connect".
+/// A dot inside a name (cal.com) does not end one.
+function sentencesOf(text: string): string[] {
+  return text.split(/\n+|[.!?;](?=\s|$)/u).map((x) => x.trim()).filter(Boolean);
+}
+
+

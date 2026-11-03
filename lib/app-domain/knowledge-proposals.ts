@@ -13,9 +13,12 @@ import {
   payloadText,
   proposalHeadline,
   proposalProblems,
+  PROBLEM_CODES,
+  suggestedFix,
   type ProposalActionLike,
   type ProposalFlag,
   type ProposalTargetLike,
+  approvalTier,
   bulkApproveBlocker,
   proposalReviewLevel,
   revertBlocker,
@@ -54,6 +57,8 @@ import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
 import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
+import { autoApplySetting, evaluateAutoPauses } from "@/lib/app-domain/auto-apply";
+import { proposalKindKey } from "@/lib/knowledge-review-filters";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -77,6 +82,11 @@ import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
 // the screens call, as the person approving, so every rule of the file
 // applies to an approved proposal exactly as to a typed item. There is no
 // way to approve through MCP (spec 8).
+//
+// 3.11.2026, the approval tiers: the one exception is a proposal in the
+// AUTO tier (approvalTier) sent by Claude, which the server approves on
+// arrival through the same approveProposal, as the person who sent it
+// (autoApplyBatch). lib/auto-apply.ts holds the rules that keep it safe.
 
 export type ProposalItemInput = {
   target: ProposalTargetLike;
@@ -130,7 +140,17 @@ export type ProposeResult = {
   /// Items whose name may be one already in the file: send them again as
   /// SUPERSEDE with that targetId, or the reviewer adds them to it.
   possibleMatches: { index: number; target: string; name: string; existing: { id: string; name: string }[] }[];
+  /// 3.11.2026: proposals the server approved on arrival (the AUTO tier):
+  /// they are in the file already.
+  autoApplied: AutoAppliedItem[];
+  /// Items the review screen will not approve as sent (a proposed rule
+  /// without its interim rule, an automated step without its check...):
+  /// what is missing and the wording it suggests. Next time, send it
+  /// complete (3.11.2026).
+  incomplete: { index: number; missing: string; suggested: string | null }[];
 };
+
+export type AutoAppliedItem = { proposalId: string; target: ProposalTargetLike; headline: string; resultId: string | null };
 
 const MAX_ITEMS = 60;
 
@@ -205,10 +225,10 @@ async function registerCodes(clientId: string): Promise<string[]> {
   return (await prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, select: { code: true } })).map((s) => s.code);
 }
 
-async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[]): Promise<ProposalFlag[]> {
+async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[], sourceTitle?: string | null): Promise<ProposalFlag[]> {
   // What would stop it from entering the file first: the reviewer reads
   // these before anything else.
-  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes);
+  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes, { sourceTitle });
   if (typeof item.payload.ownerName === "string" && item.payload.ownerName.trim() && !(await ownerByName(item.payload.ownerName))) {
     flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.ownerName.trim()}". הפריט ייכנס בלי בעלים, אלא אם מתקנים את השם.` });
   }
@@ -300,7 +320,7 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
 export async function proposeKnowledge(
   actor: User,
   input: ProposeInput,
-  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[] } = {}
+  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[]; autoApply?: boolean } = {}
 ): Promise<ProposeResult> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
@@ -315,6 +335,7 @@ export async function proposeKnowledge(
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
   const possibleMatches: ProposeResult["possibleMatches"] = [];
+  const incomplete: ProposeResult["incomplete"] = [];
 
   for (const [i, raw] of input.items.entries()) {
     const index = options.indexes?.[i] ?? i;
@@ -387,10 +408,11 @@ export async function proposeKnowledge(
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes);
+    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes, source.title);
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
+    for (const f of flags) if (PROBLEM_CODES.includes(f.code)) incomplete.push({ index, missing: f.message, suggested: f.fix?.label ?? null });
     accepted.push({ item, payload, flags });
   }
 
@@ -410,7 +432,7 @@ export async function proposeKnowledge(
 
   // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [] };
   }
 
   // The source and the batch go in together: a new source is registered
@@ -471,7 +493,48 @@ export async function proposeKnowledge(
     clientId: input.clientId,
     after: { sourceCode: registered.code, proposed: accepted.length, dropped: dropped.length },
   });
-  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches };
+  // Only what Claude sent (propose_knowledge): a batch typed on a screen,
+  // or one a person assigned to its client, waits as it always did.
+  const autoApplied = options.autoApply ? await autoApplyBatch(actor, batch.id, input.clientId) : [];
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete };
+}
+
+/// The AUTO tier on arrival (3.11.2026, approval tiers part 2): each
+/// proposal of the batch that approvalTier puts in AUTO is approved now,
+/// through approveProposal, as the person who sent it (the identity of the
+/// MCP connection), and marked autoApplied. Not when the switch is off,
+/// not for a client marked "בלי AI" (it never gets here: lookupClient
+/// refuses it first), and not for a kind or a client sent back to a
+/// person (lib/auto-apply.ts): those wait like any QUICK proposal. A
+/// proposal that fails to apply stays pending for a person.
+async function autoApplyBatch(actor: User, batchId: string, clientId: string): Promise<AutoAppliedItem[]> {
+  const setting = await autoApplySetting();
+  if (!setting.enabled) return [];
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { aiExcluded: true } });
+  if (!client || client.aiExcluded) return [];
+  const source = await batchSource(batchId);
+  const pending = await prisma.knowledgeProposal.findMany({ where: { batchId, state: "PENDING" }, orderBy: { createdAt: "asc" } });
+  const auto = pending.filter((p) => {
+    const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
+    const payload = p.payload as Record<string, unknown>;
+    const level = proposalReviewLevel({ confidence: p.confidence, flags, payload }, source);
+    return approvalTier({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level }).tier === "AUTO";
+  });
+  if (auto.length === 0) return [];
+  const keyOf = (p: (typeof auto)[number]) => proposalKindKey({ target: p.target as ProposalTargetLike, payload: p.payload as Record<string, unknown> });
+  const paused = await evaluateAutoPauses({ clientId, kindKeys: auto.map(keyOf) });
+  if (paused.clientPaused) return [];
+  const out: AutoAppliedItem[] = [];
+  for (const p of auto) {
+    if (paused.pausedKinds.has(keyOf(p))) continue;
+    try {
+      const done = await approveProposal(actor, p.id, {}, { auto: true });
+      out.push({ proposalId: p.id, target: p.target as ProposalTargetLike, headline: proposalHeadline(p.target as ProposalTargetLike, done.payload as Record<string, unknown>), resultId: done.resultId });
+    } catch (err) {
+      console.warn("[knowledge] auto-apply left a proposal for a person", p.id, err instanceof Error ? err.message : err);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -538,8 +601,19 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   for (const clientId of new Set(batches.map((b) => b.clientId))) if (await isInternalClient(clientId)) internal.add(clientId);
   const withoutR14 = (clientId: string, flags: Prisma.JsonValue) =>
     internal.has(clientId) && Array.isArray(flags) ? ((flags as ProposalFlag[]).filter((f) => f.code !== "R14") as Prisma.JsonValue) : flags;
-  const liveFlags = (pr: { id: string; clientId: string; target: string; flags: Prisma.JsonValue }) => {
-    const flags = withoutR14(pr.clientId, pr.flags);
+  // What blocks a pending proposal is said again in today's words, with
+  // its suggested wording (3.11.2026): a card stored before then has the
+  // old sentence and no wording to approve.
+  const codesOf = new Map<string, string[]>();
+  for (const clientId of new Set(batches.map((b) => b.clientId))) codesOf.set(clientId, await registerCodes(clientId));
+  const titleOf = new Map(batches.map((b) => [b.id, b.sourceId ? sourceById.get(b.sourceId)?.title ?? null : null]));
+  const restated = (pr: { clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string }, flags: Prisma.JsonValue): Prisma.JsonValue => {
+    if (pr.state !== "PENDING" || !Array.isArray(flags)) return flags;
+    const fresh = proposalProblems(pr.target as ProposalTargetLike, (pr.payload ?? {}) as Record<string, unknown>, codesOf.get(pr.clientId) ?? [], { sourceTitle: titleOf.get(pr.batchId) });
+    return [...fresh, ...(flags as ProposalFlag[]).filter((f) => !PROBLEM_CODES.includes(f.code))] as Prisma.JsonValue;
+  };
+  const liveFlags = (pr: { id: string; clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string; flags: Prisma.JsonValue }) => {
+    const flags = restated(pr, withoutR14(pr.clientId, pr.flags));
     return alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(flags) ? flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : flags;
   };
   return batches.map((b) => ({
@@ -791,7 +865,24 @@ async function apply(
   throw new Error("סוג פריט לא מוכר.");
 }
 
-export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean } = {}) {
+/// "להשלים בנוסח המוצע": every suggested wording on the proposal, as the
+/// card showed it, and the proposal approved with them in one press
+/// (Ariel, 3.11.2026). The wordings are worked out here from the proposal
+/// as stored, so the browser only says which proposal. Anything else that
+/// blocks it is refused as on any approval.
+export async function approveWithSuggestion(actor: User, id: string) {
+  const proposal = await findPending(actor, id);
+  const batch = await prisma.knowledgeBatch.findUnique({ where: { id: proposal.batchId }, select: { sourceId: true } });
+  const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { title: true } }) : null;
+  const flags = proposalProblems(proposal.target, proposal.payload as Record<string, unknown>, await registerCodes(proposal.clientId), { sourceTitle: source?.title });
+  const edits = suggestedFix(flags);
+  if (!edits) throw new Error("אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.");
+  return approveProposal(actor, id, edits);
+}
+
+/// `auto`: approved by the server on arrival (autoApplyBatch), not by a
+/// person on the screen. Marked autoApplied, with its own audit action.
+export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean; auto?: boolean } = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
@@ -825,12 +916,13 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
       edited: changed.length > 0,
       resultId,
       payload: payload as Prisma.InputJsonValue,
+      ...(options.auto ? { autoApplied: true } : {}),
     },
   });
   await closeIfDone(proposal.batchId);
   await recordAudit({
     actorId: actor.id,
-    action: "knowledge_proposal.approve",
+    action: options.auto ? "knowledge_proposal.auto_apply" : "knowledge_proposal.approve",
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
@@ -1117,6 +1209,17 @@ export async function revertProposal(actor: User, id: string) {
     clientId: proposal.clientId,
     after: { resultId, target: proposal.target, autoApplied: proposal.autoApplied, headline: proposalHeadline(proposal.target, proposal.payload as Record<string, unknown>) },
   });
+  // An auto-applied item taken out is an error of auto-apply: its kind or
+  // its client may now go back to a person (lib/auto-apply.ts).
+  // The item is out already; a failure here must not say otherwise, and
+  // the next arrival of the same client or kind checks again.
+  if (proposal.autoApplied) {
+    try {
+      await evaluateAutoPauses({ clientId: proposal.clientId, kindKeys: [proposalKindKey({ target: proposal.target as ProposalTargetLike, payload: proposal.payload as Record<string, unknown> })] });
+    } catch (err) {
+      console.error("[knowledge] auto-apply pause check after a revert failed", err);
+    }
+  }
   return prisma.knowledgeProposal.findUniqueOrThrow({ where: { id } });
 }
 

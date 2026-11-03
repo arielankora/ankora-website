@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
+import { listAutoReview } from "@/lib/app-domain/auto-apply";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
   APPROVAL_TABS,
@@ -48,10 +49,13 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   // "של כולם" stays while the tab or the client changes.
   const withScope = (href: string) => (everyone ? `${href}${href.includes("?") ? "&" : "?"}scope=all` : href);
 
-  const [everything, knowledgeAll, knowledgeClient] = await Promise.all([
+  const [everything, knowledgeAll, knowledgeClient, autoReview] = await Promise.all([
     collectApprovals(user),
     countMyPendingProposals(user, { everyone }),
     clientId ? countMyPendingProposals(user, { clientId, everyone: true }) : Promise.resolve(null),
+    // 3.11.2026: items that entered a file on their own and still need a
+    // look count on "ידע מהחילוץ", so the tab is there while they wait.
+    listAutoReview(user, { clientId }).then((r) => r.length),
   ]);
   const allItems = everyone ? everything : onlyMine(everything);
 
@@ -65,7 +69,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
   }
 
   const items = clientId ? forClient(everything, clientId) : allItems;
-  const counts = tabCounts(items, clientId ? (knowledgeClient ?? 0) : knowledgeAll);
+  const counts = tabCounts(items, (clientId ? (knowledgeClient ?? 0) : knowledgeAll) + autoReview);
   const tabs = visibleTabs(counts, tab);
 
   const rowOf = (i: ApprovalItem, showLabel: boolean) => ({
@@ -153,7 +157,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           {groups.length > 0 && <BulkRules groups={groups} />}
           <section>
             {tab === "all" && ranked.rest.length > 0 && <h2 className="mb-2 text-sm font-medium text-app-text-primary">היום</h2>}
-            <ul className="divide-y divide-app-border rounded-2xl border border-app-border bg-white px-5" data-testid={tab === "all" ? "approvals-today" : "approvals-list"}>
+            <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid={tab === "all" ? "approvals-today" : "approvals-list"}>
               {(tab === "all" ? ranked.today : [...ranked.today, ...ranked.rest]).map((i) => (
                 <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, tab === "all")} />
               ))}
@@ -162,7 +166,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
           {tab === "all" && ranked.rest.length > 0 && (
             <section>
               <h2 className="mb-2 text-sm font-medium text-app-text-primary">כל השאר ({ranked.rest.length})</h2>
-              <ul className="divide-y divide-app-border rounded-2xl border border-app-border bg-white px-5" data-testid="approvals-list">
+              <ul className="divide-y divide-app-border overflow-hidden rounded-2xl border border-app-border bg-white px-5" data-testid="approvals-list">
                 {ranked.rest.map((i) => (
                   <ApprovalRow key={`${i.kind}:${i.id}`} row={rowOf(i, true)} />
                 ))}

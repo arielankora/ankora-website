@@ -54,6 +54,26 @@ test.describe("knowledge/actions", () => {
     await expect(page.getByText(edited).first(), "the approved proposal did not reach the file").toBeVisible({ timeout: 15_000 });
   });
 
+  // 3.11.2026: a missing field says why it is needed and offers a wording,
+  // and the same note on several steps is one line. Read only: the seed's
+  // proposals with gaps stay pending for the next run.
+  test("a missing field says why, offers a wording, and one line stands for several steps", async ({ page }) => {
+    await page.goto(`/app/knowledge?clientId=${CLIENT}`);
+    await expect(page.getByRole("heading", { level: 1, name: "אישורים" })).toBeVisible();
+    // Never approved here, so the seed's two stay pending on every run.
+    const rule = page.locator("li", { hasText: "[DEMO] כלל בלי כלל ביניים" }).first();
+    await expect(rule, "the Preview seed should leave the proposals with gaps pending").toBeVisible({ timeout: 15_000 });
+    await expect(rule.getByText(/^למה: כלל מוצע לא חל/)).toBeVisible();
+    await expect(rule.getByTestId("proposal-suggested")).toContainText("כמו היום, עד שהכלל מאושר.");
+    await expect(rule.getByRole("button", { name: "להשלים בנוסח המוצע ולאשר" })).toBeVisible();
+    await expect(rule.getByRole("button", { name: "אישור", exact: true }), "blocked: only the wording or the edit").toHaveCount(0);
+
+    const process = page.locator("li", { hasText: "[DEMO] תהליך עם שלבים אוטומטיים" }).first();
+    await expect(process.getByTestId("proposal-flag").filter({ hasText: "אוטומטיים" })).toHaveCount(1);
+    await expect(process.getByText(/שלבים 1, 2 ו-3 אוטומטיים/)).toBeVisible();
+    await expect(process.getByTestId("proposal-suggested")).toContainText("שלב 1: אדם בודק שמייל בתיבת היוצאים קיים.");
+  });
+
   // 20.10.2026: the bulk reject drawer opened clipped inside the sticky
   // selection bar (a backdrop filter there trapped its fixed position),
   // so the reason field was out of reach. Opened and dismissed, nothing

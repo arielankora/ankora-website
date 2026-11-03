@@ -810,3 +810,92 @@ export async function loadPrepaidPackage(
 
   return { bank, preview };
 }
+
+export type RecentBank = {
+  id: string;
+  kind: HourBank["kind"];
+  cycleStart: Date;
+  cycleEnd: Date;
+  utilization: HourBankUtilization;
+};
+
+/// The last few cycles or packages of many clients, oldest first, with
+/// their consumption computed live (the cached column is only refreshed
+/// when a bank's own screen reads it). For the history on the clients
+/// screen (3.11.2026). Read-only and batched like
+/// getCurrentHourBanksForClients: four queries, whatever the count.
+export async function getRecentHourBanksForClients(
+  clientIds: string[],
+  count = 3,
+  now: Date = new Date()
+): Promise<Map<string, RecentBank[]>> {
+  const out = new Map<string, RecentBank[]>();
+  if (clientIds.length === 0) return out;
+
+  const all = await prisma.hourBank.findMany({
+    where: { clientId: { in: clientIds }, deletedAt: null, cycleStart: { lte: now } },
+    orderBy: [{ cycleStart: "desc" }, { createdAt: "desc" }],
+  });
+  const picked = new Map<string, HourBank[]>();
+  for (const b of all) {
+    const list = picked.get(b.clientId) ?? [];
+    if (list.length < count) {
+      list.push(b);
+      picked.set(b.clientId, list);
+    }
+  }
+  const banks = [...picked.values()].flat();
+  if (banks.length === 0) return out;
+
+  const [adjustmentRows, policies, entries] = await Promise.all([
+    prisma.hourBankAdjustment.groupBy({
+      by: ["hourBankId"],
+      where: { hourBankId: { in: banks.map((b) => b.id) } },
+      _sum: { minutes: true },
+    }),
+    prisma.billingPolicy.findMany({ where: { clientId: { in: [...picked.keys()] } } }),
+    prisma.timeEntry.findMany({
+      where: {
+        clientId: { in: [...picked.keys()] },
+        deletedAt: null,
+        endAt: { not: null },
+        startAt: {
+          gte: new Date(Math.min(...banks.map((b) => b.cycleStart.getTime()))),
+          lt: new Date(Math.max(...banks.map((b) => b.cycleEnd.getTime()))),
+        },
+      },
+      select: { clientId: true, actualSeconds: true, billableSeconds: true, taskId: true, startAt: true },
+    }),
+  ]);
+
+  const adjustmentMinutesByBank = new Map(adjustmentRows.map((r) => [r.hourBankId, r._sum.minutes ?? 0]));
+  const policyByClient = new Map(policies.map((p) => [p.clientId, p]));
+  const entriesByClient = new Map<string, ConsumableEntry[]>();
+  for (const e of entries) {
+    const list = entriesByClient.get(e.clientId);
+    if (list) list.push(e);
+    else entriesByClient.set(e.clientId, [e]);
+  }
+
+  for (const [clientId, list] of picked) {
+    const mine = entriesByClient.get(clientId) ?? [];
+    const policy = policyByClient.get(clientId) ?? null;
+    out.set(
+      clientId,
+      list
+        .map((bank) => {
+          const inCycle = mine.filter((e) => e.startAt >= bank.cycleStart && e.startAt < bank.cycleEnd);
+          const consumedMinutes = consumedMinutesFromEntries(inCycle, policy);
+          return {
+            id: bank.id,
+            kind: bank.kind,
+            cycleStart: bank.cycleStart,
+            cycleEnd: bank.cycleEnd,
+            utilization: computeUtilization(bank, adjustmentMinutesByBank.get(bank.id) ?? 0, consumedMinutes),
+          };
+        })
+        .reverse()
+    );
+  }
+  return out;
+}

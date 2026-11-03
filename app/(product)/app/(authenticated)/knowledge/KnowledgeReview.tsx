@@ -22,6 +22,10 @@ import { batchHeader, reviewProposals } from "./review-view";
 import { ReviewFilterBar, type FilterOption } from "./ReviewFilters";
 import { AwaitingAssignmentCard } from "./AwaitingAssignment";
 import { listAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
+import { autoApplyOverview, listAutoReview } from "@/lib/app-domain/auto-apply";
+import { liftBarMet } from "@/lib/auto-apply";
+import { fileItemUrl } from "@/lib/approval-links";
+import { AutoApplied } from "./AutoApplied";
 
 // Org brain, phase 2: "ממתין לאישור", now the tab "ידע מהחילוץ" of "אישורים" (claude/org-brain-spec-2026-10-12.md,
 // 5.2; decision 1). Every proposal Claude sends lands here, one card per
@@ -51,7 +55,14 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
   // The whole queue this person can see, filtered here: the counts beside
   // each option come from the queue, not from what is left after filtering,
   // so a person sees what exists without clearing anything.
-  const [queue, awaiting, staff] = await Promise.all([listOpenBatches(user), listAwaitingAssignment(user), listStaffForAssignment()]);
+  const [queue, awaiting, staff, autoRows, autoControls] = await Promise.all([
+    listOpenBatches(user),
+    listAwaitingAssignment(user),
+    listStaffForAssignment(),
+    // 3.11.2026: what entered a file on arrival and still needs a look.
+    listAutoReview(user, { clientId: filters.clientId }),
+    autoApplyOverview(user),
+  ]);
   // 22.10.2026: by default the meetings waiting on this person, whoever
   // sent them or the client's account manager; "של כולם" shows the rest.
   const manager = canManageClients(user.role);
@@ -94,7 +105,7 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
     <div className="space-y-6">
       <div>
         <p className="text-sm text-app-text-secondary">
-          מה ש-Claude הציע לתיקי הלקוחות. שום דבר לא נכנס לתיק לפני שמישהו מאשר אותו כאן.{" "}
+          מה ש-Claude הציע לתיקי הלקוחות. פריט חדש ופשוט ברמת בדיקה גבוהה נכנס לתיק לבד ומופיע ב&quot;נכנס אוטומטית&quot;; כל השאר נכנס לתיק רק אחרי שמישהו מאשר אותו כאן.{" "}
           <Link href="/app/extraction-guide" className="text-app-text-accent hover:underline">
             הנחיות החילוץ
           </Link>
@@ -113,6 +124,36 @@ export async function KnowledgeReview({ searchParams, mineOnly = false }: { sear
           </p>
         )}
       </div>
+
+      <AutoApplied
+        rows={autoRows.map((r) => ({
+          id: r.id,
+          clientName: r.clientName,
+          kindLabel: r.kindLabel,
+          headline: r.headline,
+          // A plain path: the screen is on the same site.
+          itemHref: r.resultId ? fileItemUrl("", r.clientId, r.resultId) : null,
+          enteredAt: day(r.decidedAt) ?? "",
+          why: r.why,
+        }))}
+        controls={
+          autoControls && {
+            enabled: autoControls.enabled,
+            firstEnabled: day(autoControls.firstEnabledAt),
+            pauses: autoControls.pauses.map((p) => ({
+              id: p.id,
+              scope: p.scope,
+              label: p.label,
+              reason: p.reason,
+              since: day(p.since) ?? "",
+              decisions: p.decisions,
+              approvedAsIs: p.approvedAsIs,
+              lowerBoundPct: Math.floor(p.lowerBound * 100),
+              barMet: liftBarMet(p.approvedAsIs, p.decisions),
+            })),
+          }
+        }
+      />
 
       {/* Spec 5.1, step 3: before anything else, since nothing in these can
           be reviewed until a person says whose meeting it was. */}

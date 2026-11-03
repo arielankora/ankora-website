@@ -23,10 +23,12 @@ const domain = vi.hoisted(() => ({
 }));
 const decide = vi.hoisted(() => ({ decideApproval: vi.fn() }));
 const lookup = vi.hoisted(() => ({ lookupClient: vi.fn() }));
+const auto = vi.hoisted(() => ({ listAutoReview: vi.fn(async () => [] as unknown[]) }));
 
 vi.mock("@/lib/app-domain/mcp-approvals", () => domain);
 vi.mock("@/lib/app-domain/decide-approval", () => decide);
 vi.mock("@/lib/mcp/lookup", () => lookup);
+vi.mock("@/lib/app-domain/auto-apply", () => auto);
 vi.mock("@/lib/mcp/task-extra-tools", () => ({ actorOf: () => ACTOR }));
 vi.mock("@/lib/email-templates", () => ({ appBaseUrl: () => BASE }));
 
@@ -67,6 +69,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   lookup.lookupClient.mockResolvedValue({ ok: true, value: { id: "c-nux", name: "NUX" } });
   domain.proposalAloneBecause.mockResolvedValue(null);
+  auto.listAutoReview.mockResolvedValue([]);
 });
 
 describe("list_approvals", () => {
@@ -86,6 +89,31 @@ describe("list_approvals", () => {
     expect(batch.reject).toBeNull();
     expect(rule.reject).toEqual({ label: "הסרה", needsReason: false });
     expect(batch.proposals[0]).toMatchObject({ proposalId: "pr1", approveAlone: "משנה פריט שכבר בתיק", url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#proposal-pr1` });
+  });
+
+  it("lists what entered a file on its own and waits for a look, with links, only for knowledge (3.11.2026)", async () => {
+    domain.listApprovalsForAi.mockResolvedValue({ items: [], proposals: new Map() });
+    auto.listAutoReview.mockResolvedValue([
+      { id: "pa1", clientId: "c-nux", clientName: "NUX", target: "FACT", kindLabel: "העדפה", headline: "מייל ולא טלפון", resultId: "f1", decidedAt: new Date("2026-11-03T10:00:00Z"), why: "מדגם של 20%" },
+    ]);
+    const out = await call("list_approvals", {});
+    expect(auto.listAutoReview).toHaveBeenCalledWith(ACTOR, { clientId: null, forAi: true });
+    expect(out.enteredAutomatically).toEqual([
+      {
+        proposalId: "pa1",
+        client: "NUX",
+        kind: "העדפה",
+        says: "מייל ולא טלפון",
+        enteredOn: "2026-11-03",
+        why: "מדגם של 20%",
+        url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#auto-pa1`,
+        result: `${BASE}/app/clients/c-nux?tab=file#item-f1`,
+      },
+    ]);
+    auto.listAutoReview.mockClear();
+    const rules = await call("list_approvals", { kind: "rule" });
+    expect(auto.listAutoReview).not.toHaveBeenCalled();
+    expect(rules.enteredAutomatically).toBeUndefined();
   });
 
   it("says who decides a sensitive proposal, in Hebrew", async () => {
