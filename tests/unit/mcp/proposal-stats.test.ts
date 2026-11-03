@@ -151,6 +151,29 @@ describe("proposalStatsForAi", () => {
     expect(JSON.stringify(out)).not.toContain("c-rimed");
   });
 
+  it("names the edited fields and the kind of the edit, never their values", async () => {
+    prisma.knowledgeProposal.findMany.mockResolvedValue([
+      { ...base, id: "e1", clientId: "c-nux", target: "CONTACT", action: "CREATE", state: "APPROVED", edited: true, editedFields: ["role"], payload: { name: "x", role: SECRET_TEXT } },
+      { ...base, id: "e2", clientId: "c-nux", target: "FACT", action: "CREATE", state: "APPROVED", edited: true, editedFields: ["body", "date"], payload: { kind: "NOTE", body: "y" } },
+      // Approved with an edit before editedFields existed: no fields, no kind.
+      { ...base, id: "e3", clientId: "c-nux", target: "FACT", action: "CREATE", state: "APPROVED", edited: true, payload: { kind: "NOTE" } },
+      { ...base, id: "e4", clientId: "c-nux", target: "FACT", action: "CREATE", state: "APPROVED", editedFields: [], payload: { kind: "NOTE" } },
+    ]);
+    prisma.auditEvent.findMany.mockResolvedValue([
+      { entityId: "e1", afterJson: { edited: true, editedFields: ["role"], editKind: "FACT", fields: { role: SECRET_TEXT } } },
+      { entityId: "e2", afterJson: { edited: true, editedFields: ["body", "date"], editKind: "MIXED" } },
+      { entityId: "e4", afterJson: { edited: false } },
+    ]);
+    const out = await proposalStatsForAi(MANAGER, { rows: true });
+    const byId = Object.fromEntries(out.rows!.map((r) => [r.id, r]));
+    expect(byId.e1).toMatchObject({ edited: true, editedFields: ["role"], editKind: "FACT" });
+    expect(byId.e2).toMatchObject({ editedFields: ["body", "date"], editKind: "MIXED" });
+    expect(byId.e3).toMatchObject({ edited: true, editedFields: [], editKind: null });
+    expect(byId.e4).toMatchObject({ edited: false, editedFields: [], editKind: null });
+    expect(JSON.stringify(out)).not.toContain(SECRET_TEXT);
+    expect(prisma.knowledgeProposal.findMany.mock.calls[0][0].select).toMatchObject({ editedFields: true });
+  });
+
   it("pages the rows", async () => {
     const out = await proposalStatsForAi(MANAGER, { rows: true, limit: 4 });
     expect(out.rows).toHaveLength(4);

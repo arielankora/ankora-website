@@ -6,6 +6,7 @@ import { readSourceRefs } from "@/lib/knowledge-sources";
 import { bulkApproveBlocker, reviewConfidence, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
 import { activePauses, autoApplySetting } from "@/lib/app-domain/auto-apply";
+import { readEditKind, type ProposalEditKind } from "@/lib/proposal-edits";
 
 // 3.11.2026, Ariel: "לצמצם את ההצעות מהחילוץ שמחכות לאישור מנהל תיק, לפי
 // רמת סיכון וודאות". To decide which kinds of proposals could enter a file
@@ -22,9 +23,11 @@ import { activePauses, autoApplySetting } from "@/lib/app-domain/auto-apply";
 // anyone.
 // "בלי AI": a marked client's proposals are left out, and only counted.
 //
-// What the data cannot say, said in the result so nobody reads more into
-// it: `edited` is one flag, not which field changed, and approving
-// overwrites the payload with the edited one.
+// What was edited (3.11.2026, lib/proposal-edits.ts): the names of the
+// fields a person changed (`editedFields`), and whether the change was to
+// the wording or to a fact (`editKind`, from the audit row of the
+// approval). Names and a kind only, never the values. Proposals approved
+// before then have `edited` and no fields.
 
 export type ProposalStatRow = {
   id: string;
@@ -49,6 +52,11 @@ export type ProposalStatRow = {
   blocked: boolean;
   state: string;
   edited: boolean;
+  /// The payload fields changed before approval, names only.
+  editedFields: string[];
+  /// WORDING, FACT, or MIXED (both), from the approval's audit row; null
+  /// when nothing was changed or the approval predates it.
+  editKind: ProposalEditKind | null;
   attached: boolean;
   /// 3.11.2026, the approval tiers: approved by the server with no person,
   /// and whether its item was taken out of the file again ("ביטול").
@@ -111,6 +119,7 @@ export async function proposalStatsForAi(
         flags: true,
         state: true,
         edited: true,
+        editedFields: true,
         attached: true,
         autoApplied: true,
         revertedAt: true,
@@ -143,6 +152,10 @@ export async function proposalStatsForAi(
   ]);
   const sourceById = new Map(sources.map((s) => [s.id, s]));
   const bulkIds = new Set(audits.filter((a) => (a.afterJson as { bulk?: unknown } | null)?.bulk === true).map((a) => a.entityId));
+  const editKinds = new Map(audits.flatMap((a) => {
+    const kind = readEditKind((a.afterJson as { editKind?: unknown } | null)?.editKind);
+    return kind && a.entityId ? [[a.entityId, kind] as const] : [];
+  }));
 
   const clientKey = new Map<string, string>();
   const keyOf = (id: string) => {
@@ -176,6 +189,8 @@ export async function proposalStatsForAi(
       blocked: flags.some((f) => f.block),
       state: p.state,
       edited: p.edited,
+      editedFields: p.editedFields ?? [],
+      editKind: p.edited ? (editKinds.get(p.id) ?? null) : null,
       attached: p.attached,
       autoApplied: p.autoApplied,
       reverted: p.revertedAt !== null,
