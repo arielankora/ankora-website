@@ -160,6 +160,8 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   ExtractionGuide: { decision: "DUMP", table: "extraction_guides", reason: "Every version of the extraction guidance, and who proposed and approved it." },
   KnowledgeBatch: { decision: "DUMP", table: "knowledge_batches", reason: "Which meeting or document each batch of proposals came from, and what was dropped (reasons only, never the text)." },
   KnowledgeProposal: { decision: "DUMP", table: "knowledge_proposals", reason: "Proposals to client files and who decided them: the review history decision 1 is measured on." },
+  AutoApplyPause: { decision: "DUMP", table: "auto_apply_pauses", reason: "Which kinds and clients were sent back to a person after auto-applied items turned out wrong, and who lifted it. Decided by people." },
+  AppSetting: { decision: "DUMP", table: "app_settings", reason: "Settings for all of Ankora changed on a screen (the auto-apply switch and when it was first on). Lost, they fall back to defaults nobody chose." },
   ClientEntity: { decision: "DUMP", table: "client_entities", reason: "The client's legal entities and their registration details. People and systems point at them." },
   ClientFact: { decision: "DUMP", table: "client_facts", reason: "The client file's facts and their history: preferences, scope, decisions, open questions. Typed by people." },
   SystemAccess: { decision: "DUMP", table: "system_access", reason: "The client's system map: accounts, access status and blockers. Typed by people; no secrets (those are in the vault)." },
@@ -296,6 +298,8 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
   "clients.sourceKeywords": "Words that name the client in a meeting or mail title ('nux'), for finding its material. Not a key of any kind.",
   "system_access.credentialId": "The id of a vault row, a pointer. The secret stays encrypted in client_credentials.",
+  "auto_apply_pauses.key": "Which kind of proposal (FACT.NOTE) or which client id was paused from auto-apply. A label, not a key of any kind.",
+  "app_settings.key": "A setting's name ('knowledge.auto_apply'). A label, not a key of any kind.",
   // Credentials vault. Every one of these is either ciphertext that
   // needs the production key to open, or a flag that says a value exists.
   "client_credentials.secretCiphertext": "AES-256-GCM ciphertext; the data key that opens it is wrapped by a key that is not in the backup.",

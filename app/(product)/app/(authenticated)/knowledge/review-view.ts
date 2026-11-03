@@ -45,6 +45,7 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       attached: p.attached,
       // 3.11.2026: an approved new item can be taken out again ("ביטול").
       reverted: !!p.revertedAt,
+      autoApplied: p.autoApplied,
       revertible: revertBlocker(p) === null,
       rejectReason: p.rejectReason,
       hiddenFor: p.hiddenFor,

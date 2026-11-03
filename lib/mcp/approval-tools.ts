@@ -11,7 +11,8 @@ import { decideApproval } from "@/lib/app-domain/decide-approval";
 import { decideProposalForAi, findApprovalForAi, listApprovalsForAi, proposalAloneBecause, type ProposalDecision, type ProposalForAi } from "@/lib/app-domain/mcp-approvals";
 import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { APPROVAL_TABS, KIND_LABELS, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
-import { appUrl, approvalRowUrl, batchUrl, proposalUrl } from "@/lib/approval-links";
+import { appUrl, approvalRowUrl, autoReviewUrl, batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
+import { listAutoReview } from "@/lib/app-domain/auto-apply";
 
 // "אישורים" from Claude (2.11.2026, Ariel): "as if I were working inside
 // the app". Three tools:
@@ -88,7 +89,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "List what waits on my approval",
       description:
-        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
+        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `result` (the item in the file) and `url` (its row, where "תקין" or "ביטול" is pressed; there is no tool for those). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
       inputSchema: z.object({
         client: z.string().optional().describe("Only this client, as the user said it."),
         kind: z.enum(KINDS).optional().describe("Only this kind of row."),
@@ -108,10 +109,24 @@ export function registerApprovalTools(server: McpServer): void {
         const base = appBaseUrl();
         const { items, proposals } = await listApprovalsForAi(actor, { clientId, kind: args.kind ?? null, everyone: args.everyone ?? false });
         const sorted = [...items].sort((a, b) => Number(!!b.blocking) - Number(!!a.blocking) || a.since.getTime() - b.since.getTime());
+        // 3.11.2026: what entered a file on arrival and waits for a look.
+        const auto = !args.kind || args.kind === "knowledge" ? await listAutoReview(actor, { clientId, forAi: true }) : [];
         return toolJson({
           count: sorted.length,
           screen: appUrl(base, "/app/approvals"),
           approvals: sorted.map((i) => serializeItem(base, i, actor.timezone, proposals.get(i.id))),
+          enteredAutomatically: auto.length
+            ? auto.map((a) => ({
+                proposalId: a.id,
+                client: a.clientName,
+                kind: a.kindLabel,
+                says: a.headline,
+                enteredOn: localDateKey(a.decidedAt, actor.timezone),
+                why: a.why,
+                url: autoReviewUrl(base, a.clientId, a.id),
+                result: a.resultId ? fileItemUrl(base, a.clientId, a.resultId) : undefined,
+              }))
+            : undefined,
         });
       } catch (err) {
         console.error("[mcp] list_approvals failed", err);
@@ -221,7 +236,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Measure how proposals to client files ended",
       description:
-        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took, whether the server approved it with no person (`autoApplied`), whether its item was taken out of the file again (`reverted`), and for a date whether it opens a task before it (`autoTask`). Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `edited` says only that something was changed before approval, not what.",
+        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took, whether the server approved it with no person (`autoApplied`), whether a person looked at it after and marked it right (`autoReviewed`), whether its item was taken out of the file again (`reverted`), and for a date whether it opens a task before it (`autoTask`). Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `autoApply` says whether auto-apply is on, since when, and which kinds and clients (by key) are paused back to a person. `edited` says only that something was changed before approval, not what.",
       inputSchema: z.object({
         since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only proposals that arrived on or after this day, YYYY-MM-DD. Omit for all of them."),
         via: z.enum(["MCP", "SCREEN"]).optional().describe("MCP: sent by Claude (the extraction). SCREEN: typed on the screen. Omit for both."),

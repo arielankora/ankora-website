@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { approveProposal, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
+import { liftAutoApplyPause, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
 // approve, reject with a reason. Nothing else writes a proposal into a
@@ -198,6 +199,52 @@ export async function discardAwaitingAction(_prev: FormState | undefined, formDa
     await discardAwaiting(user, String(formData.get("batchId") ?? ""), String(formData.get("why") ?? ""));
   } catch (err) {
     return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+// ---------------------------------------------------------------------------
+// "נכנס אוטומטית" (3.11.2026, approval tiers part 2): what entered a file
+// on arrival, the switch and the pauses (lib/app-domain/auto-apply.ts).
+// "ביטול" on an auto-applied item is revertProposalAction above.
+// ---------------------------------------------------------------------------
+
+/// The manager-only actions say what they need, not "the client is not
+/// assigned to you".
+function managerError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return "אירעה שגיאה. נסו שוב.";
+}
+
+/// "תקין": the auto-applied item was looked at and is right.
+export async function markAutoReviewedAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await markAutoReviewed(user, id);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+/// The switch for all clients, managers only.
+export async function setAutoApplyAction(enabled: boolean): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await setAutoApply(user, enabled);
+  } catch (err) {
+    return { error: managerError(err) };
+  }
+  return done();
+}
+
+/// "להחזיר לכניסה אוטומטית": a manager lifts a pause.
+export async function liftAutoApplyPauseAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await liftAutoApplyPause(user, id);
+  } catch (err) {
+    return { error: managerError(err) };
   }
   return done();
 }

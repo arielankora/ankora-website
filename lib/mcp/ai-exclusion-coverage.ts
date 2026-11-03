@@ -83,7 +83,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_hours_bank: "lookupClient; entries of marked tasks count only as minutes in the totals, no titles or notes",
 
   // lib/mcp/approval-tools.ts
-  list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi)",
+  list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi); auto-applied items of a marked client are left out (listAutoReview forAi)",
   decide_approval: "only a row list_approvals would show (findApprovalForAi)",
   decide_knowledge_proposals: "a proposal of a marked client is refused (decideProposalForAi)",
   get_proposal_stats: "proposals of a marked client are left out and only counted; no proposal text is returned (proposalStatsForAi)",

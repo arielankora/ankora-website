@@ -1,5 +1,5 @@
 import "server-only";
-import { batchUrl } from "@/lib/approval-links";
+import { batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
 import { aiExcludedClientIds, isDocumentAiExcluded, isTaskAiExcluded } from "@/lib/app-domain/ai-exclusion-db";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { z } from "zod";
@@ -147,7 +147,7 @@ const PROPOSE_INPUT = z.object({
 /// the schema cannot say is here. tests/unit/mcp/propose-knowledge-status
 /// holds the length.
 export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
-  "Sends proposed items for a client's file, from ONE source (a meeting, a document, an email thread). Nothing enters the file until a person approves each item on Ankora's review screen.",
+  "Sends proposed items for a client's file, from ONE source (a meeting, a document, an email thread). Nothing enters the file until a person approves it on Ankora's review screen, except AUTO.",
   "STATUS, on each item as `status`: CONFIRMED (the client or their supplier said or showed it explicitly), UNCERTAIN (said unclearly, or only by Ankora) or MISSING (needed, and we do not have it). With UNCERTAIN or MISSING add payload.toResolve: what would close it. Left out, HIGH confidence is CONFIRMED and anything else UNCERTAIN. Not used on NARRATIVE, DOMAIN, TASK, DATE or a QUESTION fact.",
   "FIELDS: each item's `payload` is described in the schema per target (payload.anyOf, titled by target), with every closed list. For example FACT.kind (SCOPE_IN, SCOPE_OUT, PREFERENCE, REQUIREMENT, LOCATION, FINANCE, TEMPORARY, ONE_OFF_DECISION, QUESTION, NOTE) and FACT.topic (COMMUNICATION, REPORTING, DOCUMENTS, AUTOMATION, ADMINS, PAYMENTS, SUPPLIERS, OTHER). A value outside a list drops that item, and the reply says where (items[0].payload.topic).",
   "Each item needs `reason` (one sentence: why it is true and where it was said), and should have `confidence` (the review screen orders by it, lowest first) and `at` (minute in the recording, \"08:13\"). `quote` is optional and short, never from a topics-only source.",
@@ -156,6 +156,7 @@ export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
   "NAMES (entityName, routeToNames, systemNames and the like) link to the item in the file with that name on approval; name only what is in the file or in the same batch. Every payload except NARRATIVE, DOMAIN, TASK and DATE may carry externalRefs, ownerName (the person at Ankora who keeps it right) and clientVisible (true only when it is the client's to see; never with sensitivity SENSITIVE or doNotDisclose).",
   "Never include passwords, keys or card numbers: such an item is dropped and a task to change the secret opens. sensitivity SENSITIVE for medical, political or personal information. Leave out small talk, guesses and Ankora's own commercial terms.",
   "WHOSE MEETING: a participant from a client's domain decides. A meeting about several clients: each item its own `client`, with newSource. Not clear and nobody decides: pass the likely `client` and `uncertain` with all candidates; nothing enters a file until a person picks.",
+  "AUTO: a new plain fact, contact, provider or entity read as HIGH, not sensitive or flagged, may enter on arrival (`enteredFile`): tell the user which, with the `result` links.",
 ].join(" ");
 
 export function registerClientFileTools(server: McpServer): void {
@@ -417,17 +418,38 @@ export function registerClientFileTools(server: McpServer): void {
           const result = await proposeKnowledge(
             actor,
             { clientId: g.id, source: args.sourceCode && groups.size === 1 ? { code: args.sourceCode } : newSource!, note: args.note, via: "MCP", items: g.items },
-            { indexes: g.indexes }
+            // 3.11.2026: the AUTO tier enters on arrival (approval tiers).
+            { indexes: g.indexes, autoApply: true }
           );
+          const base = appBaseUrl();
+          const { autoApplied, ...rest } = result;
           // 2.11.2026: the batch itself on the review screen, not the screen.
-          batches.push({ client: g.name, ...result, reviewUrl: result.batchId ? batchUrl(appBaseUrl(), g.id, result.batchId) : null });
+          batches.push({
+            client: g.name,
+            ...rest,
+            // What entered the file on arrival, each with the item in the
+            // file (`result`) and the proposal (`url`), where it is undone.
+            enteredFile: (autoApplied ?? []).map((a) => ({
+              proposalId: a.proposalId,
+              says: a.headline,
+              url: proposalUrl(base, g.id, a.proposalId),
+              ...(a.resultId ? { result: fileItemUrl(base, g.id, a.resultId) } : {}),
+            })),
+            reviewUrl: result.batchId ? batchUrl(base, g.id, result.batchId) : null,
+          });
         }
-        const proposed = batches.reduce((n, b) => n + b.proposed, 0);
+        const entered = batches.reduce((n, b) => n + b.enteredFile.length, 0);
+        const proposed = batches.reduce((n, b) => n + b.proposed, 0) - entered;
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
         const next =
           (proposed > 0
-            ? `${proposed} proposals are waiting for a person to approve them: \`reviewUrl\` opens them on Ankora's approvals screen, and list_approvals with decide_knowledge_proposals decides them from here once the user says so. Nothing is in the file yet.`
-            : "Nothing was proposed.") +
+            ? `${proposed} proposals are waiting for a person to approve them: \`reviewUrl\` opens them on Ankora's approvals screen, and list_approvals with decide_knowledge_proposals decides them from here once the user says so. ${entered > 0 ? "These are not in the file yet." : "Nothing is in the file yet."}`
+            : entered > 0
+              ? "Nothing else waits for approval."
+              : "Nothing was proposed.") +
+          (entered > 0
+            ? ` ${entered} entered the client's file automatically (\`enteredFile\`): tell the user which, with each \`result\` link. A person may still look at them on the approvals screen, and "ביטול" there takes one out again.`
+            : "") +
           (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "");
         return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });
       } catch (err) {

@@ -93,4 +93,16 @@ describe("propose_knowledge, the RIMED reproduction", () => {
     expect(r).toMatchObject({ proposed: 0, sourceCode: null, dropped: [{ index: 0, reason: expect.stringContaining("items[0].reason") }] });
     expect(await prisma.clientSource.count({ where: { clientId: client.id } })).toBe(1);
   });
+
+  it("3.11.2026: an AUTO item enters the file on arrival, and the reply says so with its link", async () => {
+    const { client, user, source } = await setup();
+    const r = await propose(user, { client: "RIMED", sourceCode: source.code, items: [PREFERENCE, { ...PREFERENCE, confidence: "MEDIUM", payload: { kind: "NOTE", body: "בינוני" } }] });
+    expect(r.enteredFile).toHaveLength(1);
+    expect(r.enteredFile[0].result).toContain(`/app/clients/${client.id}?tab=file#item-`);
+    expect(r.enteredFile[0].url).toContain(`#proposal-${r.enteredFile[0].proposalId}`);
+    expect(r.next).toContain("1 proposals are waiting");
+    expect(r.next).toContain("1 entered the client's file automatically");
+    const p = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: r.enteredFile[0].proposalId } });
+    expect(p).toMatchObject({ state: "APPROVED", autoApplied: true, decidedById: user.id });
+  });
 });

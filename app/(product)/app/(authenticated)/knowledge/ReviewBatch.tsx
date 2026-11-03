@@ -36,6 +36,8 @@ export type ReviewProposal = {
   attached: boolean;
   /// Approved, and its item taken out of the file again ("ביטול").
   reverted: boolean;
+  /// Approved by the server on arrival (the AUTO tier), not by a person.
+  autoApplied?: boolean;
   /// Approved, and its item may still be taken out again (revertBlocker).
   revertible: boolean;
   rejectReason: string | null;
@@ -360,7 +362,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   if (p.state !== "PENDING") {
     return (
       <li id={proposalAnchor(p.id)} className="py-2.5 text-xs text-app-text-tertiary scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-        {p.state === "APPROVED" ? (p.reverted ? "אושר ובוטל: " : p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
+        {p.state === "APPROVED" ? (p.reverted ? "אושר ובוטל: " : p.autoApplied ? "נכנס אוטומטית: " : p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
         {p.taskId && (
