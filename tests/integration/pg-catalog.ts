@@ -43,9 +43,10 @@ export async function tableColumns(db: Client, table: string): Promise<ColumnInf
 /// which is exactly the kind of thing a generated fixture is for.
 export async function foreignKeys(
   db: Client
-): Promise<Array<{ child: string; column: string; parent: string; parentColumn: string }>> {
+): Promise<Array<{ child: string; column: string; parent: string; parentColumn: string; nullable: boolean }>> {
   const r = await db.query(
-    `SELECT c.relname AS child, a.attname AS column, f.relname AS parent, fa.attname AS "parentColumn"
+    `SELECT c.relname AS child, a.attname AS column, f.relname AS parent, fa.attname AS "parentColumn",
+            NOT a.attnotnull AS nullable
      FROM pg_constraint con
      JOIN pg_class c ON c.oid = con.conrelid
      JOIN pg_class f ON f.oid = con.confrelid
@@ -73,23 +74,64 @@ export async function enumLabels(db: Client): Promise<Map<string, string[]>> {
   return out;
 }
 
-export function topoSort(tables: string[], edges: Array<[string, string]>): string[] {
-  const remaining = new Set(tables);
-  const deps = new Map(tables.map((t) => [t, new Set<string>()]));
-  for (const [child, parent] of edges) {
-    if (child === parent) continue;
-    if (remaining.has(child) && remaining.has(parent)) deps.get(child)!.add(parent);
-  }
-  const ordered: string[] = [];
-  while (remaining.size) {
-    const ready = [...remaining].filter((t) => [...deps.get(t)!].every((d) => !remaining.has(d))).sort();
-    if (!ready.length) throw new Error(`Cycle among ${[...remaining].join(", ")}`);
-    for (const t of ready) {
-      ordered.push(t);
-      remaining.delete(t);
+/// The order to fill tables in, the same way the restore script orders
+/// them (scripts/restore-from-dump.mjs, restoreOrder): parents first, and
+/// for a cycle of foreign keys (3.11.2026: clients ->
+/// client_documents -> tasks -> clients) one nullable key on the cycle is
+/// set aside, filled with null first and set after every table has rows.
+export function fillOrder(
+  tables: string[],
+  edges: Array<{ child: string; parent: string; column: string; nullable: boolean }>
+): { order: string[]; deferred: Array<{ table: string; column: string }> } {
+  const inSet = new Set(tables);
+  let active = edges.filter((e) => e.child !== e.parent && inSet.has(e.child) && inSet.has(e.parent));
+  const deferred: Array<{ table: string; column: string }> = [];
+  const kahn = (es: typeof active) => {
+    const remaining = new Set(tables);
+    const deps = new Map(tables.map((t) => [t, new Set<string>()]));
+    for (const e of es) deps.get(e.child)!.add(e.parent);
+    const ordered: string[] = [];
+    for (;;) {
+      const ready = [...remaining].filter((t) => [...deps.get(t)!].every((d) => !remaining.has(d))).sort();
+      if (!ready.length) break;
+      for (const t of ready) {
+        ordered.push(t);
+        remaining.delete(t);
+      }
     }
+    return { ordered, remaining, deps };
+  };
+  for (;;) {
+    const { ordered, remaining, deps } = kahn(active);
+    if (!remaining.size) return { order: ordered, deferred };
+    const dependsOn = (from: string, to: string) => {
+      const seen = new Set<string>();
+      const stack = [from];
+      while (stack.length) {
+        const t = stack.pop()!;
+        if (t === to) return true;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        for (const d of deps.get(t)!) if (remaining.has(d)) stack.push(d);
+      }
+      return false;
+    };
+    const breakable = active.filter(
+      (e) => e.nullable && remaining.has(e.child) && remaining.has(e.parent) && dependsOn(e.parent, e.child)
+    );
+    if (!breakable.length) throw new Error(`Cycle among ${[...remaining].join(", ")}`);
+    let best = breakable[0];
+    let bestLeft = Infinity;
+    for (const e of breakable) {
+      const left = kahn(active.filter((x) => x !== e)).remaining.size;
+      if (left < bestLeft) {
+        best = e;
+        bestLeft = left;
+      }
+    }
+    deferred.push({ table: best.child, column: best.column });
+    active = active.filter((e) => e !== best);
   }
-  return ordered;
 }
 
 /// Every column gets a value, including nullable ones. Leaving nullables
