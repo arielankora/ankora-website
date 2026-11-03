@@ -86,6 +86,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
     href: withApprovalsBack(i.href, tab, clientId),
     actions: i.actions,
     blocked: i.blocked,
+    failing: i.failing ?? null,
     preview: i.preview ?? null,
     label: KIND_LABELS[i.kind],
     tone: KIND_TONES[i.kind],

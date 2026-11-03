@@ -21,6 +21,9 @@ export const TONE_CLASSES: Record<KindTone, string> = {
   neutral: "bg-app-neutral-soft text-app-text-secondary",
 };
 
+/// The failing checks a row lists before the rest waits in the preview.
+const MAX_FAILING = 5;
+
 export function KindLabel({ label, tone }: { label: string; tone: KindTone }) {
   return <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${TONE_CLASSES[tone]}`}>{label}</span>;
 }
@@ -38,6 +41,7 @@ export type RowView = {
   href: string;
   actions: RowActions;
   blocked?: string | null;
+  failing?: string[] | null;
   preview?: ApprovalPreview | null;
   label: string;
   tone: KindTone;
@@ -98,6 +102,16 @@ export function ApprovalRow({ row }: { row: RowView }) {
               </>
             )}
           </p>
+        )}
+        {/* Which check fails, and in which step, without opening the
+            procedure (3.11.2026). The rest is under "הצגת הנוהל". */}
+        {row.failing && row.failing.length > 0 && (
+          <ul className="mt-1 list-disc space-y-0.5 ps-5 text-[12.5px] leading-relaxed text-app-error" data-testid="approval-failing">
+            {row.failing.slice(0, MAX_FAILING).map((line, i) => (
+              <li key={i}>{line}</li>
+            ))}
+            {row.failing.length > MAX_FAILING && <li className="list-none text-app-text-secondary">ועוד {row.failing.length - MAX_FAILING} בדיקות, ב&quot;{row.preview?.toggle ?? "הצגת הנוהל"}&quot;.</li>}
+          </ul>
         )}
         {row.preview && (
           <button

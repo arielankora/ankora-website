@@ -8,7 +8,7 @@ import { canSendToAi } from "@/lib/knowledge";
 import { listProcesses } from "@/lib/app-domain/processes";
 import { listClientPolicies } from "@/lib/app-domain/client-policies";
 import { listOpenExceptions } from "@/lib/app-domain/policy-exceptions";
-import { ACTION_TAG_LABELS, FIELD_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, type ProcessStep } from "@/lib/process-rules";
+import { ACTION_TAG_LABELS, FIELD_LABELS, HUMAN_ONLY_TAGS, HUMAN_REVIEWED_TAGS, STEP_MODE_LABELS, TRANSITION_LABELS, TRIGGER_LABELS, mergeStepChecks, type ProcessStep } from "@/lib/process-rules";
 import { POLICY_KIND_LABELS, ruleDatesLine, ruleInForce } from "@/lib/client-policies";
 import { paramsInForce, paramsSummary } from "@/lib/policy-params";
 import { readReviewReason, REVIEW_REASON_LABELS } from "@/lib/process-review";
@@ -102,6 +102,14 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     amountMax: s.amountMaxMinor !== null ? `${(s.amountMaxMinor / 100).toLocaleString("en-US")} ${s.currency ?? ""}`.trim() : null,
     channel: s.channel,
   });
+  // The same R3 note on several steps is one line naming them.
+  const version = (v: { version: number; steps: ProcessStep[]; highlights: string | null; outputs: string | null; checks: { code: string; message: string; step?: number; excepted?: boolean }[] }) => ({
+    version: v.version,
+    steps: v.steps.map(step),
+    highlights: v.highlights,
+    outputs: v.outputs,
+    failsRules: mergeStepChecks(v.checks.filter((c) => !c.excepted)).map((c) => c.message),
+  });
   const runs = await prisma.task.findMany({
     // 28.10.2026: a run marked "בלי AI" is not listed to Claude.
     where: { processId: p.id, parentId: null, deletedAt: null, aiExcluded: false },
@@ -143,16 +151,12 @@ export async function mcpGetProcess(actor: User, clientId: string, processId: st
     externalParty: p.externalPartyText,
     exceptionPlaybook: p.exceptionPlaybook,
     gaps: p.gaps,
-    procedure: p.current
-      ? {
-          version: p.current.version,
-          steps: p.current.steps.map(step),
-          highlights: p.current.highlights,
-          outputs: p.current.outputs,
-          failsRules: p.current.checks.filter((c) => !c.excepted).map((c) => c.message),
-        }
-      : null,
+    // null: no approved version. A draft is under `draft`.
+    procedure: p.current ? version(p.current) : null,
     draftVersion: p.draft?.version ?? null,
+    // 3.11.2026: the version waiting for approval, step by step, and what
+    // holds it back, so Claude can see why it is blocked and fix it.
+    draft: p.draft ? version(p.draft) : null,
     recentRuns: runs.map((r) => ({ taskId: r.id, title: r.title, status: r.status, due: day(r.dueDate) })),
     // Spec 5.4: what people who closed runs said, still waiting for the
     // next version. Read them before drafting one.

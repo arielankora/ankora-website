@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { proposalProblems, suggestedFix, SUGGESTED_INTERIM, suggestedToResolve, suggestedVerification } from "@/lib/knowledge-proposals";
+import { EDIT_FIELD_LABELS, proposalProblems, suggestedFix, SUGGESTED_INTERIM, suggestedToResolve, suggestedVerification } from "@/lib/knowledge-proposals";
 
 // 3.11.2026: a missing-field note says why the field is needed and offers
 // a wording that is approved in one press. Notes that repeat on several
@@ -58,6 +58,27 @@ describe("missing-field notes with a suggested wording", () => {
     const interim = proposalProblems("POLICY", { kind: "THRESHOLD", title: "t", statement: "s [S9]" }, []);
     expect(interim.map((x) => x.code).sort()).toEqual(["R17", "SHAPE"]);
     expect(suggestedFix(interim)).toBeNull();
+  });
+
+  it("every note names the field it is completed in, as the edit form labels it", () => {
+    const msg = (target: Parameters<typeof proposalProblems>[0], payload: Record<string, unknown>) => proposalProblems(target, payload, [])[0].message;
+    expect(msg("POLICY", { kind: "THRESHOLD", title: "t", statement: "s" })).toContain(`בשדה "${EDIT_FIELD_LABELS.interimStatement}"`);
+    expect(msg("FACT", { kind: "TEMPORARY", body: "x" })).toContain(`בשדה "${EDIT_FIELD_LABELS.validUntilEvent}"`);
+    expect(msg("FACT", { kind: "ONE_OFF_DECISION", body: "x" })).toContain(`בשדה "${EDIT_FIELD_LABELS.decidedAt}"`);
+    expect(msg("FACT", { kind: "NOTE", body: "x", knowledgeStatus: "UNCERTAIN" })).toContain(`בשדה "${EDIT_FIELD_LABELS.toResolve}"`);
+    expect(msg("FACT", { kind: "NOTE", body: "x", clientVisible: true, sensitivity: "SENSITIVE" })).toContain(`בשדה "${EDIT_FIELD_LABELS.clientVisible}"`);
+    expect(msg("DATE", { title: "דוח", recurrence: "ONCE" })).toContain(`בשדה "${EDIT_FIELD_LABELS.date}"`);
+    // A monthly day has no field in the edit: the note says so.
+    expect(msg("DATE", { title: "דוח", recurrence: "MONTHLY" })).toContain("אין שדה בעריכה");
+    // A task has no "מה יסגור את זה" in its edit: the note does not send there.
+    expect(msg("TASK", { title: "t", knowledgeStatus: "UNCERTAIN" })).not.toContain("בשדה");
+  });
+
+  it("automated steps: the note says where the check is written, and that the process still enters", () => {
+    const [f] = proposalProblems("PROCESS", { name: "P1", steps: [{ title: "a", mode: "AUTOMATED" }, { title: "b", mode: "AUTOMATED" }] }, []);
+    expect(f.message).toContain("שלבים 1 ו-2 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.");
+    expect(f.message).toContain('בכל שלב בשדה "איך אדם מוודא שזה קרה"');
+    expect(f.message).toContain("התהליך ייכנס כטיוטה");
   });
 
   it("a long output falls back to the plain wording", () => {

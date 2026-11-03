@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, suggestedFix, type ConfidenceLike, type ProposalFlag, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, EDIT_FIELD_LABELS, proposalDetails, reviewSummary, suggestedFix, type ConfidenceLike, type ProposalFlag, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -71,10 +71,10 @@ function targetLabel(p: { target: ProposalTargetLike; payload: Record<string, un
 
 const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long?: boolean }[]> = {
   FACT: [
-    { key: "body", label: "מה", long: true },
-    { key: "validUntilEvent", label: "בתוקף עד אירוע" },
+    { key: "body", label: EDIT_FIELD_LABELS.body, long: true },
+    { key: "validUntilEvent", label: EDIT_FIELD_LABELS.validUntilEvent },
     { key: "decidedBy", label: "מי החליט" },
-    { key: "decidedAt", label: "תאריך ההחלטה (2026-10-17)" },
+    { key: "decidedAt", label: `${EDIT_FIELD_LABELS.decidedAt} (2026-10-17)` },
   ],
   CONTACT: [
     { key: "name", label: "שם" },
@@ -93,7 +93,7 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
   POLICY: [
     { key: "title", label: "שם הכלל" },
     { key: "statement", label: "הכלל", long: true },
-    { key: "interimStatement", label: "עד שיאושר", long: true },
+    { key: "interimStatement", label: EDIT_FIELD_LABELS.interimStatement, long: true },
   ],
   SYSTEM: [
     { key: "systemName", label: "מערכת" },
@@ -121,7 +121,7 @@ const EDIT_FIELDS: Record<ProposalTargetLike, { key: string; label: string; long
   ],
   DATE: [
     { key: "title", label: "מה המועד" },
-    { key: "date", label: "תאריך (2026-10-22), לחד-פעמי או שנתי" },
+    { key: "date", label: `${EDIT_FIELD_LABELS.date} (2026-10-22), לחד-פעמי או שנתי` },
     { key: "responsibleName", label: "אחראי באנקורה (שם)" },
     { key: "notes", label: "הערות", long: true },
   ],
@@ -162,7 +162,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
             </select>
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">מה יסגור את זה (אם לא מאושר)</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{EDIT_FIELD_LABELS.toResolve} (אם לא מאושר)</span>
             <input name="toResolve" defaultValue={str(p.payload.toResolve)} className={INPUT} />
           </label>
         </>
@@ -180,7 +180,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
             <input name="ownerName" defaultValue={str(p.payload.ownerName)} className={INPUT} />
           </label>
           <label className="block">
-            <span className="block text-xs font-medium text-app-text-secondary">גלוי ללקוח</span>
+            <span className="block text-xs font-medium text-app-text-secondary">{EDIT_FIELD_LABELS.clientVisible}</span>
             <select name="clientVisible" defaultValue={p.payload.clientVisible === true ? "yes" : "no"} className={INPUT}>
               <option value="no">לא</option>
               <option value="yes">כן</option>

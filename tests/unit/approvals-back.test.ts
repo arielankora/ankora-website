@@ -99,6 +99,14 @@ describe("procedurePreview", () => {
     expect(p.problems).toHaveLength(2);
     expect(p.problems[1]).toContain("חריגה מאושרת");
   });
+  it("merges the same R3 note on several steps into one problem line", () => {
+    const p = procedurePreview({ steps: [step({}), step({}), step({})] }, {}, [
+      { code: "R3", step: 1, message: "שלב 1 אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.", severity: "BLOCK" },
+      { code: "R1", step: 2, message: "שלב 2: הודעה ללקוח עוברת בדיקה של אדם.", severity: "BLOCK" },
+      { code: "R3", step: 3, message: "שלב 3 אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה.", severity: "BLOCK" },
+    ]);
+    expect(p.problems).toEqual(["שלבים 1 ו-3 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.", "שלב 2: הודעה ללקוח עוברת בדיקה של אדם."]);
+  });
   it("names a removed system instead of its id", () => {
     expect(stepLine(step({ systemIds: ["gone"] }), 0, {})).toContain("מערכת שהוסרה");
   });

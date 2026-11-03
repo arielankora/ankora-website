@@ -22,7 +22,7 @@ describe("suggested wording for missing fields", () => {
     const { client, user } = await setup();
     const r = await proposeKnowledge(user, { clientId: client.id, source: DOC, items: [{ target: "POLICY", reason: "נכתב בנוהל", payload: RULE }] });
     expect(r.proposed).toBe(1);
-    expect(r.incomplete).toEqual([{ index: 0, missing: expect.stringContaining("חסר כלל ביניים"), suggested: "כמו היום, עד שהכלל מאושר." }]);
+    expect(r.incomplete).toEqual([{ index: 0, missing: expect.stringContaining('בשדה "עד שיאושר"'), why: expect.stringContaining("בינתיים"), suggested: "כמו היום, עד שהכלל מאושר." }]);
 
     const [batch] = await listOpenBatches(user, { clientId: client.id });
     const [p] = batch.proposals;
@@ -45,6 +45,23 @@ describe("suggested wording for missing fields", () => {
     const flags = batch.proposals[0].flags as { message: string; fix?: unknown }[];
     expect(flags).toHaveLength(1);
     expect(flags[0].fix).toBeTruthy();
+  });
+
+  it("lists every note the card would show: the interim rule, and automated steps in one line", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: DOC,
+      items: [
+        { target: "POLICY", reason: "נכתב בנוהל", payload: RULE },
+        { target: "PROCESS", reason: "נכתב בנוהל", payload: { knowledgeStatus: "CONFIRMED", title: "דוח חודשי", steps: [{ title: "שליפה", mode: "AUTOMATED" }, { title: "שמירה", mode: "AUTOMATED" }] } },
+      ],
+    });
+    expect(r.incomplete.map((i) => i.index)).toEqual([0, 1]);
+    expect(r.incomplete[1].missing).toContain("שלבים 1 ו-2 אוטומטיים");
+    const [batch] = await listOpenBatches(user, { clientId: client.id });
+    const cardNotes = batch.proposals.flatMap((p) => (p.flags as { code: string; message: string }[]).filter((f) => ["SHAPE", "R3"].includes(f.code)).map((f) => f.message));
+    expect(r.incomplete.map((i) => i.missing).sort()).toEqual(cardNotes.sort());
   });
 
   it("without a wording for every problem, nothing is approved", async () => {
