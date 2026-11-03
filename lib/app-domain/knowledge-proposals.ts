@@ -37,6 +37,7 @@ import {
   taskTitleProblem,
 } from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
+import { summarizeProposalEdit } from "@/lib/proposal-edits";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity, removeClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
@@ -909,13 +910,19 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     if (existing) throw new Error(`${existing.body}: כבר בתיק. "כבר בתיק: הוספת המקור" מוסיף את המקור לפריט שבתיק.`);
   }
   const resultId = await apply(actor, proposal, payload);
+  // Which fields changed, and whether in wording or in fact
+  // (lib/proposal-edits.ts). A change of spaces only is no edit. The names
+  // go on the proposal, the values before and after only in the audit row.
+  const edit = summarizeProposalEdit(original, payload);
+  const edited = edit.editedFields.length > 0;
   const updated = await prisma.knowledgeProposal.update({
     where: { id },
     data: {
       state: "APPROVED",
       decidedById: actor.id,
       decidedAt: new Date(),
-      edited: changed.length > 0,
+      edited,
+      editedFields: edit.editedFields,
       resultId,
       payload: payload as Prisma.InputJsonValue,
       ...(options.auto ? { autoApplied: true } : {}),
@@ -928,7 +935,14 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
-    after: { resultId, edited: changed.length > 0, headline: proposalHeadline(proposal.target, payload), ...(options.bulk ? { bulk: true } : {}) },
+    ...(edited ? { before: { fields: edit.before } } : {}),
+    after: {
+      resultId,
+      edited,
+      headline: proposalHeadline(proposal.target, payload),
+      ...(edited ? { editedFields: edit.editedFields, editKind: edit.editKind, fieldKinds: edit.fieldKinds, fields: edit.after } : {}),
+      ...(options.bulk ? { bulk: true } : {}),
+    },
   });
   return updated;
 }

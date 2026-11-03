@@ -3461,6 +3461,10 @@ model KnowledgeProposal {
   /// Whether the person changed it before approving (decision 1 measures
   /// this: under 10% after a month opens approval in conversation).
   edited       Boolean       @default(false)
+  /// 3.11.2026: which payload fields the person changed before approving
+  /// (lib/proposal-edits.ts), names only. The values before and after are
+  /// in the audit row of the approval, not here.
+  editedFields String[]      @default([])
   /// "כבר בתיק": it was already in the file, so approving it added its
   /// sources to the item there (`resultId`) and created nothing.
   attached     Boolean       @default(false)
