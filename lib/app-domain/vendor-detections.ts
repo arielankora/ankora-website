@@ -105,6 +105,13 @@ export async function checkVendorSignal(taskId: string, extraText?: string | nul
   if (task.vendorDetection) return task.vendorDetection.status === "PENDING" ? toVendorCheck(task.vendorDetection) : null;
   if (task.status === "DONE" || task.status === "ARCHIVED") return null;
 
+  // The text first: it costs nothing, and almost every task has no signal
+  // at all. Whether there is one does not depend on which names are known
+  // (that only decides new or existing), so the site's list is enough to
+  // stop here without a single further query.
+  const text = [task.title, task.description, extraText].filter(Boolean).join("\n");
+  if (!detectVendorSignal(text, knownVendorsFromSite())) return null;
+
   const p8 = await p8Process();
   // A P8 run talks about vendors all day; it is not a new one.
   if (p8 && task.processId === p8.id) return null;
@@ -112,7 +119,6 @@ export async function checkVendorSignal(taskId: string, extraText?: string | nul
   const internal = await internalClientIds([task.client]);
   if (internal.has(task.clientId) && task.category?.name !== PRODUCT_CATEGORY_NAME) return null;
 
-  const text = [task.title, task.description, extraText].filter(Boolean).join("\n");
   const known = await knownVendors();
   const signal = detectVendorSignal(text, known.names);
   if (!signal) return null;
