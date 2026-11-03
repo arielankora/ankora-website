@@ -7,6 +7,8 @@ import { listClientFacts, removeClientFact } from "@/lib/app-domain/client-facts
 import { approveProposal, proposeKnowledge, revertProposal, type ProposalItemInput } from "@/lib/app-domain/knowledge-proposals";
 import { AUTO_APPLY_PAUSED, autoApplySetting, liftAutoApplyPause, listAutoReview, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
 import { inAutoSample } from "@/lib/auto-apply";
+import { decideAutoAppliedForAi } from "@/lib/app-domain/mcp-approvals";
+import { countApprovals } from "@/lib/app-domain/approvals";
 
 // Auto-apply at intake (3.11.2026, approval tiers part 2). What is worth
 // holding here: only the AUTO tier enters on arrival, and only when Claude
@@ -217,5 +219,69 @@ describe("the switch", () => {
     await prisma.client.update({ where: { id: client.id }, data: { aiExcluded: true } });
     const r = await propose(user, client.id, [pref("לקוח בלי AI")]);
     expect(r.autoApplied).toEqual([]);
+  });
+});
+
+describe("from Claude: decide_knowledge_proposals on what entered automatically (3.11.2026)", () => {
+  it("reviewed_ok marks it right like the screen; refused on a manual approval, twice, or for a stranger", async () => {
+    const { client, user } = await setup();
+    const r = await propose(user, client.id, [pref("מעדיפים מייל")]);
+    const [auto] = r.autoApplied;
+    const out = await decideAutoAppliedForAi(user, auto.proposalId, "reviewed_ok");
+    expect(out).toMatchObject({ clientId: client.id, resultId: auto.resultId, headline: expect.stringContaining("מעדיפים מייל") });
+    expect(await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: auto.proposalId } })).toMatchObject({ autoReviewedById: user.id });
+    expect(await prisma.auditEvent.count({ where: { entityId: auto.proposalId, action: "knowledge_proposal.auto_review" } })).toBe(1);
+    expect((await listAutoReview(user)).map((i) => i.id)).not.toContain(auto.proposalId);
+    await expect(decideAutoAppliedForAi(user, auto.proposalId, "reviewed_ok")).rejects.toThrow("already marked");
+
+    const manual = await propose(user, client.id, [pref("אושר ביד")], false);
+    const p = await prisma.knowledgeProposal.findFirstOrThrow({ where: { batchId: manual.batchId! } });
+    await approveProposal(user, p.id);
+    await expect(decideAutoAppliedForAi(user, p.id, "reviewed_ok")).rejects.toThrow("enteredAutomatically");
+    await expect(decideAutoAppliedForAi(user, p.id, "revert")).rejects.toThrow("enteredAutomatically");
+    expect(await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: p.id } })).toMatchObject({ revertedAt: null });
+
+    const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(decideAutoAppliedForAi(stranger, auto.proposalId, "revert")).rejects.toThrow("No proposal");
+  });
+
+  it("revert takes the item out, and two of one client pause it, as the screen's ביטול", async () => {
+    const { client, user, manager } = await setup();
+    const r = await propose(user, client.id, [pref("ראשון"), { target: "CONTACT", reason: "נאמר", at: "02:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", name: "יוסי לוי", role: "CEO" } }]);
+    expect(r.autoApplied).toHaveLength(2);
+    // Marked right already: still taken out when it turns out wrong.
+    await decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "reviewed_ok");
+    await decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "revert");
+    expect((await listClientFacts(user, client.id)).current).toEqual([]);
+    await expect(decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "revert")).rejects.toThrow("כבר בוטלה");
+    await expect(decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "reviewed_ok")).rejects.toThrow();
+    await decideAutoAppliedForAi(user, r.autoApplied[1].proposalId, "revert");
+    expect(await prisma.auditEvent.count({ where: { action: "knowledge_proposal.revert", clientId: client.id } })).toBe(2);
+    expect(await prisma.autoApplyPause.findFirstOrThrow({ where: { liftedAt: null } })).toMatchObject({ scope: "CLIENT", key: client.id, errors: 2 });
+    expect(await prisma.notification.count({ where: { type: AUTO_APPLY_PAUSED, userId: manager.id } })).toBe(1);
+  });
+
+  it("never for a client marked בלי AI", async () => {
+    const { client, user } = await setup();
+    const r = await propose(user, client.id, [pref("לפני הסימון")]);
+    await prisma.client.update({ where: { id: client.id }, data: { aiExcluded: true } });
+    await expect(decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "revert")).rejects.toThrow();
+    await expect(decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "reviewed_ok")).rejects.toThrow();
+    expect(await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: r.autoApplied[0].proposalId } })).toMatchObject({ revertedAt: null, autoReviewedAt: null });
+  });
+});
+
+describe("the count beside אישורים, in the menu and the morning email", () => {
+  it("counts the items still waiting for a look, the same set as ידע מהחילוץ", async () => {
+    const { client, user } = await setup();
+    const before = await countApprovals(user);
+    const r = await propose(user, client.id, [pref("אחד"), pref("שניים", { at: "02:00" })]);
+    expect(r.autoApplied).toHaveLength(2);
+    expect((await listAutoReview(user)).length).toBe(2);
+    expect(await countApprovals(user)).toBe(before + 2);
+    await decideAutoAppliedForAi(user, r.autoApplied[0].proposalId, "reviewed_ok");
+    expect(await countApprovals(user)).toBe(before + 1);
+    await decideAutoAppliedForAi(user, r.autoApplied[1].proposalId, "revert");
+    expect(await countApprovals(user)).toBe(before);
   });
 });

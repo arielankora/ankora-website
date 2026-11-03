@@ -5,6 +5,7 @@ import { approvesProceduresOf, procedureApprovalBlocker } from "@/lib/procedure-
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { countPendingProposals } from "@/lib/app-domain/knowledge-proposals";
+import { countAutoReview } from "@/lib/app-domain/auto-apply";
 import { sentForApprovalAt } from "@/lib/app-domain/task-approval-times";
 import { OPEN_STATUSES } from "@/lib/app-domain/tasks";
 import { approvalsHref, knowledgeBatchIsMine, onlyMine, tabCounts, type ApprovalItem } from "@/lib/approvals";
@@ -491,11 +492,13 @@ export async function collectApprovals(user: User): Promise<ApprovalItem[]> {
 /// what waits on this person. The knowledge part counts the proposals of
 /// the meetings that are theirs (knowledgeBatchIsMine), each proposal one,
 /// as the review screen always counted; a meeting waiting for its client
-/// counts as one for whoever sent it.
+/// counts as one for whoever sent it. Since 3.11.2026 the items that
+/// entered a file on their own and still wait for a look count too, as
+/// they do on the screen's "ידע מהחילוץ" (countAutoReview).
 export async function countApprovals(user: User): Promise<number> {
   if (!can(user.role, "time_entry.create_self")) return 0;
-  const [items, proposals] = await Promise.all([collectApprovals(user).then(onlyMine), countMyPendingProposals(user)]);
-  return tabCounts(items, proposals).all;
+  const [items, proposals, autoReview] = await Promise.all([collectApprovals(user).then(onlyMine), countMyPendingProposals(user), countAutoReview(user)]);
+  return tabCounts(items, proposals + autoReview).all;
 }
 
 /// The proposals waiting on this person (22.10.2026). `everyone`: a

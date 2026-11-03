@@ -8,7 +8,8 @@ import { TOOL_ANNOTATIONS } from "@/lib/mcp/annotations";
 import { appBaseUrl } from "@/lib/email-templates";
 import { localDateKey } from "@/lib/timezone";
 import { decideApproval } from "@/lib/app-domain/decide-approval";
-import { decideProposalForAi, findApprovalForAi, listApprovalsForAi, proposalAloneBecause, type ProposalDecision, type ProposalForAi } from "@/lib/app-domain/mcp-approvals";
+import { decideAutoAppliedForAi, decideProposalForAi, findApprovalForAi, listApprovalsForAi, proposalAloneBecause, type ProposalDecision, type ProposalForAi } from "@/lib/app-domain/mcp-approvals";
+import type { AutoAppliedDecision } from "@/lib/auto-apply";
 import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { APPROVAL_TABS, KIND_LABELS, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
 import { appUrl, approvalRowUrl, autoReviewUrl, batchUrl, fileItemUrl, proposalUrl } from "@/lib/approval-links";
@@ -25,7 +26,9 @@ import { listAutoReview } from "@/lib/app-domain/auto-apply";
 //                              a summary, the extraction guide, a process
 //                              step, Ankora's own file);
 //   decide_knowledge_proposals approve, reject, "already in the file" or
-//                              "make it a task" for proposals to a file.
+//                              "make it a task" for proposals to a file;
+//                              "תקין" or "ביטול" for an item that entered
+//                              a file on its own (3.11.2026).
 //
 // Every decision is taken only on a row that is waiting on this person
 // right now (lib/app-domain/mcp-approvals.ts re-reads the list), and goes
@@ -37,6 +40,10 @@ const KINDS = APPROVAL_TABS.map((t) => t.key).filter((k): k is ApprovalKind => k
 /// Proposals decided in one call. A batch is rarely longer, and each one
 /// is a separate decision with its own audit row.
 const MAX_PROPOSALS = 25;
+
+/// The decisions on an item that entered a file on its own ("תקין",
+/// "ביטול"), as against those on a proposal still waiting.
+const AUTO_DECISIONS: readonly string[] = ["reviewed_ok", "revert"] satisfies AutoAppliedDecision[];
 
 function serializeProposal(base: string, p: ProposalForAi) {
   return {
@@ -91,7 +98,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "List what waits on my approval",
       description:
-        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `result` (the item in the file) and `url` (its row, where "תקין" or "ביטול" is pressed; there is no tool for those). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
+        'What waits on the signed-in person\'s decision, as Ankora\'s "אישורים" screen shows it: tasks sent for sign-off, exceptions, rules, procedures, process decisions, Ankora\'s own file, proposals to client files (with each proposal), task plans, monthly summaries, the extraction guide and signed PDFs to check. Each row has its kind and id (pass them to decide_approval), Ankora\'s recommendation and why, `approve` and `reject` (the button\'s label, or null when the row has none here; `reject.needsReason` when rejecting needs a reason), and `url`: a direct link that opens the screen on that very row. Each proposal has its own `proposalId` (for decide_knowledge_proposals) and `url`. `enteredAutomatically` (with no kind, or kind knowledge) lists items that entered a client file on their own and still need a person to look: each with `proposalId`, `result` (the item in the file), `url` (its row) and `decisions`: what decide_knowledge_proposals can do with it ("reviewed_ok" for "תקין", "revert" for "ביטול"). Give the user the links as they are; never build one by hand. By default the person\'s own rows; `everyone` adds the meetings other people sent; a client shows all of that client\'s.',
       inputSchema: z.object({
         client: z.string().optional().describe("Only this client, as the user said it."),
         kind: z.enum(KINDS).optional().describe("Only this kind of row."),
@@ -127,6 +134,7 @@ export function registerApprovalTools(server: McpServer): void {
                 why: a.why,
                 url: autoReviewUrl(base, a.clientId, a.id),
                 result: a.resultId ? fileItemUrl(base, a.clientId, a.resultId) : undefined,
+                decisions: a.revertible ? ["reviewed_ok", "revert"] : ["reviewed_ok"],
               }))
             : undefined,
         });
@@ -187,15 +195,15 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Decide proposals to a client file",
       description:
-        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. Each result has `url` (the proposal on its card), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
+        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. For an item under `enteredAutomatically`, "reviewed_ok" marks it right ("תקין") and "revert" takes it out of the file again ("ביטול"), as its buttons do; only the decisions its row lists are accepted. Each result has `url` (the proposal on its card, or its row under "נכנס אוטומטית"), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
       inputSchema: z.object({
         proposalIds: z.array(z.string().min(1)).min(1).max(MAX_PROPOSALS).describe("The proposals, by proposalId. Never typed or guessed."),
-        decision: z.enum(["approve", "reject", "already_in_file", "task"]),
+        decision: z.enum(["approve", "reject", "already_in_file", "task", "reviewed_ok", "revert"]),
         reason: z.string().optional().describe("Why they are rejected, in a line. Required for reject."),
       }),
       annotations: TOOL_ANNOTATIONS.decide_knowledge_proposals,
     },
-    async (args: { proposalIds: string[]; decision: ProposalDecision; reason?: string }, ctx: ServerContext) => {
+    async (args: { proposalIds: string[]; decision: ProposalDecision | AutoAppliedDecision; reason?: string }, ctx: ServerContext) => {
       try {
         const actor = actorOf(ctx);
         const base = appBaseUrl();
@@ -209,7 +217,18 @@ export function registerApprovalTools(server: McpServer): void {
               const alone = await proposalAloneBecause(id);
               if (alone) throw new Error(`Approved only on its own (${alone}). Show it to the user, then call again with this id alone.`);
             }
-            const r = await decideProposalForAi(actor, id, args.decision, args.reason ?? null);
+            if (AUTO_DECISIONS.includes(args.decision)) {
+              const r = await decideAutoAppliedForAi(actor, id, args.decision as AutoAppliedDecision);
+              done.push({
+                proposalId: id,
+                says: r.headline,
+                // Its row under "נכנס אוטומטית": the card of its batch is closed.
+                url: autoReviewUrl(base, r.clientId, id),
+                ...(r.resultId ? { result: fileItemUrl(base, r.clientId, r.resultId) } : {}),
+              });
+              continue;
+            }
+            const r = await decideProposalForAi(actor, id, args.decision as ProposalDecision, args.reason ?? null);
             done.push({
               proposalId: id,
               says: r.headline,

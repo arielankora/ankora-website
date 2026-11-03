@@ -4,7 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
-import { approveProposal, attachProposalToExisting, batchSource, listOpenBatches, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, attachProposalToExisting, batchSource, listOpenBatches, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
+import { listAutoReview, markAutoReviewed } from "@/lib/app-domain/auto-apply";
+import { autoDecisionBlocker, type AutoAppliedDecision } from "@/lib/auto-apply";
 import { onlyMine, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
 import { bulkApproveBlocker, proposalHeadline, proposalReviewLevel, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey, proposalKindLabel } from "@/lib/knowledge-review-filters";
@@ -157,4 +159,32 @@ export async function proposalAloneBecause(id: string): Promise<string | null> {
   const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
   const payload = (p.payload ?? {}) as Record<string, unknown>;
   return bulkApproveBlocker({ target: p.target, action: p.action, flags, payload, level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, await batchSource(p.batchId)) });
+}
+
+/// "תקין" or "ביטול" on an item that entered a client file on its own
+/// (3.11.2026), as the two buttons on "נכנס אוטומטית" do: the same domain
+/// functions (markAutoReviewed, revertProposal), so the same access checks
+/// and audit rows, and a revert runs the pause checks. Refused unless the
+/// proposal entered automatically and the decision still applies
+/// (autoDecisionBlocker); "בלי AI" is refused as for every decision.
+export async function decideAutoAppliedForAi(
+  actor: User,
+  id: string,
+  decision: AutoAppliedDecision
+): Promise<{ clientId: string; headline: string; resultId: string | null }> {
+  const p = await prisma.knowledgeProposal.findUnique({
+    where: { id },
+    select: { clientId: true, target: true, payload: true, state: true, action: true, attached: true, resultId: true, revertedAt: true, autoApplied: true, autoReviewedAt: true },
+  });
+  const accessible = p ? (await listAccessibleClients(actor)).some((c) => c.id === p.clientId) : false;
+  if (!p || !accessible) throw new Error("No proposal with this id is waiting for you. Call list_approvals for the current ones.");
+  if ((await aiExcludedClientIds([p.clientId])).size > 0) throw new Error(AI_EXCLUDED_TOOL_MESSAGE);
+  // Still on "נכנס אוטומטית" for this person: the list the screen and
+  // list_approvals show, read once, the same way.
+  const listed = decision === "reviewed_ok" && p.autoApplied ? (await listAutoReview(actor, { clientId: p.clientId, forAi: true })).some((i) => i.id === id) : false;
+  const why = autoDecisionBlocker(decision, p, listed);
+  if (why) throw new Error(why);
+  if (decision === "reviewed_ok") await markAutoReviewed(actor, id);
+  else await revertProposal(actor, id);
+  return { clientId: p.clientId, headline: proposalHeadline(p.target as ProposalTargetLike, (p.payload ?? {}) as Record<string, unknown>), resultId: p.resultId };
 }

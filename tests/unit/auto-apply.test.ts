@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTO_REVIEW_SAMPLE_PERCENT,
+  autoDecisionBlocker,
   autoErrorAt,
   autoReviewReason,
   clientPauseDue,
@@ -127,5 +128,25 @@ describe("the bar for lifting a pause", () => {
     expect(liftBarMet(29, 29)).toBe(false);
     expect(liftBarMet(30, 30)).toBe(true);
     expect(liftBarMet(28, 30)).toBe(false);
+  });
+});
+
+describe("Claude's decisions on an auto-applied item (decide_knowledge_proposals)", () => {
+  const AUTO = { autoApplied: true, autoReviewedAt: null, state: "APPROVED", action: "CREATE", target: "FACT", attached: false, resultId: "f1", revertedAt: null };
+  it("only on what entered automatically", () => {
+    expect(autoDecisionBlocker("reviewed_ok", { ...AUTO, autoApplied: false }, true)).toContain("enteredAutomatically");
+    expect(autoDecisionBlocker("revert", { ...AUTO, autoApplied: false }, true)).toContain("enteredAutomatically");
+  });
+  it("reviewed_ok: only while it still waits for a look", () => {
+    expect(autoDecisionBlocker("reviewed_ok", AUTO, true)).toBeNull();
+    expect(autoDecisionBlocker("reviewed_ok", AUTO, false)).toContain("not waiting");
+    expect(autoDecisionBlocker("reviewed_ok", { ...AUTO, autoReviewedAt: D("2026-11-03T00:00:00Z") }, true)).toContain("already marked");
+    expect(autoDecisionBlocker("reviewed_ok", { ...AUTO, revertedAt: D("2026-11-03T00:00:00Z") }, true)).toContain("taken out");
+  });
+  it("revert: while revertBlocker allows it, looked at or not", () => {
+    expect(autoDecisionBlocker("revert", AUTO, false)).toBeNull();
+    expect(autoDecisionBlocker("revert", { ...AUTO, autoReviewedAt: D("2026-11-03T00:00:00Z") }, false)).toBeNull();
+    expect(autoDecisionBlocker("revert", { ...AUTO, revertedAt: D("2026-11-03T00:00:00Z") }, true)).toContain("כבר בוטלה");
+    expect(autoDecisionBlocker("revert", { ...AUTO, resultId: null }, true)).toContain("cannot be taken out");
   });
 });
