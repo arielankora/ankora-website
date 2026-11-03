@@ -8,6 +8,8 @@ import { mp3DurationSeconds } from "./mp3-duration";
 import { manualBatchLine, manualRecordingKey, manualRecordingStart } from "./manual-recordings";
 
 const BASE_URL = "https://api.unipile.com/v2";
+/// How far back the import looks: 4 pages of 50 emails.
+const MAX_PAGES = 4;
 
 type RawAttachment = { id?: unknown; mimetype?: unknown; filename?: unknown; is_inline?: unknown };
 type RawEmail = { id?: unknown; subject?: unknown; attachments?: RawAttachment[] | null };
@@ -29,16 +31,33 @@ export async function importManualRecordings(actorId: string): Promise<ManualImp
   const result: ManualImportResult = { emails: 0, stored: 0, existing: 0, failed: 0 };
   if (!mail || !driveFolder || lines.length === 0) return result;
 
-  const listUrl = new URL(`${BASE_URL}/${mail.mailAccountId}/emails`);
-  listUrl.searchParams.set("limit", "50");
-  listUrl.searchParams.set("meta_only", "true");
-  const listed = ((await (await unipileFetch(mail.apiKey, listUrl, "application/json")).json()) as { data?: RawEmail[] }).data ?? [];
+  // The latest emails, a few pages back (the mailbox gets a dozen recording
+  // emails a day). The light listing (meta_only) is enough to find a batch
+  // by its subject, but carries no attachments: 3.11.2026, the first import
+  // found Aloha's email and stored nothing. So each batch found is read in
+  // full before its files are taken.
+  const listed: RawEmail[] = [];
+  let cursor: string | null = null;
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const listUrl = new URL(`${BASE_URL}/${mail.mailAccountId}/emails`);
+    listUrl.searchParams.set("limit", "50");
+    listUrl.searchParams.set("meta_only", "true");
+    if (cursor) listUrl.searchParams.set("cursor", cursor);
+    const body = (await (await unipileFetch(mail.apiKey, listUrl, "application/json")).json()) as { data?: RawEmail[]; next_cursor?: unknown };
+    listed.push(...(body.data ?? []));
+    cursor = typeof body.next_cursor === "string" && body.next_cursor ? body.next_cursor : null;
+    if (!cursor) break;
+  }
 
-  for (const email of listed) {
-    if (typeof email.id !== "string" || !isSafeId(email.id) || typeof email.subject !== "string") continue;
-    const line = manualBatchLine(email.subject);
+  for (const meta of listed) {
+    if (typeof meta.id !== "string" || !isSafeId(meta.id) || typeof meta.subject !== "string") continue;
+    const line = manualBatchLine(meta.subject);
     if (!line || !lines.includes(line)) continue;
     result.emails += 1;
+
+    const emailUrl = new URL(`${BASE_URL}/${mail.mailAccountId}/emails/${meta.id}`);
+    const email = (await (await unipileFetch(mail.apiKey, emailUrl, "application/json")).json()) as RawEmail;
+    if (email.id !== meta.id) continue;
 
     for (const a of email.attachments ?? []) {
       if (typeof a.id !== "string" || !isSafeId(a.id) || typeof a.filename !== "string" || a.is_inline === true) continue;
@@ -83,5 +102,6 @@ export async function importManualRecordings(actorId: string): Promise<ManualImp
   }
 
   await recordAudit({ actorId, action: "call_recording.manual_import", entityType: "CallRecording", entityId: null, after: result });
+  console.log(`comms manual import ${JSON.stringify(result)}`);
   return result;
 }
