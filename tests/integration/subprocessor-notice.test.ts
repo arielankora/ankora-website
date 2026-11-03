@@ -146,4 +146,15 @@ describe("buildClientFile(): the answer is a line of the client's identity", () 
       expect(line.details).toContain("מקור: הסכם שירות, סעיף 9");
     }
   });
+
+  it("says an internal client is left out, as the recipients list does", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    await prisma.client.update({ where: { id: client.id }, data: { isInternal: true } });
+
+    const doc = await buildClientFile(admin, client.id, { audience: "staff" });
+    const identity = doc.sections.find((s) => s.number === "1")!;
+    const line = identity.items.find((i) => i.text.startsWith("התחייבות בחוזה לעדכון יזום על תת-מעבד"))!;
+    expect(line.text).toContain("לקוח פנימי, לא נכלל ברשימת הנמענים");
+  });
 });
