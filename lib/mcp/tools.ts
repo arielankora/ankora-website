@@ -61,6 +61,8 @@ import { describePick, type CategoryPick } from "@/lib/mcp/category-pick";
 import { procedureReminderFor } from "@/lib/app-domain/procedure-to-file";
 import { AI_REDACTED, redactEntriesForAi } from "@/lib/mcp/ai-redact";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
+import { checkVendorSignalSafely } from "@/lib/app-domain/vendor-detections";
+import { VENDOR_CHECK_NEXT } from "@/lib/mcp/vendor-check";
 
 // Phase 13/14 (MCP server, docs/adr/0005): the tool surface.
 //
@@ -1032,6 +1034,8 @@ export function registerAnkoraTools(server: McpServer): void {
           }
         }
 
+        // P8: the task, with its steps, looks like connecting a new vendor.
+        const vendorCheck = await checkVendorSignalSafely(task.id, createdSteps.join("\n") || null);
         return toolJson({
           created: true,
           taskId: task.id,
@@ -1052,6 +1056,7 @@ export function registerAnkoraTools(server: McpServer): void {
           priority: task.priority,
           steps: createdSteps,
           ...(stepError ? { warning: stepError } : {}),
+          ...(vendorCheck ? { vendorCheck, next: VENDOR_CHECK_NEXT } : {}),
         });
       } catch (err) {
         console.error("[mcp] create_task failed", err);
@@ -1312,6 +1317,8 @@ export function registerAnkoraTools(server: McpServer): void {
           console.error("[mcp] update_task procedure check failed", err);
           return null;
         });
+        // P8: an open question on this task, new or still unanswered.
+        const vendorCheck = await checkVendorSignalSafely(updated.id);
         return toolJson({
           updated: true,
           taskId: updated.id,
@@ -1326,6 +1333,7 @@ export function registerAnkoraTools(server: McpServer): void {
             ? { categoryNote: describePick(autoCategory), categoryOptions: await categoryOptions(taskClientId, autoCategory.id) }
             : {}),
           ...(reminder ? { reminder: reminder.forClaude } : {}),
+          ...(vendorCheck ? { vendorCheck, next: VENDOR_CHECK_NEXT } : {}),
         });
       } catch (err) {
         console.error("[mcp] update_task failed", err);

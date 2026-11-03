@@ -2144,6 +2144,14 @@
       "firstSeen": "2026-11-02",
       "riskReason": "ייצוא כל השיחות וההקלטות של לקוח לקובץ. למנהלים בלבד, בלי מספר שהמבקש מוחרג ממנו ובלי הודעות מוסתרות. טעות כאן חושפת שיחות למי שאסור לו לראות אותן."
     },
+    "domain:vendor-detections": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "medium",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-03",
+      "riskReason": "P8: reads every product task and plan and opens a subprocessor run. A miss leaves a vendor without P8; a false alarm costs one question. It never blocks a task save, and every decision is audited."
+    },
     "domain:subprocessor-recipients": {
       "kind": "domain",
       "area": "app",

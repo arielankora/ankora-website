@@ -67,6 +67,9 @@ export const TOOL_ANNOTATIONS = {
   set_task_step: { ...WRITES, idempotentHint: true },
   add_task_comment: WRITES,
   create_decision: WRITES,
+  // P8 (3.11.2026): answers "is this a new vendor?". The answer opens a
+  // run; a second call on the same detection is refused, not repeated.
+  decide_vendor_check: { ...WRITES, idempotentHint: true },
   // The one tool here that removes something: the open steps of a task,
   // replaced by a new list. Marked destructive so a client asks before
   // calling it. It never removes a step already done or one with time
@@ -207,6 +210,7 @@ export const WRITE_TOOLS = [
   "dismiss_pdf_upload",
   "decide_approval",
   "decide_knowledge_proposals",
+  "decide_vendor_check",
 ] as const;
 
 /// Phase 16: task tools are NOT in TEAM_TOOLS.

@@ -89,6 +89,8 @@ const TABLES = [
   "client_credentials",
   "time_entry_revisions",
   "time_entries",
+  // P8 vendor detections (3.11.2026): before the tasks they point at.
+  "vendor_detections",
   "tasks",
   "user_client_access",
   "client_users",

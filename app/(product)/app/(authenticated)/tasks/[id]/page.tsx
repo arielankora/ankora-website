@@ -27,6 +27,8 @@ import { RevealCredential } from "@/components/app/vault/RevealCredential";
 import { getTaskPlans, type TaskPlanRow } from "@/lib/app-domain/task-plans";
 import { advancePromptFor } from "@/lib/app-domain/advance-prompt-input";
 import { AdvanceWithClaude } from "./AdvanceWithClaude";
+import { VendorCheckCard } from "./VendorCheckCard";
+import { pendingVendorCheck } from "@/lib/app-domain/vendor-detections";
 import { NewPlanEditor, TaskPlanPanel, type PlanView } from "./TaskPlanPanel";
 import { RunLessonCard } from "./RunLessonCard";
 import { runLesson } from "@/lib/app-domain/process-lessons";
@@ -165,6 +167,8 @@ export default async function TaskDetailPage(props: {
 
   // Learning from runs (spec 5.4): a closed run asks once about its
   // procedure.
+  // P8 (3.11.2026): an unanswered "is this a new vendor?" on this task.
+  const vendorCheck = !isStep && !isClosed ? await pendingVendorCheck(task.id) : null;
   const lessonProcess =
     task.processId && asksForLesson(task, !!(await runLesson(task.id)))
       ? await prisma.process.findUnique({ where: { id: task.processId }, select: { code: true, title: true } })
@@ -315,6 +319,8 @@ export default async function TaskDetailPage(props: {
           {!isStep && !isClosed && !currentPlan && <NewPlanEditor taskId={task.id} />}
         </div>
       )}
+
+      {vendorCheck && <VendorCheckCard taskId={task.id} detectionId={vendorCheck.detectionId} vendor={vendorCheck.vendor} matched={vendorCheck.matched} />}
 
       {lessonProcess && <RunLessonCard taskId={task.id} processName={`${lessonProcess.code} ${lessonProcess.title}`} />}
 

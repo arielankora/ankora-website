@@ -237,6 +237,7 @@ model User {
   taskComments               TaskComment[]                 @relation("TaskCommentAuthor")
   taskPlansWritten           TaskPlan[]                    @relation("TaskPlanAuthor")
   taskPlansApproved          TaskPlan[]                    @relation("TaskPlanApprover")
+  vendorDetectionsDecided    VendorDetection[]             @relation("VendorDetectionDecider")
   approvedTasks              Task[]                        @relation("TaskApprover")
   importantDatesResponsible  ImportantDate[]                @relation("ImportantDateResponsible")
   importantDatesCreated      ImportantDate[]                @relation("ImportantDateCreator")
@@ -1061,6 +1062,10 @@ model Task {
   documents     ClientDocument[]
   comments      TaskComment[]
   plans         TaskPlan[]
+  /// P8, 3.11.2026: a new vendor noticed in this task (lib/app-domain/vendor-detections.ts).
+  vendorDetection   VendorDetection?  @relation("VendorDetectionSource")
+  /// The detections that opened this P8 run, or were noted on it.
+  vendorDetectionRuns VendorDetection[] @relation("VendorDetectionRun")
 
   @@unique([importantDateId, importantDateOccurrenceKey])
   @@index([processId])
@@ -1189,6 +1194,61 @@ model TaskPlan {
 
   @@unique([taskId, version])
   @@map("task_plans")
+}
+
+/// P8 (הוספת תת-מעבד חדש), 3.11.2026: a task whose text looks like
+/// connecting a new vendor to the app or the service Ankora gives its
+/// clients. The stranger test on P8 found that the subprocessor run was
+/// left to someone's memory; this row is the memory.
+///
+/// One per task (sourceTaskId is unique): a task is asked about once,
+/// however often it is edited. A person or Claude decides it; nobody
+/// deciding for one business day opens the run anyway (the daily cron),
+/// because a question nobody answers is the same gap as no question.
+model VendorDetection {
+  id           String @id @default(cuid())
+  sourceTaskId String @unique
+  /// The client of the source task, for access checks and the audit.
+  clientId     String
+
+  /// The vendor's name as it appeared, or as the person corrected it.
+  /// Null while the text named no vendor ("לחבר את המערכת של הבנק").
+  vendorName String?
+  /// vendorName lower-cased, for "this vendor already has a run".
+  vendorSlug String?
+  /// What set it off, for the person asked: "לחבר + Pipedrive".
+  matched    String
+
+  status VendorDetectionStatus @default(PENDING)
+  /// The P8 run it opened, or the vendor's existing run it was noted on.
+  runTaskId String?
+  /// True when the daily job opened the run because nobody answered.
+  autoOpened Boolean @default(false)
+
+  decidedById String?
+  decidedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sourceTask Task  @relation("VendorDetectionSource", fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  runTask    Task? @relation("VendorDetectionRun", fields: [runTaskId], references: [id], onDelete: SetNull)
+  decidedBy  User? @relation("VendorDetectionDecider", fields: [decidedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([vendorSlug])
+  @@map("vendor_detections")
+}
+
+enum VendorDetectionStatus {
+  /// Asked, not yet answered.
+  PENDING
+  /// A P8 run was opened for it.
+  OPENED
+  /// A person said it is not a new vendor of the product.
+  NOT_A_VENDOR
+  /// A new channel of a vendor that already had its run: noted there.
+  EXISTING
 }
 
 enum TaskPlanStatus {

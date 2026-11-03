@@ -15,6 +15,10 @@ import { taskUrl } from "@/lib/mcp/serialize";
 import { clientDecisionUrl } from "@/lib/approval-links";
 import { appBaseUrl } from "@/lib/email-templates";
 import { PlanVersionConflictError, applyPlanSteps, getTaskPlans, saveTaskPlan, type TaskPlanRow } from "@/lib/app-domain/task-plans";
+import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
+import { VENDOR_CHECK_NEXT } from "@/lib/mcp/vendor-check";
+import { prisma } from "@/lib/prisma";
+import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 import { MAX_PLAN_LENGTH, MAX_PLAN_STEPS, TaskPlanRuleError } from "@/lib/task-plan-rules";
 
 // MCP tasks, second pass (NUX handover, 3.10.2026).
@@ -398,8 +402,10 @@ export function registerTaskExtraTools(server: McpServer): void {
             // The task was OPEN, and an approved plan moves it to
             // IN_PROGRESS on its own (19.10.2026).
             taskStarted: saved.taskStarted,
+            ...(saved.vendorCheck ? { vendorCheck: saved.vendorCheck } : {}),
             next:
               [
+                saved.vendorCheck ? VENDOR_CHECK_NEXT : null,
                 saved.stepsAppliedAt !== null
                   ? "The task had no steps, so the plan's steps were added to it automatically. Tell the user; do not ask about it."
                   : saved.steps.length > 0 && saved.status === "APPROVED"
@@ -538,6 +544,50 @@ export function registerTaskExtraTools(server: McpServer): void {
         return toolJson({ commented: true, task: found.value.name, at: comment.createdAt.toISOString() });
       } catch (err) {
         console.error("[mcp] add_task_comment failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // ------------------------------------------------------ new vendors (P8)
+
+  // 3.11.2026. create_task, update_task and save_task_plan answer with a
+  // `vendorCheck` when the task looks like connecting a new vendor to the
+  // product. This is the answer, after asking the user.
+  server.registerTool(
+    "decide_vendor_check",
+    {
+      title: "Decide whether a task connects a new vendor (P8)",
+      description:
+        "Answers a `vendorCheck` that create_task, update_task or save_task_plan returned: the task looks like connecting a new vendor to the app or the service Ankora gives clients. Ask the user first, in their language, naming the vendor, and call this only with their answer. OPEN_RUN opens a P8 (new subprocessor) run on Ankora's internal file, named after the vendor and linked both ways with the task; if that vendor already has a run, the task is noted there instead. NOT_A_VENDOR records that it is not (marketing, sales and Ankora's own back office are out of P8's scope). Pass `vendor` when the check had none, or to correct the name. Nobody answering for a business day opens the run anyway. Give the user `runUrl` exactly.",
+      inputSchema: z.object({
+        detectionId: z.string().min(1).describe("The `detectionId` from the vendorCheck."),
+        decision: z.enum(["OPEN_RUN", "NOT_A_VENDOR"]).describe("OPEN_RUN: it is a new vendor that will reach client data. NOT_A_VENDOR: it is not."),
+        vendor: z.string().min(1).max(120).optional().describe("The vendor's name, when the check had none or had it wrong."),
+      }),
+      annotations: TOOL_ANNOTATIONS.decide_vendor_check,
+    },
+    async (args: { detectionId: string; decision: "OPEN_RUN" | "NOT_A_VENDOR"; vendor?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const row = await prisma.vendorDetection.findUnique({ where: { id: args.detectionId }, select: { sourceTaskId: true } });
+        if (!row) return toolText("No vendor check with that id. Use the detectionId exactly as the tool returned it.");
+        if ((await aiExcludedTaskIds([row.sourceTaskId])).size > 0) return toolText(AI_EXCLUDED_TOOL_MESSAGE);
+        const out = await decideVendorCheck(actor, args.detectionId, args.decision, args.vendor ?? null);
+        return toolJson({
+          decided: true,
+          status: out.status,
+          vendor: out.vendor,
+          runUrl: out.runUrl,
+          next:
+            out.status === "OPENED"
+              ? "A P8 run was opened for this vendor and assigned to the process owner. Give the user runUrl. Remind them that P8 step 5 applies: in a pilot, connect only a channel without client data until clients are notified."
+              : out.status === "EXISTING"
+                ? "This vendor already has a P8 run; the task was noted on it. Give the user runUrl."
+                : "Recorded as not a new vendor. Nothing was opened.",
+        });
+      } catch (err) {
+        console.error("[mcp] decide_vendor_check failed", err);
         return toolFailure(err);
       }
     }

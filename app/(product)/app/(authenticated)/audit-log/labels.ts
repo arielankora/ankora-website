@@ -170,6 +170,12 @@ export const ACTION_LABEL: Record<string, string> = {
   "process.lesson_applied": "הערה על נוהל נכנסה לנוהל",
   "process.lesson_dismissed": "הערה על נוהל לא נכנסה לנוהל",
   "process.run_open": "פתיחת ריצה של תהליך",
+  // P8 (3.11.2026): noticing a new vendor in a task.
+  "vendor_detection.create": "זיהוי של ספק חדש במשימה",
+  "vendor_detection.existing": "ספק קיים: נרשם בריצה שלו",
+  "vendor_detection.dismiss": "סימון שאין ספק חדש",
+  "vendor_detection.open_run": "פתיחת ריצת P8 לספק חדש",
+  "vendor_detection.auto_open": "פתיחה אוטומטית של ריצת P8 בלי תשובה",
   "process.stranger_test": "מבחן זר לתהליך",
   "process.stranger_answer": "תשובה לשאלה של מבחן הזר",
   "process.stranger_not_relevant": "שאלה של מבחן הזר סומנה כלא רלוונטית",
