@@ -2151,6 +2151,14 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-03",
       "riskReason": "P8: reads every product task and plan and opens a subprocessor run. A miss leaves a vendor without P8; a false alarm costs one question. It never blocks a task save, and every decision is audited."
+    },
+    "domain:subprocessor-recipients": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-03",
+      "riskReason": "רשימת הלקוחות שמקבלים מייל על תת-מעבד חדש (P8 שלב 8). למנהלים בלבד. טעות כאן משאירה לקוח בלי הודעה שהחוזה שלו מחייב, או חושפת בכלי של קלוד לקוח שסומן בלי AI."
     }
   },
   "waivers": {},

@@ -1,4 +1,5 @@
 import "server-only";
+import { SUBPROCESSOR_NOTICE_FILE_LINE } from "@/lib/subprocessor-notice";
 import { AI_ALLOWED_TASK_WHERE, AiExcludedError } from "@/lib/ai-exclusion";
 import { readinessLabel } from "@/lib/process-readiness";
 import { prisma } from "@/lib/prisma";
@@ -86,7 +87,7 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
   const shown = (r: { sensitivity: KnowledgeSensitivity; audience: KnowledgeAudienceLike; audienceUserIds: string[] }) => !ai || canSendToAi(r, actor.id);
 
   const [client, entities, people, facts, systems, sources, dates, audit, requestTypes, narratives, policies, exceptions, processes, warnings, daysSinceBatch, supplierTasks, openLessons, batches] = await Promise.all([
-    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true, aiExcluded: true } }),
+    prisma.client.findUniqueOrThrow({ where: { id: clientId }, select: { name: true, legalName: true, kind: true, industry: true, aiExcluded: true, subprocessorNotice: true, subprocessorNoticeSource: true, subprocessorNoticeCheckedAt: true } }),
     listClientEntities(actor, clientId),
     listClientPeople(actor, clientId),
     listClientFacts(actor, clientId),
@@ -208,6 +209,16 @@ export async function buildClientFile(actor: User, clientId: string, options: { 
       items: [
         { text: client.legalName ? `${client.name} (${client.legalName})` : client.name, details: [client.kind === "PRIVATE" ? "לקוח פרטי" : "לקוח עסקי", client.industry] },
         ...(primary ? [{ text: `איש קשר ראשי: ${primary.person.name ?? primary.role}`, details: [primary.role] }] : []),
+        // P8 step 8 (3.11.2026): does the contract commit Ankora to tell
+        // this client by email about a new sub-processor. Internal: the
+        // file is staff and Claude only, never the portal.
+        {
+          text: `התחייבות בחוזה לעדכון יזום על תת-מעבד: ${SUBPROCESSOR_NOTICE_FILE_LINE[client.subprocessorNotice]}`,
+          details: [
+            client.subprocessorNoticeSource ? `מקור: ${client.subprocessorNoticeSource}` : null,
+            client.subprocessorNoticeCheckedAt ? `נבדק ${day(client.subprocessorNoticeCheckedAt)}` : null,
+          ],
+        },
         ...entities.filter(shown).map((e) => ({
           ref: e.id,
           text: `ישות: ${e.name}`,

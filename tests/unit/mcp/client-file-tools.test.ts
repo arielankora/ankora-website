@@ -27,6 +27,7 @@ const lookup = vi.hoisted(() => ({
   canSeeOthersTime: vi.fn(() => false),
 }));
 const auth = vi.hoisted(() => ({ actorFromAuthInfo: vi.fn() }));
+const recipients = vi.hoisted(() => ({ listSubprocessorRecipients: vi.fn() }));
 
 // 28.10.2026: "בלי AI" lookups need a database; nothing here is marked.
 vi.mock("@/lib/app-domain/ai-exclusion-db", () => ({ aiExcludedTaskIds: vi.fn(async () => new Set()), aiExcludedClientIds: vi.fn(async () => new Set()), isTaskAiExcluded: vi.fn(async () => false), isDocumentAiExcluded: vi.fn(async () => false) }));
@@ -43,6 +44,7 @@ vi.mock("@/lib/app-domain/decisions", () => ({}));
 vi.mock("@/lib/app-domain/task-plans", () => ({ PlanVersionConflictError: class extends Error {} }));
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
+vi.mock("@/lib/app-domain/subprocessor-recipients", () => recipients);
 vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
 vi.mock("@/lib/app-auth/permissions", () => ({ assertCan: vi.fn() }));
 vi.mock("@/lib/email-templates", () => ({ appBaseUrl: () => "https://www.ankora.co.il" }));
@@ -219,5 +221,40 @@ describe("get_client_brief and get_client_changes", () => {
     const bad = await tools.get("get_client_changes")!.handler({ client: "nux", since: "yesterday" }, CTX);
     expect(bad.content[0].text).toContain("not a date");
     expect(live.clientFileChanges).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("list_subprocessor_notice_recipients", () => {
+  const row = (id: string, name: string, notice: string, aiExcluded = false) => ({
+    id,
+    name,
+    status: "ACTIVE",
+    notice,
+    source: notice === "UNCHECKED" ? null : "הסכם, סעיף 9",
+    checkedAt: notice === "UNCHECKED" ? null : new Date("2026-11-03T08:00:00Z"),
+    aiExcluded,
+  });
+
+  it("is registered as a read", () => {
+    expect(tools.has("list_subprocessor_notice_recipients")).toBe(true);
+    expect(TOOL_ANNOTATIONS.list_subprocessor_notice_recipients.readOnlyHint).toBe(true);
+  });
+
+  it("returns the three groups with links, and counts a client marked \"בלי AI\" without naming it", async () => {
+    recipients.listSubprocessorRecipients.mockResolvedValue({
+      committed: [row("c1", "Grantor", "COMMITTED"), row("c2", "סודי", "COMMITTED", true)],
+      unchecked: [row("c3", "RIMED", "UNCHECKED")],
+      notCommitted: [row("c4", "NUX", "NOT_COMMITTED")],
+    });
+    const r = await tools.get("list_subprocessor_notice_recipients")!.handler({}, CTX);
+    expect(recipients.listSubprocessorRecipients).toHaveBeenCalledWith(ACTOR);
+    const out = JSON.parse(r.content[0].text!);
+    expect(out.email).toEqual([
+      { client: "Grantor", status: "ACTIVE", source: "הסכם, סעיף 9", checkedOn: "2026-11-03", url: "https://www.ankora.co.il/app/clients/c1" },
+    ]);
+    expect(out.emailToBeSafe.map((c: { client: string }) => c.client)).toEqual(["RIMED"]);
+    expect(out.websiteOnly.map((c: { client: string }) => c.client)).toEqual(["NUX"]);
+    expect(out.aiExcludedLeftOut).toBe(1);
+    expect(r.content[0].text).not.toContain("סודי");
   });
 });

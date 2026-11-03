@@ -8,6 +8,8 @@ import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
 import { ClientsGrid, type ClientCard } from "./ClientsGrid";
 import { RestoreClientButton } from "./RestoreClientButton";
+import { SubprocessorRecipientsPanel } from "./SubprocessorRecipientsPanel";
+import { listSubprocessorRecipients } from "@/lib/app-domain/subprocessor-recipients";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -36,7 +38,12 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
 
   const canManageBanks = can(user.role, "hour_bank.manage");
   const canViewReports = can(user.role, "report.internal.view");
-  const [clients, archived] = await Promise.all([listClients(), listArchivedClients(user)]);
+  const [clients, archived, noticeGroups] = await Promise.all([
+    listClients(),
+    listArchivedClients(user),
+    // P8 step 8 (3.11.2026). The screen is client.manage only, as is this.
+    listSubprocessorRecipients(user),
+  ]);
   // 2.11.2026: an archived client's conversations and recordings are kept
   // 30 days for the export, then deleted. Managers export them from here.
   const manager = canManageClients(user.role);
@@ -89,6 +96,8 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
           canManageBanks={canManageBanks}
           canViewReports={canViewReports}
         />
+
+        <SubprocessorRecipientsPanel groups={noticeGroups} />
 
         {archived.length > 0 && (
           <details className="rounded-2xl border border-app-border bg-white p-5">
