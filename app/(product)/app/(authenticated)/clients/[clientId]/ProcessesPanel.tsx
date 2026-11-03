@@ -15,6 +15,7 @@ import {
   STEP_MODE_LABELS,
   TRANSITION_LABELS,
   TRIGGER_LABELS,
+  VERIFICATION_FIELD_LABEL,
   blockingChecks,
   type ActionTag,
   type Channel,
@@ -773,7 +774,7 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
                 aria-invalid={!st.verification}
                 value={st.verification ?? ""}
                 onChange={(e) => set(i, { verification: e.target.value || null })}
-                placeholder="איך אדם מוודא שזה קרה *"
+                placeholder={`${VERIFICATION_FIELD_LABEL} *`}
                 className={`${INPUT} ${st.verification ? "" : "!border-app-error"}`}
               />
             )}

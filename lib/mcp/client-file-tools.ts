@@ -454,7 +454,7 @@ export function registerClientFileTools(server: McpServer): void {
             : "") +
           (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "") +
           (incomplete > 0
-            ? ` WARNING: ${incomplete} item(s) are incomplete (incomplete): the review screen will not approve them as sent. Tell the user what is missing and the suggested wording, which the reviewer can accept in one press; next time send the field filled in (interimStatement on a proposed APPROVAL_REQUIRED or THRESHOLD rule, verification on every AUTOMATED step, toResolve when not CONFIRMED).`
+            ? ` WARNING: ${incomplete} item(s) are incomplete (incomplete): the review screen will not approve them as sent. Fix them first: each entry has the card's note (missing), why, and any suggested wording, which the reviewer can accept in one press. Otherwise tell the user what is missing; next time send the field filled in (interimStatement on a proposed APPROVAL_REQUIRED or THRESHOLD rule, verification on every AUTOMATED step, toResolve when not CONFIRMED).`
             : "");
         return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });
       } catch (err) {
@@ -513,7 +513,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Get a process and its procedure",
       description:
-        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting.",
+        "One of a client's processes in full: everything list_processes says, plus the SLA, who executes it today, the approver, the external party, the exception playbook, the gaps, the approved procedure step by step (mode, business day, actions, systems, output, how a person verifies an automated step, whether it needs approval, the most it moves, the channel), what in it fails the client's rules today, the last five runs, and the open lessons people left when closing runs (read them before drafting a new version). Follow the approved procedure; a step marked as needing approval waits for a person. If the procedure fails a rule, say so before acting. `procedure` is null when no version is approved; a version waiting for approval is under `draft`, in the same shape, with what holds it back in `failsRules`.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),

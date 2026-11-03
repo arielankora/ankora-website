@@ -73,6 +73,16 @@ beforeEach(() => {
 });
 
 describe("list_approvals", () => {
+  it("a blocked procedure lists the checks it fails (`failing`), and other rows carry none", async () => {
+    const failing = ["שלבים 1 ו-4 אוטומטיים: צריך לכתוב בכל אחד איך אדם מוודא שהשלב קרה.", "שלב 2: הודעה ללקוח עוברת בדיקה של אדם לפני שהיא יוצאת, ולכן לא נשלחת אוטומטית."];
+    domain.listApprovalsForAi.mockResolvedValue({ items: [{ ...PROCEDURE, failing }, RULE], proposals: new Map() });
+    const out = await call("list_approvals", {});
+    const proc = out.approvals.find((a: { kind: string }) => a.kind === "procedure");
+    expect(proc.blocked).toContain("הנוהל לא עובר את הבדיקות");
+    expect(proc.failing).toEqual(failing);
+    expect(out.approvals.find((a: { kind: string }) => a.kind === "rule").failing).toBeUndefined();
+  });
+
   it("gives every row and every proposal a direct link", async () => {
     domain.listApprovalsForAi.mockResolvedValue({ items: [RULE, BATCH], proposals: new Map([["b52", [PROPOSAL]]]) });
     const out = await call("list_approvals", {});

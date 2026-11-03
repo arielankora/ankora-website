@@ -147,7 +147,9 @@ export type ProposeResult = {
   /// without its interim rule, an automated step without its check...):
   /// what is missing and the wording it suggests. Next time, send it
   /// complete (3.11.2026).
-  incomplete: { index: number; missing: string; suggested: string | null }[];
+  /// Every note the card shows as blocking, or as holding the procedure
+  /// back (proposalProblems), in the card's own words, with why it matters.
+  incomplete: { index: number; missing: string; why: string | null; suggested: string | null }[];
 };
 
 export type AutoAppliedItem = { proposalId: string; target: ProposalTargetLike; headline: string; resultId: string | null };
@@ -412,7 +414,7 @@ export async function proposeKnowledge(
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
-    for (const f of flags) if (PROBLEM_CODES.includes(f.code)) incomplete.push({ index, missing: f.message, suggested: f.fix?.label ?? null });
+    for (const f of flags) if (PROBLEM_CODES.includes(f.code)) incomplete.push({ index, missing: f.message, why: f.why ?? null, suggested: f.fix?.label ?? null });
     accepted.push({ item, payload, flags });
   }
 

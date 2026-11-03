@@ -4,7 +4,7 @@
 // Pure: the domain reads the version, the rule or the plan, and this
 // turns it into lines; the row shows them under "הצגת ...".
 
-import { ACTION_TAG_LABELS, CHANNEL_LABELS, STEP_MODE_LABELS, type ProcessStep } from "@/lib/process-rules";
+import { ACTION_TAG_LABELS, CHANNEL_LABELS, STEP_MODE_LABELS, mergeStepChecks, type ProcessStep } from "@/lib/process-rules";
 import { formatAmount } from "@/lib/policy-params";
 
 export type ApprovalPreview = {
@@ -15,7 +15,7 @@ export type ApprovalPreview = {
   problems: string[];
 };
 
-export type PreviewCheck = { message: string; severity: string; excepted?: boolean };
+export type PreviewCheck = { message: string; severity: string; excepted?: boolean; code?: string; step?: number };
 
 /// One line per step, as the client's page writes it.
 export function stepLine(st: ProcessStep, i: number, systemName: Record<string, string>): string {
@@ -52,7 +52,8 @@ export function procedurePreview(
   return {
     toggle: "הצגת הנוהל",
     sections,
-    problems: checks.filter(holdsBack).map((c) => (c.severity === "EXCEPTION" ? `${c.message} אפשר לאשר רק עם חריגה מאושרת לכלל.` : c.message)),
+    // The same R3 note on several steps is one line naming them.
+    problems: mergeStepChecks(checks.filter(holdsBack).map((c) => ({ ...c, code: c.code ?? "" }))).map((c) => (c.severity === "EXCEPTION" ? `${c.message} אפשר לאשר רק עם חריגה מאושרת לכלל.` : c.message)),
   };
 }
 
