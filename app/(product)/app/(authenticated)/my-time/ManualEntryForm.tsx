@@ -4,6 +4,7 @@ import { createManualEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { BackdateReasonField, OverlapNotice, todayKey } from "./ManualEntryParts";
+import { ClosedBankNotice } from "./ClosedBankNotice";
 
 type Client = { id: string; name: string };
 type Category = { id: string; name: string; clientId: string | null };
@@ -44,6 +45,9 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
   const [date, setDate] = useState(todayKey());
   const [warningDismissed, setWarningDismissed] = useState(false);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
+  const intoOpenBankRef = useRef<HTMLInputElement>(null);
+  const overrideReasonRef = useRef<HTMLInputElement>(null);
+  const [closedDismissed, setClosedDismissed] = useState(false);
 
   const availableCategories = useMemo(
     () => categories.filter((cat) => cat.clientId === null || cat.clientId === clientId),
@@ -57,6 +61,13 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     // it has to be cleared once a save succeeds - otherwise the NEXT entry would
     // silently confirm an overlap nobody was shown.
     if (confirmOverlapRef.current && (result?.ok || result?.error)) confirmOverlapRef.current.value = "false";
+    // Same for the closed-bank answers: they belong to the one entry the
+    // notice was shown for.
+    if (result?.closedBank) setClosedDismissed(false);
+    if (result?.ok || result?.error) {
+      if (intoOpenBankRef.current) intoOpenBankRef.current.value = "false";
+      if (overrideReasonRef.current) overrideReasonRef.current.value = "";
+    }
     if (!result?.ok) return;
     formRef.current?.reset();
     setClientId("");
@@ -64,6 +75,16 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
     showToast({ tone: "success", title: "הדיווח נשמר" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result]);
+
+  function recordInOpenBank() {
+    if (intoOpenBankRef.current) intoOpenBankRef.current.value = "true";
+    formRef.current?.requestSubmit();
+  }
+
+  function overrideClosedBank(reason: string) {
+    if (overrideReasonRef.current) overrideReasonRef.current.value = reason;
+    formRef.current?.requestSubmit();
+  }
 
   function saveAnyway() {
     if (confirmOverlapRef.current) confirmOverlapRef.current.value = "true";
@@ -77,6 +98,8 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
       className="rounded-2xl border border-app-border bg-white p-5"
     >
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
+      <input ref={intoOpenBankRef} type="hidden" name="intoOpenBank" defaultValue="false" />
+      <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
       <p className="mb-3 text-[13px] font-medium text-app-text-primary">הוספת דיווח - שורה אחת</p>
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block min-w-0" style={{ flex: "1 1 150px" }}>
@@ -162,6 +185,14 @@ export function ManualEntryForm({ clients, categories }: { clients: Client[]; ca
       {isBackdated && <BackdateReasonField />}
       {result?.overlapWarning && !warningDismissed && (
         <OverlapNotice warning={result.overlapWarning} onSaveAnyway={saveAnyway} onDismiss={() => setWarningDismissed(true)} />
+      )}
+      {result?.closedBank && !closedDismissed && (
+        <ClosedBankNotice
+          notice={result.closedBank}
+          onMoveToOpen={recordInOpenBank}
+          onOverride={overrideClosedBank}
+          onDismiss={() => setClosedDismissed(true)}
+        />
       )}
       {result?.error && (
         <p className="mt-3 rounded-[10px] border border-app-error/30 bg-app-error-soft px-3 py-2.5 text-[12.5px] text-app-error">

@@ -46,8 +46,12 @@ import {
   startTimer,
   stopTimer,
   updateActiveTimerNote,
+  closedBankForStoppedEntry,
+  moveEntryIntoOpenBank,
 } from "@/lib/app-domain/time-entries";
 import { localDateTimeToUtc } from "@/lib/timezone";
+import { ClosedBankError, OVERRIDE_WARNING, stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
+import { prisma } from "@/lib/prisma";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
 import { READ_ONLY, WRITES } from "@/lib/mcp/annotations";
 import { registerTaskExtraTools } from "@/lib/mcp/task-extra-tools";
@@ -134,6 +138,23 @@ async function guardRunning(
   const [redacted] = await redactEntriesForAi([entry], { keepExcludedClients: true });
   if (redacted.aiExcluded) return { ok: false, text: `${AI_EXCLUDED_TOOL_MESSAGE} Nothing was changed.` };
   return { ok: true, entry };
+}
+
+/// 3.11.2026, "לא רושמים בחבילה סגורה": what the model is told when an
+/// entry lands in a closed hour bank. Nothing was written.
+function closedBankToolText(err: ClosedBankError): string {
+  const lines = [`Nothing was recorded. Ankora says (Hebrew, show it to the user): "${err.message}"`];
+  if (err.canMoveToOpen) {
+    lines.push(
+      "Ask the user whether to record it in the open hour bank instead. Only if they agree, call create_time_entry again with the same values and intoOpenBank: true. In a scheduled run with nobody to ask, do that and say so in the run's report."
+    );
+  }
+  if (err.canOverride) {
+    lines.push(
+      `The user is a manager and may record it in the closed bank anyway. Do not offer this unless they ask. If they do, first show them this warning: "${OVERRIDE_WARNING}" Only after they confirm and give a reason, call again with closedBankOverrideReason.`
+    );
+  }
+  return lines.join(" ");
 }
 
 function actorOf(ctx: ServerContext): User {
@@ -566,14 +587,68 @@ export function registerAnkoraTools(server: McpServer): void {
           );
         }
         const entry = await stopTimer(actor, running.entry.id, args.note ? { note: args.note } : undefined);
+        // 3.11.2026: a timer that was still running when its hour bank
+        // closed has stopped in the closed bank. The person decides
+        // whether it moves into the open one.
+        const crossed = await closedBankForStoppedEntry(entry);
         return toolJson({
           stopped: true,
           entryId: entry.id,
           actualMinutes: entry.actualSeconds === null ? null : Math.round(entry.actualSeconds / 60),
           billableMinutes: entry.billableSeconds === null ? null : Math.round(entry.billableSeconds / 60),
+          ...(crossed
+            ? {
+                closedBank: {
+                  message: stoppedAcrossClosureMessage(crossed),
+                  next: "Ask the user, in their language, whether to move this entry into the open hour bank. Only if they agree, call move_time_entry_to_open_bank with this entryId. Never decide for them.",
+                },
+              }
+            : {}),
         });
       } catch (err) {
         console.error("[mcp] stop_timer failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "move_time_entry_to_open_bank",
+    {
+      title: "Move a stopped timer into the open hour bank",
+      description:
+        "Only after stop_timer answered with `closedBank`: the timer was still running when the client's hour bank closed, so it stopped in the closed bank. With the user's agreement, this moves that entry into the open bank: it starts the moment the open bank opened, keeps its length, and its note says when the work was done. Never call it without asking the user first.",
+      inputSchema: z.object({
+        entryId: z.string().describe("The entryId stop_timer returned. Never typed or guessed."),
+      }),
+      annotations: WRITES,
+    },
+    async (args: { entryId: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const entry = await prisma.timeEntry.findFirst({
+          where: { id: args.entryId, userId: actor.id, deletedAt: null },
+          include: { client: true, category: true, task: true },
+        });
+        if (!entry) return toolText("No entry of yours with that id. Use the entryId stop_timer returned.");
+        const [redacted] = await redactEntriesForAi([entry], { keepExcludedClients: true });
+        if (redacted.aiExcluded) return toolText(`${AI_EXCLUDED_TOOL_MESSAGE} Nothing was changed.`);
+        const moved = await moveEntryIntoOpenBank(actor, entry.id);
+        return toolJson({
+          moved: true,
+          entryId: moved.id,
+          startAt: moved.startAt.toISOString(),
+          endAt: moved.endAt ? moved.endAt.toISOString() : null,
+          note: moved.note,
+        });
+      } catch (err) {
+        console.error("[mcp] move_time_entry_to_open_bank failed", err);
+        // moveEntryIntoOpenBank refuses with plain Hebrew sentences meant for
+        // a person (the entry did not cross a closing, or the open bank is
+        // younger than the entry). Anything else stays behind toolFailure.
+        if (err instanceof Error && err.name === "Error" && /[\u0590-\u05FF]/.test(err.message)) {
+          return toolText(`Nothing was changed. Ankora says (Hebrew, show it to the user): "${err.message}"`);
+        }
         return toolFailure(err);
       }
     }
@@ -637,6 +712,18 @@ export function registerAnkoraTools(server: McpServer): void {
           .string()
           .optional()
           .describe("Why this is being recorded late. Required for older entries; Ankora will say so if it is."),
+        intoOpenBank: z
+          .boolean()
+          .optional()
+          .describe(
+            "Only after Ankora refused the entry because its time falls in a closed hour bank: true records it in the open one instead, starting the moment that one opened, with a line in the note saying when the work was done. Pass it only after the user agreed, or in a scheduled run with nobody to ask; then say so in the run's report."
+          ),
+        closedBankOverrideReason: z
+          .string()
+          .optional()
+          .describe(
+            "Only for SUPER_ADMIN or ANKORA_ADMIN, and only after the user saw Ankora's warning about changing a closed hour bank and confirmed it: why the time must be recorded in the closed bank anyway. Recorded in the audit log."
+          ),
       }),
       annotations: WRITES,
     },
@@ -650,6 +737,8 @@ export function registerAnkoraTools(server: McpServer): void {
         note?: string;
         task?: string;
         backdateReason?: string;
+        intoOpenBank?: boolean;
+        closedBankOverrideReason?: string;
       },
       ctx: ServerContext
     ) => {
@@ -693,9 +782,14 @@ export function registerAnkoraTools(server: McpServer): void {
           taskId,
           backdateReason: args.backdateReason ?? null,
           createdVia: "MCP",
+          intoOpenBank: !!args.intoOpenBank,
+          closedBankOverride: args.closedBankOverrideReason?.trim() ? { reason: args.closedBankOverrideReason.trim() } : null,
         });
         return toolJson({
           created: true,
+          ...(args.intoOpenBank && entry.startAt.getTime() !== startAt.getTime()
+            ? { movedIntoOpenBank: true, note: entry.note }
+            : {}),
           entryId: entry.id,
           client: client.value.name,
           ...entryCategoryFields(category),
@@ -706,6 +800,7 @@ export function registerAnkoraTools(server: McpServer): void {
           billableMinutes: entry.billableSeconds === null ? null : Math.round(entry.billableSeconds / 60),
         });
       } catch (err) {
+        if (err instanceof ClosedBankError) return toolText(closedBankToolText(err));
         console.error("[mcp] create_time_entry failed", err);
         return toolFailure(err);
       }

@@ -5,6 +5,7 @@ import {
   startTimerAction,
   stopTimerAction,
   reopenTimerAction,
+  moveEntryIntoOpenBankAction,
   discardActiveTimerAction,
   updateActiveTimerNoteAction,
   recordPromiseStageAction,
@@ -545,6 +546,35 @@ function RunningTimerCard({
       return;
     }
     onStopped(timer.id);
+
+    // 3.11.2026: the timer was still running when its hour bank closed.
+    // The stop stands; the person is asked whether to move it into the
+    // open bank. This question comes before the promise question below:
+    // it decides which bank the time counts in.
+    if (result.closedBank) {
+      showToast({
+        tone: "warning",
+        title: `הדיווח נשמר · ${durationText}`,
+        description: result.closedBank.message,
+        ask: {
+          question: "להעביר?",
+          choices: [
+            { value: "move", label: "להעביר" },
+            { value: "keep", label: "להשאיר" },
+          ],
+          onAnswer: async (choice) => {
+            if (choice !== "move") return;
+            const moved = await moveEntryIntoOpenBankAction({ timeEntryId: timer.id });
+            if (!moved.ok) {
+              showToast({ tone: "error", title: "ההעברה נכשלה", description: moved.error });
+              return;
+            }
+            showToast({ tone: "success", title: "הרישום הועבר", description: "ההערה מציינת מתי העבודה נעשתה." });
+          },
+        },
+      });
+      return;
+    }
 
     // Team adoption: time against a promise asks where the promise
     // stands now, in the same toast, instead of an undo. The question is

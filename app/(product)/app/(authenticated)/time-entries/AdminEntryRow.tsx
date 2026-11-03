@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { adminUpdateEntryAction, deleteEntryAction, restoreEntryAction, getEntryRevisionsAction } from "./actions";
+import { ClosedBankNotice } from "../my-time/ClosedBankNotice";
+import type { ClosedBankNoticeState } from "../my-time/entry-errors";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatDuration, SOURCE_LABEL } from "@/lib/time-entry-format";
@@ -102,20 +104,30 @@ export function AdminEntryRow({
   const [revisions, setRevisions] = useState<Revision[] | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [deleted, setDeleted] = useState(false);
+  // 3.11.2026: an edit or delete in a closed hour bank, and the override.
+  const editFormRef = useRef<HTMLFormElement>(null);
+  const overrideReasonRef = useRef<HTMLInputElement>(null);
+  const [closedDismissed, setClosedDismissed] = useState(false);
+  const [deleteClosed, setDeleteClosed] = useState<ClosedBankNoticeState | null>(null);
 
-  async function handleDelete() {
-    const result = await deleteEntryAction(entry.id);
+  async function handleDelete(closedBankOverrideReason?: string) {
+    const result = await deleteEntryAction(entry.id, closedBankOverrideReason);
     if (!result.ok) {
+      if ("closedBank" in result && result.closedBank) {
+        setDeleteClosed(result.closedBank);
+        return;
+      }
       showToast({ tone: "error", title: "המחיקה נכשלה", description: result.error });
       return;
     }
+    setDeleteClosed(null);
     setDeleted(true);
     showToast({
       tone: "warning",
       title: "הדיווח נמחק",
       description: `${entry.userName} · ${entry.clientName}`,
       undo: async () => {
-        const restored = await restoreEntryAction(entry.id);
+        const restored = await restoreEntryAction(entry.id, closedBankOverrideReason);
         if (restored.ok) setDeleted(false);
       },
     });
@@ -127,6 +139,8 @@ export function AdminEntryRow({
   // the edit form open with stale values and no visible confirmation.
   useEffect(() => {
     if (state?.ok) setEditing(false);
+    if (state?.closedBank) setClosedDismissed(false);
+    if ((state?.ok || state?.error) && overrideReasonRef.current) overrideReasonRef.current.value = "";
   }, [state]);
 
   // Must come after every hook above (rules-of-hooks) - this early return
@@ -151,8 +165,9 @@ export function AdminEntryRow({
     return (
       <tr className="border-b border-app-border">
         <td colSpan={9} className="px-5 py-4">
-          <form action={formAction} className="space-y-3">
+          <form ref={editFormRef} action={formAction} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
+            <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
             <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <div>
@@ -210,6 +225,16 @@ export function AdminEntryRow({
                 </label>
               </div>
             </div>
+            {state?.closedBank && !closedDismissed && (
+              <ClosedBankNotice
+                notice={state.closedBank}
+                onOverride={(reason) => {
+                  if (overrideReasonRef.current) overrideReasonRef.current.value = reason;
+                  editFormRef.current?.requestSubmit();
+                }}
+                onDismiss={() => setClosedDismissed(true)}
+              />
+            )}
             <div className="flex items-center gap-3">
               <SubmitButton />
               <button type="button" onClick={() => setEditing(false)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
@@ -267,12 +292,23 @@ export function AdminEntryRow({
             <button type="button" onClick={() => setEditing(true)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
               עריכה
             </button>
-            <button type="button" onClick={handleDelete} className="text-xs text-app-text-tertiary hover:text-app-error">
+            <button type="button" onClick={() => void handleDelete()} className="text-xs text-app-text-tertiary hover:text-app-error">
               מחיקה
             </button>
           </div>
         </td>
       </tr>
+      {deleteClosed && (
+        <tr className="border-b border-app-border">
+          <td colSpan={9} className="px-5 py-3">
+            <ClosedBankNotice
+              notice={deleteClosed}
+              onOverride={(reason) => void handleDelete(reason)}
+              onDismiss={() => setDeleteClosed(null)}
+            />
+          </td>
+        </tr>
+      )}
       {showHistory && (
         <tr className="border-b border-app-border bg-cream/60">
           <td colSpan={9} className="px-5 py-4">

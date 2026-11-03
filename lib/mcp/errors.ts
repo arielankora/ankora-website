@@ -100,6 +100,23 @@ const KNOWN: Record<string, McpToolError> = {
       "Ankora's document storage is not connected yet, so documents cannot be filed or read. Do not retry. Tell the user an Ankora admin needs to connect the client documents folder.",
     recoverable: false,
   },
+  // 3.11.2026, "לא רושמים בחבילה סגורה". create_time_entry answers this
+  // itself with the bank's dates; this is the fallback from any other tool.
+  ClosedBankError: {
+    message:
+      "Nothing was recorded: this time falls in a client's closed hour bank (a newer package or cycle has been opened since). Ask the user whether to record it in the open bank instead; with create_time_entry that is intoOpenBank: true. Do not retry unchanged.",
+    recoverable: true,
+  },
+  ClosedBankOverrideReasonRequiredError: {
+    message:
+      "Changing a closed hour bank needs a reason. Ask the user why, then call again with that reason.",
+    recoverable: true,
+  },
+  RunningTimersOnClientError: {
+    message:
+      "Timers are running on this client, and a package cannot be loaded or a cycle opened until they stop. Tell the user; do not stop other people's timers.",
+    recoverable: true,
+  },
   ConflictError: {
     message:
       "This record changed since it was read. Re-read it with the matching list or get tool and retry once with fresh values.",

@@ -4,6 +4,7 @@ import { useActionForm } from "@/components/app/useActionForm";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { BackdateReasonField, OverlapNotice, todayKey } from "../../my-time/ManualEntryParts";
 import { createTaskManualEntryAction } from "./actions";
+import { ClosedBankNotice } from "../../my-time/ClosedBankNotice";
 
 const FIELD =
   "w-full rounded-[9px] border border-app-border-strong bg-white px-2.5 py-2.5 text-[13px] text-app-text-primary outline-none focus:border-gold";
@@ -27,6 +28,9 @@ export function TaskManualEntry({
   const { showToast } = useToast();
   const formRef = useRef<HTMLFormElement>(null);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
+  const intoOpenBankRef = useRef<HTMLInputElement>(null);
+  const overrideReasonRef = useRef<HTMLInputElement>(null);
+  const [dismissedClosed, setDismissedClosed] = useState<object | null>(null);
   const [date, setDate] = useState(todayKey());
   /// The warning the person dismissed. Every answer is a new object, so
   /// the next overlap shows again without an effect resetting a flag.
@@ -36,6 +40,10 @@ export function TaskManualEntry({
   useEffect(() => {
     // Sticky across submits, like the same flag in ManualEntryForm.
     if (confirmOverlapRef.current && (result?.ok || result?.error)) confirmOverlapRef.current.value = "false";
+    if (result?.ok || result?.error) {
+      if (intoOpenBankRef.current) intoOpenBankRef.current.value = "false";
+      if (overrideReasonRef.current) overrideReasonRef.current.value = "";
+    }
     if (!result?.ok) return;
     showToast({ tone: "success", title: "הדיווח נשמר", description: taskTitle });
     onDone();
@@ -56,6 +64,8 @@ export function TaskManualEntry({
     >
       <input type="hidden" name="taskId" value={taskId} />
       <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
+      <input ref={intoOpenBankRef} type="hidden" name="intoOpenBank" defaultValue="false" />
+      <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
       <div className="flex flex-wrap items-end gap-2.5">
         <label className="block" style={{ flex: "0 0 150px" }}>
           <span className="mb-1.5 block text-[11px] text-app-text-secondary">תאריך</span>
@@ -105,6 +115,20 @@ export function TaskManualEntry({
           warning={result.overlapWarning}
           onSaveAnyway={saveAnyway}
           onDismiss={() => setDismissedWarning(result.overlapWarning ?? null)}
+        />
+      )}
+      {result?.closedBank && result.closedBank !== dismissedClosed && (
+        <ClosedBankNotice
+          notice={result.closedBank}
+          onMoveToOpen={() => {
+            if (intoOpenBankRef.current) intoOpenBankRef.current.value = "true";
+            formRef.current?.requestSubmit();
+          }}
+          onOverride={(reason) => {
+            if (overrideReasonRef.current) overrideReasonRef.current.value = reason;
+            formRef.current?.requestSubmit();
+          }}
+          onDismiss={() => setDismissedClosed(result.closedBank ?? null)}
         />
       )}
       {result?.error && (

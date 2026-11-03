@@ -8,7 +8,14 @@ import {
   combineWallClockTime,
   OverlapError,
 } from "@/lib/app-domain/time-entries";
-import { friendlyError, overlapWarningFrom, type ManualEntryFormState } from "./entry-errors";
+import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
+import {
+  closedBankNoticeFrom,
+  closedBankOptionsFrom,
+  friendlyError,
+  overlapWarningFrom,
+  type ManualEntryFormState,
+} from "./entry-errors";
 
 type FormState = ManualEntryFormState;
 
@@ -58,8 +65,10 @@ export async function createManualEntryAction(_prev: FormState | undefined, form
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
       allowOverlapOverride: confirmOverlap,
+      ...closedBankOptionsFrom(formData),
     });
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -92,8 +101,10 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
       reason: String(formData.get("reason") || "") || null,
       allowOverlapOverride: confirmOverlap,
       expectedUpdatedAt: expectedUpdatedAtRaw ? new Date(expectedUpdatedAtRaw) : undefined,
+      closedBankOverride: closedBankOptionsFrom(formData).closedBankOverride,
     });
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -120,12 +131,15 @@ export async function updateMyEntryAction(_prev: UpdateState | undefined, formDa
 /// word instead of on a re-render that did not always arrive (see
 /// SavedEntry above). It used to return nothing at all, which also meant a
 /// refused delete looked exactly like a slow one.
-export async function deleteMyEntryAction(timeEntryId: string): Promise<FormState> {
+export async function deleteMyEntryAction(timeEntryId: string, closedBankOverrideReason?: string): Promise<FormState> {
   const user = await requireUser();
   if (!timeEntryId) return { error: "נתונים חסרים." };
   try {
-    await deleteTimeEntry(user, timeEntryId);
+    await deleteTimeEntry(user, timeEntryId, {
+      closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
+    });
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     return { error: friendlyError(err) };
   }
   revalidatePath("/app/timer");

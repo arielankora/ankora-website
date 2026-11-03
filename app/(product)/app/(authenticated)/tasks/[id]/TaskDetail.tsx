@@ -12,6 +12,7 @@ import {
   stopTimerForTaskAction,
   updateTaskDetailAction,
 } from "./actions";
+import { moveEntryIntoOpenBankAction } from "../../timer/actions";
 import { TaskManualEntry } from "./TaskManualEntry";
 import { TaskShare, type SharePerson } from "./TaskShare";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
@@ -1253,6 +1254,32 @@ function TimerButton({
       return;
     }
     announce();
+    // 3.11.2026: the timer ran across its hour bank's closing.
+    if (result.closedBank) {
+      const timeEntryId = running.id;
+      showToast({
+        tone: "warning",
+        title: "הטיימר נעצר",
+        description: result.closedBank.message,
+        ask: {
+          question: "להעביר?",
+          choices: [
+            { value: "move", label: "להעביר" },
+            { value: "keep", label: "להשאיר" },
+          ],
+          onAnswer: async (choice) => {
+            if (choice !== "move") return;
+            const moved = await moveEntryIntoOpenBankAction({ timeEntryId });
+            if (!moved.ok) {
+              showToast({ tone: "error", title: "ההעברה נכשלה", description: moved.error });
+              return;
+            }
+            showToast({ tone: "success", title: "הרישום הועבר", description: "ההערה מציינת מתי העבודה נעשתה." });
+          },
+        },
+      });
+      return;
+    }
     showToast({ tone: "success", title: "הטיימר נעצר", description: task.title });
   }
 

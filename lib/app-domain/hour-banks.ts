@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
+import { RunningTimersOnClientError } from "@/lib/app-domain/closed-bank-guard";
 import { afterResponse } from "@/lib/after-response";
 import {
   computeConsumedMinutesForRange,
@@ -352,6 +353,21 @@ export function computeRolloverInMinutes(
 /// cycle. If a prior cycle exists, its rolloverMode decides how many
 /// minutes flow into this new cycle (see computeRolloverInMinutes); a
 /// client's very first cycle always starts at rolloverInMinutes = 0.
+/// 3.11.2026, Ariel: a load or a new cycle waits until the client's
+/// running timers have stopped. A timer that began before the load and
+/// stopped after it would otherwise land in the bank that just closed.
+/// Nothing stops them automatically: the person running one decides.
+async function assertNoRunningTimersOnClient(clientId: string) {
+  const running = await prisma.timeEntry.findMany({
+    where: { clientId, endAt: null, deletedAt: null },
+    orderBy: { startAt: "asc" },
+    select: { startAt: true, user: { select: { name: true } } },
+  });
+  if (running.length > 0) {
+    throw new RunningTimersOnClientError(running.map((t) => ({ employeeName: t.user.name, startAt: t.startAt })));
+  }
+}
+
 export async function openHourBankCycle(
   actor: User,
   clientId: string,
@@ -370,6 +386,7 @@ export async function openHourBankCycle(
   if (input.cycleEnd.getTime() <= input.cycleStart.getTime()) {
     throw new Error("cycleEnd must be after cycleStart");
   }
+  await assertNoRunningTimersOnClient(clientId);
 
   const previous = await prisma.hourBank.findFirst({
     where: { clientId, deletedAt: null },
@@ -761,6 +778,7 @@ export async function loadPrepaidPackage(
   if (input.startAt.getTime() > Date.now()) throw new Error("תאריך הרכישה לא יכול להיות בעתיד.");
   const expiresAt = input.expiresAt ?? defaultPackageExpiry(input.startAt);
   if (expiresAt.getTime() <= input.startAt.getTime()) throw new Error("התוקף חייב להיות אחרי תאריך הרכישה.");
+  await assertNoRunningTimersOnClient(clientId);
 
   const preview = await previewPrepaidLoad(clientId, input.startAt);
 
