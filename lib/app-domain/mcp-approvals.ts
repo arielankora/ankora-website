@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
+import type { ProcedureAlongside } from "@/lib/app-domain/processes";
 import { approveProposal, attachProposalToExisting, batchSource, listOpenBatches, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
 import { listAutoReview, markAutoReviewed } from "@/lib/app-domain/auto-apply";
 import { autoDecisionBlocker, type AutoAppliedDecision } from "@/lib/auto-apply";
@@ -120,7 +121,7 @@ export async function decideProposalForAi(
   id: string,
   decision: ProposalDecision,
   reason: string | null
-): Promise<{ clientId: string; batchId: string; headline: string; taskId: string | null; resultId: string | null }> {
+): Promise<{ clientId: string; batchId: string; headline: string; taskId: string | null; resultId: string | null; procedure: ProcedureAlongside | null }> {
   const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, batchId: true, target: true, payload: true } });
   const accessible = p ? (await listAccessibleClients(actor)).some((c) => c.id === p.clientId) : false;
   if (!p || !accessible) throw new Error("No proposal with this id is waiting for you. Call list_approvals for the current ones.");
@@ -130,11 +131,14 @@ export async function decideProposalForAi(
   // task it opened, so the person can see the result, not only the card.
   let taskId: string | null = null;
   let resultId: string | null = null;
+  // 3.11.2026: a process proposal's procedure, approved with it or not.
+  let procedure: ProcedureAlongside | null = null;
   switch (decision) {
     case "approve": {
       const r = await approveProposal(actor, id);
       if (p.target === "TASK") taskId = r.resultId ?? null;
       else resultId = r.resultId ?? null;
+      procedure = r.procedure;
       break;
     }
     case "reject":
@@ -147,7 +151,7 @@ export async function decideProposalForAi(
       taskId = (await proposalToTask(actor, id)).taskId;
       break;
   }
-  return { clientId: p.clientId, batchId: p.batchId, headline, taskId, resultId };
+  return { clientId: p.clientId, batchId: p.batchId, headline, taskId, resultId, procedure };
 }
 
 /// Whether a proposal must be approved on its own (bulkApproveBlocker), as

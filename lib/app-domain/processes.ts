@@ -492,6 +492,39 @@ export async function approveProcessVersion(actor: User, processId: string, vers
   await recordAudit({ actorId: actor.id, action: "process.version_approve", entityType: "Process", entityId: processId, clientId: process.clientId, after: { version, checks: checks.length } });
 }
 
+/// What approving a process proposal did to its procedure (3.11.2026):
+/// approved with it, or why not, in words the screen shows. Null when
+/// there was nothing to approve with it, or this person does not approve
+/// procedures (then it waits as before, and nothing is said).
+export type ProcedureAlongside = { approved: true; version: number } | { approved: false; reason: string };
+
+/// The procedure version a process proposal just brought, approved in the
+/// same act when this person approves procedures of the client and it
+/// passes every check (lib/procedure-approval.ts). Only a draft this
+/// person wrote after version `after` (the latest before the proposal was
+/// applied: 0 for a new process), so an older draft someone else wrote is
+/// never approved by the way. Never throws: the proposal is approved
+/// already, and a procedure that is not stays a draft as before.
+export async function approveProcedureAlongside(actor: User, processId: string, after: number): Promise<ProcedureAlongside | null> {
+  try {
+    const process = await prisma.process.findUnique({ where: { id: processId }, select: { clientId: true, entityId: true, externalPartyContactIds: true } });
+    if (!process) return null;
+    const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
+    const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
+    if (!approvesProceduresOf(approver)) return null;
+    const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+    if (!latest || latest.status !== "DRAFT" || latest.createdById !== actor.id || latest.version <= after) return null;
+    const blocker = procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: latest.createdById });
+    if (blocker) return { approved: false, reason: blocker };
+    const blocking = holdsApproval(await checkProcessVersion(process, latest));
+    if (blocking.length) return { approved: false, reason: `הנוהל לא עובר את הבדיקות: ${blocking.map((b) => b.message).join(" ")}` };
+    await approveProcessVersion(actor, processId, latest.version);
+    return { approved: true, version: latest.version };
+  } catch (err) {
+    return { approved: false, reason: err instanceof Error ? err.message : "אישור הנוהל נכשל. הוא ממתין לאישור בטאב נוהל." };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Reading
 // ---------------------------------------------------------------------------
