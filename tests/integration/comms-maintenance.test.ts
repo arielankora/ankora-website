@@ -77,4 +77,12 @@ describe("repairCallLines", () => {
     expect(fixed.direction).toBe("OUT");
     expect(fixed.otherPhone).toBe("+972549999999");
   });
+
+  it("leaves a hand-sent recording (no other side) as it is", async () => {
+    const anna = "+972553356775";
+    await prisma.callRecording.create({
+      data: { emailId: "e-manual.1", mailAccountId: "acc_m", fromPhone: anna, toPhone: anna, otherPhone: anna, direction: "UNKNOWN", callAt: new Date() },
+    });
+    expect(await repairCallLines([anna])).toEqual({ repaired: 0 });
+  });
 });

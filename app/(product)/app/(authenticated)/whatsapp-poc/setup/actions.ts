@@ -9,6 +9,7 @@ import { normalizePhone } from "@/lib/contact-normalize";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
 import { transcribeRecording } from "@/lib/comms/call-store";
+import { importManualRecordings } from "@/lib/comms/manual-import";
 import { afterResponse } from "@/lib/after-response";
 import { prisma } from "@/lib/prisma";
 
@@ -177,4 +178,18 @@ export async function loadHistoryAction(_prev: SetupState | undefined, formData:
     await backfillChannel(channel, { budgetMs: 50_000, transcribe: transcribeRecording });
   });
   return { ok: "הטעינה רצה ברקע, כדקה. רעננו את מסך התקשורת בעוד דקה. אפשר ללחוץ שוב כדי להמשיך." };
+}
+
+/// 2.11.2026: recordings Aloha sent by hand (a batch for one line, no other
+/// side), into the store. Managers only. Runs after the response; running it
+/// again stores nothing twice.
+export async function importManualRecordingsAction(_prev: SetupState | undefined): Promise<SetupState> {
+  const g = await gate();
+  if (g.error) return { error: g.error };
+  if (!canManageClients(g.user.role)) return { error: "אין הרשאה." };
+  const actorId = g.user.id;
+  await afterResponse("comms: manual recordings import", async () => {
+    await importManualRecordings(actorId);
+  });
+  return { ok: "הייבוא רץ ברקע, כדקה. ההקלטות יופיעו במסך התקשורת, ויתומללו בריצה הלילית." };
 }
