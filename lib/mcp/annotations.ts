@@ -107,6 +107,9 @@ export const TOOL_ANNOTATIONS = {
   // P8 step 8 (3.11.2026): who is told about a new sub-processor, and how.
   // Reads the clients' answers; nothing is written.
   list_subprocessor_notice_recipients: READ_ONLY,
+  // 3.11.2026: writes one client's answer, as the settings form does.
+  // Setting the same answer twice leaves it as it was.
+  set_client_subprocessor_notice: { ...WRITES, idempotentHint: true },
   // Each call adds a batch of proposals (and may register a source). It
   // writes nothing into the file itself: a person approves on the screen.
   propose_knowledge: WRITES,
@@ -163,6 +166,8 @@ export const TOOL_ANNOTATIONS = {
   list_approvals: READ_ONLY,
   decide_approval: WRITES,
   decide_knowledge_proposals: WRITES,
+  // Managers only: how proposals ended, metadata only (3.11.2026).
+  get_proposal_stats: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
@@ -193,6 +198,7 @@ export const WRITE_TOOLS = [
   "start_document_upload",
   "set_document_kind",
   "propose_knowledge",
+  "set_client_subprocessor_notice",
   "start_process",
   "record_process_check",
   "save_procedure_translation",

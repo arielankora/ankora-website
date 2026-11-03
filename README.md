@@ -264,7 +264,7 @@ existed.
 ### Claude Desktop (MCP)
 
 `/api/mcp` exposes the Time Tracking app to a staff member's Claude over
-the Model Context Protocol. 55 tools, by family:
+the Model Context Protocol. 56 tools, by family:
 
 | | |
 | --- | --- |
@@ -274,7 +274,7 @@ the Model Context Protocol. 55 tools, by family:
 | Client file (`client-file-tools.ts`, 17) | `get_client_file`, `get_client_brief`, `get_client_changes`, `propose_knowledge`, `lookup_contact`, `list_processes`, `get_process`, `get_procedure_for_translation`, `save_procedure_translation`, `list_policies`, `start_process`, `record_run_lesson`, `record_stranger_test`, `answer_stranger_question`, `list_my_routines`, `record_process_check`, `get_extraction_brief` |
 | Documents (`document-tools.ts`, 5) | `list_documents`, `read_document`, `set_document_kind`, `start_document_upload`, `upload_document` |
 | Hour bank (`hour-bank-tools.ts`, 1) | `get_hours_bank`: the Hour Banks screen's figures for one client, optionally as of a date, in whole minutes. Adjustments go to managers only, flagged as internal |
-| Approvals (`approval-tools.ts`, 3) | `list_approvals`, `decide_approval`, `decide_knowledge_proposals`: the decisions waiting on the person, and approving or rejecting them from Claude |
+| Approvals (`approval-tools.ts`, 4) | `list_approvals`, `decide_approval`, `decide_knowledge_proposals`: the decisions waiting on the person, and approving or rejecting them from Claude. `get_proposal_stats` (managers only): how proposals to client files ended, by kind, metadata only |
 | Internal suppliers (`employee-tools.ts`, 5) | `get_employee_status`, `get_blank_agreement_pdf`, `issue_agreement_upload_code`, `record_pdf_signature`, `dismiss_pdf_upload` |
 
 A second, separate server at `/api/mcp/portal` (`portal-tools.ts`) serves

@@ -45,7 +45,8 @@ vi.mock("@/lib/app-domain/task-plans", () => ({ PlanVersionConflictError: class 
 vi.mock("@/lib/mcp/lookup", () => lookup);
 vi.mock("@/lib/mcp/auth", () => auth);
 vi.mock("@/lib/app-domain/subprocessor-recipients", () => recipients);
-vi.mock("@/lib/app-domain/clients", () => ({ listAccessibleClients: vi.fn(async () => []) }));
+const clients = vi.hoisted(() => ({ listAccessibleClients: vi.fn(async () => []), updateClient: vi.fn() }));
+vi.mock("@/lib/app-domain/clients", () => clients);
 vi.mock("@/lib/app-auth/permissions", () => ({ assertCan: vi.fn() }));
 vi.mock("@/lib/email-templates", () => ({ appBaseUrl: () => "https://www.ankora.co.il" }));
 
@@ -256,5 +257,52 @@ describe("list_subprocessor_notice_recipients", () => {
     expect(out.websiteOnly.map((c: { client: string }) => c.client)).toEqual(["NUX"]);
     expect(out.aiExcludedLeftOut).toBe(1);
     expect(r.content[0].text).not.toContain("סודי");
+  });
+});
+
+describe("set_client_subprocessor_notice", () => {
+  const call = (args: unknown) => tools.get("set_client_subprocessor_notice")!.handler(args, CTX);
+
+  it("is a write, safe to repeat", () => {
+    expect(TOOL_ANNOTATIONS.set_client_subprocessor_notice.readOnlyHint).toBe(false);
+    expect(TOOL_ANNOTATIONS.set_client_subprocessor_notice.idempotentHint).toBe(true);
+  });
+
+  it("writes through updateClient, as the settings form does, and returns the saved answer with a link", async () => {
+    clients.updateClient.mockResolvedValue({
+      subprocessorNotice: "COMMITTED",
+      subprocessorNoticeSource: "DPA 6.10.2026, סעיף 3.1",
+      subprocessorNoticeDocumentId: null,
+    });
+    const r = await call({ client: "nux", notice: "COMMITTED", source: "DPA 6.10.2026, סעיף 3.1" });
+    expect(clients.updateClient).toHaveBeenCalledWith(ACTOR, "c-nux", {
+      subprocessorNotice: { notice: "COMMITTED", source: "DPA 6.10.2026, סעיף 3.1", documentId: null },
+    });
+    const out = JSON.parse(r.content[0].text!);
+    expect(out).toMatchObject({ client: "NUX", notice: "COMMITTED", meaning: "יש, מקבל מייל", url: "https://www.ankora.co.il/app/clients/c-nux?tab=work" });
+  });
+
+  it("passes an unknown client back, and writes nothing", async () => {
+    lookup.lookupClient.mockResolvedValue({ ok: false, message: 'No client named "nx" is available to this user.' });
+    const r = await call({ client: "nx", notice: "NOT_COMMITTED", source: "x" });
+    expect(r.content[0].text).toContain("No client named");
+    expect(clients.updateClient).not.toHaveBeenCalled();
+  });
+
+  it("asks for the source of a yes or a no, and writes nothing", async () => {
+    const r = await call({ client: "nux", notice: "COMMITTED", source: "  " });
+    expect(r.content[0].text).toContain("צריך לכתוב את המקור");
+    expect(clients.updateClient).not.toHaveBeenCalled();
+  });
+
+  it("lets UNCHECKED through without a source", async () => {
+    clients.updateClient.mockResolvedValue({ subprocessorNotice: "UNCHECKED", subprocessorNoticeSource: null, subprocessorNoticeDocumentId: null });
+    await call({ client: "nux", notice: "UNCHECKED" });
+    expect(clients.updateClient).toHaveBeenCalledWith(ACTOR, "c-nux", { subprocessorNotice: { notice: "UNCHECKED", source: null, documentId: null } });
+  });
+
+  it("refuses a value outside the three", () => {
+    const schema = tools.get("set_client_subprocessor_notice")!.config.inputSchema as { safeParse: (v: unknown) => { success: boolean } };
+    expect(schema.safeParse({ client: "nux", notice: "YES" }).success).toBe(false);
   });
 });

@@ -49,6 +49,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_client_brief: "lookupClient; buildClientFile for AI",
   get_client_changes: "lookupClient; buildClientFile for AI",
   list_subprocessor_notice_recipients: "marked clients are counted, never named; the person sees them on the clients screen",
+  set_client_subprocessor_notice: "lookupClient",
   propose_knowledge: "lookupClient for every client named; a marked task or document as newSource is refused",
   lookup_contact: "links of a marked client are left out (lookupContact)",
   list_processes: "lookupClient",
@@ -85,6 +86,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_approvals: "lookupClient; rows of a marked client, and tasks and plans of a marked task, are left out (listApprovalsForAi)",
   decide_approval: "only a row list_approvals would show (findApprovalForAi)",
   decide_knowledge_proposals: "a proposal of a marked client is refused (decideProposalForAi)",
+  get_proposal_stats: "proposals of a marked client are left out and only counted; no proposal text is returned (proposalStatsForAi)",
 
   // lib/mcp/portal-tools.ts (the client's own connector)
   get_status: "a marked client gets no answer (portalAiBlocked); marked tasks are left out of the lists",
