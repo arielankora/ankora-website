@@ -2,11 +2,15 @@ import { requireUser } from "@/lib/app-auth/session";
 import { can, canManageClients } from "@/lib/app-auth/permissions";
 import { engagementDeletesOn } from "@/lib/comms/engagement";
 import { listClients, listArchivedClients } from "@/lib/app-domain/clients";
-import { getCurrentHourBanksForClients } from "@/lib/app-domain/hour-banks";
+import { getCurrentHourBanksForClients, getPrepaidForecastsForClients, getRecentHourBanksForClients } from "@/lib/app-domain/hour-banks";
+import { countApprovalsByClient } from "@/lib/app-domain/approvals";
+import { countOpenTasksByClient } from "@/lib/app-domain/tasks";
+import { assessClient, attentionRank, bankDisplay, LOW_REMAINING_SHARE, PACE_MIN_DAYS, PACKAGE_ENDING_DAYS } from "@/lib/client-attention";
+import { formatDecimalHours } from "@/lib/hours-format";
 import { Forbidden } from "@/components/app/Forbidden";
 import { Drawer } from "@/components/app/Drawer";
 import { CreateClientForm } from "./CreateClientForm";
-import { ClientsGrid, type ClientCard } from "./ClientsGrid";
+import { ClientsGrid, type ClientCard, type HistoryBar } from "./ClientsGrid";
 import { RestoreClientButton } from "./RestoreClientButton";
 import { SubprocessorRecipientsPanel } from "./SubprocessorRecipientsPanel";
 import { listSubprocessorRecipients } from "@/lib/app-domain/subprocessor-recipients";
@@ -61,17 +65,135 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
   // Archived clients are still skipped: their cycles are frozen and
   // irrelevant to a "current state" card, and leaving them out keeps the
   // query narrower.
-  const snapshots = await getCurrentHourBanksForClients(
-    clients.filter((c) => c.status !== "ARCHIVED").map((c) => c.id),
+  const liveIds = clients.filter((c) => c.status !== "ARCHIVED").map((c) => c.id);
+  const now = new Date();
+  const [snapshots, recent, openTasks, approvals] = await Promise.all([
+    getCurrentHourBanksForClients(liveIds),
+    getRecentHourBanksForClients(liveIds, 3, now),
+    countOpenTasksByClient(liveIds),
+    countApprovalsByClient(user).catch(() => new Map<string, number>()),
+  ]);
+  const forecasts = await getPrepaidForecastsForClients(
+    [...snapshots.values()].map((s) => ({ clientId: s.bank.clientId, kind: s.bank.kind, remainingMinutes: s.utilization.remainingMinutes })),
+    now,
   );
 
-  const cards: ClientCard[] = clients.map((client) => ({
-    id: client.id,
-    name: client.name,
-    status: client.status,
-    employeeCount: client._count.employeeAccess,
-    utilizationPct: snapshots.get(client.id)?.utilization.utilizationPct ?? null,
-  }));
+  // 3.11.2026 (Ariel): every client in one grid, the ones that need
+  // attention first, each card with its hours "X of Y", why it needs
+  // attention, and its last cycles. The rules: lib/client-attention.ts.
+  const day = (d: Date, year = false) =>
+    new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", ...(year ? { year: "numeric" } : {}), timeZone: "Asia/Jerusalem" }).format(d);
+  const month = (d: Date) => new Intl.DateTimeFormat("he-IL", { month: "short", timeZone: "Asia/Jerusalem" }).format(d);
+
+  // Per client, what the figures at the top of the screen add up.
+  const totals = new Map<string, { remaining: number; used: number; overran: boolean; ending: boolean }>();
+
+  const cards: ClientCard[] = clients.map((client) => {
+    const base = {
+      id: client.id,
+      name: client.name,
+      status: client.status,
+      employeeCount: client._count.employeeAccess,
+      openTasks: openTasks.get(client.id) ?? 0,
+      approvals: approvals.get(client.id) ?? 0,
+    };
+    const snap = snapshots.get(client.id);
+    if (!snap) return { ...base, bank: null, assessment: null, rank: attentionRank(null), history: [] };
+
+    const history = recent.get(client.id) ?? [];
+    const at = history.findIndex((h) => h.id === snap.bank.id);
+    const prev = at > 0 ? history[at - 1] : null;
+    const forecast = forecasts.get(client.id) ?? null;
+    const state = {
+      kind: snap.bank.kind,
+      cycleStart: snap.bank.cycleStart,
+      cycleEnd: snap.bank.cycleEnd,
+      purchasedMinutes: snap.utilization.purchasedMinutes,
+      rolloverInMinutes: snap.utilization.rolloverInMinutes,
+      totalMinutes: snap.utilization.totalMinutes,
+      consumedMinutes: snap.utilization.consumedMinutes,
+      remainingMinutes: snap.utilization.remainingMinutes,
+      utilizationPct: snap.utilization.utilizationPct,
+    };
+    const assessment = assessClient({
+      bank: state,
+      previous: prev ? { kind: prev.kind, ...prev.utilization } : null,
+      forecast,
+      now,
+    });
+    const shown = bankDisplay(state);
+
+    totals.set(client.id, {
+      remaining: snap.utilization.remainingMinutes,
+      used: shown.usedMinutes,
+      overran: assessment.previousOverrun,
+      ending: assessment.endingSoon,
+    });
+
+    const ended = snap.bank.cycleEnd.getTime() <= now.getTime();
+    const kindLabel =
+      snap.bank.kind === "PREPAID"
+        ? `חבילה מראש, בתוקף עד ${day(snap.bank.cycleEnd, true)}`
+        : ended
+          ? `המחזור הסתיים ב-${day(snap.bank.cycleEnd)}`
+          : `מחזור, מתחדש ב-${day(snap.bank.cycleEnd)}`;
+
+    // The bars: hours used against the size of each cycle, on one scale.
+    const bars = history.map((h) => {
+      const d = bankDisplay({ kind: h.kind, ...h.utilization });
+      return { h, d };
+    });
+    const top = Math.max(1, ...bars.map(({ d }) => Math.max(d.usedMinutes, d.sizeMinutes)));
+    const historyBars: HistoryBar[] = bars.map(({ h, d }) => ({
+      label: h.id === snap.bank.id ? (h.kind === "PREPAID" ? "נוכחית" : month(h.cycleStart)) : month(h.cycleStart),
+      usedShare: Math.max(0, d.usedMinutes) / top,
+      sizeShare: d.sizeMinutes > 0 ? d.sizeMinutes / top : null,
+      over: d.sizeMinutes > 0 && d.usedMinutes > d.sizeMinutes,
+      current: h.id === snap.bank.id,
+      title: `${month(h.cycleStart)}: ${d.consumed} מתוך ${d.total}`,
+    }));
+
+    return {
+      ...base,
+      bank: {
+        kindLabel,
+        used: shown.consumed,
+        total: shown.total,
+        remaining: shown.remaining,
+        overdrawn: shown.overdrawn,
+        pct: snap.utilization.utilizationPct,
+        expectedPct: ended ? null : assessment.expectedPct,
+      },
+      assessment: { attention: assessment.attention, tone: assessment.tone, reasons: assessment.reasons },
+      rank: attentionRank(assessment),
+      history: historyBars,
+    };
+  });
+
+  // Needs attention first, then on track, then no bank; a paused client
+  // last, whatever its bank says. Names break ties, as before.
+  cards.sort((a, b) => {
+    const ra = a.status === "ACTIVE" ? a.rank : 4;
+    const rb = b.status === "ACTIVE" ? b.rank : 4;
+    return ra - rb || a.name.localeCompare(b.name, "he");
+  });
+
+  const counted = cards.flatMap((c) => {
+    const t = totals.get(c.id);
+    return t ? [{ name: c.name, ...t }] : [];
+  });
+  const overran = counted.filter((t) => t.overran).map((t) => t.name);
+  const ending = counted.filter((t) => t.ending).map((t) => t.name);
+  const summary = {
+    remaining: formatDecimalHours(counted.reduce((n, t) => n + t.remaining, 0)),
+    used: formatDecimalHours(counted.reduce((n, t) => n + t.used, 0)),
+    withBank: counted.length,
+    overranCount: overran.length,
+    overranNames: overran.slice(0, 2).join(", "),
+    endingCount: ending.length,
+    endingNames: ending.slice(0, 2).join(", "),
+  };
+  const rulesLine = `מסומן "דורש תשומת לב" כשהבנק נגמר, כשהמחזור הקודם חרג, כשנשאר פחות מ-${Math.round(LOW_REMAINING_SHARE * 100)}% מהבנק, כשהקצב מהיר אחרי ${PACE_MIN_DAYS} ימים במחזור, או כשחבילה צפויה להיגמר תוך ${PACKAGE_ENDING_DAYS} ימים.`;
 
   return (
     <>
@@ -95,6 +217,8 @@ export default async function ClientsPage(props: { searchParams: Promise<{ q?: s
           initialQuery={initialQuery}
           canManageBanks={canManageBanks}
           canViewReports={canViewReports}
+          summary={summary}
+          rulesLine={rulesLine}
         />
 
         <SubprocessorRecipientsPanel groups={noticeGroups} />
