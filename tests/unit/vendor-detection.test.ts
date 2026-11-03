@@ -74,6 +74,56 @@ describe("detectVendorSignal", () => {
   });
 });
 
+// 3.11.2026: three questions asked about vendors that were not there.
+describe("detectVendorSignal, false alarms of 3.11.2026", () => {
+  it("does not take a step letter from another sentence (\"N\")", () => {
+    const text = [
+      "- תהליך עם שלבים אוטומטיים: חמש הערות זהות, \"שלב N אוטומטי: צריך לכתוב איך אדם מוודא שזה קרה\".",
+      "7. לכתוב בדיקות יחידה, אינטגרציה וזרימה במסך. מבצע: קלוד.",
+    ].join("\n");
+    expect(detectVendorSignal(text, known)).toBeNull();
+  });
+
+  it("does not read a path as an integration of \"tests\"", () => {
+    expect(detectVendorSignal("הבדיקה `tests/integration/backup-restore-roundtrip.test.ts` נעצרת ב-main.", known)).toBeNull();
+    expect(detectVendorSignal("הבדיקה tests/integration/backup-restore-roundtrip.test.ts נעצרת ב-main.", known)).toBeNull();
+  });
+
+  it("does not take a process code (\"P14\") or a quoted detection for a vendor", () => {
+    const text = [
+      "לחדד את הזיהוי האוטומטי של ספק חדש (P14), כדי שלא ייתפס על מילים נפוצות",
+      "- \"N\" (התאמה \"אינטגרציה + N\"), בשמירת תוכנית.",
+      "- \"tests\" (התאמה \"integration + tests\"), ביצירת המשימה.",
+    ].join("\n");
+    expect(detectVendorSignal(text, known)).toBeNull();
+  });
+
+  it("does not take code identifiers for names", () => {
+    // The verb still asks, as any "חיבור" does, but with no name taken from the code.
+    expect(detectVendorSignal("חיבור השדה clients.subprocessorNoticeDocumentId ל-client_documents", known)?.vendor).toBeNull();
+    expect(detectVendorSignal("integration של subprocessorNoticeDocumentId עם client_documents", known)).toBeNull();
+  });
+});
+
+describe("detectVendorSignal, still finds real vendors", () => {
+  it("in the same sentence as the action word", () => {
+    expect(detectVendorSignal("רקע על המשימה.\nלחבר את HubSpot לפורטל הלקוח.", known)?.vendor).toBe("HubSpot");
+    expect(detectVendorSignal("integration with Salesforce for client data", known)?.vendor).toBe("Salesforce");
+  });
+
+  it("a lower-case name right next to the action word", () => {
+    expect(detectVendorSignal("לחבר את pipedrive לאפליקציה", known)?.vendor).toBe("pipedrive");
+  });
+
+  it("not a name from a sentence that connects nothing", () => {
+    expect(detectVendorSignal("השבוע דיברנו עם Pipedrive. צריך לחבר את המערכת של הבנק.", known)).toEqual({
+      vendor: null,
+      existingVendor: null,
+      matched: "לחבר",
+    });
+  });
+});
+
 describe("vendorKey", () => {
   it("is case and space insensitive", () => {
     expect(vendorKey("  Meet   Alfred ")).toBe("meet alfred");
