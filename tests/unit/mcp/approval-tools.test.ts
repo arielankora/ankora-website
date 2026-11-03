@@ -19,6 +19,7 @@ const domain = vi.hoisted(() => ({
   listApprovalsForAi: vi.fn(),
   findApprovalForAi: vi.fn(),
   decideProposalForAi: vi.fn(),
+  decideAutoAppliedForAi: vi.fn(),
   proposalAloneBecause: vi.fn(async (_id: string) => null as string | null),
 }));
 const decide = vi.hoisted(() => ({ decideApproval: vi.fn() }));
@@ -104,7 +105,8 @@ describe("list_approvals", () => {
   it("lists what entered a file on its own and waits for a look, with links, only for knowledge (3.11.2026)", async () => {
     domain.listApprovalsForAi.mockResolvedValue({ items: [], proposals: new Map() });
     auto.listAutoReview.mockResolvedValue([
-      { id: "pa1", clientId: "c-nux", clientName: "NUX", target: "FACT", kindLabel: "העדפה", headline: "מייל ולא טלפון", resultId: "f1", decidedAt: new Date("2026-11-03T10:00:00Z"), why: "מדגם של 20%" },
+      { id: "pa1", clientId: "c-nux", clientName: "NUX", target: "FACT", kindLabel: "העדפה", headline: "מייל ולא טלפון", resultId: "f1", decidedAt: new Date("2026-11-03T10:00:00Z"), why: "מדגם של 20%", revertible: true },
+      { id: "pa2", clientId: "c-nux", clientName: "NUX", target: "FACT", kindLabel: "הערה", headline: "בלי ביטול", resultId: null, decidedAt: new Date("2026-11-03T10:00:00Z"), why: "מדגם של 20%", revertible: false },
     ]);
     const out = await call("list_approvals", {});
     expect(auto.listAutoReview).toHaveBeenCalledWith(ACTOR, { clientId: null, forAi: true });
@@ -118,7 +120,9 @@ describe("list_approvals", () => {
         why: "מדגם של 20%",
         url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#auto-pa1`,
         result: `${BASE}/app/clients/c-nux?tab=file#item-f1`,
+        decisions: ["reviewed_ok", "revert"],
       },
+      expect.objectContaining({ proposalId: "pa2", decisions: ["reviewed_ok"] }),
     ]);
     auto.listAutoReview.mockClear();
     const rules = await call("list_approvals", { kind: "rule" });
@@ -223,6 +227,29 @@ describe("decide_knowledge_proposals", () => {
     const out = await call("decide_knowledge_proposals", { proposalIds: ["x", "y"], decision: "task" });
     expect(out.failed).toBe(1);
     expect(out.results[0].task).toBe(`${BASE}/app/tasks/t9`);
+  });
+});
+
+describe("decide_knowledge_proposals on what entered automatically (3.11.2026)", () => {
+  it("reviewed_ok and revert go to their own domain function, with the row and the item", async () => {
+    domain.decideAutoAppliedForAi.mockResolvedValue({ clientId: "c-nux", headline: "מייל ולא טלפון", resultId: "f1" });
+    const ok = await call("decide_knowledge_proposals", { proposalIds: ["pa1"], decision: "reviewed_ok" });
+    expect(domain.decideAutoAppliedForAi).toHaveBeenCalledWith(ACTOR, "pa1", "reviewed_ok");
+    expect(domain.decideProposalForAi).not.toHaveBeenCalled();
+    expect(ok.results[0]).toEqual({ proposalId: "pa1", says: "מייל ולא טלפון", url: `${BASE}/app/approvals?tab=knowledge&clientId=c-nux#auto-pa1`, result: `${BASE}/app/clients/c-nux?tab=file#item-f1` });
+
+    const out = await call("decide_knowledge_proposals", { proposalIds: ["pa1", "pa2"], decision: "revert" });
+    expect(domain.decideAutoAppliedForAi).toHaveBeenLastCalledWith(ACTOR, "pa2", "revert");
+    expect(out.done).toBe(2);
+    expect(domain.proposalAloneBecause).not.toHaveBeenCalled();
+  });
+
+  it("reports one that is refused and goes on", async () => {
+    domain.decideAutoAppliedForAi.mockRejectedValueOnce(new Error("This proposal did not enter the file automatically")).mockResolvedValueOnce({ clientId: "c-nux", headline: "h", resultId: null });
+    const out = await call("decide_knowledge_proposals", { proposalIds: ["manual", "pa1"], decision: "reviewed_ok" });
+    expect(out.failed).toBe(1);
+    expect(out.errors[0]).toMatchObject({ proposalId: "manual", error: expect.stringContaining("automatically") });
+    expect(out.results[0].result).toBeUndefined();
   });
 });
 

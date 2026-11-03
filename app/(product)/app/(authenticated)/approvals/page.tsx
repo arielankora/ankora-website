@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { can } from "@/lib/app-auth/permissions";
 import { collectApprovals, countMyPendingProposals } from "@/lib/app-domain/approvals";
-import { listAutoReview } from "@/lib/app-domain/auto-apply";
+import { countAutoReview } from "@/lib/app-domain/auto-apply";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import {
   APPROVAL_TABS,
@@ -55,7 +55,7 @@ export default async function ApprovalsPage(props: { searchParams: Promise<Recor
     clientId ? countMyPendingProposals(user, { clientId, everyone: true }) : Promise.resolve(null),
     // 3.11.2026: items that entered a file on their own and still need a
     // look count on "ידע מהחילוץ", so the tab is there while they wait.
-    listAutoReview(user, { clientId }).then((r) => r.length),
+    countAutoReview(user, { clientId }),
   ]);
   const allItems = everyone ? everything : onlyMine(everything);
 

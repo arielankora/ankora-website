@@ -13,6 +13,8 @@
 //   auto-applied proposals of a kind, or 2 errors of one client within 14
 //   days.
 
+import { revertBlocker } from "@/lib/knowledge-proposals";
+
 export const AUTO_REVIEW_ALL_DAYS = 14;
 export const GUIDE_REVIEW_DAYS = 7;
 /// Percent of auto-applied items a person looks at once the first days are over.
@@ -134,4 +136,39 @@ export function wilsonLower(good: number, total: number): number {
 /// works either way, this only says so beside it.
 export function liftBarMet(good: number, total: number): boolean {
   return total >= LIFT_DECISIONS && wilsonLower(good, total) >= LIFT_LOWER_BOUND;
+}
+
+/// The two decisions Claude may take on an auto-applied item (3.11.2026,
+/// decide_knowledge_proposals): "reviewed_ok" is the "תקין" button,
+/// "revert" is "ביטול".
+export type AutoAppliedDecision = "reviewed_ok" | "revert";
+
+/// Why Claude may not take this decision on this proposal, or null.
+/// "reviewed_ok" only on an item still waiting for a look (`listed`: it is
+/// on "נכנס אוטומטית" now); "revert" on any auto-applied item that may still
+/// be taken out (revertBlocker). Both only on what entered automatically:
+/// what a person approved is taken out on its card, not from here.
+export function autoDecisionBlocker(
+  decision: AutoAppliedDecision,
+  p: {
+    autoApplied: boolean;
+    autoReviewedAt: Date | string | null;
+    state: string;
+    action: string;
+    target: string;
+    attached: boolean;
+    resultId: string | null;
+    revertedAt: Date | string | null;
+  },
+  listed: boolean
+): string | null {
+  if (!p.autoApplied) return "This proposal did not enter the file automatically: reviewed_ok and revert are only for the items list_approvals shows under `enteredAutomatically`.";
+  if (decision === "revert") {
+    const why = revertBlocker(p);
+    return why ? `It cannot be taken out of the file: ${why}` : null;
+  }
+  if (p.revertedAt) return "Its item was already taken out of the file, so there is nothing to mark.";
+  if (p.autoReviewedAt) return "It was already marked right (תקין).";
+  if (!listed) return "It is not waiting for a look (it is not under `enteredAutomatically`), so there is nothing to mark.";
+  return null;
 }

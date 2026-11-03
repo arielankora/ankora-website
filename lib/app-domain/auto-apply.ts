@@ -5,7 +5,7 @@ import { assertCan, canManageClients, ForbiddenError } from "@/lib/app-auth/perm
 import { recordAudit } from "@/lib/app-auth/audit";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { assertClientAccess } from "@/lib/app-domain/client-sources";
-import { proposalHeadline, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { proposalHeadline, revertBlocker, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey, proposalKindLabel } from "@/lib/knowledge-review-filters";
 import {
   CHANGE_ACTIONS,
@@ -241,6 +241,8 @@ export type AutoReviewItem = {
   resultId: string | null;
   decidedAt: Date;
   why: string;
+  /// "ביטול" may still take its item out (revertBlocker).
+  revertible: boolean;
 };
 
 /// "נכנס אוטומטית": auto-applied items a person still looks at, newest
@@ -258,7 +260,7 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       where: { clientId: { in: [...nameOf.keys()] }, autoApplied: true, state: "APPROVED", revertedAt: null, autoReviewedAt: null },
       orderBy: { decidedAt: "desc" },
       take: 500,
-      select: { id: true, clientId: true, target: true, payload: true, resultId: true, decidedAt: true },
+      select: { id: true, clientId: true, target: true, payload: true, resultId: true, decidedAt: true, state: true, action: true, attached: true, revertedAt: true },
     }),
     autoApplySetting(),
     guideApprovals(),
@@ -280,9 +282,17 @@ export async function listAutoReview(actor: User, filter: { clientId?: string | 
       resultId: r.resultId,
       decidedAt: r.decidedAt,
       why,
+      revertible: revertBlocker(r) === null,
     });
   }
   return out;
+}
+
+/// How many auto-applied items wait for a person's look: the "נכנס
+/// אוטומטית" list, counted on "ידע מהחילוץ", beside "אישורים" in the menu
+/// and in the morning email. One set, read by listAutoReview.
+export async function countAutoReview(actor: User, filter: { clientId?: string | null } = {}): Promise<number> {
+  return (await listAutoReview(actor, filter)).length;
 }
 
 /// "תקין": a person looked at an auto-applied item and it is right.
