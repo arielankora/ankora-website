@@ -2167,6 +2167,21 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-03",
       "riskReason": "כמה הצעות לתיק אושרו, נערכו או נדחו, לפי סוג, בשביל get_proposal_stats. למנהלים בלבד, נתוני מטא בלבד, לקוחות כמפתחות אטומים, ולקוח בלי AI רק נספר. טעות כאן חושפת ל-AI תוכן של לקוחות או חומר מסומן."
+    },
+    "domain:auto-apply": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-03"
+    },
+    "domain:process-dates": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-03",
+      "riskReason": "יוצר מועד בתיק הלקוח ומקשר אותו לתהליך, ומהמועד נפתחות ריצות לבד. בודק גישה ללקוח, עובר דרך createImportantDate ו-linkProcessDates עם הבדיקות והיומן שלהן. טעות כאן פותחת ריצות מיותרות או משאירה תהליך בלי ריצות."
     }
   },
   "waivers": {},
