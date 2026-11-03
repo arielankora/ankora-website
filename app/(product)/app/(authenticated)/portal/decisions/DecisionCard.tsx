@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { formatPortalDate } from "@/lib/portal-dates";
 import { respondToDecisionAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
@@ -178,7 +179,7 @@ export function DecisionCard({
         {decision.dueAt && (
           <span className="rounded-full bg-app-warning-soft px-2.5 py-0.5 text-[11.5px] font-medium text-app-warning">
             נשמח לתשובה עד{" "}
-            {new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "long", timeZone: "Asia/Jerusalem" }).format(new Date(decision.dueAt))}
+            {formatPortalDate(new Date(decision.dueAt))}
           </span>
         )}
       </div>

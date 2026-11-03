@@ -1,3 +1,4 @@
+import { formatPortalDate } from "@/lib/portal-dates";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHistory } from "@/lib/app-domain/client-portal";
@@ -22,9 +23,8 @@ const REPORT_TYPE_LABEL: Record<string, string> = {
   HOUR_BANK_STATUS: "מצב בנק שעות",
 };
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
+// One date form on every portal screen (lib/portal-dates.ts).
+const formatDate = (date: Date) => formatPortalDate(date);
 
 
 // App redesign (handoff README, screen 16 "היסטוריה"): the prototype

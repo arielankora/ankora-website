@@ -1,3 +1,4 @@
+import { formatPortalDate } from "@/lib/portal-dates";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalFile } from "@/lib/app-domain/client-file";
@@ -14,9 +15,8 @@ import { PreferencesForm, DigestForm } from "./PreferencesForm";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-function formatDay(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Jerusalem" }).format(date);
-}
+// One date form on every portal screen (lib/portal-dates.ts).
+const formatDay = (date: Date) => formatPortalDate(date);
 
 function formatSize(bytes: number | null): string | null {
   if (!bytes) return null;

@@ -11,6 +11,7 @@ import { bankFigures, formatDecimalHours, packageFigures } from "@/lib/hours-for
 import { describeForecast } from "@/lib/prepaid-format";
 import { cycleElapsedShare } from "@/lib/app-domain/hour-banks";
 import { ProgressBar } from "@/components/app/ProgressBar";
+import { formatPortalDate, formatPortalRange } from "@/lib/portal-dates";
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -18,9 +19,8 @@ export const metadata = { robots: { index: false, follow: false } };
 // client bought (lib/hours-format.ts). "3:04" beside "11:56" reads as two
 // decimals that do not add up; "3.07" beside "11.93" does. Every figure on
 // this screen goes through formatDecimalHours or bankFigures.
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
+// One date form on every portal screen (lib/portal-dates.ts).
+const formatDate = (date: Date) => formatPortalDate(date);
 
 // 20.10.2026: four tones of the palette that differ in lightness, not three
 // golds a client cannot tell apart.
@@ -162,7 +162,11 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
 
       <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <div className="rounded-2xl border border-app-border bg-white p-5">
-          <p className="mb-4 text-[13.5px] font-medium text-app-text-primary">פילוח לפי תחום · החודש</p>
+          {/* 3.11.2026 (Hadas's review): the period is written out on both
+              cards. "החודש" beside "השבוע" was easy to miss, and two figures
+              for one name then read as a contradiction. */}
+          <p className="text-[13.5px] font-medium text-app-text-primary">פילוח לפי תחום · החודש</p>
+          <p className="mb-4 mt-0.5 text-[11.5px] text-app-text-tertiary">{formatPortalRange(categorySummary.from, categorySummary.to)}</p>
           {categorySummary.rows.length === 0 ? (
             <p className="text-sm text-app-text-tertiary">אין עדיין נתונים לחודש הנוכחי.</p>
           ) : (
@@ -189,7 +193,10 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
 
         <div className="overflow-hidden rounded-2xl border border-app-border bg-white">
           <div className="flex items-center justify-between border-b border-app-border px-[18px] py-3.5">
-            <span className="text-[13.5px] font-medium text-app-text-primary">פעילות השבוע</span>
+            <span>
+              <span className="block text-[13.5px] font-medium text-app-text-primary">פעילות השבוע</span>
+              <span className="mt-0.5 block text-[11.5px] text-app-text-tertiary">{formatPortalRange(weekly.from, weekly.to)}</span>
+            </span>
             <Link href="/app/portal/hours?view=weekly" className="text-xs text-app-text-accent hover:underline">
               לפי ימים
             </Link>
@@ -199,12 +206,15 @@ export default async function PortalHoursPage(props: { searchParams: Promise<{ v
           ) : (
             weekly.topActivities.map((a, i) => (
               <div
-                key={a.activity}
+                key={`${a.activity}|${a.category}`}
                 className={`flex justify-between gap-2.5 px-[18px] py-3 text-sm ${
                   i < weekly.topActivities.length - 1 ? "border-b border-app-border" : ""
                 }`}
               >
-                <span className="text-app-text-primary">{a.activity}</span>
+                <span className="min-w-0">
+                  <span className="block text-app-text-primary">{a.activity}</span>
+                  <span className="block text-[11.5px] text-app-text-tertiary">תחום: {a.category}</span>
+                </span>
                 <span className="font-jbmono text-app-text-secondary">{formatDecimalHours(a.minutes)}</span>
               </div>
             ))

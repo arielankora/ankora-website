@@ -1,3 +1,4 @@
+import { formatPortalDate } from "@/lib/portal-dates";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalDecisions } from "@/lib/app-domain/decisions";
@@ -9,9 +10,8 @@ import { DecisionCard } from "./DecisionCard";
 
 export const metadata = { robots: { index: false, follow: false } };
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
+// One date form on every portal screen (lib/portal-dates.ts).
+const formatDate = (date: Date) => formatPortalDate(date);
 
 // Portal phase 2. The screen the portal exists for.
 //

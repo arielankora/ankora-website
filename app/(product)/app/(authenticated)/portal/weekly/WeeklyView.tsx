@@ -5,16 +5,16 @@ import { getWeeklyActivity } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import { HOURS_TABS } from "../hours/tabs";
-import { formatClockMinutes } from "@/lib/hours-format";
+import { formatDecimalHours } from "@/lib/hours-format";
+import { formatPortalDate, formatPortalRange } from "@/lib/portal-dates";
 
 const WEEKDAY_SHORT = ["א׳", "ב׳", "ג׳", "ד׳", "ה׳", "ו׳", "ש׳"];
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
+// 3.11.2026 (Hadas's review): decimal hours, like the bank and every
+// other hours figure in the portal. This screen used to print "5:12" here
+// while the hours screen one tab away printed "5.20" for the same week.
 function formatHours(minutes: number) {
-  return formatClockMinutes(minutes);
+  return formatDecimalHours(minutes);
 }
 
 // Spec 13's Weekly Activity. App redesign (handoff README, screen 16): a
@@ -54,7 +54,7 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">פעילות שבועית</h1>
           <p className="mt-1 text-sm text-app-text-secondary">
-            {formatDate(activity.from)} עד {formatDate(new Date(activity.to.getTime() - 86_400_000))}
+            {formatPortalRange(activity.from, activity.to)}
           </p>
         </div>
         <div className="flex gap-2 text-sm">
@@ -90,7 +90,7 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
               <span
                 className={`rounded-t-md ${d.minutes > 0 ? "bg-gold/60" : "bg-app-surface-sunken"}`}
                 style={{ height: `${Math.max(4, (d.minutes / maxMinutes) * 100)}%` }}
-                title={`${d.date}: ${formatHours(d.minutes)}`}
+                title={`${formatPortalDate(d.date)}: ${formatHours(d.minutes)}`}
               />
             </span>
           ))}
@@ -109,12 +109,15 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
         ) : (
           activity.topActivities.map((a, i) => (
             <div
-              key={a.activity}
-              className={`flex justify-between px-5 py-3 text-sm ${
+              key={`${a.activity}|${a.category}`}
+              className={`flex justify-between gap-2.5 px-5 py-3 text-sm ${
                 i < activity.topActivities.length - 1 ? "border-b border-app-border" : ""
               }`}
             >
-              <span className="text-app-text-primary">{a.activity}</span>
+              <span className="min-w-0">
+                <span className="block text-app-text-primary">{a.activity}</span>
+                <span className="block text-[11.5px] text-app-text-tertiary">תחום: {a.category}</span>
+              </span>
               <span dir="ltr" className="font-jbmono text-app-text-secondary">
                 {formatHours(a.minutes)}
               </span>
@@ -135,9 +138,9 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
             <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">פעילות</th>
-              <th className="px-5 py-3 font-medium">קטגוריה</th>
+              <th className="px-5 py-3 font-medium">תחום</th>
               {activity.showEmployeeNames && <th className="px-5 py-3 font-medium">איש צוות</th>}
-              <th className="px-5 py-3 font-medium">דקות לחיוב</th>
+              <th className="px-5 py-3 font-medium">שעות לחיוב</th>
             </tr>
           </thead>
           <tbody>
@@ -150,11 +153,11 @@ export async function WeeklyView({ searchParams }: { searchParams: { weekOffset?
             )}
             {activity.rows.map((row, i) => (
               <tr key={i} className="border-b border-app-border last:border-0">
-                <td className="px-5 py-3 text-app-text-secondary">{row.date}</td>
+                <td className="px-5 py-3 text-app-text-secondary">{formatPortalDate(row.date)}</td>
                 <td className="px-5 py-3 text-app-text-primary">{row.activity}</td>
                 <td className="px-5 py-3 text-app-text-secondary">{row.category}</td>
                 {activity.showEmployeeNames && <td className="px-5 py-3 text-app-text-secondary">{row.employee}</td>}
-                <td className="px-5 py-3 text-app-text-secondary">{row.billableMinutes}</td>
+                <td dir="ltr" className="px-5 py-3 text-end font-jbmono text-app-text-secondary">{formatHours(row.billableMinutes)}</td>
               </tr>
             ))}
           </tbody>

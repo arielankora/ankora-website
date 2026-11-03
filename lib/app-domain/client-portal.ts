@@ -268,20 +268,68 @@ interface PortalEntryRow {
   employee?: string;
 }
 
+/// What an hours row is called when it cannot be called by a task the
+/// client can see. 3.11.2026 (Hadas's review): this used to be the
+/// category's own name, and then "פעילות השבוע" and "פילוח לפי תחום"
+/// printed the same word with two different numbers beside it (a week's
+/// and a month's), which read as the portal contradicting itself.
+export const GENERAL_ACTIVITY_LABEL = "עבודה שוטפת";
+
+/// The name a client reads for the work behind one time entry.
+///
+/// 3.11.2026 (Hadas's review): this used to be the task's internal title
+/// whenever the entry had a task, so a client read the team's own notes
+/// ("ורטו - חוב", "להציע לנדב רעיון אחד") in their hours table. Now a task
+/// names the row only if it is a task the client already sees on the home
+/// screen (clientVisible, not archived), and then by the same words:
+/// clientTitle when someone wrote one, the title otherwise - the same rule
+/// as toPromise, so a row and a promise never disagree on a name. An entry
+/// on a subtask is named by its top-level task, which is the one the
+/// client sees. Anything else is GENERAL_ACTIVITY_LABEL, and the category
+/// beside it says what kind of work it was.
+///
+/// `hiddenFromAi` (28.10.2026): for the portal's MCP connector. An entry on
+/// a task marked "בלי AI" is never named by the task.
+export function portalActivityName(
+  task:
+    | {
+        title: string;
+        clientTitle: string | null;
+        clientVisible: boolean;
+        status: string;
+        parent?: { title: string; clientTitle: string | null; clientVisible: boolean; status: string } | null;
+      }
+    | null,
+  hiddenFromAi = false
+): string {
+  if (!task || hiddenFromAi) return GENERAL_ACTIVITY_LABEL;
+  const shown = task.parent ?? task;
+  if (!shown.clientVisible || shown.status === "ARCHIVED") return GENERAL_ACTIVITY_LABEL;
+  return shown.clientTitle?.trim() || shown.title;
+}
+
 /// `forAi` (28.10.2026): for the portal's MCP connector. An entry on a task
-/// marked "בלי AI" is named by its category, never by the task's title.
+/// marked "בלי AI" is never named by the task's title (portalActivityName).
 async function fetchPortalEntries(clientId: string, from: Date, to: Date, showEmployeeNames: boolean, forAi = false) {
   const entries = await prisma.timeEntry.findMany({
     where: { clientId, deletedAt: null, endAt: { not: null }, startAt: { gte: from, lt: to } },
     orderBy: { startAt: "asc" },
-    include: { category: true, task: { include: { parent: { select: { aiExcluded: true } } } }, user: true },
+    include: {
+      category: true,
+      task: {
+        include: {
+          parent: { select: { aiExcluded: true, title: true, clientTitle: true, clientVisible: true, status: true } },
+        },
+      },
+      user: true,
+    },
   });
 
   return entries.map((e): PortalEntryRow => {
     const hidden = forAi && !!e.task && (e.task.aiExcluded || !!e.task.parent?.aiExcluded);
     const row: PortalEntryRow = {
       date: localDateKey(e.startAt), // Phase 8 fix: was UTC-date via toISOString(), wrong near Israel midnight
-      activity: (hidden ? null : e.task?.title) ?? e.category.name,
+      activity: portalActivityName(e.task, hidden),
       category: e.category.name,
       billableMinutes: toMinutes(e.billableSeconds),
     };
@@ -310,13 +358,18 @@ function dailyTotals(rows: PortalEntryRow[], from: Date) {
   }));
 }
 
+/// Grouped by activity AND category (3.11.2026): "עבודה שוטפת" in payroll
+/// and "עבודה שוטפת" in bookkeeping are two lines, each carrying its
+/// category, rather than one line that silently mixes them.
 function topActivities(rows: PortalEntryRow[], limit = 5) {
-  const byActivity = new Map<string, number>();
-  for (const r of rows) byActivity.set(r.activity, (byActivity.get(r.activity) ?? 0) + r.billableMinutes);
-  return [...byActivity.entries()]
-    .map(([activity, minutes]) => ({ activity, minutes }))
-    .sort((a, b) => b.minutes - a.minutes)
-    .slice(0, limit);
+  const byActivity = new Map<string, { activity: string; category: string; minutes: number }>();
+  for (const r of rows) {
+    const key = `${r.activity}\u0000${r.category}`;
+    const cur = byActivity.get(key) ?? { activity: r.activity, category: r.category, minutes: 0 };
+    cur.minutes += r.billableMinutes;
+    byActivity.set(key, cur);
+  }
+  return [...byActivity.values()].sort((a, b) => b.minutes - a.minutes).slice(0, limit);
 }
 
 /// Spec 13's Weekly Activity: "משימות שבוצעו, שעות לפי משימה/קטגוריה,
@@ -358,10 +411,33 @@ export async function getWeeklyActivity(actor: User, weekStart?: Date, opts: { f
 /// this month" this schema offers (there's no separate completedAt
 /// column). nextAutoSendLabel is also real: the client's own enabled
 /// MONTHLY_DETAILED ReportSchedule, if one exists.
+///
+/// 3.11.2026 (Hadas's review): the count used to include every finished
+/// task, visible to the client or not, and to date it by updatedAt. The
+/// report said "5 משימות שהושלמו" while the home screen, which lists only
+/// visible tasks, said nothing had arrived yet. Both now read the same
+/// tasks (doneInPeriodWhere), so the number in the report is the number of
+/// rows the client can open on the home screen.
+function doneInPeriodWhere(clientId: string, from: Date, to: Date, clientVisible = true) {
+  return {
+    clientId,
+    status: "DONE" as const,
+    deletedAt: null,
+    ...TOP_LEVEL_ONLY,
+    clientVisible,
+    // completedAt since team adoption; updatedAt only for rows closed
+    // before the column existed, the same fallback as toPromise's movedAt.
+    OR: [
+      { completedAt: { gte: from, lt: to } },
+      { completedAt: null, updatedAt: { gte: from, lt: to } },
+    ],
+  };
+}
+
 async function tasksCompletedCount(clientId: string, from: Date, to: Date) {
-  return prisma.task.count({
-    where: { clientId, status: "DONE", deletedAt: null, ...TOP_LEVEL_ONLY, updatedAt: { gte: from, lt: to } },
-  });
+  // TOP_LEVEL_ONLY is already inside doneInPeriodWhere; spelled out here
+  // too so the subtask guard (subtask-isolation.test.ts) can read it.
+  return prisma.task.count({ where: { ...doneInPeriodWhere(clientId, from, to), ...TOP_LEVEL_ONLY } });
 }
 
 const WEEKDAY_LABELS = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
@@ -581,6 +657,9 @@ export interface PortalPromise {
   /// a direct way to answer them instead of leaving the client to find
   /// the decisions tab on their own.
   openDecisions: number;
+  /// When the request reached us (Task.createdAt). Shown when a row on the
+  /// home screen's monthly summary is opened (3.11.2026).
+  receivedAt: Date;
 }
 
 /// Waiting on the client wins over the internal status: a task can be
@@ -617,6 +696,7 @@ function toPromise(task: {
   completedAt: Date | null;
   clientOutcome: string | null;
   clientRequest?: string | null;
+  createdAt: Date;
   _count?: { decisions: number };
 }): PortalPromise {
   return {
@@ -631,6 +711,7 @@ function toPromise(task: {
     // and is kept off the portal by design (task-blocking.test.ts).
     waitingFor: task.blockedOn === "CLIENT" ? task.clientRequest?.trim() || null : null,
     openDecisions: task._count?.decisions ?? 0,
+    receivedAt: task.createdAt,
   };
 }
 
@@ -664,6 +745,7 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       completedAt: true,
       clientOutcome: true,
       clientRequest: true,
+      createdAt: true,
       // Only OPEN ones: an answered or withdrawn decision asks nothing of
       // the client any more.
       _count: { select: { decisions: { where: { status: "OPEN" } } } },
@@ -687,6 +769,25 @@ export interface PortalHome {
   waitingOnClient: PortalPromise[];
   inProgress: PortalPromise[];
   recentlyDone: PortalPromise[];
+  /// 3.11.2026 (Hadas's review): "מה טיפלנו בו החודש". The month's finished
+  /// promises, by the same rule the monthly report counts them
+  /// (doneInPeriodWhere), so the report's number and this list agree.
+  /// Together with inProgress and waitingOnClient it replaces the empty
+  /// state that used to promise "the first item within a working day"
+  /// to a client whose report already showed finished work.
+  month: {
+    from: Date;
+    to: Date;
+    done: PortalPromise[];
+    /// Billable minutes this month per promise id, subtasks rolled into
+    /// their top-level task. Shown when a row is opened.
+    minutesByTask: Record<string, number>;
+    /// Staff preview only, 0 for a client: tasks finished this month that
+    /// nobody marked visible to the client. They are the gap between what
+    /// the team did and what this screen can show, and the person
+    /// previewing is the one who can close it.
+    hiddenDone: number;
+  };
   /// The quiet line at the bottom of the screen, and the only number on
   /// it. Null when no cycle has been set up yet.
   cycle: {
@@ -708,7 +809,9 @@ const RECENTLY_DONE_TAKE = 5;
 /// waiting for me" before it answers anything else.
 export async function getPortalHome(actor: User): Promise<PortalHome> {
   const { client, isStaffPreview } = await resolvePortalClient(actor);
-  const [tasks, snapshot, openDecisions, manager] = await Promise.all([
+  const monthFrom = startOfMonth(new Date());
+  const monthTo = endOfMonth(monthFrom);
+  const [tasks, snapshot, openDecisions, manager, monthEntries, hiddenDone] = await Promise.all([
     listVisibleTasks(client.id),
     getCurrentHourBank(client.id),
     // Queried here rather than through lib/app-domain/decisions.ts on
@@ -718,10 +821,31 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
     client.accountManagerId
       ? prisma.user.findFirst({ where: { id: client.accountManagerId, deletedAt: null }, select: { name: true } })
       : null,
+    prisma.timeEntry.findMany({
+      where: {
+        clientId: client.id,
+        deletedAt: null,
+        endAt: { not: null },
+        taskId: { not: null },
+        startAt: { gte: monthFrom, lt: monthTo },
+      },
+      select: { taskId: true, billableSeconds: true, task: { select: { parentId: true } } },
+    }),
+    isStaffPreview
+      ? prisma.task.count({ where: { ...doneInPeriodWhere(client.id, monthFrom, monthTo, false), ...TOP_LEVEL_ONLY } })
+      : 0,
   ]);
 
   const promises = tasks.map(toPromise);
   const done = promises.filter((p) => p.stage === "DONE");
+  const inMonth = (d: Date) => d >= monthFrom && d < monthTo;
+
+  const minutesByTask: Record<string, number> = {};
+  for (const e of monthEntries) {
+    const id = e.task?.parentId ?? e.taskId;
+    if (!id) continue;
+    minutesByTask[id] = (minutesByTask[id] ?? 0) + toMinutes(e.billableSeconds);
+  }
 
   const daysUntilCycleEnd = daysLeftToShow(snapshot);
   const forecast = await getPrepaidForecast(snapshot);
@@ -737,6 +861,15 @@ export async function getPortalHome(actor: User): Promise<PortalHome> {
     // screen would ask the client to care about our internal handover.
     inProgress: promises.filter((p) => p.stage === "RECEIVED" || p.stage === "IN_PROGRESS"),
     recentlyDone: done.slice(0, RECENTLY_DONE_TAKE),
+    month: {
+      from: monthFrom,
+      to: monthTo,
+      // movedAt is completedAt, or updatedAt for rows closed before that
+      // column existed: the same two dates doneInPeriodWhere checks.
+      done: done.filter((p) => inMonth(p.movedAt)).sort((a, b) => b.movedAt.getTime() - a.movedAt.getTime()),
+      minutesByTask,
+      hiddenDone,
+    },
     cycle: snapshot
       ? {
           usedMinutes: snapshot.utilization.consumedMinutes,

@@ -120,6 +120,7 @@ export function AppShell({
   approvals = 0,
   clients,
   showComms,
+  portalPreview = false,
   children,
 }: {
   user: User;
@@ -136,9 +137,14 @@ export function AppShell({
   clients: { id: string; name: string }[];
   /// The communications screen, for those it opens to (lib/comms/access.ts).
   showComms?: boolean;
+  /// A manager is previewing a client's portal (the preview cookie is set
+  /// and they may preview). On portal screens the shell then shows the
+  /// client's menu and none of the staff actions (portal-preview-nav.ts).
+  portalPreview?: boolean;
   children: ReactNode;
 }) {
   const items = navItemsFor(user.role, { whatsappPoc: showComms ?? false });
+  const portalItems = portalPreview && user.role !== "CLIENT_USER" ? navItemsFor("CLIENT_USER") : undefined;
   const showPrimaryCta = can(user.role, "time_entry.create_self");
 
   return (
@@ -149,6 +155,7 @@ export function AppShell({
     <div className="min-h-screen bg-app-surface-page md:flex">
       <Sidebar
         items={items}
+        portalItems={portalItems}
         userName={user.name}
         roleLabel={ROLE_LABELS[user.role]}
         counters={{
@@ -174,6 +181,7 @@ export function AppShell({
 
         <TopBar
           items={items}
+          portalItems={portalItems}
           notifications={notifications}
           unreadCount={unreadCount}
           showPrimaryCta={showPrimaryCta}
@@ -193,7 +201,7 @@ export function AppShell({
         </main>
       </div>
 
-      <BottomNav items={items} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
+      <BottomNav items={items} portalItems={portalItems} userName={user.name} roleLabel={ROLE_LABELS[user.role]} />
     </div>
     </BackSlotProvider>
     </ActiveTimerProvider>

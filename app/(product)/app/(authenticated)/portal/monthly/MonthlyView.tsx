@@ -7,16 +7,14 @@ import { Forbidden } from "@/components/app/Forbidden";
 import { ExportMenu } from "@/components/app/ExportMenu";
 import { ViewTabs } from "@/components/app/ViewTabs";
 import { HOURS_TABS } from "../hours/tabs";
+import { formatDecimalHours } from "@/lib/hours-format";
+import { formatPortalDate, formatPortalRange } from "@/lib/portal-dates";
 
 
-function formatDate(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeZone: "Asia/Jerusalem" }).format(date);
-}
-
+// 3.11.2026 (Hadas's review): decimal hours, like every other hours figure
+// in the portal (lib/hours-format.ts), and the one portal date form.
 function formatHours(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${h}:${String(m).padStart(2, "0")}`;
+  return formatDecimalHours(minutes);
 }
 
 function formatMonthTitle(date: Date) {
@@ -126,7 +124,7 @@ export async function MonthlyView({ searchParams }: { searchParams: { monthOffse
       </div>
 
       <p className="text-sm text-app-text-secondary">
-        {formatDate(report.from)} - {formatDate(new Date(report.to.getTime() - 86_400_000))}
+        {formatPortalRange(report.from, report.to)}
       </p>
 
       <div className="overflow-x-auto rounded-2xl border border-app-border bg-white">
@@ -135,9 +133,9 @@ export async function MonthlyView({ searchParams }: { searchParams: { monthOffse
             <tr className="border-b border-app-border text-xs text-app-text-tertiary">
               <th className="px-5 py-3 font-medium">תאריך</th>
               <th className="px-5 py-3 font-medium">פעילות</th>
-              <th className="px-5 py-3 font-medium">קטגוריה</th>
+              <th className="px-5 py-3 font-medium">תחום</th>
               {report.showEmployeeNames && <th className="px-5 py-3 font-medium">איש צוות</th>}
-              <th className="px-5 py-3 font-medium">דקות לחיוב</th>
+              <th className="px-5 py-3 font-medium">שעות לחיוב</th>
             </tr>
           </thead>
           <tbody>
@@ -150,11 +148,11 @@ export async function MonthlyView({ searchParams }: { searchParams: { monthOffse
             )}
             {report.rows.map((row, i) => (
               <tr key={i} className="border-b border-app-border last:border-0">
-                <td className="px-5 py-3 text-app-text-secondary">{row.date}</td>
+                <td className="px-5 py-3 text-app-text-secondary">{formatPortalDate(row.date)}</td>
                 <td className="px-5 py-3 text-app-text-primary">{row.activity}</td>
                 <td className="px-5 py-3 text-app-text-secondary">{row.category}</td>
                 {report.showEmployeeNames && <td className="px-5 py-3 text-app-text-secondary">{row.employee}</td>}
-                <td className="px-5 py-3 text-app-text-secondary">{row.billableMinutes}</td>
+                <td dir="ltr" className="px-5 py-3 text-end font-jbmono text-app-text-secondary">{formatHours(row.billableMinutes)}</td>
               </tr>
             ))}
           </tbody>

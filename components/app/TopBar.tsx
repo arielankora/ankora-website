@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Plus } from "lucide-react";
 import type { NavItem } from "./Sidebar";
 import { ShellTimerPill } from "./ActiveTimerProvider";
+import { useShellNav } from "./portal-preview-nav";
 import { NotificationsBell, type NotificationSummary } from "./NotificationsBell";
 import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, type OpenDrawerDetail } from "./drawer-keys";
 
@@ -20,17 +21,24 @@ import { NEW_TASK_KEY, OPEN_DRAWER_EVENT, OPEN_DRAWER_PARAM, PENDING_OPEN_KEY, t
 // right, so the first flex child (not row-reversed) lands there - the
 // second child lands at the left/end edge. See inline comments below.
 export function TopBar({
-  items,
+  items: staffItems,
+  portalItems,
   notifications,
   unreadCount,
-  showPrimaryCta,
+  showPrimaryCta: staffCta,
 }: {
   items: NavItem[];
+  /// Set only during a staff preview of the portal (portal-preview-nav.ts).
+  portalItems?: NavItem[];
   notifications: NotificationSummary[];
   unreadCount: number;
   showPrimaryCta: boolean;
 }) {
   const pathname = usePathname();
+  // In a portal preview the manager sees the client's top bar: no "דיווח
+  // חדש", no "משימה חדשה" (3.11.2026, Hadas's review).
+  const { items, inPortalPreview } = useShellNav(staffItems, portalItems);
+  const showPrimaryCta = staffCta && !inPortalPreview;
   const current = [...items].reverse().find((item) => (item.href === "/app" ? pathname === "/app" : pathname.startsWith(item.href)));
 
   return (

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { prisma } from "./setup";
 import { createTestClient, createTestClientUser, createTestUser, createTestCategory } from "./factories";
-import { getPortalHome, getPortalTimeline } from "@/lib/app-domain/client-portal";
+import { getPortalHome, getPortalTimeline, getWeeklyActivity, GENERAL_ACTIVITY_LABEL } from "@/lib/app-domain/client-portal";
 import { createTask, updateTask } from "@/lib/app-domain/tasks";
 
 // Portal phase 1. What a client may see is now decided per task, so the
@@ -18,6 +18,8 @@ async function seedTask(
     clientVisible?: boolean;
     status?: "OPEN" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
     waitingOnClientSince?: Date | null;
+    completedAt?: Date | null;
+    parentId?: string;
   } = {}
 ) {
   return prisma.task.create({
@@ -29,6 +31,8 @@ async function seedTask(
       status: overrides.status ?? "OPEN",
       blockedOn: overrides.waitingOnClientSince ? "CLIENT" : null,
       blockedSince: overrides.waitingOnClientSince ?? null,
+      completedAt: overrides.completedAt ?? null,
+      parentId: overrides.parentId ?? null,
     },
   });
 }
@@ -161,5 +165,91 @@ describe("task portal fields", () => {
     const created = await createTask(admin, { clientId: client.id, title: "Just internal" });
 
     expect(created.clientVisible).toBe(false);
+  });
+});
+
+// 3.11.2026, Hadas's review of the client screen.
+describe("getPortalHome() - the month's summary", () => {
+  it("lists this month's finished promises and leaves out last month's and hidden ones", async () => {
+    const client = await createTestClient({ name: "Client Month" });
+    const { user } = await createTestClientUser({ clientId: client.id });
+    const lastMonth = new Date(Date.now() - 45 * 24 * 60 * 60 * 1000);
+
+    await seedTask(client.id, { title: "Closed now", status: "DONE", completedAt: new Date() });
+    await seedTask(client.id, { title: "Closed long ago", status: "DONE", completedAt: lastMonth });
+    await seedTask(client.id, { title: "Closed, internal", status: "DONE", completedAt: new Date(), clientVisible: false });
+
+    const home = await getPortalHome(user);
+
+    expect(home.month.done.map((p) => p.title)).toEqual(["Closed now"]);
+    // A client is never told about tasks they cannot see.
+    expect(home.month.hiddenDone).toBe(0);
+    expect(JSON.stringify(home)).not.toContain("Closed, internal");
+  });
+
+  it("rolls a subtask's hours into its top-level promise", async () => {
+    const client = await createTestClient({ name: "Client Hours" });
+    const category = await createTestCategory({ clientId: client.id, name: "שכר" });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user } = await createTestClientUser({ clientId: client.id });
+
+    const parent = await seedTask(client.id, { title: "Payroll", status: "IN_PROGRESS" });
+    const step = await seedTask(client.id, { title: "step", parentId: parent.id, clientVisible: false });
+    const start = new Date();
+    for (const [taskId, seconds] of [[parent.id, 1800], [step.id, 900]] as const) {
+      await prisma.timeEntry.create({
+        data: {
+          userId: employee.id,
+          clientId: client.id,
+          categoryId: category.id,
+          taskId,
+          startAt: start,
+          endAt: new Date(start.getTime() + seconds * 1000),
+          actualSeconds: seconds,
+          billableSeconds: seconds,
+        },
+      });
+    }
+
+    const home = await getPortalHome(user);
+    expect(home.month.minutesByTask[parent.id]).toBe(45);
+  });
+});
+
+describe("hours rows - the name a client reads (3.11.2026)", () => {
+  it("never names a row by a task the client cannot see", async () => {
+    const client = await createTestClient({ name: "Client Names" });
+    const category = await createTestCategory({ clientId: client.id, name: "ניהול" });
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user } = await createTestClientUser({ clientId: client.id });
+
+    const internal = await seedTask(client.id, { title: "ורטו - חוב", clientVisible: false });
+    const visible = await seedTask(client.id, { title: "תיאום ספק", clientTitle: "חידוש חוזה הניקיון" });
+    const step = await seedTask(client.id, { title: "להציע לנדב רעיון אחד", parentId: visible.id, clientVisible: false });
+    const now = new Date();
+    for (const taskId of [internal.id, visible.id, step.id]) {
+      await prisma.timeEntry.create({
+        data: {
+          userId: employee.id,
+          clientId: client.id,
+          categoryId: category.id,
+          taskId,
+          startAt: now,
+          endAt: new Date(now.getTime() + 600_000),
+          actualSeconds: 600,
+          billableSeconds: 600,
+        },
+      });
+    }
+
+    const week = await getWeeklyActivity(user, now);
+    const names = week.rows.map((r) => r.activity).sort();
+
+    expect(names).toEqual([GENERAL_ACTIVITY_LABEL, "חידוש חוזה הניקיון", "חידוש חוזה הניקיון"].sort());
+    expect(JSON.stringify(week)).not.toContain("ורטו");
+    expect(JSON.stringify(week)).not.toContain("לנדב");
+    // Grouped with its category, so the same label in two categories is
+    // two lines, never one mixed line.
+    expect(week.topActivities.every((a) => a.category === "ניהול")).toBe(true);
   });
 });

@@ -134,7 +134,9 @@ async function seedTwoClients() {
   const catB = await createTestCategory({ clientId: clientB.id, name: "קטגוריה סודית של בטא" });
   const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
   await prisma.user.update({ where: { id: employee.id }, data: { name: "דנה כהן" } });
-  const taskA = await prisma.task.create({ data: { clientId: clientA.id, title: FORMULA_TITLE } });
+  // Visible to the client: only a visible task names an exported row
+  // (3.11.2026), and this test needs the title to reach the file.
+  const taskA = await prisma.task.create({ data: { clientId: clientA.id, title: FORMULA_TITLE, clientVisible: true } });
 
   // Inside the current Israel month whatever day the suite runs: the
   // portal export's default period is "this month".
@@ -272,7 +274,7 @@ describe("GET /api/portal/export - the client's own monthly file", () => {
       ["2026-09-15T09:00:00Z", "עבודה בספטמבר"],
       ["2026-10-15T09:00:00Z", "עבודה באוקטובר"],
     ] as const) {
-      const task = await prisma.task.create({ data: { clientId: client.id, title } });
+      const task = await prisma.task.create({ data: { clientId: client.id, title, clientVisible: true } });
       const startAt = new Date(iso);
       await prisma.timeEntry.create({
         data: {

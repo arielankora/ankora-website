@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { PORTAL_STAGE_LABELS, type PortalPromise } from "@/lib/app-domain/client-portal";
+import { formatPortalDate } from "@/lib/portal-dates";
+import { formatDecimalHours } from "@/lib/hours-format";
 
 // Portal phase 1. One row shape for a promise, used by the home screen
 // and by the activity stream, so the client learns to read it once.
@@ -18,9 +20,8 @@ const STAGE_TONE: Record<PortalPromise["stage"], string> = {
   DONE: "border-transparent bg-app-success-soft text-app-success",
 };
 
-function formatDay(date: Date) {
-  return new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "short", timeZone: "Asia/Jerusalem" }).format(date);
-}
+// One date form on every portal screen (lib/portal-dates.ts).
+const formatDay = formatPortalDate;
 
 /// Whole days, floored, in the client's own timezone sense of "a day".
 /// Zero reads as "today" rather than "0 days", because "מחכה לך 0 ימים"
@@ -39,6 +40,63 @@ function waitingLabel(since: Date): string {
 export function PromiseRow({ promise, showStage = true }: { promise: PortalPromise; showStage?: boolean }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5">
+      <PromiseRowBody promise={promise} showStage={showStage} />
+    </div>
+  );
+}
+
+/// 3.11.2026 (Hadas's review): the home screen's monthly summary lets the
+/// client open each row. There is no portal task screen to go to, and the
+/// row already holds everything the client may read about a promise, so it
+/// opens in place: when it arrived, when it is due or was finished, and the
+/// hours put into it this month. A native <details>, so it opens without
+/// JavaScript and the keyboard and screen readers get it for free.
+export function ExpandablePromiseRow({
+  promise,
+  minutesThisMonth,
+  showStage = true,
+}: {
+  promise: PortalPromise;
+  minutesThisMonth: number;
+  showStage?: boolean;
+}) {
+  return (
+    <details className="group" data-testid="portal-month-row">
+      <summary className="flex cursor-pointer list-none flex-wrap items-baseline justify-between gap-x-3 gap-y-1.5 px-[18px] py-3.5 hover:bg-app-surface-sunken [&::-webkit-details-marker]:hidden">
+        <PromiseRowBody promise={promise} showStage={showStage} />
+      </summary>
+      <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-t border-app-border bg-app-surface-sunken px-[18px] py-3 text-[12.5px]">
+        <dt className="text-app-text-tertiary">התקבל</dt>
+        <dd className="text-app-text-secondary">{formatDay(promise.receivedAt)}</dd>
+        {promise.stage === "DONE" ? (
+          <>
+            <dt className="text-app-text-tertiary">הושלם</dt>
+            <dd className="text-app-text-secondary">{formatDay(promise.movedAt)}</dd>
+          </>
+        ) : (
+          <>
+            <dt className="text-app-text-tertiary">מצב</dt>
+            <dd className="text-app-text-secondary">{PORTAL_STAGE_LABELS[promise.stage]}</dd>
+            {promise.dueDate && (
+              <>
+                <dt className="text-app-text-tertiary">יעד</dt>
+                <dd className="text-app-text-secondary">{formatDay(promise.dueDate)}</dd>
+              </>
+            )}
+          </>
+        )}
+        <dt className="text-app-text-tertiary">שעות החודש</dt>
+        <dd className="text-app-text-secondary">
+          {minutesThisMonth > 0 ? <bdi dir="ltr" className="font-jbmono">{formatDecimalHours(minutesThisMonth)}</bdi> : "לא דווחו שעות החודש"}
+        </dd>
+      </dl>
+    </details>
+  );
+}
+
+function PromiseRowBody({ promise, showStage }: { promise: PortalPromise; showStage: boolean }) {
+  return (
+    <>
       <span className="min-w-0 flex-1 text-sm text-app-text-primary">
         {promise.title}
         {/* Team adoption: what came of it.
@@ -73,12 +131,12 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
           <span className="text-[11.5px] text-app-text-secondary">{waitingLabel(promise.waitingSince)}</span>
         )}
         {promise.stage === "DONE" && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+          <span className="text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.movedAt)}
           </span>
         )}
         {promise.stage !== "DONE" && promise.dueDate && (
-          <span dir="ltr" className="font-jbmono text-[11.5px] text-app-text-tertiary">
+          <span className="text-[11.5px] text-app-text-tertiary">
             {formatDay(promise.dueDate)}
           </span>
         )}
@@ -88,7 +146,7 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
           </span>
         )}
       </span>
-    </div>
+    </>
   );
 }
 

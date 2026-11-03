@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronUp, Home, Search } from "lucide-react";
+import { useShellNav } from "./portal-preview-nav";
 import { NAV_ICONS } from "./nav-icons";
 import { LogoutButton } from "./LogoutButton";
 import { OPEN_COMMAND_PALETTE_EVENT } from "./CommandPalette";
@@ -55,17 +56,21 @@ function formatCounterTime(totalSeconds: number): string {
 // AppShell.tsx's navItemsFor) is unchanged - only sizing, the OPS badge,
 // the search button, and per-item counters are new here.
 export function Sidebar({
-  items,
+  items: staffItems,
+  portalItems,
   userName,
   roleLabel,
   counters,
 }: {
   items: NavItem[];
+  /// Set only during a staff preview of the portal (portal-preview-nav.ts).
+  portalItems?: NavItem[];
   userName: string;
   roleLabel: string;
   counters?: NavCounters;
 }) {
   const pathname = usePathname();
+  const { items } = useShellNav(staffItems, portalItems);
 
   // 20.10.2026: the two home screens are exact; every other item owns its
   // sub-paths ("/app/portal" used to light up on every portal screen).

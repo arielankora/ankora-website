@@ -35,6 +35,7 @@ const {
   getPortalHistory,
   PORTAL_CLIENT_COOKIE,
   PORTAL_PREVIEW_COOKIE,
+  GENERAL_ACTIVITY_LABEL,
 } = await import("@/lib/app-domain/client-portal");
 
 beforeEach(() => {
@@ -84,7 +85,9 @@ async function seedTwoClients() {
   const catA2 = await createTestCategory({ clientId: clientA.id, name: "רכב" });
   const catB = await createTestCategory({ clientId: clientB.id, name: "סודי של ב" });
   const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
-  const taskA = await prisma.task.create({ data: { clientId: clientA.id, title: "חידוש ביטוח דירה" } });
+  // Visible to the client, so its hours rows are named by it (3.11.2026:
+  // a task the client cannot see never names a row).
+  const taskA = await prisma.task.create({ data: { clientId: clientA.id, title: "חידוש ביטוח דירה", clientVisible: true } });
   const taskB = await prisma.task.create({ data: { clientId: clientB.id, title: "משימה של ב" } });
 
   const nov10 = new Date("2026-11-10T08:00:00Z");
@@ -145,8 +148,10 @@ describe("getMonthlyDetailed() - a client sees only their own month", () => {
     // read 30, or the report and the invoice disagree.
     expect(insurance?.billableMinutes).toBe(30);
     expect(JSON.stringify(report)).not.toContain("הערה פנימית");
-    // No task: the category name stands in, never a blank activity.
-    expect(report.rows.find((r) => r.category === "רכב")?.activity).toBe("רכב");
+    // No task: a general label stands in, never a blank activity, and
+    // never the category's own name (3.11.2026: an activity and a category
+    // with the same name read as two contradicting figures).
+    expect(report.rows.find((r) => r.category === "רכב")?.activity).toBe(GENERAL_ACTIVITY_LABEL);
   });
 
   it("never counts a soft-deleted entry or a running timer", async () => {
@@ -229,11 +234,30 @@ describe("getMonthlyDetailed() - a client sees only their own month", () => {
     expect(JSON.stringify(b)).not.toContain(employee.name);
   });
 
-  it("counts only the client's own top-level, live tasks marked DONE inside the month", async () => {
+  it("counts only the client's own top-level, live, visible tasks marked DONE inside the month", async () => {
     const { clientA, clientB } = await seedTwoClients();
     const inNov = new Date("2026-11-20T10:00:00Z");
     const parent = await prisma.task.create({
-      data: { clientId: clientA.id, title: "סגור בנובמבר", status: "DONE", updatedAt: inNov },
+      data: { clientId: clientA.id, title: "סגור בנובמבר", status: "DONE", clientVisible: true, updatedAt: inNov },
+    });
+    // 3.11.2026: not visible to the client, so not counted. The home
+    // screen cannot show it, and the report must not count what the
+    // client cannot open (Hadas's review: "5 completed" over an empty
+    // home screen).
+    await prisma.task.create({
+      data: { clientId: clientA.id, title: "פנימית", status: "DONE", clientVisible: false, updatedAt: inNov },
+    });
+    // Closed in November by completedAt, touched in December: counted in
+    // November, by the date it closed.
+    await prisma.task.create({
+      data: {
+        clientId: clientA.id,
+        title: "נסגרה בנובמבר ונערכה בדצמבר",
+        status: "DONE",
+        clientVisible: true,
+        completedAt: inNov,
+        updatedAt: new Date("2026-12-02T10:00:00Z"),
+      },
     });
     // Each of these must NOT be counted: a subtask (steps are not
     // promises), a deleted task, a task closed in October, another
@@ -252,7 +276,7 @@ describe("getMonthlyDetailed() - a client sees only their own month", () => {
 
     const { user: viewerA } = await createTestClientUser({ clientId: clientA.id });
     const report = await getMonthlyDetailed(viewerA, new Date("2026-11-15T12:00:00Z"));
-    expect(report.tasksCompleted).toBe(1);
+    expect(report.tasksCompleted).toBe(2);
   });
 
   it("labels the auto-send from the client's own enabled monthly schedule only", async () => {

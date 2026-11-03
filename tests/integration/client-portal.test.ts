@@ -5,6 +5,7 @@ import {
   resolvePortalClient,
   getWeeklyActivity,
   updatePortalScheduleRecipients,
+  GENERAL_ACTIVITY_LABEL,
 } from "@/lib/app-domain/client-portal";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 
@@ -143,7 +144,8 @@ describe("getWeeklyActivity() - cross-client isolation (spec 21.2)", () => {
     const activity = await getWeeklyActivity(clientUser, now);
 
     expect(activity.rows).toHaveLength(1);
-    expect(activity.rows[0].activity).toBe("Consulting"); // falls back to category.name, no task
+    expect(activity.rows[0].activity).toBe(GENERAL_ACTIVITY_LABEL); // no task: the general label, the category stays in its own column
+    expect(activity.rows[0].category).toBe("Consulting");
     expect(JSON.stringify(activity.rows[0])).not.toContain("internal note");
   });
 

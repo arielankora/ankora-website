@@ -4,10 +4,48 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { getPortalHome } from "@/lib/app-domain/client-portal";
 import { Forbidden } from "@/components/app/Forbidden";
 import { whatsappHref } from "@/lib/whatsapp";
-import { PromiseList } from "./PromiseList";
+import { ExpandablePromiseRow, PromiseList } from "./PromiseList";
 import { portalHeadline } from "@/lib/app-domain/portal-labels";
 import { bankFigures, packageFigures } from "@/lib/hours-format";
 import { forecastCell } from "@/lib/prepaid-format";
+import type { PortalPromise } from "@/lib/app-domain/client-portal";
+
+function monthName(date: Date) {
+  return new Intl.DateTimeFormat("he-IL", { month: "long", timeZone: "Asia/Jerusalem" }).format(date);
+}
+
+/// One group inside the monthly summary card: a heading with its count,
+/// and rows that open in place.
+function MonthGroup({
+  title,
+  promises,
+  minutesByTask,
+  emptyText,
+  showStage,
+}: {
+  title: string;
+  promises: PortalPromise[];
+  minutesByTask: Record<string, number>;
+  emptyText: string;
+  showStage: boolean;
+}) {
+  return (
+    <div>
+      <p className="bg-app-surface-sunken px-[18px] py-2 text-[12px] font-medium text-app-text-secondary">
+        {title} <span className="font-jbmono">({promises.length})</span>
+      </p>
+      {promises.length === 0 ? (
+        <p className="px-[18px] py-4 text-[13px] text-app-text-tertiary">{emptyText}</p>
+      ) : (
+        <div className="divide-y divide-app-border">
+          {promises.map((p) => (
+            <ExpandablePromiseRow key={p.id} promise={p} minutesThisMonth={minutesByTask[p.id] ?? 0} showStage={showStage} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export const metadata = { robots: { index: false, follow: false } };
 
@@ -36,10 +74,9 @@ export default async function PortalHomePage() {
     throw err;
   }
 
-  const { client, waitingOnClient, inProgress, recentlyDone, cycle, openDecisions, contact } = home;
-  const nothingYet =
-    openDecisions === 0 && waitingOnClient.length === 0 && inProgress.length === 0 && recentlyDone.length === 0;
+  const { client, waitingOnClient, inProgress, month, cycle, openDecisions, contact, isStaffPreview } = home;
   const waHref = whatsappHref(contact.whatsappNumber);
+  const openCount = inProgress.length + waitingOnClient.length;
 
   return (
     <div className="space-y-4">
@@ -64,54 +101,68 @@ export default async function PortalHomePage() {
         )}
       </div>
 
-      {nothingYet ? (
-        // The empty state of a brand-new client, and the one place the
-        // portal explains itself. Written as a promise with a date on it
-        // rather than as a tour: "here is what will appear, and when".
-        <div className="rounded-2xl border border-app-border bg-white p-6">
-          <p className="text-[13.5px] font-medium text-app-text-primary">כאן יופיע מה שאנחנו מטפלים בו עבורך</p>
-          <ul className="mt-3 space-y-2 text-sm text-app-text-secondary">
-            <li>כל בקשה שנכנסת מופיעה כאן ברגע שהיא מתקבלת אצלנו.</li>
-            <li>כשמשהו מחכה לך, הוא יעלה לראש המסך.</li>
-            <li>מה שהושלם נשאר כאן, עם התאריך.</li>
-          </ul>
-          <p className="mt-4 text-[12.5px] text-app-text-tertiary">
-            הפריט הראשון שלך יופיע כאן תוך יום עבודה. בינתיים, כל בקשה נשלחת כרגיל בוואטסאפ למנהל התיק.
-          </p>
+      {/* Staff preview only. Finished work nobody marked visible is the
+          most common reason this screen looks emptier than the team's own
+          view of the month, and the person previewing can fix it. */}
+      {isStaffPreview && month.hiddenDone > 0 && (
+        <div className="rounded-[14px] border border-gold/40 bg-gold/10 px-4 py-3 text-[12.5px] text-app-text-primary" data-testid="portal-hidden-done">
+          {month.hiddenDone === 1
+            ? "משימה אחת הושלמה החודש ולא סומנה כגלויה ללקוח, ולכן היא לא מופיעה כאן."
+            : `${month.hiddenDone} משימות הושלמו החודש ולא סומנו כגלויות ללקוח, ולכן הן לא מופיעות כאן.`}{" "}
+          כדי שיופיעו, סמנו אותן כגלויות ללקוח במסך המשימה.
         </div>
-      ) : (
-        <>
-
-          {/* "מחכה לך", not "מחכה להחלטה שלך".
-              These are promises in flight that need something from the
-              client - an answer, a document, a key. They are not
-              decisions, and the decisions tab does not list them. Calling
-              them decisions sent a client to that tab to be told nothing
-              was waiting, which is the fastest way to teach someone the
-              portal is not accurate. The wording here is the same stage
-              label they read on every other screen. */}
-          {waitingOnClient.length > 0 && (
-            <PromiseList title="מחכה לך" promises={waitingOnClient} tone="attention" showStage={false} />
-          )}
-
-          <PromiseList
-            title="בטיפול עכשיו"
-            promises={inProgress}
-            emptyText="אין כרגע הבטחות פתוחות."
-          />
-
-          <PromiseList
-            title="נסגר לאחרונה"
-            promises={recentlyDone}
-            action={
-              <Link href="/app/portal/activity" className="text-xs text-app-text-accent hover:underline">
-                כל הפעילות
-              </Link>
-            }
-            showStage={false}
-          />
-        </>
       )}
+
+      {/* "מחכה לך", not "מחכה להחלטה שלך".
+          These are promises in flight that need something from the
+          client - an answer, a document, a key. They are not
+          decisions, and the decisions tab does not list them. Calling
+          them decisions sent a client to that tab to be told nothing
+          was waiting, which is the fastest way to teach someone the
+          portal is not accurate. The wording here is the same stage
+          label they read on every other screen. */}
+      {waitingOnClient.length > 0 && (
+        <PromiseList title="מחכה לך" promises={waitingOnClient} tone="attention" showStage={false} />
+      )}
+
+      {/* 3.11.2026 (Hadas's review): "מה טיפלנו בו החודש". Replaces both the
+          empty state, which told a client with five finished tasks in their
+          monthly report that the first item would arrive within a working
+          day, and the two lists that stood here ("בטיפול עכשיו", "נסגר
+          לאחרונה"). The finished count is the monthly report's own number
+          (doneInPeriodWhere), so the two screens can no longer disagree. */}
+      <div className="overflow-hidden rounded-2xl border border-app-border bg-white" data-testid="portal-month-summary">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 border-b border-app-border px-[18px] py-3.5">
+          <span className="text-[13.5px] font-medium text-app-text-primary">מה טיפלנו בו ב{monthName(month.from)}</span>
+          <Link href="/app/portal/activity" className="text-xs text-app-text-accent hover:underline">
+            כל הפעילות
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 border-b border-app-border px-[18px] py-3.5">
+          <div>
+            <p className="text-[11.5px] text-app-text-secondary">הושלמו החודש</p>
+            <p className="mt-1 font-jbmono text-xl text-app-text-primary">{month.done.length}</p>
+          </div>
+          <div>
+            <p className="text-[11.5px] text-app-text-secondary">פתוחות</p>
+            <p className="mt-1 font-jbmono text-xl text-app-text-primary">{openCount}</p>
+          </div>
+        </div>
+        <MonthGroup
+          title="הושלמו החודש"
+          promises={month.done}
+          minutesByTask={month.minutesByTask}
+          emptyText="עוד לא הושלמו משימות החודש."
+          showStage={false}
+        />
+        <MonthGroup
+          title="בטיפול"
+          promises={inProgress}
+          minutesByTask={month.minutesByTask}
+          emptyText="אין כרגע משימות בטיפול."
+          showStage
+        />
+      </div>
 
       {/* 20.10.2026: the account manager and the hours side by side, two cards
           in one row on a wide screen, one under the other on a phone. */}

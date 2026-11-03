@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { MoreHorizontal, LogOut, Home } from "lucide-react";
 import { NAV_ICONS } from "./nav-icons";
+import { useShellNav } from "./portal-preview-nav";
+import type { NavItem } from "./Sidebar";
 
 // Spec 11.1: "Bottom navigation עם 3-5 יעדים בלבד." AppShell.tsx computes
 // the full, role-filtered `items` list (2 items for a bare employee, up to
@@ -15,15 +17,19 @@ import { NAV_ICONS } from "./nav-icons";
 // opens a sheet with whatever didn't fit plus the account/sign-out block
 // the old hamburger used to show. See ADR addendum section 14.5.
 export function BottomNav({
-  items,
+  items: staffItems,
+  portalItems,
   userName,
   roleLabel,
 }: {
-  items: { href: string; label: string }[];
+  items: NavItem[];
+  /// Set only during a staff preview of the portal (portal-preview-nav.ts).
+  portalItems?: NavItem[];
   userName: string;
   roleLabel: string;
 }) {
   const pathname = usePathname();
+  const { items } = useShellNav(staffItems, portalItems);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const direct = items.slice(0, 4);

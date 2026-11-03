@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 import { countApprovals } from "@/lib/app-domain/approvals";
 import type { Notification, Client } from "@prisma/client";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { PORTAL_PREVIEW_COOKIE } from "@/lib/app-domain/client-portal";
 import { requireUser } from "@/lib/app-auth/session";
 import { CONFIDENTIALITY_SIGN_PATH, confidentialitySignatures, mustSignConfidentiality } from "@/lib/agreements";
 import { AppShell } from "@/components/app/AppShell";
@@ -104,10 +106,19 @@ export default async function AuthenticatedAppLayout({ children }: { children: R
   // (lib/comms/access.ts). A failure leaves the entry out, never the page.
   const showComms = await commsAccess(user).then((a) => a.allowed).catch(() => false);
 
+  // A manager previewing a client's portal (portal/actions.ts). Gated on
+  // the same permission resolvePortalClient checks before honouring the
+  // cookie, so a cookie alone never changes anyone's shell.
+  const portalPreview =
+    !isClientUser &&
+    can(user.role, "report.internal.view") &&
+    !!(await cookies()).get(PORTAL_PREVIEW_COOKIE)?.value;
+
   return (
     <AppShell
       user={user}
       showComms={showComms}
+      portalPreview={portalPreview}
       // Parallel timers: one pill, for the oldest, with "+1" when a
       // second is running. The timer screen is where both are shown.
       activeTimer={
