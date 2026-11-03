@@ -9,6 +9,7 @@ import { appBaseUrl } from "@/lib/email-templates";
 import { localDateKey } from "@/lib/timezone";
 import { decideApproval } from "@/lib/app-domain/decide-approval";
 import { decideProposalForAi, findApprovalForAi, listApprovalsForAi, proposalAloneBecause, type ProposalDecision, type ProposalForAi } from "@/lib/app-domain/mcp-approvals";
+import { proposalStatsForAi } from "@/lib/app-domain/proposal-stats";
 import { APPROVAL_TABS, KIND_LABELS, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
 import { appUrl, approvalRowUrl, batchUrl, proposalUrl } from "@/lib/approval-links";
 
@@ -208,6 +209,41 @@ export function registerApprovalTools(server: McpServer): void {
         return toolJson({ decision: args.decision, done: done.length, failed: failed.length, results: done, errors: failed.length ? failed : undefined });
       } catch (err) {
         console.error("[mcp] decide_knowledge_proposals failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  // 3.11.2026, Ariel: measure the extraction's history before deciding
+  // which kinds of proposals could skip a person (lib/app-domain/proposal-stats.ts).
+  server.registerTool(
+    "get_proposal_stats",
+    {
+      title: "Measure how proposals to client files ended",
+      description:
+        "Managers only. How every proposal to a client file ended, for measuring which kinds are approved as they come and which are edited or rejected: `groups` counts, per kind (a fact's own kind, contact, rule, process, date...) and action (CREATE, SUPERSEDE, CONTRADICT), how many are pending, approved as is, approved after an edit, approved together with others, found already in the file, rejected, or turned into a task. With `rows: true`, one row per proposal with its metadata: source kind, Claude's confidence and the review screen's level, flags, whether it is sensitive, client-visible or carries a \"do not disclose\", why it could not be approved together with others, the outcome and how long the decision took. Metadata only: no proposal text, reason, quote or rejection reason is returned, and clients appear as opaque keys (L1, L2...). Proposals of a client marked \"בלי AI\" are left out and only counted. `guideVersions` gives when each version of the extraction guide was approved, to compare periods. `edited` says only that something was changed before approval, not what.",
+      inputSchema: z.object({
+        since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only proposals that arrived on or after this day, YYYY-MM-DD. Omit for all of them."),
+        via: z.enum(["MCP", "SCREEN"]).optional().describe("MCP: sent by Claude (the extraction). SCREEN: typed on the screen. Omit for both."),
+        rows: z.boolean().optional().describe("Also return one row per proposal."),
+        limit: z.number().int().min(1).max(500).optional().describe("Rows per call, up to 500 (default 200)."),
+        offset: z.number().int().min(0).optional().describe("Rows to skip: the `nextOffset` of the previous call."),
+      }),
+      annotations: TOOL_ANNOTATIONS.get_proposal_stats,
+    },
+    async (args: { since?: string; via?: "MCP" | "SCREEN"; rows?: boolean; limit?: number; offset?: number }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const out = await proposalStatsForAi(actor, {
+          since: args.since ? new Date(`${args.since}T00:00:00Z`) : null,
+          via: args.via ?? null,
+          rows: args.rows ?? false,
+          limit: args.limit,
+          offset: args.offset,
+        });
+        return toolJson(out);
+      } catch (err) {
+        console.error("[mcp] get_proposal_stats failed", err);
         return toolFailure(err);
       }
     }

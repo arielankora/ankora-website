@@ -160,6 +160,8 @@ export const TOOL_ANNOTATIONS = {
   list_approvals: READ_ONLY,
   decide_approval: WRITES,
   decide_knowledge_proposals: WRITES,
+  // Managers only: how proposals ended, metadata only (3.11.2026).
+  get_proposal_stats: READ_ONLY,
 } as const;
 
 export type ToolName = keyof typeof TOOL_ANNOTATIONS;
