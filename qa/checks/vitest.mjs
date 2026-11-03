@@ -65,6 +65,19 @@ function analyse(parsed, r, suiteName) {
 
   const failures = [];
   for (const file of parsed.testResults ?? []) {
+    // A file that failed before any test in it ran (a throw in beforeAll,
+    // an import that breaks) reports its tests as skipped, not failed, and
+    // went unseen (3.11.2026: the backup round trip stopped on a
+    // foreign-key cycle and read as "2 skipped"). So the file itself is a
+    // failure when none of its tests says so.
+    const anyFailed = (file.assertionResults ?? []).some((t) => t.status === "failed");
+    if (file.status === "failed" && !anyFailed) {
+      failures.push({
+        name: `${path.relative(ROOT, file.name ?? "")} (the file failed before its tests ran)`,
+        file: path.relative(ROOT, file.name ?? ""),
+        message: String(file.message ?? "").split("\n").slice(0, 6).join("\n"),
+      });
+    }
     for (const t of file.assertionResults ?? []) {
       if (t.status !== "failed") continue;
       failures.push({

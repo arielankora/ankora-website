@@ -34,6 +34,7 @@
 
 import { readFileSync } from "node:fs";
 import { gunzipSync } from "node:zlib";
+import { pathToFileURL } from "node:url";
 import pg from "pg";
 
 function parseArgs(argv) {
@@ -61,26 +62,90 @@ function readDump(file) {
   return dump;
 }
 
-/** Kahn's algorithm over the target's foreign keys, restricted to the dumped tables. */
-function topoSort(tables, edges) {
-  const remaining = new Set(tables);
-  const deps = new Map(tables.map((t) => [t, new Set()]));
-  for (const [child, parent] of edges) {
-    if (child === parent) continue; // self-reference: handled per row, not per table
-    if (remaining.has(child) && remaining.has(parent)) deps.get(child).add(parent);
-  }
-  const ordered = [];
-  while (remaining.size) {
-    const ready = [...remaining].filter((t) => [...deps.get(t)].every((d) => !remaining.has(d))).sort();
-    if (!ready.length) {
+/** Tables a migration writes a default row into. In a freshly migrated
+ * target those rows give way to the dump's. */
+const SEEDED_BY_MIGRATION = new Set(["app_settings"]);
+
+/**
+ * Restore order: Kahn's algorithm over the target's foreign keys,
+ * restricted to the dumped tables.
+ *
+ * A cycle of foreign keys (3.11.2026: clients.subprocessorNoticeDocumentId
+ * -> client_documents -> tasks -> clients) has no order. When one shows
+ * up, a foreign key on that cycle whose column may be null is set aside:
+ * its rows go in with that column empty, and the column is filled in
+ * after every table is in, inside the same transaction. A cycle made
+ * only of required columns cannot be restored row by row, and still
+ * stops the restore with the tables named.
+ *
+ * `edges` are { child, parent, column, nullable }. Returns the order and
+ * the set-aside columns as { table, column }.
+ */
+export function restoreOrder(tables, edges) {
+  const inDump = new Set(tables);
+  let active = edges.filter((e) => e.child !== e.parent && inDump.has(e.child) && inDump.has(e.parent));
+  const deferred = [];
+  for (;;) {
+    const remaining = new Set(tables);
+    const deps = new Map(tables.map((t) => [t, new Set()]));
+    for (const e of active) deps.get(e.child).add(e.parent);
+    const ordered = [];
+    while (remaining.size) {
+      const ready = [...remaining].filter((t) => [...deps.get(t)].every((d) => !remaining.has(d))).sort();
+      if (!ready.length) break;
+      for (const t of ready) {
+        ordered.push(t);
+        remaining.delete(t);
+      }
+    }
+    if (!remaining.size) return { order: ordered, deferred };
+
+    // Stuck: the foreign keys that close a cycle are those whose parent
+    // depends, through the others, on their child.
+    const dependsOn = (from, to) => {
+      const seen = new Set();
+      const stack = [from];
+      while (stack.length) {
+        const t = stack.pop();
+        if (t === to) return true;
+        if (seen.has(t)) continue;
+        seen.add(t);
+        for (const d of deps.get(t)) if (remaining.has(d)) stack.push(d);
+      }
+      return false;
+    };
+    const breakable = active.filter(
+      (e) => e.nullable && remaining.has(e.child) && remaining.has(e.parent) && dependsOn(e.parent, e.child)
+    );
+    if (!breakable.length) {
       throw new Error(`Foreign-key cycle among: ${[...remaining].join(", ")}. Restore order cannot be derived.`);
     }
-    for (const t of ready) {
-      ordered.push(t);
-      remaining.delete(t);
+    // Set aside as few as possible: the one key whose removal frees the
+    // most tables, then look again. One key usually closes every cycle.
+    let best = breakable[0];
+    let bestLeft = Infinity;
+    for (const e of breakable) {
+      const left = stuckAfter(tables, active.filter((x) => x !== e));
+      if (left < bestLeft) {
+        best = e;
+        bestLeft = left;
+      }
     }
+    deferred.push({ table: best.child, column: best.column });
+    active = active.filter((e) => e !== best);
   }
-  return ordered;
+}
+
+/** How many tables Kahn's algorithm cannot place under these edges. */
+function stuckAfter(tables, edges) {
+  const remaining = new Set(tables);
+  const deps = new Map(tables.map((t) => [t, new Set()]));
+  for (const e of edges) deps.get(e.child).add(e.parent);
+  for (;;) {
+    const ready = [...remaining].filter((t) => [...deps.get(t)].every((d) => !remaining.has(d)));
+    if (!ready.length) return remaining.size;
+    for (const t of ready) remaining.delete(t);
+  }
 }
 
 /** Rows of a self-referencing table, parents before children. */
@@ -132,10 +197,11 @@ async function main() {
     // --- schema agreement -------------------------------------------------
     let targetMigration = null;
     try {
+      // By name, as the dump records it (lib/app-domain/backup-dump.ts).
       const r = await client.query(
         `SELECT migration_name FROM _prisma_migrations
          WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
-         ORDER BY finished_at DESC LIMIT 1`
+         ORDER BY migration_name DESC LIMIT 1`
       );
       targetMigration = r.rows[0]?.migration_name ?? null;
     } catch {
@@ -144,20 +210,28 @@ async function main() {
     if (dump.schemaMigration !== targetMigration) {
       const msg = `Dump was taken at migration "${dump.schemaMigration}" but this database is at "${targetMigration}".`;
       if (!args.allowSchemaDrift) {
-        throw new Error(`${msg} Run \`prisma migrate deploy\` to the dump's migration, or pass --allow-schema-drift if you know why they differ.`);
+        throw new Error(
+          `${msg} Run \`prisma migrate deploy\` to the dump's migration, or pass --allow-schema-drift if you know why they differ. ` +
+            `A dump taken before 4.11.2026 named the migration that ran last, not the newest by name: if the dump's migration is in this database's _prisma_migrations, the schemas match and --allow-schema-drift is safe.`
+        );
       }
       console.warn(`WARNING: ${msg} Continuing because --allow-schema-drift was given.`);
     }
 
     // --- catalog ----------------------------------------------------------
     const dumpTables = Object.keys(dump.tables);
+    // One row per foreign-key column, with whether it may be null: a
+    // nullable key on a cycle is filled in last (restoreOrder).
     const fk = await client.query(
-      `SELECT conrelid::regclass::text AS child, confrelid::regclass::text AS parent
-       FROM pg_constraint
-       WHERE contype = 'f' AND connamespace = 'public'::regnamespace`
+      `SELECT c.relname AS child, f.relname AS parent, a.attname AS column, NOT a.attnotnull AS nullable
+       FROM pg_constraint con
+       JOIN pg_class c ON c.oid = con.conrelid
+       JOIN pg_class f ON f.oid = con.confrelid
+       JOIN LATERAL unnest(con.conkey) k(attnum) ON true
+       JOIN pg_attribute a ON a.attrelid = c.oid AND a.attnum = k.attnum
+       WHERE con.contype = 'f' AND con.connamespace = 'public'::regnamespace`
     );
-    const edges = fk.rows.map((r) => [r.child.replace(/"/g, ""), r.parent.replace(/"/g, "")]);
-    const order = topoSort(dumpTables, edges);
+    const { order, deferred } = restoreOrder(dumpTables, fk.rows);
 
     const selfRef = await client.query(
       `SELECT c.relname AS table_name, a.attname AS column_name
@@ -179,6 +253,7 @@ async function main() {
       console.log(`Dry run. Dump taken ${dump.generatedAt} at migration ${dump.schemaMigration}.`);
       console.log(`Restore order (${order.length} tables):`);
       for (const t of order) console.log(`  ${t.padEnd(34)} ${dump.tables[t].rowCount} rows`);
+      for (const d of deferred) console.log(`Filled in after all tables (foreign-key cycle): ${d.table}.${d.column}`);
       return;
     }
 
@@ -188,6 +263,22 @@ async function main() {
     if (args.truncate) {
       // One statement, so the cascade and the FK checks resolve together.
       await client.query(`TRUNCATE TABLE ${order.map((t) => `"${t}"`).join(", ")} CASCADE`);
+    } else {
+      // A freshly migrated database is not quite empty: a migration may
+      // write a default row (3.11.2026: app_settings, the auto-apply
+      // switch). The dump has the real value, so those rows give way to
+      // it. Rows anywhere else mean this is not the empty target the
+      // restore expects.
+      const occupied = [];
+      for (const table of order) {
+        const r = await client.query(`SELECT EXISTS (SELECT 1 FROM "${table}") AS any`);
+        if (r.rows[0].any) occupied.push(table);
+      }
+      const unexpected = occupied.filter((t) => !SEEDED_BY_MIGRATION.has(t));
+      if (unexpected.length) {
+        throw new Error(`The target already has rows in: ${unexpected.join(", ")}. Restore into an empty, migrated database, or pass --truncate to replace them.`);
+      }
+      for (const t of occupied) await client.query(`DELETE FROM "${t}"`);
     }
 
     const restored = [];
@@ -205,6 +296,10 @@ async function main() {
         const parentIdx = t.columns.indexOf(selfCol);
         if (idIdx >= 0 && parentIdx >= 0) rows = orderRowsParentFirst(rows, idIdx, parentIdx);
       }
+
+      // A set-aside foreign key goes in empty now and is filled in below.
+      const later = new Set(deferred.filter((d) => d.table === table).map((d) => t.columns.indexOf(d.column)).filter((i) => i >= 0));
+      if (later.size) rows = rows.map((row) => row.map((v, ci) => (later.has(ci) ? null : v)));
 
       const colSql = t.columns.map((c) => `"${c}"`).join(", ");
       const CHUNK = 200;
@@ -225,6 +320,32 @@ async function main() {
         await client.query(`INSERT INTO "${table}" (${colSql}) VALUES ${valueSql}`, params);
       }
       restored.push({ table, rows: rows.length });
+    }
+
+    // The foreign keys set aside for a cycle, now that every row exists.
+    for (const d of deferred) {
+      const t = dump.tables[d.table];
+      const idIdx = t ? t.columns.indexOf("id") : -1;
+      const colIdx = t ? t.columns.indexOf(d.column) : -1;
+      if (idIdx < 0 || colIdx < 0) continue;
+      const idType = udtByColumn.get(`${d.table}.id`);
+      const colType = udtByColumn.get(`${d.table}.${d.column}`);
+      const pairs = t.rows.filter((row) => row[colIdx] !== null && row[colIdx] !== undefined);
+      const CHUNK = 200;
+      for (let i = 0; i < pairs.length; i += CHUNK) {
+        const params = [];
+        const valueSql = pairs
+          .slice(i, i + CHUNK)
+          .map((row) => {
+            params.push(decode(row[idIdx], idType), decode(row[colIdx], colType));
+            return `($${params.length - 1}::${idType}, $${params.length}::${colType})`;
+          })
+          .join(", ");
+        await client.query(
+          `UPDATE "${d.table}" AS t SET "${d.column}" = v.val FROM (VALUES ${valueSql}) AS v(id, val) WHERE t."id" = v.id`,
+          params
+        );
+      }
     }
 
     await client.query("COMMIT");
@@ -259,7 +380,10 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(`Restore failed: ${err.message}`);
-  process.exit(1);
-});
+// Run only as a command, so the unit suite can import restoreOrder.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error(`Restore failed: ${err.message}`);
+    process.exit(1);
+  });
+}

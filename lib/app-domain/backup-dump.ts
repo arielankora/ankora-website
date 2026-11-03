@@ -137,10 +137,14 @@ export async function buildDump(exec: SqlExecutor, now: Date = new Date()): Prom
 
   let schemaMigration: string | null = null;
   try {
+    // The newest migration by name, not by when it ran: a branch merged
+    // late runs an older-named migration last (3.11.2026: #398 after
+    // #408), while a fresh database runs them in name order. By name, a
+    // dump and a freshly migrated target agree.
     const mig = await exec.query<{ migration_name: string }>(
       `SELECT migration_name FROM _prisma_migrations
        WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL
-       ORDER BY finished_at DESC LIMIT 1`
+       ORDER BY migration_name DESC LIMIT 1`
     );
     schemaMigration = mig[0]?.migration_name ?? null;
   } catch {

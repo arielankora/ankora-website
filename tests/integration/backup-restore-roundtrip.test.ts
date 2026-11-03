@@ -34,7 +34,7 @@ import { gzipSync } from "node:zlib";
 import pg from "pg";
 import { buildDump } from "@/lib/app-domain/backup-dump";
 import { dumpedTables, skippedTables, REDACTED_PASSWORD_HASH } from "@/lib/app-domain/backup-coverage";
-import { tableColumns, foreignKeys, enumLabels, topoSort, fixtureValue } from "./pg-catalog";
+import { tableColumns, foreignKeys, enumLabels, fillOrder, fixtureValue } from "./pg-catalog";
 
 const DATABASE_URL = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 const ROWS_PER_TABLE = 3;
@@ -58,10 +58,26 @@ function normalize(v: unknown): unknown {
   return v;
 }
 
+/// A table's primary-key columns, to order its rows by. Not every table
+/// has an `id`: app_settings (3.11.2026) is keyed by `key`.
+async function primaryKey(db: pg.Client, table: string): Promise<string[]> {
+  const r = await db.query(
+    `SELECT a.attname AS name
+     FROM pg_index i
+     JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+     WHERE i.indrelid = ('public."' || $1 || '"')::regclass AND i.indisprimary
+     ORDER BY array_position(i.indkey, a.attnum)`,
+    [table]
+  );
+  return r.rows.map((x: { name: string }) => x.name);
+}
+
 async function snapshot(db: pg.Client, tables: string[]): Promise<Record<string, unknown[]>> {
   const out: Record<string, unknown[]> = {};
   for (const t of tables) {
-    const r = await db.query(`SELECT * FROM "${t}" ORDER BY "id"`);
+    const pk = await primaryKey(db, t);
+    const orderBy = (pk.length ? pk : ["id"]).map((c) => `"${c}"`).join(", ");
+    const r = await db.query(`SELECT * FROM "${t}" ORDER BY ${orderBy}`);
     out[t] = r.rows.map((row: Record<string, unknown>) => {
       const o: Record<string, unknown> = {};
       for (const k of Object.keys(row).sort()) o[k] = normalize(row[k]);
@@ -74,6 +90,8 @@ async function snapshot(db: pg.Client, tables: string[]): Promise<Record<string,
 describe.skipIf(!DATABASE_URL)("nightly dump restores the database it came from", () => {
   let db: pg.Client;
   let allTables: string[] = [];
+  // Foreign keys on a cycle, filled in after every table has rows.
+  let deferred: Array<{ table: string; column: string }> = [];
   let workDir: string;
 
   beforeAll(async () => {
@@ -88,10 +106,7 @@ describe.skipIf(!DATABASE_URL)("nightly dump restores the database it came from"
     );
     const names = r.rows.map((x: { table_name: string }) => x.table_name);
     const fks = await foreignKeys(db);
-    allTables = topoSort(
-      names,
-      fks.map((f) => [f.child, f.parent] as [string, string])
-    );
+    ({ order: allTables, deferred } = fillOrder(names, fks));
   }, 60_000);
 
   afterAll(async () => {
@@ -126,7 +141,9 @@ describe.skipIf(!DATABASE_URL)("nightly dump restores the database it came from"
       const columnValues = new Map<string, unknown[]>(cols.map((c) => [c.name, []]));
       for (let i = 0; i < ROWS_PER_TABLE; i++) {
         const values = cols.map((c) =>
-          fixtureValue(table, c, i, enums, fkTarget.get(`${table}.${c.name}`), valuesByTable)
+          deferred.some((d) => d.table === table && d.column === c.name)
+            ? null
+            : fixtureValue(table, c, i, enums, fkTarget.get(`${table}.${c.name}`), valuesByTable)
         );
         const placeholders = cols.map((c, idx) => {
           const udt = c.udt;
@@ -142,6 +159,20 @@ describe.skipIf(!DATABASE_URL)("nightly dump restores the database it came from"
         cols.forEach((c, idx) => columnValues.get(c.name)!.push(values[idx]));
       }
       valuesByTable.set(table, columnValues);
+    }
+
+    // The foreign keys set aside for a cycle get their value now, so the
+    // round trip compares them too: a restore that left them empty would
+    // fail below, and that is the restore's job to get right.
+    for (const d of deferred) {
+      const target = fkTarget.get(`${d.table}.${d.column}`)!;
+      const parentValues = valuesByTable.get(target.parent)!.get(target.parentColumn)!;
+      const ids = valuesByTable.get(d.table)!.get("id")!;
+      for (let i = 0; i < ids.length; i++) {
+        const v = parentValues[i % parentValues.length];
+        await db.query(`UPDATE "${d.table}" SET "${d.column}" = $1 WHERE "id" = $2`, [v, ids[i]]);
+        valuesByTable.get(d.table)!.get(d.column)![i] = v;
+      }
     }
 
     // Every table in the schema now has rows. If it does not, the
@@ -172,6 +203,14 @@ describe.skipIf(!DATABASE_URL)("nightly dump restores the database it came from"
       const c = await db.query(`SELECT count(*)::int AS n FROM "${table}"`);
       expect(c.rows[0].n, `${table} should be empty before the restore`).toBe(0);
     }
+
+    // A freshly migrated database is not quite empty: the auto-apply
+    // migration writes a default row (3.11.2026). The restore must let the
+    // dump's row replace it, not stop on a duplicate key.
+    await db.query(
+      `INSERT INTO app_settings ("key", "value", "updatedAt") VALUES ($1, '{"enabled": true}'::jsonb, now())`,
+      [String(before.app_settings?.[0] && (before.app_settings[0] as Record<string, unknown>).key)]
+    );
 
     // --- restore, through the operator's own command ------------------------
     const out = execFileSync(
