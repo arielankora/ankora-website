@@ -180,6 +180,7 @@ export function assertValidSchedule(s: {
       throw new Error("במועד שבועי צריך לבחור יום בשבוע.");
     }
   }
+  if (s.recurrence === "BUSINESS_DAILY" && s.calendarType !== "GREGORIAN") throw new Error("מועד של כל יום עסקים נקבע לפי הלוח הלועזי.");
   if (s.intervalMonths !== null && s.intervalMonths !== 1) {
     if (s.recurrence !== "MONTHLY" || s.calendarType !== "GREGORIAN") {
       throw new Error('"כל כמה חודשים" רלוונטי רק למועד חודשי בלוח הלועזי.');
@@ -202,7 +203,7 @@ export function resolvePrecision(s: {
   recurrence: RecurrenceType;
 }): { precision: DatePrecisionLike; dayAlternatives: number[]; day: number } {
   if (s.precision !== "APPROXIMATE") return { precision: s.precision, dayAlternatives: [], day: s.day };
-  if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "CUSTOM_INTERVAL") {
+  if (s.recurrence === "ONCE" || s.recurrence === "WEEKLY" || s.recurrence === "BUSINESS_DAILY" || s.recurrence === "CUSTOM_INTERVAL") {
     throw new Error("מועד משוער אפשרי רק במועד שנתי או חודשי.");
   }
   const days = Array.from(new Set(s.dayAlternatives.filter((d) => Number.isInteger(d)))).sort((a, b) => a - b);

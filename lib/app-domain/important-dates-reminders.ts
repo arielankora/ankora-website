@@ -121,7 +121,7 @@ export function buildReminderIdempotencyKey(params: {
 /// and ONCE keep the year, so rows written before this change still match
 /// and nothing already sent is sent again.
 export function occurrenceKeyFor(
-  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY",
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY" | "BUSINESS_DAILY",
   occurrenceYear: number,
   occurrenceLocalDate: string
 ): string | number {

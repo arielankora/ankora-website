@@ -222,6 +222,23 @@ describe("computeNextOccurrence() - WEEKLY", () => {
   });
 });
 
+describe("computeNextOccurrence() - BUSINESS_DAILY (3.11.2026)", () => {
+  const daily = { calendarType: "GREGORIAN" as const, month: 1, day: 1, recurrence: "BUSINESS_DAILY" as const, businessCalendar: "IL" };
+  it("today, when today is a business day", () => {
+    expect(keyOf(computeNextOccurrence(daily, at("2026-11-03")))).toBe("2026-11-03");
+  });
+  it("Friday and Saturday move to Sunday in Israel", () => {
+    expect(keyOf(computeNextOccurrence(daily, at("2026-11-06")))).toBe("2026-11-08");
+    expect(keyOf(computeNextOccurrence(daily, at("2026-11-07")))).toBe("2026-11-08");
+  });
+  it("a holiday is skipped: Yom Kippur 2026 is Monday 21.9", () => {
+    expect(keyOf(computeNextOccurrence(daily, at("2026-09-21")))).toBe("2026-09-22");
+  });
+  it("a roll convention does not move it", () => {
+    expect(keyOf(computeNextOccurrence({ ...daily, rollConvention: "PREVIOUS_BUSINESS_DAY" }, at("2026-11-06")))).toBe("2026-11-08");
+  });
+});
+
 describe("computeNextOccurrence() - MONTHLY every N months", () => {
   it("quarterly from January lands in January, April, July, October", () => {
     const input = { calendarType: "GREGORIAN" as const, month: 1, day: 15, recurrence: "MONTHLY" as const, intervalMonths: 3 };

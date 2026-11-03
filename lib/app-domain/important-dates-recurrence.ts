@@ -41,7 +41,7 @@ import { localDateTimeToUtc, localDateKey, TIMEZONE } from "@/lib/timezone";
 import { addDaysToKey, rollToBusinessDay, subtractBusinessDays, weekdayOfKey, isBusinessCalendarKey, type RollConventionLike } from "@/lib/business-calendar";
 
 export type CalendarTypeLike = "GREGORIAN" | "HEBREW";
-export type RecurrenceTypeLike = "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY";
+export type RecurrenceTypeLike = "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY" | "BUSINESS_DAILY";
 export type { RollConventionLike };
 
 /// Every N months for a Gregorian MONTHLY date. Only divisors of 12, so the
@@ -358,6 +358,14 @@ export function computeRawNextOccurrence(input: RecurrenceInput, fromDate: Date)
     if (!input.onceDate) return null;
     const onceKey = localDateKey(input.onceDate, timezone);
     return onceKey >= localDateKey(fromDate, timezone) ? input.onceDate : null;
+  }
+
+  if (input.recurrence === "BUSINESS_DAILY") {
+    // 3.11.2026: the next business day of the date's calendar, today
+    // included. Already a business day, so a roll never moves it.
+    const calendar = isBusinessCalendarKey(input.businessCalendar) ? input.businessCalendar : "IL";
+    const [y, m, d] = rollToBusinessDay(localDateKey(fromDate, timezone), calendar, "NEXT_BUSINESS_DAY").split("-").map(Number);
+    return toUtcMidnight(y, m, d, timezone);
   }
 
   if (input.recurrence === "WEEKLY") {

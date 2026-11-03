@@ -186,6 +186,8 @@ export function sameSchedule(a: DateKey, b: DateKey): boolean {
       return a.day != null && a.day === b.day;
     case "WEEKLY":
       return a.weekday != null && a.weekday === b.weekday;
+    case "BUSINESS_DAILY":
+      return true;
     default:
       return false;
   }

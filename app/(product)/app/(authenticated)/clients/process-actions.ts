@@ -16,6 +16,8 @@ import {
   setProcessFieldNotApplicable,
 } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
+import { addProcessDate } from "@/lib/app-domain/process-dates";
+import { readProcessDateSchedule } from "@/lib/process-date-schedule";
 import { recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { markProcessReviewed, rescanAfterRuleChange } from "@/lib/app-domain/process-review";
 import { resolveLesson } from "@/lib/app-domain/process-lessons";
@@ -223,6 +225,20 @@ export async function linkProcessDatesAction(_prev: FormState | undefined, f: Fo
   const user = await requireUser();
   const clientId = String(f.get("clientId") ?? "");
   return run(clientId, () => linkProcessDates(user, String(f.get("processId") ?? ""), list(f, "dateIds")));
+}
+
+/// A new date that starts the process, created and linked in one step.
+export async function addProcessDateAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const clientId = String(f.get("clientId") ?? "");
+  const schedule = readProcessDateSchedule({
+    recurrence: String(f.get("recurrence") ?? ""),
+    weekday: String(f.get("weekday") ?? ""),
+    dayOfMonth: String(f.get("dayOfMonth") ?? ""),
+    onceDate: String(f.get("onceDate") ?? ""),
+  });
+  if ("error" in schedule) return { error: schedule.error };
+  return run(clientId, () => addProcessDate(user, String(f.get("processId") ?? ""), schedule));
 }
 
 export async function startProcessRunAction(_prev: FormState | undefined, f: FormData): Promise<FormState> {

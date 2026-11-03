@@ -1904,6 +1904,10 @@ enum RecurrenceType {
   /// Thursday" is a weekday, and CUSTOM_INTERVAL of 7 days only matches it
   /// if somebody picked the right start date.
   WEEKLY
+  /// 3.11.2026: every business day of `businessCalendar` (Sunday to
+  /// Thursday in Israel, without its holidays). A daily process ("every
+  /// working day at 9:00") is one date, not five weekly ones.
+  BUSINESS_DAILY
 }
 
 /// 13.10.2026 (org-brain spec 3.10). How well we know when a date falls.
