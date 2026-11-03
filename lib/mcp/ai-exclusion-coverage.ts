@@ -48,6 +48,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   get_client_brief: "lookupClient; buildClientFile for AI",
   get_client_changes: "lookupClient; buildClientFile for AI",
   list_subprocessor_notice_recipients: "marked clients are counted, never named; the person sees them on the clients screen",
+  set_client_subprocessor_notice: "lookupClient",
   propose_knowledge: "lookupClient for every client named; a marked task or document as newSource is refused",
   lookup_contact: "links of a marked client are left out (lookupContact)",
   list_processes: "lookupClient",

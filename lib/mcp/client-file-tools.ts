@@ -29,6 +29,8 @@ import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
 import { listSubprocessorRecipients, type SubprocessorRecipient } from "@/lib/app-domain/subprocessor-recipients";
+import { updateClient } from "@/lib/app-domain/clients";
+import { SUBPROCESSOR_NOTICE_FILE_LINE, SUBPROCESSOR_NOTICE_SOURCE_REQUIRED, SUBPROCESSOR_NOTICE_VALUES } from "@/lib/subprocessor-notice";
 
 /// Ceilings on the list-shaped inputs of this file's tools (security
 /// review, 25.10.2026).
@@ -241,6 +243,54 @@ export function registerClientFileTools(server: McpServer): void {
         });
       } catch (err) {
         console.error("[mcp] list_subprocessor_notice_recipients failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "set_client_subprocessor_notice",
+    {
+      title: "Set a client's sub-processor notice answer",
+      description:
+        "Records whether a client's own contract commits Ankora to tell it, by email and ahead of time, about a new sub-processor (P8 step 8), exactly as the client settings form does. COMMITTED: the contract says so. NOT_COMMITTED: it does not (section 6 of the standard data processing addendum on the website does not count on its own). UNCHECKED: nobody has read the contract; it clears the source. COMMITTED and NOT_COMMITTED need `source`: the contract, its date and the section, in the user's language. `documentId` (optional) cites a contract already filed in this client's file (list_documents). Managers only. Call it only after the user approved the answer and the source for that client. Who and when are recorded automatically, with an audit line.",
+      inputSchema: z.object({
+        client: z.string().describe("Client name, as the user said it."),
+        notice: z.enum(SUBPROCESSOR_NOTICE_VALUES as unknown as [string, ...string[]]).describe("COMMITTED, NOT_COMMITTED or UNCHECKED."),
+        source: z.string().max(300).optional().describe("The contract, its date and the section. Required unless UNCHECKED."),
+        documentId: z.string().max(64).optional().describe("A document filed in this client's file, from list_documents."),
+      }),
+      annotations: TOOL_ANNOTATIONS.set_client_subprocessor_notice,
+    },
+    async (args: { client: string; notice: string; source?: string; documentId?: string }, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const client = await lookupClient(actor, args.client);
+        if (!client.ok) return toolText(client.message);
+        const notice = args.notice as (typeof SUBPROCESSOR_NOTICE_VALUES)[number];
+        // The domain refuses both of these too, but with a plain Error that
+        // toolFailure hides; said here, the model can ask for what is missing.
+        if (notice !== "UNCHECKED" && !args.source?.trim()) return toolText(SUBPROCESSOR_NOTICE_SOURCE_REQUIRED);
+        if (notice !== "UNCHECKED" && args.documentId) {
+          const doc = await prisma.clientDocument.findFirst({
+            where: { id: args.documentId, clientId: client.value.id, deletedAt: null },
+            select: { id: true },
+          });
+          if (!doc) return toolText(`No document ${args.documentId} is filed in the file of ${client.value.name}. Use list_documents with this client, or leave documentId out.`);
+        }
+        const saved = await updateClient(actor, client.value.id, {
+          subprocessorNotice: { notice, source: args.source ?? null, documentId: args.documentId ?? null },
+        });
+        return toolJson({
+          client: client.value.name,
+          notice: saved.subprocessorNotice,
+          meaning: SUBPROCESSOR_NOTICE_FILE_LINE[saved.subprocessorNotice],
+          source: saved.subprocessorNoticeSource,
+          documentId: saved.subprocessorNoticeDocumentId,
+          url: `${appBaseUrl()}/app/clients/${client.value.id}?tab=work`,
+        });
+      } catch (err) {
+        console.error("[mcp] set_client_subprocessor_notice failed", err);
         return toolFailure(err);
       }
     }
