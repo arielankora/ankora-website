@@ -22,7 +22,7 @@ export interface ExistingImportantDate {
   month: number;
   day: number;
   originYear: number | null;
-  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY";
+  recurrence: "ONCE" | "ANNUAL" | "MONTHLY" | "CUSTOM_INTERVAL" | "WEEKLY" | "BUSINESS_DAILY";
   customIntervalDays: number | null;
   onceDate: Date | null;
   responsibleUserId: string;
@@ -217,6 +217,7 @@ export function ImportantDateForm({
             <option value="MONTHLY">חודשי</option>
             <option value="ONCE">חד-פעמי</option>
             <option value="WEEKLY">שבועי</option>
+            <option value="BUSINESS_DAILY">כל יום עסקים</option>
             <option value="CUSTOM_INTERVAL">מרווח מותאם (ימים)</option>
           </select>
         </div>
@@ -245,6 +246,14 @@ export function ImportantDateForm({
           <input type="hidden" name="month" value={existing?.month ?? 1} />
           <input type="hidden" name="day" value={existing?.day ?? 1} />
           המועד יופיע ברשימה כ&quot;מועד חסר&quot;, בלי תזכורות ובלי משימה, עד שיתברר היום.
+        </div>
+      ) : recurrence === "BUSINESS_DAILY" ? (
+        <div className="rounded-lg border border-dashed border-app-border px-3 py-2 text-xs text-app-text-secondary">
+          {/* month/day are NOT NULL and ignored for a daily date, like WEEKLY. */}
+          <input type="hidden" name="month" value="1" />
+          <input type="hidden" name="day" value="1" />
+          כל יום עסקים לפי לוח ימי העבודה של המועד: בישראל ראשון עד חמישי, בלי חגים.
+          {calendarType === "HEBREW" && <span className="mt-1 block text-[11px] text-app-error">מועד של כל יום עסקים נקבע לפי הלוח הלועזי.</span>}
         </div>
       ) : recurrence === "WEEKLY" ? (
         <div>

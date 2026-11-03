@@ -27,6 +27,7 @@ import {
 import {
   addProcessAction,
   linkProcessDatesAction,
+  addProcessDateAction,
   removeProcessAction,
   resolveLessonAction,
   runProcessStepAction,
@@ -807,18 +808,75 @@ function ProcedureEditor({ clientId, process, systems }: { clientId: string; pro
   );
 }
 
+const WEEKDAY_NAMES = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
+
 function DatesForm({ clientId, process, dates }: { clientId: string; process: PanelProcess; dates: Option[] }) {
   const close = useDrawerClose();
   const { onSubmit, pending, error } = useActionForm(linkProcessDatesAction, close);
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
+    <div className="flex flex-col gap-6">
+      <NewProcessDateForm clientId={clientId} process={process} />
+      {dates.length > 0 && (
+        <form onSubmit={onSubmit} className="flex flex-col gap-3.5 border-t border-app-border pt-5" data-testid="process-dates-link">
+          <input type="hidden" name="clientId" value={clientId} />
+          <input type="hidden" name="processId" value={process.id} />
+          <p className="text-sm font-medium text-app-text-primary">או לקשר מועד שכבר בתיק</p>
+          <p className="text-xs text-app-text-secondary">המועדים של הלקוח שמפעילים את התהליך. ריצה תיפתח מהם כשהנוהל מאושר.</p>
+          <Checks name="dateIds" options={dates} selected={process.dateIds} />
+          {error && <p className="text-sm text-app-error">{error}</p>}
+          <button type="submit" disabled={pending} className="w-full rounded-full border border-app-border-strong px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
+            {pending ? "שומר..." : "שמירת הקישורים"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+/// 3.11.2026: a new date for the process, created and linked in one step,
+/// so a process with no fitting date in the file is not a dead end.
+function NewProcessDateForm({ clientId, process }: { clientId: string; process: PanelProcess }) {
+  const close = useDrawerClose();
+  const { onSubmit, pending, error } = useActionForm(addProcessDateAction, close);
+  const [recurrence, setRecurrence] = useState("BUSINESS_DAILY");
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3.5" data-testid="process-date-new">
       <input type="hidden" name="clientId" value={clientId} />
       <input type="hidden" name="processId" value={process.id} />
-      <p className="text-xs text-app-text-secondary">המועדים של הלקוח שמפעילים את התהליך. ריצה תיפתח מהם כשהנוהל מאושר.</p>
-      <Checks name="dateIds" options={dates} selected={process.dateIds} />
+      <p className="text-sm font-medium text-app-text-primary">מועד חדש לתהליך</p>
+      <p className="text-xs text-app-text-secondary">המועד נוצר בתיק בשם התהליך, מקושר אליו, ופותח ריצה בכל פעם שהוא מגיע.</p>
+      <Field label="כל כמה זמן">
+        <select name="recurrence" value={recurrence} onChange={(e) => setRecurrence(e.target.value)} className={INPUT}>
+          <option value="BUSINESS_DAILY">כל יום עסקים (ראשון עד חמישי, בלי חגים)</option>
+          <option value="WEEKLY">פעם בשבוע</option>
+          <option value="MONTHLY">פעם בחודש</option>
+          <option value="ONCE">פעם אחת</option>
+        </select>
+      </Field>
+      {recurrence === "WEEKLY" && (
+        <Field label="באיזה יום">
+          <select name="weekday" defaultValue="0" className={INPUT}>
+            {WEEKDAY_NAMES.map((name, i) => (
+              <option key={i} value={i}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {recurrence === "MONTHLY" && (
+        <Field label="יום בחודש">
+          <input name="dayOfMonth" type="number" min={1} max={31} required className={INPUT} />
+        </Field>
+      )}
+      {recurrence === "ONCE" && (
+        <Field label="תאריך">
+          <input name="onceDate" type="date" required className={INPUT} />
+        </Field>
+      )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : "שמירה"}
+        {pending ? "יוצר..." : "יצירת המועד וקישור"}
       </button>
     </form>
   );
@@ -834,6 +892,7 @@ function StartRunForm({ clientId, process }: { clientId: string; process: PanelP
       <p className="text-xs text-app-text-secondary">
         נפתחת משימה עם {process.current?.steps.length ?? 0} השלבים של נוהל גרסה {process.current?.version}, כל אחד ביום העסקים שלו.
       </p>
+      <p className="text-xs text-app-text-secondary">ריצה אחת, ליום אחד. כדי שהתהליך ירוץ בקביעות מוסיפים לו מועד.</p>
       <Field label="לאיזה יום *">
         <input name="day" type="date" required className={INPUT} />
       </Field>
