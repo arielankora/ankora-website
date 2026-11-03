@@ -160,6 +160,16 @@ const latinActionRe = new RegExp(`\\b(${LATIN_ACTIONS.map((a) => a.replace(" ", 
 /// and two capitalised words kept together (Google Drive, Meet Alfred).
 const latinTokenRe = /[A-Za-z][A-Za-z0-9.\-]*[A-Za-z0-9]|[A-Za-z]/g;
 
+/// Codes the team writes all day that are not names: a process (P15), a
+/// source in a client file (S28), a pull request (PR400), a version (v2,
+/// 1.0). 3.11.2026: "MCP + P15" in a task about the approvals screen read
+/// as connecting a vendor called P15.
+const CODE_LIKE = /^(?:[A-Za-z]{1,3}\d+|v?\d+(?:\.\d+)*)$/;
+
+function isNotAName(word: string): boolean {
+  return NOT_A_VENDOR.has(word.toLowerCase()) || CODE_LIKE.test(word);
+}
+
 function latinTokens(text: string): { word: string; index: number }[] {
   const out: { word: string; index: number }[] = [];
   for (const m of text.matchAll(latinTokenRe)) out.push({ word: m[0], index: m.index ?? 0 });
@@ -204,7 +214,7 @@ export function detectVendorSignal(text: string, known: string[]): VendorSignal 
   const candidates: string[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const w = tokens[i].word;
-    if (NOT_A_VENDOR.has(w.toLowerCase())) continue;
+    if (isNotAName(w)) continue;
     if (!/^[A-Z0-9]/.test(w) && w.length < 4) continue;
     let name = w;
     const next = tokens[i + 1];
@@ -212,7 +222,7 @@ export function detectVendorSignal(text: string, known: string[]): VendorSignal 
       next &&
       /^[A-Z]/.test(w) &&
       /^[A-Z]/.test(next.word) &&
-      !NOT_A_VENDOR.has(next.word.toLowerCase()) &&
+      !isNotAName(next.word) &&
       t.slice(tokens[i].index + w.length, next.index).trim() === ""
     ) {
       name = `${w} ${next.word}`;

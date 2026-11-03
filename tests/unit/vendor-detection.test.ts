@@ -63,6 +63,19 @@ describe("detectVendorSignal", () => {
     expect(detectVendorSignal("להוסיף API לייצוא", known)).toBeNull();
   });
 
+  it("does not take a process, source, PR or version code for a vendor", () => {
+    // 3.11.2026, in production: "MCP + P15" read as a vendor called P15.
+    expect(detectVendorSignal("אישור אחד לתהליך: MCP + P15", known)).toBeNull();
+    expect(detectVendorSignal("לחבר את S28 ל-P8", known)).toEqual({ vendor: null, existingVendor: null, matched: "לחבר" });
+    expect(detectVendorSignal("API v2 ל-PR400", known)).toBeNull();
+    expect(detectVendorSignal("MCP 1.0", known)).toBeNull();
+  });
+
+  it("still finds a real name next to a code", () => {
+    expect(detectVendorSignal("לחבר את Pipedrive ל-P15", known)?.vendor).toBe("Pipedrive");
+    expect(detectVendorSignal("חיבור MCP ל-P15 Pipedrive", known)?.vendor).toBe("Pipedrive");
+  });
+
   it("stays quiet when nothing is being connected", () => {
     expect(detectVendorSignal("רשימת משימות: עריכת תאריך יעד מהשורה", known)).toBeNull();
     expect(detectVendorSignal("", known)).toBeNull();
