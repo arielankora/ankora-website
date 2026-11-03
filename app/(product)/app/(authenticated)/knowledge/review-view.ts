@@ -63,6 +63,8 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       },
       taskBlocked: taskBlocker({ target: p.target as ProposalTargetLike, payload }),
       taskId: p.state === "TASK" || (p.state === "APPROVED" && p.target === "TASK") ? p.resultId : null,
+      // 3.11.2026: approving it approves its procedure too (one button).
+      combinedProcedure: p.target === "PROCESS" && p.action !== "CONTRADICT" && b.procedureMode === "combined",
     };
   });
   // Pending first, in the order they should be read; decided ones after.

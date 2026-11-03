@@ -40,3 +40,34 @@ export function procedureApprovalBlocker(p: ProcedureApprovalInput): string | nu
 export function mayApproveProcedure(p: ProcedureApprovalInput): boolean {
   return procedureApprovalBlocker(p) === null;
 }
+
+// One approval for a process proposal (3.11.2026, Ariel: "a manager who
+// approves a process proposal approves the same thing twice"). Whoever
+// approves procedures of the client approves, with the proposal, the
+// procedure version it brought, when that version passes every check
+// against the client's rules. With the client's separation on, the one
+// who approves the proposal is the version's author, so nothing changes
+// there: two approvals, by two people. Anyone else: as before.
+
+export const COMBINED_APPROVE_LABEL = "אישור ההצעה והנוהל";
+
+/// Whether approving a process proposal also approves its procedure,
+/// for this person and this client (before the checks, which the server
+/// runs at the click).
+export function approvesProcedureWithProposal(p: Omit<ProcedureApprovalInput, "authorId">): boolean {
+  return approvesProceduresOf(p) && !p.separation;
+}
+
+export type ProcessProposalMode = "combined" | "separation" | "draft";
+
+export function processProposalMode(p: Omit<ProcedureApprovalInput, "authorId">): ProcessProposalMode {
+  if (!approvesProceduresOf(p)) return "draft";
+  return p.separation ? "separation" : "combined";
+}
+
+/// The PROCESS flag on the review card, as it reads for this person.
+export function processProposalFlagMessage(mode: ProcessProposalMode): string {
+  if (mode === "combined") return "באישור, גם הנוהל מאושר אם הוא עובר את הבדיקות מול כללי הלקוח, והתהליך נכנס לפעולה. אם לא, התהליך נכנס כטיוטה, והמסך אומר מה לתקן.";
+  if (mode === "separation") return "באישור, התהליך נכנס כטיוטה. ללקוח הזה נדרשת הפרדה, ולכן מישהו אחר מאשר את הנוהל בנפרד.";
+  return "באישור, התהליך נכנס כטיוטה. הנוהל רץ רק אחרי שמנהל מאשר אותו במסך התהליכים.";
+}

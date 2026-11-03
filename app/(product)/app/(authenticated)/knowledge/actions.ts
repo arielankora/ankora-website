@@ -5,12 +5,16 @@ import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { approveProposal, approveWithSuggestion, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 import { liftAutoApplyPause, markAutoReviewed, setAutoApply } from "@/lib/app-domain/auto-apply";
+import type { ProcedureAlongside } from "@/lib/app-domain/processes";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
 // approve, reject with a reason. Nothing else writes a proposal into a
 // client file.
 
 type FormState = { error?: string; ok?: boolean };
+/// 3.11.2026: approving a process proposal says what became of its
+/// procedure: approved with it, or why it waits.
+type ApproveState = FormState & { procedure?: ProcedureAlongside | null };
 type BulkState = FormState & { done?: number; failed?: { id: string; error: string }[] };
 
 /// The fields a person may change before approving. Anything else on the
@@ -58,14 +62,15 @@ function done(): FormState {
   return { ok: true };
 }
 
-export async function approveProposalAction(id: string): Promise<FormState> {
+export async function approveProposalAction(id: string): Promise<ApproveState> {
   const user = await requireUser();
+  let procedure: ProcedureAlongside | null;
   try {
-    await approveProposal(user, id);
+    procedure = (await approveProposal(user, id)).procedure;
   } catch (err) {
     return { error: friendlyError(err) };
   }
-  return done();
+  return { ...done(), procedure };
 }
 
 /// "ביטול" (3.11.2026): the new item an approved proposal created is taken
@@ -82,14 +87,15 @@ export async function revertProposalAction(id: string): Promise<FormState> {
 
 /// "להשלים בנוסח המוצע": the suggested wording, worked out on the server,
 /// and approval with it.
-export async function approveWithSuggestionAction(id: string): Promise<FormState> {
+export async function approveWithSuggestionAction(id: string): Promise<ApproveState> {
   const user = await requireUser();
+  let procedure: ProcedureAlongside | null;
   try {
-    await approveWithSuggestion(user, id);
+    procedure = (await approveWithSuggestion(user, id)).procedure;
   } catch (err) {
     return { error: friendlyError(err) };
   }
-  return done();
+  return { ...done(), procedure };
 }
 
 /// "כבר בתיק": its sources join the item already in the file.
@@ -114,7 +120,7 @@ export async function mergeProposalAction(id: string, targetId: string): Promise
   return done();
 }
 
-export async function approveEditedProposalAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {
+export async function approveEditedProposalAction(_prev: ApproveState | undefined, formData: FormData): Promise<ApproveState> {
   const user = await requireUser();
   const edits: Record<string, unknown> = {};
   for (const [key, value] of formData.entries()) {
@@ -129,12 +135,13 @@ export async function approveEditedProposalAction(_prev: FormState | undefined, 
     }
     edits[key] = v || null;
   }
+  let procedure: ProcedureAlongside | null;
   try {
-    await approveProposal(user, String(formData.get("id") ?? ""), edits);
+    procedure = (await approveProposal(user, String(formData.get("id") ?? ""), edits)).procedure;
   } catch (err) {
     return { error: friendlyError(err) };
   }
-  return done();
+  return { ...done(), procedure };
 }
 
 export async function rejectProposalAction(_prev: FormState | undefined, formData: FormData): Promise<FormState> {

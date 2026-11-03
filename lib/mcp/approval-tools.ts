@@ -195,7 +195,7 @@ export function registerApprovalTools(server: McpServer): void {
     {
       title: "Decide proposals to a client file",
       description:
-        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. For an item under `enteredAutomatically`, "reviewed_ok" marks it right ("תקין") and "revert" takes it out of the file again ("ביטול"), as its buttons do; only the decisions its row lists are accepted. Each result has `url` (the proposal on its card, or its row under "נכנס אוטומטית"), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
+        'Decides proposals to a client file, each as its own button on the review card: "approve" puts it in the file, "reject" drops it (needs `reason`), "already_in_file" closes it against the item already there and adds its source (only for a proposal list_approvals shows with `alreadyInFile`, as the card offers it only then), "task" opens a task from it instead (assigned to the user, due in three business days). Pass `proposalId`s exactly as list_approvals or propose_knowledge returned them. A proposal marked `approveAlone` (it changes an item in the file, may be a duplicate, or was flagged) is approved only in a call of its own, after the user read it. Each proposal is decided separately: one that fails is reported and the rest go on. For an item under `enteredAutomatically`, "reviewed_ok" marks it right ("תקין") and "revert" takes it out of the file again ("ביטול"), as its buttons do; only the decisions its row lists are accepted. Each result has `url` (the proposal on its card, or its row under "נכנס אוטומטית"), and `result` (the item in the client\'s file) or `task` where the decision made one: give the user those to see the outcome. Approving a process proposal also approves the procedure it brought when the user approves procedures of that client (a manager, or its account manager), the client has no separation of duties, and the procedure passes every check against the client\'s rules: the result\'s `procedure` then says it was approved and the process runs. When it does not pass, `procedure` says why and the process is a draft as before; tell the user what to fix. Before calling, tell the user which proposals and what will happen, and call only after they said so.',
       inputSchema: z.object({
         proposalIds: z.array(z.string().min(1)).min(1).max(MAX_PROPOSALS).describe("The proposals, by proposalId. Never typed or guessed."),
         decision: z.enum(["approve", "reject", "already_in_file", "task", "reviewed_ok", "revert"]),
@@ -209,7 +209,7 @@ export function registerApprovalTools(server: McpServer): void {
         const base = appBaseUrl();
         if (args.decision === "reject" && !args.reason?.trim()) return toolText("Rejecting needs a reason in a line. Ask the user why, then call again with `reason`. Nothing was changed.");
         const ids = [...new Set(args.proposalIds.map((id) => id.trim()).filter(Boolean))];
-        const done: { proposalId: string; says: string; url: string; task?: string }[] = [];
+        const done: { proposalId: string; says: string; url: string; task?: string; procedure?: string }[] = [];
         const failed: { proposalId: string; error: string }[] = [];
         for (const id of ids) {
           try {
@@ -237,6 +237,14 @@ export function registerApprovalTools(server: McpServer): void {
               url: proposalUrl(base, r.clientId, id),
               ...(r.resultId ? { result: appUrl(base, `/app/clients/${encodeURIComponent(r.clientId)}?tab=file#item-${r.resultId}`) } : {}),
               ...(r.taskId ? { task: appUrl(base, `/app/tasks/${r.taskId}`) } : {}),
+              // 3.11.2026: the procedure it brought, approved with it or not.
+              ...(r.procedure
+                ? {
+                    procedure: r.procedure.approved
+                      ? `Approved too (procedure version ${r.procedure.version}): the process is active and runs.`
+                      : `Not approved, the process entered as a draft: ${r.procedure.reason}`,
+                  }
+                : {}),
             });
           } catch (err) {
             failed.push({ proposalId: id, error: err instanceof Error ? err.message : "Something went wrong." });

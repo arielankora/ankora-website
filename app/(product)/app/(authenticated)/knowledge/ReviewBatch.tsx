@@ -9,6 +9,8 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, EDIT_FIELD_LABELS, proposalDetails, reviewSummary, suggestedFix, type ConfidenceLike, type ProposalFlag, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { COMBINED_APPROVE_LABEL } from "@/lib/procedure-approval";
+import type { ProcedureAlongside } from "@/lib/app-domain/processes";
 import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
@@ -53,6 +55,9 @@ export type ReviewProposal = {
   task: { title: string; description: string; needsTitle?: boolean; said?: string; due?: string };
   taskBlocked: string | null;
   taskId: string | null;
+  /// A process proposal whose approval also approves its procedure, when
+  /// it passes the checks (3.11.2026): the button says so.
+  combinedProcedure?: boolean;
 };
 
 export type ReviewStaff = { id: string; name: string }[];
@@ -131,9 +136,23 @@ function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
+/// 3.11.2026: what approving a process proposal did to its procedure, as
+/// the toast says it. Null when it did nothing to it (as before).
+function procedureToast(procedure: ProcedureAlongside | null | undefined, headline: string) {
+  if (!procedure) return null;
+  return procedure.approved
+    ? { tone: "info" as const, title: "התהליך והנוהל אושרו", description: headline.slice(0, 80) }
+    : { tone: "info" as const, title: "התהליך נכנס כטיוטה. הנוהל ממתין", description: procedure.reason };
+}
+
 function EditForm({ p }: { p: ReviewProposal }) {
   const close = useDrawerClose();
-  const { onSubmit, pending, error } = useActionForm(approveEditedProposalAction, close);
+  const { showToast } = useToast();
+  const { onSubmit, pending, error } = useActionForm(approveEditedProposalAction, (r) => {
+    const t = procedureToast(r.procedure, p.headline);
+    if (t) showToast(t);
+    close();
+  });
   const status = (str(p.payload.knowledgeStatus) || "CONFIRMED") as KnowledgeStatusLike;
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-3.5">
@@ -190,7 +209,7 @@ function EditForm({ p }: { p: ReviewProposal }) {
       )}
       {error && <p className="text-sm text-app-error">{error}</p>}
       <button type="submit" disabled={pending} className="w-full rounded-full bg-app-accent px-5 py-2.5 text-sm font-medium text-app-text-primary disabled:opacity-50">
-        {pending ? "שומר..." : p.target === "TASK" ? "פתיחת המשימה" : "אישור עם השינויים"}
+        {pending ? "שומר..." : p.target === "TASK" ? "פתיחת המשימה" : p.combinedProcedure ? `${COMBINED_APPROVE_LABEL} עם השינויים` : "אישור עם השינויים"}
       </button>
     </form>
   );
@@ -350,13 +369,13 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   async function approve() {
     const r = await approveProposalAction(p.id);
     if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast({ tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
+    else showToast(procedureToast(r.procedure, p.headline) ?? { tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
   }
 
   async function approveSuggested() {
     const r = await approveWithSuggestionAction(p.id);
     if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
-    else showToast({ tone: "info", title: "הושלם ונכנס לתיק", description: p.headline.slice(0, 80) });
+    else showToast(procedureToast(r.procedure, p.headline) ?? { tone: "info", title: "הושלם ונכנס לתיק", description: p.headline.slice(0, 80) });
   }
 
   async function attach() {
@@ -489,7 +508,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             <>
               {suggested && (
                 <button type="button" onClick={approveSuggested} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary" data-testid="proposal-approve-suggested">
-                  להשלים בנוסח המוצע ולאשר
+                  {p.combinedProcedure ? "להשלים בנוסח המוצע ולאשר את ההצעה והנוהל" : "להשלים בנוסח המוצע ולאשר"}
                 </button>
               )}
               {/* A process that only lacks a check enters as a draft: it may
@@ -500,7 +519,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
                   onClick={approve}
                   className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful || suggested ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
                 >
-                  אישור
+                  {p.combinedProcedure ? COMBINED_APPROVE_LABEL : "אישור"}
                 </button>
               )}
             </>

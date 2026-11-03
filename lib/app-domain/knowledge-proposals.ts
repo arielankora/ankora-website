@@ -37,11 +37,12 @@ import {
   taskTitleProblem,
 } from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
+import { processProposalFlagMessage, processProposalMode, type ProcessProposalMode } from "@/lib/procedure-approval";
 import { summarizeProposalEdit } from "@/lib/proposal-edits";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
 import { addClientEntity, removeClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
-import { addProcess, linkProcessDates, saveProcessVersion } from "@/lib/app-domain/processes";
+import { addProcess, approveProcedureAlongside, linkProcessDates, saveProcessVersion, type ProcedureAlongside } from "@/lib/app-domain/processes";
 import { addClientContact, addClientOrganization, removeClientContact, removeClientOrganization } from "@/lib/app-domain/client-contacts";
 import { addClientFact, addClientFactSources, answerClientQuestion, recordContradiction, removeClientFact, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { FACT_KIND_LABELS, isQuestion, type FactKindLike } from "@/lib/client-facts";
@@ -554,7 +555,7 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     where: { clientId: { in: clientIds }, closedAt: null, awaitingAssignment: false },
     orderBy: { createdAt: "desc" },
     include: {
-      client: { select: { id: true, name: true, accountManagerId: true } },
+      client: { select: { id: true, name: true, accountManagerId: true, procedureApprovalSeparation: true } },
       proposals: { orderBy: { createdAt: "asc" } },
     },
   });
@@ -615,14 +616,24 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
     const fresh = proposalProblems(pr.target as ProposalTargetLike, (pr.payload ?? {}) as Record<string, unknown>, codesOf.get(pr.clientId) ?? [], { sourceTitle: titleOf.get(pr.batchId) });
     return [...fresh, ...(flags as ProposalFlag[]).filter((f) => !PROBLEM_CODES.includes(f.code))] as Prisma.JsonValue;
   };
+  // 3.11.2026: what approving a process proposal does to its procedure,
+  // for this person and this client (lib/procedure-approval.ts).
+  const procedureModeOf = (b: (typeof batches)[number]): ProcessProposalMode =>
+    processProposalMode({ userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: b.client.accountManagerId, separation: b.client.procedureApprovalSeparation });
+  const modeByClient = new Map(batches.map((b) => [b.clientId, procedureModeOf(b)]));
+  const withProcessMode = (clientId: string, flags: Prisma.JsonValue): Prisma.JsonValue =>
+    Array.isArray(flags)
+      ? ((flags as ProposalFlag[]).map((f) => (f.code === "PROCESS" ? { ...f, message: processProposalFlagMessage(modeByClient.get(clientId) ?? "draft") } : f)) as Prisma.JsonValue)
+      : flags;
   const liveFlags = (pr: { id: string; clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string; flags: Prisma.JsonValue }) => {
-    const flags = restated(pr, withoutR14(pr.clientId, pr.flags));
+    const flags = withProcessMode(pr.clientId, restated(pr, withoutR14(pr.clientId, pr.flags)));
     return alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(flags) ? flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : flags;
   };
   return batches.map((b) => ({
     ...b,
     source: b.sourceId ? sourceById.get(b.sourceId) ?? null : null,
     createdByName: b.createdById ? nameOf.get(b.createdById) ?? null : null,
+    procedureMode: modeByClient.get(b.clientId) ?? ("draft" as ProcessProposalMode),
     proposals: b.proposals.map((p) => {
       const hidden = isSensitive(p.payload) && !approverOf.get(b.clientId);
       return hidden
@@ -909,6 +920,14 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
     const existing = await findExisting(proposal.clientId, proposal.target, proposal.action, payload);
     if (existing) throw new Error(`${existing.body}: כבר בתיק. "כבר בתיק: הוספת המקור" מוסיף את המקור לפריט שבתיק.`);
   }
+  // 3.11.2026: the procedure version this proposal brings is approved
+  // with it, when this person approves procedures and it passes the
+  // checks (approveProcedureAlongside). The version in force before, so
+  // only the one it brought is.
+  const versionBefore =
+    proposal.target === "PROCESS" && proposal.action === "SUPERSEDE" && proposal.targetId
+      ? ((await prisma.processVersion.findFirst({ where: { processId: proposal.targetId }, orderBy: { version: "desc" }, select: { version: true } }))?.version ?? 0)
+      : 0;
   const resultId = await apply(actor, proposal, payload);
   // Which fields changed, and whether in wording or in fact
   // (lib/proposal-edits.ts). A change of spaces only is no edit. The names
@@ -944,7 +963,10 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
       ...(options.bulk ? { bulk: true } : {}),
     },
   });
-  return updated;
+  // Not on arrival (auto): a procedure is approved by a person.
+  const procedure: ProcedureAlongside | null =
+    proposal.target === "PROCESS" && !options.auto && resultId && proposal.action !== "CONTRADICT" ? await approveProcedureAlongside(actor, resultId, versionBefore) : null;
+  return { ...updated, procedure };
 }
 
 /// "כבר בתיק" (20.10.2026): what the proposal says is already in the
