@@ -8,8 +8,8 @@ import { StatusBadge } from "@/components/app/StatusBadge";
 import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowledge";
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
-import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
+import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, suggestedFix, type ConfidenceLike, type ProposalFlag, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { approveProposalAction, approveEditedProposalAction, approveWithSuggestionAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -26,7 +26,7 @@ export type ReviewProposal = {
   sources: string[];
   reason: string | null;
   quote: string | null;
-  flags: { code: string; message: string; block?: boolean; match?: { id: string; name: string } }[];
+  flags: ProposalFlag[];
   link: string | null;
   existing: { body: string } | null;
   /// A new item that is already in the file, as it stands now: what is
@@ -347,6 +347,12 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
     else showToast({ tone: "info", title: p.target === "TASK" ? "נפתחה משימה" : "נכנס לתיק", description: p.headline.slice(0, 80) });
   }
 
+  async function approveSuggested() {
+    const r = await approveWithSuggestionAction(p.id);
+    if (r.error) showToast({ tone: "error", title: "האישור נכשל", description: r.error });
+    else showToast({ tone: "info", title: "הושלם ונכנס לתיק", description: p.headline.slice(0, 80) });
+  }
+
   async function attach() {
     const r = await attachProposalAction(p.id);
     if (r.error) showToast({ tone: "error", title: "לא נסגר", description: r.error });
@@ -386,6 +392,8 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 
   const doubtful = p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR");
   const blocked = p.flags.some((f) => f.block);
+  // Every problem has a ready wording: one press completes and approves.
+  const suggested = !p.alreadyIn && suggestedFix(p.flags) !== null;
   const alone = bulkApproveBlocker({ ...p, level: p.confidence.level });
   return (
     <li id={proposalAnchor(p.id)} className={`py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${selected ? "bg-gold/[0.04]" : ""}`}>
@@ -439,8 +447,14 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
           {p.quote && <p className="mt-1 border-s-2 border-app-border ps-2 text-xs italic text-app-text-secondary">{p.quote}</p>}
           {/* "Already in the file" is said once, above, with what is there. */}
           {p.flags.filter((f) => !(p.alreadyIn && f.code === "DUPLICATE")).map((f, i) => (
-            <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`}>
+            <p key={i} className={`mt-1 text-xs ${f.block ? "font-medium text-app-error" : "text-app-warning"}`} data-testid="proposal-flag">
               {f.message}
+              {f.why && <span className="block font-normal text-app-text-secondary">למה: {f.why}</span>}
+              {f.fix && (
+                <span className="block font-normal text-app-text-secondary" data-testid="proposal-suggested">
+                  נוסח מוצע: <span className="text-app-text-primary">{f.fix.label}</span>
+                </span>
+              )}
               {/* The same item under another spelling: added to it, not a second one. */}
               {/* A date is not merged: the existing one is opened and completed. */}
               {f.match && p.target === "DATE" && (
@@ -456,7 +470,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             </p>
           ))}
         </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-3 text-xs">
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-3 text-xs">
           {/* A problem that blocks approval (spec 5.2) is fixed in the edit,
               where the server checks the approved text again. */}
           {/* Already in the file: approving would make a second copy, or
@@ -465,14 +479,25 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             <button type="button" onClick={attach} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary">
               {p.alreadyIn.addsSources ? "כבר בתיק: הוספת המקור" : "כבר בתיק: סגירה"}
             </button>
-          ) : !blocked && (
-            <button
-              type="button"
-              onClick={approve}
-              className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
-            >
-              אישור
-            </button>
+          ) : (
+            <>
+              {suggested && (
+                <button type="button" onClick={approveSuggested} className="rounded-full bg-app-accent px-3.5 py-1.5 font-medium text-app-text-primary" data-testid="proposal-approve-suggested">
+                  להשלים בנוסח המוצע ולאשר
+                </button>
+              )}
+              {/* A process that only lacks a check enters as a draft: it may
+                  also be approved as it is. */}
+              {!blocked && (
+                <button
+                  type="button"
+                  onClick={approve}
+                  className={`rounded-full px-3.5 py-1.5 font-medium ${doubtful || suggested ? "border border-app-border text-app-text-secondary" : "bg-app-accent text-app-text-primary"}`}
+                >
+                  אישור
+                </button>
+              )}
+            </>
           )}
           <Drawer triggerLabel="עריכה ואישור" title="עריכה לפני אישור" variant="link">
             <EditForm p={p} />

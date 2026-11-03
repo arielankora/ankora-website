@@ -260,6 +260,15 @@ export type ProposalFlag = {
   code: string;
   message: string;
   block?: boolean;
+  /// Why the field is needed, in one sentence, so the reviewer knows what
+  /// the missing part is for before completing it (3.11.2026).
+  why?: string;
+  /// A ready wording that completes the proposal: shown in full on the
+  /// card, and approved with it in one press. `edits` are recomputed on the
+  /// server from the proposal as stored, never taken from the browser.
+  fix?: { label: string; edits: Record<string, unknown> };
+  /// The steps one flag stands for, when the same note applies to several.
+  steps?: number[];
   /// SIMILAR, by name: the item in the file it may be, so the reviewer
   /// can add the proposal to it instead of a second item.
   match?: { id: string; name: string };
@@ -276,36 +285,113 @@ export type ProposalFlag = {
 /// A process enters as a draft, so what its procedure fails (R1, R3, R4)
 /// is said here but does not block the proposal: it blocks the procedure's
 /// approval, on the processes screen.
-export function proposalProblems(target: ProposalTargetLike, payload: Record<string, unknown>, registerCodes: string[]): ProposalFlag[] {
+/// The approved wordings (Ariel, 3.11.2026).
+export const SUGGESTED_INTERIM = "כמו היום, עד שהכלל מאושר.";
+export const suggestedToResolve = (sourceTitle?: string | null) => (sourceTitle?.trim() ? `אישור מ${sourceTitle.trim()}.` : "אישור מהמקור של ההצעה.");
+/// A long output would make a sentence nobody reads, and pass the field's
+/// length: then the plain wording.
+export const suggestedVerification = (output?: string | null) => (output?.trim() && output.trim().length <= 200 ? `אדם בודק ש${output.trim()} קיים.` : "אדם בודק שהשלב בוצע.");
+
+/// "שלבים 2, 4 ו-5", or "שלב 3".
+function stepList(steps: number[]): string {
+  if (steps.length === 1) return `שלב ${steps[0]}`;
+  return `שלבים ${steps.slice(0, -1).join(", ")} ו-${steps[steps.length - 1]}`;
+}
+
+/// The codes proposalProblems says, so a stored card can be said again
+/// with today's wording.
+export const PROBLEM_CODES = ["R17", "SHAPE", "VISIBLE", "R1", "R2", "R3", "R4"];
+
+export function proposalProblems(target: ProposalTargetLike, payload: Record<string, unknown>, registerCodes: string[], ctx: { sourceTitle?: string | null } = {}): ProposalFlag[] {
   const out: ProposalFlag[] = [];
   const known = new Set(registerCodes);
   const unknown = [...new Set(Object.values(payload).flatMap((v) => (typeof v === "string" ? citedCodes(v) : [])))].filter((c) => !known.has(c));
-  if (unknown.length) out.push({ code: "R17", block: true, message: `הטקסט מצטט ${unknown.join(", ")}, ${unknown.length === 1 ? "שלא קיים" : "שלא קיימים"} במרשם המקורות של הלקוח. מתקנים את הקוד בעריכה, או דוחים.` });
+  if (unknown.length) out.push({ code: "R17", block: true, why: "כל פריט בתיק מפנה למקור שאפשר לפתוח, וקוד שלא במרשם הוא כנראה טעות הקלדה.", message: `הטקסט מצטט ${unknown.join(", ")}, ${unknown.length === 1 ? "שלא קיים" : "שלא קיימים"} במרשם המקורות של הלקוח. מתקנים את הקוד בעריכה, או דוחים.` });
   const s = (k: string) => (typeof payload[k] === "string" ? (payload[k] as string) : null);
   if (target === "FACT") {
     const shape = factShapeError({ kind: payload.kind as never, body: s("body") ?? "", validUntil: s("validUntil") ? new Date(s("validUntil")!) : null, validUntilEvent: s("validUntilEvent"), decidedAt: s("decidedAt") ? new Date(s("decidedAt")!) : null });
-    if (shape) out.push({ code: "SHAPE", block: true, message: `${shape} משלימים בעריכה, או דוחים.` });
+    const why =
+      payload.kind === "TEMPORARY"
+        ? "בלי תאריך או אירוע שבו הוא נגמר, מידע זמני נשאר בתיק לתמיד."
+        : payload.kind === "ONE_OFF_DECISION"
+          ? "בלי תאריך אי אפשר לדעת אם ההחלטה עדיין בתוקף."
+          : undefined;
+    if (shape) out.push({ code: "SHAPE", block: true, why, message: `${shape} משלימים בעריכה, או דוחים.` });
   }
   if (target === "DATE") {
     const shape = dateShapeError(payload);
-    if (shape) out.push({ code: "SHAPE", block: true, message: `${shape} משלימים בעריכה, או דוחים.` });
+    if (shape) out.push({ code: "SHAPE", block: true, why: "בלי היום שבו המועד חל, המערכת לא יודעת מתי להזכיר.", message: `${shape} משלימים בעריכה, או דוחים.` });
   }
   if (target === "POLICY" && NEEDS_INTERIM.includes(payload.kind as PolicyKindLike) && !s("interimStatement")?.trim()) {
-    out.push({ code: "SHAPE", block: true, message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים "עד שיאושר" בעריכה, או דוחים.' });
+    out.push({
+      code: "SHAPE",
+      block: true,
+      why: "כלל מוצע לא חל עד שמאשרים אותו, ולכן צריך לכתוב מה עושים בינתיים.",
+      message: 'חסר כלל ביניים: מה עושים עד שהכלל מאושר. משלימים בנוסח המוצע, בעריכה, או דוחים.',
+      fix: { label: SUGGESTED_INTERIM, edits: { interimStatement: SUGGESTED_INTERIM } },
+    });
   }
   // Rule 1: anything short of confirmed says what would confirm it.
   if ((payload.knowledgeStatus === "UNCERTAIN" || payload.knowledgeStatus === "MISSING") && !s("toResolve")?.trim()) {
-    out.push({ code: "SHAPE", block: true, message: 'לא ודאי או חסר, בלי "מה יסגור את זה". משלימים בעריכה, או דוחים.' });
+    const toResolve = suggestedToResolve(ctx.sourceTitle);
+    out.push({
+      code: "SHAPE",
+      block: true,
+      why: "בלי זה אף אחד לא יודע איך מאמתים את הפריט, והוא נשאר לא ודאי לתמיד.",
+      message: 'לא ודאי או חסר, בלי "מה יסגור את זה". משלימים בנוסח המוצע, בעריכה, או דוחים.',
+      fix: { label: toResolve, edits: { toResolve } },
+    });
   }
   // Spec 3.1: shown to the client only when nothing forbids it.
   if (payload.clientVisible === true) {
     const why = clientVisibleBlocker({ sensitivity: s("sensitivity"), doNotDisclose: s("doNotDisclose") });
-    if (why) out.push({ code: "VISIBLE", block: true, message: `${why} מורידים את "גלוי ללקוח" בעריכה, או דוחים.` });
+    if (why) {
+      out.push({
+        code: "VISIBLE",
+        block: true,
+        why: "הלקוח רואה בפורטל רק פריט שאין סיבה להסתיר ממנו.",
+        message: `${why} מורידים את "גלוי ללקוח", או דוחים.`,
+        fix: { label: 'בלי "גלוי ללקוח"', edits: { clientVisible: false } },
+      });
+    }
   }
   if (target === "PROCESS" && Array.isArray(payload.steps) && payload.steps.length) {
-    for (const c of blockingChecks({ steps: readSteps(payload.steps) }, [])) out.push({ code: c.code, message: `${c.message} (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)` });
+    const draft = " (התהליך ייכנס כטיוטה, והנוהל לא יאושר עד שזה יתוקן.)";
+    const checks = blockingChecks({ steps: readSteps(payload.steps) }, []);
+    // R3 on several steps is one line with the steps, not one per step
+    // (3.11.2026: five identical lines said nothing the first did not).
+    const r3 = checks.filter((c) => c.code === "R3" && c.step);
+    for (const c of checks.filter((c) => !(c.code === "R3" && c.step))) out.push({ code: c.code, message: `${c.message}${draft}` });
+    if (r3.length) {
+      const steps = r3.map((c) => c.step!);
+      const edits = {
+        steps: (payload.steps as unknown[]).map((raw) => {
+          if (!raw || typeof raw !== "object") return raw;
+          const st = raw as Record<string, unknown>;
+          if (st.mode !== "AUTOMATED" || (typeof st.verification === "string" && st.verification.trim())) return raw;
+          return { ...st, verification: suggestedVerification(typeof st.output === "string" ? st.output : null) };
+        }),
+      };
+      out.push({
+        code: "R3",
+        steps,
+        why: "פעולה אוטומטית יכולה להיכשל בשקט, ולכן אדם צריך דרך לבדוק שהיא קרתה.",
+        message: `${stepList(steps)} ${steps.length === 1 ? "אוטומטי" : "אוטומטיים"}: צריך לכתוב איך אדם מוודא שזה קרה.${draft}`,
+        // The wording in full, step by step, before anyone presses.
+        fix: { label: readSteps(payload.steps).flatMap((st, i) => (steps.includes(i + 1) ? [`שלב ${i + 1}: ${suggestedVerification(st.output)}`] : [])).join(" "), edits },
+      });
+    }
   }
   return out;
+}
+
+/// Every suggested wording on a proposal together, or null when a problem
+/// that blocks approval has none: then only the edit can complete it.
+export function suggestedFix(flags: ProposalFlag[]): Record<string, unknown> | null {
+  const fixes = flags.filter((f) => f.fix);
+  if (fixes.length === 0) return null;
+  if (flags.some((f) => f.block && !f.fix)) return null;
+  return Object.assign({}, ...fixes.map((f) => f.fix!.edits));
 }
 
 /// The most proposals decided in one action.

@@ -13,6 +13,8 @@ import {
   payloadText,
   proposalHeadline,
   proposalProblems,
+  PROBLEM_CODES,
+  suggestedFix,
   type ProposalActionLike,
   type ProposalFlag,
   type ProposalTargetLike,
@@ -141,6 +143,11 @@ export type ProposeResult = {
   /// 3.11.2026: proposals the server approved on arrival (the AUTO tier):
   /// they are in the file already.
   autoApplied: AutoAppliedItem[];
+  /// Items the review screen will not approve as sent (a proposed rule
+  /// without its interim rule, an automated step without its check...):
+  /// what is missing and the wording it suggests. Next time, send it
+  /// complete (3.11.2026).
+  incomplete: { index: number; missing: string; suggested: string | null }[];
 };
 
 export type AutoAppliedItem = { proposalId: string; target: ProposalTargetLike; headline: string; resultId: string | null };
@@ -218,10 +225,10 @@ async function registerCodes(clientId: string): Promise<string[]> {
   return (await prisma.clientSource.findMany({ where: { clientId, deletedAt: null }, select: { code: true } })).map((s) => s.code);
 }
 
-async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[]): Promise<ProposalFlag[]> {
+async function flagsFor(clientId: string, item: ProposalItemInput & { payload: Record<string, unknown> }, sourceWeight: string, codes: string[], sourceTitle?: string | null): Promise<ProposalFlag[]> {
   // What would stop it from entering the file first: the reviewer reads
   // these before anything else.
-  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes);
+  const flags: ProposalFlag[] = proposalProblems(item.target, item.payload, codes, { sourceTitle });
   if (typeof item.payload.ownerName === "string" && item.payload.ownerName.trim() && !(await ownerByName(item.payload.ownerName))) {
     flags.push({ code: "OWNER", message: `אין איש צוות אחד בשם "${item.payload.ownerName.trim()}". הפריט ייכנס בלי בעלים, אלא אם מתקנים את השם.` });
   }
@@ -328,6 +335,7 @@ export async function proposeKnowledge(
   const dropped: ProposeResult["dropped"] = [...(options.dropped ?? [])];
   const accepted: { item: ProposalItemInput & { action: ProposalActionLike }; payload: Record<string, unknown>; flags: ProposalFlag[] }[] = [];
   const possibleMatches: ProposeResult["possibleMatches"] = [];
+  const incomplete: ProposeResult["incomplete"] = [];
 
   for (const [i, raw] of input.items.entries()) {
     const index = options.indexes?.[i] ?? i;
@@ -400,10 +408,11 @@ export async function proposeKnowledge(
       const latest = await prisma.clientNarrative.findFirst({ where: { clientId: input.clientId, kind: payload.kind as never }, orderBy: { version: "desc" }, select: { version: true } });
       payload.baseVersion = latest?.version ?? 0;
     }
-    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes);
+    const flags = await flagsFor(input.clientId, { ...item, payload }, weight, codes, source.title);
     const existing = flags.flatMap((f) => (f.match ? [f.match] : []));
     if (existing.length && isNamedTarget(item.target)) possibleMatches.push({ index, target: item.target, name: String(payload[nameFieldOf(item.target)] ?? ""), existing });
     else if (existing.length && item.target === "DATE") possibleMatches.push({ index, target: item.target, name: String(payload.title ?? ""), existing });
+    for (const f of flags) if (PROBLEM_CODES.includes(f.code)) incomplete.push({ index, missing: f.message, suggested: f.fix?.label ?? null });
     accepted.push({ item, payload, flags });
   }
 
@@ -423,7 +432,7 @@ export async function proposeKnowledge(
 
   // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [] };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [], incomplete: [] };
   }
 
   // The source and the batch go in together: a new source is registered
@@ -487,7 +496,7 @@ export async function proposeKnowledge(
   // Only what Claude sent (propose_knowledge): a batch typed on a screen,
   // or one a person assigned to its client, waits as it always did.
   const autoApplied = options.autoApply ? await autoApplyBatch(actor, batch.id, input.clientId) : [];
-  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied };
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied, incomplete };
 }
 
 /// The AUTO tier on arrival (3.11.2026, approval tiers part 2): each
@@ -592,8 +601,19 @@ export async function listOpenBatches(actor: User, filter: { clientId?: string }
   for (const clientId of new Set(batches.map((b) => b.clientId))) if (await isInternalClient(clientId)) internal.add(clientId);
   const withoutR14 = (clientId: string, flags: Prisma.JsonValue) =>
     internal.has(clientId) && Array.isArray(flags) ? ((flags as ProposalFlag[]).filter((f) => f.code !== "R14") as Prisma.JsonValue) : flags;
-  const liveFlags = (pr: { id: string; clientId: string; target: string; flags: Prisma.JsonValue }) => {
-    const flags = withoutR14(pr.clientId, pr.flags);
+  // What blocks a pending proposal is said again in today's words, with
+  // its suggested wording (3.11.2026): a card stored before then has the
+  // old sentence and no wording to approve.
+  const codesOf = new Map<string, string[]>();
+  for (const clientId of new Set(batches.map((b) => b.clientId))) codesOf.set(clientId, await registerCodes(clientId));
+  const titleOf = new Map(batches.map((b) => [b.id, b.sourceId ? sourceById.get(b.sourceId)?.title ?? null : null]));
+  const restated = (pr: { clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string }, flags: Prisma.JsonValue): Prisma.JsonValue => {
+    if (pr.state !== "PENDING" || !Array.isArray(flags)) return flags;
+    const fresh = proposalProblems(pr.target as ProposalTargetLike, (pr.payload ?? {}) as Record<string, unknown>, codesOf.get(pr.clientId) ?? [], { sourceTitle: titleOf.get(pr.batchId) });
+    return [...fresh, ...(flags as ProposalFlag[]).filter((f) => !PROBLEM_CODES.includes(f.code))] as Prisma.JsonValue;
+  };
+  const liveFlags = (pr: { id: string; clientId: string; batchId: string; target: string; payload: Prisma.JsonValue; state: string; flags: Prisma.JsonValue }) => {
+    const flags = restated(pr, withoutR14(pr.clientId, pr.flags));
     return alreadyIn.has(pr.id) ? (withLiveDuplicate((Array.isArray(flags) ? flags : []) as ProposalFlag[], pr.target, alreadyIn.get(pr.id) ?? null) as Prisma.JsonValue) : flags;
   };
   return batches.map((b) => ({
@@ -843,6 +863,21 @@ async function apply(
     return task.id;
   }
   throw new Error("סוג פריט לא מוכר.");
+}
+
+/// "להשלים בנוסח המוצע": every suggested wording on the proposal, as the
+/// card showed it, and the proposal approved with them in one press
+/// (Ariel, 3.11.2026). The wordings are worked out here from the proposal
+/// as stored, so the browser only says which proposal. Anything else that
+/// blocks it is refused as on any approval.
+export async function approveWithSuggestion(actor: User, id: string) {
+  const proposal = await findPending(actor, id);
+  const batch = await prisma.knowledgeBatch.findUnique({ where: { id: proposal.batchId }, select: { sourceId: true } });
+  const source = batch?.sourceId ? await prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { title: true } }) : null;
+  const flags = proposalProblems(proposal.target, proposal.payload as Record<string, unknown>, await registerCodes(proposal.clientId), { sourceTitle: source?.title });
+  const edits = suggestedFix(flags);
+  if (!edits) throw new Error("אין להצעה הזו נוסח מוצע. משלימים בעריכה, או דוחים.");
+  return approveProposal(actor, id, edits);
 }
 
 /// `auto`: approved by the server on arrival (autoApplyBatch), not by a

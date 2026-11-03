@@ -154,6 +154,7 @@ export const PROPOSE_KNOWLEDGE_DESCRIPTION = [
   "SOURCE: `sourceCode` (\"S3\") for a source in the client's register (get_client_file lists it), or `newSource` to register one; it is registered only when at least one item is kept. A recording is found again by firefliesId and an email thread (kind EMAIL) by gmailThreadId, so sending it twice makes no second source. An email thread is a source only when it is this client's; quote only what the client or their supplier wrote.",
   "CHANGES: to change an item already in the file, action SUPERSEDE with `targetId` (the id after the item in get_client_file) and only the fields that change. When someone said otherwise and it is not clear who is right, CONTRADICT with its targetId: nothing is overwritten. Never propose a second item for something in the file: names vary between meetings (\"Washington DOR\" and \"Washington Department of Revenue\"), so look for one first. The reply's `possibleMatches` lists new items that may already exist; resend them as SUPERSEDE or leave them to the reviewer.",
   "NAMES (entityName, routeToNames, systemNames and the like) link to the item in the file with that name on approval; name only what is in the file or in the same batch. Every payload except NARRATIVE, DOMAIN, TASK and DATE may carry externalRefs, ownerName (the person at Ankora who keeps it right) and clientVisible (true only when it is the client's to see; never with sensitivity SENSITIVE or doNotDisclose).",
+  "Fill interimStatement (APPROVAL_REQUIRED/THRESHOLD rules) and verification (AUTOMATED steps).",
   "Never include passwords, keys or card numbers: such an item is dropped and a task to change the secret opens. sensitivity SENSITIVE for medical, political or personal information. Leave out small talk, guesses and Ankora's own commercial terms.",
   "WHOSE MEETING: a participant from a client's domain decides. A meeting about several clients: each item its own `client`, with newSource. Not clear and nobody decides: pass the likely `client` and `uncertain` with all candidates; nothing enters a file until a person picks.",
   "AUTO: a new plain fact, contact, provider or entity read as HIGH, not sensitive or flagged, may enter on arrival (`enteredFile`): tell the user which, with the `result` links.",
@@ -441,6 +442,7 @@ export function registerClientFileTools(server: McpServer): void {
         const entered = batches.reduce((n, b) => n + b.enteredFile.length, 0);
         const proposed = batches.reduce((n, b) => n + b.proposed, 0) - entered;
         const matched = batches.reduce((n, b) => n + b.possibleMatches.length, 0);
+        const incomplete = batches.reduce((n, b) => n + (b.incomplete?.length ?? 0), 0);
         const next =
           (proposed > 0
             ? `${proposed} proposals are waiting for a person to approve them: \`reviewUrl\` opens them on Ankora's approvals screen, and list_approvals with decide_knowledge_proposals decides them from here once the user says so. ${entered > 0 ? "These are not in the file yet." : "Nothing is in the file yet."}`
@@ -450,7 +452,10 @@ export function registerClientFileTools(server: McpServer): void {
           (entered > 0
             ? ` ${entered} entered the client's file automatically (\`enteredFile\`): tell the user which, with each \`result\` link. A person may still look at them on the approvals screen, and "ביטול" there takes one out again.`
             : "") +
-          (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "");
+          (matched > 0 ? ` ${matched} of them may be items already in the file under another spelling (possibleMatches): if they are, propose a SUPERSEDE of the existing id instead.` : "") +
+          (incomplete > 0
+            ? ` WARNING: ${incomplete} item(s) are incomplete (incomplete): the review screen will not approve them as sent. Tell the user what is missing and the suggested wording, which the reviewer can accept in one press; next time send the field filled in (interimStatement on a proposed APPROVAL_REQUIRED or THRESHOLD rule, verification on every AUTOMATED step, toResolve when not CONFIRMED).`
+            : "");
         return toolJson(batches.length === 1 ? { ...batches[0], next } : { batches, next });
       } catch (err) {
         console.error("[mcp] propose_knowledge failed", err);
