@@ -983,6 +983,8 @@ erDiagram
         boolean autoApplied "approved by the server with no person (approval tiers)"
         datetime revertedAt "nullable, its item was taken out of the file again"
         string revertedById "nullable"
+        datetime autoReviewedAt "nullable, a person looked at an auto-applied item and found it right"
+        string autoReviewedById "nullable"
         datetime createdAt
     }
 
@@ -1039,6 +1041,24 @@ erDiagram
         string decidedById "nullable"
         datetime decidedAt "nullable"
         string rejectReason "nullable"
+    }
+
+    AutoApplyPause {
+        string id PK
+        string scope "enum AutoApplyScope, KIND or CLIENT"
+        string key "the kind key, or the client's id"
+        string reason
+        int errors
+        datetime createdAt
+        datetime liftedAt "nullable"
+        string liftedById "nullable"
+    }
+
+    AppSetting {
+        string key PK
+        json value
+        datetime updatedAt
+        string updatedById "nullable"
     }
 ```
 

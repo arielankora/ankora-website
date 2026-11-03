@@ -5,6 +5,7 @@ import { canManageClients } from "@/lib/app-auth/permissions";
 import { readSourceRefs } from "@/lib/knowledge-sources";
 import { bulkApproveBlocker, reviewConfidence, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey } from "@/lib/knowledge-review-filters";
+import { activePauses, autoApplySetting } from "@/lib/app-domain/auto-apply";
 
 // 3.11.2026, Ariel: "לצמצם את ההצעות מהחילוץ שמחכות לאישור מנהל תיק, לפי
 // רמת סיכון וודאות". To decide which kinds of proposals could enter a file
@@ -53,6 +54,8 @@ export type ProposalStatRow = {
   /// and whether its item was taken out of the file again ("ביטול").
   autoApplied: boolean;
   reverted: boolean;
+  /// Auto-applied, and a person looked at it after and marked it right ("תקין").
+  autoReviewed: boolean;
   /// A date only: whether it opens a task before it (taskDaysBefore).
   autoTask?: boolean;
   /// Approved or rejected together with others, by the audit row.
@@ -111,6 +114,7 @@ export async function proposalStatsForAi(
         attached: true,
         autoApplied: true,
         revertedAt: true,
+        autoReviewedAt: true,
         createdAt: true,
         decidedAt: true,
         batch: { select: { via: true, sourceId: true } },
@@ -175,6 +179,7 @@ export async function proposalStatsForAi(
       attached: p.attached,
       autoApplied: p.autoApplied,
       reverted: p.revertedAt !== null,
+      autoReviewed: p.autoReviewedAt !== null,
       ...(p.target === "DATE" ? { autoTask: payload.taskDaysBefore != null } : {}),
       bulk: bulkIds.has(p.id),
       rejected: p.state === "REJECTED",
@@ -199,6 +204,15 @@ export async function proposalStatsForAi(
     groups.set(key, g);
   }
 
+  // 3.11.2026, approval tiers part 2: the switch and what is paused. A
+  // paused client is named by its opaque key, as in the rows.
+  const [setting, pauses] = await Promise.all([autoApplySetting(), activePauses()]);
+  const autoApply = {
+    enabled: setting.enabled,
+    firstEnabledAt: iso(setting.firstEnabledAt),
+    pauses: pauses.map((p) => ({ scope: p.scope, key: p.scope === "CLIENT" ? keyOf(p.key) : p.key, errors: p.errors, since: p.createdAt.toISOString() })),
+  };
+
   const limit = Math.min(Math.max(opts.limit ?? 200, 1), 500);
   const offset = Math.max(opts.offset ?? 0, 0);
   return {
@@ -208,6 +222,7 @@ export async function proposalStatsForAi(
     firstAt: all[0]?.createdAt ?? null,
     lastAt: all.at(-1)?.createdAt ?? null,
     guideVersions: guides.map((g) => ({ version: g.version, approvedAt: iso(g.decidedAt ?? g.createdAt) })),
+    autoApply,
     groups: [...groups.values()].sort((a, b) => b.total - a.total),
     rows: opts.rows ? all.slice(offset, offset + limit) : undefined,
     nextOffset: opts.rows && offset + limit < all.length ? offset + limit : undefined,

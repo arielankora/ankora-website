@@ -16,6 +16,7 @@ import {
   type ProposalActionLike,
   type ProposalFlag,
   type ProposalTargetLike,
+  approvalTier,
   bulkApproveBlocker,
   proposalReviewLevel,
   revertBlocker,
@@ -54,6 +55,8 @@ import { isInternalClient } from "@/lib/app-domain/internal-client-id";
 import { assertCanApproveForClient, canApproveForClient, notifyRuleApprovers, ruleApproversFor } from "@/lib/app-domain/rule-approvals";
 import { datesInFile, isNamedTarget, listsOf, nameFieldOf, namesInFile } from "@/lib/app-domain/name-duplicates";
 import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
+import { autoApplySetting, evaluateAutoPauses } from "@/lib/app-domain/auto-apply";
+import { proposalKindKey } from "@/lib/knowledge-review-filters";
 
 // Org brain, phase 2: proposals to the client file
 // (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2; decisions 1 and 3).
@@ -77,6 +80,11 @@ import { findDateMatches, findNameMatches, nameTokens } from "@/lib/name-match";
 // the screens call, as the person approving, so every rule of the file
 // applies to an approved proposal exactly as to a typed item. There is no
 // way to approve through MCP (spec 8).
+//
+// 3.11.2026, the approval tiers: the one exception is a proposal in the
+// AUTO tier (approvalTier) sent by Claude, which the server approves on
+// arrival through the same approveProposal, as the person who sent it
+// (autoApplyBatch). lib/auto-apply.ts holds the rules that keep it safe.
 
 export type ProposalItemInput = {
   target: ProposalTargetLike;
@@ -130,7 +138,12 @@ export type ProposeResult = {
   /// Items whose name may be one already in the file: send them again as
   /// SUPERSEDE with that targetId, or the reviewer adds them to it.
   possibleMatches: { index: number; target: string; name: string; existing: { id: string; name: string }[] }[];
+  /// 3.11.2026: proposals the server approved on arrival (the AUTO tier):
+  /// they are in the file already.
+  autoApplied: AutoAppliedItem[];
 };
+
+export type AutoAppliedItem = { proposalId: string; target: ProposalTargetLike; headline: string; resultId: string | null };
 
 const MAX_ITEMS = 60;
 
@@ -300,7 +313,7 @@ async function flagsFor(clientId: string, item: ProposalItemInput & { payload: R
 export async function proposeKnowledge(
   actor: User,
   input: ProposeInput,
-  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[] } = {}
+  options: { createdById?: string | null; dropped?: ProposeResult["dropped"]; indexes?: number[]; autoApply?: boolean } = {}
 ): Promise<ProposeResult> {
   assertCan(actor.role, "time_entry.create_self");
   await assertClientAccess(actor, input.clientId);
@@ -410,7 +423,7 @@ export async function proposeKnowledge(
 
   // Nothing kept: a new source is not registered (31.10.2026).
   if (accepted.length === 0) {
-    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches };
+    return { batchId: null, sourceCode: source.existing ? source.code : null, proposed: 0, dropped, secretTaskId, possibleMatches, autoApplied: [] };
   }
 
   // The source and the batch go in together: a new source is registered
@@ -471,7 +484,48 @@ export async function proposeKnowledge(
     clientId: input.clientId,
     after: { sourceCode: registered.code, proposed: accepted.length, dropped: dropped.length },
   });
-  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches };
+  // Only what Claude sent (propose_knowledge): a batch typed on a screen,
+  // or one a person assigned to its client, waits as it always did.
+  const autoApplied = options.autoApply ? await autoApplyBatch(actor, batch.id, input.clientId) : [];
+  return { batchId: batch.id, sourceCode: registered.code, proposed: accepted.length, dropped, secretTaskId, possibleMatches, autoApplied };
+}
+
+/// The AUTO tier on arrival (3.11.2026, approval tiers part 2): each
+/// proposal of the batch that approvalTier puts in AUTO is approved now,
+/// through approveProposal, as the person who sent it (the identity of the
+/// MCP connection), and marked autoApplied. Not when the switch is off,
+/// not for a client marked "בלי AI" (it never gets here: lookupClient
+/// refuses it first), and not for a kind or a client sent back to a
+/// person (lib/auto-apply.ts): those wait like any QUICK proposal. A
+/// proposal that fails to apply stays pending for a person.
+async function autoApplyBatch(actor: User, batchId: string, clientId: string): Promise<AutoAppliedItem[]> {
+  const setting = await autoApplySetting();
+  if (!setting.enabled) return [];
+  const client = await prisma.client.findUnique({ where: { id: clientId }, select: { aiExcluded: true } });
+  if (!client || client.aiExcluded) return [];
+  const source = await batchSource(batchId);
+  const pending = await prisma.knowledgeProposal.findMany({ where: { batchId, state: "PENDING" }, orderBy: { createdAt: "asc" } });
+  const auto = pending.filter((p) => {
+    const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
+    const payload = p.payload as Record<string, unknown>;
+    const level = proposalReviewLevel({ confidence: p.confidence, flags, payload }, source);
+    return approvalTier({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level }).tier === "AUTO";
+  });
+  if (auto.length === 0) return [];
+  const keyOf = (p: (typeof auto)[number]) => proposalKindKey({ target: p.target as ProposalTargetLike, payload: p.payload as Record<string, unknown> });
+  const paused = await evaluateAutoPauses({ clientId, kindKeys: auto.map(keyOf) });
+  if (paused.clientPaused) return [];
+  const out: AutoAppliedItem[] = [];
+  for (const p of auto) {
+    if (paused.pausedKinds.has(keyOf(p))) continue;
+    try {
+      const done = await approveProposal(actor, p.id, {}, { auto: true });
+      out.push({ proposalId: p.id, target: p.target as ProposalTargetLike, headline: proposalHeadline(p.target as ProposalTargetLike, done.payload as Record<string, unknown>), resultId: done.resultId });
+    } catch (err) {
+      console.warn("[knowledge] auto-apply left a proposal for a person", p.id, err instanceof Error ? err.message : err);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -791,7 +845,9 @@ async function apply(
   throw new Error("סוג פריט לא מוכר.");
 }
 
-export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean } = {}) {
+/// `auto`: approved by the server on arrival (autoApplyBatch), not by a
+/// person on the screen. Marked autoApplied, with its own audit action.
+export async function approveProposal(actor: User, id: string, edits: Record<string, unknown> = {}, options: { bulk?: boolean; auto?: boolean } = {}) {
   assertCan(actor.role, "time_entry.create_self");
   const proposal = await findPending(actor, id);
   if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
@@ -825,12 +881,13 @@ export async function approveProposal(actor: User, id: string, edits: Record<str
       edited: changed.length > 0,
       resultId,
       payload: payload as Prisma.InputJsonValue,
+      ...(options.auto ? { autoApplied: true } : {}),
     },
   });
   await closeIfDone(proposal.batchId);
   await recordAudit({
     actorId: actor.id,
-    action: "knowledge_proposal.approve",
+    action: options.auto ? "knowledge_proposal.auto_apply" : "knowledge_proposal.approve",
     entityType: "KnowledgeProposal",
     entityId: id,
     clientId: proposal.clientId,
@@ -1117,6 +1174,17 @@ export async function revertProposal(actor: User, id: string) {
     clientId: proposal.clientId,
     after: { resultId, target: proposal.target, autoApplied: proposal.autoApplied, headline: proposalHeadline(proposal.target, proposal.payload as Record<string, unknown>) },
   });
+  // An auto-applied item taken out is an error of auto-apply: its kind or
+  // its client may now go back to a person (lib/auto-apply.ts).
+  // The item is out already; a failure here must not say otherwise, and
+  // the next arrival of the same client or kind checks again.
+  if (proposal.autoApplied) {
+    try {
+      await evaluateAutoPauses({ clientId: proposal.clientId, kindKeys: [proposalKindKey({ target: proposal.target as ProposalTargetLike, payload: proposal.payload as Record<string, unknown> })] });
+    } catch (err) {
+      console.error("[knowledge] auto-apply pause check after a revert failed", err);
+    }
+  }
   return prisma.knowledgeProposal.findUniqueOrThrow({ where: { id } });
 }
 

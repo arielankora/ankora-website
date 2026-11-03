@@ -3469,6 +3469,10 @@ model KnowledgeProposal {
   /// and by whom (revertProposal). The proposal stays APPROVED.
   revertedAt   DateTime?
   revertedById String?
+  /// An auto-applied item a person looked at after the fact and found
+  /// right ("תקין" on "נכנס אוטומטית"), and who (lib/auto-apply.ts).
+  autoReviewedAt   DateTime?
+  autoReviewedById String?
 
   createdAt DateTime @default(now())
 
@@ -3476,7 +3480,47 @@ model KnowledgeProposal {
 
   @@index([clientId, state])
   @@index([batchId])
+  @@index([autoApplied, decidedAt])
   @@map("knowledge_proposals")
+}
+
+enum AutoApplyScope {
+  /// A kind of proposal (proposalKindKey: a target, or FACT.<kind>).
+  KIND
+  /// One client.
+  CLIENT
+}
+
+/// A kind of proposal, or a client, sent back to a person after too many
+/// auto-applied items turned out wrong (lib/auto-apply.ts). While a pause
+/// is active its proposals wait for approval like any other. A manager
+/// lifts it on the approvals screen.
+model AutoApplyPause {
+  id         String         @id @default(cuid())
+  scope      AutoApplyScope
+  /// The kind key, or the client's id.
+  key        String
+  /// Why, in a Hebrew line, without client names.
+  reason     String
+  errors     Int
+  createdAt  DateTime       @default(now())
+  liftedAt   DateTime?
+  liftedById String?
+
+  @@index([scope, key, liftedAt])
+  @@map("auto_apply_pauses")
+}
+
+/// Settings that apply to all of Ankora, by key, changed on a screen
+/// without a deploy. First key: "knowledge.auto_apply" (the auto-apply
+/// switch, and when it was first switched on).
+model AppSetting {
+  key         String   @id
+  value       Json
+  updatedAt   DateTime @updatedAt
+  updatedById String?
+
+  @@map("app_settings")
 }
 
 /// What comes in from whom, and how it is answered (spec 3.7, section 7.5

@@ -11,12 +11,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //      bulk decision is read from its audit row.
 //   5. The approval tiers (3.11.2026): whether the server approved it,
 //      whether it was taken back, and whether a date opens a task.
+//   6. Part 2: whether a person marked it right after, the switch, and the
+//      pauses, with a paused client as its opaque key.
 
 const prisma = vi.hoisted(() => ({
   knowledgeProposal: { findMany: vi.fn(), count: vi.fn() },
   extractionGuide: { findMany: vi.fn() },
   clientSource: { findMany: vi.fn() },
   auditEvent: { findMany: vi.fn() },
+  appSetting: { findUnique: vi.fn(), upsert: vi.fn() },
+  autoApplyPause: { findMany: vi.fn() },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma }));
 
@@ -32,6 +36,7 @@ const base = {
   attached: false,
   autoApplied: false,
   revertedAt: null,
+  autoReviewedAt: null,
   decidedAt: new Date("2026-10-20T12:00:00Z"),
   createdAt: new Date("2026-10-20T10:00:00Z"),
   batch: { via: "MCP", sourceId: "s1" },
@@ -53,6 +58,8 @@ beforeEach(() => {
   prisma.extractionGuide.findMany.mockResolvedValue([{ version: 1, decidedAt: new Date("2026-10-15T00:00:00Z"), createdAt: new Date("2026-10-14T00:00:00Z") }]);
   prisma.clientSource.findMany.mockResolvedValue([{ id: "s1", kind: "TRANSCRIPT", restriction: "NONE" }]);
   prisma.auditEvent.findMany.mockResolvedValue([{ entityId: "p1", afterJson: { bulk: true } }]);
+  prisma.appSetting.findUnique.mockResolvedValue({ key: "knowledge.auto_apply", value: { enabled: true, firstEnabledAt: "2026-11-03T12:00:00.000Z" } });
+  prisma.autoApplyPause.findMany.mockResolvedValue([]);
 });
 
 describe("proposalStatsForAi", () => {
@@ -117,6 +124,31 @@ describe("proposalStatsForAi", () => {
       ["t1", "HIGH", "משימה נפתחת לאדם אחר"],
       ["l1", "LOW", "רמת בדיקה נמוכה"],
     ]);
+  });
+
+  it("says whether a person marked an auto-applied item right, the switch, and the pauses by key", async () => {
+    prisma.knowledgeProposal.findMany.mockResolvedValue([
+      { ...base, id: "a1", clientId: "c-nux", target: "FACT", action: "CREATE", state: "APPROVED", autoApplied: true, autoReviewedAt: new Date("2026-10-21T08:00:00Z"), payload: { kind: "NOTE" } },
+      { ...base, id: "a2", clientId: "c-nux", target: "CONTACT", action: "CREATE", state: "APPROVED", autoApplied: true, payload: {} },
+    ]);
+    prisma.autoApplyPause.findMany.mockResolvedValue([
+      { id: "z1", scope: "KIND", key: "FACT.NOTE", errors: 3, reason: "r", createdAt: new Date("2026-11-01T00:00:00Z"), liftedAt: null },
+      { id: "z2", scope: "CLIENT", key: "c-rimed", errors: 2, reason: "r", createdAt: new Date("2026-11-02T00:00:00Z"), liftedAt: null },
+    ]);
+    const out = await proposalStatsForAi(MANAGER, { rows: true });
+    expect(out.rows!.map((r) => [r.id, r.autoReviewed])).toEqual([
+      ["a1", true],
+      ["a2", false],
+    ]);
+    expect(out.autoApply).toEqual({
+      enabled: true,
+      firstEnabledAt: "2026-11-03T12:00:00.000Z",
+      pauses: [
+        { scope: "KIND", key: "FACT.NOTE", errors: 3, since: "2026-11-01T00:00:00.000Z" },
+        { scope: "CLIENT", key: "L2", errors: 2, since: "2026-11-02T00:00:00.000Z" },
+      ],
+    });
+    expect(JSON.stringify(out)).not.toContain("c-rimed");
   });
 
   it("pages the rows", async () => {

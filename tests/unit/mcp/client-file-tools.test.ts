@@ -126,13 +126,13 @@ describe("propose_knowledge", () => {
         via: "MCP",
         source: expect.objectContaining({ kind: "TRANSCRIPT", externalIds: ["ff-1"], restriction: "NONE", occurredAt: new Date("2026-10-12T00:00:00Z") }),
       }),
-      { indexes: [0] }
+      { indexes: [0], autoApply: true }
     );
   });
 
   it("passes an item's status on to the domain, where it is read (31.10.2026)", async () => {
     await call({ client: "nux", sourceCode: "S4", items: [{ ...ITEM, reason: "r", status: "CONFIRMED" }] });
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ items: [expect.objectContaining({ status: "CONFIRMED" })] }), { indexes: [0] });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ items: [expect.objectContaining({ status: "CONFIRMED" })] }), { indexes: [0], autoApply: true });
   });
 
   it("takes a task as the source, so a mapping task can be cited (19.10.2026)", async () => {
@@ -140,8 +140,27 @@ describe("propose_knowledge", () => {
     expect(proposals.proposeKnowledge).toHaveBeenCalledWith(
       ACTOR,
       expect.objectContaining({ source: expect.objectContaining({ kind: "TASK", externalIds: ["t-map"] }) }),
-      { indexes: [0] }
+      { indexes: [0], autoApply: true }
     );
+  });
+
+  it("says which items entered the file on arrival, with the item's link, and how many still wait (3.11.2026)", async () => {
+    proposals.proposeKnowledge.mockResolvedValue({
+      batchId: "b1",
+      sourceCode: "S4",
+      proposed: 3,
+      dropped: [],
+      secretTaskId: null,
+      possibleMatches: [],
+      autoApplied: [{ proposalId: "p1", target: "FACT", headline: "מייל ולא טלפון", resultId: "f1" }],
+    });
+    const body = JSON.parse((await call({ client: "nux", sourceCode: "S4", items: [ITEM, ITEM, ITEM] })).content[0].text!);
+    expect(body.enteredFile).toEqual([
+      { proposalId: "p1", says: "מייל ולא טלפון", url: "https://www.ankora.co.il/app/approvals?tab=knowledge&clientId=c-nux#proposal-p1", result: "https://www.ankora.co.il/app/clients/c-nux?tab=file#item-f1" },
+    ]);
+    expect(body).not.toHaveProperty("autoApplied");
+    expect(body.next).toContain("2 proposals are waiting");
+    expect(body.next).toContain("1 entered the client's file automatically");
   });
 
   it("needs a source, and a date it can read, before anything is sent", async () => {
@@ -155,8 +174,8 @@ describe("propose_knowledge", () => {
     const r = await call({ client: "nux", newSource: { kind: "TRANSCRIPT", title: "Nextage", firefliesId: "ff-2" }, items: [ITEM, { ...ITEM, client: "zest" }, ITEM] });
     const body = JSON.parse(r.content[0].text!);
     expect(body.batches.map((b: { client: string }) => b.client)).toEqual(["NUX", "Zest"]);
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-nux", items: [ITEM, ITEM] }), { indexes: [0, 2] });
-    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-zest", items: [ITEM] }), { indexes: [1] });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-nux", items: [ITEM, ITEM] }), { indexes: [0, 2], autoApply: true });
+    expect(proposals.proposeKnowledge).toHaveBeenCalledWith(ACTOR, expect.objectContaining({ clientId: "c-zest", items: [ITEM] }), { indexes: [1], autoApply: true });
     // A source code belongs to one register.
     proposals.proposeKnowledge.mockClear();
     expect((await call({ client: "nux", sourceCode: "S1", items: [ITEM, { ...ITEM, client: "zest" }] })).content[0].text).toContain("newSource");
