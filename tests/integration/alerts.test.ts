@@ -132,7 +132,7 @@ describe("evaluateAlertsForClient() - ADR 11.3 dedupe/retrigger, end to end", ()
     expect(sendEmail).toHaveBeenCalledTimes(2);
   });
 
-  it.fails("fires once even when two evaluations of the same client interleave (KNOWN BUG: remove .fails when fixed)", async () => {
+  it("fires once even when two evaluations of the same client interleave", async () => {
     // Since #87 every time-entry write evaluates alerts in after(), so two
     // saves landing together evaluate the same client concurrently. The
     // decision is read-then-create with no lock and no unique constraint:
