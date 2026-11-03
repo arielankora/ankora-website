@@ -100,6 +100,51 @@ const NOT_A_VENDOR = new Set(
   ].map((w) => w.toLowerCase())
 );
 
+/// Hebrew action words that ask about a vendor even with no name next to
+/// them: the verb of connecting itself ("לחבר את המערכת של הבנק"). The
+/// nouns ("אינטגרציה", "התחברות", "הרשמה") are too common in product
+/// writing to ask about alone (3.11.2026: "בדיקות אינטגרציה" asked).
+const HEBREW_BARE_ACTIONS = new Set(["לחבר", "חיבור", "מחברים", "להירשם", "להטמיע"]);
+
+/// Hebrew phrases where an action word does not mean connecting anything:
+/// a kind of test, not an integration.
+const HEBREW_NOT_CONNECTING = /(?:בדיקות|בדיקת|טסטים של|טסט)\s+(?:יחידה,?\s+)?אינטגרציה/gu;
+
+/// Common words of product and engineering writing, never a vendor's name
+/// (3.11.2026: "tests" from a path, and the like). Lower case.
+const COMMON_WORDS = new Set([
+  "test", "tests", "spec", "specs", "unit", "e2e", "schema", "migration", "migrations", "branch", "commit", "merge",
+  "deploy", "build", "code", "file", "files", "field", "fields", "screen", "step", "steps", "flow", "prompt", "plan",
+  "task", "tasks", "status", "error", "errors", "bug", "fix", "data", "database", "table", "tables", "user", "users",
+  "admin", "client", "clients", "portal", "script", "cron", "job", "jobs", "check", "checks", "lint", "type", "types", "model", "models",
+  "proposal", "proposals", "approval", "approvals", "knowledge", "vendor", "vendors", "detection", "run", "runs",
+  "crm", "erp", "saas", "ai", "llm", "main", "preview", "production", "staging", "local", "null", "true", "false",
+  "string", "number", "id", "ids", "next", "result", "results", "payload", "tool", "tools", "description", "workflow",
+]);
+
+/// A process, source or rule code (P14, S30, R3): ours, not a vendor.
+const OUR_CODE = /^[A-Z]{1,2}\d+$/;
+
+/// What is code, not prose: inline code, URLs, paths, and identifiers
+/// (camelCase, snake_case, file.ext). Removed before reading, so a path
+/// like tests/integration/x.test.ts says neither "integration" nor "tests".
+function withoutCode(text: string): string {
+  return text
+    .replace(/`[^`]*`/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\S*\/\S*/g, " ")
+    .replace(/\b\w+(?:\.\w+)*\.[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b\w+_\w+\b/g, " ")
+    .replace(/\b[\w-]+\.(?:ts|tsx|js|mjs|json|md|sql|prisma|yml|yaml|css|html)\b/g, " ");
+}
+
+/// Sentences: a vendor counts only in the sentence that says "connect".
+/// A dot inside a name (cal.com) does not end one.
+function sentencesOf(text: string): string[] {
+  return text.split(/\n+|[.!?;](?=\s|$)/u).map((x) => x.trim()).filter(Boolean);
+}
+
 /// A channel name that belongs to a vendor we already work with. Seeing
 /// one is a new channel at an existing vendor (Ariel, 3.11.2026): a note
 /// on that vendor's run, not a new run.
@@ -188,57 +233,67 @@ function channelVendorOf(text: string): { channel: string; vendor: string } | nu
 /// word is reported as `existingVendor`, so the caller can note it on that
 /// vendor's run instead of opening another.
 export function detectVendorSignal(text: string, known: string[]): VendorSignal | null {
-  const t = (text ?? "").trim();
+  const t = withoutCode(text ?? "").replace(HEBREW_NOT_CONNECTING, " ").trim();
   if (!t) return null;
-
-  const hebrew = t.match(hebrewActionRe);
-  const latin = t.match(latinActionRe);
-  if (!hebrew && !latin) return null;
-  const action = (hebrew?.[1] ?? latin?.[1] ?? "").trim();
-
   const knownKeys = new Map(known.map((k) => [vendorKey(k), k]));
 
-  // A candidate vendor: a Latin token that is not technology or a generic
-  // word. Two capitalised tokens in a row read as one name.
-  const tokens = latinTokens(t);
-  const candidates: string[] = [];
-  for (let i = 0; i < tokens.length; i++) {
-    const w = tokens[i].word;
-    if (NOT_A_VENDOR.has(w.toLowerCase())) continue;
-    if (!/^[A-Z0-9]/.test(w) && w.length < 4) continue;
-    let name = w;
-    const next = tokens[i + 1];
-    if (
-      next &&
-      /^[A-Z]/.test(w) &&
-      /^[A-Z]/.test(next.word) &&
-      !NOT_A_VENDOR.has(next.word.toLowerCase()) &&
-      t.slice(tokens[i].index + w.length, next.index).trim() === ""
-    ) {
-      name = `${w} ${next.word}`;
-      i++;
+  let bareHebrew: string | null = null;
+  for (const sentence of sentencesOf(t)) {
+    const hebrew = sentence.match(hebrewActionRe);
+    const latin = sentence.match(latinActionRe);
+    if (!hebrew && !latin) continue;
+    const action = (hebrew?.[1] ?? latin?.[1] ?? "").trim();
+    const actionAt = hebrew ? (hebrew.index ?? 0) + hebrew[0].indexOf(hebrew[1]) : latin?.index ?? 0;
+
+    // A candidate vendor: a Latin token that is not technology, a common
+    // word or one of our codes. Two capitalised tokens in a row read as one
+    // name. A word in lower case counts only right next to the action word
+    // ("לחבר את pipedrive"), since prose is full of lower-case words.
+    const tokens = latinTokens(sentence);
+    const candidates: string[] = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const w = tokens[i].word;
+      const lower = w.toLowerCase();
+      if (NOT_A_VENDOR.has(lower) || COMMON_WORDS.has(lower) || OUR_CODE.test(w) || w.length < 2) continue;
+      if (!/^[A-Z0-9]/.test(w)) {
+        if (w.length < 4 || Math.abs(tokens[i].index - actionAt) > action.length + 12) continue;
+      }
+      let name = w;
+      const next = tokens[i + 1];
+      if (
+        next &&
+        /^[A-Z]/.test(w) &&
+        /^[A-Z]/.test(next.word) &&
+        !NOT_A_VENDOR.has(next.word.toLowerCase()) &&
+        !COMMON_WORDS.has(next.word.toLowerCase()) &&
+        sentence.slice(tokens[i].index + w.length, next.index).trim() === ""
+      ) {
+        name = `${w} ${next.word}`;
+        i++;
+      }
+      candidates.push(name);
     }
-    candidates.push(name);
-  }
 
-  for (const c of candidates) {
-    const key = vendorKey(c);
-    const existing = knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
-    if (existing) return { vendor: c, existingVendor: existing, matched: `${action} + ${c}` };
-    // A single word that is itself an action word is not a name.
-    if (LATIN_ACTIONS.includes(key)) continue;
-    return { vendor: c, existingVendor: null, matched: `${action} + ${c}` };
-  }
+    for (const c of candidates) {
+      const key = vendorKey(c);
+      const existing = knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
+      if (existing) return { vendor: c, existingVendor: existing, matched: `${action} + ${c}` };
+      // A single word that is itself an action word is not a name.
+      if (LATIN_ACTIONS.includes(key)) continue;
+      return { vendor: c, existingVendor: null, matched: `${action} + ${c}` };
+    }
 
-  // No Latin name: maybe a channel written in Hebrew ("לחבר וואטסאפ").
-  const channel = channelVendorOf(t);
-  if (channel) {
-    return { vendor: channel.channel, existingVendor: channel.vendor, matched: `${action} + ${channel.channel}` };
-  }
+    // No Latin name: maybe a channel written in Hebrew ("לחבר וואטסאפ").
+    const channel = channelVendorOf(sentence);
+    if (channel) {
+      return { vendor: channel.channel, existingVendor: channel.vendor, matched: `${action} + ${channel.channel}` };
+    }
 
-  // Only technology words, with no name at all ("להוסיף API"): a bare
-  // Latin action like "api" on its own is too common to ask about.
-  // A Hebrew verb of connecting is asked about even without a name.
-  if (hebrew) return { vendor: null, existingVendor: null, matched: action };
-  return null;
+    // Only technology words, with no name at all ("להוסיף API"): a bare
+    // Latin action is too common to ask about. The Hebrew verb of
+    // connecting is asked about even without a name, once nothing better
+    // turned up in another sentence.
+    if (hebrew && HEBREW_BARE_ACTIONS.has(hebrew[1]) && !bareHebrew) bareHebrew = hebrew[1];
+  }
+  return bareHebrew ? { vendor: null, existingVendor: null, matched: bareHebrew } : null;
 }
