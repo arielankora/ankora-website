@@ -179,11 +179,12 @@ function ColumnHeader() {
   return (
     <div
       data-testid="task-columns"
-      className="hidden border-b border-app-border grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-app-text-tertiary xl:grid"
+      className="hidden border-b border-app-border grid-cols-[20px_minmax(0,130px)_minmax(0,1fr)_minmax(0,110px)_56px_minmax(0,110px)_128px_minmax(0,110px)_64px] items-center gap-x-3 px-[18px] py-2 text-[11px] font-medium text-app-text-tertiary xl:grid"
     >
       <span />
       <SortButton column="client" />
       <SortButton column="title" />
+      <SortButton column="category" />
       <SortButton column="due" end />
       <SortButton column="assignee" />
       <SortButton column="status" />

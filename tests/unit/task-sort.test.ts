@@ -87,6 +87,17 @@ describe("task list sort", () => {
     expect(ids(sortRows(rows, { key: "assignee", desc: true }))).toEqual(["hadas", "ariel", "nobody"]);
   });
 
+  it("sorts by category, uncategorised last in both directions", () => {
+    const rows = [
+      row("none", { categoryName: null }),
+      row("hr", { categoryName: "גיוס" }),
+      row("ops", { categoryName: "אוטומציות" }),
+    ];
+    expect(parseSort("category")).toEqual({ key: "category", desc: false });
+    expect(ids(sortRows(rows, { key: "category", desc: false }))).toEqual(["ops", "hr", "none"]);
+    expect(ids(sortRows(rows, { key: "category", desc: true }))).toEqual(["hr", "ops", "none"]);
+  });
+
   it("travels with the way back from a task", () => {
     expect(listQueryOf({ status: "DONE", sort: "-due" })).toBe("status=DONE&sort=-due");
     expect(tasksListHref("sort=client")).toBe("/app/tasks?sort=client");
