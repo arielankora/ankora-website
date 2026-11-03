@@ -50,12 +50,9 @@ describe("detectVendorSignal", () => {
     expect(detectVendorSignal("להירשם ל-Apollo", [...known, "Apollo"])?.existingVendor).toBe("Apollo");
   });
 
-  it("asks about a Hebrew verb of connecting even without a name", () => {
-    expect(detectVendorSignal("לחבר את המערכת של הבנק", known)).toEqual({
-      vendor: null,
-      existingVendor: null,
-      matched: "לחבר",
-    });
+  it("needs a name: a verb of connecting alone is not a vendor", () => {
+    // 3.11.2026: asking "which vendor?" on every "חיבור" was the noise.
+    expect(detectVendorSignal("לחבר את המערכת של הבנק", known)).toBeNull();
   });
 
   it("stays quiet on technology words alone", () => {
@@ -66,14 +63,30 @@ describe("detectVendorSignal", () => {
   it("does not take a process, source, PR or version code for a vendor", () => {
     // 3.11.2026, in production: "MCP + P15" read as a vendor called P15.
     expect(detectVendorSignal("אישור אחד לתהליך: MCP + P15", known)).toBeNull();
-    expect(detectVendorSignal("לחבר את S28 ל-P8", known)).toEqual({ vendor: null, existingVendor: null, matched: "לחבר" });
+    expect(detectVendorSignal("לחבר את S28 ל-P8", known)).toBeNull();
     expect(detectVendorSignal("API v2 ל-PR400", known)).toBeNull();
     expect(detectVendorSignal("MCP 1.0", known)).toBeNull();
   });
 
   it("still finds a real name next to a code", () => {
     expect(detectVendorSignal("לחבר את Pipedrive ל-P15", known)?.vendor).toBe("Pipedrive");
-    expect(detectVendorSignal("חיבור MCP ל-P15 Pipedrive", known)?.vendor).toBe("Pipedrive");
+    expect(detectVendorSignal("חיבור MCP של Pipedrive ל-P15", known)?.vendor).toBe("Pipedrive");
+  });
+
+  it("stays quiet on the false alarms seen in production (3.11.2026)", () => {
+    expect(detectVendorSignal("תיקון integration tests שנכשלים ב-qa", known)).toBeNull();
+    expect(detectVendorSignal("Integration tests: להוסיף בדיקה לחיבור", known)).toBeNull();
+    expect(detectVendorSignal("חיבור ariel@ankora.co.il לחשבון", known)).toBeNull();
+    expect(detectVendorSignal("להוסיף integration עם tests", known)).toBeNull();
+    expect(detectVendorSignal("Claude MCP: כלי חדש לאישורים", known)).toBeNull();
+    expect(detectVendorSignal("חיבור הכפתור למסך ב-https://www.ankora.co.il/app", known)).toBeNull();
+  });
+
+  it("finds a name after an English verb of connecting", () => {
+    expect(detectVendorSignal("Connect Pipedrive to the app", known)?.vendor).toBe("Pipedrive");
+    expect(detectVendorSignal("integrate with HubSpot", known)?.vendor).toBe("HubSpot");
+    expect(detectVendorSignal("sign up for Aircall", known)?.vendor).toBe("Aircall");
+    expect(detectVendorSignal("connect tests", known)).toBeNull();
   });
 
   it("stays quiet when nothing is being connected", () => {

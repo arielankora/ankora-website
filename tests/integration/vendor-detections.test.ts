@@ -123,16 +123,25 @@ describe("deciding", () => {
     expect(await prisma.task.count({ where: { processId: { not: null }, parentId: null } })).toBe(1);
   });
 
-  it("asks for a name when the text had none, and records a dismissal", async () => {
+  it("asks nothing when no vendor is named, and records a dismissal", async () => {
     const { internal, ops, product } = await setup();
-    const t = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את המערכת של הבנק" });
+    const vague = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את המערכת של הבנק" });
+    expect(await pendingVendorCheck(vague.id)).toBeNull();
+    const t = await createTask(ops, { clientId: internal.id, categoryId: product.id, title: "לחבר את Pipedrive" });
     const check = (await pendingVendorCheck(t.id))!;
-    expect(check.vendor).toBeNull();
-    await expect(decideVendorCheck(ops, check.detectionId, "OPEN_RUN")).rejects.toThrow("שם הספק");
     const out = await decideVendorCheck(ops, check.detectionId, "NOT_A_VENDOR");
     expect(out.status).toBe("NOT_A_VENDOR");
     const row = await prisma.vendorDetection.findUniqueOrThrow({ where: { id: check.detectionId } });
     expect(row.decidedById).toBe(ops.id);
+  });
+
+  it("asks nothing about everyday product work (3.11.2026 false alarms)", async () => {
+    const { internal, ops, product } = await setup();
+    for (const title of ["תיקון integration tests שנכשלים", "אישור אחד לתהליך: MCP + P15", "חיבור ariel@ankora.co.il לחשבון"]) {
+      const t = await createTask(ops, { clientId: internal.id, categoryId: product.id, title });
+      expect(await pendingVendorCheck(t.id), title).toBeNull();
+    }
+    expect(await prisma.vendorDetection.count()).toBe(0);
   });
 
   it("is refused to someone without access to the task's client", async () => {
