@@ -135,6 +135,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "knowledge_proposal.reject": "דחיית הצעה לתיק הלקוח",
   "knowledge_proposal.attach": "הצעה שכבר בתיק: המקור נוסף לפריט הקיים",
   "knowledge_proposal.to_task": "הצעה לתיק הלקוח הפכה למשימה",
+  "knowledge_proposal.revert": "ביטול הצעה שאושרה: הפריט הוסר מתיק הלקוח",
   "brain_metrics.weekly_email": "נשלח מייל שבועי של מדדי התיק",
   "request_type.add": "הוספת סוג פנייה לתיק הלקוח",
   "request_type.update": "עדכון סוג פנייה בתיק הלקוח",

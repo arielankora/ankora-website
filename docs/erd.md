@@ -980,6 +980,9 @@ erDiagram
         string confidence "nullable, HIGH / MEDIUM / LOW, as Claude reported it"
         boolean attached "it was already in the file, so approving only added its sources"
         string resultId "nullable"
+        boolean autoApplied "approved by the server with no person (approval tiers)"
+        datetime revertedAt "nullable, its item was taken out of the file again"
+        string revertedById "nullable"
         datetime createdAt
     }
 

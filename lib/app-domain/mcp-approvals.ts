@@ -4,9 +4,9 @@ import { prisma } from "@/lib/prisma";
 import { collectApprovals } from "@/lib/app-domain/approvals";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { aiExcludedClientIds, aiExcludedTaskIds } from "@/lib/app-domain/ai-exclusion-db";
-import { approveProposal, attachProposalToExisting, listOpenBatches, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, attachProposalToExisting, batchSource, listOpenBatches, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
 import { onlyMine, type ApprovalItem, type ApprovalKind } from "@/lib/approvals";
-import { bulkApproveBlocker, proposalHeadline, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { bulkApproveBlocker, proposalHeadline, proposalReviewLevel, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { proposalKindKey, proposalKindLabel } from "@/lib/knowledge-review-filters";
 import { AI_EXCLUDED_TOOL_MESSAGE } from "@/lib/ai-exclusion";
 
@@ -87,7 +87,7 @@ export async function listApprovalsForAi(
               reason: p.reason,
               quote: p.quote,
               flags: flags.map((f) => f.message),
-              aloneBecause: bulkApproveBlocker({ action: p.action, flags, payload }),
+              aloneBecause: bulkApproveBlocker({ target, action: p.action, flags, payload, level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, b.source) }),
               alreadyInFile: p.alreadyIn?.body ?? null,
               hiddenFor: null,
             };
@@ -150,9 +150,11 @@ export async function decideProposalForAi(
 
 /// Whether a proposal must be approved on its own (bulkApproveBlocker), as
 /// the card says it: a change to an item already in the file, a possible
-/// duplicate, something flagged. Null when it may go with others.
+/// duplicate, something flagged, a task, a low review level. Null when it may go with others.
 export async function proposalAloneBecause(id: string): Promise<string | null> {
-  const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { action: true, flags: true, payload: true } });
+  const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { batchId: true, target: true, action: true, flags: true, payload: true, confidence: true } });
   if (!p) return null;
-  return bulkApproveBlocker({ action: p.action, flags: (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[], payload: (p.payload ?? {}) as Record<string, unknown> });
+  const flags = (Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[];
+  const payload = (p.payload ?? {}) as Record<string, unknown>;
+  return bulkApproveBlocker({ target: p.target, action: p.action, flags, payload, level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, await batchSource(p.batchId)) });
 }

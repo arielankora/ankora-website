@@ -22,6 +22,7 @@ const p = (over: Partial<Parameters<typeof proposalMatches>[0]> = {}) => ({
   flags: [],
   payload: { kind: "FINANCE" } as Record<string, unknown>,
   hiddenFor: null,
+  confidence: { level: "HIGH" as const },
   ...over,
 });
 
@@ -60,6 +61,11 @@ describe("review filters", () => {
     expect(needsAttention(p({ flags: [{ code: "R14", message: "" }] }))).toBe(true);
     expect(needsAttention(p({ payload: { kind: "NOTE", sensitivity: "SENSITIVE" } }))).toBe(true);
     expect(needsAttention(p({ hiddenFor: "הדס" }))).toBe(true);
+    // 3.11.2026, the approval tiers: a low review level and a task are
+    // decided one at a time, so they need a look too.
+    expect(needsAttention(p({ confidence: { level: "LOW" } }))).toBe(true);
+    expect(needsAttention(p({ target: "TASK", payload: { title: "x" } }))).toBe(true);
+    expect(needsAttention(p({ confidence: { level: "MEDIUM" } }))).toBe(false);
   });
 
   it("kinds are OR, everything else AND", () => {
