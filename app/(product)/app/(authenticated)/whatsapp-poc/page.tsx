@@ -740,17 +740,6 @@ export default async function CommunicationsPage(props: {
                 </header>
 
                 <ol className="flex-1 space-y-3 overflow-y-auto p-4 sm:px-6">
-                  {loaded.hasOlder && messages[0] ? (
-                    <li className="flex justify-center">
-                      <Link
-                        prefetch={false}
-                        href={href({ c: openKey, filter, q: query, before: messages[0].timestamp })}
-                        className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
-                      >
-                        הודעות קודמות
-                      </Link>
-                    </li>
-                  ) : null}
                   {beforeParam ? (
                     <li className="flex justify-center">
                       <Link prefetch={false} href={href({ c: openKey, filter, q: query })} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
@@ -774,6 +763,18 @@ export default async function CommunicationsPage(props: {
                     return call ? [day, <CallCard key={`c-${call.emailId}`} call={call} transcribe={config.hasOpenAiKey} />] : day;
                   })}
                   {timeline.length === 0 ? <li className="text-sm text-app-text-secondary">אין הודעות או שיחות להצגה.</li> : null}
+                  {/* Newest first, so the way back to older messages sits at the bottom. */}
+                  {loaded.hasOlder && messages[0] ? (
+                    <li className="flex justify-center">
+                      <Link
+                        prefetch={false}
+                        href={href({ c: openKey, filter, q: query, before: messages[0].timestamp })}
+                        className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline"
+                      >
+                        הודעות קודמות
+                      </Link>
+                    </li>
+                  ) : null}
                 </ol>
 
                 {chat ? (

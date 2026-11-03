@@ -227,13 +227,14 @@ export type TimelineMessage = { kind: "message"; at: string; id: string };
 export type TimelineCall = { kind: "call"; at: string; id: string };
 export type TimelineItem = TimelineMessage | TimelineCall;
 
-/// Messages and calls in one line, oldest first, as a conversation reads.
+/// Messages and calls in one line, newest first: the latest item sits at the
+/// top of the timeline, like the contact list beside it (Ariel, 3.11.2026).
 export function buildTimeline(messages: Array<{ id: string; timestamp: string }>, calls: InboxCall[]): TimelineItem[] {
   const items: TimelineItem[] = [
     ...messages.map((m) => ({ kind: "message" as const, at: m.timestamp, id: m.id })),
     ...calls.map((c) => ({ kind: "call" as const, at: c.callAt, id: c.emailId })),
   ];
-  return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
+  return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
 }
 
 /// Day headings in the timeline ("יום ראשון, 1 בנובמבר"), Israel time.
