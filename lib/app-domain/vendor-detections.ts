@@ -301,7 +301,17 @@ export async function decideVendorCheck(
 /// the run's first step (classification) is where a person names it.
 export async function openOverdueVendorRuns(now: Date = new Date()): Promise<{ opened: number; failed: number }> {
   const todayKey = localDateKey(now, TIMEZONE);
-  const pending = await prisma.vendorDetection.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 50 });
+  // A task dropped (archived) or deleted while its question waited is not
+  // a vendor being connected: nothing opens for it. It stays pending, and
+  // reopening the task brings the question back. A task finished (DONE)
+  // still opens: the work, vendor included, most likely happened.
+  // Filtered in the query rather than skipped in the loop, so rows that
+  // will never open cannot crowd the 50 out of newer ones.
+  const pending = await prisma.vendorDetection.findMany({
+    where: { status: "PENDING", sourceTask: { deletedAt: null, status: { not: "ARCHIVED" } } },
+    orderBy: { createdAt: "asc" },
+    take: 50,
+  });
   let opened = 0;
   let failed = 0;
   for (const row of pending) {
