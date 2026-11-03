@@ -2081,3 +2081,15 @@ export async function setStepDone(actor: User, stepId: string, done: boolean): P
   });
   return "sent";
 }
+
+/// Open top-level tasks per client, for the clients screen (3.11.2026).
+/// The screen is client.manage only, so this is not scoped per actor.
+export async function countOpenTasksByClient(clientIds: string[]): Promise<Map<string, number>> {
+  if (clientIds.length === 0) return new Map();
+  const rows = await prisma.task.groupBy({
+    by: ["clientId"],
+    where: { clientId: { in: clientIds }, deletedAt: null, ...TOP_LEVEL_ONLY, status: { in: OPEN_STATUSES } },
+    _count: { _all: true },
+  });
+  return new Map(rows.map((r) => [r.clientId, r._count._all]));
+}

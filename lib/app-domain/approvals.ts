@@ -525,3 +525,14 @@ export async function countApprovalsForClient(user: User, clientId: string): Pro
   const items = onlyMine(await collectApprovals(user)).filter((i) => i.clientId === clientId);
   return items.reduce((n, i) => n + (i.weight ?? 1), 0);
 }
+
+/// Per client, for every client at once (the clients screen, 3.11.2026):
+/// one collection rather than one per card.
+export async function countApprovalsByClient(user: User): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  for (const i of onlyMine(await collectApprovals(user))) {
+    if (!i.clientId) continue;
+    out.set(i.clientId, (out.get(i.clientId) ?? 0) + (i.weight ?? 1));
+  }
+  return out;
+}
