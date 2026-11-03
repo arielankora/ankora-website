@@ -21,37 +21,6 @@
 
 import security from "@/content/security/he";
 
-/// Words that say "we are connecting something". Hebrew forms cover the
-/// verb, the noun and the common prefixes (ל, ה, ו, ב, ש).
-const HEBREW_ACTIONS = [
-  "לחבר",
-  "חיבור",
-  "מחבר",
-  "מחברים",
-  "התחברות",
-  "אינטגרציה",
-  "אינטגרציית",
-  "להירשם",
-  "הרשמה",
-  "להטמיע",
-  "הטמעת",
-];
-const LATIN_ACTIONS = [
-  "connect",
-  "connector",
-  "connection",
-  "integrate",
-  "integration",
-  "mcp",
-  "api",
-  "sdk",
-  "oauth",
-  "webhook",
-  "webhooks",
-  "signup",
-  "sign up",
-];
-
 /// Latin words that sit next to an action word but are never a vendor:
 /// the technology itself, our own names, and generic nouns.
 const NOT_A_VENDOR = new Set(
@@ -99,51 +68,6 @@ const NOT_A_VENDOR = new Set(
     "p8",
   ].map((w) => w.toLowerCase())
 );
-
-/// Hebrew action words that ask about a vendor even with no name next to
-/// them: the verb of connecting itself ("לחבר את המערכת של הבנק"). The
-/// nouns ("אינטגרציה", "התחברות", "הרשמה") are too common in product
-/// writing to ask about alone (3.11.2026: "בדיקות אינטגרציה" asked).
-const HEBREW_BARE_ACTIONS = new Set(["לחבר", "חיבור", "מחברים", "להירשם", "להטמיע"]);
-
-/// Hebrew phrases where an action word does not mean connecting anything:
-/// a kind of test, not an integration.
-const HEBREW_NOT_CONNECTING = /(?:בדיקות|בדיקת|טסטים של|טסט)\s+(?:יחידה,?\s+)?אינטגרציה/gu;
-
-/// Common words of product and engineering writing, never a vendor's name
-/// (3.11.2026: "tests" from a path, and the like). Lower case.
-const COMMON_WORDS = new Set([
-  "test", "tests", "spec", "specs", "unit", "e2e", "schema", "migration", "migrations", "branch", "commit", "merge",
-  "deploy", "build", "code", "file", "files", "field", "fields", "screen", "step", "steps", "flow", "prompt", "plan",
-  "task", "tasks", "status", "error", "errors", "bug", "fix", "data", "database", "table", "tables", "user", "users",
-  "admin", "client", "clients", "portal", "script", "cron", "job", "jobs", "check", "checks", "lint", "type", "types", "model", "models",
-  "proposal", "proposals", "approval", "approvals", "knowledge", "vendor", "vendors", "detection", "run", "runs",
-  "crm", "erp", "saas", "ai", "llm", "main", "preview", "production", "staging", "local", "null", "true", "false",
-  "string", "number", "id", "ids", "next", "result", "results", "payload", "tool", "tools", "description", "workflow",
-]);
-
-/// A process, source or rule code (P14, S30, R3): ours, not a vendor.
-const OUR_CODE = /^[A-Z]{1,2}\d+$/;
-
-/// What is code, not prose: inline code, URLs, paths, and identifiers
-/// (camelCase, snake_case, file.ext). Removed before reading, so a path
-/// like tests/integration/x.test.ts says neither "integration" nor "tests".
-function withoutCode(text: string): string {
-  return text
-    .replace(/`[^`]*`/g, " ")
-    .replace(/https?:\/\/\S+/g, " ")
-    .replace(/\S*\/\S*/g, " ")
-    .replace(/\b\w+(?:\.\w+)*\.[a-z]+[A-Z]\w*\b/g, " ")
-    .replace(/\b[a-z]+[A-Z]\w*\b/g, " ")
-    .replace(/\b\w+_\w+\b/g, " ")
-    .replace(/\b[\w-]+\.(?:ts|tsx|js|mjs|json|md|sql|prisma|yml|yaml|css|html)\b/g, " ");
-}
-
-/// Sentences: a vendor counts only in the sentence that says "connect".
-/// A dot inside a name (cal.com) does not end one.
-function sentencesOf(text: string): string[] {
-  return text.split(/\n+|[.!?;](?=\s|$)/u).map((x) => x.trim()).filter(Boolean);
-}
 
 /// A channel name that belongs to a vendor we already work with. Seeing
 /// one is a new channel at an existing vendor (Ariel, 3.11.2026): a note
@@ -195,105 +119,151 @@ export type VendorSignal = {
 };
 
 const HEBREW_PREFIX = "[להובשמכ]{0,2}";
-const hebrewActionRe = new RegExp(
-  `(?:^|[^\\u0590-\\u05FF])${HEBREW_PREFIX}(${HEBREW_ACTIONS.join("|")})(?=$|[^\\u0590-\\u05FF])`,
-  "u"
+
+/// Codes the team writes all day that are not names: a process (P15), a
+/// source in a client file (S28), a pull request (PR400), a version (v2,
+/// 1.0). 3.11.2026: "MCP + P15" in a task about the approvals screen read
+/// as connecting a vendor called P15.
+const CODE_LIKE = /^(?:[A-Za-z]{1,3}\d+|v?\d+(?:\.\d+)*)$/;
+
+/// Capitalised words that start sentences and titles in product work and
+/// are never a vendor. 3.11.2026: "integration tests" and the like.
+const COMMON_WORDS = new Set(
+  [
+    "test", "tests", "testing", "integration", "integrations", "unit", "e2e", "admin", "dashboard", "portal",
+    "page", "screen", "task", "tasks", "user", "users", "data", "file", "files", "report", "reports", "mobile",
+    "web", "email", "mail", "login", "auth", "settings", "preview", "production", "staging", "main", "branch",
+    "bug", "fix", "feature", "old", "draft", "plan", "step", "steps", "process", "client", "clients", "team",
+    "home", "app", "apps", "tool", "tools", "connector", "connectors", "server", "service", "services", "system",
+    "systems", "account", "accounts", "error", "errors", "check", "checks", "flow", "flows", "job", "jobs",
+    "cron", "list", "lists", "view", "views", "card", "button", "form", "forms", "table", "tables", "field",
+    "fields", "note", "notes", "comment", "comments", "link", "links", "id", "ids", "url", "urls", "json", "csv",
+    "pdf", "html", "css", "ts", "js", "node", "next", "react", "prisma", "vitest", "playwright", "github",
+  ].map((w) => w.toLowerCase())
 );
-const latinActionRe = new RegExp(`\\b(${LATIN_ACTIONS.map((a) => a.replace(" ", "\\s+")).join("|")})\\b`, "i");
 
-/// Latin tokens, with a dot or dash inside allowed (Meet-Alfred, cal.com),
-/// and two capitalised words kept together (Google Drive, Meet Alfred).
-const latinTokenRe = /[A-Za-z][A-Za-z0-9.\-]*[A-Za-z0-9]|[A-Za-z]/g;
-
-function latinTokens(text: string): { word: string; index: number }[] {
-  const out: { word: string; index: number }[] = [];
-  for (const m of text.matchAll(latinTokenRe)) out.push({ word: m[0], index: m.index ?? 0 });
-  return out;
+function isNotAName(word: string): boolean {
+  const w = word.toLowerCase();
+  return NOT_A_VENDOR.has(w) || COMMON_WORDS.has(w) || CODE_LIKE.test(word);
 }
 
-function channelVendorOf(text: string): { channel: string; vendor: string } | null {
-  const lower = text.toLowerCase();
-  // Longest names first, so "google drive" wins over "drive".
-  const names = Object.keys(CHANNEL_VENDOR).sort((a, b) => b.length - a.length);
-  for (const name of names) {
-    const isHebrew = /[֐-׿]/.test(name);
-    const re = isHebrew
-      ? new RegExp(`(?:^|[^\\u0590-\\u05FF])${HEBREW_PREFIX}${name}(?=$|[^\\u0590-\\u05FF])`, "u")
-      : new RegExp(`\\b${name.replace(" ", "\\s+")}\\b`, "i");
-    if (re.test(lower)) return { channel: name, vendor: CHANNEL_VENDOR[name] };
-  }
-  return null;
+/// A vendor's name as people write it: a capital letter first, at least
+/// three characters, a dot or dash inside allowed (Meet-Alfred, Cal.com),
+/// and a second capitalised word kept with it (Meet Alfred, Google Drive).
+const NAME = "([A-Z][A-Za-z0-9][A-Za-z0-9.\\-]*[A-Za-z0-9](?:\\s+[A-Z][A-Za-z0-9.\\-]*[A-Za-z0-9])?)";
+
+/// Hebrew verbs of connecting, with the words that sit between the verb
+/// and the name: "לחבר את X", "חיבור ל-X", "האינטגרציה עם X", "להירשם ל-X".
+const HEBREW_CONNECT = ["לחבר", "לחיבור", "חיבור", "מחבר", "אינטגרציה", "אינטגרציית", "להירשם", "הרשמה", "להטמיע", "הטמעת"];
+const HEBREW_FILLER = "(?:\\s+(?:את|עם|אל|של|גם))?\\s+(?:[לבה][-־]?)?";
+/// English verbs of connecting: "connect X", "integrate with X",
+/// "sign up for X", "onboard X".
+const ENGLISH_CONNECT = "(?:[Cc]onnect(?:s|ed|ing)?|[Ii]ntegrat(?:e|es|ed|ing|ion)\\s+with|[Ss]ign(?:ing)?[\\s-]?up\\s+(?:for|to|with)|[Oo]nboard(?:s|ed|ing)?)";
+/// Technology words that name what is being connected, right after the
+/// vendor ("Twilio API", "Notion MCP") or right before it ("MCP של Notion").
+const TECH = "(?:MCP|API|SDK|OAuth|[Ww]ebhooks?|[Cc]onnector|[Ii]ntegration)";
+
+const PATTERNS: { re: RegExp; label: (m: RegExpMatchArray) => string }[] = [
+  {
+    re: new RegExp(`(?:^|[^\\u0590-\\u05FF])${HEBREW_PREFIX}(${HEBREW_CONNECT.join("|")})${HEBREW_FILLER}${NAME}`, "gu"),
+    label: (m) => m[1],
+  },
+  { re: new RegExp(`\\b(${ENGLISH_CONNECT})\\s+(?:to\\s+|with\\s+|the\\s+)?${NAME}`, "g"), label: (m) => m[1] },
+  { re: new RegExp(`${NAME}\\s+(${TECH})\\b`, "g"), label: (m) => m[2] },
+  {
+    re: new RegExp(`\\b(${TECH})\\s+(?:של|ל-?|for|of|to|with)\\s*${NAME}`, "gu"),
+    label: (m) => m[1],
+  },
+];
+
+/// The name group of a match: the last capture that looks like a name.
+function nameOf(m: RegExpMatchArray, pattern: number): string {
+  return pattern === 2 ? m[1] : m[2];
 }
 
-/// Does `text` look like connecting a vendor to the product? Returns the
-/// first vendor name it finds, or a signal without a name, or null.
-///
-/// `known` is every vendor that needs no new run: the site's register and
-/// the vendors that already had one. A known name found next to an action
-/// word is reported as `existingVendor`, so the caller can note it on that
-/// vendor's run instead of opening another.
+/// A name that is part of an email address or a web address is not one.
+function insideAddress(text: string, index: number, length: number): boolean {
+  const before = text[index - 1] ?? "";
+  const after = text[index + length] ?? "";
+  return before === "@" || before === "/" || before === "." || after === "@";
+}
+
+/// Keeps the usable part of a captured name: a second word that is not a
+/// name is dropped ("Pipedrive Tests" is Pipedrive), and a first word
+/// that is not a name drops the whole capture.
+function cleanName(raw: string): string | null {
+  const words = raw.trim().split(/\s+/);
+  if (isNotAName(words[0]) || words[0].length < 3) return null;
+  if (words.length > 1 && isNotAName(words[1])) return words[0];
+  return words.join(" ");
+}
+
+function channelAfterVerb(text: string): { channel: string; vendor: string; action: string } | null {
+  const names = Object.keys(CHANNEL_VENDOR)
+    .filter((n) => /[\u0590-\u05FF]/.test(n))
+    .sort((a, b) => b.length - a.length);
+  const re = new RegExp(
+    `(?:^|[^\\u0590-\\u05FF])${HEBREW_PREFIX}(${HEBREW_CONNECT.join("|")})${HEBREW_FILLER}(${names.join("|")})(?=$|[^\\u0590-\\u05FF])`,
+    "u"
+  );
+  const m = text.match(re);
+  return m ? { action: m[1], channel: m[2], vendor: CHANNEL_VENDOR[m[2]] } : null;
+}
+
 export function detectVendorSignal(text: string, known: string[]): VendorSignal | null {
-  const t = withoutCode(text ?? "").replace(HEBREW_NOT_CONNECTING, " ").trim();
-  if (!t) return null;
+  const cleaned = withoutCode(text ?? "").replace(HEBREW_NOT_CONNECTING, " ").trim();
+  if (!cleaned) return null;
   const knownKeys = new Map(known.map((k) => [vendorKey(k), k]));
 
-  let bareHebrew: string | null = null;
-  for (const sentence of sentencesOf(t)) {
-    const hebrew = sentence.match(hebrewActionRe);
-    const latin = sentence.match(latinActionRe);
-    if (!hebrew && !latin) continue;
-    const action = (hebrew?.[1] ?? latin?.[1] ?? "").trim();
-    const actionAt = hebrew ? (hebrew.index ?? 0) + hebrew[0].indexOf(hebrew[1]) : latin?.index ?? 0;
-
-    // A candidate vendor: a Latin token that is not technology, a common
-    // word or one of our codes. Two capitalised tokens in a row read as one
-    // name. A word in lower case counts only right next to the action word
-    // ("לחבר את pipedrive"), since prose is full of lower-case words.
-    const tokens = latinTokens(sentence);
-    const candidates: string[] = [];
-    for (let i = 0; i < tokens.length; i++) {
-      const w = tokens[i].word;
-      const lower = w.toLowerCase();
-      if (NOT_A_VENDOR.has(lower) || COMMON_WORDS.has(lower) || OUR_CODE.test(w) || w.length < 2) continue;
-      if (!/^[A-Z0-9]/.test(w)) {
-        if (w.length < 4 || Math.abs(tokens[i].index - actionAt) > action.length + 12) continue;
+  // 3.11.2026, after false alarms in production: only an explicit act of
+  // connecting a named vendor counts. Technology words alone (MCP, API,
+  // integration) are everyday product work, and a lower-case word, an
+  // email address or a code is never a name. Whatever this misses, a new
+  // dependency or environment variable in the code is caught by QA
+  // (qa/checks/new-vendors.mjs), and Claude asks from context.
+  for (const t of sentencesOf(cleaned)) {
+    for (const [i, { re, label }] of PATTERNS.entries()) {
+      re.lastIndex = 0;
+      for (const m of t.matchAll(re)) {
+        const raw = nameOf(m, i);
+        const at = (m.index ?? 0) + m[0].indexOf(raw);
+        if (insideAddress(t, at, raw.length)) continue;
+        const name = cleanName(raw);
+        if (!name) continue;
+        const action = label(m).trim();
+        const key = vendorKey(name);
+        const existing =
+          knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
+        return { vendor: name, existingVendor: existing ?? null, matched: `${action} + ${name}` };
       }
-      let name = w;
-      const next = tokens[i + 1];
-      if (
-        next &&
-        /^[A-Z]/.test(w) &&
-        /^[A-Z]/.test(next.word) &&
-        !NOT_A_VENDOR.has(next.word.toLowerCase()) &&
-        !COMMON_WORDS.has(next.word.toLowerCase()) &&
-        sentence.slice(tokens[i].index + w.length, next.index).trim() === ""
-      ) {
-        name = `${w} ${next.word}`;
-        i++;
-      }
-      candidates.push(name);
     }
-
-    for (const c of candidates) {
-      const key = vendorKey(c);
-      const existing = knownKeys.get(key) ?? (CHANNEL_VENDOR[key] ? knownKeys.get(vendorKey(CHANNEL_VENDOR[key])) ?? CHANNEL_VENDOR[key] : undefined);
-      if (existing) return { vendor: c, existingVendor: existing, matched: `${action} + ${c}` };
-      // A single word that is itself an action word is not a name.
-      if (LATIN_ACTIONS.includes(key)) continue;
-      return { vendor: c, existingVendor: null, matched: `${action} + ${c}` };
-    }
-
-    // No Latin name: maybe a channel written in Hebrew ("לחבר וואטסאפ").
-    const channel = channelVendorOf(sentence);
-    if (channel) {
-      return { vendor: channel.channel, existingVendor: channel.vendor, matched: `${action} + ${channel.channel}` };
-    }
-
-    // Only technology words, with no name at all ("להוסיף API"): a bare
-    // Latin action is too common to ask about. The Hebrew verb of
-    // connecting is asked about even without a name, once nothing better
-    // turned up in another sentence.
-    if (hebrew && HEBREW_BARE_ACTIONS.has(hebrew[1]) && !bareHebrew) bareHebrew = hebrew[1];
   }
-  return bareHebrew ? { vendor: null, existingVendor: null, matched: bareHebrew } : null;
+
+  // A channel of a vendor we have, written in Hebrew ("לחבר וואטסאפ").
+  const channel = channelAfterVerb(cleaned);
+  if (channel) return { vendor: channel.channel, existingVendor: channel.vendor, matched: `${channel.action} + ${channel.channel}` };
+  return null;
+}/// From #413 (3.11.2026): what is code, not prose, is removed before
+/// reading: inline code, URLs, paths, and identifiers (camelCase,
+/// snake_case, file.ext). A path like tests/integration/x.test.ts says
+/// neither "integration" nor "tests".
+const HEBREW_NOT_CONNECTING = /(?:בדיקות|בדיקת|טסטים של|טסט)\s+(?:יחידה,?\s+)?אינטגרציה/gu;
+
+function withoutCode(text: string): string {
+  return text
+    .replace(/`[^`]*`/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
+    .replace(/\S*\/\S*/g, " ")
+    .replace(/\b\w+(?:\.\w+)*\.[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b[a-z]+[A-Z]\w*\b/g, " ")
+    .replace(/\b\w+_\w+\b/g, " ")
+    .replace(/\b[\w-]+\.(?:ts|tsx|js|mjs|json|md|sql|prisma|yml|yaml|css|html)\b/g, " ");
 }
+
+/// Sentences: a vendor counts only in the sentence that says "connect".
+/// A dot inside a name (cal.com) does not end one.
+function sentencesOf(text: string): string[] {
+  return text.split(/\n+|[.!?;](?=\s|$)/u).map((x) => x.trim()).filter(Boolean);
+}
+
+

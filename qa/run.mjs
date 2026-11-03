@@ -23,6 +23,7 @@ import * as production from "./checks/production.mjs";
 import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { urlNumbers } from "./checks/boundary.mjs";
+import { newVendors } from "./checks/vendors.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
 import { isShard, ALWAYS, shardsFor, splitFor, PLAN, MAIN_SHARD } from "./lib/shards.mjs";
@@ -208,6 +209,16 @@ async function main() {
     "boundary",
     { label: "Boundary & data integrity", level: 1 },
     urlNumbers,
+  );
+
+  // P8 (3.11.2026): a new package or environment variable that the vendor
+  // registry does not know may be a new vendor. Level 1 so it reaches every
+  // pull request; never blocking, because most are libraries. See
+  // checks/vendors.mjs.
+  await run.check(
+    "vendors",
+    { label: "New vendors in the code", level: 1, blocking: false },
+    newVendors,
   );
 
   for (const [id, label, lvl] of [
