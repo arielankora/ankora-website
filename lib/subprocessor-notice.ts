@@ -17,6 +17,13 @@ export const SUBPROCESSOR_NOTICE_LABELS: Record<SubprocessorNotice, string> = {
   NOT_COMMITTED: "אין התחייבות: מספיק עדכון באתר",
 };
 
+/// The same answer as one line of the client file (staff and Claude only).
+export const SUBPROCESSOR_NOTICE_FILE_LINE: Record<SubprocessorNotice, string> = {
+  UNCHECKED: "לא נבדק עדיין, ולכן מקבל מייל ליתר ביטחון",
+  COMMITTED: "יש, מקבל מייל",
+  NOT_COMMITTED: "אין, מספיק עדכון באתר",
+};
+
 export const SUBPROCESSOR_NOTICE_SOURCE_REQUIRED =
   "כדי לסמן יש או אין התחייבות, צריך לכתוב את המקור: החוזה והסעיף.";
 

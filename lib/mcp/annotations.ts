@@ -101,6 +101,9 @@ export const TOOL_ANNOTATIONS = {
   // and what changed since a date. Nothing is written.
   get_client_brief: READ_ONLY,
   get_client_changes: READ_ONLY,
+  // P8 step 8 (3.11.2026): who is told about a new sub-processor, and how.
+  // Reads the clients' answers; nothing is written.
+  list_subprocessor_notice_recipients: READ_ONLY,
   // Each call adds a batch of proposals (and may register a source). It
   // writes nothing into the file itself: a person approves on the screen.
   propose_knowledge: WRITES,

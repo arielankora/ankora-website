@@ -4,6 +4,8 @@ import { createTestClient, createTestUser } from "./factories";
 import { updateClient } from "@/lib/app-domain/clients";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { SUBPROCESSOR_NOTICE_SOURCE_REQUIRED } from "@/lib/subprocessor-notice";
+import { listSubprocessorRecipients } from "@/lib/app-domain/subprocessor-recipients";
+import { buildClientFile } from "@/lib/app-domain/client-file-view";
 
 // Client.subprocessorNotice (3.11.2026), through the same updateClient the
 // client settings form calls. What matters: a new client starts unchecked,
@@ -102,5 +104,46 @@ describe("updateClient(): sub-processor notice", () => {
     await expect(
       updateClient(employee, client.id, { subprocessorNotice: { notice: "COMMITTED", source: "סעיף 9" } })
     ).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe("listSubprocessorRecipients(): P8 step 8", () => {
+  it("groups active and paused clients, leaves out internal and archived ones, and is for managers", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const committed = await createTestClient({ name: "א מחויב" });
+    const unchecked = await createTestClient({ name: "ב לא נבדק" });
+    const paused = await createTestClient({ name: "ג מושהה" });
+    const internal = await createTestClient({ name: "ד פנימי" });
+    const archived = await createTestClient({ name: "ה בארכיון" });
+    await updateClient(admin, committed.id, { subprocessorNotice: { notice: "COMMITTED", source: "סעיף 9" } });
+    await updateClient(admin, paused.id, { status: "PAUSED", subprocessorNotice: { notice: "NOT_COMMITTED", source: "סעיף 4" } });
+    await prisma.client.update({ where: { id: internal.id }, data: { isInternal: true } });
+    await prisma.client.update({ where: { id: archived.id }, data: { deletedAt: new Date(), status: "ARCHIVED" } });
+
+    const groups = await listSubprocessorRecipients(admin);
+    expect(groups.committed.map((c) => c.name)).toEqual(["א מחויב"]);
+    expect(groups.committed[0].source).toBe("סעיף 9");
+    expect(groups.unchecked.map((c) => c.name)).toEqual(["ב לא נבדק"]);
+    expect(groups.notCommitted.map((c) => c.name)).toEqual(["ג מושהה"]);
+    expect(unchecked.id).toBe(groups.unchecked[0].id);
+
+    const { user: employee } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(listSubprocessorRecipients(employee)).rejects.toBeInstanceOf(ForbiddenError);
+  });
+});
+
+describe("buildClientFile(): the answer is a line of the client's identity", () => {
+  it("shows the answer and its source to staff and to Claude", async () => {
+    const { user: admin } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const client = await createTestClient();
+    await updateClient(admin, client.id, { subprocessorNotice: { notice: "COMMITTED", source: "הסכם שירות, סעיף 9" } });
+
+    for (const audience of ["staff", "ai"] as const) {
+      const doc = await buildClientFile(admin, client.id, { audience });
+      const identity = doc.sections.find((s) => s.number === "1")!;
+      const line = identity.items.find((i) => i.text.startsWith("התחייבות בחוזה לעדכון יזום על תת-מעבד"))!;
+      expect(line.text).toContain("יש, מקבל מייל");
+      expect(line.details).toContain("מקור: הסכם שירות, סעיף 9");
+    }
   });
 });
