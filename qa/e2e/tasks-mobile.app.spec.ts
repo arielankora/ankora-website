@@ -162,6 +162,10 @@ test.describe("desktop", () => {
       await expect(header.getByText(label, { exact: true })).toBeVisible();
     }
 
+    // 3.11.2026: the category is changed from the row, so on a desk every
+    // row offers it as a select under the column's name.
+    await expect(page.locator("[data-task]").first().getByRole("combobox", { name: "קטגוריה" })).toBeVisible();
+
     const supervised = page.locator(`[data-task="${SUPERVISED}"]`);
     if ((await supervised.count()) > 0) {
       await expect(supervised.locator('[data-cell="supervisor"]')).toContainText("מנהל Ankora");

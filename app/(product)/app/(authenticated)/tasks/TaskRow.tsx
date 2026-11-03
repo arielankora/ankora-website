@@ -1,7 +1,12 @@
 "use client";
 import { useRef, useState } from "react";
 import { Check, Eye, EyeOff, Hourglass } from "lucide-react";
-import { toggleTaskDoneAction, updateTaskDueDateAction, updateTaskPortalAction } from "./actions";
+import {
+  toggleTaskDoneAction,
+  updateTaskCategoryAction,
+  updateTaskDueDateAction,
+  updateTaskPortalAction,
+} from "./actions";
 import { useTaskList } from "./TaskListProvider";
 import { taskHref } from "./list-query";
 import { useToast } from "@/components/app/toast/ToastProvider";
@@ -68,6 +73,8 @@ export function TaskRow({
     id: string;
     title: string;
     clientName: string;
+    clientId: string;
+    categoryId: string | null;
     categoryName: string | null;
     dueDate: string | null;
     /// 26.9.2026: shown on every row, on a phone as much as on a desk.
@@ -92,7 +99,7 @@ export function TaskRow({
 }) {
   // Outside the tasks screen there is no provider
   // and this is empty, so the row links to the task plainly.
-  const { listQuery } = useTaskList();
+  const { listQuery, categories } = useTaskList();
   const { showToast } = useToast();
   const [status, setStatus] = useState(task.status);
   const [pending, setPending] = useState(false);
@@ -371,6 +378,46 @@ export function TaskRow({
     });
   }
 
+  // 3.11.2026: "אני רוצה גם להיות מסוגל לעדכן קטגוריה ישירות מהמסך
+  // הזה". A select over the column's text, offering what the task screen
+  // offers: the global categories and this client's own. The one already
+  // on the task stays in the list even if it has since been retired, so
+  // the select cannot show a different category from the one saved.
+  const [category, setCategory] = useState<{ id: string | null; name: string | null }>({
+    id: task.categoryId,
+    name: task.categoryName,
+  });
+  const [categoryPending, setCategoryPending] = useState(false);
+  const categoryOptions = categories.filter((c) => c.clientId === null || c.clientId === task.clientId);
+  if (category.id && category.name && !categoryOptions.some((c) => c.id === category.id)) {
+    categoryOptions.unshift({ id: category.id, name: category.name, clientId: task.clientId });
+  }
+
+  async function changeCategory(id: string | null, isUndo = false) {
+    const previous = category;
+    if ((previous.id ?? null) === id) return;
+    setCategory({ id, name: categoryOptions.find((c) => c.id === id)?.name ?? null });
+    setCategoryPending(true);
+    const result = await updateTaskCategoryAction({ taskId: task.id, categoryId: id });
+    setCategoryPending(false);
+    if (!result.ok) {
+      setCategory(previous);
+      showToast({ tone: "error", title: "העדכון נכשל", description: result.error });
+      return;
+    }
+    setCategory({ id: result.categoryId, name: result.categoryName });
+    if (isUndo) {
+      showToast({ tone: "info", title: "השינוי בוטל", description: task.title });
+      return;
+    }
+    showToast({
+      tone: "success",
+      title: result.categoryName ? `הקטגוריה עודכנה ל${result.categoryName}` : "הקטגוריה הוסרה",
+      description: task.title,
+      undo: () => changeCategory(previous.id, true),
+    });
+  }
+
   const dueLabel = dueDate
     ? new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(
         new Date(dueDate)
@@ -493,11 +540,11 @@ export function TaskRow({
             task is. Hidden entirely when there is neither.
             3.11.2026: from xl the category has its own column (below), so
             on a desk this line only carries the steps. */}
-        {(task.categoryName || task.stepsTotal > 0) && (
+        {(category.name || task.stepsTotal > 0) && (
           <p className={`mt-0.5 truncate text-[11.5px] text-app-text-tertiary ${task.stepsTotal > 0 ? "" : "xl:hidden"}`}>
             <span className="xl:hidden">
-              {task.categoryName}
-              {task.categoryName && task.stepsTotal > 0 ? " · " : ""}
+              {category.name}
+              {category.name && task.stepsTotal > 0 ? " · " : ""}
             </span>
             {task.stepsTotal > 0 && (
               <span className="font-jbmono">
@@ -662,15 +709,38 @@ export function TaskRow({
 
       {/* 3.11.2026: "חסר קטגוריה במסך הזה". A column of its own on a
           desk, next to the task it describes, and sortable like the rest.
+          Editable from the row since the same day.
           Below xl it stays on the line under the title, where the card
           already shows it, so the cell is hidden there rather than
           repeating it. */}
-      <span
-        dir="auto"
-        data-cell="category"
-        className="hidden min-w-0 truncate text-right text-xs text-app-text-secondary [grid-area:category] xl:block"
-      >
-        {task.categoryName ?? <span className="text-app-text-tertiary">ללא קטגוריה</span>}
+      <span data-cell="category" className="hidden min-w-0 [grid-area:category] xl:block">
+        {categoryOptions.length > 0 ? (
+          // Looks like the text it replaces until it is hovered, so a
+          // column of selects does not read as a form.
+          <select
+            value={category.id ?? ""}
+            disabled={categoryPending}
+            aria-label="קטגוריה"
+            title="שינוי הקטגוריה"
+            onChange={(e) => changeCategory(e.target.value || null)}
+            className={`-mx-1 w-full min-w-0 cursor-pointer truncate rounded-[6px] border-0 bg-transparent px-1 py-0.5 text-right text-xs outline-none hover:bg-app-surface-sunken focus-visible:ring-1 focus-visible:ring-gold disabled:opacity-50 ${
+              category.id ? "text-app-text-secondary" : "text-app-text-tertiary"
+            }`}
+          >
+            <option value="" className="bg-white text-app-text-primary">
+              ללא קטגוריה
+            </option>
+            {categoryOptions.map((c) => (
+              <option key={c.id} value={c.id} className="bg-white text-app-text-primary">
+                {c.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <span dir="auto" className="block truncate text-right text-xs text-app-text-secondary">
+            {category.name ?? <span className="text-app-text-tertiary">ללא קטגוריה</span>}
+          </span>
+        )}
       </span>
 
       {/* Below xl the date and the assignee share one line; from xl each

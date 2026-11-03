@@ -8,6 +8,8 @@ function row(id: string, patch: Partial<ListRow>): ListRow {
     id,
     title: id,
     clientName: "לקוח",
+    clientId: "c1",
+    categoryId: null,
     categoryName: null,
     dueDate: null,
     status: "OPEN",

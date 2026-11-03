@@ -24,6 +24,8 @@ function row(over: Partial<ListRow> = {}): ListRow {
     id: "t1",
     title: "משימה",
     clientName: "לקוח א",
+    clientId: "c1",
+    categoryId: null,
     categoryName: null,
     dueDate: null,
     status: "OPEN",
