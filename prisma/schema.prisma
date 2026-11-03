@@ -256,6 +256,7 @@ model User {
 
   // Portal phase 3.
   preferencesTouched  Client[]         @relation("ClientPreferencesEditor")
+  subprocessorNoticesChecked Client[] @relation("ClientSubprocessorNoticeChecker")
   documentsUploaded   ClientDocument[] @relation("ClientDocumentUploader")
   summariesApproved   PortalSummary[]  @relation("PortalSummaryApprover")
   credentialsCreated  ClientCredential[] @relation("CredentialCreator")
@@ -498,6 +499,22 @@ model Client {
   /// client whose auditor asks for it; off by default.
   procedureApprovalSeparation Boolean @default(false)
 
+  /// 3.11.2026: whether Ankora's contract with this client commits it to
+  /// tell the client, by email and ahead of time, about a new sub-processor
+  /// (P8 step 8). Only an explicit commitment in the client's own contract
+  /// counts; section 6 of the standard data processing addendum on the
+  /// website does not count on its own (Ariel, 3.11.2026). UNCHECKED until
+  /// someone read the contract, and an unchecked client is emailed to be
+  /// safe, so a client nobody looked at never drops out of the list.
+  subprocessorNotice            SubprocessorNotice @default(UNCHECKED)
+  /// Where it says so: the contract and the section. Required once the
+  /// answer is COMMITTED or NOT_COMMITTED.
+  subprocessorNoticeSource      String?
+  /// The filed contract, when it is in the client's file. Optional.
+  subprocessorNoticeDocumentId  String?
+  subprocessorNoticeCheckedAt   DateTime?
+  subprocessorNoticeCheckedById String?
+
   /// Org brain (spec 3.3): a business or a private person, and in a few
   /// words what they do ("חברה, סטארטאפ AI"). One file template for both
   /// (decision 7); the kind says which sections a reader expects to see
@@ -594,6 +611,10 @@ model Client {
 
   // Portal phase 3.
   preferencesUpdatedBy User?            @relation("ClientPreferencesEditor", fields: [preferencesUpdatedById], references: [id], onDelete: SetNull)
+
+  // Sub-processor notice (3.11.2026).
+  subprocessorNoticeDocument  ClientDocument? @relation("ClientSubprocessorNoticeDocument", fields: [subprocessorNoticeDocumentId], references: [id], onDelete: SetNull)
+  subprocessorNoticeCheckedBy User?           @relation("ClientSubprocessorNoticeChecker", fields: [subprocessorNoticeCheckedById], references: [id], onDelete: SetNull)
   documents            ClientDocument[]
   credentials          ClientCredential[]
   portalSummaries      PortalSummary[]
@@ -2346,6 +2367,9 @@ model ClientDocument {
   task       Task?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
   uploadedBy User?  @relation("ClientDocumentUploader", fields: [uploadedById], references: [id], onDelete: SetNull)
 
+  /// Clients whose sub-processor notice answer cites this contract.
+  subprocessorNoticeFor Client[] @relation("ClientSubprocessorNoticeDocument")
+
   @@index([clientId, clientVisible])
   /// The manager's stalled-promises number asks this table "which of
   /// these tasks had something filed against them today", which is a
@@ -3252,6 +3276,13 @@ model ClientEntity {
 enum ClientKind {
   BUSINESS
   PRIVATE
+}
+
+/// Client.subprocessorNotice (3.11.2026).
+enum SubprocessorNotice {
+  UNCHECKED
+  COMMITTED
+  NOT_COMMITTED
 }
 
 enum KnowledgeBatchVia {
