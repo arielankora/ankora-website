@@ -9,8 +9,8 @@ import type { LegalContent } from "../types";
  * pointing at it even when sections are reordered. Never rename an id in use.
  */
 const legal: LegalContent = {
-  updated: "Last updated: October 2026",
-  updatedISO: "2026-10",
+  updated: "Last updated: November 2026",
+  updatedISO: "2026-11",
   contentsLabel: "Contents",
   tableLabel: "Table",
   pages: {
@@ -429,7 +429,7 @@ const legal: LegalContent = {
           body: [
             "The client approves the use of the sub-processors listed in the privacy policy, section 7.",
             "Ankora's engagement with each sub-processor includes information security and confidentiality undertakings no weaker than those in this addendum. Ankora is responsible for the acts of its sub-processors as for its own.",
-            "Ankora will give the client thirty days notice before adding a sub-processor that will have access to the client's data. A client that objects on reasonable security or privacy grounds will say so within fourteen days, and the parties will work in good faith to find an alternative. If none is found, the client may terminate the engagement at the end of the following month, and this will not be treated as a breach on the client's part.",
+            "Ankora will update the list of sub-processors in the privacy policy, section 7, at least thirty days before a new sub-processor has access to the client's data. A client that has asked in writing to be notified will also receive the notice by email, at the same time. A client that objects on reasonable security or privacy grounds will say so within fourteen days of the update, and the parties will work in good faith to find an alternative. If none is found, the client may terminate the engagement at the end of the following month, and this will not be treated as a breach on the client's part.",
           ],
         },
         {
