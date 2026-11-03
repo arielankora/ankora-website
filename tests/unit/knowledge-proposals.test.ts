@@ -61,7 +61,7 @@ describe("what blocks approval (spec 5.2)", () => {
       ["R1", false],
       ["R3", false],
     ]);
-    expect(bulkApproveBlocker({ action: "CREATE", flags: r17, payload: {} })).toContain("חוסם");
+    expect(bulkApproveBlocker({ target: "NARRATIVE", action: "CREATE", flags: r17, payload: {}, level: "HIGH" })).toContain("חוסם");
   });
 });
 

@@ -4,7 +4,7 @@
 // definition of what a proposal may say.
 
 import { z } from "zod";
-import { citedCodes } from "@/lib/knowledge-sources";
+import { citedCodes, readSourceRefs } from "@/lib/knowledge-sources";
 import { factShapeError } from "@/lib/client-facts";
 import { NEEDS_INTERIM, type PolicyKindLike } from "@/lib/client-policies";
 import { blockingChecks, readSteps } from "@/lib/process-rules";
@@ -313,15 +313,88 @@ export const MAX_BULK = 60;
 
 /// Why a proposal is decided on its own and not approved with others, or
 /// null when it may be. Approving together is still a person approving on
-/// the screen (decision 1); what stays one at a time is what changes an
-/// item already in the file, what may already be there, and what is
-/// sensitive. Rejecting together is always allowed: nothing enters the
-/// file.
-export function bulkApproveBlocker(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown> }): string | null {
-  if (p.flags.some((f) => f.block)) return "יש בה משהו שחוסם אישור";
-  if (p.action !== "CREATE") return "משנה פריט שכבר בתיק";
-  if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return "ייתכן שכבר בתיק";
-  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return "מידע רגיש";
+/// the screen (decision 1); what stays one at a time is what the approval
+/// tiers put there (approvalTier, INDIVIDUAL): what changes an item
+/// already in the file, what may already be there, what is sensitive or
+/// shown to the client, a task (it opens work for someone), a domain, and
+/// anything the review reads as low. Rejecting together is always
+/// allowed: nothing enters the file.
+export function bulkApproveBlocker(p: TierInput): string | null {
+  const t = approvalTier(p);
+  return t.tier === "INDIVIDUAL" ? t.reason : null;
+}
+
+// ---------------------------------------------------------------------------
+// Approval tiers (3.11.2026, the approved procedure for extraction
+// approvals): what may enter on its own, what may be approved together,
+// and what is approved one at a time.
+// ---------------------------------------------------------------------------
+
+export type ApprovalTier = "AUTO" | "QUICK" | "INDIVIDUAL";
+
+export type TierInput = {
+  target: ProposalTargetLike;
+  action: ProposalActionLike;
+  flags: ProposalFlag[];
+  payload: Record<string, unknown>;
+  /// reviewConfidence(...).level, as the card shows it.
+  level: ConfidenceLike;
+};
+
+/// The kinds of fact that are simple enough to enter on their own: what
+/// the client said, with nothing to answer (a question) and nothing that
+/// runs out (temporary information).
+export const AUTO_FACT_KINDS = ["NOTE", "PREFERENCE", "REQUIREMENT", "FINANCE", "LOCATION", "SCOPE_IN", "SCOPE_OUT", "ONE_OFF_DECISION"] as const;
+
+/// The items an approval may create on its own, and the only ones a
+/// "ביטול" takes out again (revertBlocker): each has a soft delete.
+export const AUTO_TARGETS: readonly ProposalTargetLike[] = ["FACT", "CONTACT", "ORGANIZATION", "ENTITY"] as const;
+
+/// A new item of a simple kind: a fact of one of AUTO_FACT_KINDS, a
+/// contact, a provider or an entity.
+export function isSimpleTarget(target: ProposalTargetLike, payload: Record<string, unknown>): boolean {
+  if (target === "FACT") return (AUTO_FACT_KINDS as readonly string[]).includes(String(payload.kind));
+  return AUTO_TARGETS.includes(target);
+}
+
+/// The tier a proposal is in, with the reason in a short Hebrew line.
+/// INDIVIDUAL is checked first and wins: one reason to look is enough.
+export function approvalTier(p: TierInput): { tier: ApprovalTier; reason: string } {
+  const one = (reason: string) => ({ tier: "INDIVIDUAL" as const, reason });
+  if (p.flags.some((f) => f.block)) return one("יש בה משהו שחוסם אישור");
+  if (p.action !== "CREATE") return one("משנה פריט שכבר בתיק");
+  if (p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR")) return one("ייתכן שכבר בתיק");
+  if (p.flags.some((f) => f.code === "R6") || p.payload.sensitivity === "SENSITIVE") return one("מידע רגיש");
+  if (typeof p.payload.doNotDisclose === "string" && p.payload.doNotDisclose.trim()) return one("יש בה מה לא לספר");
+  if (p.payload.clientVisible === true) return one("גלוי ללקוח");
+  if (p.target === "TASK") return one("משימה נפתחת לאדם אחר");
+  if (p.target === "DOMAIN") return one("דומיין משנה אילו פגישות שייכות ללקוח");
+  if (p.level === "LOW") return one("רמת בדיקה נמוכה");
+  const simple = isSimpleTarget(p.target, p.payload);
+  if (simple && p.level === "HIGH") return { tier: "AUTO", reason: "פריט חדש ופשוט, ברמת בדיקה גבוהה" };
+  if (simple) return { tier: "QUICK", reason: "רמת בדיקה בינונית" };
+  if (p.target === "FACT" && p.payload.kind === "QUESTION") return { tier: "QUICK", reason: "שאלה פתוחה" };
+  if (p.target === "FACT" && p.payload.kind === "TEMPORARY") return { tier: "QUICK", reason: "מידע זמני" };
+  return { tier: "QUICK", reason: `${TARGET_LABELS[p.target]}: לא נכנס בלי אדם` };
+}
+
+/// Why the item an approved proposal created cannot be taken out again
+/// with "ביטול", or null when it can. Only a new item of the kinds an
+/// approval may create on its own, that the approval itself created (not
+/// "כבר בתיק"), and only once.
+export function revertBlocker(p: {
+  state: string;
+  action: string;
+  target: string;
+  attached: boolean;
+  resultId: string | null;
+  revertedAt: Date | string | null;
+}): string | null {
+  if (p.state !== "APPROVED") return "אפשר לבטל רק הצעה שאושרה.";
+  if (p.revertedAt) return "ההצעה כבר בוטלה.";
+  if (p.action !== "CREATE") return "ביטול אפשרי רק להצעה שהוסיפה פריט חדש, לא לשינוי של פריט קיים.";
+  if (p.attached || !p.resultId) return "ההצעה לא יצרה פריט חדש (כבר היה בתיק), אז אין מה לבטל.";
+  if (!AUTO_TARGETS.includes(p.target as ProposalTargetLike)) return `ביטול אפשרי רק לעובדה, איש קשר, ספק או ישות משפטית, לא ל${TARGET_LABELS[p.target as ProposalTargetLike] ?? "פריט מהסוג הזה"}.`;
   return null;
 }
 
@@ -434,13 +507,24 @@ export function reviewConfidence(p: {
   return { level, why };
 }
 
+/// reviewConfidence's level for a stored proposal and its batch's source:
+/// the recording minute is read from the proposal's first source.
+export function proposalReviewLevel(
+  p: { confidence: string | null; flags: ProposalFlag[]; payload: Record<string, unknown> },
+  source: { kind: string | null; restriction: string | null } | null
+): ConfidenceLike {
+  const at = readSourceRefs(p.payload.sources)[0]?.at ?? null;
+  return reviewConfidence({ confidence: p.confidence, flags: p.flags, payload: p.payload, at, sourceKind: source?.kind ?? null, sourceRestriction: source?.restriction ?? null }).level;
+}
+
 /// The order on the card: what stops approval first, then what is decided
 /// one at a time, then by how sure it is. The easy ones end up together at
 /// the bottom, to be approved in one go.
-export function reviewRank(p: { action: ProposalActionLike; flags: ProposalFlag[]; payload: Record<string, unknown>; level: ConfidenceLike }): number {
+export function reviewRank(p: TierInput): number {
   if (p.flags.some((f) => f.block)) return 0;
+  // One at a time, a low review level among them (approvalTier).
   if (bulkApproveBlocker(p)) return 1;
-  return p.level === "LOW" ? 2 : p.level === "MEDIUM" ? 3 : 4;
+  return p.level === "MEDIUM" ? 3 : 4;
 }
 
 /// The line on top of a card: how much of it can go together.

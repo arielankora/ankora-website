@@ -15,9 +15,10 @@ import { proposalKindKey } from "@/lib/knowledge-review-filters";
 // Metadata only. A proposal's payload, reason and quote are a client's
 // own information, and the measure needs none of it: the payload is read
 // here for a few yes/no facts (sensitive, client-visible, "do not
-// disclose", uncertain, has a recording minute) and nothing of it is
-// returned. Clients are named by an opaque key (L1, L2...), so the
-// numbers can be quoted in a task comment without naming anyone.
+// disclose", uncertain, has a recording minute, a date that opens a task)
+// and nothing of it is returned. Clients are named by an opaque key (L1,
+// L2...), so the numbers can be quoted in a task comment without naming
+// anyone.
 // "בלי AI": a marked client's proposals are left out, and only counted.
 //
 // What the data cannot say, said in the result so nobody reads more into
@@ -48,6 +49,12 @@ export type ProposalStatRow = {
   state: string;
   edited: boolean;
   attached: boolean;
+  /// 3.11.2026, the approval tiers: approved by the server with no person,
+  /// and whether its item was taken out of the file again ("ביטול").
+  autoApplied: boolean;
+  reverted: boolean;
+  /// A date only: whether it opens a task before it (taskDaysBefore).
+  autoTask?: boolean;
   /// Approved or rejected together with others, by the audit row.
   bulk: boolean;
   rejected: boolean;
@@ -102,6 +109,8 @@ export async function proposalStatsForAi(
         state: true,
         edited: true,
         attached: true,
+        autoApplied: true,
+        revertedAt: true,
         createdAt: true,
         decidedAt: true,
         batch: { select: { via: true, sourceId: true } },
@@ -158,12 +167,15 @@ export async function proposalStatsForAi(
       sensitive: payload.sensitivity === "SENSITIVE",
       clientVisible: payload.clientVisible === true,
       doNotDisclose: bool(payload.doNotDisclose),
-      aloneBecause: bulkApproveBlocker({ action: p.action, flags, payload }),
+      aloneBecause: bulkApproveBlocker({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level }),
       flags: [...new Set(flags.map((f) => f.code))],
       blocked: flags.some((f) => f.block),
       state: p.state,
       edited: p.edited,
       attached: p.attached,
+      autoApplied: p.autoApplied,
+      reverted: p.revertedAt !== null,
+      ...(p.target === "DATE" ? { autoTask: payload.taskDaysBefore != null } : {}),
       bulk: bulkIds.has(p.id),
       rejected: p.state === "REJECTED",
       createdAt: p.createdAt.toISOString(),

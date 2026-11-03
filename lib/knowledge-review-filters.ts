@@ -6,7 +6,7 @@
 // The filter lives in the URL: a link can be sent, a reload keeps it.
 
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
-import { TARGET_LABELS, bulkApproveBlocker, type ProposalActionLike, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { TARGET_LABELS, bulkApproveBlocker, type ConfidenceLike, type ProposalActionLike, type ProposalFlag, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 
 export type ReviewFilters = {
   clientId: string | null;
@@ -76,13 +76,13 @@ export function proposalKindLabel(key: string): string {
   return TARGET_LABELS[key as ProposalTargetLike] ?? key;
 }
 
-type AttentionLike = KindLike & { action: ProposalActionLike; flags: ProposalFlag[]; hiddenFor: string | null };
+type AttentionLike = KindLike & { action: ProposalActionLike; flags: ProposalFlag[]; hiddenFor: string | null; confidence: { level: ConfidenceLike } };
 
 /// What a person should look at closely: what is approved one at a time
-/// (a change, a possible duplicate, sensitive), anything a rule flagged,
+/// (a change, a possible duplicate, sensitive, a low review level), anything a rule flagged,
 /// and a sensitive item waiting for someone else.
 export function needsAttention(p: AttentionLike): boolean {
-  return !!p.hiddenFor || p.flags.length > 0 || !!bulkApproveBlocker(p);
+  return !!p.hiddenFor || p.flags.length > 0 || !!bulkApproveBlocker({ ...p, level: p.confidence.level });
 }
 
 export type FilterableBatch = { clientId: string; sourceKind: string | null; createdById: string | null; createdAt: Date };

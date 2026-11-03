@@ -9,7 +9,7 @@ import { KNOWLEDGE_STATUS_LABELS, type KnowledgeStatusLike } from "@/lib/knowled
 import { FACT_KIND_LABELS, type FactKindLike } from "@/lib/client-facts";
 import { POLICY_KIND_LABELS, type PolicyKindLike } from "@/lib/client-policies";
 import { ACTION_LABELS, CONFIDENCE_LABELS, MAX_BULK, NARRATIVE_KIND_LABELS, TARGET_LABELS, bulkApproveBlocker, proposalDetails, reviewSummary, type ConfidenceLike, type ProposalActionLike, type ProposalTargetLike } from "@/lib/knowledge-proposals";
-import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction } from "./actions";
+import { approveProposalAction, approveEditedProposalAction, approveProposalsAction, attachProposalAction, mergeProposalAction, proposalToTaskAction, rejectProposalAction, rejectProposalsAction, revertProposalAction } from "./actions";
 
 // One batch: one meeting or one document, and what Claude proposed from
 // it (spec 5.2). Each proposal shows what it would write, how sure it is
@@ -34,6 +34,10 @@ export type ReviewProposal = {
   alreadyIn: { body: string; addsSources: boolean } | null;
   /// Closed by "כבר בתיק": nothing was created.
   attached: boolean;
+  /// Approved, and its item taken out of the file again ("ביטול").
+  reverted: boolean;
+  /// Approved, and its item may still be taken out again (revertBlocker).
+  revertible: boolean;
   rejectReason: string | null;
   /// Sensitive and this person is not an approver (R6): who decides it.
   hiddenFor: string | null;
@@ -295,6 +299,41 @@ function RejectManyForm({ ids }: { ids: string[] }) {
   );
 }
 
+/// "ביטול" on an approved new item (3.11.2026): the item is taken out of
+/// the file again, and the proposal stays approved, marked reverted. Two
+/// steps on the row, not the browser's confirm() (see SetupForms.tsx).
+function RevertButton({ p }: { p: ReviewProposal }) {
+  const { showToast } = useToast();
+  const [asking, setAsking] = useState(false);
+  const [pending, setPending] = useState(false);
+  if (!asking) {
+    return (
+      <button type="button" onClick={() => setAsking(true)} className="ms-1.5 text-app-text-accent hover:underline" data-testid="proposal-revert">
+        ביטול
+      </button>
+    );
+  }
+  async function revert() {
+    setPending(true);
+    const r = await revertProposalAction(p.id);
+    setPending(false);
+    setAsking(false);
+    if (r.error) showToast({ tone: "error", title: "הביטול נכשל", description: r.error });
+    else showToast({ tone: "info", title: "בוטל: הפריט הוסר מהתיק", description: p.headline.slice(0, 80) });
+  }
+  return (
+    <span className="ms-1.5 inline-flex flex-wrap items-center gap-2">
+      <span className="text-app-text-secondary">להסיר את הפריט מהתיק?</span>
+      <button type="button" disabled={pending} onClick={revert} className="font-medium text-app-error disabled:opacity-50" data-testid="proposal-revert-confirm">
+        {pending ? "מסיר..." : "להסיר"}
+      </button>
+      <button type="button" disabled={pending} onClick={() => setAsking(false)} className="text-app-text-secondary">
+        להשאיר
+      </button>
+    </span>
+  );
+}
+
 function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal; selected: boolean; onSelect: (on: boolean) => void; staff: ReviewStaff; meId: string }) {
   const { showToast } = useToast();
   const status = (str(p.payload.knowledgeStatus) || (p.payload.kind === "QUESTION" ? "MISSING" : "CONFIRMED")) as KnowledgeStatusLike;
@@ -321,7 +360,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
   if (p.state !== "PENDING") {
     return (
       <li id={proposalAnchor(p.id)} className="py-2.5 text-xs text-app-text-tertiary scroll-mt-24 rounded-lg target:bg-app-accent-soft">
-        {p.state === "APPROVED" ? (p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
+        {p.state === "APPROVED" ? (p.reverted ? "אושר ובוטל: " : p.attached ? "כבר בתיק: " : p.target === "TASK" ? "נפתחה משימה: " : "אושר: ") : p.state === "TASK" ? "הפך למשימה: " : "נדחה: "}
         {p.headline}
         {p.rejectReason && ` (${p.rejectReason})`}
         {p.taskId && (
@@ -329,6 +368,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
             למשימה
           </a>
         )}
+        {p.revertible && <RevertButton p={p} />}
       </li>
     );
   }
@@ -344,7 +384,7 @@ function ProposalRow({ p, selected, onSelect, staff, meId }: { p: ReviewProposal
 
   const doubtful = p.flags.some((f) => f.code === "DUPLICATE" || f.code === "SIMILAR");
   const blocked = p.flags.some((f) => f.block);
-  const alone = bulkApproveBlocker(p);
+  const alone = bulkApproveBlocker({ ...p, level: p.confidence.level });
   return (
     <li id={proposalAnchor(p.id)} className={`py-3.5 scroll-mt-24 rounded-lg target:bg-app-accent-soft ${selected ? "bg-gold/[0.04]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -486,8 +526,8 @@ export function ReviewBatch({
   const decidable = pending.filter((p) => !p.hiddenFor);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const chosen = decidable.filter((p) => selected.has(p.id));
-  const approvable = chosen.filter((p) => !bulkApproveBlocker(p));
-  const allTogether = decidable.filter((p) => !bulkApproveBlocker(p));
+  const approvable = chosen.filter((p) => !bulkApproveBlocker({ ...p, level: p.confidence.level }));
+  const allTogether = decidable.filter((p) => !bulkApproveBlocker({ ...p, level: p.confidence.level }));
   const select = (id: string, on: boolean) =>
     setSelected((all) => {
       const next = new Set(all);

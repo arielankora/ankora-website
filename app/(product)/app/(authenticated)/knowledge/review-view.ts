@@ -1,5 +1,5 @@
 import { readSourceRefs, formatSourceRef, SOURCE_KIND_LABELS } from "@/lib/knowledge-sources";
-import { defaultTaskDue, firefliesLink, proposalHeadline, reviewConfidence, reviewRank, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
+import { defaultTaskDue, firefliesLink, proposalHeadline, reviewConfidence, reviewRank, revertBlocker, taskBlocker, taskFromProposal, type ProposalTargetLike } from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
 import type { listOpenBatches } from "@/lib/app-domain/knowledge-proposals";
 import type { ReviewProposal } from "./ReviewBatch";
@@ -28,7 +28,7 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
     const confidence = reviewConfidence({ confidence: p.confidence, flags, payload, at, sourceKind: b.source?.kind ?? null, sourceRestriction: b.source?.restriction ?? null });
     return {
       confidence,
-      rank: reviewRank({ action: p.action, flags, payload, level: confidence.level }),
+      rank: reviewRank({ target: p.target as ProposalTargetLike, action: p.action, flags, payload, level: confidence.level }),
       id: p.id,
       target: p.target as ProposalTargetLike,
       action: p.action,
@@ -43,6 +43,9 @@ export function reviewProposals(b: OpenBatch): ReviewProposal[] {
       existing: p.existing ? { body: p.existing.body } : null,
       alreadyIn: p.alreadyIn ? { body: p.alreadyIn.body, addsSources: p.alreadyIn.addsSources } : null,
       attached: p.attached,
+      // 3.11.2026: an approved new item can be taken out again ("ביטול").
+      reverted: !!p.revertedAt,
+      revertible: revertBlocker(p) === null,
       rejectReason: p.rejectReason,
       hiddenFor: p.hiddenFor,
       task: {

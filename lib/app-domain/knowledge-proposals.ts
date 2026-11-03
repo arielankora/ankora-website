@@ -17,6 +17,8 @@ import {
   type ProposalFlag,
   type ProposalTargetLike,
   bulkApproveBlocker,
+  proposalReviewLevel,
+  revertBlocker,
   MAX_BULK,
   missingRequired,
   resolveKnowledgeStatus,
@@ -33,11 +35,11 @@ import {
 } from "@/lib/knowledge-proposals";
 import { localDateKey } from "@/lib/timezone";
 import { addClientDomain, addClientSource, assertClientAccess } from "@/lib/app-domain/client-sources";
-import { addClientEntity } from "@/lib/app-domain/client-entities";
+import { addClientEntity, removeClientEntity } from "@/lib/app-domain/client-entities";
 import { NarrativeConflictError, saveNarrative } from "@/lib/app-domain/client-narratives";
 import { addProcess, linkProcessDates, saveProcessVersion } from "@/lib/app-domain/processes";
-import { addClientContact, addClientOrganization } from "@/lib/app-domain/client-contacts";
-import { addClientFact, addClientFactSources, answerClientQuestion, recordContradiction, supersedeClientFact } from "@/lib/app-domain/client-facts";
+import { addClientContact, addClientOrganization, removeClientContact, removeClientOrganization } from "@/lib/app-domain/client-contacts";
+import { addClientFact, addClientFactSources, answerClientQuestion, recordContradiction, removeClientFact, supersedeClientFact } from "@/lib/app-domain/client-facts";
 import { FACT_KIND_LABELS, isQuestion, type FactKindLike } from "@/lib/client-facts";
 import { addSystemAccess } from "@/lib/app-domain/system-map";
 import { addRequestType } from "@/lib/app-domain/request-types";
@@ -1039,14 +1041,19 @@ export async function decideProposals(
   for (const id of unique) {
     try {
       if (decision.approve) {
-        const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, target: true, action: true, flags: true, payload: true } });
+        const p = await prisma.knowledgeProposal.findUnique({ where: { id }, select: { clientId: true, batchId: true, target: true, action: true, flags: true, payload: true, confidence: true } });
         if (!p) throw new Error("ההצעה לא נמצאה.");
-        // The flags as they stand now, as the card showed them.
+        // The flags as they stand now, as the card showed them, and the
+        // review level the card read from them.
         const existing = await findExisting(p.clientId, p.target, p.action, p.payload as Record<string, unknown>);
+        const flags = withLiveDuplicate((Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[], p.target, existing) as ProposalFlag[];
+        const payload = p.payload as Record<string, unknown>;
         const blocker = bulkApproveBlocker({
+          target: p.target,
           action: p.action,
-          flags: withLiveDuplicate((Array.isArray(p.flags) ? p.flags : []) as ProposalFlag[], p.target, existing) as ProposalFlag[],
-          payload: p.payload as Record<string, unknown>,
+          flags,
+          payload,
+          level: proposalReviewLevel({ confidence: p.confidence, flags, payload }, await batchSource(p.batchId)),
         });
         if (blocker) throw new Error(`מאשרים אחת אחת: ${blocker}.`);
         await approveProposal(actor, id, {}, { bulk: true });
@@ -1059,6 +1066,58 @@ export async function decideProposals(
     }
   }
   return out;
+}
+
+/// The source of a proposal's batch, as reviewConfidence reads it.
+export async function batchSource(batchId: string): Promise<{ kind: SourceKind; restriction: SourceRestriction } | null> {
+  const batch = await prisma.knowledgeBatch.findUnique({ where: { id: batchId }, select: { sourceId: true } });
+  if (!batch?.sourceId) return null;
+  return prisma.clientSource.findUnique({ where: { id: batch.sourceId }, select: { kind: true, restriction: true } });
+}
+
+/// "ביטול" (3.11.2026, the approval tiers): the new item an approved
+/// proposal created is taken out of the file again, through the file's own
+/// soft delete, as the person reverting. The proposal stays APPROVED and
+/// is marked reverted, so what was approved and what was taken back are
+/// both known. Only a new fact, contact, provider or entity, once
+/// (revertBlocker); the same access as approving it.
+export async function revertProposal(actor: User, id: string) {
+  assertCan(actor.role, "time_entry.create_self");
+  const proposal = await prisma.knowledgeProposal.findUnique({ where: { id } });
+  if (!proposal) throw new Error("ההצעה לא נמצאה.");
+  await assertClientAccess(actor, proposal.clientId);
+  if (isSensitive(proposal.payload)) await assertCanApproveForClient(actor, proposal.clientId);
+  const why = revertBlocker(proposal);
+  if (why) throw new Error(why);
+  const resultId = proposal.resultId!;
+  // Claimed first, so two presses take the item out once.
+  const now = new Date();
+  const claimed = await prisma.knowledgeProposal.updateMany({
+    where: { id, state: "APPROVED", revertedAt: null },
+    data: { revertedAt: now, revertedById: actor.id },
+  });
+  if (claimed.count === 0) throw new Error("ההצעה כבר בוטלה.");
+  try {
+    if (proposal.target === "FACT") await removeClientFact(actor, resultId);
+    else if (proposal.target === "CONTACT") await removeClientContact(actor, resultId);
+    else if (proposal.target === "ORGANIZATION") await removeClientOrganization(actor, resultId);
+    else if (proposal.target === "ENTITY") await removeClientEntity(actor, resultId);
+  } catch (err) {
+    // Not taken out (removed by hand already, or an entity something now
+    // points at): the proposal goes back to what it was.
+    await prisma.knowledgeProposal.update({ where: { id }, data: { revertedAt: null, revertedById: null } });
+    const message = err instanceof Error ? err.message : "אירעה שגיאה.";
+    throw new Error(`הפריט לא הוסר מהתיק: ${message}`);
+  }
+  await recordAudit({
+    actorId: actor.id,
+    action: "knowledge_proposal.revert",
+    entityType: "KnowledgeProposal",
+    entityId: id,
+    clientId: proposal.clientId,
+    after: { resultId, target: proposal.target, autoApplied: proposal.autoApplied, headline: proposalHeadline(proposal.target, proposal.payload as Record<string, unknown>) },
+  });
+  return prisma.knowledgeProposal.findUniqueOrThrow({ where: { id } });
 }
 
 /// Decision 1's measure: of the proposals decided in the window, how many

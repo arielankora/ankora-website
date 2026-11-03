@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 //   3. A "בלי AI" client's proposals are left out and only counted.
 //   4. The outcome of each proposal lands in exactly one bucket, and a
 //      bulk decision is read from its audit row.
+//   5. The approval tiers (3.11.2026): whether the server approved it,
+//      whether it was taken back, and whether a date opens a task.
 
 const prisma = vi.hoisted(() => ({
   knowledgeProposal: { findMany: vi.fn(), count: vi.fn() },
@@ -28,6 +30,8 @@ const base = {
   flags: [],
   edited: false,
   attached: false,
+  autoApplied: false,
+  revertedAt: null,
   decidedAt: new Date("2026-10-20T12:00:00Z"),
   createdAt: new Date("2026-10-20T10:00:00Z"),
   batch: { via: "MCP", sourceId: "s1" },
@@ -84,6 +88,35 @@ describe("proposalStatsForAi", () => {
     const p4 = out.rows!.find((r) => r.id === "p4")!;
     expect(p4).toMatchObject({ client: "L2", sensitive: true, doNotDisclose: true, sourceKind: "TRANSCRIPT", aloneBecause: "משנה פריט שכבר בתיק" });
     expect(out.rows!.find((r) => r.id === "p1")).toMatchObject({ bulk: true, hoursToDecision: 2 });
+  });
+
+  it("says whether the server approved it, whether it was taken back, and for a date only, whether it opens a task", async () => {
+    prisma.knowledgeProposal.findMany.mockResolvedValue([
+      { ...base, id: "a1", clientId: "c-nux", target: "FACT", action: "CREATE", state: "APPROVED", autoApplied: true, revertedAt: new Date("2026-10-21T08:00:00Z"), payload: { kind: "NOTE", body: SECRET_TEXT } },
+      { ...base, id: "d1", clientId: "c-nux", target: "DATE", action: "CREATE", state: "APPROVED", payload: { title: SECRET_TEXT, taskDaysBefore: 0 } },
+      { ...base, id: "d2", clientId: "c-nux", target: "DATE", action: "CREATE", state: "PENDING", decidedAt: null, payload: { title: "y", taskDaysBefore: null } },
+    ]);
+    const out = await proposalStatsForAi(MANAGER, { rows: true });
+    const [a1, d1, d2] = out.rows!;
+    expect(a1).toMatchObject({ autoApplied: true, reverted: true });
+    expect(a1).not.toHaveProperty("autoTask");
+    expect(d1).toMatchObject({ autoApplied: false, reverted: false, autoTask: true });
+    expect(d2).toMatchObject({ autoTask: false });
+    expect(JSON.stringify(out)).not.toContain(SECRET_TEXT);
+    expect(prisma.knowledgeProposal.findMany.mock.calls[0][0].select).toMatchObject({ autoApplied: true, revertedAt: true });
+  });
+
+  it("reads why one waits with the review level: a task and a low level are approved one at a time", async () => {
+    prisma.knowledgeProposal.findMany.mockResolvedValue([
+      { ...base, id: "t1", clientId: "c-nux", target: "TASK", action: "CREATE", state: "PENDING", decidedAt: null, payload: { title: "x", sources: [{ code: "S1", at: "01:00" }] } },
+      // A recording with no minute: HIGH is read one lower, and LOW lower still.
+      { ...base, id: "l1", clientId: "c-nux", target: "FACT", action: "CREATE", state: "PENDING", decidedAt: null, confidence: "MEDIUM", payload: { kind: "NOTE" } },
+    ]);
+    const out = await proposalStatsForAi(MANAGER, { rows: true });
+    expect(out.rows!.map((r) => [r.id, r.reviewLevel, r.aloneBecause])).toEqual([
+      ["t1", "HIGH", "משימה נפתחת לאדם אחר"],
+      ["l1", "LOW", "רמת בדיקה נמוכה"],
+    ]);
   });
 
   it("pages the rows", async () => {

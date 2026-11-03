@@ -34,12 +34,14 @@ describe("how sure", () => {
 });
 
 describe("the card's order", () => {
-  const base = { action: "CREATE" as const, flags: [], payload: {} };
-  it("blocked, then one at a time, then low to high", () => {
+  const base = { target: "FACT" as const, action: "CREATE" as const, flags: [], payload: { kind: "NOTE" } };
+  it("blocked, then one at a time (a low level among them), then medium, then high", () => {
     expect(reviewRank({ ...base, flags: [{ code: "R17", message: "", block: true }], level: "HIGH" })).toBe(0);
     expect(reviewRank({ ...base, action: "SUPERSEDE", level: "HIGH" })).toBe(1);
     expect(reviewRank({ ...base, payload: { sensitivity: "SENSITIVE" }, level: "HIGH" })).toBe(1);
-    expect(reviewRank({ ...base, level: "LOW" })).toBe(2);
+    // 3.11.2026, the approval tiers: low is decided one at a time.
+    expect(reviewRank({ ...base, level: "LOW" })).toBe(1);
+    expect(reviewRank({ ...base, target: "TASK", payload: { title: "x" }, level: "HIGH" })).toBe(1);
     expect(reviewRank({ ...base, level: "MEDIUM" })).toBe(3);
     expect(reviewRank({ ...base, level: "HIGH" })).toBe(4);
   });

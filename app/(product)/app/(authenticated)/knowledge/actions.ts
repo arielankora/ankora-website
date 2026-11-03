@@ -2,7 +2,7 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { approveProposal, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal } from "@/lib/app-domain/knowledge-proposals";
+import { approveProposal, attachProposalToExisting, decideProposals, mergeProposal, proposalToTask, rejectProposal, revertProposal } from "@/lib/app-domain/knowledge-proposals";
 import { assignBatch, discardAwaiting } from "@/lib/app-domain/batch-assignment";
 
 // Org brain, phase 2: "ממתין לאישור" (spec 5.2). Approve, edit and
@@ -61,6 +61,18 @@ export async function approveProposalAction(id: string): Promise<FormState> {
   const user = await requireUser();
   try {
     await approveProposal(user, id);
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
+  return done();
+}
+
+/// "ביטול" (3.11.2026): the new item an approved proposal created is taken
+/// out of the file again. The proposal stays approved, marked reverted.
+export async function revertProposalAction(id: string): Promise<FormState> {
+  const user = await requireUser();
+  try {
+    await revertProposal(user, id);
   } catch (err) {
     return { error: friendlyError(err) };
   }

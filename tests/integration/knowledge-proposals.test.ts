@@ -15,6 +15,7 @@ import {
   proposalToTask,
   proposeKnowledge,
   rejectProposal,
+  revertProposal,
 } from "@/lib/app-domain/knowledge-proposals";
 
 // Org brain, phase 2 (claude/org-brain-spec-2026-10-12.md, 4, 5.1, 5.2).
@@ -275,8 +276,10 @@ describe("knowledge proposals", () => {
       clientId: client.id,
       source: MEETING,
       items: [
-        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "9 עובדים שכירים בישראל" } },
-        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "SOC 2 הושג" } },
+        // A minute in the recording: without one, and without a confidence,
+        // the review level is low and it waits for one at a time (3.11.2026).
+        { target: "FACT", reason: "נאמר בפגישה", at: "03:10", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "9 עובדים שכירים בישראל" } },
+        { target: "FACT", reason: "נאמר בפגישה", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "SOC 2 הושג" } },
         { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "REQUIREMENT", body: "דוח שבועי לאורן" } },
         { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "שיחת חולין" } },
       ],
@@ -300,6 +303,83 @@ describe("knowledge proposals", () => {
     const other = await proposeKnowledge(user, { clientId: client.id, source: MEETING, items: [{ target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "עוד" } }] });
     const [mine] = (await listOpenBatches(user)).find((x) => x.id === other.batchId)!.proposals;
     expect((await decideProposals(stranger, [mine.id], { approve: true })).failed).toHaveLength(1);
+  });
+
+  it("3.11.2026: a task and a low review level wait for one at a time", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נאמר בפגישה", at: "01:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "המשרד בתל אביב" } },
+        { target: "FACT", reason: "נאמר בפגישה", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "בלי דקה ובלי ביטחון" } },
+        { target: "TASK", reason: "הבטחנו", at: "02:00", confidence: "HIGH", payload: { title: "לשלוח לאורן את החוזה" } },
+      ],
+    });
+    const [ok, low, task] = (await listOpenBatches(user)).find((x) => x.id === r.batchId)!.proposals;
+    const out = await decideProposals(user, [ok.id, low.id, task.id], { approve: true });
+    expect(out.done).toEqual([ok.id]);
+    expect(out.failed).toEqual([
+      { id: low.id, error: "מאשרים אחת אחת: רמת בדיקה נמוכה." },
+      { id: task.id, error: "מאשרים אחת אחת: משימה נפתחת לאדם אחר." },
+    ]);
+    // One at a time, each is still approved.
+    await approveProposal(user, low.id);
+    expect((await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: low.id } })).state).toBe("APPROVED");
+  });
+
+  it("ביטול: the new item an approved proposal created leaves the file, once, and the proposal stays approved", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [
+        { target: "FACT", reason: "נאמר בפגישה", at: "01:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "PREFERENCE", body: "דוחות ביום ראשון" } },
+        { target: "CONTACT", reason: "נאמר בפגישה", at: "02:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", name: "דנה כהן", role: "CFO" } },
+        { target: "ORGANIZATION", reason: "נאמר בפגישה", at: "03:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", name: "רואי חשבון בע\"מ" } },
+        { target: "ENTITY", reason: "נאמר בפגישה", at: "04:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", name: "NUX Inc" } },
+        { target: "TASK", reason: "הבטחנו", at: "05:00", confidence: "HIGH", payload: { title: "לשלוח לדנה את הדוח" } },
+        { target: "FACT", reason: "נאמר בפגישה", at: "06:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "עוד דבר" } },
+      ],
+    });
+    const [fact, contact, org, entity, task, pending] = (await listOpenBatches(user)).find((x) => x.id === r.batchId)!.proposals;
+    for (const p of [fact, contact, org, entity, task]) await approveProposal(user, p.id);
+
+    const reverted = await revertProposal(user, fact.id);
+    expect(reverted).toMatchObject({ state: "APPROVED", revertedById: user.id });
+    expect(reverted.revertedAt).toBeInstanceOf(Date);
+    expect((await listClientFacts(user, client.id)).current.map((f) => f.body)).not.toContain("דוחות ביום ראשון");
+    const audit = await prisma.auditEvent.findFirst({ where: { entityId: fact.id, action: "knowledge_proposal.revert" } });
+    expect(audit!.afterJson).toMatchObject({ target: "FACT", autoApplied: false });
+    await expect(revertProposal(user, fact.id)).rejects.toThrow("כבר בוטלה");
+
+    for (const p of [contact, org, entity]) await revertProposal(user, p.id);
+    const c = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: contact.id } });
+    expect((await prisma.clientContact.findUniqueOrThrow({ where: { id: c.resultId! } })).deletedAt).not.toBeNull();
+    const o = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: org.id } });
+    expect((await prisma.clientOrganization.findUniqueOrThrow({ where: { id: o.resultId! } })).deletedAt).not.toBeNull();
+    const e = await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: entity.id } });
+    expect((await prisma.clientEntity.findUniqueOrThrow({ where: { id: e.resultId! } })).deletedAt).not.toBeNull();
+
+    // A task, a pending proposal, and someone not on the client: refused.
+    await expect(revertProposal(user, task.id)).rejects.toThrow("לא למשימה");
+    await expect(revertProposal(user, pending.id)).rejects.toThrow("שאושרה");
+    const { user: stranger } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    await expect(revertProposal(stranger, pending.id)).rejects.toThrow(ForbiddenError);
+  });
+
+  it("ביטול of an item already taken out by hand says so, and leaves the proposal as it was", async () => {
+    const { client, user } = await setup();
+    const r = await proposeKnowledge(user, {
+      clientId: client.id,
+      source: MEETING,
+      items: [{ target: "FACT", reason: "נאמר בפגישה", at: "01:00", confidence: "HIGH", payload: { knowledgeStatus: "CONFIRMED", kind: "NOTE", body: "הוסר ביד" } }],
+    });
+    const [p] = (await listOpenBatches(user)).find((x) => x.id === r.batchId)!.proposals;
+    const approved = await approveProposal(user, p.id);
+    await prisma.clientFact.update({ where: { id: approved.resultId! }, data: { deletedAt: new Date() } });
+    await expect(revertProposal(user, p.id)).rejects.toThrow("הפריט לא הוסר מהתיק");
+    expect((await prisma.knowledgeProposal.findUniqueOrThrow({ where: { id: p.id } })).revertedAt).toBeNull();
   });
 
   it("is closed to anyone not assigned to the client, in both directions", async () => {

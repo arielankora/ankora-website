@@ -3462,6 +3462,13 @@ model KnowledgeProposal {
   attached     Boolean       @default(false)
   /// The item approving it created or changed.
   resultId     String?
+  /// 3.11.2026: approved by the server on arrival, with no person, under
+  /// the approval tiers (lib/knowledge-proposals.ts, approvalTier).
+  autoApplied  Boolean       @default(false)
+  /// When the item it created was taken out of the file again ("ביטול"),
+  /// and by whom (revertProposal). The proposal stays APPROVED.
+  revertedAt   DateTime?
+  revertedById String?
 
   createdAt DateTime @default(now())
 
