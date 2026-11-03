@@ -370,7 +370,10 @@ export function proposalProblems(target: ProposalTargetLike, payload: Record<str
     });
   }
   // Rule 1: anything short of confirmed says what would confirm it.
-  if ((payload.knowledgeStatus === "UNCERTAIN" || payload.knowledgeStatus === "MISSING") && !s("toResolve")?.trim()) {
+  // Not an open question: what closes it is its answer, and the file
+  // writes that on its own (client-facts.ts). Its edit had no such field,
+  // so a question from a meeting could not be approved at all (3.11.2026).
+  if (!(target === "FACT" && payload.kind === "QUESTION") && (payload.knowledgeStatus === "UNCERTAIN" || payload.knowledgeStatus === "MISSING") && !s("toResolve")?.trim()) {
     const toResolve = suggestedToResolve(ctx.sourceTitle);
     out.push({
       code: "SHAPE",
