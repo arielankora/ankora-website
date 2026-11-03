@@ -936,7 +936,16 @@ export default async function ClientDetailPage(props: { params: Promise<{ client
         {tab === "work" && (
           <>
             <div className="rounded-2xl border border-app-border bg-white p-6">
-              <EditClientForm client={client} staff={staff} />
+              <EditClientForm
+                client={client}
+                staff={staff}
+                noticeDocuments={[...documents]
+                  .sort((a, b) => Number(b.kind === "CONTRACT") - Number(a.kind === "CONTRACT"))
+                  .map((d) => ({ id: d.id, title: d.title }))}
+                noticeCheckedByName={
+                  client.subprocessorNoticeCheckedById ? staffName.get(client.subprocessorNoticeCheckedById) ?? null : null
+                }
+              />
             </div>
 
             <TasksPanel

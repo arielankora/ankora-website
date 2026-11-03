@@ -28,6 +28,7 @@ import { clientBrief, clientFileChanges } from "@/lib/app-domain/client-file-liv
 import { readSince } from "@/lib/client-file-live";
 import { appBaseUrl } from "@/lib/email-templates";
 import { saveProcedureTranslation, translationSource } from "@/lib/app-domain/procedure-documents";
+import { listSubprocessorRecipients, type SubprocessorRecipient } from "@/lib/app-domain/subprocessor-recipients";
 
 /// Ceilings on the list-shaped inputs of this file's tools (security
 /// review, 25.10.2026).
@@ -196,6 +197,50 @@ export function registerClientFileTools(server: McpServer): void {
         return toolText(await clientBrief(actor, client.value.id));
       } catch (err) {
         console.error("[mcp] get_client_brief failed", err);
+        return toolFailure(err);
+      }
+    }
+  );
+
+  server.registerTool(
+    "list_subprocessor_notice_recipients",
+    {
+      title: "List sub-processor notice recipients",
+      description:
+        "P8 step 8: who is told about a new sub-processor, and how. Every client Ankora works for (active or paused, not Ankora's internal client) in three groups: `email` (the client's contract commits Ankora to tell it, with the contract and section), `emailToBeSafe` (nobody checked the contract yet: email it too, and say in the run that it is unchecked), and `websiteOnly` (no such commitment: the website update is enough). Only an explicit commitment in the client's own contract counts. A client marked \"בלי AI\" is never named here, only counted in `aiExcludedLeftOut`: tell the user to take those from the clients screen. Managers only. Read-only.",
+      inputSchema: z.object({}),
+      annotations: TOOL_ANNOTATIONS.list_subprocessor_notice_recipients,
+    },
+    async (_args: Record<string, never>, ctx: ServerContext) => {
+      try {
+        const actor = actorOf(ctx);
+        const groups = await listSubprocessorRecipients(actor);
+        const base = appBaseUrl();
+        let aiExcludedLeftOut = 0;
+        const shape = (list: SubprocessorRecipient[]) =>
+          list.flatMap((c) => {
+            if (c.aiExcluded) {
+              aiExcludedLeftOut += 1;
+              return [];
+            }
+            return [
+              {
+                client: c.name,
+                status: c.status,
+                source: c.source,
+                checkedOn: c.checkedAt ? c.checkedAt.toISOString().slice(0, 10) : null,
+                url: `${base}/app/clients/${c.id}`,
+              },
+            ];
+          });
+        return toolJson({
+          email: shape(groups.committed),
+          emailToBeSafe: shape(groups.unchecked),
+          websiteOnly: shape(groups.notCommitted),
+          aiExcludedLeftOut,
+        });
+      } catch (err) {
+        console.error("[mcp] list_subprocessor_notice_recipients failed", err);
         return toolFailure(err);
       }
     }

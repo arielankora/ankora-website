@@ -1,5 +1,6 @@
 "use server";
 import { revalidatePath } from "next/cache";
+import { parseSubprocessorNotice } from "@/lib/subprocessor-notice";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/app-auth/session";
 import { createClient, updateClient, archiveClient, restoreClient } from "@/lib/app-domain/clients";
@@ -83,6 +84,18 @@ export async function updateClientAction(_prev: FormState | undefined, formData:
       // Org brain (spec 3.3). Always on the form.
       kind: formData.get("kind") === "PRIVATE" ? "PRIVATE" : "BUSINESS",
       industry: String(formData.get("industry") || "") || null,
+      // 3.11.2026: sub-processor notice. Always on the form; an unknown
+      // value leaves the answer untouched rather than resetting it.
+      subprocessorNotice: (() => {
+        const notice = parseSubprocessorNotice(formData.get("subprocessorNotice"));
+        return notice
+          ? {
+              notice,
+              source: String(formData.get("subprocessorNoticeSource") || ""),
+              documentId: String(formData.get("subprocessorNoticeDocumentId") || "") || null,
+            }
+          : undefined;
+      })(),
     });
   } catch (err) {
     return { error: friendlyError(err) };

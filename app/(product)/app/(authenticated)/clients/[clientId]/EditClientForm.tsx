@@ -3,6 +3,7 @@ import { updateClientAction } from "../actions";
 import { useActionForm } from "@/components/app/useActionForm";
 import { formatMinor } from "@/lib/money";
 import type { Client } from "@prisma/client";
+import { SUBPROCESSOR_NOTICE_LABELS, SUBPROCESSOR_NOTICE_VALUES } from "@/lib/subprocessor-notice";
 
 function SubmitButton({ pending }: { pending: boolean }) {
   return (
@@ -19,12 +20,19 @@ function SubmitButton({ pending }: { pending: boolean }) {
 export function EditClientForm({
   client,
   staff,
+  noticeDocuments = [],
+  noticeCheckedByName = null,
 }: {
   client: Client;
   /// Portal phase 2: who can be this client's account manager. Ankora
   /// staff only - a client user on that list would end up named as the
   /// person to talk to on their own portal.
   staff: { id: string; name: string }[];
+  /// 3.11.2026: the client's filed documents, to cite the contract behind
+  /// the sub-processor notice answer. Contracts first.
+  noticeDocuments?: { id: string; title: string }[];
+  /// Who last set the sub-processor notice answer, by name.
+  noticeCheckedByName?: string | null;
 }) {
   const { onSubmit, pending, error, ok } = useActionForm(updateClientAction);
 
@@ -142,6 +150,64 @@ export function EditClientForm({
           </span>
         </span>
       </label>
+
+      {/* 3.11.2026: P8 step 8. Whether this client's own contract commits
+          Ankora to tell it by email about a new sub-processor. Internal:
+          the client does not see it on the portal. */}
+      <div className="rounded-lg border border-app-border bg-cream-dim/40 p-4 sm:col-span-2">
+        <p className="text-xs font-medium text-app-text-primary">התחייבות לעדכון יזום על תת-מעבד</p>
+        <p className="mt-1 text-[11px] text-app-text-tertiary">
+          רק התחייבות מפורשת בחוזה של הלקוח נחשבת. סעיף 6 בנספח עיבוד המידע שבאתר לא נחשב לבד. לא נבדק: הלקוח מקבל מייל ליתר ביטחון.
+        </p>
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <label className="block">
+            <span className="block text-xs font-medium text-app-text-secondary">מצב</span>
+            <select
+              name="subprocessorNotice"
+              defaultValue={client.subprocessorNotice}
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            >
+              {SUBPROCESSOR_NOTICE_VALUES.map((v) => (
+                <option key={v} value={v}>
+                  {SUBPROCESSOR_NOTICE_LABELS[v]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-app-text-secondary">מקור: חוזה וסעיף</span>
+            <input
+              name="subprocessorNoticeSource"
+              defaultValue={client.subprocessorNoticeSource ?? ""}
+              placeholder="הסכם שירות 3.2026, סעיף 9"
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            />
+            <span className="mt-1 block text-[11px] text-app-text-tertiary">חובה כשמסמנים יש או אין.</span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-medium text-app-text-secondary">החוזה בתיק</span>
+            <select
+              name="subprocessorNoticeDocumentId"
+              defaultValue={client.subprocessorNoticeDocumentId ?? ""}
+              className="mt-1.5 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
+            >
+              <option value="">לא נבחר</option>
+              {noticeDocuments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.title}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-[11px] text-app-text-tertiary">רשות.</span>
+          </label>
+        </div>
+        {client.subprocessorNoticeCheckedAt && (
+          <p className="mt-3 text-[11px] text-app-text-tertiary">
+            עודכן ב-{new Date(client.subprocessorNoticeCheckedAt).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}
+            {noticeCheckedByName ? ` על ידי ${noticeCheckedByName}` : ""}.
+          </p>
+        )}
+      </div>
 
       {/* Portal phase 2. Three fields that only matter because of the
           portal, grouped so they read as one subject rather than as more

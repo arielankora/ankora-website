@@ -4,6 +4,11 @@ import { assertCan, canManageClients } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import type { User, ClientStatus, ClientKind } from "@prisma/client";
 import { ensureDefaultAlertRules } from "@/lib/app-domain/alerts";
+import {
+  normalizeSubprocessorNotice,
+  subprocessorNoticeChanged,
+  type SubprocessorNoticeInput,
+} from "@/lib/subprocessor-notice";
 
 export async function listClients() {
   return prisma.client.findMany({
@@ -126,10 +131,24 @@ export async function updateClient(
     /// Org brain (spec 3.3).
     kind?: ClientKind;
     industry?: string | null;
+    /// 3.11.2026: Client.subprocessorNotice, its source and contract.
+    subprocessorNotice?: SubprocessorNoticeInput;
   }
 ) {
   assertCan(actor.role, "client.manage");
   const before = await prisma.client.findUniqueOrThrow({ where: { id: clientId } });
+
+  // Sub-processor notice (3.11.2026). Validated before anything is written,
+  // so a missing source does not leave the other settings half-saved.
+  const notice = input.subprocessorNotice ? normalizeSubprocessorNotice(input.subprocessorNotice) : null;
+  const noticeChanged = notice !== null && subprocessorNoticeChanged(before, notice);
+  if (noticeChanged && notice.subprocessorNoticeDocumentId) {
+    const doc = await prisma.clientDocument.findFirst({
+      where: { id: notice.subprocessorNoticeDocumentId, clientId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!doc) throw new Error("החוזה שנבחר לא נמצא בתיק של הלקוח הזה.");
+  }
 
   const touchedPreferences =
     (input.preferenceContact !== undefined && (input.preferenceContact?.trim() || null) !== before.preferenceContact) ||
@@ -174,6 +193,11 @@ export async function updateClient(
       procedureApprovalSeparation: input.procedureApprovalSeparation,
       kind: input.kind,
       industry: input.industry === null ? null : input.industry?.trim() || undefined,
+      // Who checked and when is stamped only when the answer moved, so a
+      // save of the timezone does not claim somebody re-read the contract.
+      ...(noticeChanged
+        ? { ...notice, subprocessorNoticeCheckedAt: new Date(), subprocessorNoticeCheckedById: actor.id }
+        : {}),
       // Only stamp the editor when a preference actually moved, so the
       // client's screen does not report "עודכן לאחרונה" because somebody
       // changed the timezone.
@@ -202,6 +226,23 @@ export async function updateClient(
       clientId,
       before: { aiExcluded: before.aiExcluded },
       after: { aiExcluded: client.aiExcluded },
+    });
+  }
+  // 3.11.2026: its own line, like "בלי AI", so "who marked this client and
+  // on what basis" has a direct answer when P8 step 8 is questioned.
+  if (noticeChanged) {
+    await recordAudit({
+      actorId: actor.id,
+      action: "client.subprocessor_notice",
+      entityType: "Client",
+      entityId: clientId,
+      clientId,
+      before: {
+        subprocessorNotice: before.subprocessorNotice,
+        subprocessorNoticeSource: before.subprocessorNoticeSource,
+        subprocessorNoticeDocumentId: before.subprocessorNoticeDocumentId,
+      },
+      after: notice,
     });
   }
   if (archiving) {
