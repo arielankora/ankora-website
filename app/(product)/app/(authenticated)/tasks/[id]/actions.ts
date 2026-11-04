@@ -28,6 +28,7 @@ import {
   type ManualEntryFormState,
 } from "../../my-time/entry-errors";
 import type { TaskBlocker, TaskPriority, TaskStatus } from "@prisma/client";
+import type { AdvanceTimerOutcome } from "@/lib/advance-timer";
 
 // Tasks phase 1, the writes behind /app/tasks/[id].
 //
@@ -226,6 +227,49 @@ export async function startTimerForTaskAction(input: {
     return { ok: true as const, timeEntryId: entry.id, startAt: entry.startAt.toISOString() };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// "קדם עם קלוד והפעל טיימר" (3.11.2026): the timer half of the button.
+///
+/// Never asks and never runs anything in parallel: it starts a timer on
+/// the task only when nothing else is running, and otherwise reports why
+/// not, so Claude asks in the conversation as it always did. The rules
+/// (one timer per client, a confirmed parallel) stay startTimer's: this
+/// calls it without confirmParallel and reads its refusal, so a race with
+/// another tab is settled under the same lock. See lib/advance-timer.ts.
+export async function startTimerFromAdvanceAction(input: {
+  taskId: string;
+}): Promise<{ outcome: AdvanceTimerOutcome; error?: string }> {
+  const user = await requireUser();
+  try {
+    const task = await prisma.task.findFirst({
+      where: { id: input.taskId, deletedAt: null },
+      select: { id: true, clientId: true, categoryId: true, title: true },
+    });
+    if (!task) return { outcome: "error", error: "המשימה לא נמצאה." };
+    if (!task.categoryId) return { outcome: "no_category" };
+
+    await startTimer(user, {
+      clientId: task.clientId,
+      categoryId: task.categoryId,
+      taskId: task.id,
+      // As the task's own timer button: the title, which the client's
+      // monthly report reads. Claude replaces it with a summary when it
+      // stops the timer at the end of the conversation.
+      note: task.title,
+    });
+
+    revalidatePath(`/app/tasks/${task.id}`);
+    revalidatePath("/app/timer");
+    revalidatePath("/app");
+    return { outcome: "started" };
+  } catch (err) {
+    if (err instanceof SameClientTimerError) return { outcome: "running_on_client" };
+    if (err instanceof ParallelTimerConfirmationRequiredError || err instanceof TimerLimitError) {
+      return { outcome: "other_client" };
+    }
+    return { outcome: "error", error: friendlyError(err) };
   }
 }
 
