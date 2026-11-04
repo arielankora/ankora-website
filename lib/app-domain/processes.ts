@@ -34,6 +34,7 @@ import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
+import { flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -312,6 +313,9 @@ export async function linkProcessDates(actor: User, processId: string, dateIds: 
 
 export type VersionInput = {
   steps: unknown;
+  /// A procedure built as a flow (lib/process-flow.ts). When given, the
+  /// steps are derived from it and `steps` is ignored.
+  flow?: unknown;
   highlights?: string | null;
   outputs?: string | null;
   changeNote?: string | null;
@@ -414,7 +418,14 @@ export function holdsApproval(checks: ProcessCheckResult[]): ProcessCheckResult[
 export async function saveProcessVersion(actor: User, processId: string, input: VersionInput) {
   assertCan(actor.role, "time_entry.create_self");
   const process = await findProcess(actor, processId);
-  const steps = readSteps(input.steps);
+  let flow: ProcessFlow | null = null;
+  if (input.flow !== undefined && input.flow !== null) {
+    flow = readFlow(input.flow);
+    if (!flow) throw new Error("הזרימה לא נקראה. רעננו ונסו שוב.");
+    const issues = flowIssues(flow);
+    if (issues.length) throw new Error(issues.map((i) => i.message).join(" "));
+  }
+  const steps = flow ? flowSteps(flow) : readSteps(input.steps);
   if (steps.length === 0) throw new Error("נוהל צריך לפחות שלב אחד.");
   if (steps.length > MAX_PROCESS_STEPS) throw new Error(`עד ${MAX_PROCESS_STEPS} שלבים. נוהל ארוך מזה הוא כמה תהליכים.`);
   const systemIds = [...new Set(steps.flatMap((s) => s.systemIds))];
@@ -437,6 +448,7 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
         processId,
         version: latestVersion + 1,
         steps: steps as unknown as Prisma.InputJsonValue,
+        flow: flow ? (flow as unknown as Prisma.InputJsonValue) : Prisma.DbNull,
         highlights: version.highlights,
         outputs: version.outputs,
         changeNote: clean(input.changeNote),
@@ -449,6 +461,44 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new ProcessVersionConflictError(latestVersion + 1);
     throw err;
   }
+}
+
+/// "שמור והפעל" (task cmvtivumj000pjs08q9qj4t67, step 3 decisions, Ariel
+/// 4.11.2026): the account manager saves and the version goes live at once,
+/// through the same approval, checks, snapshot and audit as any approval.
+/// It waits as a draft for a second pair of eyes when it sends mail to the
+/// client on its own or moves money, when the client keeps authors from
+/// approving their own procedures, or when the person saving does not
+/// approve procedures of this client. The live version keeps running until
+/// then. Never called for what Claude proposes: that stays a draft.
+export type SaveAndActivateResult =
+  | { live: true; version: number }
+  | { live: false; version: number; reason: string; secondEye: string[] };
+
+export async function saveAndActivateProcessVersion(actor: User, processId: string, input: VersionInput): Promise<SaveAndActivateResult> {
+  const row = await saveProcessVersion(actor, processId, input);
+  const process = await findProcess(actor, processId);
+  const flow = readFlow(row.flow);
+  const waiting = flow ? secondEyeNodes(flow).map((n) => n.title) : [];
+  if (waiting.length) {
+    return { live: false, version: row.version, secondEye: waiting, reason: `ממתין לעין שנייה: ${waiting.map((t) => `"${t}"`).join(", ")}. עד האישור, הגרסה הקודמת ממשיכה לרוץ.` };
+  }
+  const client = await prisma.client.findUnique({ where: { id: process.clientId }, select: { accountManagerId: true, procedureApprovalSeparation: true } });
+  const approver = { userId: actor.id, isManager: canManageClients(actor.role), accountManagerId: client?.accountManagerId ?? null };
+  if (!approvesProceduresOf(approver)) {
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: רק מנהל או מנהל התיק של הלקוח מפעילים נוהל." };
+  }
+  if (procedureApprovalBlocker({ ...approver, separation: client?.procedureApprovalSeparation ?? false, authorId: row.createdById })) {
+    return { live: false, version: row.version, secondEye: [], reason: "נשמר כטיוטה: אצל הלקוח הזה מי שכתב את הנוהל לא מאשר אותו, ולכן הוא ממתין לעין שנייה." };
+  }
+  try {
+    await approveProcessVersion(actor, processId, row.version);
+  } catch (err) {
+    // Saved, not live: the client's rules hold it (an approval threshold
+    // with no approval step, say). The editor shows why.
+    return { live: false, version: row.version, secondEye: [], reason: err instanceof Error ? err.message : "הנוהל נשמר כטיוטה ולא הופעל." };
+  }
+  return { live: true, version: row.version };
 }
 
 /// The checks a version would face if approved now.

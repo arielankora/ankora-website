@@ -4199,6 +4199,11 @@ model ProcessVersion {
   ///    actionTags: [], systemIds: [], output, verification,
   ///    requiresApproval }], at most 15 (lib/process-rules.ts).
   steps      Json   @default("[]")
+  /// 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): the procedure as a flow,
+  /// with conditions and branches (lib/process-flow.ts, ProcessFlow). When
+  /// set, `steps` is derived from it (flowSteps) on every save, so every
+  /// reader of the list keeps working. Null for a procedure that is a list.
+  flow       Json?
   /// Hadas's "דגשים": what matters and is not a step.
   highlights String?
   /// What must exist for a run to count as done.

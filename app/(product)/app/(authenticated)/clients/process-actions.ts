@@ -8,7 +8,9 @@ import {
   approveProcessVersion,
   linkProcessDates,
   removeProcess,
+  saveAndActivateProcessVersion,
   saveProcessVersion,
+  type SaveAndActivateResult,
   setProcessStatus,
   updateProcess,
   ProcessVersionConflictError,
@@ -204,6 +206,35 @@ export async function saveProcessVersionAction(_prev: FormState | undefined, f: 
       baseVersion: Number(f.get("baseVersion") ?? 0),
     })
   );
+}
+
+/// "שמור והפעל" from the flow editor (task cmvtivumj000pjs08q9qj4t67): the
+/// flow goes live at once, or waits for a second pair of eyes and says why.
+export async function saveAndActivateFlowAction(input: {
+  clientId: string;
+  processId: string;
+  flow: unknown;
+  baseVersion: number;
+  changeNote?: string | null;
+  /// Carried from the version being edited: the flow editor does not edit them.
+  highlights?: string | null;
+  outputs?: string | null;
+}): Promise<{ error?: string; result?: SaveAndActivateResult }> {
+  const user = await requireUser();
+  try {
+    const result = await saveAndActivateProcessVersion(user, input.processId, {
+      steps: [],
+      flow: input.flow,
+      highlights: input.highlights ?? null,
+      outputs: input.outputs ?? null,
+      changeNote: input.changeNote ?? null,
+      baseVersion: input.baseVersion,
+    });
+    revalidatePath(`/app/clients/${input.clientId}`);
+    return { result };
+  } catch (err) {
+    return { error: friendlyError(err) };
+  }
 }
 
 export async function approveProcessVersionAction(processId: string, version: number, clientId: string): Promise<FormState> {
