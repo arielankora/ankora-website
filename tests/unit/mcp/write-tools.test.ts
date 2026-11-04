@@ -35,6 +35,8 @@ const domain = vi.hoisted(() => ({
   listMyTimeEntries: vi.fn(),
   listTimeEntriesForAdmin: vi.fn(),
   combineWallClockTime: vi.fn(),
+  closedBankForStoppedEntry: vi.fn(async (): Promise<unknown> => null),
+  moveEntryIntoOpenBank: vi.fn(),
 }));
 
 const lookup = vi.hoisted(() => ({

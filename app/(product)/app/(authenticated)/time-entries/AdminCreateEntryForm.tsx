@@ -1,7 +1,8 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { adminCreateEntryAction } from "./actions";
 import { useActionForm } from "@/components/app/useActionForm";
+import { ClosedBankNotice } from "../my-time/ClosedBankNotice";
 import { useToast } from "@/components/app/toast/ToastProvider";
 
 type Option = { id: string; name: string };
@@ -55,7 +56,13 @@ export function AdminCreateEntryForm({
   // names the employee, because filing time against somebody else's name
   // is exactly the case where "saved" is not enough to know it went to
   // the right person.
-  const { onSubmit, pending, error } = useActionForm(adminCreateEntryAction, () => {
+  const formRef = useRef<HTMLFormElement>(null);
+  const intoOpenBankRef = useRef<HTMLInputElement>(null);
+  const overrideReasonRef = useRef<HTMLInputElement>(null);
+  const [closedDismissed, setClosedDismissed] = useState(false);
+  const { onSubmit, pending, error, result } = useActionForm(adminCreateEntryAction, () => {
+    if (intoOpenBankRef.current) intoOpenBankRef.current.value = "false";
+    if (overrideReasonRef.current) overrideReasonRef.current.value = "";
     setOpen(false);
     const person = users.find((u) => u.id === userId);
     showToast({
@@ -88,9 +95,15 @@ export function AdminCreateEntryForm({
 
   return (
     <form
-      onSubmit={onSubmit}
+      ref={formRef}
+      onSubmit={(e) => {
+        setClosedDismissed(false);
+        onSubmit(e);
+      }}
       className="grid grid-cols-1 gap-4 rounded-2xl border border-app-border bg-white p-6 sm:grid-cols-2 lg:grid-cols-4"
     >
+      <input ref={intoOpenBankRef} type="hidden" name="intoOpenBank" defaultValue="false" />
+      <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
       <div>
         <label className="block text-xs font-medium text-app-text-secondary">איש צוות *</label>
         <select
@@ -197,6 +210,22 @@ export function AdminCreateEntryForm({
         </label>
       </div>
 
+      {result?.closedBank && !closedDismissed && (
+        <div className="sm:col-span-2 lg:col-span-4">
+          <ClosedBankNotice
+            notice={result.closedBank}
+            onMoveToOpen={() => {
+              if (intoOpenBankRef.current) intoOpenBankRef.current.value = "true";
+              formRef.current?.requestSubmit();
+            }}
+            onOverride={(reason) => {
+              if (overrideReasonRef.current) overrideReasonRef.current.value = reason;
+              formRef.current?.requestSubmit();
+            }}
+            onDismiss={() => setClosedDismissed(true)}
+          />
+        </div>
+      )}
       <div className="flex items-end justify-between gap-4 sm:col-span-2 lg:col-span-4">
         {error && <p className="text-sm text-app-error">{error}</p>}
         <div className="ms-auto flex gap-3">

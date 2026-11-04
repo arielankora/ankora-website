@@ -11,12 +11,14 @@ import {
   OverlapError,
   startTimer,
   stopTimer,
+  closedBankForStoppedEntry,
   SameClientTimerError,
   TimerLimitError,
   ParallelTimerConfirmationRequiredError,
   NoteRequiredError,
 } from "@/lib/app-domain/time-entries";
 import { MAX_PARALLEL_TIMERS } from "@/lib/app-domain/parallel-timers";
+import { ClosedBankError, stoppedAcrossClosureMessage } from "@/lib/app-domain/closed-bank-guard";
 import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPlan } from "@/lib/app-domain/task-plans";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
@@ -24,6 +26,8 @@ import { recordRunLesson } from "@/lib/app-domain/process-lessons";
 import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
 import {
   friendlyError as entryError,
+  closedBankNoticeFrom,
+  closedBankOptionsFrom,
   overlapWarningFrom,
   type ManualEntryFormState,
 } from "../../my-time/entry-errors";
@@ -313,6 +317,7 @@ export async function createTaskManualEntryAction(
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
       allowOverlapOverride: formData.get("confirmOverlap") === "true",
+      ...closedBankOptionsFrom(formData),
     });
 
     revalidatePath(`/app/tasks/${task.id}`);
@@ -320,6 +325,7 @@ export async function createTaskManualEntryAction(
     revalidatePath("/app/timer");
     return { ok: true };
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     if (err instanceof OverlapError && !err.sameClient) {
       return { overlapWarning: overlapWarningFrom(err) };
     }
@@ -335,12 +341,14 @@ export async function createTaskManualEntryAction(
 export async function stopTimerForTaskAction(input: { taskId: string; timeEntryId: string }) {
   const user = await requireUser();
   try {
-    await stopTimer(user, input.timeEntryId);
+    const entry = await stopTimer(user, input.timeEntryId);
     revalidatePath(`/app/tasks/${input.taskId}`);
     revalidatePath("/app/timer");
     revalidatePath("/app/timer");
     revalidatePath("/app");
-    return { ok: true as const };
+    // 3.11.2026: see stopTimerAction.
+    const crossed = await closedBankForStoppedEntry(entry);
+    return { ok: true as const, closedBank: crossed ? { message: stoppedAcrossClosureMessage(crossed) } : null };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

@@ -7,6 +7,7 @@ import {
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
+import { ClosedBankError, OVERRIDE_WARNING } from "@/lib/app-domain/closed-bank-guard";
 import { describeOverlapConflict } from "@/lib/time-entry-format";
 
 // What a manual-entry write answers with, shared by "הזמן שלי" and the
@@ -27,7 +28,39 @@ export type OverlapWarning = {
   endAt: string | null;
 };
 
-export type ManualEntryFormState = { error?: string; ok?: boolean; overlapWarning?: OverlapWarning };
+/// 3.11.2026, "לא רושמים בחבילה סגורה": a write that lands in a closed
+/// hour bank comes back as this, not as `error`, so the screen can offer
+/// what the rule allows: recording it in the open bank, or, for a manager,
+/// changing the closed bank anyway after "are you sure" and with a reason.
+export type ClosedBankNoticeState = {
+  message: string;
+  canMoveToOpen: boolean;
+  canOverride: boolean;
+  overrideWarning: string;
+};
+
+export type ManualEntryFormState = {
+  error?: string;
+  ok?: boolean;
+  overlapWarning?: OverlapWarning;
+  closedBank?: ClosedBankNoticeState;
+};
+
+export function closedBankNoticeFrom(err: ClosedBankError): ClosedBankNoticeState {
+  return { message: err.message, canMoveToOpen: err.canMoveToOpen, canOverride: err.canOverride, overrideWarning: OVERRIDE_WARNING };
+}
+
+/// The two answers a form can send back after the notice.
+export function closedBankOptionsFrom(formData: FormData): {
+  intoOpenBank: boolean;
+  closedBankOverride: { reason: string } | null;
+} {
+  const reason = String(formData.get("closedBankOverrideReason") || "").trim();
+  return {
+    intoOpenBank: formData.get("intoOpenBank") === "true",
+    closedBankOverride: reason ? { reason } : null,
+  };
+}
 
 export function friendlyError(err: unknown): string {
   if (err instanceof OverlapError)

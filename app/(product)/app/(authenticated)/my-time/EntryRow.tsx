@@ -5,6 +5,8 @@ import { updateMyEntryAction, deleteMyEntryAction, type SavedEntry } from "./act
 import { useActionForm } from "@/components/app/useActionForm";
 import { StatusBadge } from "@/components/app/StatusBadge";
 import { formatClockMinutes } from "@/lib/hours-format";
+import { ClosedBankNotice } from "./ClosedBankNotice";
+import type { ClosedBankNoticeState } from "./entry-errors";
 
 function todayKey(): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
@@ -96,6 +98,8 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
   const [warningDismissed, setWarningDismissed] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
   const confirmOverlapRef = useRef<HTMLInputElement>(null);
+  const overrideReasonRef = useRef<HTMLInputElement>(null);
+  const [closedDismissed, setClosedDismissed] = useState(false);
 
   // Spec 19.12 (live report from Ariel: "clicking save gives no indication
   // anything happened"): an accepted save closes the form, so the row
@@ -107,14 +111,19 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // 3.11.2026: a delete in a closed hour bank comes back as this notice.
+  const [deleteClosed, setDeleteClosed] = useState<ClosedBankNoticeState | null>(null);
   const router = useRouter();
-  async function remove() {
+  async function remove(closedBankOverrideReason?: string) {
     if (deleting) return;
     setDeleting(true);
     setDeleteError(null);
     try {
-      const answer = await deleteMyEntryAction(entry.id);
+      const answer = closedBankOverrideReason
+        ? await deleteMyEntryAction(entry.id, closedBankOverrideReason)
+        : await deleteMyEntryAction(entry.id);
       if (answer.ok) setRemoved(true);
+      else if (answer.closedBank) setDeleteClosed(answer.closedBank);
       else setDeleteError(answer.error ?? "המחיקה נכשלה.");
     } catch {
       setDeleteError("אירעה שגיאה. נסו שוב.");
@@ -137,7 +146,14 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
     // back with a plain error, or the next attempt would carry a consent the
     // person was never asked for again.
     if (result?.error && confirmOverlapRef.current) confirmOverlapRef.current.value = "false";
+    if (result?.closedBank) setClosedDismissed(false);
+    if (result?.error && overrideReasonRef.current) overrideReasonRef.current.value = "";
   }, [result]);
+
+  function overrideClosedBank(reason: string) {
+    if (overrideReasonRef.current) overrideReasonRef.current.value = reason;
+    formRef.current?.requestSubmit();
+  }
 
   function saveAnyway() {
     if (confirmOverlapRef.current) confirmOverlapRef.current.value = "true";
@@ -152,6 +168,7 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         <input type="hidden" name="timeEntryId" value={entry.id} />
         <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
         <input ref={confirmOverlapRef} type="hidden" name="confirmOverlap" defaultValue="false" />
+        <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <label className="block text-xs font-medium text-app-text-secondary">תאריך</label>
@@ -225,6 +242,13 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
             </div>
           </div>
         )}
+        {result?.closedBank && !closedDismissed && (
+          <ClosedBankNotice
+            notice={result.closedBank}
+            onOverride={overrideClosedBank}
+            onDismiss={() => setClosedDismissed(true)}
+          />
+        )}
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -286,6 +310,18 @@ export function EntryRow({ entry: fromServer }: { entry: Entry }) {
         </button>
       </div>
       {deleteError && <p className="w-full text-xs text-app-error">{deleteError}</p>}
+      {deleteClosed && (
+        <div className="w-full">
+          <ClosedBankNotice
+            notice={deleteClosed}
+            onOverride={(reason) => {
+              setDeleteClosed(null);
+              void remove(reason);
+            }}
+            onDismiss={() => setDeleteClosed(null)}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -362,6 +362,14 @@
       "firstSeen": "2026-11-01",
       "riskReason": "get_hours_bank: the hour bank as of a date, read-only; must match the Hour Banks screen, and adjustments reach managers only, flagged as internal"
     },
+    "domain:closed-bank-guard": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-03",
+      "riskReason": "no time is recorded or changed in a closed hour bank: a wrong answer moves billed minutes between packages or lets a closed balance change after it was carried"
+    },
     "domain:important-dates": {
       "kind": "domain",
       "area": "app",

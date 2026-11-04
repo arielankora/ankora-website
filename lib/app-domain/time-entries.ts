@@ -10,6 +10,16 @@ import { timed } from "@/lib/slow-log";
 import { localDateKey, localDateTimeToUtc, TIMEZONE } from "@/lib/timezone";
 import { resolveOverlapDecision, keepStoredIfSameMinute } from "@/lib/app-domain/time-entry-overlap";
 import { decideTimerStart, decideTimerReopen, MAX_PARALLEL_TIMERS, type TimerStartDecision } from "@/lib/app-domain/parallel-timers";
+import {
+  appendNoteLine,
+  canOverrideClosedBank,
+  closedBankHit,
+  ClosedBankError,
+  ClosedBankOverrideReasonRequiredError,
+  movedEntryNoteLine,
+  movedRange,
+  type ClosedBankHit,
+} from "@/lib/app-domain/closed-bank-guard";
 import type { User, TimeEntry, Prisma, EntryOrigin } from "@prisma/client";
 
 // Phase 2 domain service: spec 23 "Timer + TimeEntry + manual entry + audit
@@ -238,6 +248,88 @@ function assertNotFuture(startAt: Date, endAt: Date | null) {
   if (startAt.getTime() > cutoff || (endAt && endAt.getTime() > cutoff)) {
     throw new FutureEntryError();
   }
+}
+
+// ---------------------------------------------------------------------
+// Closed hour banks (3.11.2026, Ariel: "לא רושמים בחבילה סגורה").
+// The rule and its reasons: lib/app-domain/closed-bank-guard.ts.
+// ---------------------------------------------------------------------
+
+/// A manager's override of the rule. Only SUPER_ADMIN and ANKORA_ADMIN may
+/// send one, and only with a reason; the screens ask "are you sure" first.
+export type ClosedBankOverride = { reason: string };
+
+async function closedBankAt(clientId: string, at: Date, now = new Date()): Promise<ClosedBankHit | null> {
+  const banks = await prisma.hourBank.findMany({
+    where: { clientId, deletedAt: null },
+    select: { id: true, kind: true, cycleStart: true, cycleEnd: true, status: true },
+  });
+  return closedBankHit(banks, at, now);
+}
+
+/// Throws ClosedBankError unless no closed bank is touched, or a manager
+/// overrides with a reason. Returns the bank an accepted override touched,
+/// so the caller can record it once the write has committed.
+async function enforceClosedBank(
+  actor: User,
+  checks: { clientId: string; at: Date }[],
+  action: "create" | "change",
+  override?: ClosedBankOverride | null
+): Promise<ClosedBankHit | null> {
+  let hit: ClosedBankHit | null = null;
+  for (const c of checks) {
+    hit = await closedBankAt(c.clientId, c.at);
+    if (hit) break;
+  }
+  if (!hit) return null;
+  const allowed = canOverrideClosedBank(actor.role);
+  if (override && allowed) {
+    if (!override.reason?.trim()) throw new ClosedBankOverrideReasonRequiredError();
+    return hit;
+  }
+  throw new ClosedBankError(hit, action, allowed);
+}
+
+/// The override's trail: an audit row with the reason, and the bank flagged
+/// RECALCULATED so its screen shows the numbers changed after it closed.
+async function recordClosedBankOverride(
+  actor: User,
+  hit: ClosedBankHit,
+  entry: Pick<TimeEntry, "id" | "clientId">,
+  operation: string,
+  reason: string
+) {
+  await prisma.hourBank.update({
+    where: { id: hit.closed.id },
+    data: { status: "RECALCULATED", recalculatedAt: new Date() },
+  });
+  await recordAudit({
+    actorId: actor.id,
+    action: "hour_bank.closed_override",
+    entityType: "TimeEntry",
+    entityId: entry.id,
+    clientId: entry.clientId,
+    after: { hourBankId: hit.closed.id, operation, reason: reason.trim() },
+  });
+}
+
+/// For a stopped timer: the closed bank it started in, when it was still
+/// running at the moment that bank closed. That is the one case the rule
+/// lets through (a stop must never fail), and the person is then asked
+/// whether to move it into the open bank with moveEntryIntoOpenBank.
+export async function closedBankForStoppedEntry(
+  entry: Pick<TimeEntry, "clientId" | "startAt" | "endAt" | "deletedAt">
+): Promise<ClosedBankHit | null> {
+  if (!entry.endAt || entry.deletedAt) return null;
+  const hit = await closedBankAt(entry.clientId, entry.startAt);
+  if (!hit || !hit.open) return null;
+  if (entry.endAt.getTime() < hit.closed.cycleEnd.getTime()) return null;
+  // The open bank's carry is computed when it is created. If it was
+  // created after this entry stopped, the carry already counted the entry
+  // in the closed bank, and moving it would count it twice.
+  const open = await prisma.hourBank.findUnique({ where: { id: hit.open.id }, select: { createdAt: true } });
+  if (!open || open.createdAt.getTime() > entry.endAt.getTime()) return null;
+  return hit;
 }
 
 /// Spec 6.3: "Validation למניעת overlap: להתריע על חפיפה עם Entry קיים;
@@ -529,6 +621,60 @@ export async function stopTimer(
   return prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
 }
 
+/// 3.11.2026: moves a timer that was still running when its bank closed
+/// into the bank that is open now, after the person agreed. Allowed only
+/// for that case (closedBankForStoppedEntry): such a timer was never part
+/// of the closed bank's closing balance, so moving it changes no number
+/// that was carried or reported. It starts the moment the open bank
+/// opened, keeps its length, and its note says when the work was done.
+export async function moveEntryIntoOpenBank(actor: User, timeEntryId: string) {
+  const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
+  const isSelf = entry.userId === actor.id;
+  assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  const hit = await closedBankForStoppedEntry(entry);
+  if (!hit || !hit.open || !entry.endAt) {
+    throw new Error("הרישום הזה לא רץ בזמן שהחבילה או המחזור נסגרו, ולכן אי אפשר להעביר אותו.");
+  }
+  const moved = movedRange(hit.open, entry.startAt, entry.endAt);
+  if (moved.endAt.getTime() > Date.now() + FUTURE_ENTRY_GRACE_MS) {
+    throw new Error("החבילה הפתוחה נפתחה לפני פחות זמן מאורך הרישום, ולכן הוא עוד לא נכנס בה. אפשר להעביר אותו מאוחר יותר.");
+  }
+  const overlap = await assertNoOverlap(actor, entry.userId, entry.clientId, moved.startAt, moved.endAt, false, entry.id);
+  const note = appendNoteLine(entry.note, movedEntryNoteLine(entry.startAt, hit.closed));
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const after = await tx.timeEntry.update({
+      where: { id: timeEntryId },
+      data: { startAt: moved.startAt, endAt: moved.endAt, note, isEdited: true, isOverlapConfirmed: overlap.confirmed || entry.isOverlapConfirmed },
+    });
+    const lastRevision = await tx.timeEntryRevision.findFirst({ where: { timeEntryId }, orderBy: { version: "desc" } });
+    await tx.timeEntryRevision.create({
+      data: {
+        timeEntryId,
+        version: (lastRevision?.version ?? 0) + 1,
+        changedById: actor.id,
+        beforeJson: entry as unknown as Prisma.InputJsonValue,
+        afterJson: after as unknown as Prisma.InputJsonValue,
+        reason: "הועבר לחבילה הפתוחה אחרי סגירת החבילה הקודמת",
+      },
+    });
+    return after;
+  });
+
+  await recordAudit({
+    actorId: actor.id,
+    action: "time_entry.update",
+    entityType: "TimeEntry",
+    entityId: entry.id,
+    clientId: entry.clientId,
+    before: entry,
+    after: updated,
+  });
+  await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(updated.clientId));
+  return updated;
+}
+
 /// App redesign (handoff README, "Interactions & Behavior" rule 2): "לכל
 /// פעולה הרסנית... יש ביטול: עצירת טיימר... הביטול מבצע פעולה אמיתית".
 /// Stopping a timer is listed alongside delete/archive/etc as needing a
@@ -539,12 +685,25 @@ export async function stopTimer(
 /// (never two on one client, at most MAX_PARALLEL_TIMERS), since a timer
 /// may have been started in the meantime. No confirmation is asked: see
 /// decideTimerReopen.
-export async function reopenTimer(actor: User, timeEntryId: string) {
+export async function reopenTimer(
+  actor: User,
+  timeEntryId: string,
+  opts?: { closedBankOverride?: ClosedBankOverride | null }
+) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
   const isSelf = entry.userId === actor.id;
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
 
   if (!entry.endAt) return entry; // already running - nothing to undo
+
+  // Running again takes its minutes out of the bank it started in. In a
+  // closed bank that is a change after the fact, so the rule applies.
+  const overrideHit = await enforceClosedBank(
+    actor,
+    [{ clientId: entry.clientId, at: entry.startAt }],
+    "change",
+    opts?.closedBankOverride
+  );
 
   let updated: TimeEntry;
   try {
@@ -593,6 +752,10 @@ export async function reopenTimer(actor: User, timeEntryId: string) {
     after: updated,
   });
 
+  if (overrideHit && opts?.closedBankOverride) {
+    await recordClosedBankOverride(actor, overrideHit, entry, "reopen", opts.closedBankOverride.reason);
+  }
+
   // Reopening reduces this cycle's consumed minutes back down - same
   // best-effort re-evaluation trigger as every other mutation here.
   await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(updated.clientId));
@@ -637,6 +800,11 @@ export async function createManualEntry(
     allowOverlapOverride?: boolean;
     /// Phase 14 - see startTimer's own createdVia.
     createdVia?: EntryOrigin;
+    /// 3.11.2026: the person agreed to record time that falls in a closed
+    /// bank in the open one instead (see closed-bank-guard.ts).
+    intoOpenBank?: boolean;
+    /// 3.11.2026: a manager records it in the closed bank anyway.
+    closedBankOverride?: ClosedBankOverride | null;
   }
 ) {
   const isSelf = targetUserId === actor.id;
@@ -658,7 +826,31 @@ export async function createManualEntry(
   await assertTaskMatchesClient(input.clientId, input.taskId);
   assertNoteOrTask(input.note, input.taskId);
 
-  if (isBackdated(input.startAt) && !input.backdateReason?.trim()) {
+  // Before the backdate reason: a closed bank is the bigger question, and
+  // answering it can move the entry to today.
+  const originalStartAt = input.startAt;
+  let overrideHit: ClosedBankHit | null = null;
+  const hit = await closedBankAt(input.clientId, input.startAt);
+  if (hit) {
+    if (input.intoOpenBank && hit.open) {
+      const moved = movedRange(hit.open, input.startAt, input.endAt);
+      if (moved.endAt.getTime() > Date.now() + FUTURE_ENTRY_GRACE_MS) {
+        throw new Error(
+          "החבילה הפתוחה נפתחה לפני פחות זמן מאורך הרישום, ולכן הוא עוד לא נכנס בה. אפשר לרשום אותו מאוחר יותר."
+        );
+      }
+      input = {
+        ...input,
+        startAt: moved.startAt,
+        endAt: moved.endAt,
+        note: appendNoteLine(input.note, movedEntryNoteLine(originalStartAt, hit.closed)),
+      };
+    } else {
+      overrideHit = await enforceClosedBank(actor, [{ clientId: input.clientId, at: input.startAt }], "create", input.closedBankOverride);
+    }
+  }
+
+  if (isBackdated(originalStartAt) && !input.backdateReason?.trim()) {
     throw new BackdateReasonRequiredError();
   }
 
@@ -702,6 +894,10 @@ export async function createManualEntry(
     after: { ...entry, backdateReason: input.backdateReason ?? null },
   }));
 
+  if (overrideHit && input.closedBankOverride) {
+    await recordClosedBankOverride(actor, overrideHit, entry, "create", input.closedBankOverride.reason);
+  }
+
   // Phase 4 (spec 9.2): a manual entry changes consumed minutes just
   // like a stopped timer does - same best-effort, non-fatal trigger.
   await afterResponse("evaluateAlertsForClient", () => evaluateAlertsForClient(entry.clientId));
@@ -731,6 +927,8 @@ export async function updateTimeEntry(
     /// updates) that don't have a "form load time" to compare against are
     /// unaffected; every UI edit form now always sends it.
     expectedUpdatedAt?: Date;
+    /// 3.11.2026: a manager changes an entry in a closed bank anyway.
+    closedBankOverride?: ClosedBankOverride | null;
   }
 ) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
@@ -786,6 +984,18 @@ export async function updateTimeEntry(
     await assertClientAccess(actor, nextClientId);
     await assertActiveTargets(actor, nextClientId, nextCategoryId);
   }
+
+  // An entry in a closed bank stays as it is, and no edit moves one into
+  // a closed bank either, unless a manager overrides.
+  const overrideHit = await enforceClosedBank(
+    actor,
+    [
+      { clientId: entry.clientId, at: entry.startAt },
+      { clientId: nextClientId, at: nextStartAt },
+    ],
+    "change",
+    input.closedBankOverride
+  );
 
   // Re-checked whenever the time range OR the client changes - either can
   // flip the conflict from same-client (hard block) to cross-client
@@ -864,6 +1074,10 @@ export async function updateTimeEntry(
     after: result.updated,
   });
 
+  if (overrideHit && input.closedBankOverride) {
+    await recordClosedBankOverride(actor, overrideHit, result.updated, "update", input.closedBankOverride.reason);
+  }
+
   // Spec 8.2: a backdated edit that lands inside an already-closed Hour
   // Bank cycle must flip that cycle to RECALCULATED rather than silently
   // changing its previously-reported numbers. Best-effort - a failure
@@ -884,10 +1098,21 @@ export async function updateTimeEntry(
 
 /// Soft delete only (spec 5.1: "מחיקה היא soft delete; לא hard delete
 /// דרך UI. Audit נשמר.").
-export async function deleteTimeEntry(actor: User, timeEntryId: string) {
+export async function deleteTimeEntry(
+  actor: User,
+  timeEntryId: string,
+  opts?: { closedBankOverride?: ClosedBankOverride | null }
+) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
   const isSelf = entry.userId === actor.id;
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  // Discarding a running timer was never counted anywhere, so it is not a
+  // change to a closed bank. A finished entry in one is.
+  const overrideHit =
+    entry.endAt === null
+      ? null
+      : await enforceClosedBank(actor, [{ clientId: entry.clientId, at: entry.startAt }], "change", opts?.closedBankOverride);
 
   // A delete that lands on a RUNNING timer (the timer screen's "מחיקה
   // ללא שמירה") closes the row as well as marking it deleted. Leaving
@@ -916,6 +1141,10 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
     before: entry,
   });
 
+  if (overrideHit && opts?.closedBankOverride) {
+    await recordClosedBankOverride(actor, overrideHit, entry, "delete", opts.closedBankOverride.reason);
+  }
+
   // Spec 8.2: deleting an entry that falls inside an already-closed Hour
   // Bank cycle also changes that cycle's consumed total after the fact -
   // same recalculation flag as an edit, same best-effort guarantee.
@@ -941,10 +1170,20 @@ export async function deleteTimeEntry(actor: User, timeEntryId: string) {
 // both the single-row delete and the new bulk-delete toolbar can offer a
 // REAL undo per the Interactions & Behavior rule, instead of only
 // rewinding local state.
-export async function restoreTimeEntry(actor: User, timeEntryId: string) {
+export async function restoreTimeEntry(
+  actor: User,
+  timeEntryId: string,
+  opts?: { closedBankOverride?: ClosedBankOverride | null }
+) {
   const entry = await prisma.timeEntry.findUniqueOrThrow({ where: { id: timeEntryId } });
   const isSelf = entry.userId === actor.id;
   assertCan(actor.role, isSelf ? "time_entry.edit_self" : "time_entry.edit_others");
+
+  // A discarded timer is restored with zero minutes, so it changes nothing.
+  const overrideHit =
+    (entry.actualSeconds ?? 0) === 0 && (entry.billableSeconds ?? 0) === 0
+      ? null
+      : await enforceClosedBank(actor, [{ clientId: entry.clientId, at: entry.startAt }], "change", opts?.closedBankOverride);
 
   const updated = await prisma.timeEntry.update({
     where: { id: timeEntryId },
@@ -958,6 +1197,10 @@ export async function restoreTimeEntry(actor: User, timeEntryId: string) {
     entityId: entry.id,
     clientId: entry.clientId,
   });
+
+  if (overrideHit && opts?.closedBankOverride) {
+    await recordClosedBankOverride(actor, overrideHit, entry, "restore", opts.closedBankOverride.reason);
+  }
 
   await flagAffectedCyclesRecalculated(entry.clientId, [entry.startAt]).catch((err) =>
     console.error("flagAffectedCyclesRecalculated failed (non-fatal)", err)

@@ -15,10 +15,12 @@ import {
   ConflictError,
 } from "@/lib/app-domain/time-entries";
 import { assertCan, ForbiddenError } from "@/lib/app-auth/permissions";
+import { ClosedBankError } from "@/lib/app-domain/closed-bank-guard";
+import { closedBankNoticeFrom, closedBankOptionsFrom, type ClosedBankNoticeState } from "../my-time/entry-errors";
 import { timed } from "@/lib/slow-log";
 import { describeOverlapConflict } from "@/lib/time-entry-format";
 
-type FormState = { error?: string; ok?: boolean };
+type FormState = { error?: string; ok?: boolean; closedBank?: ClosedBankNoticeState };
 
 function friendlyError(err: unknown): string {
   if (err instanceof OverlapError)
@@ -58,8 +60,10 @@ export async function adminCreateEntryAction(_prev: FormState | undefined, formD
       note: String(formData.get("note") || ""),
       backdateReason: String(formData.get("backdateReason") || ""),
       allowOverlapOverride: formData.get("allowOverlapOverride") === "on",
+      ...closedBankOptionsFrom(formData),
     }));
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     return { error: friendlyError(err) };
   }
 
@@ -87,8 +91,10 @@ export async function adminUpdateEntryAction(_prev: FormState | undefined, formD
       reason: String(formData.get("reason") || "") || null,
       allowOverlapOverride: formData.get("allowOverlapOverride") === "on",
       expectedUpdatedAt: expectedUpdatedAtRaw ? new Date(expectedUpdatedAtRaw) : undefined,
+      closedBankOverride: closedBankOptionsFrom(formData).closedBankOverride,
     });
   } catch (err) {
+    if (err instanceof ClosedBankError) return { closedBank: closedBankNoticeFrom(err) };
     return { error: friendlyError(err) };
   }
 
@@ -110,21 +116,30 @@ export async function adminDeleteEntryAction(formData: FormData) {
 // clients/actions.ts's archiveClientAction/restoreClientAction. Kept
 // alongside the older FormData-based adminDeleteEntryAction above (still
 // used nowhere critical) rather than breaking its signature.
-export async function deleteEntryAction(timeEntryId: string) {
+export async function deleteEntryAction(timeEntryId: string, closedBankOverrideReason?: string) {
   const admin = await requireUser();
   try {
-    await deleteTimeEntry(admin, timeEntryId);
+    await deleteTimeEntry(admin, timeEntryId, {
+      closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
+    });
   } catch (err) {
+    if (err instanceof ClosedBankError) {
+      return { ok: false as const, error: err.message, closedBank: closedBankNoticeFrom(err) };
+    }
     return { ok: false as const, error: friendlyError(err) };
   }
   revalidatePath("/app/time-entries");
   return { ok: true as const };
 }
 
-export async function restoreEntryAction(timeEntryId: string) {
+export async function restoreEntryAction(timeEntryId: string, closedBankOverrideReason?: string) {
   const admin = await requireUser();
   try {
-    await restoreTimeEntry(admin, timeEntryId);
+    // The undo of a delete that overrode a closed bank carries the same
+    // reason, so the undo is not refused by the rule it was granted under.
+    await restoreTimeEntry(admin, timeEntryId, {
+      closedBankOverride: closedBankOverrideReason?.trim() ? { reason: closedBankOverrideReason.trim() } : null,
+    });
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

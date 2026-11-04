@@ -24,6 +24,7 @@ export const AI_EXCLUSION_COVERAGE: Record<string, string> = {
   list_team_time_entries: "lookupClient; entries redacted as in list_my_time_entries",
   start_timer: "lookupClient and lookupTask",
   stop_timer: "refuses a running timer on a marked task or client (guardRunning)",
+  move_time_entry_to_open_bank: "refuses an entry on a marked task or client (redactEntriesForAi), and only the caller's own entries",
   update_timer_note: "refuses a running timer on a marked task or client (guardRunning)",
   create_time_entry: "lookupClient and lookupTask",
   list_tasks: "listTasks forAi; lookupClient",
