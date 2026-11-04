@@ -161,8 +161,9 @@ const legal: LegalContent = {
               ["Google Workspace", "Email, calendar and document storage", "Operational correspondence and documents", "Global"],
               ["Fireflies", "Transcription and summary of calls", "Recordings and transcripts", "United States"],
               ["Unipile", "Connecting messaging channels, such as WhatsApp, to the operational layer", "Messages, contact details and correspondence", "France, with intermediate servers in the European Union, Israel, the United States and Singapore"],
+              ["Aloha", "Ankora's phone line and the recording of calls on it, on the network of Peri Telecom Communication Services Ltd.", "Call recordings, phone numbers and call details", "Israel"],
               ["Anthropic", "The operational AI layer", "Operational client data", "United States"],
-              ["OpenAI", "The operational AI layer", "Operational client data", "United States"],
+              ["OpenAI", "The operational AI layer, and transcription of call recordings and voice messages", "Operational client data, call recordings and voice messages", "United States"],
               ["Google Analytics", "Measurement of use of the marketing site", "Anonymous usage data", "Global"],
             ],
           },
@@ -171,7 +172,7 @@ const legal: LegalContent = {
           id: "transfer-of-information-outside-israel",
           title: "8. Transfer of information outside Israel",
           body: [
-            "The service relies on leading international tools, and the information is therefore stored on their servers, mostly in the United States and partly in the European Union, and some traffic passes through intermediate servers in other countries, as set out in the table in section 7. All of this is in line with the standards under which the world's leading software companies operate. These are the same providers used by the largest companies in the world, and the engagement with each of them includes information security and confidentiality undertakings.",
+            "The service relies on leading international tools, and the information is therefore stored on their servers, mostly in the United States and partly in the European Union and in Israel, and some traffic passes through intermediate servers in other countries, as set out in the table in section 7. All of this is in line with the standards under which the world's leading software companies operate. These are the same providers used by the largest companies in the world, and the engagement with each of them includes information security and confidentiality undertakings.",
           ],
         },
         {
@@ -479,7 +480,7 @@ const legal: LegalContent = {
           id: "location-of-the-data",
           title: "12. Location of the data",
           body: [
-            "The data is stored on the servers of the sub-processors, mostly in the United States and partly in the European Union, and some traffic passes through intermediate servers in other countries, as detailed in section 7 of the privacy policy. The client approves the transfer.",
+            "The data is stored on the servers of the sub-processors, mostly in the United States and partly in the European Union and in Israel, and some traffic passes through intermediate servers in other countries, as detailed in section 7 of the privacy policy. The client approves the transfer.",
           ],
         },
         {
