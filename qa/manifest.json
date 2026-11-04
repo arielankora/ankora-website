@@ -2191,8 +2191,31 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-03",
       "riskReason": "יוצר מועד בתיק הלקוח ומקשר אותו לתהליך, ומהמועד נפתחות ריצות לבד. בודק גישה ללקוח, עובר דרך createImportantDate ו-linkProcessDates עם הבדיקות והיומן שלהן. טעות כאן פותחת ריצות מיותרות או משאירה תהליך בלי ריצות."
+    },
+    "action:(product)/app/(authenticated)/whatsapp-poc/select-actions": {
+      "kind": "server-action",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-04",
+      "riskReason": "Same gate as the other WhatsApp actions (commsAccess), writes only to tasks of clients the person works on, and fetches images through accountForChatFile like the media route. Text sent to a client goes through task-portal-notes."
+    },
+    "domain:alert-closure": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": false,
+      "firstSeen": "2026-11-04"
+    },
+    "domain:task-portal-notes": {
+      "kind": "domain",
+      "area": "app",
+      "risk": "high",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-04",
+      "riskReason": "Text the client reads on the portal. Written only on a client-visible task by someone on that client; isolation and removal covered in tests/integration/task-portal-notes.test.ts."
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-03"
+  "lastScan": "2026-11-04"
 }
