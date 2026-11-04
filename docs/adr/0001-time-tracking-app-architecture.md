@@ -3615,8 +3615,11 @@ Three kinds of connection:
    consent. Scopes, the narrowest that work:
    - Mail: `gmail.metadata` when a condition only asks "did a reply arrive in
      this thread"; `gmail.readonly` only for a node that must read the body.
-   - Drive: `drive.file` with the Google Picker, so the client picks the
-     folder the procedure may use and the app sees nothing else. Full
+   - Drive: `drive.file` for the files a procedure writes, and
+     `drive.metadata.readonly` to know that a file arrived in a folder.
+     Found while building (2026-11-04): `drive.file` alone cannot see
+     files the client adds to a folder, Picker or not, so "a file arrived"
+     needs the metadata scope (names and dates, never content). Full
      `drive` is not requested.
 2. **Client mailbox, by app password (IMAP).** For a client who prefers to
    hand over access (Ariel, 2026-11-04). Works for mail only, needs 2-step

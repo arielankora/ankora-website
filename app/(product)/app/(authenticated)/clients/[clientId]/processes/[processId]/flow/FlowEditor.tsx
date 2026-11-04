@@ -39,6 +39,7 @@ type Props = {
   highlights: string | null;
   outputs: string | null;
   contacts: { id: string; name: string }[];
+  connections: { id: string; kind: "GOOGLE_OAUTH" | "MAIL_APP_PASSWORD" | "MANAGER_SEND"; account: string }[];
 };
 
 const INPUT = "w-full rounded-[10px] border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
@@ -276,6 +277,9 @@ export function FlowEditor(props: Props) {
             {props.code} · {props.triggerText ? `התחלה: ${props.triggerText}` : "בלי טריגר מוגדר"}
           </span>
           <h1 className="text-lg font-medium text-app-text-primary">{props.title}</h1>
+          <a href={`/app/clients/${props.clientId}/connections`} className="text-xs text-app-text-accent hover:underline" data-testid="flow-connections-link">
+            חיבורים של הלקוח ({props.connections.length})
+          </a>
           {props.fromList && <span className="text-xs text-app-text-tertiary">הנוהל נשמר עד היום כרשימה, והומר לזרימה. שום דבר לא נשמר עד שלוחצים על &quot;שמור והפעל&quot;.</span>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -423,7 +427,7 @@ export function FlowEditor(props: Props) {
                 <SendFields node={sel} contacts={props.contacts} onChange={(send) => update(sel.id, { send })} />
               )}
 
-              {sel.kind === "CONDITION" && <ConditionFields node={sel} flow={flow} update={update} nextSelect={nextSelect} />}
+              {sel.kind === "CONDITION" && <ConditionFields node={sel} flow={flow} update={update} nextSelect={nextSelect} connections={props.connections} clientId={props.clientId} />}
 
               {(sel.kind === "ACTION" || sel.kind === "WAIT") && nextSelect(sel.next, (v) => update(sel.id, { next: v }), "ממשיך ל")}
             </div>
@@ -478,9 +482,13 @@ function ConditionFields({
   flow,
   update,
   nextSelect,
+  connections,
+  clientId,
 }: {
   node: FlowNode;
   flow: ProcessFlow;
+  connections: Props["connections"];
+  clientId: string;
   update: (id: string, patch: Partial<FlowNode>) => void;
   nextSelect: (value: string | null, onChange: (v: string | null) => void, label: string) => React.ReactNode;
 }) {
@@ -516,7 +524,24 @@ function ConditionFields({
             </select>
           )}
           {(b.source === "EMAIL_REPLY" || b.source === "DRIVE_FILE") && (
-            <p className="text-[11px] text-app-text-tertiary">בחירת חיבור של הלקוח תתווסף עם מסך החיבורים. עד אז הענף לא נשמר.</p>
+            <>
+              <select aria-label={`ענף ${i + 1}: חיבור`} value={b.connectionId ?? ""} onChange={(e) => setBranch(b.id, { connectionId: e.target.value || null })} className={INPUT}>
+                <option value="">חיבור של הלקוח</option>
+                {connections
+                  .filter((c) => (b.source === "DRIVE_FILE" ? c.kind === "GOOGLE_OAUTH" : c.kind !== "MANAGER_SEND"))
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.account}
+                    </option>
+                  ))}
+              </select>
+              {b.source === "DRIVE_FILE" && (
+                <input aria-label={`ענף ${i + 1}: מזהה תיקייה בדרייב`} dir="ltr" value={b.ref ?? ""} onChange={(e) => setBranch(b.id, { ref: e.target.value.trim() || null })} placeholder="מזהה התיקייה בדרייב" className={INPUT} />
+              )}
+              <a href={`/app/clients/${clientId}/connections`} className="text-[11px] text-app-text-accent hover:underline">
+                ניהול החיבורים של הלקוח
+              </a>
+            </>
           )}
           {nextSelect(b.next, (v) => setBranch(b.id, { next: v }), "ממשיך ל")}
         </div>

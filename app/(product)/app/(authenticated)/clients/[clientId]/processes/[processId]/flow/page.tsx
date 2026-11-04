@@ -39,6 +39,7 @@ export default async function ProcessFlowPage(props: { params: Promise<{ clientI
         highlights={data.highlights}
         outputs={data.outputs}
         contacts={data.contacts}
+        connections={data.connections}
       />
     </div>
   );

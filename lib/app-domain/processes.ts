@@ -480,6 +480,8 @@ export type FlowEditorData = {
   highlights: string | null;
   outputs: string | null;
   contacts: { id: string; name: string }[];
+  /// The client's live connections a branch can check through.
+  connections: { id: string; kind: "GOOGLE_OAUTH" | "MAIL_APP_PASSWORD" | "MANAGER_SEND"; account: string }[];
 };
 
 export async function flowForEditor(actor: User, processId: string): Promise<FlowEditorData> {
@@ -503,6 +505,7 @@ export async function flowForEditor(actor: User, processId: string): Promise<Flo
     highlights: latest?.highlights ?? null,
     outputs: latest?.outputs ?? null,
     contacts,
+    connections: await prisma.clientConnection.findMany({ where: { clientId: process.clientId, revokedAt: null }, select: { id: true, kind: true, account: true }, orderBy: { connectedAt: "asc" } }),
   };
 }
 

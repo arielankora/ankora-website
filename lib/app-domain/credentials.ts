@@ -448,3 +448,26 @@ export async function revealCredential(
 
   return { ...secret, systemName: row.systemName };
 }
+
+// ── Connections ───────────────────────────────────────────────────────
+
+/// The secret of a client connection (ADR 0001 section 24, task
+/// cmvtivumj000pjs08q9qj4t67), for the server code that uses the connection:
+/// an OAuth refresh token or an app password, never sent to a browser.
+/// Rule 2 holds here too: the use is audited, and awaited, before the data
+/// key is unwrapped. `purpose` says what for, in words, for the audit row.
+export async function openConnectionSecret(input: { credentialId: string; connectionId: string; actorId: string | null; purpose: string }): Promise<string> {
+  const row = await prisma.clientCredential.findUnique({ where: { id: input.credentialId } });
+  if (!row || row.deletedAt) throw new CredentialNotFoundError();
+  await recordAudit({
+    actorId: input.actorId,
+    action: "credential.use_by_connection",
+    entityType: "ClientCredential",
+    entityId: row.id,
+    clientId: row.clientId,
+    after: { connectionId: input.connectionId, purpose: input.purpose },
+  });
+  const secret = await unseal(row);
+  if (!secret.password) throw new CredentialNotFoundError();
+  return secret.password;
+}

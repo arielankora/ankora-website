@@ -618,6 +618,7 @@ model Client {
   subprocessorNoticeCheckedBy User?           @relation("ClientSubprocessorNoticeChecker", fields: [subprocessorNoticeCheckedById], references: [id], onDelete: SetNull)
   documents            ClientDocument[]
   credentials          ClientCredential[]
+  connections          ClientConnection[]
   portalSummaries      PortalSummary[]
 
   // Org brain, phase 2 (spec 3.5).
@@ -4573,4 +4574,46 @@ model CommsBlock {
   @@unique([channelId, kind, value])
   @@index([status])
   @@map("comms_blocks")
+}
+
+/// 4.11.2026 (task cmvtivumj000pjs08q9qj4t67, ADR 0001 section 24): an
+/// account of the client's that its procedures read from or write to, or
+/// the account manager's mailbox they send from. The secret (an OAuth
+/// refresh token, or an app password) lives in the vault as a
+/// ClientCredential, so key rotation, backup and the reveal audit cover it;
+/// this row holds only what a screen may show.
+model ClientConnection {
+  id       String         @id @default(cuid())
+  clientId String
+  kind     ConnectionKind
+  /// The address connected ("nadav@client.com").
+  account  String
+  /// What the connection may do, as granted (OAuth scopes, or "imap").
+  scopes   String[]       @default([])
+  /// The vault row that holds the secret. Null once disconnected.
+  credentialId String?    @unique
+  /// MANAGER_SEND: whose mailbox it is.
+  ownerUserId  String?
+  /// Who at the client approved the connection, in words, and when: the
+  /// Google consent screen, or the access the client handed over.
+  consentText  String?
+  connectedById String
+  connectedAt   DateTime  @default(now())
+  lastUsedAt    DateTime?
+  revokedAt     DateTime?
+  revokedById   String?
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@index([clientId, revokedAt])
+  @@map("client_connections")
+}
+
+enum ConnectionKind {
+  /// The client's Google account, approved on Google's own screen.
+  GOOGLE_OAUTH
+  /// The client's mailbox by app password (IMAP). Mail only.
+  MAIL_APP_PASSWORD
+  /// The account manager's own mailbox, send only.
+  MANAGER_SEND
 }
