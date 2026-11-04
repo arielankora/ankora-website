@@ -1284,6 +1284,9 @@ function ProcessCard({
           <Drawer triggerLabel={p.draft ? "עריכת הטיוטה" : p.current ? "גרסה חדשה לנוהל" : "כתיבת נוהל"} title={`נוהל: ${p.code} ${p.title}`} variant="link">
             <ProcedureEditor clientId={clientId} process={p} systems={systems} />
           </Drawer>
+          <Link href={`/app/clients/${clientId}/processes/${p.id}/flow`} className="font-medium text-app-text-accent hover:underline" data-testid="procedure-flow-link">
+            עורך זרימה
+          </Link>
           {p.triggerKinds.includes("SCHEDULED") && (
             <Drawer triggerLabel="מועדים" title={`מועדים: ${p.code} ${p.title}`} variant="link">
               <DatesForm clientId={clientId} process={p} dates={dates} />

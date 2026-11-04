@@ -34,7 +34,7 @@ import { readControlRefs } from "@/lib/procedure-document";
 import { buildSnapshot } from "@/lib/app-domain/procedure-documents";
 import { runReadiness } from "@/lib/process-readiness";
 import { mentionedIn, processTexts, type Named } from "@/lib/process-mentions";
-import { flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
+import { flowFromSteps, flowIssues, flowSteps, readFlow, secondEyeNodes, type ProcessFlow } from "@/lib/process-flow";
 
 // Org brain, phase 1: processes and their procedures
 // (claude/org-brain-spec-2026-10-12.md, 3.8, 3.9; Hadas's review approved
@@ -461,6 +461,49 @@ export async function saveProcessVersion(actor: User, processId: string, input: 
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new ProcessVersionConflictError(latestVersion + 1);
     throw err;
   }
+}
+
+/// What the flow editor opens with (task cmvtivumj000pjs08q9qj4t67): the
+/// newest version as a flow, a list turned into one when it was saved as a
+/// list, and what the editor shows around it.
+export type FlowEditorData = {
+  processId: string;
+  clientId: string;
+  code: string;
+  title: string;
+  triggerText: string | null;
+  latestVersion: number;
+  latestStatus: "DRAFT" | "APPROVED" | "SUPERSEDED" | null;
+  flow: ProcessFlow;
+  /// The flow was built from a list just now, not saved as a flow.
+  fromList: boolean;
+  highlights: string | null;
+  outputs: string | null;
+  contacts: { id: string; name: string }[];
+};
+
+export async function flowForEditor(actor: User, processId: string): Promise<FlowEditorData> {
+  const process = await findProcess(actor, processId);
+  const latest = await prisma.processVersion.findFirst({ where: { processId }, orderBy: { version: "desc" } });
+  const saved = latest ? readFlow(latest.flow) : null;
+  const rows = await prisma.clientContact.findMany({ where: { clientId: process.clientId, deletedAt: null }, select: { id: true, role: true, person: { select: { name: true } } }, take: 200 });
+  const contacts = rows
+    .map((r) => ({ id: r.id, name: [r.person.name, r.role].filter(Boolean).join(", ") || "איש קשר בלי שם" }))
+    .sort((a, b) => a.name.localeCompare(b.name, "he"));
+  return {
+    processId,
+    clientId: process.clientId,
+    code: process.code,
+    title: process.title,
+    triggerText: process.triggerText,
+    latestVersion: latest?.version ?? 0,
+    latestStatus: latest?.status ?? null,
+    flow: saved ?? (latest ? flowFromSteps(readSteps(latest.steps)) : { v: 1, start: null, nodes: [] }),
+    fromList: !saved,
+    highlights: latest?.highlights ?? null,
+    outputs: latest?.outputs ?? null,
+    contacts,
+  };
 }
 
 /// "שמור והפעל" (task cmvtivumj000pjs08q9qj4t67, step 3 decisions, Ariel
