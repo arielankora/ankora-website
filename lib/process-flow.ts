@@ -37,6 +37,24 @@ export const SEND_MODE_LABELS: Record<SendMode, string> = {
   AUTO: "שליחה אוטומטית",
 };
 
+/// What a fixed message may fill in when it goes out (Ariel, 4.11.2026):
+/// written {{like this}} in the wording. A closed list, so the wording a
+/// person approved is the wording that leaves, with only these values in it.
+export const MESSAGE_PARAMS = ["שם איש הקשר", "שם הלקוח", "חודש", "תאריך", "מנהל התיק", "קישור לתיקייה"] as const;
+export type MessageParam = (typeof MESSAGE_PARAMS)[number];
+
+/// The {{parameters}} a wording uses, and the ones it uses that do not exist.
+export function messageParams(body: string): { used: MessageParam[]; unknown: string[] } {
+  const names = [...body.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].map((m) => m[1]);
+  const used = [...new Set(names.filter((n): n is MessageParam => (MESSAGE_PARAMS as readonly string[]).includes(n)))];
+  const unknown = [...new Set(names.filter((n) => !(MESSAGE_PARAMS as readonly string[]).includes(n)))];
+  return { used, unknown };
+}
+
+/// How a person makes sure an automatic mail went out (R3), unless the
+/// editor wrote another.
+export const SENT_MAIL_VERIFICATION = "המייל מופיע בתיקיית \"נשלח\" של מנהל התיק, ונרשם ביומן הביקורת.";
+
 /// Who does a node, when it is not the process's executor.
 export type FlowOwner = { userId: string | null; contactId: string | null; text: string | null };
 
@@ -246,12 +264,17 @@ export function flowSteps(flow: ProcessFlow): ProcessStep[] {
       const hasCondition = flow.nodes.some((x) => x.kind === "CONDITION");
       const offset = hasCondition || n.waitBusinessDays !== null ? day.get(n.id) ?? null : st.offsetBusinessDays;
       if (n.send) {
+        const auto = n.send.mode === "AUTO";
         return {
           ...st,
           offsetBusinessDays: offset,
           channel: "EMAIL" as const,
           actionTags: st.actionTags.includes("CLIENT_MESSAGE") ? st.actionTags : [...st.actionTags, "CLIENT_MESSAGE" as const],
-          mode: n.send.mode === "AUTO" ? ("AUTOMATED" as const) : st.mode === "AUTOMATED" ? ("ASSISTED" as const) : st.mode,
+          mode: auto ? ("AUTOMATED" as const) : st.mode === "AUTOMATED" ? ("ASSISTED" as const) : st.mode,
+          verification: auto ? st.verification ?? SENT_MAIL_VERIFICATION : st.verification,
+          // Fixed only when a person wrote the wording here; flowIssues
+          // refuses an automatic mail without one.
+          ...(auto && n.send.body ? { fixedMessage: true } : {}),
         };
       }
       return { ...st, offsetBusinessDays: offset };
@@ -279,6 +302,15 @@ export function flowIssues(flow: ProcessFlow): FlowIssue[] {
   for (const n of flow.nodes) {
     for (const t of nextOf(n)) {
       if (t && !byId.has(t)) out.push({ code: "F3", node: n.id, message: `${nodeName(n)} ממשיך לצומת שלא קיים.` });
+    }
+    if (n.send?.mode === "AUTO" && !n.send.body) {
+      out.push({ code: "F11", node: n.id, message: `${nodeName(n)} נשלח אוטומטית, ולכן צריך נוסח קבוע שאדם כתב כאן.` });
+    }
+    if (n.send?.body) {
+      const { unknown } = messageParams(n.send.body);
+      if (unknown.length) {
+        out.push({ code: "F12", node: n.id, message: `בנוסח של ${nodeName(n)} יש פרמטר שלא קיים: ${unknown.map((u) => `{{${u}}}`).join(", ")}. אפשר: ${MESSAGE_PARAMS.join(", ")}.` });
+      }
     }
     if (n.kind !== "END" && n.kind !== "CONDITION" && !n.next) {
       out.push({ code: "F4", node: n.id, message: `${nodeName(n)} לא ממשיך לשום מקום. כל מסלול מסתיים בצומת "סיום".` });

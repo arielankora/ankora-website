@@ -1,6 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { flowFromSteps, flowIssues, flowOrder, flowSteps, flowTree, readFlow, secondEyeNodes, type FlowNode, type ProcessFlow } from "@/lib/process-flow";
-import type { ProcessStep } from "@/lib/process-rules";
+import {
+  flowFromSteps,
+  flowIssues,
+  flowOrder,
+  flowSteps,
+  flowTree,
+  messageParams,
+  readFlow,
+  secondEyeNodes,
+  SENT_MAIL_VERIFICATION,
+  type FlowNode,
+  type ProcessFlow,
+} from "@/lib/process-flow";
+import { blockingChecks, type ProcessStep } from "@/lib/process-rules";
 
 // 4.11.2026 (task cmvtivumj000pjs08q9qj4t67): a procedure as a flow with
 // conditions, branches that meet again, and no loops.
@@ -124,6 +136,30 @@ describe("flowSteps", () => {
     expect(remind.channel).toBe("EMAIL");
     expect(remind.actionTags).toContain("CLIENT_MESSAGE");
     expect(steps.find((s) => s.title === "ask")?.mode).toBe("MANUAL");
+  });
+});
+
+describe("fixed messages (R1, Ariel 4.11.2026)", () => {
+  it("lets a fixed wording with known parameters go out on its own, and nothing else", () => {
+    const f = monthly();
+    const remind = f.nodes.find((n) => n.id === "remind")!;
+    remind.send!.body = "שלום {{שם איש הקשר}}, עדיין לא קיבלנו את הדוחות של {{חודש}}.";
+    expect(flowIssues(f)).toEqual([]);
+    const st = flowSteps(f).find((s) => s.title === "remind")!;
+    expect(st.fixedMessage).toBe(true);
+    expect(st.verification).toBe(SENT_MAIL_VERIFICATION);
+    expect(blockingChecks({ steps: flowSteps(f) }, []).filter((c) => c.code === "R1" || c.code === "R3")).toEqual([]);
+
+    remind.send!.body = "שלום {{כינוי}}";
+    expect(flowIssues(f).find((i) => i.code === "F12")?.message).toContain("{{כינוי}}");
+
+    remind.send!.body = null;
+    expect(flowIssues(f).map((i) => i.code)).toContain("F11");
+    expect(blockingChecks({ steps: flowSteps(f) }, []).some((c) => c.code === "R1")).toBe(true);
+  });
+
+  it("reads the parameters a wording uses", () => {
+    expect(messageParams("{{ חודש }} ו-{{שם הלקוח}} ו-{{חודש}} ו-{{x}}")).toEqual({ used: ["חודש", "שם הלקוח"], unknown: ["x"] });
   });
 });
 
