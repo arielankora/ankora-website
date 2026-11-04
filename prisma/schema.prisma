@@ -1587,11 +1587,37 @@ model AlertEvent {
   value      Int
   resolvedAt DateTime?
 
+  /// 4.11.2026: how a closed event was closed, and why, in words the
+  /// Alerts screen's event history shows as they are. Null while open, and
+  /// null on events closed before this date (shown as "נפתר"). Every value
+  /// but MANUAL is a closing the system did on its own; those never count
+  /// as open and are never touched again, except SUPERSEDED (see
+  /// lib/app-domain/alert-closure.ts). hourBankId above is the cycle or
+  /// package the event belongs to.
+  closeKind   AlertCloseKind?
+  closeReason String?
+
   rule           AlertRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
   emailDeliveries EmailDelivery[]
 
   @@index([ruleId, hourBankId])
+  @@index([hourBankId])
   @@map("alert_events")
+}
+
+/// 4.11.2026: see AlertEvent.closeKind.
+///  MANUAL           "סימון כטופל" on the Alerts screen.
+///  BELOW_THRESHOLD  an evaluation found the metric back under the threshold.
+///  NEW_CYCLE        a new cycle was opened for the client.
+///  HOURS_LOADED     hours were loaded (a package, or a positive adjustment)
+///                   and the threshold no longer holds.
+///  SUPERSEDED       a higher utilization threshold fired on the same bank.
+enum AlertCloseKind {
+  MANUAL
+  BELOW_THRESHOLD
+  NEW_CYCLE
+  HOURS_LOADED
+  SUPERSEDED
 }
 
 /// Spec section 5's field list, verbatim: template, recipients,

@@ -7,6 +7,7 @@ import {
   listAlertRulesForClient,
   listOpenAlertEvents,
 } from "@/lib/app-domain/alerts";
+import { isAutoClose } from "@/lib/app-domain/alert-closure";
 import Link from "next/link";
 import { Forbidden } from "@/components/app/Forbidden";
 import { StatusBadge } from "@/components/app/StatusBadge";
@@ -183,10 +184,15 @@ export default async function AlertsPage(props: { searchParams: Promise<{ client
                                 {formatDateTime(event.triggeredAt)} - ערך {event.value}
                               </span>
                               <StatusBadge
-                                label={event.resolvedAt ? "נפתר" : "פעיל"}
+                                label={event.resolvedAt ? (isAutoClose(event.closeKind) ? "נסגר אוטומטית" : "נפתר") : "פעיל"}
                                 tone={event.resolvedAt ? "gray" : "amber"}
                               />
                             </div>
+                            {event.resolvedAt && isAutoClose(event.closeKind) && (
+                              <p className="mt-1 text-[11px] text-app-text-tertiary">
+                                {event.closeReason} · {formatDateTime(event.resolvedAt)}
+                              </p>
+                            )}
                             {event.emailDeliveries.length > 0 && (
                               <ul className="mt-2 space-y-1">
                                 {event.emailDeliveries.map((d) => (

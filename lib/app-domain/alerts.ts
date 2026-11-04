@@ -5,6 +5,14 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { sendEmail } from "@/lib/email";
 import { getCurrentHourBank } from "@/lib/app-domain/hour-banks";
 import { rebuildReportRunEmail } from "@/lib/app-domain/report-schedules";
+import {
+  CLOSE_REASON,
+  currentValueForThreshold,
+  isThresholdBreached,
+  reopenUncoveredSuperseded,
+  supersedeLowerUtilizationAlerts,
+  type UtilizationSnapshotForAlerts,
+} from "@/lib/app-domain/alert-closure";
 import type { User, AlertRule, AlertThresholdType, HourBank, EmailDelivery } from "@prisma/client";
 
 // Phase 4 domain service: spec sections 9 ("התראות") and 9.1/9.2 (threshold
@@ -283,7 +291,10 @@ export async function deleteAlertRule(actor: User, ruleId: string) {
 export async function resolveAlertEvent(actor: User, eventId: string) {
   assertCan(actor.role, "alert.manage");
   const before = await prisma.alertEvent.findUniqueOrThrow({ where: { id: eventId } });
-  const event = await prisma.alertEvent.update({ where: { id: eventId }, data: { resolvedAt: new Date() } });
+  const event = await prisma.alertEvent.update({
+    where: { id: eventId },
+    data: { resolvedAt: new Date(), closeKind: "MANUAL", closeReason: null },
+  });
 
   await recordAudit({
     actorId: actor.id,
@@ -300,7 +311,10 @@ export async function resolveAlertEvent(actor: User, eventId: string) {
 export async function unresolveAlertEvent(actor: User, eventId: string) {
   assertCan(actor.role, "alert.manage");
   const before = await prisma.alertEvent.findUniqueOrThrow({ where: { id: eventId } });
-  const event = await prisma.alertEvent.update({ where: { id: eventId }, data: { resolvedAt: null } });
+  const event = await prisma.alertEvent.update({
+    where: { id: eventId },
+    data: { resolvedAt: null, closeKind: null, closeReason: null },
+  });
 
   await recordAudit({
     actorId: actor.id,
@@ -318,45 +332,10 @@ export async function unresolveAlertEvent(actor: User, eventId: string) {
 // Threshold evaluation (pure function - unit-testable without a database)
 // ---------------------------------------------------------------------------
 
-export interface UtilizationSnapshotForAlerts {
-  totalMinutes: number;
-  consumedMinutes: number;
-  remainingMinutes: number;
-  utilizationPct: number;
-}
-
-/// Spec 9.1's four threshold types, each read off the same utilization
-/// snapshot Hour Banks already computes (lib/app-domain/hour-banks.ts).
-/// "Forecast" is deliberately excluded - spec 9.1 itself marks that row
-/// "Future" (see ADR 11.5).
-export function currentValueForThreshold(
-  type: AlertThresholdType,
-  snapshot: UtilizationSnapshotForAlerts
-): number {
-  switch (type) {
-    case "UTILIZATION_PCT":
-      return snapshot.utilizationPct;
-    case "REMAINING_MINUTES":
-      return snapshot.remainingMinutes;
-    case "CONSUMED_MINUTES":
-      return snapshot.consumedMinutes;
-    case "OVERAGE":
-      return Math.max(0, snapshot.consumedMinutes - snapshot.totalMinutes);
-    default:
-      return 0;
-  }
-}
-
-/// Whether a rule should be considered "crossed" (breached) at the given
-/// current value. REMAINING_MINUTES is the one inverted case - a rule
-/// fires when remaining time drops TO OR BELOW the threshold, every other
-/// type fires when its value rises to or above the threshold.
-export function isThresholdBreached(type: AlertThresholdType, thresholdValue: number, currentValue: number): boolean {
-  if (type === "REMAINING_MINUTES") {
-    return currentValue <= thresholdValue;
-  }
-  return currentValue >= thresholdValue;
-}
+// currentValueForThreshold, isThresholdBreached and the snapshot type moved
+// to alert-closure.ts (4.11.2026), which hour-banks.ts also needs and which
+// cannot import this file. Re-exported so existing imports keep working.
+export { currentValueForThreshold, isThresholdBreached, type UtilizationSnapshotForAlerts };
 
 // ---------------------------------------------------------------------------
 // Dedupe / retrigger + evaluation (ADR 11.3)
@@ -456,9 +435,21 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
   // told once, by the 100% rule, rather than twice that it ran out.
   const hasFullRule = rules.some(isFullPackageRule);
 
-  for (const rule of rules) {
+  // Lower utilization thresholds first, so that when one entry crosses
+  // both 80% and 100% the 100% event is created last and supersedes the
+  // 80% one, rather than the 80% one opening after it.
+  const ordered = [...rules].sort((a, b) => {
+    const au = a.type === "UTILIZATION_PCT" ? 0 : 1;
+    const bu = b.type === "UTILIZATION_PCT" ? 0 : 1;
+    return au !== bu ? au - bu : a.thresholdValue - b.thresholdValue;
+  });
+  for (const rule of ordered) {
     await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule);
   }
+
+  // A 100% event that just closed (back under the threshold) uncovers the
+  // 80% event it superseded.
+  await reopenUncoveredSuperseded(prisma, bank.id, utilization);
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -486,21 +477,35 @@ async function evaluateSingleRule(
   const action = decideAlertAction(breached, rule.allowRetrigger, priorEvents.length > 0, openEvent !== null);
 
   if (action === "resolve" && openEvent) {
-    await prisma.alertEvent.update({ where: { id: openEvent.id }, data: { resolvedAt: new Date() } });
+    await prisma.alertEvent.updateMany({
+      where: { id: openEvent.id, resolvedAt: null },
+      data: { resolvedAt: new Date(), closeKind: "BELOW_THRESHOLD", closeReason: CLOSE_REASON.BELOW_THRESHOLD },
+    });
     return; // spec 9.2: no email is sent for the resolve itself.
   }
 
   if (action !== "fire") return;
+  // An event closed only because a higher threshold fired is not a reason
+  // to fire again, even with allowRetrigger: reopenUncoveredSuperseded
+  // brings that same event back once the higher one closes.
+  if (priorEvents[0]?.closeKind === "SUPERSEDED") return;
 
   // The decision above is a read followed by this write, so two evaluations
   // of the same client running at once (each time-entry write evaluates in
   // after()) can both decide to fire. The partial unique index
   // alert_events_one_open_per_rule_bank lets only one create succeed; the
   // loser stops here, because the winner is sending the emails.
+  //
+  // Created together with the superseding of lower thresholds on the same
+  // bank (80% when 100% fires), so neither is ever seen without the other.
   let event;
   try {
-    event = await prisma.alertEvent.create({
-      data: { ruleId: rule.id, hourBankId: bank.id, value: Math.round(currentValue) },
+    event = await prisma.$transaction(async (tx) => {
+      const created = await tx.alertEvent.create({
+        data: { ruleId: rule.id, hourBankId: bank.id, value: Math.round(currentValue) },
+      });
+      await supersedeLowerUtilizationAlerts(tx, bank.id, rule);
+      return created;
     });
   } catch (err) {
     if (isUniqueViolation(err)) return;

@@ -4,6 +4,7 @@ import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
 import { RunningTimersOnClientError } from "@/lib/app-domain/closed-bank-guard";
 import { afterResponse } from "@/lib/after-response";
+import { closeOpenAlertsOutsideBank, reconcileBankAfterHoursLoaded } from "@/lib/app-domain/alert-closure";
 import {
   computeConsumedMinutesForRange,
   consumedMinutesFromEntries,
@@ -415,39 +416,48 @@ export async function openHourBankCycle(
       )
     : 0;
 
-  const bank = await prisma.hourBank.create({
-    data: {
-      clientId,
-      cycleStart: input.cycleStart,
-      cycleEnd: input.cycleEnd,
-      purchasedMinutes: Math.max(0, Math.round(input.purchasedMinutes)),
-      rolloverInMinutes,
-      rolloverMode: input.rolloverMode,
-      rolloverCapMinutes:
-        input.rolloverMode === "CAPPED" ? Math.max(0, Math.round(input.rolloverCapMinutes ?? 0)) : null,
-    },
-  });
-
-  // Closing the previous cycle here (rather than waiting for the lazy
-  // closeIfExpired check) keeps "open a new cycle" and "close the old
-  // one" atomic from the admin's point of view - two OPEN cycles for the
-  // same client would make getCurrentHourBank's "cycle covering now"
-  // lookup ambiguous.
-  if (previous && previous.status === "OPEN") {
-    await prisma.hourBank.update({
-      where: { id: previous.id },
+  // 4.11.2026: one transaction for the new cycle, the closing of the
+  // previous one, and the closing of the previous cycles' open alerts, so
+  // there is never a new cycle with the old alerts still open, or the
+  // other way round.
+  const { bank, alertsClosed } = await prisma.$transaction(async (tx) => {
+    const bank = await tx.hourBank.create({
       data: {
-        status: "CLOSED",
-        // A prepaid package runs to its expiry, a year out. Left as it is,
-        // it would still cover "now" next to the new cycle, and the
-        // "cycle covering now" lookup would have two answers. Cycles are
-        // left alone: their end is the date someone typed.
-        ...(previous.kind === "PREPAID" && previous.cycleEnd > input.cycleStart
-          ? { cycleEnd: input.cycleStart }
-          : {}),
+        clientId,
+        cycleStart: input.cycleStart,
+        cycleEnd: input.cycleEnd,
+        purchasedMinutes: Math.max(0, Math.round(input.purchasedMinutes)),
+        rolloverInMinutes,
+        rolloverMode: input.rolloverMode,
+        rolloverCapMinutes:
+          input.rolloverMode === "CAPPED" ? Math.max(0, Math.round(input.rolloverCapMinutes ?? 0)) : null,
       },
     });
-  }
+
+    // Closing the previous cycle here (rather than waiting for the lazy
+    // closeIfExpired check) keeps "open a new cycle" and "close the old
+    // one" atomic from the admin's point of view - two OPEN cycles for the
+    // same client would make getCurrentHourBank's "cycle covering now"
+    // lookup ambiguous.
+    if (previous && previous.status === "OPEN") {
+      await tx.hourBank.update({
+        where: { id: previous.id },
+        data: {
+          status: "CLOSED",
+          // A prepaid package runs to its expiry, a year out. Left as it is,
+          // it would still cover "now" next to the new cycle, and the
+          // "cycle covering now" lookup would have two answers. Cycles are
+          // left alone: their end is the date someone typed.
+          ...(previous.kind === "PREPAID" && previous.cycleEnd > input.cycleStart
+            ? { cycleEnd: input.cycleStart }
+            : {}),
+        },
+      });
+    }
+
+    const alertsClosed = await closeOpenAlertsOutsideBank(tx, clientId, bank.id, "NEW_CYCLE");
+    return { bank, alertsClosed };
+  });
 
   await recordAudit({
     actorId: actor.id,
@@ -457,8 +467,40 @@ export async function openHourBankCycle(
     clientId,
     after: bank,
   });
+  await auditAlertsAutoClosed(actor, clientId, bank.id, alertsClosed, "NEW_CYCLE");
 
   return bank;
+}
+
+async function auditAlertsAutoClosed(
+  actor: Pick<User, "id">,
+  clientId: string,
+  hourBankId: string,
+  count: number,
+  kind: "NEW_CYCLE" | "HOURS_LOADED"
+) {
+  if (count === 0) return;
+  await recordAudit({
+    actorId: actor.id,
+    action: "alert_event.auto_close",
+    entityType: "HourBank",
+    entityId: hourBankId,
+    clientId,
+    after: { count, closeKind: kind },
+  });
+}
+
+/// A bank's utilization computed live, without writing anything: no
+/// closeIfExpired, no refresh of the consumedMinutes cache. For the
+/// one-time alert cleanup, whose dry run must leave the database as it was.
+export async function readOnlyUtilization(
+  bank: Pick<HourBank, "id" | "clientId" | "kind" | "cycleStart" | "cycleEnd" | "purchasedMinutes" | "rolloverInMinutes">
+): Promise<HourBankUtilization> {
+  const [adjustmentMinutes, consumedMinutes] = await Promise.all([
+    sumAdjustments(bank.id),
+    computeConsumedMinutesForRange(bank.clientId, { from: bank.cycleStart, to: bank.cycleEnd }),
+  ]);
+  return computeUtilization(bank, adjustmentMinutes, consumedMinutes);
 }
 
 /// Manual credit/debit (spec 8.2: "manual adjustments"). Defaults to the
@@ -481,15 +523,37 @@ export async function recordHourBankAdjustment(
     hourBankId = current?.bank.id ?? null;
   }
 
-  const adjustment = await prisma.hourBankAdjustment.create({
-    data: {
-      clientId,
-      hourBankId,
-      minutes: Math.round(input.minutes),
-      reason,
-      createdById: actor.id,
-      effectiveAt: input.effectiveAt ?? new Date(),
-    },
+  // 4.11.2026: a credit is hours loaded into this bank. In the same
+  // transaction as the adjustment, the bank's open alerts are checked
+  // against the new total, and the ones whose threshold no longer holds
+  // close. Consumption does not change with an adjustment, so it is read
+  // before the transaction. A debit can only raise utilization, and is
+  // left to the evaluation below, which is what fires alerts.
+  const minutes = Math.round(input.minutes);
+  const targetBank =
+    hourBankId && minutes > 0
+      ? await prisma.hourBank.findFirst({ where: { id: hourBankId, clientId } })
+      : null;
+  const consumedMinutes = targetBank
+    ? await computeConsumedMinutesForRange(clientId, { from: targetBank.cycleStart, to: targetBank.cycleEnd })
+    : 0;
+
+  const { adjustment, alertsClosed } = await prisma.$transaction(async (tx) => {
+    const adjustment = await tx.hourBankAdjustment.create({
+      data: {
+        clientId,
+        hourBankId,
+        minutes,
+        reason,
+        createdById: actor.id,
+        effectiveAt: input.effectiveAt ?? new Date(),
+      },
+    });
+    if (!targetBank) return { adjustment, alertsClosed: 0 };
+    const agg = await tx.hourBankAdjustment.aggregate({ where: { hourBankId: targetBank.id }, _sum: { minutes: true } });
+    const utilization = computeUtilization(targetBank, agg._sum.minutes ?? 0, consumedMinutes);
+    const alertsClosed = await reconcileBankAfterHoursLoaded(tx, targetBank.id, utilization);
+    return { adjustment, alertsClosed };
   });
 
   await recordAudit({
@@ -500,6 +564,7 @@ export async function recordHourBankAdjustment(
     clientId,
     after: adjustment,
   });
+  if (targetBank) await auditAlertsAutoClosed(actor, clientId, targetBank.id, alertsClosed, "HOURS_LOADED");
 
   // A manual credit/debit changes the cycle's total immediately, so the
   // cached consumedMinutes/utilization on the affected bank needs to be
@@ -782,14 +847,19 @@ export async function loadPrepaidPackage(
 
   const preview = await previewPrepaidLoad(clientId, input.startAt);
 
-  const bank = await prisma.$transaction(async (tx) => {
+  // 4.11.2026: the load closes the previous package's (or cycle's) open
+  // alerts in the same transaction, as "נטענו שעות לבנק". Its balance,
+  // overrun included, carries into the new package, which the evaluation
+  // after the response judges afresh: if the new package is still over a
+  // threshold, that is a new alert on the new package.
+  const { bank, alertsClosed } = await prisma.$transaction(async (tx) => {
     if (preview.previous) {
       await tx.hourBank.update({
         where: { id: preview.previous.id },
         data: { status: "CLOSED", cycleEnd: preview.previous.endsAt },
       });
     }
-    return tx.hourBank.create({
+    const bank = await tx.hourBank.create({
       data: {
         clientId,
         kind: "PREPAID",
@@ -801,6 +871,8 @@ export async function loadPrepaidPackage(
         rolloverCapMinutes: null,
       },
     });
+    const alertsClosed = await closeOpenAlertsOutsideBank(tx, clientId, bank.id, "HOURS_LOADED");
+    return { bank, alertsClosed };
   });
 
   await recordAudit({
@@ -814,6 +886,7 @@ export async function loadPrepaidPackage(
       : undefined,
     after: bank,
   });
+  await auditAlertsAutoClosed(actor, clientId, bank.id, alertsClosed, "HOURS_LOADED");
 
   // The two default rules are the whole alert story of a package: 80% of
   // the package, then all of it. Make sure they exist. They go to Ankora
