@@ -7,7 +7,9 @@
 // and no Unipile, so it is unit-tested on its own
 // (tests/unit/whatsapp-selected-messages.test.ts).
 
-import { TIMEZONE } from "@/lib/timezone";
+// Not imported from lib/timezone.ts: that module is server-only, and this
+// one is also loaded in the browser by MessageSelection.tsx.
+const TIMEZONE = "Asia/Jerusalem";
 
 /// How many messages one save takes. A month of coordination is many
 /// conversations, each saved on its own; a single save of more than this
