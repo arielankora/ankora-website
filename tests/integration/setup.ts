@@ -93,6 +93,8 @@ const TABLES = [
   "client_credentials",
   "time_entry_revisions",
   "time_entries",
+  // Portal notes (4.11.2026): before the tasks they belong to.
+  "task_portal_notes",
   // P8 vendor detections (3.11.2026): before the tasks they point at.
   "vendor_detections",
   "tasks",

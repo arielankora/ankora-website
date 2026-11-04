@@ -42,6 +42,8 @@ import {
 import { SendForm } from "./SendForm";
 import { AddNumberForm, AssignToClientForm, GroupClientForm } from "./ContactForms";
 import { TaskFromConversation } from "./TaskFromConversation";
+import { MessageSelectionProvider, SelectModeButton, SelectToggle } from "./MessageSelection";
+import { proposeSelectedTitle, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
 import { RecordingPlayer } from "./calls/RecordingPlayer";
 import { TranscribeButton, TranscriptText } from "./calls/TranscribeButton";
 import { prisma } from "@/lib/prisma";
@@ -169,10 +171,23 @@ function Banner({ tone, children }: { tone: "error" | "warning" | "info"; childr
   );
 }
 
+/// What the mark mode needs to know about one message (MessageSelection.tsx).
+function selectable(m: PageMessage): SelectedMessage {
+  return {
+    id: m.id,
+    at: m.timestamp,
+    text: m.text,
+    mine: m.isSender,
+    senderName: m.senderName,
+    files: m.attachments.flatMap((a) => (a.id ? [{ id: a.id, type: a.type, label: attachmentLabel(a) }] : [])),
+  };
+}
+
 function MessageBubble({ m, chat, transcript }: { m: PageMessage; chat: PocChat; transcript?: StoredTranscript }) {
   const mine = m.isSender;
   return (
-    <li className={`flex ${mine ? "justify-end" : "justify-start"}`}>
+    <li className={`flex items-center gap-1 ${mine ? "justify-end" : "justify-start"}`}>
+      {m.isDeleted ? null : <SelectToggle message={selectable(m)} />}
       <div
         className={`max-w-[85%] space-y-1 px-3.5 py-2.5 text-[15px] sm:max-w-[65%] ${
           mine ? "rounded-2xl rounded-ee-md bg-navy text-white" : "rounded-2xl rounded-es-md border border-app-border bg-white text-app-text-primary"
@@ -686,7 +701,16 @@ export default async function CommunicationsPage(props: {
             className={`${isOpen ? "flex" : "hidden lg:flex"} min-h-[24rem] flex-col overflow-hidden rounded-2xl border border-app-border bg-app-surface-page`}
           >
             {isOpen ? (
-              <>
+              <MessageSelectionProvider
+                key={`select-${openKey}`}
+                chatId={chat?.id ?? ""}
+                numberKey={messages[0]?.numberKey ?? ""}
+                contactName={contactName}
+                phone={selectedPhone}
+                clients={clientOptions}
+                defaultClientId={owner?.clients.length === 1 ? owner.clients[0].id : null}
+                proposedTitle={proposeSelectedTitle(contactName, selectedPhone)}
+              >
                 <header className="flex flex-wrap items-center justify-between gap-3 border-b border-app-border bg-white px-4 py-3">
                   <div className="flex min-w-0 items-center gap-2">
                     <Link prefetch={false}
@@ -727,6 +751,8 @@ export default async function CommunicationsPage(props: {
                         manager={access.manager}
                       />
                     ) : null}
+                    {/* "סמן הודעות" (4.11.2026): several messages into one task. */}
+                    {chat && messages.length > 0 ? <SelectModeButton /> : null}
                     {/* Keyed by the open contact: a form that stayed mounted kept the
                         previous contact's title and details (Ariel, 1.11.2026). */}
                     <TaskFromConversation
@@ -800,7 +826,7 @@ export default async function CommunicationsPage(props: {
                     )}
                   </div>
                 ) : null}
-              </>
+              </MessageSelectionProvider>
             ) : (
               <p className="m-auto p-6 text-sm text-app-text-secondary">בחרו איש קשר מהרשימה, או פתחו לפי מספר.</p>
             )}

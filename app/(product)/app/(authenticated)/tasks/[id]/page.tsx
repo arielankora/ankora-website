@@ -35,6 +35,8 @@ import { runLesson } from "@/lib/app-domain/process-lessons";
 import { asksForLesson } from "@/lib/process-lessons";
 import { prisma } from "@/lib/prisma";
 import { taskAiExclusion } from "@/lib/ai-exclusion";
+import { listTaskPortalNotes } from "@/lib/app-domain/task-portal-notes";
+import { PortalNotesPanel } from "./PortalNotesPanel";
 
 function planView(p: TaskPlanRow): PlanView {
   return {
@@ -155,6 +157,10 @@ export default async function TaskDetailPage(props: {
   const isStep = task.parentId !== null;
   const isClosed = task.status === "DONE" || task.status === "ARCHIVED";
   const plans = isStep ? null : await getTaskPlans(user, task.id);
+  // 4.11.2026: the lines the client reads under a visible task. Lines
+  // written before the task was hidden stay stored, and show again here
+  // and on the portal if it is made visible again.
+  const portalNotes = !isStep && task.clientVisible ? await listTaskPortalNotes(user, task.id) : null;
   const currentPlan = plans?.current ?? null;
   // Built here, while the page renders, so the button copies inside the
   // click (see AdvanceWithClaude). Not for a step. On a closed task there
@@ -291,6 +297,14 @@ export default async function TaskDetailPage(props: {
           onThisClient: t.clientId === task.clientId,
         }))}
       />
+
+      {portalNotes ? (
+        <PortalNotesPanel
+          taskId={task.id}
+          notes={portalNotes.map((n) => ({ id: n.id, body: n.body, mine: n.createdById === user.id }))}
+          canRemoveAny={can(user.role, "time_entry.edit_others")}
+        />
+      ) : null}
 
       {/* The button that writes to the client, above the steps and above
           the record below them. Nothing here sends by itself: it opens a

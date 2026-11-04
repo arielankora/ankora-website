@@ -170,7 +170,7 @@ describe("get_status", () => {
       openDecisions: 2,
       contact: { managerName: "Ariel", whatsappNumber: null },
       waitingOnClient: [promise("ספי אישור", "WAITING_ON_CLIENT", { waitingSince: new Date("2026-10-04T08:00:00Z") })],
-      inProgress: [promise("Payroll", "IN_PROGRESS")],
+      inProgress: [promise("Payroll", "IN_PROGRESS", { notes: ["רותם כהן · פגישה ברביעי 11.11 ב-11:00"] })],
       recentlyDone: [promise("Slack", "DONE", { outcome: "אנקורה צורפה ל-Slack" })],
       cycle: { usedMinutes: 600, totalMinutes: 2400, pct: 25, daysLeft: 20, kind: "CYCLE", purchasedMinutes: 2400, remainingMinutes: 1800, forecast: null },
     });
@@ -186,6 +186,9 @@ describe("get_status", () => {
     expect(out.decisionsWaitingForYou).toBe(2);
     expect(out.waitingForYou[0]).toMatchObject({ title: "ספי אישור", stageLabel: "מחכה לך", waitingForYouSince: "2026-10-04" });
     expect(out.recentlyDone[0].outcome).toBe("אנקורה צורפה ל-Slack");
+    // 4.11.2026: the lines written for the client under a task reach its Claude too.
+    expect(out.inProgress[0].updatesFromAnkora).toEqual(["רותם כהן · פגישה ברביעי 11.11 ב-11:00"]);
+    expect(out.recentlyDone[0].updatesFromAnkora).toEqual([]);
     expect(out.hourBank).toEqual({ usedHours: 10, totalHours: 40, percentUsed: 25, daysLeftInCycle: 20, model: "cycle" });
   });
 

@@ -23,6 +23,7 @@ import { applyPlanSteps, approveTaskPlan, recordAdvancePromptCopied, saveTaskPla
 import { ForbiddenError } from "@/lib/app-auth/permissions";
 import { prisma } from "@/lib/prisma";
 import { recordRunLesson } from "@/lib/app-domain/process-lessons";
+import { addTaskPortalNote, removeTaskPortalNote } from "@/lib/app-domain/task-portal-notes";
 import { decideVendorCheck } from "@/lib/app-domain/vendor-detections";
 import {
   friendlyError as entryError,
@@ -588,6 +589,32 @@ export async function decideVendorCheckAction(input: { taskId: string; detection
     revalidatePath(`/app/tasks/${input.taskId}`);
     if (out.runTaskId) revalidatePath(`/app/tasks/${out.runTaskId}`);
     return { ok: true as const, status: out.status };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+/// 4.11.2026: a line the client reads under this task on their portal
+/// (TaskPortalNote). Written by hand; see lib/app-domain/task-portal-notes.ts.
+export async function addTaskPortalNoteAction(input: { taskId: string; body: string }) {
+  const user = await requireUser();
+  try {
+    await addTaskPortalNote(user, input.taskId, input.body);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/portal");
+    return { ok: true as const };
+  } catch (err) {
+    return { ok: false as const, error: friendlyError(err) };
+  }
+}
+
+export async function removeTaskPortalNoteAction(input: { taskId: string; noteId: string }) {
+  const user = await requireUser();
+  try {
+    await removeTaskPortalNote(user, input.noteId);
+    revalidatePath(`/app/tasks/${input.taskId}`);
+    revalidatePath("/app/portal");
+    return { ok: true as const };
   } catch (err) {
     return { ok: false as const, error: friendlyError(err) };
   }

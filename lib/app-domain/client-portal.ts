@@ -581,6 +581,10 @@ export interface PortalPromise {
   /// a direct way to answer them instead of leaving the client to find
   /// the decisions tab on their own.
   openDecisions: number;
+  /// Lines Ankora wrote for the client under this task (TaskPortalNote,
+  /// 4.11.2026), oldest first: for example who was booked and when in a
+  /// "תיאום פגישות" task. Written by hand, never the messages themselves.
+  notes: string[];
 }
 
 /// Waiting on the client wins over the internal status: a task can be
@@ -618,6 +622,7 @@ function toPromise(task: {
   clientOutcome: string | null;
   clientRequest?: string | null;
   _count?: { decisions: number };
+  portalNotes?: Array<{ body: string }>;
 }): PortalPromise {
   return {
     id: task.id,
@@ -631,6 +636,7 @@ function toPromise(task: {
     // and is kept off the portal by design (task-blocking.test.ts).
     waitingFor: task.blockedOn === "CLIENT" ? task.clientRequest?.trim() || null : null,
     openDecisions: task._count?.decisions ?? 0,
+    notes: task.portalNotes?.map((n) => n.body) ?? [],
   };
 }
 
@@ -667,6 +673,8 @@ async function listVisibleTasks(clientId: string, opts: { take?: number } = {}) 
       // Only OPEN ones: an answered or withdrawn decision asks nothing of
       // the client any more.
       _count: { select: { decisions: { where: { status: "OPEN" } } } },
+      // Capped: a month of coordination is tens of lines, not hundreds.
+      portalNotes: { where: { deletedAt: null }, select: { body: true }, orderBy: { createdAt: "asc" }, take: 100 },
     },
     orderBy: { updatedAt: "desc" },
     take: opts.take,

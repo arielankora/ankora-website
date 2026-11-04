@@ -1061,6 +1061,7 @@ model Task {
   decisions     Decision[]
   documents     ClientDocument[]
   comments      TaskComment[]
+  portalNotes   TaskPortalNote[]
   plans         TaskPlan[]
   /// P8, 3.11.2026: a new vendor noticed in this task (lib/app-domain/vendor-detections.ts).
   vendorDetection   VendorDetection?  @relation("VendorDetectionSource")
@@ -1140,6 +1141,34 @@ model TaskComment {
 
   @@index([taskId, createdAt])
   @@map("task_comments")
+}
+
+/// A line the client reads under a visible task on their portal (4.11.2026,
+/// "מעקב: שיחה עם ANKORA"). Hadas: the meetings she coordinates over
+/// WhatsApp go into one task, and at the end of the month the client should
+/// see in one place who was booked and when.
+///
+/// Separate from TaskComment on purpose: a comment is internal and has no
+/// clientVisible column by design. A portal note is the opposite, written
+/// for the client, by hand, one short line at a time, and never the text of
+/// the messages themselves. Only on a task that is visible to the client
+/// (lib/app-domain/task-portal-notes.ts refuses otherwise).
+model TaskPortalNote {
+  id          String    @id @default(cuid())
+  taskId      String
+  body        String
+  /// Who wrote it. A plain id, like an audit actor: a person who leaves
+  /// should not take the client's list with them.
+  createdById String?
+  createdAt   DateTime  @default(now())
+  /// Soft, like every other delete here. A removed line leaves the portal
+  /// at once and stays in the audit log.
+  deletedAt   DateTime?
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_portal_notes")
 }
 
 /// "קדם עם קלוד" (10.10.2026): the work plan of a task, one row per version.
