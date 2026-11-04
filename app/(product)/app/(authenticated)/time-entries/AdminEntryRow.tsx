@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useActionForm } from "@/components/app/useActionForm";
 import { adminUpdateEntryAction, deleteEntryAction, restoreEntryAction, getEntryRevisionsAction } from "./actions";
 import { ClosedBankNotice } from "../my-time/ClosedBankNotice";
 import type { ClosedBankNoticeState } from "../my-time/entry-errors";
@@ -44,8 +44,7 @@ type Revision = {
   afterJson: unknown;
 };
 
-function SubmitButton() {
-  const { pending } = useFormStatus();
+function SubmitButton({ pending }: { pending: boolean }) {
   return (
     <button
       type="submit"
@@ -98,7 +97,11 @@ export function AdminEntryRow({
   onToggleSelect: () => void;
 }) {
   const { showToast } = useToast();
-  const [state, formAction] = useFormState(adminUpdateEntryAction, {});
+  // 4.11.2026: useActionForm, not `<form action>`. A form action resets
+  // the form once it returns, so after the closed-bank notice the edit
+  // fields were back to the stored values, and the manager's override
+  // resubmitted the old entry unchanged (found by a Cowork run on RIMED).
+  const { onSubmit, pending, result: state, error: saveError } = useActionForm(adminUpdateEntryAction);
   const [editing, setEditing] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [revisions, setRevisions] = useState<Revision[] | null>(null);
@@ -165,7 +168,7 @@ export function AdminEntryRow({
     return (
       <tr className="border-b border-app-border">
         <td colSpan={9} className="px-5 py-4">
-          <form ref={editFormRef} action={formAction} className="space-y-3">
+          <form ref={editFormRef} onSubmit={onSubmit} className="space-y-3">
             <input type="hidden" name="timeEntryId" value={entry.id} />
             <input ref={overrideReasonRef} type="hidden" name="closedBankOverrideReason" defaultValue="" />
             <input type="hidden" name="expectedUpdatedAt" value={entry.updatedAt} />
@@ -236,11 +239,11 @@ export function AdminEntryRow({
               />
             )}
             <div className="flex items-center gap-3">
-              <SubmitButton />
+              <SubmitButton pending={pending} />
               <button type="button" onClick={() => setEditing(false)} className="text-xs text-app-text-secondary hover:text-app-text-primary">
                 ביטול
               </button>
-              {state?.error && <p className="text-xs text-app-error">{state.error}</p>}
+              {saveError && <p className="text-xs text-app-error">{saveError}</p>}
             </div>
           </form>
         </td>
