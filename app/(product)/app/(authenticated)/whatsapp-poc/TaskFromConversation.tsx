@@ -17,6 +17,8 @@ export function TaskFromConversation(props: {
   defaultClientId: string | null;
   title: string;
   description: string;
+  /// The button's text. A call card says which conversation it means.
+  label?: string;
 }) {
   const [state, action, pending] = useActionState<State | undefined, FormData>(createTaskAction, undefined);
   if (state?.ok && state.created) {
@@ -32,7 +34,7 @@ export function TaskFromConversation(props: {
   return (
     <details className="group relative">
       <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary">
-        צור משימה מהשיחה
+        {props.label ?? "צור משימה מהשיחה"}
       </summary>
       <form
         action={action}
