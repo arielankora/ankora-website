@@ -97,6 +97,7 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
   Category: { decision: "DUMP", table: "categories", reason: "Every time entry and task points at one." },
   Task: { decision: "DUMP", table: "tasks", reason: "The work itself, subtasks included (tasks.parentId is restored parent-first)." },
   TaskComment: { decision: "DUMP", table: "task_comments", reason: "The conversation on a task is part of the task; it exists nowhere else." },
+  TaskPortalNote: { decision: "DUMP", table: "task_portal_notes", reason: "The lines a client reads under a task on their portal (4.11.2026). Written by hand; they exist nowhere else." },
   TaskPlan: { decision: "DUMP", table: "task_plans", reason: "Every version of a task's work plan, and who approved it. Written by a person and Claude together; it exists nowhere else." },
   VendorDetection: { decision: "DUMP", table: "vendor_detections", reason: "P8: which tasks were asked about as a new vendor, and who decided. Without it every past task would be asked about again." },
   TimeEntry: { decision: "DUMP", table: "time_entries", reason: "The billable record. This is the row the business is built on." },

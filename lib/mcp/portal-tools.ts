@@ -83,6 +83,9 @@ function serializePromise(p: PortalPromise, tz: string) {
     outcome: p.outcome,
     whatIsNeededFromYou: p.waitingFor,
     decisionsToAnswer: p.openDecisions,
+    /// Lines Ankora wrote for the client under this task (4.11.2026), such
+    /// as who was booked and when. The same lines the portal shows.
+    updatesFromAnkora: p.notes ?? [],
   };
 }
 

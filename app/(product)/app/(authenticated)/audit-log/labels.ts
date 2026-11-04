@@ -267,6 +267,9 @@ export const ACTION_LABEL: Record<string, string> = {
   "task.approve": "אישור משימה",
   "task.comment": "הערה על משימה",
   "task.comment_delete": "מחיקת הערה על משימה",
+  "task.portal_note_add": "שורה ללקוח בפורטל על משימה",
+  "task.portal_note_remove": "הסרת שורה ללקוח מהפורטל",
+  "whatsapp_poc.messages_to_task": "הודעות וואטסאפ שצורפו למשימה",
   // Tasks phase 5. Written once per step, by the server, when the task
   // above it is closed. Named for what a person reading the log needs to
   // know: this step did not close on its own.

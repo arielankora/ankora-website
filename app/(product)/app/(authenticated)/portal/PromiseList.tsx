@@ -59,6 +59,15 @@ export function PromiseRow({ promise, showStage = true }: { promise: PortalPromi
             מה צריך ממך: {promise.waitingFor}
           </span>
         )}
+        {/* 4.11.2026: the lines Ankora wrote for the client under this task,
+            such as who was booked and when (TaskPortalNote). */}
+        {promise.notes.length > 0 && (
+          <ul className="mt-1.5 space-y-0.5 text-[12.5px] leading-relaxed text-app-text-secondary">
+            {promise.notes.map((n, i) => (
+              <li key={i}>{n}</li>
+            ))}
+          </ul>
+        )}
         {promise.stage !== "DONE" && promise.openDecisions > 0 && (
           <Link
             href="/app/portal/decisions"
