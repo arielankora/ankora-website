@@ -35,6 +35,7 @@ export const ENTITY_TYPES = [
   "System",
   // Credentials vault. Failed identity checks record against "User".
   "ClientCredential",
+  "ClientConnection",
   "Passkey",
   // Both halves of a Claude grant's life: "OAuthClient" is what consent
   // records when access is given, "McpGrant" what revoking records when
@@ -332,6 +333,10 @@ export const ACTION_LABEL: Record<string, string> = {
   "credential.delete": "מחיקת גישה למערכת",
   "credential.reveal": "צפייה בפרטי גישה",
   "credential.reveal_denied": "ניסיון צפייה בפרטי גישה שנחסם",
+  "credential.use_by_connection": "שימוש בפרטי גישה בידי חיבור של נוהל",
+  "connection.add": "חיבור מערכת של לקוח לנהלים",
+  "connection.revoke": "ניתוק מערכת של לקוח מהנהלים",
+  "connection.test": "בדיקת חיבור של לקוח",
   "credential.stepup_failed": "אימות זהות שנכשל",
   "credential.exposure_report": "הפקת דוח גישות שנצפו",
   "vault.rewrap": "העברת הכספת למפתח חדש",

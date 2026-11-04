@@ -210,6 +210,15 @@ export const BACKUP_COVERAGE: Readonly<Record<string, BackupCoverage>> = {
     table: "client_credentials",
     reason: "Clients' logins, encrypted under a key that is not in the backup. Not reconstructible, and unreadable without that key.",
   },
+  // Client connections for procedures (ADR 0001 section 24, 4.11.2026).
+  // What a screen shows about a connection; the secret itself is a
+  // ClientCredential above, encrypted. Without these rows a restore would
+  // keep the secrets but lose which procedure uses which account.
+  ClientConnection: {
+    decision: "DUMP",
+    table: "client_connections",
+    reason: "Which client accounts the procedures read from and send through, and who approved each. No secret: that is in client_credentials.",
+  },
   // Passkeys (vault phase 1a). Public keys only; the private half never
   // left anyone's device. Kept so a restore does not force everyone to
   // enrol again before they can open a client's login.
@@ -299,6 +308,7 @@ export const ACKNOWLEDGED_SENSITIVE_COLUMNS: Readonly<Record<string, string>> = 
   "tasks.importantDateOccurrenceKey": "A de-duplication key for generated tasks.",
   "clients.sourceKeywords": "Words that name the client in a meeting or mail title ('nux'), for finding its material. Not a key of any kind.",
   "system_access.credentialId": "The id of a vault row, a pointer. The secret stays encrypted in client_credentials.",
+  "client_connections.credentialId": "The id of a vault row, a pointer. The connection's secret stays encrypted in client_credentials.",
   "auto_apply_pauses.key": "Which kind of proposal (FACT.NOTE) or which client id was paused from auto-apply. A label, not a key of any kind.",
   "app_settings.key": "A setting's name ('knowledge.auto_apply'). A label, not a key of any kind.",
   // Credentials vault. Every one of these is either ciphertext that
