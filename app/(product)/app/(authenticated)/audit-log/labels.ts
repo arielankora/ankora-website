@@ -256,6 +256,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "email_delivery.retry": "ניסיון שליחה חוזר להתראה",
   "alert_event.resolve": "סימון התראה כטופלה",
   "alert_event.reopen": "פתיחה מחדש של התראה",
+  "alert_event.auto_close": "סגירה אוטומטית של התראות",
   "report_schedule.create": "יצירת דוח מתוזמן",
   "report_schedule.update": "עדכון דוח מתוזמן",
   "report_schedule.delete": "מחיקת דוח מתוזמן",

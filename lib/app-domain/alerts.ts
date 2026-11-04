@@ -443,13 +443,15 @@ export async function evaluateAlertsForClient(clientId: string): Promise<void> {
     const bu = b.type === "UTILIZATION_PCT" ? 0 : 1;
     return au !== bu ? au - bu : a.thresholdValue - b.thresholdValue;
   });
+  let anyResolved = false;
   for (const rule of ordered) {
-    await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule);
+    const action = await evaluateSingleRule(rule, bank, utilization, client.name, accountManagerEmail, hasFullRule);
+    if (action === "resolve" && rule.type === "UTILIZATION_PCT") anyResolved = true;
   }
 
   // A 100% event that just closed (back under the threshold) uncovers the
-  // 80% event it superseded.
-  await reopenUncoveredSuperseded(prisma, bank.id, utilization);
+  // 80% event it superseded. Only then: nothing else can uncover one here.
+  if (anyResolved) await reopenUncoveredSuperseded(prisma, bank.id, utilization);
 }
 
 function isUniqueViolation(err: unknown): boolean {
@@ -464,7 +466,7 @@ async function evaluateSingleRule(
   clientName: string,
   accountManagerEmail: string | null = null,
   hasFullRule = false
-): Promise<void> {
+): Promise<"fire" | "resolve" | "none"> {
   const currentValue = currentValueForThreshold(rule.type, utilization);
   const breached = isThresholdBreached(rule.type, rule.thresholdValue, currentValue);
 
@@ -481,14 +483,14 @@ async function evaluateSingleRule(
       where: { id: openEvent.id, resolvedAt: null },
       data: { resolvedAt: new Date(), closeKind: "BELOW_THRESHOLD", closeReason: CLOSE_REASON.BELOW_THRESHOLD },
     });
-    return; // spec 9.2: no email is sent for the resolve itself.
+    return "resolve"; // spec 9.2: no email is sent for the resolve itself.
   }
 
-  if (action !== "fire") return;
+  if (action !== "fire") return "none";
   // An event closed only because a higher threshold fired is not a reason
   // to fire again, even with allowRetrigger: reopenUncoveredSuperseded
   // brings that same event back once the higher one closes.
-  if (priorEvents[0]?.closeKind === "SUPERSEDED") return;
+  if (priorEvents[0]?.closeKind === "SUPERSEDED") return "none";
 
   // The decision above is a read followed by this write, so two evaluations
   // of the same client running at once (each time-entry write evaluates in
@@ -508,7 +510,7 @@ async function evaluateSingleRule(
       return created;
     });
   } catch (err) {
-    if (isUniqueViolation(err)) return;
+    if (isUniqueViolation(err)) return "none";
     throw err;
   }
 
@@ -565,6 +567,7 @@ async function evaluateSingleRule(
       textClient
     ),
   ]);
+  return "fire";
 }
 
 // ---------------------------------------------------------------------------
