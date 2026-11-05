@@ -55,23 +55,36 @@ export async function loadWhatsapp(user: Pick<User, "id" | "email">, access: Com
   const out: WhatsappSources = { chats: [], channelOf: new Map(), stored: new Set(), channels, error: null };
   const multi = channels.length > 1;
 
-  for (const ch of channels) {
-    const info: ChannelInfo = { id: ch.id, accountId: ch.accountId, ownerUserId: ch.ownerUserId, label: multi ? (ch.owner.name ?? "") : "" };
-    let list: PocChat[] = [];
-    if (ch.storeEnabled) {
-      list = await listStoredChats(ch, user);
-      for (const c of list) out.stored.add(c.id);
-    }
-    const live = unipile(ch.accountId);
-    if (live && mayReadLive(ch, user, access)) {
-      try {
-        const fromUnipile = (await loadMergedChats(live)).chats;
-        list = ch.storeEnabled ? await withLiveChats(ch, user, list, fromUnipile) : fromUnipile;
-      } catch (err) {
-        if (!(err instanceof UnipileError)) throw err;
-        out.error = err.message;
+  // 5.11.2026 (Ariel: opening a conversation took 2 to 4 seconds): the
+  // numbers are read side by side, not one after the other. Each still
+  // reads its stored list and, where allowed, Unipile's live list; the
+  // results are put together in the numbers' order, as before.
+  const perChannel = await Promise.all(
+    channels.map(async (ch) => {
+      const info: ChannelInfo = { id: ch.id, accountId: ch.accountId, ownerUserId: ch.ownerUserId, label: multi ? (ch.owner.name ?? "") : "" };
+      let list: PocChat[] = [];
+      let error: string | null = null;
+      const stored = new Set<string>();
+      if (ch.storeEnabled) {
+        list = await listStoredChats(ch, user);
+        for (const c of list) stored.add(c.id);
       }
-    }
+      const live = unipile(ch.accountId);
+      if (live && mayReadLive(ch, user, access)) {
+        try {
+          const fromUnipile = (await loadMergedChats(live)).chats;
+          list = ch.storeEnabled ? await withLiveChats(ch, user, list, fromUnipile) : fromUnipile;
+        } catch (err) {
+          if (!(err instanceof UnipileError)) throw err;
+          error = err.message;
+        }
+      }
+      return { info, list, stored, error };
+    }),
+  );
+  for (const { info, list, stored, error } of perChannel) {
+    for (const id of stored) out.stored.add(id);
+    if (error) out.error = error;
     for (const c of list) {
       out.channelOf.set(c.id, info);
       out.chats.push(c);
