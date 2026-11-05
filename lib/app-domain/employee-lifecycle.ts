@@ -482,6 +482,54 @@ export async function onPdfUploadDismissed(
   }
 }
 
+/// Which onboarding step the system closes by itself.
+type LifecycleStep = "sign" | "pdf";
+
+/// Recognises a step by what it is about, for when its title is no longer
+/// the one openOnboardingTask wrote. Applying an approved work plan
+/// replaces the open steps with the plan's own wording (applyPlanSteps),
+/// so "קבלת ה-PDF החתום, בדיקת גרסה ותיוק" became "לבדוק את ה-PDF החתום
+/// ולרשום אותו", the exact-title lookup found nothing, and the step stayed
+/// open after both signatures (Maor Sharan, 5.11.2026).
+///
+/// Deliberately narrow. The PDF step is about the signed PDF and checking,
+/// receiving or filing it, never the email that sends the blank form
+/// ("לנסח מייל ... כ-PDF"). The sign step is the one that mentions the
+/// passkey.
+export function looksLikeLifecycleStep(which: LifecycleStep, title: string): boolean {
+  const t = title.toLowerCase();
+  if (which === "sign") return t.includes("passkey");
+  if (!t.includes("pdf") || !title.includes("חתום")) return false;
+  if (/מייל|לנסח|לשלוח|שליחת/.test(title)) return false;
+  return /לבדוק|בדיקת|לרשום|רישום|קבלת|לקבל|לתייק|תיוק/.test(title);
+}
+
+/// The open step of an onboarding task that the system may close: first by
+/// its original title, then by what it is about. `ambiguous` when renamed
+/// steps leave no single match, so the caller can say so on the task
+/// instead of guessing which one to close.
+async function findOpenLifecycleStep(
+  taskId: string,
+  which: LifecycleStep
+): Promise<{ id: string } | { ambiguous: true } | null> {
+  const title = ONBOARDING_STEPS[which === "sign" ? ONBOARDING_SIGN_STEP : ONBOARDING_PDF_STEP];
+  const exact = await prisma.task.findFirst({
+    where: { parentId: taskId, title, deletedAt: null, status: { in: OPEN_STATUSES } },
+    select: { id: true },
+  });
+  if (exact) return exact;
+
+  const open = await prisma.task.findMany({
+    // subtasks-included: the-lifecycle-steps. The open steps of one
+    // onboarding task, read to find a renamed system step.
+    where: { parentId: taskId, deletedAt: null, status: { in: OPEN_STATUSES } },
+    select: { id: true, title: true },
+  });
+  const matches = open.filter((s) => looksLikeLifecycleStep(which, s.title));
+  if (matches.length === 1) return { id: matches[0].id };
+  return matches.length > 1 ? { ambiguous: true } : null;
+}
+
 /// Called after the APP confidentiality signature is recorded.
 ///
 /// Step 4 is "the undertaking approved in the app AND a passkey set up".
@@ -499,21 +547,23 @@ export async function onConfidentialitySigned(userId: string): Promise<void> {
     if (!task) return;
 
     const passkeys = await prisma.passkey.count({ where: { userId } });
-    const step = await prisma.task.findFirst({
-      where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_SIGN_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
-      select: { id: true },
-    });
+    const step = await findOpenLifecycleStep(task.id, "sign");
 
-    if (step && passkeys > 0) {
+    const found = !!step && "id" in step;
+    if (found && passkeys > 0) {
       await completeStepAsSystem(step.id, "confidentiality_signed_with_passkey");
     }
 
+    // The comment says "closed" only when there was a step to close: with
+    // renamed steps and no single match, it says that instead.
     await systemComment(
       task.id,
       task.clientId,
-      passkeys > 0
-        ? `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה, ו-passkey כבר מוגדר. השלב נסגר.`
-        : `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה. ה-passkey עדיין לא הוגדר, ולכן השלב נשאר פתוח.`,
+      passkeys === 0
+        ? `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה. ה-passkey עדיין לא הוגדר, ולכן השלב נשאר פתוח.`
+        : found
+          ? `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה, ו-passkey כבר מוגדר. השלב נסגר.`
+          : `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) אושרה באפליקציה, ו-passkey כבר מוגדר. לא נמצא במשימה שלב פתוח אחד שמתאים, ולכן לא נסגר שלב.`,
     );
 
     // The PDF may have been recorded first; then this signature is the
@@ -532,11 +582,8 @@ export async function onPasskeyRegistered(userId: string): Promise<void> {
     if (!(await hasSignedCurrent(userId, "CONFIDENTIALITY", "APP"))) return;
     const task = await openLifecycleTaskFor(userId, "ONBOARDING");
     if (!task) return;
-    const step = await prisma.task.findFirst({
-      where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_SIGN_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
-      select: { id: true },
-    });
-    if (!step) return;
+    const step = await findOpenLifecycleStep(task.id, "sign");
+    if (!step || !("id" in step)) return;
     if (await completeStepAsSystem(step.id, "passkey_registered_after_signature")) {
       await systemComment(task.id, task.clientId, "הוגדר passkey, וההתחייבות לסודיות כבר אושרה באפליקציה. השלב נסגר.");
     }
@@ -594,11 +641,17 @@ async function closePdfStepIfBothSigned(userId: string, reason: string): Promise
   if (!app || !pdf) return;
   const task = await openLifecycleTaskFor(userId, "ONBOARDING");
   if (!task) return;
-  const step = await prisma.task.findFirst({
-    where: { parentId: task.id, title: ONBOARDING_STEPS[ONBOARDING_PDF_STEP], deletedAt: null, status: { in: OPEN_STATUSES } },
-    select: { id: true },
-  });
+  const step = await findOpenLifecycleStep(task.id, "pdf");
   if (!step) return;
+  if (!("id" in step)) {
+    // More than one open step reads like the PDF step: a person picks.
+    await systemComment(
+      task.id,
+      task.clientId,
+      `ההתחייבות לסודיות (${CURRENT_AGREEMENTS.CONFIDENTIALITY}) חתומה בשני הערוצים: באפליקציה וב-PDF. לא ברור איזה שלב במשימה הוא שלב ה-PDF, ולכן לא נסגר שלב. יש לסגור אותו ידנית.`,
+    );
+    return;
+  }
   if (await completeStepAsSystem(step.id, reason)) {
     await systemComment(
       task.id,
