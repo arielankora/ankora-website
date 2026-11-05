@@ -625,80 +625,102 @@ export default async function CommunicationsPage(props: {
   const openTargets = readTargets(openChats.length > 0 ? openChats.map((c) => c.id) : chat ? [chat.id] : []);
   const openUnread = openRow ? isUnread(openRow) : (chat?.unreadCount ?? 0) !== 0;
 
-  const chips = (
-    <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible" role="group" aria-label="סינון">
-      {INBOX_FILTERS.map((f) => (
-        <Link prefetch={false}
-          key={f.id}
-          href={href({ filter: f.id, team: teamValue, q: query, inMessages, c: callsTable || f.id === "call" ? null : openKey })}
-          aria-current={filter === f.id ? "page" : undefined}
-          className={`inline-flex min-h-9 flex-none items-center whitespace-nowrap rounded-full border px-3 text-[13px] ${
-            filter === f.id ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-white text-app-text-secondary"
-          }`}
-        >
-          {f.label}
-        </Link>
-      ))}
-    </div>
+  // The list's filters (design 8ב, 5.11.2026): two menus side by side,
+  // "סוג" and "צוות", each showing what is chosen. Until then the type was
+  // four chips over two lines and the team menu a third line under them.
+  // Each is a <details>, so it works without script; each choice is a link
+  // that keeps the rest.
+  const menu = (props: {
+    label: string;
+    value: string;
+    active: boolean;
+    align: "start" | "end";
+    items: Array<{ id: string; name: string; count?: number; href: string; current: boolean }>;
+  }) => (
+    <details className="relative min-w-0 flex-1">
+      <summary
+        className={`flex min-h-10 cursor-pointer list-none items-center justify-between gap-1 rounded-lg border px-3 text-[13px] ${
+          props.active ? "border-navy bg-app-accent-soft font-medium text-app-text-primary" : "border-app-border-strong bg-white text-app-text-primary"
+        }`}
+      >
+        <span className="truncate">
+          <span className="font-normal text-app-text-secondary">{props.label}:</span> <bdi>{props.value}</bdi>
+        </span>
+        <ChevronDown className="size-3.5 flex-none" aria-hidden="true" />
+      </summary>
+      {/* Opens toward the inside of the list, so nothing is cut off. */}
+      <ul className={`absolute ${props.align === "start" ? "start-0" : "end-0"} z-20 mt-1 w-52 max-w-[calc(100vw-2rem)] rounded-xl border border-app-border bg-white py-1 shadow-lg`}>
+        {props.items.map((m) => (
+          <li key={m.id}>
+            <Link
+              prefetch={false}
+              href={m.href}
+              aria-current={m.current ? "page" : undefined}
+              className={`flex min-h-11 items-center justify-between gap-2 px-3 text-sm text-app-text-primary hover:bg-app-surface-sunken ${
+                m.current ? "bg-app-accent-soft font-medium" : ""
+              }`}
+            >
+              <bdi>{m.name}</bdi>
+              {m.count !== undefined ? <span className="text-xs text-app-text-secondary">{m.count}</span> : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 
-  // "צוות" (design 2א): a menu beside the search box. A <details>, so it
-  // works without script; each choice is a link that keeps the rest.
+  const typeMenu = menu({
+    label: "סוג",
+    value: INBOX_FILTERS.find((f) => f.id === filter)?.label ?? "הכל",
+    active: filter !== "all",
+    align: "start",
+    items: INBOX_FILTERS.map((f) => ({
+      id: f.id,
+      name: f.label,
+      href: href({ filter: f.id, team: teamValue, q: query, inMessages, c: callsTable || f.id === "call" ? null : openKey }),
+      current: filter === f.id,
+    })),
+  });
+
   const teamMenu =
-    teamMembers.length > 0 ? (
-      <details className="relative flex-none">
-        <summary
-          className={`flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-lg border px-3 text-[13px] ${
-            teamValue !== "all" ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-white text-app-text-secondary"
-          }`}
-        >
-          צוות: {teamLabel}
-          <ChevronDown className="size-3.5" aria-hidden="true" />
-        </summary>
-        <ul className="absolute end-0 z-20 mt-1 w-52 rounded-xl border border-app-border bg-white py-1 shadow-lg">
-          {[
+    teamMembers.length > 0
+      ? menu({
+          label: "צוות",
+          value: teamLabel,
+          active: teamValue !== "all",
+          align: "end",
+          items: [
             { id: "all", name: "כל הצוות", count: rows.length },
             ...(teamNames.has(user.id) ? [{ id: "me", name: "רק השיחות שלי", count: rows.filter((r) => r.teamIds.includes(user.id)).length }] : []),
             ...teamMembers.filter((m) => m.id !== user.id || !teamNames.has(user.id)),
-          ].map((m) => (
-            <li key={m.id}>
-              <Link
-                prefetch={false}
-                href={href({ filter, team: m.id, q: query, inMessages, c: callsTable ? null : openKey })}
-                aria-current={teamValue === m.id ? "page" : undefined}
-                className={`flex min-h-11 items-center justify-between gap-2 px-3 text-sm text-app-text-primary hover:bg-app-surface-sunken ${
-                  teamValue === m.id ? "bg-app-accent-soft font-medium" : ""
-                }`}
-              >
-                <bdi>{m.name}</bdi>
-                <span className="text-xs text-app-text-secondary">{m.count}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </details>
-    ) : null;
+          ].map((m) => ({
+            ...m,
+            href: href({ filter, team: m.id, q: query, inMessages, c: callsTable ? null : openKey }),
+            current: teamValue === m.id,
+          })),
+        })
+      : null;
 
-  // "אנשי קשר / תוכן הודעות" (design 6א).
-  const searchScope = (
-    <div role="group" aria-label="איפה לחפש" className="flex rounded-lg bg-app-surface-sunken p-0.5">
-      {[
-        { on: !inMessages, label: "אנשי קשר", to: false },
-        { on: inMessages, label: "תוכן הודעות", to: true },
-      ].map((o) => (
-        <Link
-          key={o.label}
-          prefetch={false}
-          href={href({ filter, team: teamValue, q: query, inMessages: o.to, c: openKey })}
-          aria-current={o.on ? "page" : undefined}
-          className={`flex min-h-9 flex-1 items-center justify-center rounded-md text-[13px] ${
-            o.on ? "bg-white font-medium text-app-text-primary shadow-sm" : "text-app-text-secondary"
-          }`}
-        >
-          {o.label}
-        </Link>
-      ))}
+  const filterRow = (
+    <div className="flex gap-2" role="group" aria-label="סינון">
+      {typeMenu}
+      {teamMenu}
     </div>
+  );
+
+  // "גם בתוך ההודעות" (design 8ב): the search scope as one switch inside the
+  // search box, in place of the two-way switch under it.
+  const searchScope = (
+    <Link
+      prefetch={false}
+      href={href({ filter, team: teamValue, q: query, inMessages: !inMessages, c: openKey })}
+      aria-pressed={inMessages}
+      className={`flex min-h-9 flex-none items-center whitespace-nowrap rounded-md border px-2 text-xs ${
+        inMessages ? "border-navy bg-navy font-medium text-white" : "border-app-border-strong bg-app-surface-sunken text-app-text-primary"
+      }`}
+    >
+      גם בתוך ההודעות
+    </Link>
   );
 
   return (
@@ -764,10 +786,7 @@ export default async function CommunicationsPage(props: {
       {callsTable ? (
         <section aria-label="שיחות טלפון" className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              {chips}
-              {teamMenu}
-            </div>
+            <div className="w-full max-w-sm">{filterRow}</div>
             <p className="text-sm text-app-text-secondary">ההקלטות מגיעות אוטומטית מ-Aloha. שם איש הקשר פותח את ציר הזמן שלו.</p>
           </div>
           {!config.hasOpenAiKey ? <Banner tone="info">התמלול עוד לא מוגדר בסביבה הזו. ההאזנה עובדת.</Banner> : null}
@@ -845,23 +864,22 @@ export default async function CommunicationsPage(props: {
                 <label htmlFor="inbox-q" className="sr-only">
                   חיפוש
                 </label>
-                <input
-                  id="inbox-q"
-                  name="q"
-                  type="search"
-                  defaultValue={query}
-                  placeholder={inMessages ? "חיפוש מילה בתוך ההודעות" : "חיפוש לפי שם, מספר או לקוח"}
-                  className="min-w-0 flex-1 rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary outline-none focus:border-gold"
-                />
+                <div className="flex min-w-0 flex-1 items-center gap-1 rounded-lg border border-app-border-strong bg-white pe-1 focus-within:border-gold">
+                  <input
+                    id="inbox-q"
+                    name="q"
+                    type="search"
+                    defaultValue={query}
+                    placeholder={inMessages ? "מילה בתוך ההודעות" : "שם, מספר או לקוח"}
+                    className="min-w-0 flex-1 rounded-lg bg-transparent px-3 py-2 text-sm text-app-text-primary outline-none"
+                  />
+                  {searchScope}
+                </div>
                 <button type="submit" aria-label="חיפוש" className="flex size-11 flex-none items-center justify-center rounded-lg border border-app-border-strong text-app-text-primary">
                   <Search className="size-4" aria-hidden="true" />
                 </button>
               </form>
-              {searchScope}
-              <div className="flex flex-wrap items-start gap-2">
-                {chips}
-                {teamMenu}
-              </div>
+              {filterRow}
             </div>
             {inMessages ? (
               <ul className="flex-1 divide-y divide-app-border overflow-y-auto">
