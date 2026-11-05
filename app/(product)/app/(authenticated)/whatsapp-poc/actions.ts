@@ -8,7 +8,7 @@ import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 import { commsAccess } from "@/lib/comms/access";
 import { UnipileError, getChat, readPocConfig, sendText, setReadStatus } from "@/lib/whatsapp-poc/unipile";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
-import { addClientContact, updateClientContact } from "@/lib/app-domain/client-contacts";
+import { addClientContact, listClientPeople, updateClientContact } from "@/lib/app-domain/client-contacts";
 import { addClientSource } from "@/lib/app-domain/client-sources";
 import { normalizePhone } from "@/lib/contact-normalize";
 import { prisma } from "@/lib/prisma";
@@ -95,6 +95,51 @@ function contactError(err: unknown): string {
   return "אירעה שגיאה. נסו שוב.";
 }
 
+export type ClientPersonOption = { contactId: string; name: string };
+
+/// The people in one client's file, for "שיוך ללקוח" (5.11.2026, Ariel: Oren
+/// is NUX's CEO and in its file, but the number he writes from was not, and
+/// the form could only add a new person, so his chat stayed "לא משויך" or
+/// he would have been in the file twice). listClientPeople checks access to
+/// the client and each person's audience, as the client file does.
+export async function listClientPeopleForAssignAction(clientId: string): Promise<ClientPersonOption[]> {
+  const user = await requireUser();
+  if (!(await commsAccess(user)).allowed) return [];
+  if (typeof clientId !== "string" || !clientId || clientId.length > 64) return [];
+  try {
+    const { contacts } = await listClientPeople(user, clientId);
+    return contacts.map((c) => ({ contactId: c.id, name: [c.person.name, c.role].filter(Boolean).join(", ") || "ללא שם" }));
+  } catch {
+    return [];
+  }
+}
+
+/// A number added to someone already in a client's file. Shared by "שיוך
+/// ללקוח" (picking an existing person) and "שיוך מספר נוסף".
+async function addNumberToContact(
+  user: Awaited<ReturnType<typeof requireUser>>,
+  contactId: string,
+  phone: string,
+  clientId: string | null = null,
+): Promise<ContactState> {
+  const contact = await prisma.clientContact.findUnique({
+    where: { id: contactId },
+    select: { clientId: true, deletedAt: true, person: { select: { phones: true } } },
+  });
+  if (!contact || contact.deletedAt || (clientId && contact.clientId !== clientId)) return { error: "איש הקשר לא נמצא." };
+  if (contact.person.phones.includes(phone)) return { error: "המספר כבר רשום אצלו." };
+  const owner = await prisma.person.findFirst({ where: { deletedAt: null, phones: { has: phone } }, select: { id: true } });
+  if (owner) return { error: "המספר כבר שייך לאיש קשר אחר." };
+  try {
+    await updateClientContact(user, contactId, { phones: [...contact.person.phones, phone] });
+  } catch (err) {
+    return { error: contactError(err) };
+  }
+  revalidatePath("/app/whatsapp-poc");
+  revalidatePath(`/app/clients/${contact.clientId}`);
+  return { ok: true };
+}
+
 /// 1.11.2026 (communications screen): "שיוך ללקוח". A number nobody has
 /// written down becomes a contact in one client's file, through the same
 /// path as the client file's own form (addClientContact: access check,
@@ -109,6 +154,13 @@ export async function assignNumberToClientAction(_prev: ContactState | undefined
   if (!phone || !/^\+\d{8,15}$/.test(phone)) return { error: "מספר לא תקין." };
   const clientId = String(formData.get("clientId") || "");
   if (!clientId) return { error: "יש לבחור לקוח." };
+  // 5.11.2026: someone already in the file gets the number added, not a
+  // second entry. The contact must be in the chosen client's file.
+  const contactId = String(formData.get("contactId") || "");
+  if (contactId) {
+    if (contactId.length > 64) return { error: "איש הקשר לא נמצא." };
+    return addNumberToContact(user, contactId, phone, clientId);
+  }
   const name = String(formData.get("name") || "").trim().slice(0, 120);
   const role = String(formData.get("role") || "").trim().slice(0, 120);
   if (!name && !role) return { error: "צריך שם או תפקיד." };
@@ -162,23 +214,7 @@ export async function addNumberToContactAction(_prev: ContactState | undefined, 
   const phone = normalizePhone(String(formData.get("phone") || "").slice(0, 40));
   if (!phone || !/^\+\d{8,15}$/.test(phone)) return { error: "מספר לא תקין." };
 
-  const contact = await prisma.clientContact.findUnique({
-    where: { id: contactId },
-    select: { clientId: true, deletedAt: true, person: { select: { phones: true } } },
-  });
-  if (!contact || contact.deletedAt) return { error: "איש הקשר לא נמצא." };
-  if (contact.person.phones.includes(phone)) return { error: "המספר כבר רשום אצלו." };
-  const owner = await prisma.person.findFirst({ where: { deletedAt: null, phones: { has: phone } }, select: { id: true } });
-  if (owner) return { error: "המספר כבר שייך לאיש קשר אחר." };
-
-  try {
-    await updateClientContact(user, contactId, { phones: [...contact.person.phones, phone] });
-  } catch (err) {
-    return { error: contactError(err) };
-  }
-  revalidatePath("/app/whatsapp-poc");
-  revalidatePath(`/app/clients/${contact.clientId}`);
-  return { ok: true };
+  return addNumberToContact(user, contactId, phone);
 }
 
 /// 1.11.2026: a WhatsApp group belongs to a client only when someone says
