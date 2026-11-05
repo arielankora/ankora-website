@@ -655,7 +655,7 @@ export default async function CommunicationsPage(props: {
           צוות: {teamLabel}
           <ChevronDown className="size-3.5" aria-hidden="true" />
         </summary>
-        <ul className="absolute end-0 z-20 mt-1 w-52 rounded-xl border border-app-border bg-white py-1 shadow-lg">
+        <ul className="absolute start-0 z-20 mt-1 w-52 rounded-xl border border-app-border bg-white py-1 shadow-lg">
           {[
             { id: "all", name: "כל הצוות", count: rows.length },
             ...(teamNames.has(user.id) ? [{ id: "me", name: "רק השיחות שלי", count: rows.filter((r) => r.teamIds.includes(user.id)).length }] : []),
