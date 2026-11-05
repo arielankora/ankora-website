@@ -349,6 +349,7 @@ export const ACTION_LABEL: Record<string, string> = {
   "comms_channel.connected": "חיבור מספר WhatsApp לשמירה",
   "comms_channel.excluded_viewers_updated": "עריכת מי לא רואה שיחות ממספר WhatsApp",
   "comms_channel.store_started": "התחלת שמירה של שיחות WhatsApp",
+  "comms_channel.owner_changed": "שינוי הבעלים של מספר WhatsApp",
   "comms_block.requested": "בקשה לא לשמור שיחות עם מספר",
   "comms_block.approved": "חסימת מספר משמירה, ומחיקת מה שנשמר ממנו",
   "comms_block.rejected": "דחיית בקשת חסימה",

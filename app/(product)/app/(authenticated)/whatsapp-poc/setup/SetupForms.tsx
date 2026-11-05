@@ -3,6 +3,7 @@ import { useActionState, useState } from "react";
 import {
   blockAction,
   blockManyAction,
+  changeChannelOwnerAction,
   connectChannelAction,
   decideBlockAction,
   loadHistoryAction,
@@ -130,10 +131,12 @@ export function ExcludedViewersForm(props: {
   people: Array<{ id: string; name: string }>;
   excluded: string[];
   locked: string[];
+  /// Name and email of everyone already on the list, active or not.
+  labels?: Record<string, string>;
 }) {
   const [state, action, pending] = useActionState(updateExcludedViewersAction, undefined);
   const [editing, setEditing] = useState(false);
-  const nameOf = new Map(props.people.map((p) => [p.id, p.name]));
+  const nameOf = new Map([...Object.entries(props.labels ?? {}), ...props.people.map((p) => [p.id, p.name] as [string, string])]);
   const names = props.excluded.map((id) => nameOf.get(id) ?? id);
   if (!editing) {
     return (
@@ -306,6 +309,73 @@ export function LoadHistoryForm({ channelId }: { channelId: string }) {
       <button type="submit" disabled={pending} className={secondary}>
         {pending ? "מתחיל..." : "טעינת היסטוריה עכשיו"}
       </button>
+      <Result state={state} />
+    </form>
+  );
+}
+
+/// "שינוי בעלים" on a number's card, for a manager (5.11.2026). Three steps:
+/// the button, then the list of active people, then a confirmation that
+/// names the current owner and the new one, each with their email.
+export function ChangeOwnerForm(props: { channelId: string; current: string; candidates: Array<{ id: string; name: string }> }) {
+  const [state, action, pending] = useActionState(changeChannelOwnerAction, undefined);
+  const [step, setStep] = useState<"closed" | "pick" | "confirm">("closed");
+  const [picked, setPicked] = useState("");
+  const chosen = props.candidates.find((p) => p.id === picked) ?? null;
+  const field = "mt-1 w-full rounded-lg border border-app-border-strong bg-white px-3 py-2 text-sm text-app-text-primary";
+  const selectId = `owner-${props.channelId}`;
+  if (state?.ok) return <Result state={state} />;
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="channelId" value={props.channelId} />
+      <input type="hidden" name="ownerUserId" value={picked} />
+      {step === "closed" ? (
+        <button type="button" onClick={() => setStep("pick")} className={secondary}>
+          שינוי בעלים
+        </button>
+      ) : null}
+      {step === "pick" ? (
+        <div className="space-y-2 rounded-lg border border-app-border-strong bg-app-surface-sunken p-3">
+          <label htmlFor={selectId} className="block text-xs font-medium text-app-text-secondary">
+            הבעלים החדש (רק משתמשים פעילים)
+          </label>
+          <select id={selectId} value={picked} onChange={(e) => setPicked(e.target.value)} className={field}>
+            <option value="" disabled>
+              בחירת משתמש
+            </option>
+            {props.candidates.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!chosen} onClick={() => setStep("confirm")} className={primary}>
+              המשך
+            </button>
+            <button type="button" onClick={() => setStep("closed")} className={secondary}>
+              ביטול
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {step === "confirm" && chosen ? (
+        <div role="alertdialog" aria-label="שינוי בעלים" className="space-y-2 rounded-lg border border-app-border-strong bg-app-surface-sunken p-3">
+          <p className="text-sm text-app-text-primary">הבעלים הנוכחי: {props.current}</p>
+          <p className="text-sm text-app-text-primary">הבעלים החדש: {chosen.name}</p>
+          <p className="text-sm text-app-text-secondary">
+            הבעלים רואה את כל השיחות במספר. השיחות שכבר נשמרו ורשימת החסימה לא משתנות. השינוי נרשם ביומן הביקורת.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="submit" disabled={pending} className={primary}>
+              {pending ? "שומר..." : "כן, לשנות בעלים"}
+            </button>
+            <button type="button" onClick={() => setStep("pick")} disabled={pending} className={secondary}>
+              חזרה
+            </button>
+          </div>
+        </div>
+      ) : null}
       <Result state={state} />
     </form>
   );
