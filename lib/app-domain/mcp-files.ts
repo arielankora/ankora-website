@@ -9,7 +9,7 @@ import { listAccessibleClients } from "@/lib/app-domain/clients";
 import { DriveNotConfiguredError, MAX_DOCUMENT_BYTES, addClientDocument } from "@/lib/app-domain/client-documents";
 import { clientDocumentsFolder, downloadFileFromDrive } from "@/lib/google-drive";
 import { extractDocumentText, type ExtractedText } from "@/lib/document-text";
-import { cleanFileName, fileTicketExpiry, generateFileTicket, hashFileTicket, looksLikeFileTicket, mimeTypeFor } from "@/lib/mcp/file-ticket";
+import { cleanFileName, downloadFileName, fileTicketExpiry, generateFileTicket, hashFileTicket, looksLikeFileTicket, mimeTypeFor } from "@/lib/mcp/file-ticket";
 
 // MCP document files (12.10.2026): the server half of upload_document,
 // start_document_upload, list_documents and read_document. See
@@ -334,5 +334,5 @@ export async function redeemDownloadTicket(raw: string, now = new Date()): Promi
     });
   }
 
-  return { ok: true, status: 200, body: file.body, mimeType: doc.mimeType, fileName: doc.title };
+  return { ok: true, status: 200, body: file.body, mimeType: doc.mimeType, fileName: downloadFileName(doc.title, doc.mimeType) };
 }

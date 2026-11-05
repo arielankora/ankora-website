@@ -2214,8 +2214,16 @@
       "riskAssigned": true,
       "firstSeen": "2026-11-04",
       "riskReason": "Text the client reads on the portal. Written only on a client-visible task by someone on that client; isolation and removal covered in tests/integration/task-portal-notes.test.ts."
+    },
+    "api:/api/documents/[documentId]": {
+      "kind": "api",
+      "area": "api",
+      "risk": "critical",
+      "riskAssigned": true,
+      "firstSeen": "2026-11-05",
+      "riskReason": "client documents, isolation: staff download from the task screen; resolveStaffDocument refuses a client the person is not on"
     }
   },
   "waivers": {},
-  "lastScan": "2026-11-04"
+  "lastScan": "2026-11-05"
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
-import { MessageSquare, Paperclip, Trash2, Eye, EyeOff } from "lucide-react";
+import { MessageSquare, Paperclip, Trash2, Eye, EyeOff, Download } from "lucide-react";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { renderMarkdownLite } from "@/lib/markdown-lite";
 import { addTaskCommentAction, attachFileToTaskAction, deleteTaskCommentAction } from "./actions";
@@ -245,10 +245,29 @@ function FileLine({ entry }: { entry: Extract<ThreadEntry, { kind: "file" }> }) 
   return (
     <p className="flex flex-wrap items-center gap-1.5 text-[13.5px] text-app-text-primary">
       <Paperclip size={13} className="text-app-text-tertiary" />
-      {entry.title}
+      {/* 5.11.2026: the title is the download, and says so. A file line
+          that only names the file left people looking for a way to open
+          it that did not exist. A plain link, not a fetch: the browser
+          handles the save, and a session that ended sends it to login. */}
+      <a
+        href={`/api/documents/${encodeURIComponent(entry.id)}`}
+        download
+        className="text-app-text-accent hover:underline"
+      >
+        {entry.title}
+      </a>
       {entry.sizeBytes !== null && (
         <span className="text-app-text-tertiary">({formatSize(entry.sizeBytes)})</span>
       )}
+      <a
+        href={`/api/documents/${encodeURIComponent(entry.id)}`}
+        download
+        aria-label={`הורדת הקובץ ${entry.title}`}
+        className="inline-flex items-center gap-1 text-[12px] text-app-text-accent hover:underline"
+      >
+        <Download size={12} />
+        הורדה
+      </a>
       {/* Said on the line, because filing a document against a promise
           is a choice about what the client gets to see, and the next
           person should not have to go looking for it. */}
