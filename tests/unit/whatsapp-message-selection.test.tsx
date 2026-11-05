@@ -124,4 +124,36 @@ describe("message selection", () => {
     fireEvent.click(portal);
     expect(screen.getByLabelText("השורה שהלקוח יראה (בלי תוכן ההודעות)")).toBeTruthy();
   });
+
+  it("proposes each message as a step, an image alone unticked, and sends only the ticked lines (5.11.2026)", () => {
+    render(<Screen />);
+    fireEvent.click(screen.getByRole("button", { name: "סמן הודעות" }));
+    const boxes = screen.getAllByRole("checkbox");
+    fireEvent.click(boxes[0]);
+    fireEvent.click(boxes[1]);
+    fireEvent.click(screen.getByRole("button", { name: "משימה חדשה" }));
+
+    const first = screen.getByRole("textbox", { name: "שלב 1" }) as HTMLTextAreaElement;
+    expect(first.value).toBe("אפשר לקבוע פגישה?");
+    expect((screen.getByRole("checkbox", { name: "לכלול את שלב 1" }) as HTMLInputElement).checked).toBe(true);
+    expect((screen.getByRole("checkbox", { name: "לכלול את שלב 2" }) as HTMLInputElement).checked).toBe(false);
+
+    const sent = () => JSON.parse((document.querySelector('input[name="steps"]') as HTMLInputElement).value);
+    expect(sent()).toEqual(["אפשר לקבוע פגישה?"]);
+    expect(screen.getByRole("button", { name: "יצירת משימה עם שלב אחד" })).toBeTruthy();
+
+    fireEvent.change(first, { target: { value: "לקבוע פגישה עם רותם" } });
+    fireEvent.click(screen.getByRole("button", { name: "הוספת שלב" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "שלב 3" }), { target: { value: "לשלוח סיכום" } });
+    fireEvent.click(screen.getByRole("button", { name: "הזזת שלב 3 למעלה" }));
+    expect(sent()).toEqual(["לקבוע פגישה עם רותם", "לשלוח סיכום"]);
+    expect(document.querySelector('input[name="keepComment"]')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /לשמור גם את ההודעות המלאות/ }));
+    expect(document.querySelector('input[name="keepComment"]')).toBeNull();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: "להוסיף את ההודעות כשלבים במשימה" }));
+    expect(sent()).toEqual([]);
+    expect(screen.getByRole("button", { name: "יצירת משימה" })).toBeTruthy();
+  });
 });

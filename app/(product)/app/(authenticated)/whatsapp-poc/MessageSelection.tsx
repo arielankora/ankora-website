@@ -1,7 +1,14 @@
 "use client";
 import Link from "next/link";
+import { Plus } from "lucide-react";
 import { createContext, useActionState, useContext, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
-import { MAX_SELECTED_MESSAGES, type SelectedMessage } from "@/lib/whatsapp-poc/selected-messages";
+import {
+  MAX_SELECTED_MESSAGES,
+  MAX_STEP_TITLE,
+  MAX_STEPS_FROM_MESSAGES,
+  proposeStepText,
+  type SelectedMessage,
+} from "@/lib/whatsapp-poc/selected-messages";
 import { MAX_PORTAL_NOTE_LENGTH } from "@/lib/task-portal-note-text";
 import { attachSelectedMessagesAction, listTasksForMessagesAction, type AttachState, type AttachTaskOption } from "./select-actions";
 
@@ -200,6 +207,11 @@ function AttachDialog(props: {
   const [newVisible, setNewVisible] = useState(false);
   const [portalOn, setPortalOn] = useState(false);
   const [loading, startLoading] = useTransition();
+  // 5.11.2026, option B: the step list. On by default when there is more
+  // than one message; one message is usually context, not a checklist.
+  const [stepsOn, setStepsOn] = useState(props.messages.length > 1);
+  const [keepComment, setKeepComment] = useState(true);
+  const [rows, setRows] = useState<StepRow[]>(() => initialRows(props.messages, props.contactName));
 
   useEffect(() => {
     if (props.mode !== "existing" || !clientId) return;
@@ -230,12 +242,15 @@ function AttachDialog(props: {
   const chosen = tasks?.find((t) => t.id === taskId) ?? null;
   const portalAllowed = props.mode === "new" ? newVisible : Boolean(chosen?.clientVisible);
   const count = props.messages.length;
+  const stepLines = stepsOn ? rows.filter((r) => r.on).map((r) => r.text.replace(/\s+/g, " ").trim()).filter(Boolean) : [];
+  const tooManySteps = stepLines.length > MAX_STEPS_FROM_MESSAGES;
 
   if (state?.done) {
     return (
       <Shell title="נשמר" onClose={props.onClose}>
         <p className="text-sm text-app-success" role="status">
           {state.done.created ? "המשימה נוצרה" : "ההודעות צורפו למשימה"}: {state.done.title}.
+          {state.done.steps > 0 ? ` ${state.done.steps === 1 ? "נוסף שלב אחד" : `נוספו ${state.done.steps} שלבים`}.` : ""}
           {state.done.images > 0 ? ` ${state.done.images === 1 ? "תמונה אחת תויקה" : `${state.done.images} תמונות תויקו`} במשימה.` : ""}
           {state.done.portalLine ? " השורה ללקוח נוספה לפורטל." : ""}
         </p>
@@ -265,6 +280,8 @@ function AttachDialog(props: {
         <input type="hidden" name="numberKey" value={props.numberKey} />
         <input type="hidden" name="contactName" value={props.contactName} />
         <input type="hidden" name="phone" value={props.phone ?? ""} />
+        <input type="hidden" name="steps" value={JSON.stringify(stepLines)} />
+        {stepLines.length > 0 && keepComment ? <input type="hidden" name="keepComment" value="on" /> : null}
 
         <div role="group" aria-label="לאן" className="flex gap-2">
           <button
@@ -344,25 +361,44 @@ function AttachDialog(props: {
           </div>
         )}
 
-        <div className="space-y-1 rounded-lg border border-app-border bg-app-surface-page p-3 text-sm">
-          <p className="text-xs text-app-text-secondary">ייכנס למשימה כהערה פנימית. תמונות יתויקו כמסמך במשימה, מוסתר מהלקוח.</p>
-          <ul className="space-y-0.5">
-            {props.messages
-              .slice()
-              .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-              .map((m) => (
-                <li key={m.id} className="truncate">
-                  {m.mine ? "אנחנו" : m.senderName || props.contactName}:{" "}
-                  {m.text ||
-                    (m.transcript
-                      ? `[${m.files[0]?.label || "הודעה קולית"}] ${m.transcript}`
-                      : m.files[0]?.label
-                        ? `[${m.files[0].label}${m.files[0].type === "audio" ? ", לא תומללה" : ""}]`
-                        : "[הודעה שאינה טקסט]")}
-                </li>
-              ))}
-          </ul>
-        </div>
+        <label className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
+          <input type="checkbox" checked={stepsOn} onChange={(e) => setStepsOn(e.target.checked)} className="size-5 accent-navy" />
+          להוסיף את ההודעות כשלבים במשימה
+        </label>
+
+        {stepsOn ? (
+          <StepsEditor rows={rows} setRows={setRows} count={stepLines.length} existing={props.mode === "existing"} />
+        ) : null}
+
+        {stepsOn && stepLines.length > 0 ? (
+          <label className="flex items-start gap-2 border-t border-app-border pt-3 text-sm text-app-text-primary">
+            <input type="checkbox" checked={keepComment} onChange={(e) => setKeepComment(e.target.checked)} className="mt-0.5 size-5 flex-none accent-navy" />
+            <span>
+              לשמור גם את ההודעות המלאות כהערה פנימית
+              <span className="block text-xs text-app-text-secondary">המקור נשאר במשימה, עם השעות והשולח. תמונות מתויקות במשימה, מוסתרות מהלקוח.</span>
+            </span>
+          </label>
+        ) : (
+          <div className="space-y-1 rounded-lg border border-app-border bg-app-surface-page p-3 text-sm">
+            <p className="text-xs text-app-text-secondary">ייכנס למשימה כהערה פנימית. תמונות יתויקו כמסמך במשימה, מוסתר מהלקוח.</p>
+            <ul className="space-y-0.5">
+              {props.messages
+                .slice()
+                .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+                .map((m) => (
+                  <li key={m.id} className="truncate">
+                    {m.mine ? "אנחנו" : m.senderName || props.contactName}:{" "}
+                    {m.text ||
+                      (m.transcript
+                        ? `[${m.files[0]?.label || "הודעה קולית"}] ${m.transcript}`
+                        : m.files[0]?.label
+                          ? `[${m.files[0].label}${m.files[0].type === "audio" ? ", לא תומללה" : ""}]`
+                          : "[הודעה שאינה טקסט]")}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        )}
 
         <div className="space-y-2">
           <label className={`flex min-h-11 items-center gap-2 text-sm ${portalAllowed ? "text-app-text-primary" : "text-app-text-secondary"}`}>
@@ -403,10 +439,10 @@ function AttachDialog(props: {
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={pending || !clientId || (props.mode === "existing" && !taskId)}
+            disabled={pending || !clientId || (props.mode === "existing" && !taskId) || tooManySteps}
             className="min-h-11 rounded-lg bg-navy px-5 text-sm font-medium text-white disabled:opacity-60"
           >
-            {pending ? "שומר..." : props.mode === "new" ? "יצירת משימה" : "צירוף"}
+            {pending ? "שומר..." : submitLabel(props.mode, stepLines.length)}
           </button>
           <button type="button" onClick={props.onClose} className="min-h-11 rounded-lg border border-app-border-strong bg-white px-4 text-sm text-app-text-primary">
             ביטול
@@ -435,5 +471,140 @@ function Shell({ title, onClose, children }: { title: string; onClose: () => voi
         {children}
       </section>
     </div>
+  );
+}
+
+type StepRow = { key: string; text: string; on: boolean; meta: string; edited: boolean };
+
+const stepTime = new Intl.DateTimeFormat("he-IL", { timeZone: "Asia/Jerusalem", hour: "2-digit", minute: "2-digit", hour12: false });
+
+/// One row per message, in the order they were written. A message with
+/// nothing to read (an image alone) is listed unticked, so it is visible
+/// and can still be written in by hand.
+function initialRows(messages: SelectedMessage[], contactName: string): StepRow[] {
+  return messages
+    .slice()
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    .map((m) => {
+      const text = proposeStepText(m);
+      const who = m.mine ? "אנחנו" : m.senderName || contactName || "איש קשר";
+      const hasImage = m.files.some((f) => f.type === "img" || f.type === "image");
+      const parts = [stepTime.format(new Date(m.at)), who];
+      if (!text) parts.push("הודעה בלי טקסט");
+      if (hasImage) parts.push("התמונה תתויק במשימה");
+      return { key: m.id, text, on: Boolean(text), meta: parts.join(" · "), edited: false };
+    });
+}
+
+function submitLabel(mode: "existing" | "new", steps: number): string {
+  if (mode === "new") return steps === 0 ? "יצירת משימה" : steps === 1 ? "יצירת משימה עם שלב אחד" : `יצירת משימה עם ${steps} שלבים`;
+  return steps === 0 ? "צירוף" : steps === 1 ? "צירוף ושלב אחד" : `צירוף ו-${steps} שלבים`;
+}
+
+const smallButton =
+  "flex size-9 flex-none items-center justify-center rounded-lg text-app-text-secondary hover:bg-app-surface-sunken disabled:opacity-40";
+
+/// The editable step list (option B). Reordering is by buttons rather than
+/// drag: it works the same with a finger, a mouse and a keyboard.
+function StepsEditor(props: {
+  rows: StepRow[];
+  setRows: (fn: (prev: StepRow[]) => StepRow[]) => void;
+  count: number;
+  existing: boolean;
+}) {
+  const [added, setAdded] = useState(0);
+  const update = (key: string, patch: Partial<StepRow>) =>
+    props.setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const move = (i: number, by: -1 | 1) =>
+    props.setRows((prev) => {
+      const j = i + by;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = prev.slice();
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
+  const over = props.count > MAX_STEPS_FROM_MESSAGES;
+
+  return (
+    <section aria-label="שלבים במשימה" className="space-y-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-medium text-app-text-primary">
+          שלבים במשימה <span className="font-normal text-app-text-secondary">· {props.count === 1 ? "שלב אחד" : `${props.count} שלבים`}</span>
+        </h3>
+        <div className="flex gap-1">
+          <button type="button" onClick={() => props.setRows((prev) => prev.map((r) => ({ ...r, on: Boolean(r.text.trim()) })))} className="min-h-9 px-2 text-sm text-app-text-accent underline">
+            סימון הכול
+          </button>
+          <button type="button" onClick={() => props.setRows((prev) => prev.map((r) => ({ ...r, on: false })))} className="min-h-9 px-2 text-sm text-app-text-accent underline">
+            ניקוי
+          </button>
+        </div>
+      </div>
+      <p className="text-xs text-app-text-secondary">
+        כל הודעה היא שורה. אפשר לערוך, להוריד סימון, לשנות סדר או להוסיף שלב. רק השורות המסומנות נשמרות
+        {props.existing ? ", אחרי השלבים שכבר במשימה" : ""}.
+      </p>
+      <ol className="space-y-1.5">
+        {props.rows.map((r, i) => (
+          <li key={r.key} className={`flex items-start gap-1 rounded-lg p-1 ${r.on ? "" : "bg-app-surface-sunken"}`}>
+            <label className="flex size-9 flex-none cursor-pointer items-center justify-center">
+              <input
+                type="checkbox"
+                checked={r.on}
+                onChange={(e) => update(r.key, { on: e.target.checked })}
+                aria-label={`לכלול את שלב ${i + 1}`}
+                className="size-5 accent-navy"
+              />
+            </label>
+            <div className="min-w-0 flex-1 space-y-0.5">
+              <textarea
+                rows={2}
+                value={r.text}
+                maxLength={MAX_STEP_TITLE}
+                aria-label={`שלב ${i + 1}`}
+                placeholder="כתיבת השלב"
+                onChange={(e) => update(r.key, { text: e.target.value, edited: true, on: r.on || Boolean(e.target.value.trim()) })}
+                className={`w-full resize-none rounded-lg border bg-white px-2.5 py-1.5 text-sm leading-snug text-app-text-primary outline-none focus:border-gold ${r.edited ? "border-gold" : "border-app-border"}`}
+              />
+              {r.meta || r.edited ? (
+                <p className="text-xs text-app-text-tertiary">{[r.meta, r.edited ? "נערך" : ""].filter(Boolean).join(" · ")}</p>
+              ) : null}
+            </div>
+            <div className="flex flex-none flex-col">
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label={`הזזת שלב ${i + 1} למעלה`} className={smallButton}>
+                ↑
+              </button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === props.rows.length - 1} aria-label={`הזזת שלב ${i + 1} למטה`} className={smallButton}>
+                ↓
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => props.setRows((prev) => prev.filter((x) => x.key !== r.key))}
+              aria-label={`הסרת שלב ${i + 1}`}
+              className={`${smallButton} text-lg`}
+            >
+              ×
+            </button>
+          </li>
+        ))}
+      </ol>
+      <button
+        type="button"
+        onClick={() => {
+          setAdded((n) => n + 1);
+          props.setRows((prev) => [...prev, { key: `added-${added}`, text: "", on: true, meta: "", edited: true }]);
+        }}
+        className="flex min-h-11 items-center gap-1.5 rounded-lg border border-dashed border-app-border-strong bg-white px-3.5 text-sm text-app-text-primary"
+      >
+        <Plus aria-hidden="true" className="size-4" />
+        הוספת שלב
+      </button>
+      {over ? (
+        <p role="alert" className="text-sm text-app-error">
+          עד {MAX_STEPS_FROM_MESSAGES} שלבים בפעם אחת. סומנו {props.count}.
+        </p>
+      ) : null}
+    </section>
   );
 }
