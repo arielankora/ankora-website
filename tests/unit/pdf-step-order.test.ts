@@ -10,7 +10,7 @@ const db = {
   employeeAgreement: {
     findFirst: vi.fn(async (args: { where: { channel: "APP" | "EMAIL_PDF" } }) => (signed[args.where.channel] ? { id: "sig" } : null)),
   },
-  task: { findFirst: vi.fn() },
+  task: { findFirst: vi.fn(), findMany: vi.fn(async () => []) },
   taskComment: { create: vi.fn(async (_args: { data: { body: string } }) => ({ id: "c" })) },
   passkey: { count: vi.fn(async () => 0) },
 };
