@@ -175,8 +175,36 @@ export function ConnectionsScreen(props: {
         <strong className="text-sm font-medium text-app-text-primary">שליחה</strong>
         <span className="text-sm text-app-text-secondary">מיילים שהנהלים של הלקוח הזה שולחים יוצאים מהתיבה של מנהל התיק.</span>
         {mine ? (
-          <span className="ms-auto rounded-full bg-app-success-soft px-2.5 py-0.5 text-xs font-medium text-app-success" dir="auto">
-            התיבה שלך מחוברת: {mine.account}
+          <span className="ms-auto flex flex-wrap items-center gap-2" data-testid="send-connection">
+            <span className="rounded-full bg-app-success-soft px-2.5 py-0.5 text-xs font-medium text-app-success" dir="auto">
+              התיבה שלך מחוברת: {mine.account}
+            </span>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => start(async () => {
+                const r = await testConnectionAction(mine.id, null);
+                setMsg({ id: mine.id, text: r.error ?? r.ok ?? "", error: !!r.error });
+              })}
+              className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-text-primary"
+            >
+              בדיקת חיבור
+            </button>
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => {
+                if (!confirm("לנתק את התיבה שלך מהשליחה ולבטל את ההרשאה?")) return;
+                start(async () => {
+                  const r = await disconnectAction(props.clientId, mine.id);
+                  setMsg({ id: null, text: r.error ?? r.ok ?? "", error: !!r.error });
+                });
+              }}
+              className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-error"
+            >
+              ניתוק
+            </button>
+            {msg?.id === mine.id && <span className={`basis-full text-xs ${msg.error ? "text-app-error" : "text-app-success"}`}>{msg.text}</span>}
           </span>
         ) : props.mayManage && props.googleReady ? (
           <a href={google("SEND")} className="ms-auto rounded-[10px] border border-app-border px-3 py-2 text-sm text-app-text-primary">
