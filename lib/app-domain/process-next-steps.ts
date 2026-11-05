@@ -69,6 +69,7 @@ export async function processDecisions(clientIds: string[], filter: (p: { client
       status: true,
       triggerKinds: true,
       triggerText: true,
+      checkEveryDays: true,
       ownerId: true,
       needsReview: true,
       reviewReason: true,
@@ -104,7 +105,7 @@ export async function processDecisions(clientIds: string[], filter: (p: { client
       openLessons: p._count.lessons,
       knowledge: { uncertain: false, toResolve: null },
       dateCandidate: c?.date ?? null,
-      readiness: runReadiness({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: next }),
+      readiness: runReadiness({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: next, checkEveryDays: p.checkEveryDays }),
     };
     return { clientId: p.clientId, facts, deadline: next, updatedAt: p.updatedAt };
   });

@@ -17,7 +17,7 @@ import { proposeKnowledge, type ProposalItemInput } from "@/lib/app-domain/knowl
 import { proposeAwaitingAssignment } from "@/lib/app-domain/batch-assignment";
 import { lookupContact } from "@/lib/app-domain/client-contacts";
 import { extractionBrief } from "@/lib/app-domain/extraction-brief";
-import { startProcessRun } from "@/lib/app-domain/process-runs";
+import { SameDayRunError, startProcessRun } from "@/lib/app-domain/process-runs";
 import { listMyRoutines, recordProcessCheck } from "@/lib/app-domain/process-checks";
 import { mcpGetProcess, mcpListPolicies, mcpListProcesses } from "@/lib/app-domain/mcp-processes";
 import { prisma } from "@/lib/prisma";
@@ -658,7 +658,7 @@ export function registerClientFileTools(server: McpServer): void {
     {
       title: "Start a run of a process",
       description:
-        "Opens a run of one of a client's processes (get_client_file lists them as P1, P2... in section 7.4): a task with the approved procedure's steps, each due on its business day, assigned to the process's owner. Use it when something happened that the process answers (an employee's trip, a request) or when the user asks. Confirm the process and the date with the user first: every call opens another run. A process without an approved procedure, a paused one, or an ongoing one cannot be started.",
+        "Opens a run of one of a client's processes (get_client_file lists them as P1, P2... in section 7.4): a task with the approved procedure's steps, each due on its business day, assigned to the process's owner. Use it when something happened that the process answers (an employee's trip, a request) or when the user asks. Confirm the process and the date with the user first: every call for a new day opens another run. One run per process per day: when the day already has an unfinished run, no second one is opened and the answer is that run, with alreadyOpen true. A process without an approved procedure, a paused one, or an ongoing one cannot be started.",
       inputSchema: z.object({
         client: z.string().describe("Client name, as the user said it."),
         process: z.string().describe('The process code ("P3") or its title.'),
@@ -677,6 +677,12 @@ export function registerClientFileTools(server: McpServer): void {
         const run = await startProcessRun(actor, process.id, new Date(`${args.date}T00:00:00Z`));
         return toolJson({ taskId: run.id, title: run.title, link: `${appBaseUrl()}/app/tasks/${run.id}` });
       } catch (err) {
+        // One run a day (3.11.2026): the run already open for that day is
+        // the answer, not a failure.
+        if (err instanceof SameDayRunError) {
+          const { id, title } = err.existing;
+          return toolJson({ alreadyOpen: true, taskId: id, title, link: `${appBaseUrl()}/app/tasks/${id}`, message: err.message });
+        }
         console.error("[mcp] start_process failed", err);
         return toolFailure(err);
       }

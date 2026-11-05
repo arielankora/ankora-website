@@ -7,6 +7,7 @@ import { addClientPolicy } from "@/lib/app-domain/client-policies";
 import { addProcess, approveProcessVersion, saveProcessVersion } from "@/lib/app-domain/processes";
 import { startProcessRun } from "@/lib/app-domain/process-runs";
 import { mcpListProcesses } from "@/lib/app-domain/mcp-processes";
+import { CONTINUOUS_NO_CHECK_BLOCKER } from "@/lib/process-readiness";
 
 // list_processes, get_process and list_policies (claude/org-brain-spec-
 // 2026-10-12.md, 8) against a real database. What is worth holding: the
@@ -103,6 +104,37 @@ describe("list_processes and get_process", () => {
     const detail = await call(hadas, "get_process", { client: "NUX", process: p1.code });
     expect(detail.json.procedure.version).toBe(1);
     expect(detail.json.draft).toBeNull();
+  });
+});
+
+describe("start_process and the check of an ongoing process (3.11.2026)", () => {
+  it("opens one run a day; asked again for that day, answers with the run that is open", async () => {
+    const { hadas, p1 } = await setup();
+    const first = await call(hadas, "start_process", { client: "NUX", process: p1.code, date: "2026-11-04" });
+    expect(first.json.alreadyOpen).toBeUndefined();
+    const again = await call(hadas, "start_process", { client: "NUX", process: p1.code, date: "2026-11-04" });
+    expect(again.json).toMatchObject({ alreadyOpen: true, taskId: first.json.taskId, link: first.json.link });
+    expect(again.json.message).toContain("כבר יש ריצה פתוחה");
+    const nextDay = await call(hadas, "start_process", { client: "NUX", process: p1.code, date: "2026-11-05" });
+    expect(nextDay.json.taskId).not.toBe(first.json.taskId);
+    expect(await prisma.task.count({ where: { processId: p1.id, parentId: null } })).toBe(2);
+  });
+
+  it("says how often an ongoing process is checked, and that it will not run without a check", async () => {
+    const { client, hadas, ariel } = await setup();
+    const withCheck = await addProcess(hadas, { clientId: client.id, title: "מעקב תיבה", ownerId: hadas.id, triggerKinds: ["CONTINUOUS"], triggerText: "כל הזמן", checkEveryDays: 7, checkText: "שאין מיילים בלי מענה", sources: S1 });
+    const noCheck = await addProcess(hadas, { clientId: client.id, title: "תזכורת בוקר", ownerId: hadas.id, triggerKinds: ["CONTINUOUS"], triggerText: "כל יום עבודה ב-9:00", sources: S1 });
+    for (const p of [withCheck, noCheck]) {
+      await saveProcessVersion(hadas, p.id, { steps: [{ title: "שלב" }], baseVersion: 0 });
+      await approveProcessVersion(ariel, p.id, 1);
+    }
+    const list = await call(hadas, "list_processes", { client: "NUX" });
+    const byCode = new Map<string, { runs: string }>(list.json.processes.map((p: { code: string; runs: string }) => [p.code, p]));
+    expect(byCode.get(withCheck.code)).toMatchObject({ check: "פעם בשבוע: שאין מיילים בלי מענה", runs: "רץ", notRunningBecause: [] });
+    expect(byCode.get(noCheck.code)).toMatchObject({ check: null, notRunningBecause: [CONTINUOUS_NO_CHECK_BLOCKER] });
+    expect(byCode.get(noCheck.code)?.runs).not.toBe("רץ");
+    const detail = await call(hadas, "get_process", { client: "NUX", process: withCheck.code });
+    expect(detail.json.check).toBe("פעם בשבוע: שאין מיילים בלי מענה");
   });
 });
 

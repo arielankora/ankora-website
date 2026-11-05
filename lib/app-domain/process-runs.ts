@@ -1,5 +1,5 @@
 import "server-only";
-import type { ProcessStepMode, User } from "@prisma/client";
+import type { Prisma, ProcessStepMode, User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertCan } from "@/lib/app-auth/permissions";
 import { recordAudit } from "@/lib/app-auth/audit";
@@ -24,6 +24,22 @@ import { assertClientAccess } from "@/lib/app-domain/client-sources";
 // run is under way changes the next run, not this one.
 
 export const RUN_OPENED = "process.run_opened";
+
+/// A run in one of these is over: it does not stop another for its day.
+export const FINISHED_RUN_STATUSES = ["DONE", "ARCHIVED"] as const;
+
+/// A second run asked for a day that already has an unfinished one. The
+/// screen shows the message; start_process answers with the run that is
+/// there (`existing`) instead of a failure.
+export class SameDayRunError extends Error {
+  constructor(
+    code: string,
+    readonly existing: { id: string; title: string }
+  ) {
+    super(`כבר יש ריצה פתוחה של ${code} ליום הזה: "${existing.title}" (${existing.id}). אפשר לעבוד עליה, או לסגור אותה ואז לפתוח חדשה.`);
+    this.name = "SameDayRunError";
+  }
+}
 
 /// The business calendar of a run (decision 6): the one set on the
 /// process, otherwise its entity's country ("US" for NUX Inc), otherwise
@@ -57,6 +73,10 @@ export type OpenRunInput = {
   /// saying where it came from. Both optional; a dated run has neither.
   titleSuffix?: string | null;
   descriptionPrefix?: string | null;
+  /// One run of the process per day (startProcessRun, 3.11.2026): the run
+  /// is created only when the day has no unfinished run, checked and
+  /// inserted under a lock so two requests at once cannot both pass.
+  oneADay?: boolean;
 };
 
 /// Opens the run, or returns null when the process cannot run: retired,
@@ -130,20 +150,30 @@ export async function openProcessRun(input: OpenRunInput) {
   });
   const dueKeys = stepDueKeys(runKey, steps, calendar);
 
-  const run = await prisma.task.create({
-    data: {
-      clientId: process.clientId,
-      categoryId: process.categoryId ?? input.fallbackCategoryId ?? null,
-      title: `${process.code} ${process.title}${input.titleSuffix ? `: ${input.titleSuffix}` : ""}`.slice(0, 200),
-      description: input.descriptionPrefix ? `${input.descriptionPrefix}\n\n${description}` : description,
-      assignedToId: assignee,
-      dueDate: dayAt(runKey),
-      importantDateId: input.importantDateId ?? null,
-      importantDateOccurrenceKey: input.occurrenceKey ?? null,
-      processId: process.id,
-      processVersionId: version.id,
-    },
-  });
+  const runData = {
+    clientId: process.clientId,
+    categoryId: process.categoryId ?? input.fallbackCategoryId ?? null,
+    title: `${process.code} ${process.title}${input.titleSuffix ? `: ${input.titleSuffix}` : ""}`.slice(0, 200),
+    description: input.descriptionPrefix ? `${input.descriptionPrefix}\n\n${description}` : description,
+    assignedToId: assignee,
+    dueDate: dayAt(runKey),
+    importantDateId: input.importantDateId ?? null,
+    importantDateOccurrenceKey: input.occurrenceKey ?? null,
+    processId: process.id,
+    processVersionId: version.id,
+  } satisfies Prisma.TaskUncheckedCreateInput;
+  const run = input.oneADay
+    ? await prisma.$transaction(async (tx) => {
+        // The check and the insert under one lock per process and day, the
+        // way timers are serialised (lockTimersFor in time-entries.ts).
+        // Only the run row is written inside: everything else runs after
+        // commit, so the transaction holds one connection for three short queries.
+        await tx.$queryRaw`SELECT 1 AS locked FROM pg_advisory_xact_lock(hashtext(${`process-run:${process.id}:${runKey}`}))`;
+        const existing = await sameDayRun(process.id, input.occurrence, tx);
+        if (existing) throw new SameDayRunError(process.code, existing);
+        return tx.task.create({ data: runData });
+      })
+    : await prisma.task.create({ data: runData });
   for (const [i, step] of steps.entries()) {
     await prisma.task.create({
       data: {
@@ -198,9 +228,36 @@ export async function startProcessRun(actor: User, processId: string, day: Date)
     throw new Error("תהליך שוטף לא נפתח כריצה. הוא רץ כל הזמן, ונבדק בסקירה התקופתית.");
   }
   if (Number.isNaN(day.getTime())) throw new Error("צריך תאריך לריצה.");
-  const run = await openProcessRun({ processId, occurrence: day, actorId: actor.id, fallbackAssigneeId: actor.id });
+  // 3.11.2026: P7 of Grantor had two runs for 4.11, opened five minutes
+  // apart, and the calendar showed both. One run of a process per day: a
+  // second one for a day that already has an unfinished run is refused,
+  // with the run that is there. A finished or archived run does not block
+  // (the work came back), and a run opened by the vendor job (P8, one per
+  // vendor) does not come through here.
+  // Checked here for a quick answer, and again under a lock where the run
+  // is inserted (oneADay), which is what holds when two requests race.
+  const existing = await sameDayRun(processId, day);
+  if (existing) throw new SameDayRunError(process.code, existing);
+  const run = await openProcessRun({ processId, occurrence: day, actorId: actor.id, fallbackAssigneeId: actor.id, oneADay: true });
   if (!run) throw new Error("לא ניתן לפתוח ריצה לתהליך הזה.");
   return run;
+}
+
+/// An unfinished run of the process due on the same Israel day, if any.
+/// Runs are due at UTC midnight of their day (dayAt), so the day's key is
+/// the comparison.
+export async function sameDayRun(processId: string, day: Date, db: Prisma.TransactionClient = prisma) {
+  const key = localDateKey(day, TIMEZONE);
+  return db.task.findFirst({
+    where: {
+      processId,
+      parentId: null,
+      deletedAt: null,
+      dueDate: dayAt(key),
+      status: { notIn: [...FINISHED_RUN_STATUSES] },
+    },
+    select: { id: true, title: true },
+  });
 }
 
 /// Recent runs of a process, newest first, for its card.

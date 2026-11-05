@@ -1,5 +1,6 @@
 import "server-only";
 import { readinessLabel, runBlockers } from "@/lib/process-readiness";
+import { checkEveryText } from "@/lib/process-checks";
 import type { User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl } from "@/lib/email-templates";
@@ -52,13 +53,16 @@ function summary(p: Processes[number], user: Map<string, string>, stranger: Stra
     status: p.status,
     triggers: p.triggerKinds.map((t) => TRIGGER_LABELS[t]),
     trigger: p.triggerText,
+    // 3.11.2026: an ongoing process's check, or null. Without one it is in
+    // nobody's routine (notRunningBecause says so).
+    check: p.checkEveryDays ? `${checkEveryText(p.checkEveryDays)}${p.checkText ? `: ${p.checkText}` : ""}` : null,
     owner: p.ownerId ? (user.get(p.ownerId) ?? null) : null,
     backup: p.backupOwnerId ? (user.get(p.backupOwnerId) ?? null) : null,
     handover: TRANSITION_LABELS[p.transitionStatus],
     // 25.10.2026: whether it runs, and how well it is written down.
     runs: readinessLabel(p.readiness),
     // 2.11.2026: every reason, not only the first the screen shows.
-    notRunningBecause: runBlockers({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: p.nextDate }),
+    notRunningBecause: runBlockers({ status: p.status, ownerId: p.ownerId, triggerKinds: p.triggerKinds, triggerText: p.triggerText, nextDate: p.nextDate, checkEveryDays: p.checkEveryDays }),
     documentation: `${p.documentation.score}/${p.documentation.of}`,
     // 31.10.2026: could a stranger run it? What is still open.
     strangerTest: strangerLine(stranger.get(p.id) ?? null),
