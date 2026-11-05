@@ -7,7 +7,7 @@ import { normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
 // of the clients they manage.
 //
 // ALOHA_LINE_OWNERS pairs a line with its person's email:
-//   "+972553302266=hadas@ankora.co.il,+972553356775=anna@ankora.co.il"
+//   "+972553302266=hadas@ankora.co.il,+972553356775=annam@ankora.co.il"
 // A line missing here is still ours (ALOHA_LINE_NUMBER), just owned by
 // nobody in particular: the full viewers and the call viewers see it.
 
