@@ -263,7 +263,16 @@ export function RevokeForm({ blockId }: { blockId: string }) {
 }
 
 /// The button on a conversation: "לא לשמור שיחות עם המספר הזה".
-export function BlockButton(props: { channelId: string; kind: "PHONE" | "CHAT"; value: string; label: string; manager: boolean }) {
+export function BlockButton(props: {
+  channelId: string;
+  kind: "PHONE" | "CHAT";
+  value: string;
+  label: string;
+  manager: boolean;
+  /// 5.11.2026 (Ariel): in the conversation's "עוד" menu, not a button of
+  /// its own in the header: red, with a line on what it does.
+  asMenuItem?: boolean;
+}) {
   const [state, action, pending] = useActionState(blockAction, undefined);
   if (state?.ok) return <Result state={state} />;
   const question = props.manager
@@ -271,7 +280,7 @@ export function BlockButton(props: { channelId: string; kind: "PHONE" | "CHAT"; 
     : "לבקש לא לשמור שיחות עם המספר הזה? ההודעות יוסתרו מיד, ומנהל יחליט אם למחוק.";
   const label = props.kind === "CHAT" ? "לא לשמור את הקבוצה הזו" : "לא לשמור שיחות עם המספר הזה";
   return (
-    <form action={action} className="inline-flex max-w-sm flex-col gap-1">
+    <form action={action} className={props.asMenuItem ? "flex w-full flex-col gap-0.5" : "inline-flex max-w-sm flex-col gap-1"}>
       <input type="hidden" name="channelId" value={props.channelId} />
       <input type="hidden" name="kind" value={props.kind} />
       <input type="hidden" name="value" value={props.value} />
@@ -282,8 +291,17 @@ export function BlockButton(props: { channelId: string; kind: "PHONE" | "CHAT"; 
         yes={props.manager ? "כן, לחסום ולמחוק" : "כן, לשלוח בקשה"}
         pending={pending}
         pendingLabel="שומר..."
-        className="min-h-11 rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary"
+        className={
+          props.asMenuItem
+            ? "flex min-h-11 w-full items-center px-3 text-start text-sm text-app-error hover:bg-app-error-soft"
+            : "min-h-11 rounded-lg border border-app-border-strong bg-white px-3 text-sm text-app-text-primary"
+        }
       />
+      {props.asMenuItem ? (
+        <p className="px-3 pb-1 text-xs text-app-text-secondary">
+          {props.manager ? "מוחק את מה שנשמר מהמספר. יש אישור לפני." : "שולח בקשה למנהל. ההודעות מוסתרות מיד."}
+        </p>
+      ) : null}
       <Result state={state} />
     </form>
   );

@@ -62,7 +62,29 @@ export type InboxRow = {
   at: string | null;
   unreadCount: number;
   clients: ClientRef[];
+  /// The people whose number or line this row's chats and calls are on
+  /// (5.11.2026, the "צוות" filter): user ids.
+  teamIds: string[];
+  /// The WhatsApp chats behind the row, for "סמן כנקראה" (5.11.2026).
+  chatIds: string[];
 };
+
+/// Who each chat and call belongs to, for the "צוות" filter. Optional: a
+/// list built without it has no team on any row.
+export type TeamOf = {
+  chat?: (chatId: string) => string | null | undefined;
+  call?: (call: InboxCall) => string | null | undefined;
+};
+
+function addTeam(row: InboxRow, id: string | null | undefined) {
+  if (id && !row.teamIds.includes(id)) row.teamIds.push(id);
+}
+
+/// WhatsApp reports a chat marked unread by hand with no count (5.11.2026):
+/// any count other than zero is unread.
+export function isUnread(row: Pick<InboxRow, "unreadCount">): boolean {
+  return row.unreadCount !== 0;
+}
 
 export function phoneKey(phone: string): string {
   return `p:${phone}`;
@@ -119,6 +141,13 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/// Two chats with the same person: counts add up; a chat marked unread by
+/// hand (a negative count) keeps the row unread.
+function mergeUnread(a: number, b: number): number {
+  if (a > 0 || b > 0) return Math.max(a, 0) + Math.max(b, 0);
+  return a !== 0 || b !== 0 ? -1 : 0;
+}
+
 const CALL_PREVIEW = { in: "שיחה נכנסת", out: "שיחה יוצאת", unknown: "שיחה" } as const;
 
 function later(a: string | null, b: string | null): boolean {
@@ -130,7 +159,7 @@ function later(a: string | null, b: string | null): boolean {
 /// One row per person: a WhatsApp chat and the calls with the same number
 /// become one row, whose preview and time are those of the latest of
 /// them. Newest first.
-export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<string, PhoneOwner>): InboxRow[] {
+export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<string, PhoneOwner>, teamOf: TeamOf = {}): InboxRow[] {
   const rows = new Map<string, InboxRow>();
 
   for (const chat of chats) {
@@ -141,10 +170,12 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
     // latest activity of the two.
     const seen = rows.get(key);
     if (seen && !later(seen.at, chat.lastMessageAt)) {
-      seen.unreadCount += chat.unreadCount;
+      seen.unreadCount = mergeUnread(seen.unreadCount, chat.unreadCount);
+      seen.chatIds.push(chat.id);
+      addTeam(seen, teamOf.chat?.(chat.id));
       continue;
     }
-    rows.set(key, {
+    const row: InboxRow = {
       key,
       name: chat.name,
       phone,
@@ -154,10 +185,14 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
       hasCalls: false,
       preview: chat.lastMessagePreview ?? "",
       at: chat.lastMessageAt,
-      unreadCount: chat.unreadCount,
+      unreadCount: seen ? mergeUnread(seen.unreadCount, chat.unreadCount) : chat.unreadCount,
       // A group has no number; it belongs to a client only when assigned.
       clients: owner?.clients ?? (chat.groupClient ? [chat.groupClient] : []),
-    });
+      teamIds: seen ? [...seen.teamIds] : [],
+      chatIds: seen ? [...seen.chatIds, chat.id] : [chat.id],
+    };
+    addTeam(row, teamOf.chat?.(chat.id));
+    rows.set(key, row);
   }
 
   for (const call of calls) {
@@ -178,9 +213,13 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
         at: call.callAt,
         unreadCount: 0,
         clients: owner?.clients ?? [],
+        teamIds: [],
+        chatIds: [],
       });
+      addTeam(rows.get(key)!, teamOf.call?.(call));
       continue;
     }
+    addTeam(existing, teamOf.call?.(call));
     existing.hasCalls = true;
     if (later(existing.at, call.callAt)) {
       existing.at = call.callAt;
@@ -204,10 +243,11 @@ export function buildInbox(chats: InboxChat[], calls: InboxCall[], owners: Map<s
 }
 
 /// The list under the filter chips and the search box.
-export function filterInbox(rows: InboxRow[], filter: InboxFilter, query: string): InboxRow[] {
+export function filterInbox(rows: InboxRow[], filter: InboxFilter, query: string, team: string | null = null): InboxRow[] {
   const q = query.trim().toLowerCase();
   const digits = q.replace(/\D/g, "");
   return rows.filter((row) => {
+    if (team && !row.teamIds.includes(team)) return false;
     if (filter === "wa" && !row.hasWhatsapp) return false;
     if (filter === "call" && !row.hasCalls) return false;
     if (filter === "none" && (row.clients.length > 0 || !row.phone)) return false;
@@ -227,14 +267,16 @@ export type TimelineMessage = { kind: "message"; at: string; id: string };
 export type TimelineCall = { kind: "call"; at: string; id: string };
 export type TimelineItem = TimelineMessage | TimelineCall;
 
-/// Messages and calls in one line, newest first: the latest item sits at the
-/// top of the timeline, like the contact list beside it (Ariel, 3.11.2026).
+/// Messages and calls in one line, oldest first, as WhatsApp reads: the
+/// latest item sits at the bottom, beside the reply box (Ariel, 5.11.2026;
+/// from 3.11.2026 it was newest first, and the reply box ended up below a
+/// long scroll).
 export function buildTimeline(messages: Array<{ id: string; timestamp: string }>, calls: InboxCall[]): TimelineItem[] {
   const items: TimelineItem[] = [
     ...messages.map((m) => ({ kind: "message" as const, at: m.timestamp, id: m.id })),
     ...calls.map((c) => ({ kind: "call" as const, at: c.callAt, id: c.emailId })),
   ];
-  return items.sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+  return items.sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime());
 }
 
 /// Day headings in the timeline ("יום ראשון, 1 בנובמבר"), Israel time.
@@ -277,4 +319,18 @@ export function proposeTask(input: {
     lines.push("", "תמלול השיחה האחרונה:", input.transcript.trim().slice(0, 3000));
   }
   return { title: `מעקב: שיחה עם ${who}`, description: lines.join("\n") };
+}
+
+/// The part of a message around the first match, for the results list.
+export function snippetAround(text: string, query: string, radius = 60): { before: string; match: string; after: string } {
+  const flat = text.replace(/\s+/g, " ").trim();
+  const i = flat.toLowerCase().indexOf(query.trim().toLowerCase());
+  if (i < 0) return { before: flat.slice(0, radius * 2), match: "", after: "" };
+  const end = i + query.trim().length;
+  const start = Math.max(0, i - radius);
+  return {
+    before: (start > 0 ? "…" : "") + flat.slice(start, i),
+    match: flat.slice(i, end),
+    after: flat.slice(end, end + radius) + (end + radius < flat.length ? "…" : ""),
+  };
 }
