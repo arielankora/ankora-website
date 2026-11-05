@@ -6,6 +6,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { commsAccess } from "@/lib/comms/access";
 import { normalizePhone } from "@/lib/contact-normalize";
+import { nextExcludedViewers } from "@/lib/comms/visibility";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
 import { transcribeRecording } from "@/lib/comms/call-store";
@@ -54,6 +55,33 @@ export async function connectChannelAction(_prev: SetupState | undefined, formDa
   });
   refresh();
   return { ok: "המספר מחובר. עכשיו מסמנים מה לא לשמור." };
+}
+
+/// Edit "לא רואים שיחות מהמספר" of a connected number (Ariel, 5.11.2026).
+/// The owner or a manager may edit it. Someone who is on the list cannot take
+/// themselves off it: a manager the owner kept out stays out until the owner
+/// says otherwise.
+export async function updateExcludedViewersAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const user = await requireUser();
+  if (user.role === "CLIENT_USER") return { error: "אין הרשאה." };
+  const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
+  if (!channel) return { error: "המספר לא נמצא." };
+  const isOwner = channel.ownerUserId === user.id;
+  if (!isOwner && !canManageClients(user.role)) return { error: "אין הרשאה." };
+  const picked = formData.getAll("excluded").map(String).slice(0, 300);
+  const valid = await prisma.user.findMany({ where: { id: { in: picked }, deletedAt: null }, select: { id: true } });
+  const excludedViewerIds = nextExcludedViewers({ channel, editorId: user.id, picked: valid.map((u) => u.id) });
+  await prisma.commsChannel.update({ where: { id: channel.id }, data: { excludedViewerIds } });
+  await recordAudit({
+    actorId: user.id,
+    action: "comms_channel.excluded_viewers_updated",
+    entityType: "CommsChannel",
+    entityId: channel.id,
+    before: { excludedViewerIds: channel.excludedViewerIds },
+    after: { excludedViewerIds },
+  });
+  refresh();
+  return { ok: excludedViewerIds.length ? "הרשימה נשמרה." : "הרשימה נשמרה. כל מי שיש לו גישה רואה עכשיו את השיחות מהמספר." };
 }
 
 function target(formData: FormData): { kind: "PHONE" | "CHAT"; value: string; label: string | null } | null {
