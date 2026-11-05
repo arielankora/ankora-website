@@ -921,3 +921,47 @@ export function taskFromProposal(p: {
   ];
   return { title, description: lines.filter(Boolean).join("\n\n"), needsTitle, said: headline };
 }
+
+/// 5.11.2026: a process names its systems by name, and a name links only
+/// to a system already in the file (proposal-links.ts). A process that
+/// names a system the map does not have entered without the link, and the
+/// card said so to a reviewer who could not fix it from there. This says
+/// it to Claude instead, while it still holds the meeting: the names a
+/// process in the batch uses that are neither in the client's system map
+/// nor proposed as a SYSTEM in the same batch, each with the systems in
+/// the map whose name looks like it ("Claude" and "Claude, חשבון התפעול"),
+/// so it uses that name rather than opening a second system.
+export type MissingSystem = { index: number; name: string; similar: { id: string; name: string }[] };
+
+export function missingSystems(
+  items: { index: number; target: string; action?: string | null; payload: Record<string, unknown> }[],
+  existing: { id: string; name: string }[]
+): MissingSystem[] {
+  // The same match the link makes on approval (systemByName): case and
+  // spaces aside, the name exactly. Looser only for the suggestions.
+  const key = (s: string) => s.trim().replace(/\s+/g, " ").toLowerCase();
+  const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && !!x.trim()) : []);
+  const inMap = new Set(existing.map((s) => key(s.name)));
+  const inBatch = new Set(
+    items.filter((i) => i.target === "SYSTEM" && (i.action ?? "CREATE") === "CREATE" && typeof i.payload.systemName === "string").map((i) => key(i.payload.systemName as string))
+  );
+  const out: MissingSystem[] = [];
+  for (const item of items) {
+    if (item.target !== "PROCESS") continue;
+    const steps = Array.isArray(item.payload.steps) ? (item.payload.steps as { systemNames?: unknown }[]) : [];
+    const named = [...strings(item.payload.systemNames), ...steps.flatMap((st) => strings(st?.systemNames))];
+    const seen = new Set<string>();
+    for (const raw of named) {
+      const k = key(raw);
+      if (!k || seen.has(k) || inMap.has(k) || inBatch.has(k)) continue;
+      seen.add(k);
+      const loose = normalizeForMatch(raw);
+      const similar = existing.filter((s) => {
+        const e = normalizeForMatch(s.name);
+        return e.length >= 3 && loose.length >= 3 && (e.includes(loose) || loose.includes(e));
+      });
+      out.push({ index: item.index, name: raw.trim().replace(/\s+/g, " "), similar });
+    }
+  }
+  return out;
+}
