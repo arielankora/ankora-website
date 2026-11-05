@@ -48,6 +48,28 @@ export function ConnectionsScreen(props: {
   const [msg, setMsg] = useState<{ id: string | null; text: string; error: boolean } | null>(props.notice ? { id: null, text: props.notice, error: props.notice.includes("נכשל") || props.notice.includes("לא") } : null);
   const [folder, setFolder] = useState<Record<string, string>>({});
   const [pending, start] = useTransition();
+  // 5.11.2026: a browser confirm() never showed in an embedded browser, and
+  // the disconnect silently did nothing. The question is asked in the page.
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const runDisconnect = (id: string) => {
+    setConfirming(null);
+    start(async () => {
+      const r = await disconnectAction(props.clientId, id);
+      setMsg({ id: null, text: r.error ?? r.ok ?? "", error: !!r.error });
+    });
+  };
+  const confirmBox = (id: string, question: string) =>
+    confirming === id && (
+      <div className="flex basis-full flex-wrap items-center gap-2 rounded-[10px] bg-app-error-soft px-3 py-2" role="alertdialog" aria-label="אישור ניתוק" data-testid="disconnect-confirm">
+        <span className="text-xs text-app-error">{question}</span>
+        <button type="button" onClick={() => runDisconnect(id)} className="h-11 rounded-[10px] bg-app-error px-3 text-sm font-medium text-white">
+          כן, לנתק
+        </button>
+        <button type="button" onClick={() => setConfirming(null)} className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-text-primary">
+          ביטול
+        </button>
+      </div>
+    );
   const [formState, formAction, formPending] = useActionState(addAppPasswordAction, undefined);
   const mine = props.connections.find((c) => c.kind === "MANAGER_SEND" && c.ownerUserId === props.userId);
   const google = (purpose: "CLIENT" | "SEND") => `/api/connections/google/start?clientId=${encodeURIComponent(props.clientId)}&purpose=${purpose}`;
@@ -115,19 +137,14 @@ export function ConnectionsScreen(props: {
                   <button
                     type="button"
                     disabled={pending}
-                    onClick={() => {
-                      if (!confirm(c.usedBy ? `החיבור בשימוש ב-${c.usedBy} נהלים, והם ייעצרו בצומת שמשתמש בו. לנתק?` : "לנתק את החיבור ולבטל את ההרשאה?")) return;
-                      start(async () => {
-                        const r = await disconnectAction(props.clientId, c.id);
-                        setMsg({ id: null, text: r.error ?? r.ok ?? "", error: !!r.error });
-                      });
-                    }}
+                    onClick={() => setConfirming(c.id)}
                     className="h-11 flex-1 rounded-[10px] border border-app-border bg-white text-sm text-app-error"
                   >
                     ניתוק
                   </button>
                 </div>
               )}
+              {confirmBox(c.id, c.usedBy ? `החיבור בשימוש ב-${c.usedBy} נהלים, והם ייעצרו בצומת שמשתמש בו. לנתק?` : "לנתק את החיבור ולבטל את ההרשאה ב-Google?")}
             </li>
           ))}
 
@@ -193,17 +210,12 @@ export function ConnectionsScreen(props: {
             <button
               type="button"
               disabled={pending}
-              onClick={() => {
-                if (!confirm("לנתק את התיבה שלך מהשליחה ולבטל את ההרשאה?")) return;
-                start(async () => {
-                  const r = await disconnectAction(props.clientId, mine.id);
-                  setMsg({ id: null, text: r.error ?? r.ok ?? "", error: !!r.error });
-                });
-              }}
+              onClick={() => setConfirming(mine.id)}
               className="h-11 rounded-[10px] border border-app-border bg-white px-3 text-sm text-app-error"
             >
               ניתוק
             </button>
+            {confirmBox(mine.id, "לנתק את התיבה שלך מהשליחה ולבטל את ההרשאה ב-Google?")}
             {msg?.id === mine.id && <span className={`basis-full text-xs ${msg.error ? "text-app-error" : "text-app-success"}`}>{msg.text}</span>}
           </span>
         ) : props.mayManage && props.googleReady ? (

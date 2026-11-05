@@ -27,8 +27,8 @@ test("a mailbox connected by app password appears, and a disconnect removes it",
   await expect(card).toContainText("[E2E] איש קשר");
   await expect(card).not.toContainText("abcd");
 
-  page.once("dialog", (d) => d.accept());
-  await card.getByRole("button", { name: "ניתוק" }).click();
+  await card.getByRole("button", { name: "ניתוק", exact: true }).click();
+  await card.getByTestId("disconnect-confirm").getByRole("button", { name: "כן, לנתק" }).click();
   await expect(page.getByText("החיבור נותק")).toBeVisible({ timeout: 15_000 });
   await page.reload();
   await expect(page.getByTestId("connection-card").filter({ hasText: account })).toHaveCount(0);

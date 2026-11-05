@@ -3632,6 +3632,16 @@ Three kinds of connection:
    leave a draft for a person; sending on its own needs a second pair of
    eyes before the procedure version goes live (step 3 decision).
 
+**The OAuth client (2026-11-05).** It lives in its own Google Cloud project,
+`ankora-app-513817`, not in `ankora-backups`, which holds the backup service
+account and the vault's KMS key: a client-facing OAuth app should not share a
+project with them, and Google's app verification is per project. Consent
+screen External, status Testing. `GOOGLE_OAUTH_CLIENT_ID` and
+`GOOGLE_OAUTH_CLIENT_SECRET` are set in Vercel for Preview on the prototype
+branch only. Verified end to end on the preview that day: a client account
+(mail metadata and one Drive folder) and the account manager's mailbox
+(a test mail sent and received).
+
 ### 24.3 Where secrets live
 
 OAuth refresh tokens and app passwords are stored in the existing vault
