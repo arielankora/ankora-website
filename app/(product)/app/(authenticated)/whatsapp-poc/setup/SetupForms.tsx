@@ -8,6 +8,8 @@ import {
   decideBlockAction,
   loadHistoryAction,
   importManualRecordingsAction,
+  keepAllNewChatsAction,
+  reviewNewChatAction,
   revokeBlockAction,
   startStoringAction,
   updateExcludedViewersAction,
@@ -418,5 +420,107 @@ export function ChangeOwnerForm(props: { channelId: string; current: string; can
       ) : null}
       <Result state={state} />
     </form>
+  );
+}
+
+export type NewChatRow = {
+  conversationId: string;
+  name: string;
+  detail: string;
+  clients: string[];
+};
+
+/// One row of "שיחות חדשות לבדיקה" (design 9, 5.11.2026): "לשמור" or "לא
+/// לשמור", one click each. A kept chat can be put back on the list; "לא
+/// לשמור" asks first, since a manager's deletes what was kept.
+function NewChatDecision({ row, manager }: { row: NewChatRow; manager: boolean }) {
+  const [state, action, pending] = useActionState(reviewNewChatAction, undefined);
+  const [asking, setAsking] = useState(false);
+  const decided = state?.ok ? state.ok : null;
+  const btn = "min-h-10 whitespace-nowrap rounded-lg border px-3 text-sm disabled:opacity-60";
+  return (
+    <li className={`flex flex-wrap items-center gap-3 px-3 py-2.5 ${decided ? "opacity-70" : ""}`}>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-app-text-primary">
+          <bdi>{row.name}</bdi>
+        </p>
+        <p className="text-xs text-app-text-secondary">{row.detail}</p>
+      </div>
+      {row.clients.length > 0 ? (
+        <span className="rounded-full bg-app-success-soft px-2 py-0.5 text-xs text-app-success">בתיק של {row.clients.join(", ")}</span>
+      ) : null}
+      <form action={action} className="flex flex-wrap items-center gap-2">
+        <input type="hidden" name="conversationId" value={row.conversationId} />
+        {decided ? (
+          <>
+            <span role="status" className="text-xs text-app-text-secondary">
+              {decided}
+            </span>
+            {decided === "נשמרת." ? (
+              <button type="submit" name="decision" value="undo" disabled={pending} className="min-h-10 text-sm text-app-text-primary underline">
+                ביטול
+              </button>
+            ) : null}
+          </>
+        ) : asking ? (
+          <span role="alertdialog" aria-label="לא לשמור" className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-app-text-primary">{manager ? "מה שנשמר מהשיחה יימחק. להמשיך?" : "תישלח בקשה למנהל. להמשיך?"}</span>
+            <button type="submit" name="decision" value="block" disabled={pending} className={`${btn} border-navy bg-navy text-white`}>
+              {pending ? "שומר..." : "כן, לא לשמור"}
+            </button>
+            <button type="button" onClick={() => setAsking(false)} className={`${btn} border-app-border-strong bg-white text-app-text-primary`}>
+              ביטול
+            </button>
+          </span>
+        ) : (
+          <>
+            <button type="submit" name="decision" value="keep" disabled={pending} className={`${btn} border-navy bg-navy text-white`}>
+              לשמור
+            </button>
+            <button type="button" onClick={() => setAsking(true)} disabled={pending} className={`${btn} border-app-border-strong bg-white text-app-text-primary`}>
+              לא לשמור
+            </button>
+          </>
+        )}
+      </form>
+      {state?.error ? (
+        <p role="alert" className="w-full text-sm text-app-error">
+          {state.error}
+        </p>
+      ) : null}
+    </li>
+  );
+}
+
+/// "שיחות חדשות לבדיקה": the chats that began after storing started, with a
+/// decision on each, and "לשמור את כל השאר" for the rest.
+export function NewChatsReview(props: { channelId: string; rows: NewChatRow[]; total: number; manager: boolean }) {
+  const [state, action, pending] = useActionState(keepAllNewChatsAction, undefined);
+  return (
+    <div className="overflow-hidden rounded-xl border border-app-border bg-white">
+      <div className="flex flex-wrap items-center gap-2 border-b border-app-border bg-app-surface-sunken px-3 py-2.5">
+        <h3 className="text-sm font-medium text-app-text-primary">שיחות חדשות לבדיקה</h3>
+        <span className="rounded-full bg-gold px-2 text-xs text-white">{props.total}</span>
+        <p className="w-full text-xs text-app-text-secondary sm:ms-auto sm:w-auto">
+          שיחות שהתחילו אחרי שהשמירה התחילה, ועוד לא הוחלט עליהן. הן נשמרות עד שמחליטים אחרת.
+        </p>
+      </div>
+      <ul className="divide-y divide-app-border">
+        {props.rows.map((r) => (
+          <NewChatDecision key={r.conversationId} row={r} manager={props.manager} />
+        ))}
+      </ul>
+      <form action={action} className="flex flex-wrap items-center gap-3 border-t border-app-border px-3 py-2.5">
+        <input type="hidden" name="channelId" value={props.channelId} />
+        {props.rows.map((r) => (
+          <input key={r.conversationId} type="hidden" name="conversationId" value={r.conversationId} />
+        ))}
+        <button type="submit" disabled={pending} className={secondary}>
+          {pending ? "שומר..." : "לשמור את כל השאר"}
+        </button>
+        {props.total > props.rows.length ? <span className="text-xs text-app-text-secondary">מוצגות {props.rows.length} הראשונות מתוך {props.total}</span> : null}
+        <Result state={state} />
+      </form>
+    </div>
   );
 }

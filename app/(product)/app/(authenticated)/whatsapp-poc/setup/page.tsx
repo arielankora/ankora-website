@@ -8,7 +8,21 @@ import { blockStateFor } from "@/lib/comms/visibility";
 import { commsAccess } from "@/lib/comms/access";
 import { prisma } from "@/lib/prisma";
 import { listChannelPeople, personLabel } from "@/lib/comms/channel-people";
-import { BlockManyForm, ChangeOwnerForm, ConnectForm, DecideForm, ExcludedViewersForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
+import {
+  BlockManyForm,
+  ChangeOwnerForm,
+  ConnectForm,
+  DecideForm,
+  ExcludedViewersForm,
+  LoadHistoryForm,
+  ManualRecordingsForm,
+  NewChatsReview,
+  RevokeForm,
+  StartForm,
+  type NewChatRow,
+  type SetupRow,
+} from "./SetupForms";
+import { listChatsToReview } from "@/lib/comms/new-chats";
 
 // Communications storage (1.11.2026): the WhatsApp numbers connected for
 // storing, each with its "לא לשמור" list before anything is kept, "התחל
@@ -89,6 +103,20 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
       ? await prisma.commsConversation.count({ where: { channelId: channel.id, backfilledAt: { not: null } } })
       : 0;
     const pending = channel.blocks.filter((b) => b.status === "PENDING");
+    // "שיחות חדשות לבדיקה" (design 9): for the owner and the managers.
+    const review = channel.storeEnabled && isOwnerOrManager ? await listChatsToReview(channel) : { chats: [], total: 0 };
+    const reviewRows: NewChatRow[] = review.chats.map((c) => ({
+      conversationId: c.conversationId,
+      name: c.name,
+      detail: [
+        c.isGroup ? "קבוצה" : c.phone ? displayPhone(c.phone) : null,
+        `${c.messages} הודעות`,
+        c.firstAt ? `מאז ${new Intl.DateTimeFormat("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" }).format(new Date(c.firstAt))}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      clients: c.clients,
+    }));
     const active = channel.blocks.filter((b) => b.status === "APPROVED");
     const excludedNames = channel.excludedViewerIds.map((id) => nameOf.get(id) ?? id);
 
@@ -142,6 +170,12 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
             <BlockManyForm channelId={channel.id} rows={rows} />
             <h3 className="pt-2 text-sm font-medium text-app-text-primary">התחלת השמירה</h3>
             <StartForm channelId={channel.id} />
+          </div>
+        ) : null}
+
+        {reviewRows.length > 0 ? (
+          <div id={`review-${channel.id}`}>
+            <NewChatsReview channelId={channel.id} rows={reviewRows} total={review.total} manager={manager} />
           </div>
         ) : null}
 

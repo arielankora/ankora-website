@@ -279,3 +279,61 @@ export async function importManualRecordingsAction(_prev: SetupState | undefined
   });
   return { ok: "הייבוא רץ ברקע, כדקה. ההקלטות יופיעו במסך התקשורת, ויתומללו בריצה הלילית." };
 }
+
+/// "שיחות חדשות לבדיקה" (5.11.2026, Ariel): one decision on a chat that began
+/// after storing started. The number's owner or a manager decides, as for
+/// the block list. "keep" marks it reviewed, "undo" takes that back, and
+/// "block" is the ordinary "לא לשמור" (requestBlock: a manager's deletes
+/// what was kept, anyone else's holds it for a manager).
+export async function reviewNewChatAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const g = await gate();
+  if (g.error) return { error: g.error };
+  const decision = String(formData.get("decision") || "");
+  const conversation = await prisma.commsConversation.findUnique({
+    where: { id: String(formData.get("conversationId") || "") },
+    include: { channel: true },
+  });
+  if (!conversation) return { error: "השיחה לא נמצאה." };
+  if (conversation.channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "רק בעל המספר או מנהל מחליטים." };
+  try {
+    if (decision === "keep" || decision === "undo") {
+      await prisma.commsConversation.update({ where: { id: conversation.id }, data: { reviewedAt: decision === "keep" ? new Date() : null } });
+      // No refresh here: the row stays on screen with "ביטול" until the
+      // next load, so a click by mistake can be taken back.
+      return { ok: decision === "keep" ? "נשמרת." : "חזרה לרשימה." };
+    }
+    if (decision === "block") {
+      const phone = !conversation.isGroup ? conversation.otherPhone : null;
+      const { block } = await requestBlock(g.user, {
+        channelId: conversation.channelId,
+        kind: phone ? "PHONE" : "CHAT",
+        value: phone ?? conversation.externalChatId,
+        label: conversation.name,
+      });
+      await prisma.commsConversation.update({ where: { id: conversation.id }, data: { reviewedAt: new Date() } }).catch(() => undefined);
+      refresh();
+      return { ok: block.status === "APPROVED" ? "לא נשמרת. מה שנשמר ממנה נמחק." : "נשלחה בקשה למנהל. ההודעות מוסתרות עד ההחלטה." };
+    }
+  } catch (err) {
+    if (err instanceof BlockError) return { error: err.message };
+    throw err;
+  }
+  return { error: "החלטה לא מוכרת." };
+}
+
+/// "לשמור את כל השאר": the chats still listed, all kept.
+export async function keepAllNewChatsAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const g = await gate();
+  if (g.error) return { error: g.error };
+  const channel = await prisma.commsChannel.findUnique({ where: { id: String(formData.get("channelId") || "") } });
+  if (!channel) return { error: "המספר לא נמצא." };
+  if (channel.ownerUserId !== g.user.id && !canManageClients(g.user.role)) return { error: "רק בעל המספר או מנהל מחליטים." };
+  const ids = [...new Set(formData.getAll("conversationId").map(String).filter(Boolean))].slice(0, 100);
+  if (ids.length === 0) return { error: "אין שיחות לסמן." };
+  const { count } = await prisma.commsConversation.updateMany({
+    where: { id: { in: ids }, channelId: channel.id, reviewedAt: null },
+    data: { reviewedAt: new Date() },
+  });
+  refresh();
+  return { ok: `${count} שיחות סומנו כנבדקו, וממשיכות להישמר.` };
+}
