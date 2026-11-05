@@ -14,7 +14,8 @@
 // a stranger can knock on.
 //
 // What guarded means: the function's own body calls something in GUARDS, a
-// session check (requireUser) or a credential check (authorizeCronRequest).
+// session check (requireUser) or a credential check (authorizeCronRequest),
+// directly or through a helper function declared in the same file.
 // It does not prove the guard is the *right* one, and it says so in its name:
 // this is the first stage. It answers "did anybody check at all", which is
 // the question a missing guard fails. It does not answer "may THIS role do
@@ -117,6 +118,7 @@ export const PUBLIC = {
   "app/api/mcp/oauth/metadata/protected-resource/route.ts#OPTIONS": "CORS preflight for public metadata",
   "app/api/mcp/oauth/register/route.ts#POST": "RFC 7591 dynamic client registration is open by specification; rate limited per IP",
   "app/api/mcp/oauth/token/route.ts#POST": "the OAuth token endpoint; the authorization code and its PKCE verifier are the credential",
+  "app/api/webhooks/unipile/route.ts#POST": "called by Unipile, not by a person; 503 without UNIPILE_WEBHOOK_SECRET, 401 unless verifyUnipileSignature accepts an HMAC-SHA256 of the raw body under that secret, at most five minutes old",
 };
 
 async function walk(dir) {
@@ -185,10 +187,31 @@ export function entryPoints(source, { route }) {
 
   const fileGuards = [...calledNames(sf)].filter((n) => FILE_GUARDS.includes(n));
 
+  /**
+   * The guards a function reaches: the ones its body calls, plus the ones
+   * reached through a function of the same file that it calls. Added
+   * 5.11.2026 for whatsapp-poc/setup/actions.ts, where seven actions open
+   * with `const g = await gate(); if (g.error) return ...` and gate() is the
+   * one that calls requireUser and checks the role. Only helpers declared in
+   * this file are followed: an imported helper is not read, so a guard behind
+   * an import still has to be named in GUARDS on purpose.
+   */
+  const reached = (fn, seen = new Set()) => {
+    const out = new Set();
+    for (const n of calledNames(fn.body ?? fn)) {
+      if (GUARDS.includes(n)) out.add(n);
+      else if (locals.has(n) && !seen.has(n)) {
+        seen.add(n);
+        for (const g of reached(locals.get(n), seen)) out.add(g);
+      }
+    }
+    return out;
+  };
+
   const rows = [];
   const add = (exported, fn) => {
     if (route && !HTTP_VERBS.has(exported)) return;
-    const found = fn ? [...calledNames(fn.body ?? fn)].filter((n) => GUARDS.includes(n)) : [];
+    const found = fn ? [...reached(fn)] : [];
     rows.push({ name: exported, guards: [...found, ...fileGuards] });
   };
 

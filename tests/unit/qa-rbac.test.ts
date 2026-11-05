@@ -68,6 +68,34 @@ describe("what counts as guarded", () => {
     expect(rows.find((r) => r.name === "open")?.guards).toEqual([]);
   });
 
+  it("credits a guard reached through a helper declared in the same file", () => {
+    const rows = rowsOf(`"use server";
+      async function gate() { const user = await requireUser(); return { user, error: null }; }
+      const outer = async () => gate();
+      export async function a() { const g = await gate(); if (g.error) return g; }
+      export async function b() { return outer(); }`);
+    expect(rows.find((r) => r.name === "a")?.guards).toEqual(["requireUser"]);
+    expect(rows.find((r) => r.name === "b")?.guards).toEqual(["requireUser"]);
+  });
+
+  it("does not credit a helper that guards nothing, nor one that is only imported", () => {
+    const rows = rowsOf(`"use server";
+      import { gate } from "./elsewhere";
+      function refresh() { revalidatePath("/x"); }
+      export async function a() { refresh(); }
+      export async function b() { await gate(); }`);
+    expect(rows.find((r) => r.name === "a")?.guards).toEqual([]);
+    expect(rows.find((r) => r.name === "b")?.guards).toEqual([]);
+  });
+
+  it("survives helpers that call each other", () => {
+    const rows = rowsOf(`"use server";
+      function ping(): unknown { return pong(); }
+      function pong(): unknown { return ping(); }
+      export async function a() { return ping(); }`);
+    expect(rows[0].guards).toEqual([]);
+  });
+
   it("credits a route file that wraps its handler with withMcpAuth, and only that file", () => {
     const wrapped = rowsOf(
       `const authed = withMcpAuth(handler, verify, { required: true });
