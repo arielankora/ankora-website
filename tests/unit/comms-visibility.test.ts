@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { blockStateFor, canSeeConversation, nextExcludedViewers, parseViewerEmails } from "@/lib/comms/visibility";
+import { blockStateFor, canSeeConversation, isExcludedViewer, nextExcludeAll, nextExcludedViewers, parseViewerEmails } from "@/lib/comms/visibility";
 
 // Who sees which stored WhatsApp conversation (spec decisions, 1.11.2026).
 const ariel = { id: "ariel", email: "ariel@ankora.co.il" };
@@ -60,5 +60,32 @@ describe("nextExcludedViewers (5.11.2026)", () => {
 
   it("lets a manager who is not on the list take others off", () => {
     expect(nextExcludedViewers({ channel: arielsNumber, editorId: "anna", picked: [] })).toEqual([]);
+  });
+});
+
+describe("\"כולם\" on a number (5.11.2026)", () => {
+  const closed = { ownerUserId: "ariel", excludedViewerIds: ["hadas"], excludeAllViewers: true };
+
+  it("keeps out everyone but the owner, a full viewer and someone added later too", () => {
+    const clients = [{ id: "c1", accountManagerId: "anna" }];
+    expect(canSeeConversation({ viewer: ariel, channel: closed, clients, fullViewers })).toBe(true);
+    expect(canSeeConversation({ viewer: hadas, channel: closed, clients, fullViewers })).toBe(false);
+    expect(canSeeConversation({ viewer: anna, channel: closed, clients, fullViewers })).toBe(false);
+    expect(isExcludedViewer(closed, "someone-new")).toBe(true);
+    expect(isExcludedViewer(closed, "ariel")).toBe(false);
+  });
+
+  it("is off unless set, and the named list still works", () => {
+    const named = { ownerUserId: "ariel", excludedViewerIds: ["hadas"] };
+    expect(isExcludedViewer(named, "hadas")).toBe(true);
+    expect(isExcludedViewer(named, "anna")).toBe(false);
+  });
+
+  it("lets only the owner turn it off; anyone who may edit may turn it on", () => {
+    expect(nextExcludeAll({ channel: closed, editorId: "ariel", picked: false })).toBe(false);
+    expect(nextExcludeAll({ channel: closed, editorId: "hadas", picked: false })).toBe(true);
+    const open = { ownerUserId: "ariel", excludedViewerIds: [] };
+    expect(nextExcludeAll({ channel: open, editorId: "hadas", picked: true })).toBe(true);
+    expect(nextExcludeAll({ channel: open, editorId: "hadas", picked: false })).toBe(false);
   });
 });

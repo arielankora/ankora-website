@@ -26,7 +26,13 @@ export async function gatherCommsExport(
   const conversations = await prisma.commsConversation.findMany({
     where: {
       OR: [...(phones.length ? [{ otherPhone: { in: phones } }] : []), { groupClientId: clientId }],
-      NOT: { channel: { excludedViewerIds: { has: requester.id } } },
+      // Not from a number this person is kept out of (lib/comms/visibility.ts:
+      // named on its list, or "כולם" on a number that is not theirs).
+      NOT: {
+        channel: {
+          OR: [{ excludedViewerIds: { has: requester.id } }, { excludeAllViewers: true, ownerUserId: { not: requester.id } }],
+        },
+      },
     },
     orderBy: { lastMessageAt: "desc" },
     include: {

@@ -6,7 +6,7 @@ import { recordAudit } from "@/lib/app-auth/audit";
 import { canManageClients } from "@/lib/app-auth/permissions";
 import { commsAccess } from "@/lib/comms/access";
 import { normalizePhone } from "@/lib/contact-normalize";
-import { nextExcludedViewers } from "@/lib/comms/visibility";
+import { nextExcludeAll, nextExcludedViewers } from "@/lib/comms/visibility";
 import { readPocConfig } from "@/lib/whatsapp-poc/unipile";
 import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, startStoring } from "@/lib/comms/whatsapp-store";
 import { transcribeRecording } from "@/lib/comms/call-store";
@@ -84,16 +84,19 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
   }
   const kept = await ineligibleChannelPeople(channel.excludedViewerIds);
   const excludedViewerIds = nextExcludedViewers({ channel, editorId: user.id, picked: [...picked, ...kept.filter((id) => !picked.includes(id))] });
-  await prisma.commsChannel.update({ where: { id: channel.id }, data: { excludedViewerIds } });
+  // "כולם" (5.11.2026): only the owner may turn it off.
+  const excludeAllViewers = nextExcludeAll({ channel, editorId: user.id, picked: formData.get("excludeAll") === "on" });
+  await prisma.commsChannel.update({ where: { id: channel.id }, data: { excludedViewerIds, excludeAllViewers } });
   await recordAudit({
     actorId: user.id,
     action: "comms_channel.excluded_viewers_updated",
     entityType: "CommsChannel",
     entityId: channel.id,
-    before: { excludedViewerIds: channel.excludedViewerIds },
-    after: { excludedViewerIds },
+    before: { excludedViewerIds: channel.excludedViewerIds, excludeAllViewers: channel.excludeAllViewers },
+    after: { excludedViewerIds, excludeAllViewers },
   });
   refresh();
+  if (excludeAllViewers) return { ok: "הרשימה נשמרה. רק בעל המספר רואה את השיחות, גם כשיתווספו אנשים חדשים למערכת." };
   return { ok: excludedViewerIds.length ? "הרשימה נשמרה." : "הרשימה נשמרה. כל מי שיש לו גישה רואה עכשיו את השיחות מהמספר." };
 }
 
