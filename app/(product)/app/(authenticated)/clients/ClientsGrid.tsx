@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { MoreHorizontal } from "lucide-react";
 import { withFrom } from "@/lib/list-back";
+import { clientNameMatches } from "@/lib/client-search";
 import { useToast } from "@/components/app/toast/ToastProvider";
 import { archiveClientAction, restoreClientAction } from "./actions";
 import { startPortalPreviewAction } from "../portal/actions";
@@ -131,9 +132,8 @@ export function ClientsGrid({
   }, [menuFor]);
 
   const filtered = useMemo(() => {
-    const q = query.trim();
-    if (!q) return items;
-    return items.filter((c) => c.name.includes(q));
+    if (!query.trim()) return items;
+    return items.filter((c) => clientNameMatches(c.name, query));
   }, [items, query]);
 
   const fromParam = query.trim() ? new URLSearchParams({ q: query.trim() }).toString() : "";
