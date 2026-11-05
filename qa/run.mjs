@@ -24,6 +24,7 @@ import { preflight, needs } from "./checks/preflight.mjs";
 import { e2e } from "./checks/e2e.mjs";
 import { urlNumbers } from "./checks/boundary.mjs";
 import { newVendors } from "./checks/vendors.mjs";
+import { permissionMatrix } from "./checks/rbac.mjs";
 import { coverage, coverageProviderMissing } from "./checks/coverage.mjs";
 import * as schedule from "./checks/schedule.mjs";
 import { isShard, ALWAYS, shardsFor, splitFor, PLAN, MAIN_SHARD } from "./lib/shards.mjs";
@@ -221,9 +222,20 @@ async function main() {
     newVendors,
   );
 
+  // The reserved `rbac` slot, first stage: every server action and route
+  // handler either calls a guard or is on a list of reasons. Blocking and
+  // level 1 for the same reason as `boundary`: it is a source scan, and a
+  // door added without a lock should fail the pull request that adds it, not
+  // the Sunday hunt after it shipped. See checks/rbac.mjs for what it does not
+  // prove, which is that the guard is the right one for the role.
+  await run.check(
+    "rbac",
+    { label: "Permission matrix", level: 1 },
+    permissionMatrix,
+  );
+
   for (const [id, label, lvl] of [
     ["deps", "Dependency advisories", 2],
-    ["rbac", "Permission matrix", 3],
     ["perf", "Performance budgets", 3],
   ]) {
     await run.check(id, { label, level: lvl, blocking: false, skipIf: async () => "not implemented yet (stage 2)" }, async () => []);
