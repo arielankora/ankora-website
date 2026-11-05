@@ -26,7 +26,7 @@ vi.mock("@/lib/app-auth/session", () => {
 });
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn(), revalidateTag: vi.fn() }));
 
-import { changeChannelOwnerAction, connectChannelAction } from "@/app/(product)/app/(authenticated)/whatsapp-poc/setup/actions";
+import { changeChannelOwnerAction, connectChannelAction, updateExcludedViewersAction } from "@/app/(product)/app/(authenticated)/whatsapp-poc/setup/actions";
 import { listChannelPeople } from "@/lib/comms/channel-people";
 import { commsAccess } from "@/lib/comms/access";
 import { accountForChatFile } from "@/lib/comms/route-access";
@@ -93,6 +93,27 @@ describe("who may own a number, or be on its list", () => {
     const channel = await prisma.commsChannel.findUniqueOrThrow({ where: { accountId: "acc_ok" } });
     expect(channel.ownerUserId).toBe(owner.id);
     expect(channel.excludedViewerIds).toEqual([other.id]);
+  });
+});
+
+describe("editing the excluded list", () => {
+  it("refuses adding someone who is not active, and keeps someone already on it who no longer is", async () => {
+    const { user: manager } = await createTestUser({ role: "ANKORA_ADMIN" });
+    const { user: owner } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: active } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: gone } = await createTestUser({ role: "ANKORA_EMPLOYEE" });
+    const { user: archived } = await createTestUser({ role: "ANKORA_EMPLOYEE", status: "ARCHIVED" });
+    const channel = await prisma.commsChannel.create({ data: { accountId: "acc_e", ownerUserId: owner.id, excludedViewerIds: [gone.id] } });
+    await prisma.user.update({ where: { id: gone.id }, data: { status: "ARCHIVED" } });
+    session.user = manager;
+
+    const refused = await updateExcludedViewersAction(undefined, form({ channelId: channel.id, excluded: [archived.id] }));
+    expect(refused.error).toMatch(/רק משתמשים פעילים/);
+    expect((await prisma.commsChannel.findUniqueOrThrow({ where: { id: channel.id } })).excludedViewerIds).toEqual([gone.id]);
+
+    // The form lists active people only, so `gone` is not sent back, and stays.
+    expect((await updateExcludedViewersAction(undefined, form({ channelId: channel.id, excluded: [active.id] }))).ok).toBeTruthy();
+    expect((await prisma.commsChannel.findUniqueOrThrow({ where: { id: channel.id } })).excludedViewerIds.sort()).toEqual([active.id, gone.id].sort());
   });
 });
 

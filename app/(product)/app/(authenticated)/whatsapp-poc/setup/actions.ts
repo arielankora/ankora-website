@@ -95,6 +95,7 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
   });
   refresh();
   return { ok: excludedViewerIds.length ? "הרשימה נשמרה." : "הרשימה נשמרה. כל מי שיש לו גישה רואה עכשיו את השיחות מהמספר." };
+}
 
 /// "שינוי בעלים" (5.11.2026): a manager moves a connected number to another
 /// person. Anna's number had been connected to an archived user with her name,
