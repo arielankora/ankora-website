@@ -4,7 +4,7 @@ import { blockStateFor, canSeeConversation, parseViewerEmails } from "@/lib/comm
 // Who sees which stored WhatsApp conversation (spec decisions, 1.11.2026).
 const ariel = { id: "ariel", email: "ariel@ankora.co.il" };
 const hadas = { id: "hadas", email: "hadas@ankora.co.il" };
-const anna = { id: "anna", email: "anna@ankora.co.il" };
+const anna = { id: "anna", email: "annam@ankora.co.il" };
 const fullViewers = parseViewerEmails("ariel@ankora.co.il, Hadas@Ankora.co.il");
 
 describe("canSeeConversation", () => {
