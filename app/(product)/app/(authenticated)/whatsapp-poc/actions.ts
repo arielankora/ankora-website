@@ -2,7 +2,9 @@
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/app-auth/session";
 import { recordAudit } from "@/lib/app-auth/audit";
-import { canSendTo, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
+import { canReplyTo, checkMessageText, maskPhone } from "@/lib/whatsapp-poc/access";
+import { blockStateFor } from "@/lib/comms/visibility";
+import { chatPhone } from "@/lib/whatsapp-poc/inbox";
 import { commsAccess } from "@/lib/comms/access";
 import { UnipileError, getChat, readPocConfig, sendText, setReadStatus } from "@/lib/whatsapp-poc/unipile";
 import { ForbiddenError } from "@/lib/app-auth/permissions";
@@ -16,8 +18,14 @@ export type SendState = { error?: string; sent?: boolean };
 
 // Every check is repeated here, not trusted from the screen: the viewer
 // list, the configuration, and above all the recipient. The chat is read
-// back from Unipile and its own number is checked against the send list,
-// so a hand-edited form cannot reach any other chat.
+// back from Unipile through the sender's own account, so a hand-edited form
+// cannot reach a chat on anyone else's number.
+//
+// 5.11.2026 (Ariel): replies are open, one to one and groups, from the
+// person's own number only, with no extra confirmation. Not to a chat or a
+// number on the block list (approved or pending), and not to a chat
+// WhatsApp holds read-only. WHATSAPP_POC_SEND_MODE=test brings the test
+// list back.
 export async function sendPocMessageAction(_prev: SendState | undefined, formData: FormData): Promise<SendState> {
   const user = await requireUser();
   const config = readPocConfig();
@@ -32,10 +40,12 @@ export async function sendPocMessageAction(_prev: SendState | undefined, formDat
   // before it was connected, only by the full viewers.
   const channelId = String(formData.get("channelId") || "");
   let accountId: string | null = null;
+  let blockChannelId: string | null = null;
   if (channelId) {
     const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
     if (!channel || channel.ownerUserId !== user.id) return { error: "אפשר לשלוח רק מהמספר שלך." };
     accountId = channel.accountId;
+    blockChannelId = channel.id;
   } else if (access.full && config.accountId && !(await prisma.commsChannel.findUnique({ where: { accountId: config.accountId } }))) {
     accountId = config.accountId;
   }
@@ -47,8 +57,16 @@ export async function sendPocMessageAction(_prev: SendState | undefined, formDat
 
   try {
     const chat = await getChat(unipile, chatId);
-    if (!chat || chat.type !== "1to1" || !canSendTo(chat.phone, config.sendTo)) {
-      return { error: "שליחה מותרת רק למספרים שברשימת הבדיקה." };
+    if (!chat) return { error: "השיחה לא נמצאה במספר שלך." };
+    if (chat.readOnly) return { error: "WhatsApp לא מאפשר לכתוב בשיחה הזו (למשל קבוצה שרק מנהלים כותבים בה)." };
+    if (!canReplyTo(chat, config.sendMode, config.sendTo)) {
+      return { error: config.sendMode === "test" ? "השליחה במצב בדיקה: רק למספרים שברשימת הבדיקה." : "אפשר לשלוח רק לשיחה אישית או לקבוצה." };
+    }
+    if (blockChannelId) {
+      const blocks = await prisma.commsBlock.findMany({ where: { channelId: blockChannelId }, select: { kind: true, value: true, status: true } });
+      if (blockStateFor(blocks, { phone: chatPhone(chat), chatId: chat.id }) !== "none") {
+        return { error: "השיחה ברשימת \"לא לשמור\", ולכן לא שולחים אליה מכאן." };
+      }
     }
     await sendText(unipile, chat.id, checked.text);
     await recordAudit({
@@ -58,7 +76,7 @@ export async function sendPocMessageAction(_prev: SendState | undefined, formDat
       entityId: chat.id,
       // The length, not the text: the audit log is not a second copy of
       // the conversation.
-      after: { to: maskPhone(chat.phone), length: checked.text.length },
+      after: { to: chat.type === "group" ? "קבוצה" : maskPhone(chat.phone), length: checked.text.length },
     });
   } catch (err) {
     if (err instanceof UnipileError) return { error: err.message };

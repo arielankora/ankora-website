@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
+  canReplyTo,
   canSendTo,
   canViewWhatsappPoc,
   checkMessageText,
   maskPhone,
   parseEmailList,
   parsePhoneList,
+  parseSendMode,
   MAX_MESSAGE_LENGTH,
 } from "@/lib/whatsapp-poc/access";
 import { UnipileError, loadMergedChats, resetChatListCache, CHAT_LIST_FRESH_MS, CHAT_LIST_MAX_AGE_MS, mergeChats, type PocChat, parseOffset, isHiddenChat, toPocChat, toPocMessage, whatsappAddress } from "@/lib/whatsapp-poc/unipile";
@@ -34,6 +36,40 @@ describe("WhatsApp POC: who may see the screen", () => {
 
   it("drops entries that are not addresses", () => {
     expect(parseEmailList("ariel@ankora.co.il, *, @ankora.co.il")).toEqual(["ariel@ankora.co.il"]);
+  });
+});
+
+describe("Replies (5.11.2026): open by default, the test list as a kill switch", () => {
+  const list = parsePhoneList("+972541234567");
+  const one = { type: "1to1", phone: "+972501111111" };
+  const group = { type: "group", phone: null };
+
+  it("reads the mode: only \"test\" closes it", () => {
+    expect(parseSendMode(undefined)).toBe("open");
+    expect(parseSendMode("")).toBe("open");
+    expect(parseSendMode(" TEST ")).toBe("test");
+    expect(parseSendMode("tset")).toBe("open");
+  });
+
+  it("answers any one to one chat and any group when open", () => {
+    expect(canReplyTo(one, "open", list)).toBe(true);
+    expect(canReplyTo(group, "open", list)).toBe(true);
+    expect(canReplyTo({ type: "channel", phone: null }, "open", list)).toBe(false);
+  });
+
+  it("goes back to the test list, one to one only, in test mode", () => {
+    expect(canReplyTo(one, "test", list)).toBe(false);
+    expect(canReplyTo({ type: "1to1", phone: "+972541234567" }, "test", list)).toBe(true);
+    expect(canReplyTo(group, "test", list)).toBe(false);
+  });
+
+  it("never writes to a chat WhatsApp holds read-only", () => {
+    expect(canReplyTo({ ...group, readOnly: true }, "open", list)).toBe(false);
+  });
+
+  it("reads Unipile's read-only flag", () => {
+    expect(toPocChat({ id: "g@g.us", type: "group", is_readonly: true } as never)?.readOnly).toBe(true);
+    expect(toPocChat({ id: "a@lid", type: "1to1" } as never)?.readOnly).toBeUndefined();
   });
 });
 
