@@ -119,6 +119,7 @@
     "VERCEL_GIT_COMMIT_SHA": "Vercel",
     "VERCEL_OIDC_TOKEN": "Vercel",
     "VERCEL_URL": "Vercel",
+    "WHATSAPP_POC_SEND_MODE": null,
     "WHATSAPP_POC_SEND_TO": null,
     "WHATSAPP_POC_VIEWERS": null
   }

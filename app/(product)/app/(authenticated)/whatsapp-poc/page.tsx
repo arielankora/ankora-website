@@ -6,7 +6,7 @@ import type { StoredTranscript } from "@/lib/comms/stored-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
-import { canSendTo } from "@/lib/whatsapp-poc/access";
+import { canReplyTo } from "@/lib/whatsapp-poc/access";
 import { canSeeCall, commsAccess } from "@/lib/comms/access";
 import { storedCallLine } from "@/lib/comms/call-lines";
 import { chatsWithPhone, findChat, loadMessages, loadWhatsapp, lookupAccounts, type ChannelInfo, type PageMessage } from "@/lib/comms/inbox-loader";
@@ -507,11 +507,21 @@ export default async function CommunicationsPage(props: {
   const callById = new Map(contactCalls.map((c) => [c.emailId, c]));
   const contactName = owner?.personName ?? openRow?.name ?? chat?.name ?? selectedPhone ?? "";
   // A reply goes out only from the person's own number (or, for the full
-  // viewers, the configured number before it was connected), and only to a
-  // test number.
+  // viewers, the configured number before it was connected). 5.11.2026: to
+  // any one to one chat or group, unless WHATSAPP_POC_SEND_MODE is "test".
   const replyAs =
     chat && chatInfo && (chatInfo.ownerUserId === user.id || (chatInfo.id === null && access.full)) ? chatInfo : null;
-  const mayReply = chat !== null && replyAs !== null && chat.type === "1to1" && canSendTo(chat.phone, config.sendTo);
+  const mayReply = chat !== null && replyAs !== null && canReplyTo(chat, config.sendMode, config.sendTo);
+  // Why there is no reply box, in words.
+  const noReplyReason = !chat
+    ? ""
+    : chat.readOnly
+      ? "WhatsApp לא מאפשר לכתוב בשיחה הזו."
+      : replyAs === null
+        ? `אפשר לענות רק מהמספר שלך. השיחה הזו על המספר של ${chatInfo?.label || "מישהו אחר"}.`
+        : config.sendMode === "test"
+          ? "השליחה במצב בדיקה: רק לשיחה אישית עם מספר שברשימת הבדיקה."
+          : "אפשר לענות רק בשיחה אישית או בקבוצה.";
 
   const accessible = isOpen || filter === "call" ? await listAccessibleClients(user) : [];
   const clientOptions = accessible.map((c) => ({ id: c.id, name: c.name }));
@@ -548,7 +558,7 @@ export default async function CommunicationsPage(props: {
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
-          <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. שליחה רק למספרי הבדיקה.</p>
+          <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. עונים מהמספר שלכם.</p>
           <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
             שמירת שיחות WhatsApp: מספרים ורשימת חסימה
           </Link>
@@ -862,11 +872,11 @@ export default async function CommunicationsPage(props: {
                 {chat ? (
                   mayReply ? (
                     <div className="bg-white">
-                      <SendForm chatId={chat.id} channelId={replyAs?.id ?? ""} />
+                      <SendForm key={`send-${chat.id}`} chatId={chat.id} channelId={replyAs?.id ?? ""} group={chat.type === "group"} />
                     </div>
                   ) : (
                     <p className="border-t border-app-border bg-white p-4 text-xs text-app-text-secondary">
-                      בשלב הבדיקה: שליחה רק לשיחה אישית עם מספר שברשימת הבדיקה.
+                      {noReplyReason}
                     </p>
                   )
                 ) : selectedPhone && waReady ? (

@@ -1,6 +1,6 @@
 import "server-only";
 import { afterResponse } from "@/lib/after-response";
-import { parseEmailList, parsePhoneList } from "./access";
+import { parseEmailList, parsePhoneList, parseSendMode, type SendMode } from "./access";
 
 // WhatsApp POC (31.10.2026): a thin, read-mostly client for the Unipile v2
 // API. Nothing is stored: every screen load reads the chats live, so the
@@ -11,7 +11,8 @@ import { parseEmailList, parsePhoneList } from "./access";
 //   the one WhatsApp account below (Unipile v2 "Scopes").
 // - UNIPILE_WHATSAPP_ACCOUNT_ID: "acc_...".
 // - WHATSAPP_POC_VIEWERS: addresses that may open the screen.
-// - WHATSAPP_POC_SEND_TO: the only numbers a message may be sent to.
+// - WHATSAPP_POC_SEND_TO: the test numbers, used only when
+//   WHATSAPP_POC_SEND_MODE is "test" (5.11.2026: replies are open by default).
 // Missing values leave the screen in a "not configured" state; they never
 // fall back to something wider.
 
@@ -23,6 +24,7 @@ export type PocConfig = {
   accountId: string | null;
   viewers: string[];
   sendTo: string[];
+  sendMode: SendMode;
   /// Stage 2: the aloha@ mailbox as a Unipile account ("acc_...").
   mailAccountId: string | null;
   /// Stage 2: Ankora's own number on the Aloha line, to tell incoming
@@ -47,6 +49,7 @@ export function readPocConfig(): PocConfig {
     accountId: accountIdFrom(process.env.UNIPILE_WHATSAPP_ACCOUNT_ID),
     viewers: parseEmailList(process.env.WHATSAPP_POC_VIEWERS),
     sendTo: parsePhoneList(process.env.WHATSAPP_POC_SEND_TO),
+    sendMode: parseSendMode(process.env.WHATSAPP_POC_SEND_MODE),
     mailAccountId: accountIdFrom(process.env.ALOHA_UNIPILE_ACCOUNT_ID),
     lineNumber: parsePhoneList(process.env.ALOHA_LINE_NUMBER)[0] ?? null,
     lineNumbers: parsePhoneList(process.env.ALOHA_LINE_NUMBER),
@@ -66,6 +69,9 @@ export type PocChat = {
   unreadCount: number;
   lastMessageAt: string | null;
   lastMessagePreview: string | null;
+  /// Unipile's is_readonly: WhatsApp will not take a message here (an
+  /// announcement group where only admins write, for one).
+  readOnly?: boolean;
   /// A stored group a person assigned to a client (CommsConversation.groupClientId).
   groupClient?: { id: string; name: string } | null;
 };
@@ -160,6 +166,7 @@ type RawChat = {
   name?: unknown;
   type?: unknown;
   unread_count?: unknown;
+  is_readonly?: unknown;
   last_message_timestamp?: unknown;
   last_message?: { text?: unknown } | null;
   user?: { public_identifier?: unknown; display_name?: unknown } | null;
@@ -181,6 +188,7 @@ export function toPocChat(raw: RawChat): PocChat | null {
     unreadCount: typeof raw.unread_count === "number" ? raw.unread_count : 0,
     lastMessageAt: str(raw.last_message_timestamp),
     lastMessagePreview: str(raw.last_message?.text),
+    ...(raw.is_readonly === true ? { readOnly: true } : {}),
   };
 }
 

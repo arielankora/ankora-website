@@ -6,11 +6,12 @@
 // screen is limited to an explicit list of addresses (Ariel and Hadas),
 // and an empty list means nobody, never everybody.
 //
-// Sending is narrower still. A message leaves only to a number on an
-// explicit list, and the number is read from the chat Unipile returns,
-// never from the form. That keeps the POC inside the rule that tests go
-// only to Ariel or Hadas, and inside the rule of 25.9.2026 that nothing
-// reaches a client without a person choosing to send it.
+// Sending: until 5.11.2026 a message left only to a number on an explicit
+// test list. Since then (Ariel's decision) replies are open, from the
+// person's own number, to one to one chats and groups; the test list
+// remains as a kill switch (canReplyTo). The chat is always read back from
+// Unipile, never from the form, and a message is still only ever sent by a
+// person pressing "שליחה" (the rule of 25.9.2026).
 import type { UserRole } from "@prisma/client";
 import { normalizeEmail, normalizePhone } from "@/lib/contact-normalize";
 
@@ -63,6 +64,28 @@ export function canSendTo(publicIdentifier: string | null | undefined, allowlist
   const phone = normalizePhone(publicIdentifier);
   if (!phone || !phone.startsWith("+")) return false;
   return allowlist.includes(phone);
+}
+
+/// 5.11.2026 (Ariel): replies are open. Whoever owns a number answers its
+/// chats, one to one and groups, from that number. WHATSAPP_POC_SEND_MODE
+/// set to "test" brings back the test list (WHATSAPP_POC_SEND_TO) as a kill
+/// switch, without a code change; anything else, or nothing, is open.
+export type SendMode = "open" | "test";
+
+export function parseSendMode(raw: string | undefined | null): SendMode {
+  return raw?.trim().toLowerCase() === "test" ? "test" : "open";
+}
+
+/// Whether a chat may be answered under the mode. The sender's ownership of
+/// the number, and the block list, are checked by the caller.
+export function canReplyTo(
+  chat: { type: string; phone: string | null; readOnly?: boolean },
+  mode: SendMode,
+  allowlist: readonly string[],
+): boolean {
+  if (chat.readOnly) return false;
+  if (mode === "test") return chat.type === "1to1" && canSendTo(chat.phone, allowlist);
+  return chat.type === "1to1" || chat.type === "group";
 }
 
 export type MessageTextCheck = { ok: true; text: string } | { ok: false; error: string };

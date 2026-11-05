@@ -3,7 +3,7 @@ import { useActionState, useEffect, useRef } from "react";
 import { sendPocMessageAction, type SendState } from "./actions";
 import { MAX_MESSAGE_LENGTH } from "@/lib/whatsapp-poc/access";
 
-export function SendForm({ chatId, channelId }: { chatId: string; channelId: string }) {
+export function SendForm({ chatId, channelId, group = false }: { chatId: string; channelId: string; group?: boolean }) {
   const [state, action, pending] = useActionState<SendState | undefined, FormData>(sendPocMessageAction, undefined);
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -16,7 +16,7 @@ export function SendForm({ chatId, channelId }: { chatId: string; channelId: str
       <input type="hidden" name="chatId" value={chatId} />
       <input type="hidden" name="channelId" value={channelId} />
       <label htmlFor="poc-text" className="block text-xs font-medium text-app-text-secondary">
-        הודעה (נשלחת מהמספר שלך, רק למספרי בדיקה)
+        {group ? "תשובה לקבוצה (נשלחת מהמספר שלך לכל המשתתפים)" : "תשובה (נשלחת מהמספר שלך)"}
       </label>
       <textarea
         id="poc-text"
