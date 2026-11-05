@@ -5,6 +5,7 @@ import { ContactRail, ReadToggle, RememberFilters, RowPending, TimelineScroller 
 import { ScrollToActive } from "./ScrollToActive";
 import { BlockButton } from "./setup/SetupForms";
 import { searchStoredMessages, type MessageHit, type StoredTranscript } from "@/lib/comms/stored-chats";
+import { countChatsToReview } from "@/lib/comms/new-chats";
 import { requireUser } from "@/lib/app-auth/session";
 import { Forbidden } from "@/components/app/Forbidden";
 import { listAccessibleClients } from "@/lib/app-domain/clients";
@@ -638,6 +639,12 @@ export default async function CommunicationsPage(props: {
   });
 
   const callsTable = filter === "call" && !isOpen;
+  // "שיחות חדשות לבדיקה" (design 9): on the numbers this person decides on.
+  const toReview = (
+    await Promise.all(
+      wa.channels.filter((c) => c.storeEnabled && (c.ownerUserId === user.id || access.manager)).map((c) => countChatsToReview(c)),
+    )
+  ).reduce((a, b) => a + b, 0);
   const openTargets = readTargets(openChats.length > 0 ? openChats.map((c) => c.id) : chat ? [chat.id] : []);
   const openUnread = openRow ? isUnread(openRow) : (chat?.unreadCount ?? 0) !== 0;
 
@@ -746,9 +753,20 @@ export default async function CommunicationsPage(props: {
         <div>
           <h1 className="text-xl font-medium text-app-text-primary">תקשורת עם לקוחות</h1>
           <p className="mt-0.5 hidden text-sm text-app-text-secondary sm:block">WhatsApp ושיחות טלפון במקום אחד. עונים מהמספר שלכם.</p>
-          <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
-            שמירת שיחות WhatsApp: מספרים ורשימת חסימה
-          </Link>
+          <div className="flex flex-wrap items-center gap-x-3">
+            <Link prefetch={false} href="/app/whatsapp-poc/setup" className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
+              שמירת שיחות WhatsApp: מספרים ורשימת חסימה
+            </Link>
+            {toReview > 0 ? (
+              <Link
+                prefetch={false}
+                href="/app/whatsapp-poc/setup"
+                className="inline-flex min-h-9 items-center rounded-full border border-app-warning bg-app-warning-soft px-3 text-[13px] font-medium text-app-warning"
+              >
+                {toReview === 1 ? "שיחה חדשה אחת לבדיקה" : `${toReview} שיחות חדשות לבדיקה`}
+              </Link>
+            ) : null}
+          </div>
         </div>
         {/* On a phone the box folds away, so the list starts near the top. */}
         <details className="w-full sm:hidden" open={badPhone || undefined}>

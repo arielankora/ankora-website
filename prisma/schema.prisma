@@ -4472,6 +4472,10 @@ model CommsConversation {
   /// When its history was read once (the first load, or after a block
   /// was lifted). Null: still to do.
   backfilledAt   DateTime?
+  /// "שיחות חדשות לבדיקה" (Ariel, 5.11.2026): when the number's owner or a
+  /// manager decided "לשמור" on a conversation that began after storing
+  /// started. Null: not decided yet (lib/comms/new-chats.ts).
+  reviewedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
