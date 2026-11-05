@@ -7,7 +7,8 @@ import { UnipileError, listWhatsappAccounts, loadMergedChats, type PocChat } fro
 import { blockStateFor } from "@/lib/comms/visibility";
 import { commsAccess } from "@/lib/comms/access";
 import { prisma } from "@/lib/prisma";
-import { BlockManyForm, ConnectForm, DecideForm, ExcludedViewersForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
+import { listChannelPeople, personLabel } from "@/lib/comms/channel-people";
+import { BlockManyForm, ChangeOwnerForm, ConnectForm, DecideForm, ExcludedViewersForm, LoadHistoryForm, ManualRecordingsForm, RevokeForm, StartForm, type SetupRow } from "./SetupForms";
 
 // Communications storage (1.11.2026): the WhatsApp numbers connected for
 // storing, each with its "לא לשמור" list before anything is kept, "התחל
@@ -31,16 +32,20 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
 
   const channels = await prisma.commsChannel.findMany({
     where: manager || access.full ? {} : { ownerUserId: user.id },
-    include: { owner: { select: { name: true } }, blocks: { orderBy: { requestedAt: "desc" } } },
+    include: { owner: { select: { name: true, email: true } }, blocks: { orderBy: { requestedAt: "desc" } } },
     orderBy: { createdAt: "asc" },
   });
 
-  const people = await prisma.user.findMany({
-    where: { deletedAt: null, role: { not: "CLIENT_USER" } },
-    select: { id: true, name: true, email: true },
-    orderBy: { name: "asc" },
-  });
-  const nameOf = new Map(people.map((p) => [p.id, p.name ?? p.email]));
+  // Only people who can sign in may own a number or be on its "מי לא יראה"
+  // list (lib/comms/channel-people.ts), each shown with their email, since
+  // two people can share a name (5.11.2026: two "Anna Kozlov").
+  const people = (await listChannelPeople()).map((p) => ({ id: p.id, name: personLabel(p) }));
+  // Names of people already on a list, whatever their status now.
+  const listedIds = [...new Set(channels.flatMap((c) => c.excludedViewerIds))];
+  const listed = listedIds.length
+    ? await prisma.user.findMany({ where: { id: { in: listedIds } }, select: { id: true, name: true, email: true } })
+    : [];
+  const nameOf = new Map(listed.map((p) => [p.id, personLabel(p)]));
 
   // Accounts the API key reaches, not connected yet, for the connect form.
   let accounts: Array<{ id: string; name: string }> = [];
@@ -90,13 +95,19 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
     sections.push(
       <section key={channel.id} className="space-y-4 rounded-2xl border border-app-border bg-white p-4">
         <div className="space-y-1 text-sm text-app-text-primary">
-          <h2 className="text-base font-medium">המספר של {channel.owner.name}</h2>
+          <h2 className="text-base font-medium">
+            המספר של {channel.owner.name}{" "}
+            <span dir="ltr" className="text-sm font-normal text-app-text-secondary">
+              ({channel.owner.email})
+            </span>
+          </h2>
           <p>מצב: {channel.storeEnabled ? "נשמר" : "עוד לא נשמר"}.</p>
           {isOwnerOrManager ? (
             <ExcludedViewersForm
               channelId={channel.id}
-              people={people.filter((p) => p.id !== channel.ownerUserId).map((p) => ({ id: p.id, name: p.name ?? p.email }))}
+              people={people.filter((p) => p.id !== channel.ownerUserId)}
               excluded={channel.excludedViewerIds}
+              labels={Object.fromEntries(channel.excludedViewerIds.map((id) => [id, nameOf.get(id) ?? id]))}
               locked={channel.ownerUserId !== user.id && channel.excludedViewerIds.includes(user.id) ? [user.id] : []}
             />
           ) : excludedNames.length ? (
@@ -105,6 +116,13 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
           {channel.storeEnabled ? <p className="text-app-text-secondary">היסטוריה: נטענו {loaded} שיחות. ההמשך נטען בריצה הלילית, או עכשיו:</p> : null}
         </div>
         {channel.storeEnabled && isOwnerOrManager ? <LoadHistoryForm channelId={channel.id} /> : null}
+        {manager ? (
+          <ChangeOwnerForm
+            channelId={channel.id}
+            current={personLabel(channel.owner)}
+            candidates={people.filter((p) => p.id !== channel.ownerUserId)}
+          />
+        ) : null}
 
         {!channel.storeEnabled && isOwnerOrManager ? (
           <div className="space-y-3">
@@ -208,8 +226,8 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
         <ConnectForm
           accounts={accounts}
           manualAccount={accounts.length === 0}
-          people={people.filter((p) => p.id !== user.id || manager).map((p) => ({ id: p.id, name: p.name ?? p.email }))}
-          owners={manager ? people.map((p) => ({ id: p.id, name: p.name ?? p.email })) : null}
+          people={people.filter((p) => p.id !== user.id || manager)}
+          owners={manager ? people : null}
           selfId={user.id}
         />
       </section>

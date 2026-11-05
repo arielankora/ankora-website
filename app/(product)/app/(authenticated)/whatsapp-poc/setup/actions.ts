@@ -12,6 +12,7 @@ import { BlockError, backfillChannel, decideBlock, requestBlock, revokeBlock, st
 import { transcribeRecording } from "@/lib/comms/call-store";
 import { importManualRecordings } from "@/lib/comms/manual-import";
 import { afterResponse } from "@/lib/after-response";
+import { CHANNEL_PERSON_WHERE, ineligibleChannelPeople, personLabel } from "@/lib/comms/channel-people";
 import { prisma } from "@/lib/prisma";
 
 export type SetupState = { error?: string; ok?: string };
@@ -38,13 +39,17 @@ export async function connectChannelAction(_prev: SetupState | undefined, formDa
   const accountId = String(formData.get("accountId") || "").trim();
   if (!/^acc_[A-Za-z0-9]+$/.test(accountId)) return { error: "מזהה חשבון לא תקין (acc_...)." };
   const ownerUserId = manager ? String(formData.get("ownerUserId") || user.id) : user.id;
-  const owner = await prisma.user.findFirst({ where: { id: ownerUserId, deletedAt: null, role: { not: "CLIENT_USER" } }, select: { id: true } });
-  if (!owner) return { error: "הבעלים לא נמצא." };
+  // The owner sees every conversation on the number, so it has to be someone
+  // who can sign in (lib/comms/channel-people.ts).
+  const owner = await prisma.user.findFirst({ where: { ...CHANNEL_PERSON_WHERE, id: ownerUserId }, select: { id: true } });
+  if (!owner) return { error: "אפשר לבחור כבעלים רק משתמש פעיל במערכת." };
   if (await prisma.commsChannel.findUnique({ where: { accountId } })) return { error: "המספר הזה כבר מחובר." };
-  const excluded = formData.getAll("excluded").map(String).filter((id) => id && id !== ownerUserId);
-  const valid = await prisma.user.findMany({ where: { id: { in: excluded }, deletedAt: null }, select: { id: true } });
+  const excluded = [...new Set(formData.getAll("excluded").map(String).filter((id) => id && id !== ownerUserId))];
+  if ((await ineligibleChannelPeople(excluded)).length > 0) {
+    return { error: "ברשימת \"מי לא יראה\" אפשר לסמן רק משתמשים פעילים במערכת." };
+  }
   const channel = await prisma.commsChannel.create({
-    data: { accountId, ownerUserId, excludedViewerIds: valid.map((u) => u.id) },
+    data: { accountId, ownerUserId, excludedViewerIds: excluded },
   });
   await recordAudit({
     actorId: user.id,
@@ -68,9 +73,17 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
   if (!channel) return { error: "המספר לא נמצא." };
   const isOwner = channel.ownerUserId === user.id;
   if (!isOwner && !canManageClients(user.role)) return { error: "אין הרשאה." };
-  const picked = formData.getAll("excluded").map(String).slice(0, 300);
-  const valid = await prisma.user.findMany({ where: { id: { in: picked }, deletedAt: null }, select: { id: true } });
-  const excludedViewerIds = nextExcludedViewers({ channel, editorId: user.id, picked: valid.map((u) => u.id) });
+  const picked = [...new Set(formData.getAll("excluded").map(String).filter(Boolean))].slice(0, 300);
+  // Only active people may be added (lib/comms/channel-people.ts). Someone
+  // already on the list who is no longer active is not in the form, and stays
+  // on the list: taking them off would let them see the number if they come
+  // back.
+  const added = picked.filter((id) => !channel.excludedViewerIds.includes(id));
+  if ((await ineligibleChannelPeople(added)).length > 0) {
+    return { error: "ברשימת \"מי לא יראה\" אפשר לסמן רק משתמשים פעילים במערכת." };
+  }
+  const kept = await ineligibleChannelPeople(channel.excludedViewerIds);
+  const excludedViewerIds = nextExcludedViewers({ channel, editorId: user.id, picked: [...picked, ...kept.filter((id) => !picked.includes(id))] });
   await prisma.commsChannel.update({ where: { id: channel.id }, data: { excludedViewerIds } });
   await recordAudit({
     actorId: user.id,
@@ -82,6 +95,48 @@ export async function updateExcludedViewersAction(_prev: SetupState | undefined,
   });
   refresh();
   return { ok: excludedViewerIds.length ? "הרשימה נשמרה." : "הרשימה נשמרה. כל מי שיש לו גישה רואה עכשיו את השיחות מהמספר." };
+}
+
+/// "שינוי בעלים" (5.11.2026): a manager moves a connected number to another
+/// person. Anna's number had been connected to an archived user with her name,
+/// and the only way to fix it was by hand in the database, with nothing in the
+/// audit log. The new owner has to meet the same rule as at connecting, and is
+/// taken off the number's "מי לא יראה" list if they were on it (the owner sees
+/// every conversation). Conversations already stored and the block list stay
+/// as they are. Nothing is cached per person: commsAccess reads the owned
+/// numbers on every request, so the change takes effect on the next page load.
+export async function changeChannelOwnerAction(_prev: SetupState | undefined, formData: FormData): Promise<SetupState> {
+  const user = await requireUser();
+  if (!canManageClients(user.role)) return { error: "רק מנהל יכול לשנות בעלים של מספר." };
+  const channelId = String(formData.get("channelId") || "");
+  const newOwnerId = String(formData.get("ownerUserId") || "");
+  const channel = await prisma.commsChannel.findUnique({ where: { id: channelId } });
+  if (!channel) return { error: "המספר לא נמצא." };
+  if (!newOwnerId) return { error: "לא נבחר בעלים חדש." };
+  if (channel.ownerUserId === newOwnerId) return { error: "זה כבר הבעלים של המספר." };
+  const newOwner = await prisma.user.findFirst({ where: { ...CHANNEL_PERSON_WHERE, id: newOwnerId }, select: { name: true, email: true } });
+  if (!newOwner) return { error: "אפשר לבחור כבעלים רק משתמש פעיל במערכת." };
+
+  const before = { ownerUserId: channel.ownerUserId, excludedViewerIds: channel.excludedViewerIds };
+  const excludedViewerIds = channel.excludedViewerIds.filter((id) => id !== newOwnerId);
+  // Only if nobody changed the owner in between (two managers at once).
+  const { count } = await prisma.commsChannel.updateMany({
+    where: { id: channel.id, ownerUserId: channel.ownerUserId },
+    data: { ownerUserId: newOwnerId, excludedViewerIds },
+  });
+  if (count === 0) return { error: "הבעלים של המספר השתנה בינתיים. רעננו את הדף ונסו שוב." };
+  await recordAudit({
+    actorId: user.id,
+    action: "comms_channel.owner_changed",
+    entityType: "CommsChannel",
+    entityId: channel.id,
+    before,
+    after: { ownerUserId: newOwnerId, excludedViewerIds },
+  });
+  refresh();
+  return {
+    ok: `הבעלים של המספר עכשיו ${personLabel(newOwner)}. השיחות שכבר נשמרו ורשימת החסימה לא השתנו.`,
+  };
 }
 
 function target(formData: FormData): { kind: "PHONE" | "CHAT"; value: string; label: string | null } | null {
