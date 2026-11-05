@@ -13,7 +13,15 @@ import { normalizeEmail } from "@/lib/contact-normalize";
 //     filtered where messages are read, not here.
 
 export type ViewerLike = { id: string; email: string };
-export type ChannelLike = { ownerUserId: string; excludedViewerIds: string[] };
+export type ChannelLike = { ownerUserId: string; excludedViewerIds: string[]; excludeAllViewers?: boolean };
+
+/// Whether this person is kept out of the number's conversations: named on
+/// its list, or anyone but the owner when "כולם" is on (5.11.2026). The
+/// owner is never kept out of their own number.
+export function isExcludedViewer(channel: ChannelLike, viewerId: string): boolean {
+  if (viewerId === channel.ownerUserId) return false;
+  return Boolean(channel.excludeAllViewers) || channel.excludedViewerIds.includes(viewerId);
+}
 export type ConversationClient = { id: string; accountManagerId: string | null };
 
 export function parseViewerEmails(raw: string | undefined | null): string[] {
@@ -30,7 +38,7 @@ export function canSeeConversation(input: {
   fullViewers: string[];
 }): boolean {
   const { viewer, channel } = input;
-  if (channel.excludedViewerIds.includes(viewer.id)) return false;
+  if (isExcludedViewer(channel, viewer.id)) return false;
   if (channel.ownerUserId === viewer.id) return true;
   const email = normalizeEmail(viewer.email);
   if (email && input.fullViewers.includes(email)) return true;
@@ -45,6 +53,14 @@ export function nextExcludedViewers(input: { channel: ChannelLike; editorId: str
   const next = new Set(input.picked.filter((id) => id && id !== channel.ownerUserId));
   if (editorId !== channel.ownerUserId && channel.excludedViewerIds.includes(editorId)) next.add(editorId);
   return [...next];
+}
+
+/// "כולם" after an edit: only the owner may turn it off. Anyone else who may
+/// edit the list may turn it on (it keeps them out too), but not off, since
+/// it keeps them out as well.
+export function nextExcludeAll(input: { channel: ChannelLike; editorId: string; picked: boolean }): boolean {
+  if (input.editorId === input.channel.ownerUserId) return input.picked;
+  return input.picked || Boolean(input.channel.excludeAllViewers);
 }
 
 export type BlockLike = { kind: "PHONE" | "CHAT"; value: string; status: "PENDING" | "APPROVED" | "REJECTED" | "REVOKED" };

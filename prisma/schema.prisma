@@ -4439,6 +4439,10 @@ model CommsChannel {
   /// says (Ariel, 1.11.2026: Hadas does not see conversations from his
   /// number, not even with her own clients).
   excludedViewerIds String[]  @default([])
+  /// "כולם" (Ariel, 5.11.2026): nobody but the owner sees this number's
+  /// conversations, including people added to the system later. The
+  /// names in excludedViewerIds are kept, so turning it off brings them back.
+  excludeAllViewers Boolean   @default(false)
   /// Nothing is stored until the owner has gone through the block list
   /// and pressed "התחל לשמור".
   storeEnabled      Boolean   @default(false)

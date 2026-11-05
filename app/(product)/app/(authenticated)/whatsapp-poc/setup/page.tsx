@@ -109,7 +109,11 @@ export default async function CommsSetupPage(props: { searchParams: Promise<{ st
               excluded={channel.excludedViewerIds}
               labels={Object.fromEntries(channel.excludedViewerIds.map((id) => [id, nameOf.get(id) ?? id]))}
               locked={channel.ownerUserId !== user.id && channel.excludedViewerIds.includes(user.id) ? [user.id] : []}
+              excludeAll={channel.excludeAllViewers}
+              allLocked={channel.ownerUserId !== user.id}
             />
+          ) : channel.excludeAllViewers ? (
+            <p className="text-app-text-secondary">לא רואים שיחות מהמספר: כולם חוץ מבעל המספר.</p>
           ) : excludedNames.length ? (
             <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {excludedNames.join(", ")}.</p>
           ) : null}
