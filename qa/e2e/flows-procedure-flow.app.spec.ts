@@ -6,6 +6,7 @@ import { test, expect } from "./fixtures";
 // mail to the client waits for a second pair of eyes instead.
 //
 // @covers action:(product)/app/(authenticated)/clients/process-actions
+// @covers screen:/app/clients/[clientId]/processes/[processId]/flow
 
 test.describe.configure({ timeout: 180_000 });
 

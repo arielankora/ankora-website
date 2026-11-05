@@ -4,6 +4,9 @@ import { test, expect } from "./fixtures";
 // client's connections screen, as the seeded admin. A mailbox connected by
 // app password shows up with who handed it over, and a disconnect removes
 // it. The Google round trip needs a real OAuth client and is not run here.
+//
+// @covers action:(product)/app/(authenticated)/clients/[clientId]/connections/actions
+// @covers screen:/app/clients/[clientId]/connections
 
 test.describe.configure({ timeout: 120_000 });
 
