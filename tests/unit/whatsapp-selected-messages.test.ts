@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   MAX_SELECTED_MESSAGES,
+  MAX_STEP_TITLE,
+  MAX_STEPS_FROM_MESSAGES,
   formatSelectedMessages,
   parseSelectedMessages,
+  parseStepLines,
   proposeSelectedTitle,
+  proposeStepText,
 } from "@/lib/whatsapp-poc/selected-messages";
 import { checkPortalNote, MAX_PORTAL_NOTE_LENGTH } from "@/lib/task-portal-note-text";
 
@@ -109,5 +113,26 @@ describe("checkPortalNote", () => {
   it("refuses an empty or too long note", () => {
     expect(checkPortalNote("   ").ok).toBe(false);
     expect(checkPortalNote("א".repeat(MAX_PORTAL_NOTE_LENGTH + 1)).ok).toBe(false);
+  });
+});
+
+describe("messages as steps (5.11.2026)", () => {
+  it("proposes the message's text as one line, the transcript for a voice message, and nothing for an image alone", () => {
+    expect(proposeStepText({ text: "  בן קווסקין\n- קשרים לתעשייה ", transcript: null })).toBe("בן קווסקין - קשרים לתעשייה");
+    expect(proposeStepText({ text: "", transcript: "לחזור אליו\nביום ראשון" })).toBe("לחזור אליו ביום ראשון");
+    expect(proposeStepText({ text: "", transcript: null })).toBe("");
+    expect(proposeStepText({ text: "א".repeat(500), transcript: null })).toHaveLength(MAX_STEP_TITLE);
+  });
+
+  it("reads the step lines the dialog sent, dropping empty and malformed ones", () => {
+    expect(parseStepLines(JSON.stringify(["  לתאם פגישה\n עם אמיר ", "", 7, "בן קווסקין"]))).toEqual(["לתאם פגישה עם אמיר", "בן קווסקין"]);
+    expect(parseStepLines("not json")).toEqual([]);
+    expect(parseStepLines(null)).toEqual([]);
+    expect(parseStepLines(JSON.stringify({ a: 1 }))).toEqual([]);
+  });
+
+  it("lets the caller see a list over the cap instead of cutting it silently", () => {
+    const many = Array.from({ length: MAX_STEPS_FROM_MESSAGES + 5 }, (_, i) => `שלב ${i}`);
+    expect(parseStepLines(JSON.stringify(many)).length).toBeGreaterThan(MAX_STEPS_FROM_MESSAGES);
   });
 });

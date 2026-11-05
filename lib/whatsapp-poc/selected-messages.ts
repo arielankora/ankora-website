@@ -135,3 +135,47 @@ export function formatSelectedMessages(input: {
 export function proposeSelectedTitle(contactName: string, phone: string | null): string {
   return `מעקב: שיחה עם ${contactName.trim() || phone || "איש קשר"}`;
 }
+
+// Messages as steps (5.11.2026, option B on Claude Design, chosen by
+// Ariel): each marked message is proposed as one step line, the person
+// edits, unticks, reorders or adds lines in the dialog, and only the
+// ticked lines are sent. The comment with the full messages stays.
+
+/// Steps one save creates. The same cap as the MCP tools that add steps
+/// (lib/mcp/task-extra-tools.ts), so a task gets no more lines from a
+/// conversation than from any other single request.
+export const MAX_STEPS_FROM_MESSAGES = 15;
+/// A step is a task, and a task title is capped at 200 (createTask).
+export const MAX_STEP_TITLE = 200;
+
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+/// The line a message proposes as a step: its text, or a voice message's
+/// transcript. Empty for a message with nothing to read (an image alone),
+/// which the dialog shows unticked. Time and sender are left out: they
+/// stay in the comment.
+export function proposeStepText(m: Pick<SelectedMessage, "text" | "transcript">): string {
+  const text = oneLine(m.text) || oneLine(m.transcript ?? "");
+  return text.slice(0, MAX_STEP_TITLE);
+}
+
+/// What the dialog sent as steps: a JSON list of lines. Lines are made one
+/// line each, empty ones dropped. More than the cap is refused by the
+/// caller rather than cut here, so nobody loses a step without being told.
+export function parseStepLines(raw: unknown): string[] {
+  if (raw === null || raw === undefined || raw === "") return [];
+  let data: unknown;
+  try {
+    data = typeof raw === "string" ? JSON.parse(raw) : raw;
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(data)) return [];
+  return data
+    .slice(0, MAX_STEPS_FROM_MESSAGES + 1)
+    .filter((v): v is string => typeof v === "string")
+    .map((v) => oneLine(v).slice(0, MAX_STEP_TITLE))
+    .filter(Boolean);
+}

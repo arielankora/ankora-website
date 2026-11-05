@@ -13,9 +13,11 @@ import { checkPortalNote } from "@/lib/task-portal-note-text";
 import { fetchMessageAttachment } from "@/lib/whatsapp-poc/voice-notes";
 import {
   MAX_FILED_IMAGES,
+  MAX_STEPS_FROM_MESSAGES,
   formatSelectedMessages,
   isImageFile,
   parseSelectedMessages,
+  parseStepLines,
   proposeSelectedTitle,
 } from "@/lib/whatsapp-poc/selected-messages";
 import { prisma } from "@/lib/prisma";
@@ -29,6 +31,12 @@ import { prisma } from "@/lib/prisma";
 // a document hidden from the client, and, only when the person wrote one
 // and the task is visible to the client, one line for the portal. The
 // text of the messages never reaches the client.
+//
+// 5.11.2026 (option B, chosen by Ariel): the lines the person kept in the
+// dialog's step list become steps of the task, in the order they left
+// them, after any steps it already has. Steps are internal, like every
+// step. The comment with the full messages can be turned off only when
+// there are steps, so a save never leaves the messages nowhere.
 
 export type AttachTaskOption = { id: string; title: string; status: string; clientVisible: boolean };
 
@@ -52,7 +60,7 @@ export async function listTasksForMessagesAction(input: { clientId: string; q?: 
 
 export type AttachState = {
   error?: string;
-  done?: { taskId: string; title: string; created: boolean; images: number; portalLine: boolean };
+  done?: { taskId: string; title: string; created: boolean; images: number; portalLine: boolean; steps: number; comment: boolean };
   /// What did not go through while the rest did (an image Drive refused,
   /// a portal line on a task that is not visible).
   warnings?: string[];
@@ -81,6 +89,9 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
   const wantPortalLine = formData.get("portalLineOn") === "on";
   const portalLine = wantPortalLine ? checkPortalNote(formData.get("portalLine")) : null;
   if (portalLine && !portalLine.ok) return { error: portalLine.error };
+  const steps = parseStepLines(formData.get("steps"));
+  if (steps.length > MAX_STEPS_FROM_MESSAGES) return { error: `עד ${MAX_STEPS_FROM_MESSAGES} שלבים בפעם אחת.` };
+  const keepComment = steps.length === 0 || formData.get("keepComment") === "on";
 
   // The task: checked against the person's own clients before anything is
   // written, so a hand-edited form cannot reach another client's task.
@@ -162,11 +173,31 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
     }
   }
 
-  const body = formatSelectedMessages({ contactName, phone, messages, filedImages: filed, maxLength: MAX_COMMENT_LENGTH });
-  try {
-    await addTaskComment(user, task.id, body);
-  } catch (err) {
-    return { error: `ההערה לא נשמרה: ${err instanceof Error ? err.message : "שגיאה"}` };
+  // One at a time through createTask, like a template's steps: every rule
+  // a step obeys (open parent, same client, not itself a step) lives there.
+  let stepsAdded = 0;
+  for (const title of steps) {
+    try {
+      await createTask(user, { clientId: task.clientId, title, parentId: task.id });
+      stepsAdded++;
+    } catch (err) {
+      warnings.push(
+        `נוספו ${stepsAdded} מתוך ${steps.length} שלבים. השאר לא נוספו: ${err instanceof Error ? err.message : "שגיאה"}`,
+      );
+      break;
+    }
+  }
+
+  // Without steps that went through, the comment is the only place the
+  // messages land, so it is written even when the person turned it off.
+  const commentWritten = keepComment || stepsAdded === 0;
+  if (commentWritten) {
+    const body = formatSelectedMessages({ contactName, phone, messages, filedImages: filed, maxLength: MAX_COMMENT_LENGTH });
+    try {
+      await addTaskComment(user, task.id, body);
+    } catch (err) {
+      return { error: `ההערה לא נשמרה: ${err instanceof Error ? err.message : "שגיאה"}` };
+    }
   }
 
   let portalAdded = false;
@@ -191,12 +222,12 @@ export async function attachSelectedMessagesAction(_prev: AttachState | undefine
     entityType: "Task",
     entityId: task.id,
     clientId: task.clientId,
-    after: { messages: messages.length, images: filed.size, created, portalLine: portalAdded },
+    after: { messages: messages.length, images: filed.size, created, portalLine: portalAdded, steps: stepsAdded, comment: commentWritten },
   });
 
   revalidatePath(`/app/tasks/${task.id}`);
   return {
-    done: { taskId: task.id, title: task.title, created, images: filed.size, portalLine: portalAdded },
+    done: { taskId: task.id, title: task.title, created, images: filed.size, portalLine: portalAdded, steps: stepsAdded, comment: commentWritten },
     warnings: warnings.length ? [...new Set(warnings)] : undefined,
   };
 }
