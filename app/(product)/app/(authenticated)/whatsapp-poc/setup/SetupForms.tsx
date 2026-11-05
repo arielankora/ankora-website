@@ -133,15 +133,23 @@ export function ExcludedViewersForm(props: {
   locked: string[];
   /// Name and email of everyone already on the list, active or not.
   labels?: Record<string, string>;
+  /// "כולם" (5.11.2026): nobody but the owner, people added later too.
+  excludeAll?: boolean;
+  /// Only the owner may turn "כולם" off.
+  allLocked?: boolean;
 }) {
   const [state, action, pending] = useActionState(updateExcludedViewersAction, undefined);
   const [editing, setEditing] = useState(false);
+  const [all, setAll] = useState(Boolean(props.excludeAll));
   const nameOf = new Map([...Object.entries(props.labels ?? {}), ...props.people.map((p) => [p.id, p.name] as [string, string])]);
   const names = props.excluded.map((id) => nameOf.get(id) ?? id);
   if (!editing) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <p className="text-app-text-secondary">לא רואים שיחות מהמספר: {names.length ? `${names.join(", ")}.` : "אין אף אחד."}</p>
+        <p className="text-app-text-secondary">
+          לא רואים שיחות מהמספר:{" "}
+          {props.excludeAll ? "כולם חוץ מבעל המספר, גם מי שיתווסף בעתיד." : names.length ? `${names.join(", ")}.` : "אין אף אחד."}
+        </p>
         <button type="button" onClick={() => setEditing(true)} className="inline-flex min-h-11 items-center text-sm text-app-text-primary underline">
           עריכה
         </button>
@@ -160,10 +168,24 @@ export function ExcludedViewersForm(props: {
       <input type="hidden" name="channelId" value={props.channelId} />
       <fieldset className="space-y-1">
         <legend className="text-sm font-medium text-app-text-primary">מי לא יראה אף שיחה מהמספר הזה, גם לא עם לקוחות שלו</legend>
+        <label className="flex min-h-11 items-center gap-2 border-b border-app-border pb-1 text-sm font-medium text-app-text-primary">
+          <input
+            type="checkbox"
+            name="excludeAll"
+            checked={all}
+            onChange={(e) => setAll(e.target.checked)}
+            disabled={props.allLocked && all}
+            className="size-5"
+          />
+          {props.allLocked && all ? <input type="hidden" name="excludeAll" value="on" /> : null}
+          כולם חוץ מבעל המספר (גם מי שיתווסף למערכת בעתיד)
+          {props.allLocked && all ? <span className="text-xs font-normal text-app-text-secondary">(רק בעל המספר יכול לבטל)</span> : null}
+        </label>
+        {all ? <p className="text-xs text-app-text-secondary">כל עוד &quot;כולם&quot; מסומן, אין צורך לסמן אנשים. הסימונים למטה נשמרים, ויחזרו לפעול אם מבטלים את &quot;כולם&quot;.</p> : null}
         {props.people.map((p) => {
           const locked = props.locked.includes(p.id);
           return (
-            <label key={p.id} className="flex min-h-11 items-center gap-2 text-sm text-app-text-primary">
+            <label key={p.id} className={`flex min-h-11 items-center gap-2 text-sm text-app-text-primary ${all ? "opacity-60" : ""}`}>
               <input type="checkbox" name="excluded" value={p.id} defaultChecked={props.excluded.includes(p.id)} disabled={locked} className="size-5" />
               {locked ? <input type="hidden" name="excluded" value={p.id} /> : null}
               {p.name}
